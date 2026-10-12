@@ -16,6 +16,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/Button";
+import { Icon } from "../../components/Icon";
 import { chatsDelete, chatsList, chatsRename, type ConversationListRow } from "../../lib/chats";
 import { formatRelativeTime } from "../../lib/relative-time";
 
@@ -69,6 +70,33 @@ const ROW_TITLE: CSSProperties = {
   whiteSpace: "nowrap",
   fontSize: "var(--text-base)",
   color: "var(--fg-1)",
+};
+
+/** The target glyph, so a row states what the conversation is about. */
+const TARGET: CSSProperties = {
+  flex: "none",
+  display: "inline-flex",
+  color: "var(--fg-3)",
+};
+
+/** The three-dot trigger: only what the primitive does not already do, which is
+ *  the 44px touch floor every tap target here keeps and the width it gives back
+ *  to the title. */
+const MENU_TRIGGER: CSSProperties = {
+  flex: "none",
+  width: 44,
+  height: 44,
+  padding: 0,
+};
+
+/** The menu: a bordered panel under the trigger, not a second sheet. */
+const MENU: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  background: "var(--bg-2)",
+  overflow: "hidden",
 };
 
 const ROW_META: CSSProperties = {
@@ -136,6 +164,8 @@ export function AiHistorySheet({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Which row's three-dot menu is open (myne-md/myne#848). */
+  const [menuId, setMenuId] = useState<string | null>(null);
   /**
    * The hub's filter (myne-md/myne#771 task 14).
    *
@@ -328,7 +358,37 @@ export function AiHistorySheet({
                   data-testid="ai.conversation-row"
                   data-conversation-id={row.id}
                   data-active={row.id === activeId ? "true" : undefined}
-                  style={ROW}
+                  /* **The whole row is the target** (myne-md/myne#848), as a
+                     touch convenience rather than as the control: the CONTROL is
+                     the title button inside it, and the row also holds the
+                     three-dot trigger and its menu, so making the row itself a
+                     `role="button"` would be a control inside a control and
+                     would swallow those buttons' labels into the row's name.
+                     This is `ViewsSheet`'s shape (and the note row's), and the
+                     file is exempt in
+                     `tests/a11y-tappable.test.tsx::NOT_CONTROLS` with that
+                     reason. Rename and delete moved behind the three-dot
+                     trigger: four controls on every line is most of a 390px
+                     screen, and the list stopped reading as titles. */
+                  onClick={() => {
+                    // **A click inside the rename or delete branch is not a row
+                    // choice** (myne-md/myne#848): it bubbles here, and opening
+                    // the conversation would close the sheet mid-rename. The
+                    // buttons in those branches stop propagation on their own;
+                    // this is the row's own guard, so the branch's text does not
+                    // need four more.
+                    if (renamingId === row.id || deletingId === row.id) return;
+                    onOpen(row.id);
+                  }}
+                  style={{
+                    ...ROW,
+                    // The menu is a child of this row, so the row has to be able
+                    // to wrap for it to land BELOW the title line rather than
+                    // beside it.
+                    flexWrap: "wrap",
+                    cursor: "pointer",
+                    background: row.id === activeId ? "var(--bg-2)" : "transparent",
+                  }}
                 >
                   {renamingId === row.id ? (
                     <>
@@ -348,7 +408,10 @@ export function AiHistorySheet({
                         type="button"
                         data-testid="ai.conversation-rename-confirm"
                         aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
-                        onClick={() => void commitRename(row.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void commitRename(row.id);
+                        }}
                         style={SMALL_BUTTON}
                       >
                         {t("editor.chrome.rightPanel.aiChat.historyRename")}
@@ -377,7 +440,10 @@ export function AiHistorySheet({
                       <button
                         type="button"
                         data-testid="ai.conversation-delete-cancel"
-                        onClick={() => setDeletingId(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingId(null);
+                        }}
                         style={SMALL_BUTTON}
                       >
                         {t("editor.chrome.rightPanel.aiChat.historyCancel")}
@@ -385,18 +451,59 @@ export function AiHistorySheet({
                     </>
                   ) : (
                     <>
+                      {/* What the conversation is about, as a glyph with an
+                          accessible name: the same three kinds the desktop hub
+                          draws. A conversation carries at most one anchor. */}
+                      <span
+                        // **`role="img"`** (myne-md/myne#848): an `aria-label` on a
+                        // bare span is prohibited and axe drops the name with it,
+                        // which is the same fix the desktop twin carries.
+                        role="img"
+                        aria-label={
+                          row.folder !== undefined && row.folder !== ""
+                            ? t("agent.hub.targetFolder")
+                            : row.note_id !== undefined && row.note_id !== ""
+                              ? t("agent.hub.targetNote")
+                              : t("agent.hub.targetVault")
+                        }
+                        data-testid="ai.conversation-target"
+                        data-target={
+                          row.folder !== undefined && row.folder !== ""
+                            ? "folder"
+                            : row.note_id !== undefined && row.note_id !== ""
+                              ? "note"
+                              : "vault"
+                        }
+                        style={TARGET}
+                      >
+                        <Icon
+                          name={
+                            row.folder !== undefined && row.folder !== ""
+                              ? "folder"
+                              : row.note_id !== undefined && row.note_id !== ""
+                                ? "file-text"
+                                : "message-square"
+                          }
+                          size={16}
+                        />
+                      </span>
                       <button
                         type="button"
                         data-testid="ai.conversation-open"
-                        onClick={() => onOpen(row.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpen(row.id);
+                        }}
                         style={{ ...ROW_TITLE, textAlign: "left", cursor: "pointer" }}
                       >
                         {row.title}
                       </button>
                       {row.note_id !== undefined && row.note_id !== "" ? (
-                        // The anchor, as the shared chiplet the desktop hub
-                        // uses. What makes "about this note" legible in a list
-                        // where every other row is about the vault.
+                        // **The anchored row's chip, kept beside the glyph**
+                        // (myne-md/myne#848). The glyph says the KIND for every
+                        // row; the chip carries the note id the caller uses to
+                        // open it, and it is what the user reads as "about this
+                        // note" rather than as "about something".
                         <span
                           className="myne-chiplet"
                           data-testid="ai.conversation-anchor"
@@ -408,33 +515,61 @@ export function AiHistorySheet({
                       <span style={ROW_META}>
                         {formatRelativeTime(new Date(row.updated_at))}
                       </span>
+                      <Button
+                        variant="ghost"
+                        full={false}
+                        data-testid="ai.conversation-menu"
+                        aria-label={t("agent.hub.menu")}
+                        aria-expanded={menuId === row.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenamingId(null);
+                          setDeletingId(null);
+                          setMenuId(menuId === row.id ? null : row.id);
+                        }}
+                        style={MENU_TRIGGER}
+                      >
+                        <Icon name="more-horizontal" size={18} />
+                      </Button>
+                    </>
+                  )}
+                  {menuId === row.id ? (
+                    <div
+                      data-testid="ai.conversation-menu-list"
+                      style={{ ...MENU, flexBasis: "100%", marginTop: "var(--space-1)" }}
+                      // **A tap inside the menu is not a tap on the row.** The
+                      // row opens the conversation on click, so every control
+                      // that sits inside it has to stop the event or choosing
+                      // Rename would also open the conversation behind the menu.
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         type="button"
                         data-testid="ai.conversation-rename"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
                         onClick={() => {
                           setDeletingId(null);
+                          setMenuId(null);
                           setDraft(row.title);
                           setRenamingId(row.id);
                         }}
-                        style={SMALL_BUTTON}
+                        style={{ ...SMALL_BUTTON, textAlign: "left" }}
                       >
                         {t("editor.chrome.rightPanel.aiChat.historyRename")}
                       </button>
                       <button
                         type="button"
                         data-testid="ai.conversation-delete"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyDelete")}
                         onClick={() => {
                           setRenamingId(null);
+                          setMenuId(null);
                           setDeletingId(row.id);
                         }}
-                        style={SMALL_BUTTON}
+                        style={{ ...DELETE_CONFIRM_BUTTON, textAlign: "left" }}
                       >
                         {t("editor.chrome.rightPanel.aiChat.historyDelete")}
                       </button>
-                    </>
-                  )}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -115,7 +115,12 @@ const INPUT: CSSProperties = {
   // the hairline inside the 52 whatever the theme sets them to.
   boxSizing: "border-box",
   minHeight: 52,
-  maxHeight: 140,
+  // **Five lines, and then it scrolls** (myne-md/myne#848), the same rule as the
+  // desktop composer. Written as `5 × leading × 1em` rather than as a px ceiling
+  // because the leading here is the `--leading-normal` token (1.5), not the
+  // desktop's literal 1.4, a number copied across would be five lines on one
+  // client and four and a half on the other, and nothing would say so.
+  maxHeight: "calc(5 * var(--leading-normal) * 1em)",
   padding: "var(--space-2)",
   border: "1px solid var(--line-2)",
   borderRadius: "var(--radius-1)",
@@ -536,7 +541,15 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
     if (verdict === null || !verdict.passed) return;
     setDraft("");
     setAsked(task);
-    beginRun();
+    // **`null`, deliberately** (myne-md/myne#848). The shared run store records
+    // which conversation a run belongs to so a settle can land in the right one
+    // after the user navigates away; this flow does not bind a conversation at
+    // send time (mobile's transcript is its own module, not the shared
+    // `chatStore`), and `null` is the documented value for "there is no
+    // conversation to bind". It is NOT the same as an empty string: the store's
+    // settle path reads it to decide whether to fall back to the live transcript,
+    // which is exactly what this client wants.
+    beginRun(null);
     // Captured BEFORE the await, which is the whole contract of the epoch: a
     // reply that lands after the user locked the vault, switched vault or
     // started another run must be dropped rather than repopulate the store.

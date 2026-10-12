@@ -43,7 +43,7 @@ afterEach(() => clearAgent());
 
 describe("openRun", () => {
   it("gives the surface the run id while the run is still working", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     expect(getAgent().view).toBeNull();
 
@@ -57,7 +57,7 @@ describe("openRun", () => {
   });
 
   it("is dropped when the user let go of the run while it was in flight", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     // A vault lock, a vault switch, or "New chat": every one of them bumps the
     // epoch, and the host's channel message is still on its way.
@@ -68,9 +68,9 @@ describe("openRun", () => {
   });
 
   it("is dropped when a SECOND run started while the first was in flight", () => {
-    beginRun();
+    beginRun(null);
     const first = currentRunEpoch();
-    beginRun();
+    beginRun(null);
 
     expect(openRun(VIEW, first)).toBe(false);
     expect(getAgent().view).toBeNull();
@@ -81,7 +81,7 @@ describe("openRun", () => {
   });
 
   it("does not settle the run: the step that follows still writes the end", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
 
@@ -112,7 +112,7 @@ describe("resumeRun", () => {
     // nothing and the second press raced the first. A run that has been
     // resumed is not awaiting anything, which is what `running: true` beside
     // it already claimed.
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     openRun(VIEW, epoch);
     settleStep(

@@ -26,7 +26,7 @@
 //! mechanically reversible rewrite. An agent edit is neither, so the snapshot is
 //! added **here**, at this call site, rather than by changing that path.
 
-use super::edit::{apply_edit, ProposedEdit};
+use super::edit::{apply_edit, EditKind, ProposedEdit};
 use super::error::{AgentError, EditRejection};
 use super::frontmatter::{edit_moves_note, folder_of};
 use super::hide::edit_hides_note;
@@ -311,18 +311,35 @@ pub async fn apply_approved(
         };
         match apply_edit(body, edit) {
             Ok(next) => {
-                // The folder lock, and it runs BEFORE the removal carve-out
-                // because it is the stricter of the two: it refuses under every
-                // approval label, where that one refuses only inside a bulk.
-                // Checked on the RESULT for the same reason the carve-out is.
+                // The folder rule, in two arms, and the split is what the move
+                // verb bought.
                 //
-                // What it closes: the SYNC-14 clamp twenty lines up read
-                // `folder:` off the note as it stands BEFORE this loop, and
-                // nothing re-read it afterwards. An anchored edit spanning that
-                // line could therefore move a note into an excluded
-                // folder with no control seeing it, and the removal roster does
-                // not carry the field.
-                if edit_moves_note(body, &next) {
+                // An anchored edit may still not move a note, and it is still
+                // checked on the RESULT: the SYNC-14 clamp twenty lines up read
+                // `folder:` off the note as it stands BEFORE this loop, nothing
+                // re-read it afterwards, and the removal roster does not carry
+                // the field. This arm refuses under every approval label, because
+                // no user act makes an agent-chosen folder move correct while the
+                // destination is hidden inside replacement text.
+                //
+                // The move verb is the opposite case: its destination IS the
+                // edit's field, so the same clamp can read where the note lands.
+                // That is the whole reason the verb exists rather than the lock
+                // being deleted.
+                if edit.kind == EditKind::Move {
+                    // ENTERING an excluded folder. Leaving one is refused
+                    // earlier and unconditionally by `excluded_note` above, which
+                    // drops the body of any note whose CURRENT folder is
+                    // excluded, so the two halves together are the clamp.
+                    if folder_matches_excluded(&folder_of(&next), &excluded_now) {
+                        outcome.refused.push(RefusedEdit {
+                            note_id: edit.note_id.clone(),
+                            index: *index,
+                            reason: EditRejection::MoveIntoExcludedFolder,
+                        });
+                        continue;
+                    }
+                } else if edit_moves_note(body, &next) {
                     outcome.refused.push(RefusedEdit {
                         note_id: edit.note_id.clone(),
                         index: *index,
@@ -1110,6 +1127,127 @@ mod tests {
             assert_eq!(out.applied, 1, "{anchor}");
             assert!(out.refused.is_empty(), "{anchor}");
         }
+    }
+
+    // ---- the move verb, through the whole apply path --------------------
+    //
+    // The clamp lives HERE rather than in `edit.rs` because it needs the excluded
+    // set, which only the apply path holds. These four configurations are the
+    // task's acceptance criteria, and the two refused ones are what go red when
+    // the clamp is deleted: a permitted-to-permitted move applied under either
+    // is what a clamp-less implementation would do, so only the refusals
+    // distinguish a working clamp from a missing one.
+
+    fn move_edit(note: &str, folder: &str) -> ProposedEdit {
+        ProposedEdit {
+            note_id: note.into(),
+            kind: EditKind::Move,
+            anchor: String::new(),
+            replacement: folder.into(),
+        }
+    }
+
+    #[test]
+    fn a_move_between_two_permitted_folders_lands_on_disk() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[("a", &note_with("title: T\nfolder: Work"))], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[move_edit("a", "Projects")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 1);
+        assert!(out.refused.is_empty());
+        assert!(
+            disk.read_back("a").contains("folder: Projects"),
+            "{}",
+            disk.read_back("a")
+        );
+    }
+
+    /// The direction the lock never covered, and the one the verb bought its
+    /// clamp for: the destination is an excluded folder.
+    #[test]
+    fn a_move_into_an_excluded_folder_is_refused_and_writes_nothing() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = note_with("title: T\nfolder: Work");
+        let disk = Disk::with(&[("a", &before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[move_edit("a", "Private")],
+            &[],
+            &["Private/".to_string()],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused.len(), 1);
+        assert_eq!(out.refused[0].reason, EditRejection::MoveIntoExcludedFolder);
+        assert_eq!(disk.read_back("a"), before, "the note is byte-identical");
+    }
+
+    /// And the mirror: leaving an excluded folder. Refused by the pre-batch
+    /// clamp, which reads the note's CURRENT folder, hence a different cause.
+    #[test]
+    fn a_move_out_of_an_excluded_folder_is_refused_too() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = note_with("title: T\nfolder: Private");
+        let disk = Disk::with(&[("a", &before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[move_edit("a", "Work")],
+            &[],
+            &["Private/".to_string()],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused[0].reason, EditRejection::ExcludedNow);
+        assert_eq!(disk.read_back("a"), before);
+    }
+
+    /// The direction a clamp written as "refuse any folder change" would get
+    /// wrong: a destination that canonicalises to the folder the note is already
+    /// in. It is refused, but under its own cause, and nothing is written.
+    #[test]
+    fn a_move_to_the_same_folder_is_its_own_cause_not_an_exclusion() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = note_with("title: T\nfolder: Work");
+        let disk = Disk::with(&[("a", &before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[move_edit("a", "work/")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused[0].reason, EditRejection::MoveToSameFolder);
+        assert_eq!(disk.read_back("a"), before);
     }
 
     // ---- the removal carve-out -----------------------------------------

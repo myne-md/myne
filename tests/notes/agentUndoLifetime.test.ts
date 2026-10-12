@@ -64,7 +64,7 @@ function state() {
 describe("the undo offer's lifetime", () => {
   it("survives a second run being started", () => {
     setUndoable(RUN, currentRunEpoch());
-    beginRun();
+    beginRun(null);
     // Starting a run is not applying one. The host still holds the record, and
     // before this the surface stopped offering it.
     expect(state().undoable).toEqual(RUN);
@@ -98,7 +98,7 @@ describe("the undo offer's lifetime", () => {
 // epoch the reply simply landed afterwards and put that plaintext back.
 describe("a step that lands after the vault was left", () => {
   it("is dropped rather than repopulating the store", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     // The lock happens while the host is still working.
     clearAgentForLock();
@@ -109,20 +109,20 @@ describe("a step that lands after the vault was left", () => {
 
   it("still applies when no vault-leaving event happened", () => {
     // Non-vacuity: the guard must not be rejecting everything.
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     expect(settleStep(STEP, epoch)).toBe(true);
     expect(state().view?.runId).toBe("r2");
   });
 
   it("is dropped when the user starts a new conversation mid-run", () => {
-    // The case with no host-side remedy: `beginRun()` nulls `view` and only a
+    // The case with no host-side remedy: `beginRun(null)` nulls `view` and only a
     // settled step sets it, so for the whole first leg the run is working and
     // has no id to cancel with. Without the bump in `clearAgent` the reply
     // landed afterwards, put the proposal's verbatim anchors back, and made
     // `AgentReviewTakeover`'s derived `reviewable` true: a full-screen review
     // of a conversation the user had just deleted.
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     clearAgent();
     expect(settleStep(STEP, epoch)).toBe(false);
@@ -164,18 +164,18 @@ describe("a step that lands after the vault was left", () => {
 // user's text left the device.
 describe("a second run invalidates the first run's in-flight legs", () => {
   it("drops the first run's step after a second run has started", () => {
-    beginRun();
+    beginRun(null);
     const first = currentRunEpoch();
-    beginRun();
+    beginRun(null);
     expect(settleStep(STEP, first)).toBe(false);
   });
 
   it("leaves the second run's counters untouched by the first run's step", () => {
     // The assertion that matters is the STATE, not the return value: a version
     // that returned false and wrote anyway would satisfy the case above.
-    beginRun();
+    beginRun(null);
     const first = currentRunEpoch();
-    beginRun();
+    beginRun(null);
     const second = currentRunEpoch();
     settleStep({ ...STEP, iterations: 7, notesRead: 5, charsOffDevice: 4000 }, first);
     expect(state().iterations).toBe(0);
@@ -188,7 +188,7 @@ describe("a second run invalidates the first run's in-flight legs", () => {
   });
 
   it("still lets the run that is actually live settle", () => {
-    beginRun();
+    beginRun(null);
     expect(settleStep(STEP, currentRunEpoch())).toBe(true);
     expect(state().view).toEqual(STEP.view);
   });
@@ -213,7 +213,7 @@ const APPLY = {
 
 describe("an apply outcome that lands after the vault was left", () => {
   it("is dropped rather than written into the store", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
     clearAgentForLock();
     expect(settleApply(APPLY, [0], epoch)).toBe(false);
@@ -222,15 +222,15 @@ describe("an apply outcome that lands after the vault was left", () => {
   });
 
   it("is dropped after a second run has started", () => {
-    beginRun();
+    beginRun(null);
     const epoch = currentRunEpoch();
-    beginRun();
+    beginRun(null);
     expect(settleApply(APPLY, [0], epoch)).toBe(false);
     expect(state().applied).toBeNull();
   });
 
   it("lands while the run it belongs to is still the live one", () => {
-    beginRun();
+    beginRun(null);
     expect(settleApply(APPLY, [0], currentRunEpoch())).toBe(true);
     expect(state().applied?.notesWritten).toEqual(["n1"]);
     expect(state().appliedEdits.has(0)).toBe(true);

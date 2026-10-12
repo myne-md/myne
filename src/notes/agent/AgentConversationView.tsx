@@ -103,7 +103,14 @@ export function AgentConversationView({
       </div>
       <ConversationSurface
         testId="agent.focus-surface"
+        surface="agent"
         openNoteId={noteId}
+        // **This view IS the anchored session** (myne-md/myne#848): it was
+        // opened from a note, or started on the focused one, so the composer
+        // pins its scope and shows no picker. The light panel does NOT pass
+        // this: there the note is whatever the editor has open beside the box,
+        // and changing the scope for one message is the idiom.
+        anchoredNoteId={noteId}
         {...(folders === undefined ? {} : { folders })}
         {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
         {...(onRunUndone === undefined ? {} : { onRunUndone })}

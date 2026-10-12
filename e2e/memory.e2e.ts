@@ -43,7 +43,15 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
 async function openComposer(session: Session): Promise<void> {
   await runPaletteAction(session, "ai.open-chat", "chat");
   await session.waitForElement(testIdSelector("ai.composer"), { timeoutMs: 15_000 });
-  await session.waitForElement(testIdSelector("ai.composer-scope-current"), {
+  // **`ai.composer-scope`, which is the trigger itself** (myne-md/myne#848).
+  // This waited on `ai.composer-scope-current`, a caption that no longer exists
+  // anywhere in the tree, so every scenario using this helper timed out at 5s
+  // inside `openComposer`, which is the failure this comment block records
+  // happening once already (myne-md/myne#596). The gate has to be something the
+  // composer ALWAYS renders: the count caption would be the stronger claim
+  // ("a scope resolved"), but it is absent when the probe fails, and a helper
+  // that times out on a failed probe reports the wrong thing entirely.
+  await session.waitForElement(testIdSelector("ai.composer-scope"), {
     timeoutMs: 5_000,
   });
 }
@@ -80,8 +88,13 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
         // no review (myne-md/myne#568): waiting for the review here would
         // time out on a screen that must never come. The marker is the
         // settle fact instead: it renders only on a settled turn whose host
-        // count is positive.
-        const marker = await s.waitForElement(testIdSelector("ai.agent-memory-updated"), {
+        // count is positive. **It lives behind the footprint's disclosure now**
+        // (myne-md/myne#848) - the settled run's line is one line, and the memory
+        // chip is part of the detail it opens - so the disclosure is pressed
+        // first. A wait on the marker without it would time out on a screen that
+        // is behaving correctly.
+        await (await s.byTestId("agentFootprint.disclosure")).click();
+        const marker = await s.waitForElement(testIdSelector("agentFootprint.memory"), {
           timeoutMs: 30_000,
         });
         // The i18n plural for count 1 spells the number out ("Memory updated
@@ -127,7 +140,8 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
         // bound is per run), then clear-all with confirm empties the roster.
         await openComposer(s);
         await sendTask(s, "please remember this for later");
-        await s.waitForElement(testIdSelector("ai.agent-memory-updated"), {
+        await (await s.byTestId("agentFootprint.disclosure")).click();
+        await s.waitForElement(testIdSelector("agentFootprint.memory"), {
           timeoutMs: 30_000,
         });
         await openSettings(s, "ai");

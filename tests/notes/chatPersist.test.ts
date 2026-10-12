@@ -28,9 +28,12 @@ import {
   finalizeChatTurn,
   getActiveConversationId,
   getChat,
+  getPendingAnchorFolderId,
   sendAgentTurn,
   sendChatMessage,
   setActiveConversationId,
+  setPendingAnchorFolderId,
+  setPendingAnchorNoteId,
   stopChatTurn,
   type ChatTurn,
 } from "../../src/notes/ai/chatStore";
@@ -262,6 +265,35 @@ describe("persist on settle", () => {
     expect(JSON.parse(payload).turns).toHaveLength(2);
     expect(getActiveConversationId()).toBe("c0ffee".padEnd(32, "0"));
     expect(mockChatsAppendTurn).not.toHaveBeenCalled();
+  });
+
+  // myne-md/myne#848. The catalog row carries the anchor the conversation was
+  // created with, and the FOLDER is the second kind. It is captured from module
+  // state at snapshot time and read by the create path, so it has to be on the
+  // wire, not merely in the store: a lost fourth argument looks exactly like a
+  // vault-general conversation.
+  it("sends the folder anchor on the create, and clears it afterwards", async () => {
+    installChatPersistence();
+    setPendingAnchorFolderId("Projects");
+    sendChatMessage("hello");
+    finalizeChatTurn(1);
+    await __flushChatPersistForTest();
+
+    const call = mockChatsCreate.mock.calls[0]!;
+    expect(call[3]).toBe("Projects");
+    expect(getPendingAnchorFolderId()).toBeNull();
+  });
+
+  it("sends null for the folder when the run was note-anchored", async () => {
+    installChatPersistence();
+    setPendingAnchorNoteId("note-1");
+    sendChatMessage("hello");
+    finalizeChatTurn(1);
+    await __flushChatPersistForTest();
+    const call = mockChatsCreate.mock.calls[0]!;
+    expect(call[2]).toBe("note-1");
+    // At most one anchor: a note-anchored conversation is not also folder-scoped.
+    expect(call[3]).toBeNull();
   });
 
   it("appends once bound, and skips an identical payload (stop-then-finalize)", async () => {

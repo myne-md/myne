@@ -41,7 +41,7 @@ const REPLACE: ProposedEdit = {
 };
 
 function settleWith(edits: ProposedEdit[]) {
-  beginRun();
+  beginRun(null);
   settleStep(
     {
       view: {
@@ -67,7 +67,14 @@ function settleWith(edits: ProposedEdit[]) {
 }
 
 function mount() {
-  render(<AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} />);
+  render(
+    <AgentReview
+      onClose={() => {}}
+      onNotesWritten={() => {}}
+      titleOf={() => null}
+      folderOf={() => null}
+    />,
+  );
 }
 
 afterEach(() => {

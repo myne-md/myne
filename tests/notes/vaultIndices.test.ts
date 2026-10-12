@@ -328,3 +328,50 @@ describe("reindexNoteFromBody → the tasks leg of the apply payload", () => {
     expect(applyPayload().tasks).toEqual([]);
   });
 });
+
+// myne-md/myne#848: the working-set verdict reaches the index, so the agent's
+// scope can be the list the sidebar shows rather than a second reader of the
+// marker set. Same shape as the task leg above, and for the same reason: the
+// failure is a field that stops being sent, which Rust's `Option` turns into
+// "live" rather than into an error.
+describe("reindexNoteFromBody → the working-set (`live`) leg of the apply payload", () => {
+  function applyPayload(): Record<string, unknown> {
+    const call = invokeMock.mock.calls.find(
+      ([command]) => command === "plugin:vault-indices|vault_indices_apply",
+    );
+    expect(call, "vault_indices_apply was never invoked").toBeDefined();
+    return call![1] as Record<string, unknown>;
+  }
+
+  it("sends live: true for an ordinary note", async () => {
+    await reindexNoteFromBody("n1", "# Ev\n\nsade bir not\n");
+    expect(applyPayload().live).toBe(true);
+  });
+
+  it("sends live: false for every marker the sidebar's predicate excludes", async () => {
+    const cases: Array<[string, string]> = [
+      ["trashed", "---\ntrashed: 2026-08-01T00:00:00Z\n---\nbody\n"],
+      ["deleted", "---\ndeleted: 2026-08-01T00:00:00Z\n---\nbody\n"],
+      ["archived", "---\narchived: 2026-08-01T00:00:00Z\n---\nbody\n"],
+      ["template", "---\ntemplate: true\n---\nbody\n"],
+      // `conflict:` is the axis a predicate reading only `trashed:` misses,
+      // which is the class of bug this leg exists to close.
+      ["conflict", "---\nconflict: true\n---\nbody\n"],
+    ];
+    for (const [name, body] of cases) {
+      invokeMock.mockClear();
+      await reindexNoteFromBody(name, body);
+      expect(applyPayload().live, `${name} must be outside the working set`).toBe(false);
+    }
+  });
+
+  it("is value-strict, not a marker-key match", async () => {
+    // `readTrashedFromFmBody` returns null for a malformed timestamp, so a note
+    // carrying `trashed: 2026-13-45T99:99:99Z` stays LIVE, the same answer the
+    // sidebar gives it, because both read it through the one shared reader. A
+    // hand-rolled producer matching the KEY would call this trashed and the two
+    // views would disagree from that moment on.
+    await reindexNoteFromBody("n9", "---\ntrashed: 2026-13-45T99:99:99Z\n---\nbody\n");
+    expect(applyPayload().live).toBe(true);
+  });
+});

@@ -34,6 +34,7 @@ import { useRef, type CSSProperties } from "react";
 import { ornamentRole } from "@myne/ornaments";
 
 import { useFocusTrap } from "../../../hooks/useFocusTrap";
+import { createPortal } from "react-dom";
 import { AgentReview } from "../../../screens/AgentReview";
 import { clearAgent, useAgent } from "../agentStore";
 
@@ -89,10 +90,18 @@ const CARD_STYLE: CSSProperties = {
 
 export function AgentReviewTakeover({
   titleOf,
+  folderOf,
   onNotesWritten,
 }: {
   titleOf: (noteId: string) => string | null;
-  onNotesWritten: () => void;
+  /** The folder a note sits in, for a move row's starting point. Same resolution
+   *  source as `titleOf`, so the two never describe different notes. */
+  folderOf: (noteId: string) => string | null;
+  /** The ids an apply (or an undo) wrote, so the caller can refresh what it
+   *  shows of them. Typed with the ids rather than as `() => void`: it used to
+   *  drop them, and a moved note then kept its old folder in the sidebar until
+   *  something else re-read it (myne-md/myne#848, on the user's report). */
+  onNotesWritten: (noteIds: readonly string[]) => void;
 }) {
   const agent = useAgent();
   // A run is reviewable once it has stopped, has NOT stopped to ask, and has
@@ -103,8 +112,18 @@ export function AgentReviewTakeover({
   const reviewable =
     agent.view !== null &&
     !agent.running &&
-    agent.end !== null &&
-    agent.end.kind !== "awaitingScope" &&
+    // **A FAILED leg stopped the run too, and `end` stays null when it does**
+    // (myne-md/myne#848, on the user's report: "it said proposed changes and
+    // nothing came up"). `failRun`, the path a provider refusal, a timeout or a
+    // refused scope approval takes, records `error` and leaves `end` alone, so
+    // a run whose FIRST leg proposed twenty-one edits and whose second leg
+    // failed had a proposal with no route to review it: this gate asked for an
+    // `end` that a failure never sets, and the screen the user was told about
+    // could not open. The comment below already lists the other partial ends
+    // (`cancelled`, `exhaustedIterations`, `stalled`) as reviewable for exactly
+    // this reason; a failed leg is the same shape.
+    (agent.end !== null || agent.error !== null) &&
+    agent.end?.kind !== "awaitingScope" &&
     // **And the run proposed something** (myne-md/myne#568). In the two-mode
     // world every run that reached this screen had set out to produce a
     // proposal, so "it stopped" and "there is something to review" were the same
@@ -149,11 +168,27 @@ export function AgentReviewTakeover({
   useFocusTrap(cardRef, { enabled: reviewable });
   if (!reviewable) return null;
 
-  return (
+  // **A portal, and that is the fix for two reports at once** (myne-md/myne#848):
+  // the screen did not paint until something ELSE repainted the window (a click
+  // in the note list made it appear), and once it was on screen the pointer
+  // still went to the note behind it (clicks and the wheel both) so it was
+  // visible and untouchable.
+  //
+  // The cause is where it MOUNTED. This rendered as a child of the right panel,
+  // so a `position: fixed` overlay inherited that panel's stacking and
+  // containing context: the panel is `ornamentRole("surface")` (which becomes
+  // `position: relative; isolation: isolate` under any ornament theme) and sits
+  // inside the editor's pane tree, so the overlay was composited inside a
+  // subtree rather than over the window it is painted over. `createPortal` to the
+  // body puts it in the root stacking context, where `inset: 0` means the
+  // viewport and nothing above it can take its input, the same reason `Tooltip`
+  // portals its bubble.
+  return createPortal(
     <div data-testid="editor.agent-review" style={BACKDROP_STYLE}>
       <div ref={cardRef} {...ornamentRole("surface")} style={CARD_STYLE}>
         <AgentReview
           titleOf={titleOf}
+          folderOf={folderOf}
           onNotesWritten={onNotesWritten}
           // Closing drops the frontend's copy of the run, mirroring the host,
           // which drops its half on lock: the two going out of step is how a
@@ -163,6 +198,7 @@ export function AgentReviewTakeover({
           onClose={clearAgent}
         />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -18,6 +18,7 @@ import type { ProviderModel } from "../../src/lib/ai-model-store";
 // reference these — the canonical vitest pattern for direct factory references.
 const {
   openUrl,
+  revealItemInDir,
   openFileDialog,
   loadModelPath,
   saveModelPath,
@@ -27,10 +28,14 @@ const {
   saveAiEndpoint,
   listProviderModels,
   aiProviderHasKey,
+  listFolderPaths,
 } = vi.hoisted(() => ({
   openUrl: vi.fn(() => Promise.resolve()),
+  revealItemInDir: vi.fn(() => Promise.resolve()),
   openFileDialog: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-  loadModelPath: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+  loadModelPath: vi.fn(
+    (_role?: string): Promise<string | null> => Promise.resolve(null),
+  ),
   saveModelPath: vi.fn((_role: string, p: string) => Promise.resolve(p)),
   setAutoTagEnabled: vi.fn((_enabled: boolean) => Promise.resolve()),
   tagModelAvailable: vi.fn((): Promise<boolean> => Promise.resolve(true)),
@@ -42,8 +47,11 @@ const {
   ),
   listProviderModels: vi.fn((): Promise<ProviderModel[]> => Promise.resolve([])),
   aiProviderHasKey: vi.fn((): Promise<boolean> => Promise.resolve(false)),
+  listFolderPaths: vi.fn((): Promise<{ path: string; label: string }[]> => Promise.resolve([])),
 }));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
+vi.mock("../../src/notes/listFolderPaths", () => ({ listFolderPaths }));
+
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl, revealItemInDir }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openFileDialog }));
 // Only the IPC-crossing wrappers are stubbed. `endpointRejectionOf` is a pure
 // narrower over the host's wire shape, and stubbing it would leave the thing
@@ -107,7 +115,10 @@ const setChatHistoryBudget = vi.fn((v: number | null) => {
 // so a stored exclusion could never be removed through this surface. A test that
 // never sees a non-empty stored set cannot tell that from correct behaviour.
 let aiExcludedFolders: string[] = [];
-const setAiExcludedFoldersMock = vi.fn();
+const setAiExcludedFoldersMock = vi.fn(
+  (_mutation: { add: string[]; remove: string[] }, _folders: string[]): Promise<void> =>
+    Promise.resolve(),
+);
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({
     prefs: {
@@ -120,14 +131,25 @@ vi.mock("../../src/hooks/usePrefs", () => ({
       chat_history_budget: chatHistoryBudget,
     },
     setAiEnabled: vi.fn(),
-    setAiExcludedFolders: (...a: unknown[]) => setAiExcludedFoldersMock(...a),
+    setAiExcludedFolders: (mutation: { add: string[]; remove: string[] }, folders: string[]) =>
+      setAiExcludedFoldersMock(mutation, folders),
     setAutoTagEnabled,
     setChatHistoryBudget,
   }),
 }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    // `name` and `path` are interpolated so a control's accessible name can be
+    // asserted WITH the file in it (myne-md/myne#848) rather than merely that a
+    // key rendered, which is the whole claim a location button makes.
+    t: (key: string, opts?: { path?: string; name?: string }) =>
+      opts?.path !== undefined
+        ? `${key}:${opts.path}`
+        : opts?.name !== undefined
+          ? `${key}:${opts.name}`
+          : key,
+  }),
 }));
 
 import { AiPanel } from "../../src/components/settings/AiPanel";
@@ -198,6 +220,78 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     );
     // …and the invariant is unchanged, because it is true in every state.
     expect(screen.getByTestId("ai.trust-invariant").textContent).toBe(AI_TRUST_INVARIANT);
+  });
+
+  it("carries the trust copy in a banner whose glyph follows the state", async () => {
+    // **The copy is load-bearing and the FORM is not free** (myne-md/myne#848).
+    // Three plain paragraphs in the middle of a settings panel read as one more
+    // setting, and the question a user arrives with, does anything of mine
+    // leave this machine?, had no answer you could take in without reading.
+    // The glyph is the state, so each of the three is driven separately: a
+    // banner that painted one glyph for every state would pass a single-state
+    // check and be worse than no glyph at all.
+    const { unmount } = render(<AiPanel />);
+    const banner = screen.getByTestId("ai.trust-banner");
+    expect(banner.contains(screen.getByTestId("ai.trust-headline"))).toBe(true);
+    expect(banner.contains(screen.getByTestId("ai.active-provider"))).toBe(true);
+    expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-state")).toBe(
+      "in-process",
+    );
+    expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-icon")).toBe("cpu");
+    unmount();
+
+    aiProvider = "openrouter";
+    backendClass = "remote";
+    const remote = render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-state")).toBe(
+        "remote",
+      ),
+    );
+    // A DIFFERENT glyph, not merely a different attribute on the same one.
+    expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-icon")).toBe("globe");
+    remote.unmount();
+
+    // The provider has to be unset first: a named provider wins over an
+    // endpoint, which is the order the panel derives the state in.
+    aiProvider = null;
+    backendClass = "loopback_local";
+    loadAiEndpoint.mockResolvedValue({ url: "http://127.0.0.1:11434", model: "qwen" });
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-state")).toBe(
+        "local-runtime",
+      ),
+    );
+    expect(screen.getByTestId("ai.trust-glyph").getAttribute("data-icon")).toBe(
+      "hard-drive",
+    );
+  });
+
+  it("separates its categories with a rule, not a bold label", () => {
+    // The group headings were the panel's title style one step DOWN, which made
+    // a heading smaller than the row labels it grouped and left nothing marking
+    // where one category ended and the next began, so scrolling this panel read
+    // as one flat list (myne-md/myne#848). The rule is the claim.
+    render(<AiPanel />);
+    const groups = screen.getAllByRole("heading", { level: 4 });
+    expect(groups.length).toBe(5);
+    for (const group of groups) {
+      expect(group.style.borderTop, "a category with no rule above it").toContain(
+        "var(--line-1)",
+      );
+      expect(group.style.fontSize).toContain("var(--text-base)");
+    }
+  });
+
+  it("gives the meeting prompt the panel's own field shape", () => {
+    // An unstyled `<textarea>` falls back to the WebView's white default, which
+    // is what made this the one control in the panel that did not come from the
+    // tokens (myne-md/myne#848).
+    render(<AiPanel />);
+    const box = screen.getByTestId("ai.meeting-prompt-input");
+    expect(box.style.background).toContain("var(--paper-2)");
+    expect(box.style.color).toContain("var(--fg-1)");
   });
 
   it("opens the recommended GENERATION model in the browser (not a Myne fetch)", () => {
@@ -643,9 +737,12 @@ describe("AiPanel — what is answering right now", () => {
     aiProvider = "openrouter";
     backendClass = "remote";
     render(<AiPanel />);
+    // The NAME is in the assertion, not merely the key: the caption's job is to
+    // say which provider is answering, and a caption that rendered the key
+    // without its name would satisfy a key-only check (myne-md/myne#848).
     await waitFor(() =>
       expect(screen.getByTestId("ai.active-provider").textContent).toBe(
-        "settings.ai.providerActive",
+        "settings.ai.providerActive:OpenRouter",
       ),
     );
   });
@@ -656,7 +753,7 @@ describe("AiPanel — what is answering right now", () => {
     render(<AiPanel />);
     await waitFor(() =>
       expect(screen.getByTestId("ai.active-provider").textContent).toBe(
-        "settings.ai.providerActive",
+        "settings.ai.providerActive:http://127.0.0.1:11434",
       ),
     );
   });
@@ -837,6 +934,7 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
     // so the folder the user deleted stayed excluded on disk forever.
     const [mutation] = setAiExcludedFoldersMock.mock.calls[0] as [
       { add: string[]; remove: string[] },
+      string[],
     ];
     expect(mutation.remove).toEqual(["Money/"]);
     expect(mutation.add).toEqual([]);
@@ -855,5 +953,119 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
     expect(
       (screen.getByTestId("ai.excluded-folders") as HTMLTextAreaElement).value,
     ).toBe("TypedFirst/");
+  });
+});
+
+// myne-md/myne#848. The panel is grouped by INTENT, the excluded-folders box
+// gained a picker, and an installed model stopped offering a download.
+describe("AiPanel: grouped by intent", () => {
+  it("renders the five intent headings, in order", () => {
+    render(<AiPanel />);
+    const headings = screen
+      .getAllByRole("heading", { level: 4 })
+      .map((h) => h.textContent);
+    // The taxonomy the phase settled on. Asserted as a SEQUENCE because the
+    // order is the design: a user reads down the panel, and "Privacy and
+    // limits" after the model pickers is what makes it read as the controls
+    // beside the switch rather than four more things to configure.
+    expect(headings).toEqual([
+      "settings.ai.groupAutoTag",
+      "settings.ai.groupVoice",
+      "settings.ai.groupWriting",
+      "settings.ai.groupPrivacy",
+      "settings.ai.groupAdvanced",
+    ]);
+  });
+});
+
+describe("AiPanel: the excluded-folders picker", () => {
+  beforeEach(() => {
+    // **Both, and the seed one is not tidiness.** `aiExcludedFolders` is
+    // module-level state the panel seeds its draft from, so a previous test
+    // leaving "Private/" in it makes the box contain the expected value before
+    // any click, and the assertion below then passes with the picker unwired.
+    // The precondition assertion in the test is what makes that visible.
+    aiExcludedFolders = [];
+    setAiExcludedFoldersMock.mockReset();
+  });
+
+  it("appends the picked folder to the box and commits it", async () => {
+    listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    render(<AiPanel />);
+    const picker = await screen.findByTestId("ai.excluded-folders-picker");
+    // Precondition: the box starts empty, so what follows is the picker's doing.
+    expect((screen.getByTestId("ai.excluded-folders") as HTMLTextAreaElement).value).toBe("");
+    fireEvent.click(picker);
+    fireEvent.click(
+      screen
+        .getAllByTestId("ai.excluded-folders-picker-option")
+        .find((o) => o.getAttribute("data-value") === "Private/")!,
+    );
+    const box = screen.getByTestId("ai.excluded-folders") as HTMLTextAreaElement;
+    expect(box.value).toContain("Private/");
+    // Committed, not merely typed: the exclusion is a privacy control, so a
+    // picker that only filled the box in would leave the user to blur the field
+    // before it took effect.
+    expect(setAiExcludedFoldersMock).toHaveBeenCalled();
+    expect(setAiExcludedFoldersMock.mock.calls.at(-1)![1]).toEqual(["Private/"]);
+  });
+
+  it("keeps the box as the authority: a typed line still works", async () => {
+    listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    render(<AiPanel />);
+    const box = await screen.findByTestId("ai.excluded-folders");
+    fireEvent.change(box, { target: { value: "Typed/By/Hand/" } });
+    fireEvent.blur(box);
+    await waitFor(() =>
+      expect(setAiExcludedFoldersMock.mock.calls.at(-1)![1]).toEqual([
+        "Typed/By/Hand/",
+      ]),
+    );
+  });
+});
+
+describe("AiPanel: an installed model", () => {
+  it("offers no download action, and states which file it is using", async () => {
+    loadModelPath.mockImplementation((role?: string) =>
+      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+    );
+    render(<AiPanel />);
+    await waitFor(() =>
+      expect(screen.queryByTestId("ai.model-provenance-embedding-e5-small")).not.toBeNull(),
+    );
+    // The row that HAS the model: no download control, and a folder button
+    // whose accessible name carries the FILE, the short half of the path, and
+    // the half a user recognises (myne-md/myne#848).
+    expect(screen.queryByTestId("ai.download-button-embedding-e5-small")).toBeNull();
+    const provenance = screen.getByTestId("ai.model-provenance-embedding-e5-small");
+    expect(provenance.getAttribute("aria-label")).toContain("e5-small.onnx");
+    expect(provenance.hasAttribute("disabled")).toBe(false);
+    // The row that does not: the button, and a DISABLED folder button, because
+    // there is no location to show.
+    expect(screen.getByTestId("ai.download-button-tag")).toBeTruthy();
+    expect(
+      screen.getByTestId("ai.model-provenance-tag").hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("shows the whole location, and the one action it enables, on demand", async () => {
+    // The path is what the folder button holds: printed inline it ran past the
+    // panel's edge and over the label above it (myne-md/myne#848).
+    loadModelPath.mockImplementation((role?: string) =>
+      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+    );
+    render(<AiPanel />);
+    const button = await screen.findByTestId("ai.model-provenance-embedding-e5-small");
+    expect(screen.queryByTestId("ai.model-provenance-panel-embedding-e5-small")).toBeNull();
+    fireEvent.click(button);
+    await screen.findByTestId("ai.model-provenance-panel-embedding-e5-small");
+    expect(
+      screen.getByTestId("ai.model-provenance-panel-embedding-e5-small-path").textContent,
+    ).toBe("/models/e5-small.onnx");
+    // The action the location enables, and it calls the host's reveal.
+    fireEvent.click(
+      screen.getByTestId("ai.model-provenance-embedding-e5-small-reveal"),
+    );
+    expect(revealItemInDir).toHaveBeenCalledWith("/models/e5-small.onnx");
   });
 });

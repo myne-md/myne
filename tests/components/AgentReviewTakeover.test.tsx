@@ -40,7 +40,9 @@ import {
   clearAgentForLock,
   currentRunEpoch,
   endAutoApply,
+  failRun,
   getAgent,
+  resumeRun,
   settleApply,
   settleStep,
   toggleEdit,
@@ -90,7 +92,13 @@ function settle(end: LoopEnd, proposal: Proposal = ONE_EDIT) {
 }
 
 function mount() {
-  render(<AgentReviewTakeover titleOf={() => null} onNotesWritten={() => {}} />);
+  render(
+    <AgentReviewTakeover
+      titleOf={() => null}
+      folderOf={() => null}
+      onNotesWritten={() => {}}
+    />,
+  );
 }
 
 afterEach(() => {
@@ -99,13 +107,69 @@ afterEach(() => {
 });
 
 describe("AgentReviewTakeover", () => {
+  it("renders into the BODY, not inside the pane that mounts it", () => {
+    // **The fix for two reports at once** (myne-md/myne#848): the screen did not
+    // paint until something else repainted the window, and once it was on screen
+    // the pointer still went to the note behind it, clicks and the wheel both.
+    // The cause was where it mounted: as a child of the right panel, a
+    // `position: fixed` overlay inherits that panel's stacking and containing
+    // context (the panel is `ornamentRole("surface")`, which becomes
+    // `isolation: isolate` under an ornament theme), so it was composited inside
+    // a subtree rather than over the window it is painted over.
+    //
+    // Asserted on the parent, which is the property: a portal is what puts it in
+    // the root stacking context, and a revert to a plain child fails here.
+    beginRun(null);
+    settle({ kind: "finished" });
+    mount();
+    const overlay = screen.getByTestId("editor.agent-review");
+    expect(overlay.parentElement).toBe(document.body);
+  });
+
+  it("opens for a FAILED leg that left a proposal", () => {
+    // **The hole the user hit** (myne-md/myne#848: "it said proposed changes and
+    // nothing came up"). A run is driven in legs, and `failRun`, what a
+    // provider refusal, a timeout or a refused scope approval takes, records
+    // `error` and leaves `end` alone. So a first leg that proposed twenty-one
+    // edits and a second that failed produced a proposal with no route to
+    // review it: the gate asked for an `end` a failure never sets.
+    // The state that produces it: leg 1 proposes and asks to widen the scope,
+    // the user approves (`resumeRun` clears `end`, because the dialog derives
+    // its own visibility from an `awaitingScope` end), and the approved leg
+    // FAILS. `failRun` records `error` and sets no `end`, so the gate asked for
+    // one a failure never writes while twenty-one edits sat in the store.
+    beginRun(null);
+    settle(
+      { kind: "awaitingScope", folder: "Projects", reason: "to find the notes" },
+      ONE_EDIT,
+    );
+    resumeRun();
+    failRun("the provider refused the request");
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+  });
+
+  it("stays closed when a failed leg left NOTHING to review", () => {
+    // The other direction, so the clause above cannot open the screen over an
+    // empty proposal, which is what every failed QUESTION leaves.
+    beginRun(null);
+    settle(
+      { kind: "awaitingScope", folder: "Projects", reason: "to find the notes" },
+      NOTHING,
+    );
+    resumeRun();
+    failRun("the provider refused the request");
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).toBeNull();
+  });
+
   it("renders nothing before a run has started", () => {
     mount();
     expect(screen.queryByTestId("editor.agent-review")).toBeNull();
   });
 
   it("renders nothing while the run is still working", () => {
-    beginRun();
+    beginRun(null);
     mount();
     expect(screen.queryByTestId("editor.agent-review")).toBeNull();
   });
@@ -113,7 +177,7 @@ describe("AgentReviewTakeover", () => {
   it("does NOT take over when the run stopped to ask for scope", () => {
     // The regression. An `awaitingScope` end is a question, not a proposal, and
     // the dialog that asks it lives underneath this overlay.
-    beginRun();
+    beginRun(null);
     settle({ kind: "awaitingScope", folder: "Projects", reason: "why" });
     mount();
     expect(screen.queryByTestId("editor.agent-review")).toBeNull();
@@ -132,7 +196,7 @@ describe("AgentReviewTakeover", () => {
     { kind: "stalled", barrenIterations: 3 } as const,
   ]) {
     it(`takes over when the run ended ${end.kind}`, () => {
-      beginRun();
+      beginRun(null);
       settle(end);
       mount();
       expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
@@ -157,7 +221,7 @@ describe("AgentReviewTakeover", () => {
     { kind: "stalled", barrenIterations: 3 } as const,
   ]) {
     it(`does NOT take over when a ${end.kind} run proposed nothing`, () => {
-      beginRun();
+      beginRun(null);
       settle(end, NOTHING);
       mount();
       expect(screen.queryByTestId("editor.agent-review")).toBeNull();
@@ -168,7 +232,7 @@ describe("AgentReviewTakeover", () => {
     // The other half of the emptiness test, so it cannot be satisfied by
     // looking at `edits` alone: a run that proposed only new notes has as much
     // to review as one that proposed only edits.
-    beginRun();
+    beginRun(null);
     settle(
       { kind: "finished" },
       {
@@ -186,7 +250,7 @@ describe("AgentReviewTakeover", () => {
     // separately because "there is text in the proposal" is the tempting wrong
     // condition: it would reopen this screen for every question that got a
     // wordy reply.
-    beginRun();
+    beginRun(null);
     settle(
       { kind: "finished" },
       { edits: [], newNotes: [], summary: "You have 16 personal tasks." },
@@ -198,7 +262,7 @@ describe("AgentReviewTakeover", () => {
   it("stops taking over once the run is dropped", () => {
     // Closing calls `clearAgent()`, which drops the run. That is what makes the
     // rule false again; there is no second flag to unset.
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
     expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
@@ -217,7 +281,7 @@ describe("AgentReviewTakeover", () => {
 // is a decision to throw the model's work away.
 describe("dismissal stays deliberate", () => {
   it("does not close on Escape", () => {
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
     expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
@@ -229,7 +293,7 @@ describe("dismissal stays deliberate", () => {
   });
 
   it("does not close on a backdrop click", () => {
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
     const backdrop = screen.getByTestId("editor.agent-review");
@@ -245,7 +309,7 @@ describe("dismissal stays deliberate", () => {
     // backdrop covers the window and the card inside it does not. Asserted on
     // the inset that clears the macOS traffic lights, which is the collision
     // that prompted the change.
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
     const backdrop = screen.getByTestId("editor.agent-review");
@@ -267,7 +331,7 @@ describe("a clean apply closes the dialog", () => {
   const CLEAN = applyOutcome();
 
   it("closes once the apply is clean and complete", () => {
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
     expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
@@ -286,7 +350,7 @@ describe("a clean apply closes the dialog", () => {
     // dialog over a live proposal would leave that plaintext resident with no
     // surface accounting for it, which is what this store's header exists to
     // prevent.
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" });
     mount();
 
@@ -305,7 +369,7 @@ describe("a clean apply closes the dialog", () => {
     // rejection this test stays green with `hasRefusals` deleted from the
     // predicate, which was measured. Rejecting it resolves the row and leaves
     // the accumulated refusal as the only thing holding the screen.
-    beginRun();
+    beginRun(null);
     settle({ kind: "finished" }, TWO_EDITS);
     mount();
 
@@ -343,7 +407,7 @@ describe("a clean apply closes the dialog", () => {
     // query after the fact cannot tell "never mounted" from "mounted and
     // unmounted", which is exactly the distinction myne-md/myne#551 is about.
     review.renders = 0;
-    beginRun();
+    beginRun(null);
     beginAutoApply();
     settle({ kind: "finished" });
     mount();

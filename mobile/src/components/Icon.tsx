@@ -42,6 +42,8 @@ export type IconName =
   | "share"
   | "trash"
   | "folder"
+  | "file-text"
+  | "message-square"
   | "tag"
   | "star"
   | "settings"
@@ -84,6 +86,12 @@ const PATHS: Record<IconName, string> = {
   share: "M4 12v8a1 1 0 001 1h14a1 1 0 001-1v-8|M16 6l-4-4-4 4|M12 2v14",
   trash: "M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14",
   folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
+  // The two target glyphs the conversation lists use (myne-md/myne#848): a
+  // note-anchored conversation, and one about the whole vault. Same lucide
+  // paths as the desktop registry, so the two clients draw the same shape.
+  "file-text":
+    "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z|M14 2v4a2 2 0 0 0 2 2h4|M10 9H8|M16 13H8|M16 17H8",
+  "message-square": "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   tag: "M3 3h7l11 11-7 7L3 10z|M7 7h.01",
   star: "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.4 6.2 21.4l1.1-6.5L2.6 9.8l6.5-.9z",
   settings:

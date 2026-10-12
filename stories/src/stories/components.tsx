@@ -9,11 +9,18 @@
 // default state is.
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ActionStatus } from "@app/components/ActionStatus";
 import { AccountBootstrap } from "@app/screens/AccountBootstrap";
 import { CreateVault } from "@app/screens/CreateVault";
 import { AgentReview } from "@app/screens/AgentReview";
+import {
+  beginRun,
+  clearAgentForLock,
+  currentRunEpoch,
+  settleApply,
+  settleStep,
+} from "@app/notes/agent/agentStore";
 import { AnsweredByIndicator } from "@app/components/AnsweredByIndicator";
 import { AttachmentSyncProgress } from "@app/components/attachments/AttachmentSyncProgress";
 import { AttachmentThumbnail } from "@app/components/attachments/AttachmentThumbnail";
@@ -236,6 +243,90 @@ function ToasterStackDemo() {
     };
   }, []);
   return <Toaster />;
+}
+
+/**
+ * The review screen with a settled run behind it.
+ *
+ * **Seeded on mount and cleared on unmount, deliberately.** A run lives in a
+ * module-scope store, so a story that seeded one during render would leave
+ * twenty-one proposed edits in front of whichever story the catalogue renders
+ * next, and the store is not something the fake host swaps. Clearing in the
+ * effect's cleanup is what makes this story's state belong to this story.
+ */
+function SeededReview({ refusals = false }: { refusals?: boolean }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    beginRun(null);
+    settleStep(
+      {
+        view: {
+          runId: "story-run",
+          scopeTotal: 431,
+          userGrants: 1,
+          modelGrants: 0,
+          cancelled: false,
+        },
+        proposal: {
+          edits: [
+            {
+              noteId: "n1",
+              kind: "move",
+              anchor: "",
+              replacement: "02 - AREAS/Self Improvement/",
+            },
+            {
+              noteId: "n2",
+              kind: "move",
+              anchor: "",
+              replacement: "01 - PROJECTS/",
+            },
+          ],
+          newNotes: [],
+          // Long enough to be clamped: the modal shows three lines and a
+          // disclosure, so the diff below is what the screen is about.
+          summary:
+            "Analyzed all 23 notes in 00 - INBOX/ and rehomed each according to your PARA structure. ".repeat(
+              6,
+            ),
+        },
+        end: { kind: "finished" },
+        iterations: 3,
+        notesRead: 23,
+        charsOffDevice: null,
+        excludedCount: 0,
+        memoryUpdated: 0,
+      },
+      currentRunEpoch(),
+    );
+    if (refusals) {
+      settleApply(
+        {
+          applied: 0,
+          refused: [
+            { noteId: "n2", index: 1, reason: "moveIntoExcludedFolder" },
+          ],
+          refusedNewNotes: [],
+          notesWritten: [],
+          notesCreated: [],
+          restorePoints: [],
+        },
+        [],
+        currentRunEpoch(),
+      );
+    }
+    setReady(true);
+    return () => clearAgentForLock();
+  }, [refusals]);
+  if (!ready) return null;
+  return (
+    <AgentReview
+      onClose={action("onClose")}
+      onNotesWritten={action("onNotesWritten")}
+      titleOf={() => "00 - INBOX"}
+      folderOf={() => "00 - INBOX/"}
+    />
+  );
 }
 
 export const COMPONENT_STORIES: StoryDescriptor[] = [
@@ -471,6 +562,39 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       <ScrollArea ariaLabel="Scrollable sample">
         <Prose>Scrollable content.</Prose>
       </ScrollArea>
+    ),
+  },
+  {
+    id: "components/scrollarea/content-at-end",
+    group: "components",
+    surface: "ScrollArea",
+    state: "content-at-end",
+    description:
+      "A scroller whose content is aligned to the END of its column, which is the case the indicator's gutter exists for (myne-md/myne#848): the rows stop before the thumb instead of underneath it, which is what a right-aligned chat bubble needed.",
+    tags: ["components", "scrollarea", "gutter", "overflow", "alignment"],
+    render: () => (
+      <div style={{ width: 280, height: 180, background: "var(--bg-1)" }}>
+        <ScrollArea ariaLabel="Scrollable sample" style={{ height: 180 }}>
+          {Array.from({ length: 10 }, (_, i) => (
+            <div
+              key={i}
+              style={{
+                alignSelf: "flex-end",
+                width: "fit-content",
+                marginInlineStart: "auto",
+                marginBottom: "var(--space-2)",
+                padding: "var(--space-2)",
+                background: "var(--paper-2)",
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-1)",
+                fontSize: "var(--text-sm)",
+              }}
+            >
+              A row aligned to the end, {i + 1}
+            </div>
+          ))}
+        </ScrollArea>
+      </div>
     ),
   },
   {
@@ -1483,8 +1607,32 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description: "Agent Review, a default state.",
     tags: ["components", "agentreview", "default"],
     render: () => (
-      <AgentReview onClose={action("onClose")} titleOf={() => null} />
+      <AgentReview
+        onClose={action("onClose")}
+        titleOf={() => null}
+        folderOf={() => null}
+      />
     ),
+  },
+  {
+    id: "components/agentreview/clamped-summary",
+    group: "components",
+    surface: "AgentReview",
+    state: "clamped-summary",
+    description:
+      "A settled run whose summary is long: three lines and a disclosure above the diff, so the diff is what the screen is about. The summary stays on screen rather than being hidden, because a refusal has to be able to contradict it (myne-md/myne#848).",
+    tags: ["components", "agentreview", "review", "summary", "clamp"],
+    render: () => <SeededReview />,
+  },
+  {
+    id: "components/agentreview/refusals-above-the-claim",
+    group: "components",
+    surface: "AgentReview",
+    state: "refusals-above-the-claim",
+    description:
+      "An apply that refused one of the moves: the host's refusal is pinned ABOVE the model's summary, with a count, so the claim cannot be read in the order that flatters it (myne-md/myne#848).",
+    tags: ["components", "agentreview", "review", "refusal", "applied"],
+    render: () => <SeededReview refusals />,
   },
   {
     id: "components/editor/default",

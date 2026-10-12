@@ -54,7 +54,7 @@ function newNote(title: string) {
 }
 
 function settle(proposal: Proposal) {
-  beginRun();
+  beginRun(null);
   settleStep(
     {
       view: VIEW,

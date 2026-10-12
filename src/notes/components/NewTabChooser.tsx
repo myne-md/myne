@@ -101,7 +101,13 @@ const SEARCH_PILL: CSSProperties = {
   gap: "var(--space-2)",
   height: 42,
   padding: "0 14px",
-  border: "1px solid var(--line-2)",
+  // **Longhands, because the focus state overrides the COLOUR** (review
+  // finding): a `border` shorthand beside a `borderColor` is a shorthand and a
+  // longhand for the same box property, which React warns about on every
+  // rerender and resolves in an order the author did not choose.
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "var(--line-2)",
   borderRadius: "var(--radius-2)",
   background: "var(--bg-2)",
   color: "var(--fg-3)",
