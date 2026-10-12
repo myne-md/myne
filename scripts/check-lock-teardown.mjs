@@ -181,6 +181,11 @@ const PAIRS = [
   // locked vault's note text on screen in the pop-out; only desktop opens OS
   // windows, so mobile and web hold no registry and owe nothing.
   { hook: "detached_windows_teardown_on_lock", holder: { kind: "state", type: "DetachedWindowRegistry" } },
+  // epic live-collab (`collab-editor-bridge`): a live co-editing session holds
+  // decrypted note plaintext for as long as it is open. The clients hold
+  // `LiveSessionRegistry` (desktop/mobile `app.manage`, web a `OnceLock`), so an
+  // empty teardown body would leave a locked vault's note resident in RAM.
+  { hook: "live_session_teardown_on_lock", holder: { kind: "state", type: "LiveSessionRegistry" } },
   { hook: "clear_staged_descriptor", holder: { kind: "command", name: "workspace_stage" } },
 ];
 

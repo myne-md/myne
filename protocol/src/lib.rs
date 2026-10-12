@@ -58,6 +58,7 @@ pub mod agent_personality_blob;
 pub mod attachment_blob;
 pub mod attachment_text_blob;
 pub mod attachments_catalog;
+pub mod awareness_frame;
 pub mod blob;
 pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
@@ -111,16 +112,17 @@ pub use account_number::{
 };
 pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
-    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob,
-    aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob,
-    aad_membership_blob, aad_membership_roster_blob, aad_note_content_encrypt,
-    aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
-    aad_person_member_key_store, aad_person_member_unlock_store, aad_person_profile_blob,
-    aad_person_vault_carrier, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
-    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
-    aad_singleton_blob_v0_2, aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob,
-    aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx,
-    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
+    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob,
+    aad_awareness_frame, aad_chats_blob, aad_chats_blob_v0_2, aad_chats_catalog,
+    aad_custom_themes_blob, aad_graph_layout_blob, aad_membership_blob, aad_membership_roster_blob,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
+    aad_person_binding_blob, aad_person_member_key_store, aad_person_member_unlock_store,
+    aad_person_profile_blob, aad_person_vault_carrier, aad_personal_dictionary_blob,
+    aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap, aad_recovery_wrap_v0_2,
+    aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
+    aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
+    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
 };
 pub use agent_memory_catalog_blob::{
     decode_agent_memory_catalog_blob, decode_agent_memory_catalog_blob_versioned,
@@ -173,6 +175,13 @@ pub use attachments_catalog::{
     AttachmentsCatalog, CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN, CATALOG_BLOB_HEADER_LEN,
     CATALOG_BLOB_MAGIC, CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED,
     CATALOG_BLOB_V0_2_MAGIC, MAX_CATALOG_PLAINTEXT_LEN,
+};
+pub use awareness_frame::{
+    awareness_room_id, awareness_room_id_group, decode_payload_canonical, encode_payload_canonical,
+    open_awareness_frame, seal_awareness_frame, seal_awareness_frame_raw, sign_presence_assertion,
+    verify_presence_assertion, AwarenessFrameError, AwarenessPayload, FrameType, PresenceAssertion,
+    PresenceVerdict, AWARENESS_FRAME_VERSION, AWARENESS_HEADER_LEN, AWARENESS_ROOM_ID_LEN,
+    PRESENCE_ASSERTION_PREFIX,
 };
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,

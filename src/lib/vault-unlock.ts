@@ -9,6 +9,7 @@ import { resetVimStateOnLock } from "../editor/vim";
 import { releaseAttachmentUrls } from "../platform/attachments";
 import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAwareness } from "../notes/collab/awarenessStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
@@ -89,6 +90,12 @@ export async function lockVault(): Promise<void> {
   // and only two of them remembered. A choke point cannot be forgotten by the
   // fifth one.
   teardownStep("clearAgentForLock", () => clearAgentForLock());
+  // The live-presence peer set (`collab-presence-ui` task 3), on the same leg: it
+  // holds other devices' or people's names, cursors and selections for the OPEN
+  // note, the store is module scope, and no lock path reloads the WebView. Dropped
+  // here rather than at the pane's unmount alone, which is a rendering fact rather
+  // than the vault-leaving event.
+  teardownStep("clearAwareness", () => clearAwareness());
   // The AI chat transcript, on the same leg. It holds the user's own questions
   // and the model's answers about their notes, `chatStore` is module scope, and
   // it had been relying on the Editor's unmount cleanup alone, which does fire

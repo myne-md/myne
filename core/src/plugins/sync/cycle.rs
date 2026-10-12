@@ -358,6 +358,13 @@ pub async fn run_active_cycle_from_host(
     io: &'static dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
+    // The live-session registry (`collab-editor-bridge` task 7). A pulled remote
+    // revision of a note OPEN in a session is merged INTO it (remove-wins) rather
+    // than written to disk, because the session is that note's single durable writer
+    // (`SYNC-33`). The set of live blob ids is snapshotted before the cycle so the
+    // orchestrator (which cannot hold the registry across its `'static` boundary)
+    // sees a plain `HashSet`.
+    live_registry: &crate::plugins::live::LiveSessionRegistry,
     allow_push: bool,
 ) -> CycleOutcome {
     // THE device-verification hold is read here, and here is the only place it
@@ -519,6 +526,13 @@ pub async fn run_active_cycle_from_host(
     // closure below, and the success stamp is written after it returns.
     let vault_root_for_stamp = dir.clone();
     let dir_for_prefs = dir.clone();
+    // Snapshot the live-session note ids BEFORE the `'static` closure (task 7):
+    // the registry itself cannot cross that boundary, but a plain `HashSet` can.
+    let live_note_ids = live_registry.live_note_blob_ids();
+    // `items_key`/`items_key_id` are needed both by the cycle (as `AttachmentKeys`,
+    // which move into the `'static` closure) and by the post-cycle merge of a
+    // deferred live pull, so the merge keeps its own clone of the key.
+    let live_merge_keys = (items_key.clone(), items_key_id);
 
     // Signed `0x02` head authority for an `NTV6` vault (`None` keeps the `NTV5`
     // HMAC head). Built before the blocking closure so the person keypair and the
@@ -602,6 +616,8 @@ pub async fn run_active_cycle_from_host(
             // Signed `0x02` heads when the vault is `NTV6` and a person identity
             // is held; `None` keeps the `NTV5` `root_key` HMAC head.
             signed_ctx.as_ref(),
+            // The live-session snapshot captured above (task 7).
+            &live_note_ids,
         )
         .await
     })
@@ -626,6 +642,75 @@ pub async fn run_active_cycle_from_host(
                 &summary.pulled_note_ids,
             )
             .await;
+            // Merge any pulled live-session revisions into their OPEN sessions
+            // (`collab-editor-bridge` task 7): the orchestrator DEFERRED these
+            // instead of writing, so the session stays the single durable writer and
+            // the peer's durable revision lands in the session's document (remove-wins
+            // for tombstones) rather than clobbering in-flight typing.
+            for (id, bytes, baseline_nonce) in &summary.deferred_live_pulls {
+                let note_id = uuid::Uuid::from_bytes(*id).to_string();
+                let merged = live_registry.with_note_mut(&note_id, |s| {
+                    s.merge_pulled(bytes, &live_merge_keys.0, &live_merge_keys.1)
+                });
+                if let Some(Ok(splices)) = merged {
+                    // Queue the merge's body diff for the pane to dispatch as ONE
+                    // `ChangeSet` (`live_session_take_remote_splices`), so its buffer
+                    // catches up WITHOUT a reload and its next whole-markdown save
+                    // cannot delete the merged-in peer text.
+                    live_registry.set_pending_splices(&note_id, splices);
+                    // Persist the merged document so the on-disk blob carries the
+                    // peer's revision too, then raise the calm "updated from another
+                    // device" signal (the same one the durable merge path uses).
+                    let flushed = crate::plugins::live::commands::flush_live_session_to_dir(
+                        io,
+                        &notes_dir_for_reindex,
+                        live_registry,
+                        &live_merge_keys.0,
+                        &live_merge_keys.1,
+                        &note_id,
+                    )
+                    .await;
+                    // A failed session flush must NOT be swallowed: the merge lives in
+                    // RAM, and while the session's next autosave would heal it, a
+                    // process death between here and then would leave the on-disk blob
+                    // without the peer's revision. Fall back to the plain write the
+                    // non-deferred path makes (the bytes were content_nonce-verified
+                    // before the deferral, and the merged document is a superset, so
+                    // either write carries the peer's revision).
+                    if flushed.is_err() {
+                        let _ = crate::plugins::sync::orchestrator::apply_pulled_note_blob(
+                            io,
+                            &notes_dir_for_reindex,
+                            id,
+                            bytes,
+                            baseline_nonce.as_deref(),
+                        )
+                        .await;
+                    }
+                    host.emit("sync://remote-merged", EventPayload::Text(note_id));
+                } else {
+                    // The session could not take the pulled revision (a blob the CRDT
+                    // refuses), or it was closed between the orchestrator's scan and
+                    // here. The orchestrator SKIPPED the disk write for a deferred pull,
+                    // so dropping it would lose the peer's revision with nothing said.
+                    // Fall back to the plain write the non-deferred path makes (the
+                    // bytes were already content_nonce-verified before the deferral).
+                    let applied = crate::plugins::sync::orchestrator::apply_pulled_note_blob(
+                        io,
+                        &notes_dir_for_reindex,
+                        id,
+                        bytes,
+                        // The SAME dirty-disk check the non-deferred path applies: an
+                        // unconditional write here could discard a local edit that
+                        // landed between the scan and this fallback.
+                        baseline_nonce.as_deref(),
+                    )
+                    .await;
+                    if applied.is_ok() {
+                        host.emit("sync://remote-merged", EventPayload::Text(note_id));
+                    }
+                }
+            }
             // ASM-6→B / #422: an NC05 note whose local copy an automatic CRDT
             // merge reconciled with a concurrent remote edit this cycle. Emit ONE
             // `sync://remote-merged` per affected note (`Text(note_id)`), so the
@@ -734,6 +819,31 @@ pub async fn run_active_cycle_from_host(
         );
     }
 
+    // A member's adoption of an owner group-key rotation (`collab-b2b-sessions`
+    // task 1). Best-effort and member-only: the function is a no-op unless
+    // `vault.meta` has advanced past the epoch this device's member-key store
+    // holds, in which case it fetches the member's delivered package, verifies
+    // it against the pinned owner half, and installs the new group + items keys on
+    // the live slot so this session re-keys. Runs after the content cycle so a
+    // delivery hiccup never fails content sync. Host-only (the delivery route
+    // drives the rustls transport), so it stands down on wasm32 where B2B is
+    // capability-absent.
+    #[cfg(not(target_arch = "wasm32"))]
+    if !is_owner {
+        if let Err(e) =
+            crate::plugins::sync::person_account::member_adopt_rotation_from_host(host, io, state)
+                .await
+        {
+            // The next cycle retries; a member with a pending rotation simply
+            // keeps the old tier until its package lands.
+            tracing::warn!(
+                stage = "member_rotation_adopt",
+                error = ?e,
+                "a member group-key rotation was not adopted this cycle"
+            );
+        }
+    }
+
     outcome
 }
 
@@ -751,9 +861,10 @@ pub async fn sync_now_from_host(
     io: &'static dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
+    live_registry: &crate::plugins::live::LiveSessionRegistry,
 ) -> super::status::SyncRuntimeStatus {
     use super::status::SyncRuntimeStatus;
-    match run_active_cycle_from_host(host, io, state, hooks, true).await {
+    match run_active_cycle_from_host(host, io, state, hooks, live_registry, true).await {
         CycleOutcome::Disabled => SyncRuntimeStatus::Disabled,
         // `NotReady` is one outcome covering three situations — locked vault,
         // never enrolled, and enrolled-but-awaiting-approval. Answering

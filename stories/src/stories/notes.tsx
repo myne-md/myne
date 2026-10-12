@@ -56,6 +56,9 @@ import { emitStoryEvent } from "../host/internals";
 
 import { AiHydrationProbe } from "@app/notes/components/AiHydrationProbe";
 import { BacklinksTab } from "@app/notes/components/BacklinksTab";
+import { WhoIsHereTab } from "@app/notes/components/WhoIsHereTab";
+import { setAwareness } from "@app/notes/collab/awarenessStore";
+import { participantWithColor } from "@app/notes/collab/participant";
 import { ChatComposer } from "@app/notes/components/ChatComposer";
 import { ConflictsView } from "@app/notes/components/ConflictsView";
 import { FolderRow } from "@app/notes/components/FolderRow";
@@ -353,11 +356,13 @@ const NOTES_POPULATED_FIXTURE: Fixture = {
         snapshot_uuid: "00000000-0000-7000-8000-0000000000b1",
         captured_at_ms: Date.UTC(2026, 9, 9, 8, 55, 0),
         size_bytes: 4096,
+        resolved_author: { kind: "Device", name: "Ada's Laptop", code: "aabbcc" },
       },
       {
         snapshot_uuid: "00000000-0000-7000-8000-0000000000b2",
         captured_at_ms: Date.UTC(2026, 9, 8, 17, 20, 0),
         size_bytes: 2048,
+        resolved_author: { kind: "Unknown" },
       },
     ],
   },
@@ -1027,6 +1032,59 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         </Box>
       </SidebarStateProvider>
     ),
+  },
+  {
+    id: "notes/whoisheretab/populated",
+    group: "components",
+    surface: "WhoIsHereTab",
+    state: "populated",
+    description:
+      "The 'Who's here' live-presence roster with two peers editing the open note, each a colour dot and a jump button.",
+    tags: ["notes", "collab", "presence", "roster", "right panel"],
+    fixture: NOTES_POPULATED_FIXTURE,
+    render: () => {
+      // The awareness store is module-scope; seed it so the roster shows peers.
+      // Peers are keyed by NOTE (`peersByNote`), and the tab reads the peers of the
+      // sidebar's SELECTED note, so the seeded note id must match `selectedId`.
+      const rosterNoteId = "n1";
+      setAwareness({
+        peersByNote: new Map([
+          [
+            rosterNoteId,
+            new Map(
+              [
+                participantWithColor({
+                  id: "device:a",
+                  noteId: rosterNoteId,
+                  label: "Ada's Laptop",
+                  unAttributed: false,
+                  caret: 12,
+                  selection: null,
+                }),
+                participantWithColor({
+                  id: "device:b",
+                  noteId: rosterNoteId,
+                  label: "Bob",
+                  unAttributed: false,
+                  caret: 3,
+                  selection: null,
+                }),
+              ].map((p) => [p.id, p]),
+            ),
+          ],
+        ]),
+        droppedAt: null,
+      });
+      return (
+        <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+          <Box width={280} height={200}>
+            <div style={{ padding: "var(--space-3)" }}>
+              <WhoIsHereTab />
+            </div>
+          </Box>
+        </SidebarStateProvider>
+      );
+    },
   },
   {
     id: "notes/outlinetab/populated",

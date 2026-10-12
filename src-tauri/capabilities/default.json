@@ -42,6 +42,7 @@
     "graph-layout:default",
     "chats:default",
     "memory:default",
+    "live:default",
     "detached-window:default",
     "vault-label:default",
     "account:default",

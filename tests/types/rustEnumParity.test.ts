@@ -160,6 +160,12 @@ const MIRRORS: Mirror[] = [
     rsEnum: "NoteUpdateError",
   },
   {
+    ts: "client-core/src/types/live-session-error.ts",
+    tsType: "LiveSessionCommandError",
+    rs: "core/src/plugins/live/commands.rs",
+    rsEnum: "LiveSessionCommandError",
+  },
+  {
     ts: "client-core/src/types/note-delete-error.ts",
     tsType: "NoteDeleteError",
     rs: "core/src/plugins/notes/error.rs",
@@ -181,6 +187,12 @@ const MIRRORS: Mirror[] = [
     tsType: "VaultRepairError",
     rs: "src-tauri/src/plugins/vault_repair/error.rs",
     rsEnum: "VaultRepairError",
+  },
+  {
+    ts: "src/types/resolved-identity.ts",
+    tsType: "ResolvedIdentity",
+    rs: "core/src/plugins/sync/identity_resolver.rs",
+    rsEnum: "ResolvedIdentity",
   },
   {
     // The one mirror with TWO copies, because its Rust source is still a twin

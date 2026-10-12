@@ -1550,6 +1550,7 @@ mod tests {
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
         fn detached_windows_teardown_on_lock(&self) {}
+        fn live_session_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, id: &str, _: &str, body: &str) {
@@ -1915,6 +1916,7 @@ mod tests {
                 &state,
                 &items,
                 0,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .expect("transactional batch must commit");
@@ -1976,6 +1978,7 @@ mod tests {
                 &state,
                 &items,
                 0,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .expect_err("a missing note must abort the whole batch");
@@ -2094,6 +2097,7 @@ mod tests {
                 TOMBSTONE.to_string(),
                 None,
                 &myne_core::vault_io::StdVaultIo,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .expect("tombstoning update");
@@ -2149,6 +2153,7 @@ mod tests {
                 DRAWING.to_string(),
                 None,
                 &myne_core::vault_io::StdVaultIo,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .expect("update");
@@ -2159,6 +2164,7 @@ mod tests {
                 &myne_core::vault_io::StdVaultIo,
                 &state,
                 &hooks,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
                 vec![NoteBatchUpdate {
                     note_id: id.clone(),
                     plaintext: DRAWING.to_string(),
@@ -2195,9 +2201,16 @@ mod tests {
                     ),
                 )
                 .await;
-            note_write_batch_with_dir(&myne_core::vault_io::StdVaultIo, notes_dir, &state, &[], 0)
-                .await
-                .expect("empty batch is a no-op success");
+            note_write_batch_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                notes_dir,
+                &state,
+                &[],
+                0,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
+            )
+            .await
+            .expect("empty batch is a no-op success");
         });
     }
 
@@ -2218,6 +2231,7 @@ mod tests {
                 &state,
                 &items,
                 0,
+                &myne_core::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .expect_err("a locked slot must reject the batch");

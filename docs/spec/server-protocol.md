@@ -17,7 +17,8 @@ The server stores **opaque ciphertext blobs and key-wrapping material** and perf
 - current-head pointer **compare-and-swap** (§2.3),
 - the per-note **version-counter** increment (§2.2),
 - **quota** accounting (§5) and **rate-limit** counting (§5),
-- relaying the **contentless poke** (§3).
+- relaying the **contentless poke** (§3),
+- **fan-out** of opaque live-awareness frames to a note room's subscribers (§3.5), never inspecting a frame byte.
 
 It **never** decrypts, merges, interprets, or reorders content. Plaintext, decryption keys, and the master password never leave the client (A1). Because the server cannot merge, all conflict resolution is **client-side** (`sync-protocol.md` §10). This "blindness" is structural, not a policy promise: the server has no key material with which to read what it relays.
 
@@ -50,6 +51,7 @@ The server exposes the operations whose **wire shapes are defined in `sync-proto
 - **pull(cursor)** — return the per-blob sync-meta `(uuid, version, content_nonce, size)` for everything changed since `cursor`, plus the current vault head; advance the cursor. The server selects by its own version counters; it never inspects content. **Layer-2-reclaimed records are omitted from every page** (plain and reconcile-flagged alike) while the returned cursor still advances across the omitted positions — a page may legitimately carry zero records with an advancing cursor (`sync-protocol.md` §11.3 "Reclaimed-record visibility"). The **ciphertext fetch** the client then performs — one blob at a time or many in one request — is **§3.3**; a fetch for a reclaimed record fails closed there, never as an empty-body 200.
 - **push(changed_blobs, new_head)** — accept iff the head CAS holds (§2.3); store the blobs in the vault namespace (§2.1), incrementing each blob's version counter (§2.2); reject a stale base with a 409-like response. **Idempotent**: a retried push with the same head is a no-op (the CAS already advanced).
 - **poke** — relay a **contentless** "vault changed" signal (zero payload — no uuid/version/count; `sync-protocol.md` §8.3) over SSE to a vault's other connected devices. Clients keep the stream open while unlocked (§8.3 as amended, `decisions.md` 2026-07-12); polling remains the fallback cadence the server always serves. Server obligations for the stream: (1) a periodic **contentless heartbeat** comment-line (`:hb`, ~30 s cadence — the client's dead-connection read-timeout is calibrated against it; it carries liveness and nothing else); (2) a per-account **concurrent-subscriber cap** (an OOM/fd bound, generous against the device-approval-gated device count); (3) connection attempts spend the **same per-account token bucket** (§5.2) as push/pull — never an IP key. Cap/limit rejections are the 429 `rate` class.
+- **awareness**, relay **opaque** live-awareness frames (`sync-protocol.md` §8.3/§8.4) over the session-bound `GET`/`POST /sync/awareness` pair of **§3.5**: a downstream SSE stream fanning a frame out to every subscriber of its note room, and an upstream authenticated POST publishing a batch. The server reads **no frame byte**; it matches the room id exactly and forwards. RAM-only, no persistence, no log beyond the IP-free access line.
 - **attachment byte-transport** — store and serve attachment ciphertext (`MYA1`) over the dedicated resumable routes of **§3.2**; attachment *metadata* records still ride pull/push (`sync-protocol.md` §8.1), and attachment deletion is a normal push tombstone (`sync-protocol.md` §11.4) — there is no separate delete route.
 
 All operations are bound to an **authenticated session**. The **v0.1 authentication mechanism** — a SCRAM-SHA-256 verifier handshake that yields a per-device bearer token — is documented in **§3.1** below (it is the `myne-server/internal/authapi` HTTP surface; MYND-420 exposure / MYND-425 client enrollment). `protocol.md` §11.1 records the forward-look (the next major version canonicalizes an OPAQUE aPAKE; the v0.1 mechanism is the high-entropy-verifier SCRAM path). Every push/pull/poke MUST be tied to an authenticated session and a poke channel MUST be authenticated (a spoofed poke is at worst low-severity DoS). The server MUST NOT accept an operation that is not session-bound.
@@ -158,7 +160,7 @@ The B2B access model (`decisions/protocol/0603`) makes server accounts **person-
 | Route | Auth | Request fields | Success response | Semantics |
 |---|---|---|---|---|
 | `POST /b2b/vaults/{account_hash}/members` | vault device token (owner registration) **or** the owner's per-vault token (add member) | `person_id_hex`, `role` (`"owner"` \| `"member"`) | `{"person_id_hex", "role", "token_hex"}` | Create a binding and issue its per-vault token. With the **vault device token**, only `role = "owner"` is accepted and the vault must have no owner yet (`409 already_owned` otherwise). With the **owner per-vault token**, only `role = "member"` is accepted (`400` for owner) and the token must be the owner of THIS vault (`403` otherwise); a re-bind is `409 already_bound`. |
-| `DELETE /b2b/vaults/{account_hash}/members/{person_id}` | owner's per-vault token | — | `{"ok": true}` | Delete one person's binding to one vault and revoke every outstanding token for that `(person, vault)`. `403` when the caller is not this vault's owner or when the target is the owner (the owner leaves only by deleting the vault); `404 not_found` when the person is not bound. A person's other vaults and their tokens are untouched. |
+| `DELETE /b2b/vaults/{account_hash}/members/{person_id}` | owner's per-vault token | (none) | `{"ok": true}` | Delete one person's binding to one vault and revoke every outstanding token for that `(person, vault)`. `403` when the caller is not this vault's owner or when the target is the owner (the owner leaves only by deleting the vault); `404 not_found` when the person is not bound. A person's other vaults and their tokens are untouched. Revoking the token also closes that member's open awareness streams at once (§3.5). |
 
 Normative points:
 
@@ -195,7 +197,7 @@ The server MUST therefore answer CORS, and MUST do so under the following normat
 
 **Both deployment modes, by configuration.** The hosted app origin is not privileged: a self-hoster configures their own. This is TB5 applied to the browser edge — the same protocol and the same security model, a different operator.
 
-**Every route the browser reaches, including the pre-auth ones.** The policy MUST cover the session-less routes of §3.1 (`POST /auth/register`, `POST /auth/scram/init`, `POST /auth/scram/final`, `GET /vault.meta`) as well as the authed surface (`/auth/devices`, `/auth/devices/approve`, `/auth/devices/revoke`, `/sync/push`, `/sync/pull`, `/sync/blob`, `/sync/blobs`, `/sync/poke`, `/account/status`, and `HEAD|GET|PUT /attachments/{id}` of §3.2). `POST /auth/scram/init` carries a JSON body and is therefore **not** a CORS-simple request: it is preflighted. A policy scoped to "authed routes" would leave the browser's **first** call unanswered, and authentication would fail before any token existed.
+**Every route the browser reaches, including the pre-auth ones.** The policy MUST cover the session-less routes of §3.1 (`POST /auth/register`, `POST /auth/scram/init`, `POST /auth/scram/final`, `GET /vault.meta`) as well as the authed surface (`/auth/devices`, `/auth/devices/approve`, `/auth/devices/revoke`, `/sync/push`, `/sync/pull`, `/sync/blob`, `/sync/blobs`, `/sync/poke`, `/sync/awareness` (GET and POST), `/account/status`, and `HEAD|GET|PUT /attachments/{id}` of §3.2). `POST /auth/scram/init` carries a JSON body and is therefore **not** a CORS-simple request: it is preflighted. A policy scoped to "authed routes" would leave the browser's **first** call unanswered, and authentication would fail before any token existed.
 
 **Preflight is answered by the policy, not by a route handler.** An `OPTIONS` request carrying `Access-Control-Request-Method` MUST be answered directly with the allowed methods, allowed request headers and a max-age, and MUST NOT reach a route handler — several routes implement no `OPTIONS` at all, and a `404`/`405` reads to the browser as an unexplained denial. A preflight from a **disallowed** origin MUST be refused with no CORS headers at all.
 
@@ -262,6 +264,44 @@ Normative server behaviour after a retirement:
 - **The retired blobs are reclaimed only after a bounded grace** (a recovery window, default 7 days, operator-adjustable). Reclamation never runs before the window elapses. The server may always delay or withhold reclamation — that is a storage errand, not a guarantee, and a client MUST NOT treat a still-present old blob as evidence the retirement did not happen.
 - **No retirement recalls data.** It prevents FUTURE access once the rotation propagates; it cannot delete content already synced or copied. The server holds no key and deletes only what it stored.
 - **The server's retirement fields are provenance, not verification.** The epochs and namespace kind/id are recorded so an operator/audit read sees what was retired; enforcement keys on the sync ids the owner named, which is what a write can be matched against.
+
+### 3.4a Group-rotation package delivery (`/b2b/vaults/{account_hash}/group-packages/{person_id}`; `collab-b2b-sessions`, extending `decisions/protocol/0603` + `0607`)
+
+When an owner removes a member, the vault's group key rotates (the local rotation is `b2b-member-sync`; its live-session consequences are `collab-b2b-sessions`). Each REMAINING member must receive the new group key, wrapped to its own person public half and signed by the owner, at the new epoch; the removed member gets none. The server is a **blind, latest-per-recipient postbox** for that one artefact.
+
+| Route | Auth | Request fields | Success response | Semantics |
+|---|---|---|---|---|
+| `PUT /b2b/vaults/{account_hash}/group-packages/{person_id}` | **owner's per-vault token** for that vault | `{"epoch": <u64>, "package_b64": "<opaque owner-signed bytes>"}` | `{"ok": true}` | Store one remaining member's rotation package for the vault. A member token or a token for another vault is `403`; an unknown bearer is `401`; an empty, malformed or over-cap (64 KiB) package is `400`. The vault comes from the token, not the path. |
+| `GET /b2b/vaults/{account_hash}/group-packages/{person_id}` | **recipient's own account session** + a membership binding to the vault | (none) | `{"epoch": <u64>, "package_b64": "<opaque owner-signed bytes>"}` | Return the recipient's OWN current package byte-identically. `{person_id}` MUST be the caller's own; a different person id, an unbound caller or an absent package is the same `404 not_found`, so the route cannot address another member's package. |
+
+Normative rules:
+
+- **The payload is opaque; `epoch` is the only cleartext field.** The server never decodes `package_b64` and holds no key. The package is an owner-double-signed group-key wrap (`myne.group-package v1|`, `protocol.md` §9.3.3) whose verification is entirely client-side against the owner public half PINNED at accept; the server records the epoch for retention order only.
+- **Latest-per-recipient, and NOT one-shot consumed.** A write at an epoch not greater than the stored one is ignored, so a replayed or stale write cannot regress a caught-up recipient. Unlike an invite, a package stays retrievable until the recipient's next sync catches up; it is never marked claimed.
+- **The removed member is never a recipient.** The rotation produces a package only for each remaining live member, so the recipient set is exactly the post-removal roster minus the removed row.
+- **RAM-only, IP-free, unlogged.** Like the invite relay, the store holds nothing but the opaque bytes and does not survive a restart; no package byte is written to a log.
+
+### 3.5 Live-awareness relay (`/sync/awareness`; `live-collab`, `decisions/sync/0655`)
+
+Real-time collaboration adds a live plane beside the poke: a client publishes its own **opaque, end-to-end-sealed** awareness frames (a cursor/selection/presence update, or an opaque Automerge change delta) and receives other clients' frames, over one `GET`/`POST /sync/awareness` pair. The relay is the fifth structural operation of §1.2 and it reads **no frame byte**.
+
+| Route | Request | Success response | Semantics |
+|---|---|---|---|
+| `GET /sync/awareness?rooms=<hex,hex,...>` | initial room set (optional; comma-separated lowercase-hex room ids) | `200` + `text/event-stream` | Open the downstream SSE stream, subscribed to the declared room set. The server writes each frame it fans out to this connection in the `{room_id_hex, frame_b64}` envelope; it forwards only frames whose room id is in the connection's **current** set. |
+| `POST /sync/awareness` | `{"rooms_subscribe":[…], "rooms_unsubscribe":[…], "frames":[{"room_id_hex":"…","frame_b64":"…"}, …]}` (all fields optional) | `{"ok": true}` | A batch publish and/or a subscription update on the **same** stream (no teardown). The three lists are independent: a POST may publish frames, change the subscribed set, or both. |
+
+Normative rules:
+
+- **The frame is opaque; the room id is an exact-match routing key.** The server never decodes `frame_b64`, never parses `room_id_hex` beyond an exact 16-byte equality test, and holds no key. A frame carries no note id, no plaintext and no person id the server can read.
+- **Fan-out is device-agnostic and includes the publisher.** A frame published in a room reaches every subscriber of that room in the vault namespace, the publishing device included; the client drops its own echo. Fan-out keys on the resolved vault namespace (§3.1a), so an owner and every member share one relay.
+- **RAM-only, and never logged.** The relay keeps no persistent per-room record and writes nothing beyond the standard IP-free access line; the server may observe that a vault has live rooms and how active each is (a `threat-model.md` §7, A13 accepted limit, asset AS24), never which notes or what is typed.
+- **Caps and refusal classes.** A frame over `MaxAwarenessFrameSize` (64 KiB) or a batch over `MaxAwarenessFramesPerPost` (16) is `413 too_large`; a malformed envelope is `400 bad_request`; a subscriber at the per-vault cap or an over-rate POST is `429 rate`. The publisher's own POST carries the frames plus any subscription change.
+- **A separate, account-keyed rate sub-bucket.** Awareness POSTs spend a budget **separate** from the push/pull/attachment bucket (§5.2), keyed on `account_number_hash`, never IP, so awareness can neither starve sync nor be starved by it. Exhausting the awareness bucket does not refuse a push.
+- **A larger, configurable per-vault subscriber cap.** The poke's single-user cap of 8 (an OOM/fd bound) is too small for a shared vault; awareness uses its own default (64) as an operator knob, still capped to bound memory and fds.
+- **Bounded drop-oldest, not blocking.** A subscriber that cannot keep up drops its **oldest** queued frame and keeps the newest, rather than blocking the publisher or being disconnected: cursor/selection frames are self-contained snapshots, and a dropped content frame is caught up by the durable blob plane (`sync-protocol.md` §10.1).
+- **Immediate termination on member removal.** When a member is removed (`DELETE /b2b/vaults/{account_hash}/members/{person_id}`, §3.1a/§3.4), the relay closes every open awareness stream authenticated with the removed member's **revoked token**, so future access ends at once rather than at the next reconnect. The relay keys streams on the **authenticating token**, not on a person or device, so it stays person-agnostic.
+- **Auth.** Both routes accept a per-device token (§3.1) and, on device-token failure, a per-vault membership token (§3.1a), exactly as `/sync/poke` does; fan-out keys on the resolved vault namespace. A non-flushable writer fails closed with `500`, never a silent hang.
+- **The poke stays untouched.** Awareness is a **separate** stream; the `GET /sync/poke` channel remains literally zero-payload (§3).
 
 ## 4. Device registry (AS16)
 

@@ -365,6 +365,10 @@ pub fn run() {
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
         .plugin(plugins::graph_layout::init())
+        // live-collab (`collab-editor-bridge`): the live co-editing session
+        // commands. The `LiveSessionRegistry` state is managed in the setup hook
+        // below, beside the awareness signal.
+        .plugin(plugins::live::init())
         .plugin(plugins::chats::init())
         // myne-md/myne#697: the agent-memory + personality store. Same
         // unlocked-slot gating as chats; the `ai_enabled` pref is the
@@ -687,6 +691,17 @@ pub fn run() {
             // stream on unlocked+enrolled and parks on a revoked token.
             app.manage(plugins::sync::poke_listener::SsePokeSignal::default());
             plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
+            // Live-awareness stream (live-collab): a SIBLING of the poke supervisor
+            // (`SYNC-32`), same unlocked+foregrounded gate (`SYNC-30`), carrying
+            // opaque awareness frames the relay cannot read. RAM-only sink; the
+            // frame crypto and the coalesced up-POST live in their own layers.
+            app.manage(plugins::sync::awareness_listener::AwarenessSignal::default());
+            plugins::sync::awareness_listener::spawn_awareness_supervisor(app.handle().clone());
+            // Live co-editing sessions (live-collab, `collab-editor-bridge`): the
+            // per-device registry of open notes' Automerge documents. Holds
+            // decrypted note plaintext, so `DesktopHooks::live_session_teardown_on_lock`
+            // clears it on every vault-leaving hook (`SYNC-33` single writer).
+            app.manage(myne_core::plugins::live::LiveSessionRegistry::default());
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
             // the owner-only (0600) Unix-domain-socket under the app-data dir
             // and serves the keyless clip ingest on a background thread. The

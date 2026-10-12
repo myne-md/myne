@@ -9,6 +9,20 @@ fn main() {
             "vault-creation",
             tauri_build::InlinedPlugin::new().commands(&["begin", "commit", "cancel"]),
         )
+        // live-collab (`collab-editor-bridge` task 3): the collaborative-editor
+        // live-session commands. The plugin namespace must be declared or the
+        // permissions under `permissions/live/` flatten into `__app-acl__` and
+        // never match `plugin:live|…`.
+        .plugin(
+            "live",
+            tauri_build::InlinedPlugin::new().commands(&[
+                "live_session_open",
+                "live_session_patch_frontmatter",
+                "live_session_take_remote_splices",
+                "live_session_set_presence",
+                "live_session_close",
+            ]),
+        )
         .plugin(
             "vault-unlock",
             // Task 2 of `vault-unlock-password` ships `unlock`;
@@ -603,11 +617,13 @@ fn main() {
                 "sync_unsynced_edits",
                 "sync_materialisation_progress",
                 "sync_now",
+                "resolve_identity",
                 "sync_list_devices",
                 "sync_account_status",
                 "sync_approve_device",
                 "sync_remove_device",
                 "sync_pending_conflicts",
+                "sync_awareness_stats",
                 "sync_take_conflict",
                 "sync_resolve_conflict",
                 "sync_mark_tombstone",

@@ -319,6 +319,25 @@ pub async fn read_sync_state(
     }
 }
 
+/// This device's Automerge actor for note authoring (`SYNC-42`): the enrolled
+/// `device_id` bytes (16, `DEVICE_ID_LEN`), or `None` when the vault carries no
+/// device identity.
+///
+/// A single shared read so `note_create`, `note_update` and the batch writer all
+/// derive the actor from the same source, and so `collab-provenance` resolves a
+/// revision's `actor_hex` through the same bytes. `None` covers a never-enrolled
+/// / local-only vault; the caller then falls back to a fresh CSPRNG draw
+/// (`crdt_doc::note_actor_bytes`). The persisted id is hex on disk, so a
+/// malformed value is `None` rather than an error: an unreadable identity is the
+/// same shape as an absent one, no device to attribute to.
+pub async fn read_device_actor(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Option<[u8; crate::plugins::sync::crdt_doc::ACTOR_ID_LEN]> {
+    let st = read_sync_state(io, vault_root).await.ok()?;
+    super::devices::hex16(st.device_id_hex.as_deref()?)
+}
+
 /// Remove the device-local sync baseline files (`sync-state.json` + `vault.head-state`)
 /// for a vault — the "reset sync on this device" primitive. Idempotent (absent files
 /// are fine). NEVER touches `notes/`, attachments, or `vault.meta`: it only drops the
@@ -1012,5 +1031,33 @@ mod tests {
         assert!(!vault_meta_is_dirty(&dir));
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn read_device_actor_reads_the_persisted_id_and_malformed_is_none() {
+        // `SYNC-42`: note authoring derives the Automerge actor from this id.
+        let tmp = ScopedTempDir::new("read-device-actor").unwrap();
+        let dir = tmp.path();
+        // Absent (never enrolled) → None, not an error.
+        assert_eq!(rt(super::read_device_actor(&IO, dir)), None);
+
+        let st = SyncState {
+            device_id_hex: Some("a1".repeat(16)),
+            ..Default::default()
+        };
+        write_sync_state(dir, &st).expect("write");
+        assert_eq!(
+            rt(super::read_device_actor(&IO, dir)),
+            Some([0xA1u8; 16]),
+            "the persisted hex id parses to its 16 bytes"
+        );
+
+        // A malformed id is None (no device to attribute to), never a panic.
+        let bad = SyncState {
+            device_id_hex: Some("zz".repeat(16)),
+            ..Default::default()
+        };
+        write_sync_state(dir, &bad).expect("write");
+        assert_eq!(rt(super::read_device_actor(&IO, dir)), None);
     }
 }

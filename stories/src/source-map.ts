@@ -80,7 +80,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DeviceManagementPanel": { file: "src/components/sync/DeviceManagementPanel.tsx", line: 240 },
   "DeviceRevoked": { file: "src/screens/DeviceRevoked.tsx", line: 67 },
   "DiffView": { file: "src/notes/components/DiffView.tsx", line: 91 },
-  "Editor": { file: "src/screens/Editor.tsx", line: 522 },
+  "Editor": { file: "src/screens/Editor.tsx", line: 523 },
   "EditorPanel": { file: "src/components/settings/EditorPanel.tsx", line: 369 },
   "EmptyState": { file: "src/components/primitives/EmptyState.tsx", line: 86 },
   "EncryptingStep": { file: "src/screens/vault-creation/EncryptingStep.tsx", line: 21 },
@@ -139,7 +139,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "PanelEmptyState": { file: "src/notes/components/PanelEmptyState.tsx", line: 28 },
   "PanelToggleGlyph": { file: "src/components/primitives/PanelToggleGlyph.tsx", line: 39 },
   "PaneTree": { file: "src/notes/components/PaneTree.tsx", line: 41 },
-  "PaneView": { file: "src/notes/components/PaneView.tsx", line: 293 },
+  "PaneView": { file: "src/notes/components/PaneView.tsx", line: 318 },
   "PasswordChangeForm": { file: "src/components/PasswordChangeForm.tsx", line: 62 },
   "PasswordCreateForm": { file: "src/components/PasswordCreateForm.tsx", line: 112 },
   "PasswordInput": { file: "src/components/PasswordInput.tsx", line: 129 },
@@ -236,4 +236,5 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "WebNoAccount": { file: "src/screens/WebNoAccount.tsx", line: 61 },
   "WebReloadNotice": { file: "src/components/WebReloadNotice.tsx", line: 75 },
   "Welcome": { file: "src/screens/Welcome.tsx", line: 40 },
+  "WhoIsHereTab": { file: "src/notes/components/WhoIsHereTab.tsx", line: 21 },
 };

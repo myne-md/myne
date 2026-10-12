@@ -448,17 +448,66 @@ async fn rekey_content_blobs(
     Ok(staged)
 }
 
+/// One remaining member's delivery package, addressed by its server-side
+/// `person_id_hash` (lowercase hex) so the owner can POST it to the vault-scoped
+/// route `PUT /b2b/vaults/{account_hash}/group-packages/{person_id}`
+/// (`collab-b2b-sessions` task 1). The removed member is never a recipient.
+pub struct GroupPackageDelivery {
+    pub person_id_hex: String,
+    pub package: protocol::person_invite::SignedGroupPackage,
+}
+
 /// The outcome of one local canonical group rotation. The retirement records are
 /// returned rather than persisted: they are sync-plane records whose transport
 /// and retention are Grill 4's, and this model deliberately writes none of them
 /// into the vault.
 pub struct GroupRotationOutput {
     pub new_epoch: u64,
+    /// One owner-signed group package per REMAINING live member that carries a
+    /// `person_id_hex` (`collab-b2b-sessions` task 1): the delivery half of the
+    /// rotation. The removed member gets none, its roster row is a tombstone
+    /// with no wrap. The owner POSTs each to the recipient's vault-scoped route;
+    /// a member fetches its own, verifies against the pinned owner public half
+    /// and unwraps the new `group_key`. A remaining member migrated from a
+    /// pre-B2B roster has no person account to address, so it is skipped here.
+    pub packages: Vec<GroupPackageDelivery>,
     pub retirements: Vec<protocol::person_invite::SignedGroupRetirement>,
     /// The retired epoch's shared-singleton sync-ids (hex), for the owner-only
     /// namespace-retirement call (`reclaim_sync_ids_hex`). Empty when the local
     /// sync plane was not enrolled.
     pub reclaim_sync_ids_hex: Vec<String>,
+}
+
+/// Address each rotation package by its recipient's `person_id_hex`, joined
+/// against the NEW signed roster. A package's payload names the recipient
+/// FINGERPRINT; the roster row for that fingerprint carries the
+/// `person_id_hash` the delivery route `PUT /b2b/vaults/{account_hash}/
+/// group-packages/{person_id}` is keyed on. A remaining member with no person
+/// account (a row migrated from the pre-B2B roster) has no server address and is
+/// skipped rather than addressed with a placeholder.
+fn address_packages(
+    packages: Vec<protocol::person_invite::SignedGroupPackage>,
+    roster: &protocol::person_invite::GroupRosterPayload,
+) -> Result<Vec<GroupPackageDelivery>, MemberRemovalError> {
+    let mut addressed = Vec::with_capacity(packages.len());
+    for package in packages {
+        let payload: protocol::person_invite::GroupPackagePayload =
+            serde_json::from_slice(&package.payload)
+                .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+        let Some(person_id_hex) = roster
+            .members
+            .iter()
+            .find(|m| m.fingerprint_hex == payload.recipient_fingerprint_hex)
+            .and_then(|m| m.person_id_hex.clone())
+        else {
+            continue;
+        };
+        addressed.push(GroupPackageDelivery {
+            person_id_hex,
+            package,
+        });
+    }
+    Ok(addressed)
 }
 
 /// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
@@ -626,6 +675,13 @@ pub async fn rotate_group_from_host(
     )
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
 
+    // (5b) Address each remaining member's package by its server-side
+    // `person_id_hash` so the owner can POST it to the vault-scoped delivery
+    // route (`collab-b2b-sessions` task 1).
+    let new_roster = protocol::person_invite::parse_group_roster(&rotated.signed_roster.payload)
+        .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    let packages = address_packages(rotated.packages, &new_roster)?;
+
     // (6) Re-seal the NTV6 metadata at the new epoch.
     let mut base = b2b_meta.base;
     let enc_items = protocol::aead_seal_ctx(
@@ -710,6 +766,10 @@ pub async fn rotate_group_from_host(
 
     Ok(GroupRotationOutput {
         new_epoch: rotated.new_epoch,
+        // The per-member delivery packages the rotation already built, now
+        // addressed by recipient `person_id_hash` for the delivery route
+        // (`collab-b2b-sessions` task 1).
+        packages,
         retirements: rotated.retirements,
         reclaim_sync_ids_hex,
     })
@@ -1278,6 +1338,78 @@ mod tests {
         }
     }
 
+    /// `address_packages` joins a package's recipient FINGERPRINT to the new
+    /// roster row's `person_id_hex`, and skips a remaining member with no person
+    /// account (a row migrated from the pre-B2B roster).
+    #[test]
+    fn address_packages_keys_each_delivery_on_its_recipient_person_id() {
+        let owner = PersonKeyPair::generate_raw(&[0xB1u8; 64], &[0xB2u8; 32], &[0xB3u8; 32]);
+        let addressed_member =
+            PersonKeyPair::generate_raw(&[0xC1u8; 64], &[0xC2u8; 32], &[0xC3u8; 32]);
+        let legacy_member =
+            PersonKeyPair::generate_raw(&[0xD1u8; 64], &[0xD2u8; 32], &[0xD3u8; 32]);
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let group_key = [0x7Au8; 32];
+        let p_addressed = protocol::person_invite::create_group_package(
+            &owner,
+            &addressed_member.public_half(),
+            &group_key,
+            &ROT_ACCT,
+            2,
+            &mut rng,
+        )
+        .expect("package addressed");
+        let p_legacy = protocol::person_invite::create_group_package(
+            &owner,
+            &legacy_member.public_half(),
+            &group_key,
+            &ROT_ACCT,
+            2,
+            &mut rng,
+        )
+        .expect("package legacy");
+        let pid = "12".repeat(16);
+        let mut roster = GroupRosterPayload {
+            account_number_hash_hex: rot_hex(&ROT_ACCT),
+            group_key_epoch: 2,
+            owner_fingerprint_hex: rot_hex(owner.fingerprint()),
+            members: vec![
+                rot_row(
+                    &addressed_member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    None,
+                ),
+                rot_row(
+                    &legacy_member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    None,
+                ),
+            ],
+        };
+        // Stamp the server-side person id on ONE remaining member only.
+        for m in &mut roster.members {
+            if m.fingerprint_hex == rot_hex(addressed_member.fingerprint()) {
+                m.person_id_hex = Some(pid.clone());
+            }
+        }
+
+        let addressed =
+            address_packages(vec![p_addressed.clone(), p_legacy], &roster).expect("address");
+        assert_eq!(
+            addressed.len(),
+            1,
+            "only the member carrying a person id is addressed"
+        );
+        assert_eq!(addressed[0].person_id_hex, pid);
+        assert_eq!(
+            protocol::person_invite::encode_signed_group_package(&addressed[0].package),
+            protocol::person_invite::encode_signed_group_package(&p_addressed),
+            "the delivered package is the one the rotation built"
+        );
+    }
+
     /// Build a real `NTV6` vault at `<base>/data/vaults/<id>/` with one note
     /// sealed under the epoch-1 group-derived `itemsKey` and a roster of owner +
     /// one member, plus the matching owner-held slot.
@@ -1447,6 +1579,14 @@ mod tests {
 
             assert_eq!(out.new_epoch, 2);
             assert_eq!(out.retirements.len(), 2);
+            // `collab-b2b-sessions` task 1: the delivery packages are carried out.
+            // This vault's ONLY member is the one removed, so there are none to
+            // deliver; `person_invite`'s own rotation test covers the remaining-member
+            // case (one package per remaining member, none for the removed one).
+            assert!(
+                out.packages.is_empty(),
+                "a removed member gets no package and no member remains"
+            );
             for record in &out.retirements {
                 let payload = protocol::person_invite::verify_group_retirement(
                     &owner.public_half(),

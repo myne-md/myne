@@ -335,6 +335,38 @@ pub fn aad_group_roster_blob(account_number_hash: &[u8; 16], group_key_epoch: u6
     aad
 }
 
+/// Build the v0.2 AAD for a live-collaboration **awareness frame**
+/// (`protocol.md` §5.2; SYNC-2/SYNC-21).
+///
+/// Layout: `"myne.v0.2|" || 0x02 || u16_len("awareness-frame") || role ||
+/// account_number_hash (16)` and, for an `NTV6` vault, `|| group_key_epoch (8,
+/// big-endian)`.
+///
+/// Binds the vault, so a frame sealed for one vault cannot be replayed in
+/// another. The optional epoch slot keeps a post-rotation frame from a retired
+/// epoch from opening under the new group-derived room key. `items_key_id` is
+/// deliberately NOT bound: the frame has no `itemsKey` lineage. The frame is
+/// magic-less by design (a wire-only envelope, `protocol.md` §10.7).
+pub fn aad_awareness_frame(account_number_hash: &[u8; 16], epoch: Option<u64>) -> Vec<u8> {
+    const ROLE_STR_AWARENESS_FRAME: &[u8] = b"awareness-frame";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_AWARENESS_FRAME.len()
+            + account_number_hash.len()
+            + if epoch.is_some() { 8 } else { 0 },
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_AWARENESS_FRAME);
+    aad.extend_from_slice(account_number_hash);
+    if let Some(epoch) = epoch {
+        aad.extend_from_slice(&epoch.to_be_bytes());
+    }
+    aad
+}
+
 /// Build the AAD bound into the AEAD wrap of a per-note `item_key`
 /// under the singleton v0.1 `itemsKey` (spec § 5.2 + § 6.2).
 ///
@@ -3612,6 +3644,46 @@ mod tests {
                 ("role_label", 17),
             ],
             "      \"input_role_label\": \"vault-invite-blob\",\n",
+            true,
+        );
+        // The live-collaboration awareness frame AAD (live-collab,
+        // decisions/sync/0655). The NTV5 form is the singleton shape under role
+        // 'awareness-frame'; the NTV6 form appends the 8-byte big-endian
+        // group_key_epoch after the account hash (the aad_group_roster_blob
+        // order), so a post-rotation frame from a retired epoch fails AEAD.
+        let aad_awareness_ntv5 = aad_awareness_frame(&account_number_hash, None);
+        emit_case(
+            &mut dump,
+            "aad_awareness_frame-ntv5",
+            "aad_awareness_frame",
+            "The live-collaboration awareness frame AAD, NTV5 form (live-collab, decisions/sync/0655): prefix + 0x02 + length-prefixed role 'awareness-frame' + account_number_hash, the singleton shape. The frame is sync-wire-only and magic-less (not a §10.3 family).",
+            &aad_awareness_ntv5,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 15),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
+            true,
+        );
+        let aad_awareness_ntv6 = aad_awareness_frame(&account_number_hash, Some(3));
+        emit_case(
+            &mut dump,
+            "aad_awareness_frame-ntv6-with-epoch",
+            "aad_awareness_frame",
+            "The same builder, NTV6 form: the 8-byte big-endian group_key_epoch is appended AFTER the account_number_hash (the aad_group_roster_blob order), so a post-rotation frame from a retired epoch fails AEAD verification under the new group-derived room key. Paired with the NTV5 case so the epoch slot is exercised at two lengths.",
+            &aad_awareness_ntv6,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 15),
+                ("account_number_hash", 16),
+                ("group_key_epoch", 8),
+            ],
+            &alloc::format!("{account_hash_json}      \"input_group_key_epoch\": 3,\n"),
             false,
         );
         dump.push_str("  ]\n");

@@ -37,6 +37,10 @@ pub struct SnapshotMeta {
     pub snapshot_uuid: String,
     pub captured_at_ms: u64,
     pub size_bytes: u64,
+    /// The resolved author of THIS revision (`collab-provenance` task 2/3): the
+    /// device that made the change (named, or the short-code fallback), or `Unknown`
+    /// for the `MY01` arm and an unmappable actor. Never a Person durably.
+    pub resolved_author: crate::plugins::sync::identity_resolver::ResolvedIdentity,
 }
 
 /// True if `s` is a valid UUIDv7 string (the snapshot id shape).
@@ -63,7 +67,9 @@ fn map_note_update_err(e: NoteUpdateError) -> SnapshotError {
         // never be base-guarded), so this arm fires only via a bug.
         NoteUpdateError::PlaintextTooLarge
         | NoteUpdateError::JoinFailure
-        | NoteUpdateError::BaseMismatch => SnapshotError::JoinFailure,
+        | NoteUpdateError::BaseMismatch
+        // Unreachable here too: a restore does not go through the live plane.
+        | NoteUpdateError::LiveSessionOpen => SnapshotError::JoinFailure,
     }
 }
 
@@ -94,6 +100,7 @@ fn notes_dir_beside(snapshots_dir: &std::path::Path) -> Option<PathBuf> {
 pub(crate) async fn snapshot_list_in(
     snapshots_dir: PathBuf,
     state: &VaultRuntimeState,
+    device_names: &std::collections::BTreeMap<String, String>,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
@@ -109,6 +116,8 @@ pub(crate) async fn snapshot_list_in(
     if let Some(notes_dir) = notes_dir_beside(&snapshots_dir) {
         let note_uuid_bytes = *note_id.as_uuid().as_bytes();
         let note_path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+        // Cloned into the `'static` blocking closure.
+        let names_for_arm = device_names.clone();
         let crdt = crate::task::run_blocking(
             move || -> Result<Option<Vec<SnapshotMeta>>, SnapshotError> {
                 let blob = match std::fs::read(&note_path) {
@@ -134,6 +143,13 @@ pub(crate) async fn snapshot_list_in(
                         .into_iter()
                         .rev()
                         .map(|r| SnapshotMeta {
+                            resolved_author:
+                                crate::plugins::sync::identity_resolver::resolve_revision_author(
+                                    &names_for_arm,
+                                    crate::plugins::sync::identity_resolver::actor_from_hex(
+                                        &r.actor_hex,
+                                    ),
+                                ),
                             snapshot_uuid: r.change_hash_hex,
                             captured_at_ms: r.timestamp_millis.max(0) as u64,
                             size_bytes: r.size_bytes,
@@ -164,6 +180,8 @@ pub(crate) async fn snapshot_list_in(
     Ok(files
         .into_iter()
         .map(|f| SnapshotMeta {
+            // The `MY01` snapshots arm has no Automerge actor to resolve.
+            resolved_author: crate::plugins::sync::identity_resolver::ResolvedIdentity::Unknown,
             snapshot_uuid: f.snapshot_uuid,
             captured_at_ms: f.captured_at_ms,
             size_bytes: f.size_bytes,
@@ -175,10 +193,22 @@ pub(crate) async fn snapshot_list_in(
 pub async fn snapshot_list_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
     let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
-    snapshot_list_in(snapshots_dir, state, note_id)
+    // `collab-provenance` task 3: the vault's device names resolve each revision's
+    // actor to a device label. Read once; an unreadable prefs blob degrades to an
+    // empty map (every revision then resolves to the short-code fallback).
+    let vault_dir = snapshots_dir
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(|| snapshots_dir.clone());
+    let device_names = crate::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state, io)
+        .await
+        .map(|v| v.device_names)
+        .unwrap_or_default();
+    snapshot_list_in(snapshots_dir, state, &device_names, note_id)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -198,7 +228,13 @@ pub async fn snapshot_list<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
-    snapshot_list_from_host(&TauriHost::new(app), state.inner(), note_id).await
+    snapshot_list_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+        note_id,
+    )
+    .await
 }
 
 // ---- snapshot_preview ---------------------------------------------------
@@ -353,6 +389,7 @@ pub async fn snapshot_preview<R: Runtime>(
 /// seam. Desktop's `DesktopHooks` and mobile's `MobileHooks` both capture through
 /// the shared `myne-core` snapshot store; a client whose hooks no-op capture
 /// (`NoopHooks`) simply has no undo point to fail on.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn snapshot_restore_in(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
@@ -365,8 +402,18 @@ pub(crate) async fn snapshot_restore_in(
     // passes its real host so the metric it feeds stays honest.
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
+    registry: Option<&crate::plugins::live::LiveSessionRegistry>,
 ) -> Result<(), SnapshotError> {
     let note_id_parsed = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
+    // Single-writer refusal (`SYNC-33`): while a live session owns this note it IS
+    // the only durable writer, so restoring would write behind it and the session's
+    // next flush (or the pane's next save) would silently discard the restore.
+    // `None` means the caller has NO registry in hand (the agent undo on a host that
+    // does not manage one), which skips the check: the type says so rather than a
+    // throwaway registry hiding it.
+    if registry.is_some_and(|r| r.is_note_open(&note_id_parsed.to_string())) {
+        return Err(SnapshotError::LiveSessionOpen);
+    }
     // A CRDT revision id is a change hash rather than a UUIDv7 — same per-source
     // shape rule as `snapshot_preview_in`.
     let crdt_candidate = !valid_v7(&snapshot_uuid);
@@ -575,17 +622,27 @@ pub async fn snapshot_restore_from_host(
     // arm here broke the wasm build of a crate that otherwise compiles fine.
     // Threading it keeps the choice at the edge, where the host already is.
     io: &dyn crate::vault_io::VaultIo,
+    registry: Option<&crate::plugins::live::LiveSessionRegistry>,
 ) -> Result<(), SnapshotError> {
     let notes_dir = resolve_notes_dir(host, io, state.active_vault_id().await).await?;
-    snapshot_restore_in(notes_dir, state, hooks, note_id, snapshot_uuid, io, host)
-        .await
-        .inspect_err(|e| {
-            tracing::debug!(
-                stage = "snapshot_restore",
-                error_kind = snapshot_error_kind(e),
-                "snapshot command failed"
-            )
-        })
+    snapshot_restore_in(
+        notes_dir,
+        state,
+        hooks,
+        note_id,
+        snapshot_uuid,
+        io,
+        host,
+        registry,
+    )
+    .await
+    .inspect_err(|e| {
+        tracing::debug!(
+            stage = "snapshot_restore",
+            error_kind = snapshot_error_kind(e),
+            "snapshot command failed"
+        )
+    })
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -596,6 +653,7 @@ pub async fn snapshot_restore<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
+    registry: State<'_, crate::plugins::live::LiveSessionRegistry>,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
@@ -606,6 +664,7 @@ pub async fn snapshot_restore<R: Runtime>(
         note_id,
         snapshot_uuid,
         &crate::vault_io::StdVaultIo,
+        Some(registry.inner()),
     )
     .await
 }
@@ -792,6 +851,7 @@ mod tests {
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
         fn detached_windows_teardown_on_lock(&self) {}
+        fn live_session_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
@@ -909,10 +969,15 @@ mod tests {
             .await
             .unwrap();
             // No snapshot yet (create doesn't snapshot).
-            assert!(snapshot_list_in(sdir.clone(), &state, id.clone())
-                .await
-                .unwrap()
-                .is_empty());
+            assert!(snapshot_list_in(
+                sdir.clone(),
+                &state,
+                &std::collections::BTreeMap::new(),
+                id.clone()
+            )
+            .await
+            .unwrap()
+            .is_empty());
             // First update → one snapshot (of v1).
             note_update_with_dir(
                 notes_dir.clone(),
@@ -927,7 +992,9 @@ mod tests {
             .await
             .unwrap();
 
-            let list = snapshot_list_in(sdir, &state, id).await.unwrap();
+            let list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
+                .await
+                .unwrap();
             assert_eq!(list.len(), 1);
             assert!(list[0].size_bytes > 0);
         });
@@ -1011,9 +1078,14 @@ mod tests {
             // `snapshots/` holds nothing for this note, by design.
             assert!(!sdir.join(&id).exists());
 
-            let list = snapshot_list_in(sdir.clone(), &state, id.clone())
-                .await
-                .unwrap();
+            let list = snapshot_list_in(
+                sdir.clone(),
+                &state,
+                &std::collections::BTreeMap::new(),
+                id.clone(),
+            )
+            .await
+            .unwrap();
             assert_eq!(list.len(), 3, "one revision per committed edit");
             assert!(
                 list[0].captured_at_ms >= list[list.len() - 1].captured_at_ms,
@@ -1041,6 +1113,7 @@ mod tests {
                 oldest,
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                None,
             )
             .await
             .unwrap();
@@ -1057,7 +1130,9 @@ mod tests {
 
             // The restore itself is a revision, so history GREW rather than
             // rewound — which is what makes it undoable.
-            let after_list = snapshot_list_in(sdir, &state, id).await.unwrap();
+            let after_list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
+                .await
+                .unwrap();
             assert_eq!(after_list.len(), 4);
         });
     }
@@ -1098,7 +1173,7 @@ mod tests {
             let state = VaultRuntimeState::default(); // Empty
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
             assert_eq!(
-                snapshot_list_in(sdir, &state, phantom).await,
+                snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), phantom).await,
                 Err(SnapshotError::VaultNotUnlocked)
             );
         });
@@ -1135,9 +1210,14 @@ mod tests {
             .await
             .unwrap();
 
-            let snap_uuid = snapshot_list_in(sdir.clone(), &state, id.clone())
-                .await
-                .unwrap()[0]
+            let snap_uuid = snapshot_list_in(
+                sdir.clone(),
+                &state,
+                &std::collections::BTreeMap::new(),
+                id.clone(),
+            )
+            .await
+            .unwrap()[0]
                 .snapshot_uuid
                 .clone();
             let body = snapshot_preview_in(sdir, &state, id, snap_uuid)
@@ -1230,9 +1310,14 @@ mod tests {
             .unwrap();
 
             // One snapshot exists: S1 = v1. Live note = v2.
-            let s1 = snapshot_list_in(sdir.clone(), &state, id.clone())
-                .await
-                .unwrap()[0]
+            let s1 = snapshot_list_in(
+                sdir.clone(),
+                &state,
+                &std::collections::BTreeMap::new(),
+                id.clone(),
+            )
+            .await
+            .unwrap()[0]
                 .snapshot_uuid
                 .clone();
 
@@ -1245,6 +1330,7 @@ mod tests {
                 s1,
                 &crate::vault_io::StdVaultIo,
                 &crate::host::NoopHost,
+                None,
             )
             .await
             .unwrap();
@@ -1264,7 +1350,9 @@ mod tests {
             assert_eq!(dec.plaintext(), v1.as_bytes());
 
             // Two snapshots now: S1 (v1) + the undo point (pre-restore = v2).
-            let list = snapshot_list_in(sdir, &state, id).await.unwrap();
+            let list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
+                .await
+                .unwrap();
             assert_eq!(
                 list.len(),
                 2,

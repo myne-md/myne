@@ -758,6 +758,14 @@ mod app_seam {
             let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
                 return DailyAppendOutcome::Io;
             };
+            // A live co-editing session owns its note; the CLI append must be
+            // refused through the same registry the desktop manages.
+            let Some(registry) = self
+                .app
+                .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
+            else {
+                return DailyAppendOutcome::Io;
+            };
             let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
             let io = myne_core::vault_io::StdVaultIo;
             let result = tauri::async_runtime::block_on(period_append(
@@ -765,6 +773,7 @@ mod app_seam {
                 state.inner(),
                 hooks.inner(),
                 &io,
+                registry.inner(),
                 period,
                 line,
             ));

@@ -216,6 +216,7 @@ import { infer as aiInfer } from "../lib/writing-assistant";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
 import { getActiveEditorView } from "../editor/active-view";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
+import { WhoIsHereTab } from "../notes/components/WhoIsHereTab";
 import { OutlineTab } from "../notes/components/OutlineTab";
 import { ToolbarLayoutSync } from "../notes/ToolbarLayoutSync";
 import {
@@ -5017,6 +5018,8 @@ function RightSidebar({
             // applied text of a note that has just been reverted underneath it.
             onRunUndone={() => ctx.reloadOpenNote()}
           />
+        ) : active === "who-is-here" ? (
+          <WhoIsHereTab />
         ) : null}
       </div>
 

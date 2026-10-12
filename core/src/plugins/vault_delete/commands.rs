@@ -269,6 +269,10 @@ async fn run_post_delete_teardown(
         // on the same delete-proceeded path: its plaintext must not outlive the
         // vault in a second window.
         hooks.detached_windows_teardown_on_lock();
+        // live-collab: drop every open live co-editing session on the same
+        // delete-proceeded path so a session's decrypted plaintext does not
+        // outlive the deleted vault.
+        hooks.live_session_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
         // delete-proceeded path so it does not outlive the deleted vault.
         hooks.zeroize_vault_indices();

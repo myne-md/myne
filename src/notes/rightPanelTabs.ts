@@ -37,6 +37,9 @@ export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = [
   // and the ai_enabled gating are the AI Chat body's concern (task 5), not the
   // strip's — a hideable tab like any other.
   { id: "ai-chat", labelKey: "editor.chrome.rightPanel.tabs.aiChat", icon: "message-square" },
+  // "Who's here", the live-presence roster (live-collab, `collab-presence-ui`).
+  // A hideable, reorderable tab like any other; its body is `WhoIsHereTab`.
+  { id: "who-is-here", labelKey: "editor.chrome.rightPanel.tabs.whoIsHere", icon: "users" },
 ];
 
 /**
@@ -51,6 +54,7 @@ export const RIGHT_PANEL_DEFAULT_ORDER: readonly string[] = [
   "outline",
   "tasks",
   "ai-chat",
+  "who-is-here",
 ];
 
 /** Label-key lookup for a tab id (used by the strip + the context menus). */

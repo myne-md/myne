@@ -224,17 +224,25 @@ pub async fn note_create_with_dir(
         },
         None => false,
     };
-    // A fresh CSPRNG Automerge actor id (device provenance) for the NC05 note;
-    // unused on the v0.1 path. Drawn here so a getrandom failure surfaces before
-    // the blocking hop (mirrors `sync::crdt_doc`'s production actor source).
+    // The Automerge actor for an NC05 note: this device's stable identity
+    // (`SYNC-42`), derived from the persisted `device_id`, falling back to a fresh
+    // CSPRNG actor when the vault has no device identity (never enrolled /
+    // local-only). Resolved here so a getrandom failure surfaces before the
+    // blocking hop, and so the note is attributed to the device that created it.
     let actor = if is_v0_2 {
-        match crate::plugins::sync::crdt_doc::fresh_actor_bytes() {
+        let device_id = match notes_dir.parent() {
+            Some(vault_root) => {
+                crate::plugins::sync::state::read_device_actor(io, vault_root).await
+            }
+            None => None,
+        };
+        match crate::plugins::sync::crdt_doc::note_actor_bytes(device_id) {
             Ok(a) => a,
             Err(_) => {
                 tracing::error!(
                     stage = "encode",
                     error_kind = "JoinFailure",
-                    "note_create failed to draw a CSPRNG actor id for an NC05 note"
+                    "note_create failed to derive an NC05 actor id for this device"
                 );
                 return Err(NoteCreateError::JoinFailure);
             }
@@ -749,6 +757,10 @@ fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
 /// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown,
 ///   absorbing v0.1-unreachable `ProtocolError::Csprng` /
 ///   `ProtocolError::AeadFailure` paths defensively.
+// Eight arguments (host, state, hooks, note id, plaintext, expected base, io, live
+// registry), the three-layer core command shape plus the single-writer registry,
+// the same count every `*_from_host` in this tree already runs at.
+#[allow(clippy::too_many_arguments)]
 pub async fn note_update_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -757,7 +769,20 @@ pub async fn note_update_from_host(
     plaintext: String,
     expected_base_hash_hex: Option<String>,
     io: &dyn VaultIo,
+    registry: &crate::plugins::live::LiveSessionRegistry,
 ) -> Result<(), NoteUpdateError> {
+    // Single-writer refusal (`SYNC-33`, `collab-editor-bridge`): while a live
+    // co-editing session owns this note it IS the only durable writer, so a
+    // stateless save is refused rather than racing the session's persistence.
+    // Checked before any work; nothing is written.
+    if registry.is_note_open(&note_id) {
+        tracing::debug!(
+            stage = "live_session",
+            outcome = "refused",
+            "note_update refused: a live co-editing session owns this note"
+        );
+        return Err(NoteUpdateError::LiveSessionOpen);
+    }
     // First-line Plaintext-IPC wrap (`src-tauri/AGENTS.md`): bound the
     // index-feeding copy to `Zeroizing` so it wipes on every early-return and
     // at function exit rather than lingering as a plain `String` across the
@@ -904,6 +929,7 @@ pub async fn note_update<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
+    registry: State<'_, crate::plugins::live::LiveSessionRegistry>,
     note_id: String,
     plaintext: String,
     expected_base_hash_hex: Option<String>,
@@ -916,6 +942,7 @@ pub async fn note_update<R: Runtime>(
         plaintext,
         expected_base_hash_hex,
         &crate::vault_io::StdVaultIo,
+        registry.inner(),
     )
     .await
 }
@@ -1047,6 +1074,13 @@ pub async fn note_update_with_dir(
     // coalescing gate compares against a timestamp persisted in a previous
     // session, which a per-process monotonic reading cannot be compared to.
     let now_ms = host.now_unix_millis();
+    // This device's Automerge actor (`SYNC-42`), resolved here because the
+    // blocking closure below is `'static` and cannot borrow `io`. `None` (no
+    // device identity) keeps the edited document's inherited actor.
+    let device_actor = match vault_root.as_deref() {
+        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        None => None,
+    };
     // The snapshot-capture side-effect rides the hooks seam (desktop wires the
     // real snapshot store; mobile is a no-op). Clone the `Arc` so it moves into
     // the blocking closure alongside the other captured inputs.
@@ -1122,6 +1156,7 @@ pub async fn note_update_with_dir(
             let upd = crate::plugins::notes::crdt::encode_note_edit_at_millis(
                 &blob_bytes,
                 &plaintext,
+                device_actor.as_ref(),
                 &items_key,
                 &items_key_id,
                 &note_uuid_bytes,
@@ -1338,6 +1373,7 @@ pub fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
         NoteUpdateError::Io { .. } => "Io",
         NoteUpdateError::JoinFailure => "JoinFailure",
         NoteUpdateError::BaseMismatch => "BaseMismatch",
+        NoteUpdateError::LiveSessionOpen => "LiveSessionOpen",
     }
 }
 
@@ -1396,6 +1432,7 @@ pub async fn note_write_batch_transactional_from_host(
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
+    registry: &crate::plugins::live::LiveSessionRegistry,
     notes: Vec<NoteBatchUpdate>,
 ) -> Result<(), NoteBatchError> {
     // First-line Plaintext-IPC discipline: bound every body to a
@@ -1451,7 +1488,15 @@ pub async fn note_write_batch_transactional_from_host(
             }
         })?;
 
-    note_write_batch_with_dir(io, notes_dir, state, &items, host.now_unix_millis()).await?;
+    note_write_batch_with_dir(
+        io,
+        notes_dir,
+        state,
+        &items,
+        host.now_unix_millis(),
+        registry,
+    )
+    .await?;
 
     // MYND-29 parity with `note_update`: re-index every rewritten note so
     // full-text search reflects the new bodies (esp. the renamed note's
@@ -1492,6 +1537,7 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
+    registry: State<'_, crate::plugins::live::LiveSessionRegistry>,
     notes: Vec<NoteBatchUpdate>,
 ) -> Result<(), NoteBatchError> {
     note_write_batch_transactional_from_host(
@@ -1499,6 +1545,7 @@ pub async fn note_write_batch_transactional<R: Runtime>(
         &crate::vault_io::StdVaultIo,
         state.inner(),
         hooks.inner(),
+        registry.inner(),
         notes,
     )
     .await
@@ -1519,13 +1566,31 @@ pub async fn note_write_batch_with_dir(
     // the timestamp is threaded in — the same shape
     // `crdt::encode_note_edit_at_millis` exists for.
     now_millis: u64,
+    registry: &crate::plugins::live::LiveSessionRegistry,
 ) -> Result<(), NoteBatchError> {
     if items.is_empty() {
         return Ok(());
     }
+    // Single-writer refusal (`SYNC-33`, `collab-editor-bridge`): a note a live
+    // session owns has that session as its only durable writer, so a rename/move
+    // batch is refused rather than writing behind it (which the session's next
+    // flush, or the pane's next save, would silently discard). Checked before any
+    // filesystem touch, over EVERY item.
+    for (note_id, _) in items {
+        if registry.is_note_open(note_id) {
+            return Err(NoteBatchError::LiveSessionOpen);
+        }
+    }
     // Kept for the commit, which happens after the blocking closure consumes
     // its own copy (task 86).
     let notes_dir_for_commit = notes_dir.clone();
+    // This device's Automerge actor (`SYNC-42`) for the NC05 re-encode below,
+    // resolved before the `'static` closure (which cannot borrow `io`). `None`
+    // keeps the edited documents' inherited actor.
+    let device_actor = match notes_dir.parent() {
+        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        None => None,
+    };
 
     // Strict-parse EVERY note_id before any filesystem touch (a malformed
     // id never reaches a path). Re-wrap each body in a fresh `Zeroizing`
@@ -1624,6 +1689,7 @@ pub async fn note_write_batch_with_dir(
                 let upd = crate::plugins::notes::crdt::encode_note_edit_at_millis(
                     &old_blob,
                     plaintext,
+                    device_actor.as_ref(),
                     &items_key,
                     &items_key_id,
                     &note_uuid_bytes,
@@ -1759,6 +1825,7 @@ pub fn note_batch_error_kind(e: &NoteBatchError) -> &'static str {
         NoteBatchError::Io { .. } => "Io",
         NoteBatchError::CommittedPendingPublish { .. } => "CommittedPendingPublish",
         NoteBatchError::JoinFailure => "JoinFailure",
+        NoteBatchError::LiveSessionOpen => "LiveSessionOpen",
     }
 }
 
@@ -3075,6 +3142,7 @@ mod tests {
                     &state,
                     &items,
                     0,
+                    &crate::plugins::live::LiveSessionRegistry::new(),
                 ),
             )
             .await;
@@ -3105,6 +3173,7 @@ mod tests {
                 &state,
                 &items,
                 0,
+                &crate::plugins::live::LiveSessionRegistry::new(),
             )
             .await
             .unwrap();
@@ -3266,6 +3335,7 @@ mod tests {
                     edited.to_string(),
                     None,
                     &crate::vault_io::StdVaultIo,
+                    &crate::plugins::live::LiveSessionRegistry::new(),
                 )
                 .await
                 .unwrap();

@@ -250,7 +250,25 @@ pub fn sync_signal(kind: &str) {
 
 /// `{"endpoint","token"}` JSON for the poke stream, or `None` when sync is not
 /// usable yet (no endpoint configured, or this device is not enrolled).
+///
+/// The awareness reader shares this export rather than adding a second target
+/// lookup (task 4, acceptance criterion 4): the token already crosses into JS on
+/// every sync request, so a second copy would add exposure and a second place to
+/// keep in step with none.
 #[wasm_bindgen]
 pub async fn sync_poke_target() -> Option<String> {
     crate::sync_loop::poke_target().await
+}
+
+/// Deliver one opaque awareness frame the Worker read off `/sync/awareness`.
+///
+/// `payload` is the SSE `data:` payload verbatim, with the prefix stripped by
+/// the reader; this side stores it opaque and never parses it (`crate::awareness`
+/// is the transport's read-side seam, user story 8). The up-path POST is driven
+/// from `sync_tick`, so there is no matching "send" export: the editor bridge,
+/// which WILL produce frames, is Rust inside this same wasm instance and calls
+/// `crate::awareness::push_outgoing` directly rather than crossing back to JS.
+#[wasm_bindgen]
+pub fn sync_awareness_deliver(payload: String) {
+    crate::awareness::deliver(payload.into_bytes());
 }

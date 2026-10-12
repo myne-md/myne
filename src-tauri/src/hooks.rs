@@ -202,6 +202,28 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     fn detached_windows_teardown_on_lock(&self) {
         crate::plugins::detached_window::teardown_on_lock(&self.app);
     }
+    /// Drop every open live co-editing session (epic live-collab,
+    /// `collab-editor-bridge`): a session holds decrypted note plaintext, so none
+    /// may survive a lock, a switch, a delete or a force-relock.
+    ///
+    /// This is the KEYS safety net, not the durability path: it drops the session
+    /// without flushing, because it runs on a sync teardown hook and the flush is
+    /// async. The content reaches disk first, on the frontend leg: every
+    /// vault-leaving site (the Lock button, `vault-lock-imminent`, the switch, the
+    /// StorageLost takeover) runs `runFlushChain(flushSteps, …)`, whose `flushAll`
+    /// flushes each pane's pending autosave, which for a live note routes through
+    /// `patchLiveNote` → `live_session_patch_frontmatter` → the session's own
+    /// durable flush. So a session still dirty here means a writer already failed
+    /// (the chain is best-effort by design and cannot skip the lock), and dropping
+    /// it is the right call: a locked vault must hold no plaintext.
+    fn live_session_teardown_on_lock(&self) {
+        if let Some(reg) = self
+            .app
+            .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
+        {
+            reg.clear();
+        }
+    }
     fn clear_staged_descriptor(&self) {
         crate::plugins::workspace::commands::clear_staged_descriptor();
     }

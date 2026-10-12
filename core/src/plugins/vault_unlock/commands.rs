@@ -228,6 +228,9 @@ pub async fn unlock_from_host(
         // myne#679: destroy vault A's detached (pop-out) note windows before
         // vault B hydrates: its plaintext must not survive the switch.
         hooks.detached_windows_teardown_on_lock();
+        // live-collab: drop the prior vault's live co-editing sessions before
+        // vault B hydrates, a session holds decrypted note plaintext.
+        hooks.live_session_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -1480,6 +1483,9 @@ pub async fn lock_from_host(
     // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
+    // live-collab: drop every open live co-editing session on the manual lock ,
+    // a session holds decrypted note plaintext, so locking means locked for it too.
+    hooks.live_session_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -2616,6 +2622,7 @@ mod tests {
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
                     "detached_windows_teardown_on_lock",
+                    "live_session_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

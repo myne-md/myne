@@ -42,8 +42,12 @@ pub enum SnapshotError {
     NotesDirNotADirectory,
     #[error("io error")]
     Io { io_error_kind: IoFailureKind },
-    #[error("background task failed")]
+    #[error("join failure")]
     JoinFailure,
+    /// A live co-editing session owns this note, so a restore would write behind
+    /// the session's single durable writer (`SYNC-33`). Refused rather than raced.
+    #[error("a live session owns this note")]
+    LiveSessionOpen,
 }
 
 /// Static-string label for [`SnapshotError`] variants — drift-detector
@@ -59,5 +63,6 @@ pub(crate) fn snapshot_error_kind(e: &SnapshotError) -> &'static str {
         SnapshotError::NotesDirNotADirectory => "NotesDirNotADirectory",
         SnapshotError::Io { .. } => "Io",
         SnapshotError::JoinFailure => "JoinFailure",
+        SnapshotError::LiveSessionOpen => "LiveSessionOpen",
     }
 }
