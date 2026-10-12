@@ -27,10 +27,12 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickNewItem,
   closeSettings,
   createNote,
   dismissImporterOffer,
   enableDeveloperMode,
+  openSettings,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
@@ -133,6 +135,73 @@ aiDescribe("aux1 AI settings surface + right-sidebar AI Chat tab (ai-ux-surface)
         // being present ⟺ AI Chat is the visible pane and Backlinks is hidden.
         await s.byTestId("ai.chat-tab");
         expect(await activeTabId(s)).toBe("ai-chat");
+      },
+    );
+  });
+});
+
+/** Create a folder via the sidebar's inline new-folder input. The trailing `\uE007`
+ *  (W3C Enter) commits it, else `notes.folder-row` never materializes, the same
+ *  helper `folder-archive.e2e.ts` carries locally. */
+async function createFolder(s: Session, name: string): Promise<void> {
+  await clickNewItem(s, "notes.new-folder");
+  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
+  await s.byTestId("notes.folder-row");
+}
+
+describeE2E("aux2 the excluded-folders picker writes the list the AI honors", () => {
+  // myne-md/myne#848. The list is the control `docs/threat-model.md` A17 rests its
+  // remote-provider mitigation on, and it gained a picker: the box stays the
+  // authority (a pasted list still works, and an egress control must not require
+  // a picker), while the common case stops being a hand-typed path that does not
+  // match the folder it names.
+  //
+  // **The dropdown half is asserted here; the append handler itself is pinned by
+  // `tests/components/AiPanel.test.tsx`**, which drives the real handler and
+  // asserts both that the box gains the line and that the setter fired. Two
+  // layers, because a scenario can prove the control is reachable and a component
+  // test can prove what it does.
+  // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
+  it("offers the vault's folders, appends the picked one, and commits it", async () => {
+    let password = "";
+    await scenario(
+      "aux2-excluded-picker",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        // **The AI panel is a Developer-group panel** (myne-md/myne#848): without
+        // this the `settings.tab-ai` click waits its full budget and throws, which
+        // is exactly how `aux1` was failing before it gained the same line.
+        await enableDeveloperMode(s);
+        await createNote(s, "aux2notealfa7k2m9qx4w8e5rj0aa");
+        await createFolder(s, "Private");
+
+        await openSettings(s, "ai");
+        await s.waitForElement(testIdSelector("settings.ai-panel"), { timeoutMs: 15_000 });
+
+        // With a folder in the vault the picker is offered; with none it is
+        // omitted rather than disabled (the omit-don't-disable posture), which is
+        // the state a fresh vault shows.
+        const picker = await s.byTestId("ai.excluded-folders-picker", {
+          timeoutMs: 15_000,
+        });
+        await picker.click();
+        const option = await s.waitForElement(
+          testIdSelector("ai.excluded-folders-picker-option", { "data-value": "Private/" }),
+          { timeoutMs: 10_000 },
+        );
+        await option.click();
+
+        // The box gained the line, which is what the user sees, and the line is
+        // the canonical trailing-slash form the store keeps.
+        const box = await s.byTestId("ai.excluded-folders");
+        await s.waitUntil(
+          async () => ((await box.attribute("value")) ?? "").includes("Private/") ? true : null,
+          { label: "the box carries the picked folder", timeoutMs: 10_000 },
+        );
+        await closeSettings(s);
       },
     );
   });

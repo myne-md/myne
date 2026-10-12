@@ -138,6 +138,7 @@ fn build(n: usize) -> VaultIndicesState {
                     Vec::new()
                 },
                 headings: Vec::new(),
+                live: true,
             },
         );
     }

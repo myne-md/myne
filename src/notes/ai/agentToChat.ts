@@ -35,6 +35,7 @@
 // (myne-md/myne#675); the live proposal never does. Nothing here logs the
 // task, which is the user's own words.
 
+import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import {
   agentApply,
   agentStart,
@@ -42,7 +43,11 @@ import {
   type AgentStepResult,
   type ScopeGrant,
 } from "../../lib/agent-run";
-import { engineErrorTag } from "../../lib/engine-error";
+import {
+  engineErrorTag,
+  normalizeProviderError,
+  type ProviderErrorCause,
+} from "../../lib/engine-error";
 import {
   approvedNewNoteIndices,
   beginAutoApply,
@@ -55,22 +60,102 @@ import {
   openRun,
   reportRunProgress,
   settleApply,
+  markConversationUnread,
   settleStep,
 } from "../agent/agentStore";
 import { visibleHistory } from "./chatHistory";
-import { setPendingAnchorNoteId } from "./chatStore";
-import { failAgentTurn, getChat, sendAgentTurn, settleAgentTurn } from "./chatStore";
+import { setPendingAnchorFolderId, setPendingAnchorNoteId } from "./chatStore";
+import { ensureConversation, settleTurnInConversation } from "./chatPersist";
+import { maybeGenerateConversationTitle } from "./conversationTitle";
+import {
+  failAgentTurn,
+  getActiveConversationId,
+  getChat,
+  sendAgentTurn,
+  settleAgentTurn,
+  type AgentTurnSummary,
+} from "./chatStore";
 
 /** The already-localized strings the run's turns render.
  *
  *  Passed in rather than resolved here: this module is not a component, and
  *  `src/AGENTS.md` bans freezing a resolved string at module scope (it would
  *  capture the boot language). The caller has a `t` in hand. */
+/**
+ * The sentences a FAILED leg can owe the user, resolved by the caller.
+ *
+ * **One mapping, because the alternative is what shipped**: the scope-approval
+ * resume reported EVERY failure of the approved leg as "The scope could not be
+ * widened", so a user who had just pressed Allow on the dialog was told their
+ * permission had not been taken while the real cause, a provider that refused
+ * the request, a leg that timed out, an engine that failed, was discarded
+ * (myne-md/myne#848, on the user's report). The host already tags the failure;
+ * this is the one place that turns a tag into a sentence, and both call sites
+ * use it.
+ */
+export interface LegFailureCopy {
+  /** The provider refused THIS request (HTTP 400). A fault in what Myne sent. */
+  providerRejected: string;
+  /** The scope resolved empty under `ai_excluded_folders`. */
+  scopeExcluded: string;
+  /**
+   * The host refused a folder grant that canonises to the vault root
+   * (`AgentError::RootGrant`): the ONE failure whose sentence is about the
+   * scope at all, and the only place "the scope could not be widened" is true.
+   */
+  rootGrant: string;
+  /** Nothing more specific is known. */
+  generic: string;
+  /**
+   * The shared taxonomy's sentence for a cause the host NAMED inside a refusal.
+   *
+   * A gate refusal is a cause, not a tag: "no credential", "consent missing",
+   * "not ready" all arrive as `AgentError::GateRefused { cause }`, and each of
+   * those sentences names the control that fixes it. Without this arm the run
+   * reported "The agent could not start.", which names nothing, sends nobody
+   * anywhere, and is what a user saw for a run the host had refused for a
+   * reason it had already told the WebView (myne-md/myne#848).
+   *
+   * A function rather than a resolved string, because the caller cannot know
+   * which cause it is holding until the failure arrives.
+   */
+  byCause: (cause: ProviderErrorCause) => string;
+}
+
+/**
+ * Which sentence a failed leg owes, from the HOST's own tag.
+ *
+ * The tag is the host's, so a new `AgentError` variant lands in `generic` rather
+ * than being reported as whatever the last author happened to be looking at.
+ */
+export function legFailureSentence(
+  failure: unknown,
+  copy: LegFailureCopy,
+): string {
+  const tag = engineErrorTag(failure);
+  if (tag === "RootGrant") return copy.rootGrant;
+  if (tag === "EmptyGrant") return copy.scopeExcluded;
+  if (tag === "ProviderRejected") return copy.providerRejected;
+  // The shared taxonomy next, for the failures whose FIX it names, a gate
+  // refusal above all, since the host already said which gate it was and the
+  // generic sentence throws that away.
+  const cause = normalizeProviderError(failure);
+  if (cause !== "failed") return copy.byCause(cause);
+  return copy.generic;
+}
+
 export interface AgentRunCopy {
   /** What the user turn's scope chip says: "This note", or the folder name. */
   scopeLabel: string;
   /** The sentence for a start that never landed. */
   startFailed: string;
+  /** The sentence for a leg that stopped after it started. */
+  legFailed: string;
+  /** The sentence for a folder grant the host refused as the vault root. */
+  rootGrant: string;
+  /** The taxonomy's sentence for a cause the host named (see
+   *  {@link LegFailureCopy.byCause}). */
+  byCause: (cause: ProviderErrorCause) => string;
   /** The sentence for an automatic apply that failed outright. */
   autoApplyFailed: string;
   /** The sentence for a start the PROVIDER refused (HTTP 400).
@@ -120,8 +205,18 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
   // and its counts must not reach the transcript either.
   if (!settleStep(result, epoch)) return;
   const agent = getAgent();
+  // **A result that lands is a thing to read** (myne-md/myne#848), and the mark
+  // goes in BEFORE the two early returns below, because both of them are cases
+  // where the user has more reason to look, not less: a run that stopped to ask
+  // for more scope is BLOCKED on them, and one with no view at all still
+  // finished. Whether they are looking at it is answered by the surface that
+  // displays the conversation, which clears the mark; guessing here from the
+  // active id got the closed-surface case wrong.
+  if (agent.runConversationId !== null) {
+    markConversationUnread(agent.runConversationId);
+  }
   if (agent.view === null || agent.end?.kind === "awaitingScope") return;
-  settleAgentTurn({
+  const summary: AgentTurnSummary = {
     runId: agent.view.runId,
     summary: agent.proposal.summary,
     edits: agent.proposal.edits.length,
@@ -130,13 +225,34 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
     iterations: agent.iterations,
     charsOffDevice: agent.charsOffDevice,
     memoryUpdated: agent.memoryUpdated,
+    // How long the run took (myne-md/myne#848). Absent rather than zero when the
+    // start was never recorded, so the footprint can say "unknown" instead of
+    // claiming the run was instant.
+    durationMillis:
+      agent.startedAtMillis === null
+        ? undefined
+        : Math.max(0, Date.now() - agent.startedAtMillis),
     end: agent.end?.kind ?? "finished",
     // The frozen proposal rides the turn (myne-md/myne#675): the store copies
     // it to plain data on settle, so history keeps what the run proposed even
     // after `agentStore` drops the live copy on lock. Read-only there: the
     // review screen stays the only surface that can apply anything.
     proposal: { edits: agent.proposal.edits, newNotes: agent.proposal.newNotes },
-  });
+  };
+  // **The run outlives the view, so its result goes to its own conversation**
+  // (myne-md/myne#848). The live transcript is one slot; if the user navigated
+  // to another conversation while this run was in flight, settling into it
+  // would write a run's counts and summary onto whatever they are reading now.
+  // The rule is narrower than "the ids differ", deliberately: an unbound run
+  // (`null`, the persist that would have created the conversation failed) has
+  // no better home than the live transcript, and refusing would drop the
+  // result entirely.
+  const active = getActiveConversationId();
+  if (agent.runConversationId !== null && active !== agent.runConversationId) {
+    void settleTurnInConversation(agent.runConversationId, summary);
+    return;
+  }
+  settleAgentTurn(summary);
 }
 
 /**
@@ -179,8 +295,27 @@ export async function startAgentRun(
   // turn is appended: the first persist creates the conversation and reads the
   // pending anchor (myne-md/myne#771).
   setPendingAnchorNoteId(anchorNoteId ?? null);
+  // The OTHER anchor kind (myne-md/myne#848): a run whose scope is a folder
+  // records the folder, and a run anchored to a note records the note. These
+  // two are read by the create path and travel onto the catalog row, which is
+  // what lets the Hub say what a conversation is about without opening it.
+  setPendingAnchorFolderId(grant.kind === "folder" ? grant.value : null);
   sendAgentTurn(task, copy.scopeLabel);
-  beginRun();
+  // **The conversation exists from the first user message** (myne-md/myne#848),
+  // and the run is bound to it before the first step is driven. The id is
+  // awaited rather than read later: `beginRun` records ownership, and ownership
+  // that is resolved at settle time is ownership of whatever is on screen then,
+  // which is the defect this closes. `null` is the honest answer when the write
+  // failed, the queue still owes it, and the settle falls back to the live
+  // transcript.
+  const conversationId = await ensureConversation();
+  beginRun(conversationId);
+  // **The title, behind the write rather than inside it** (myne-md/myne#848).
+  // `chats_create` is synchronous and model-free, so the derived truncation
+  // title is already in the catalog; a local model may replace it, asynchronously
+  // and never through a provider (the ambient class refuses one host-side).
+  // Deliberately not awaited: the run starts now, and a title is housekeeping.
+  void maybeGenerateConversationTitle(conversationId, task);
   // Captured BEFORE the await, so a vault lock during the call invalidates what
   // comes back rather than being raced by it.
   const epoch = currentRunEpoch();
@@ -239,13 +374,12 @@ export async function startAgentRun(
     // `kind` field, and the three failures a user can tell apart are "the
     // provider would not take this request", "the scope fell entirely inside
     // the excluded folders", and everything else.
-    const tag = engineErrorTag(failure);
-    const sentence =
-      tag === "ProviderRejected"
-        ? copy.providerRejected
-        : tag === "EmptyGrant"
-          ? copy.scopeExcluded
-          : copy.startFailed;
+    const sentence = legFailureSentence(failure, {
+      ...copy,
+      // The start's own generic: a leg that never landed has not "stopped", it
+      // never started.
+      generic: copy.startFailed,
+    });
     failRun(sentence);
     failAgentTurn(sentence);
   }
@@ -284,6 +418,10 @@ async function autoApplyRun(
     // Positions in the FULL proposal, which is what `landedEditIndices` and the
     // applied-row bookkeeping are keyed on.
     const indices = bulkApprovable.map((e) => agent.proposal.edits.indexOf(e));
+    // **The flush first, for the reason `AgentReview`'s manual path states**: an
+    // apply is a read-patch-write over whole note blobs, and an automatic one can
+    // land while the user is typing inside the default whole-vault scope.
+    await flushBeforeFrontmatterWrite();
     const outcome = await agentApply(agent.view.runId, bulkApprovable, newNotes, "bulk");
     if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
     const changed = [...outcome.notesWritten, ...outcome.notesCreated];

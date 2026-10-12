@@ -32,6 +32,23 @@ export interface AgentState {
   end: LoopEnd | null;
   /** True between sending and the loop coming back. */
   running: boolean;
+  /** When the run started, on the wall clock, for the footprint's duration.
+   *
+   *  A duration is the one part of "what did this run do" the user can see
+   *  without reading a number: "40 notes, 12 requests" says nothing about
+   *  whether it was a nuisance. Wall clock rather than monotonic because the
+   *  settled figure has to survive being persisted onto a turn and read back on
+   *  another day; a monotonic reading means nothing outside its own process. */
+  startedAtMillis: number | null;
+  /** The conversation this run belongs to, or null when it could not be bound
+   *  (the persist that creates one failed, and the queue still owes the write).
+   *
+   *  **Ownership, not bookkeeping** (myne-md/myne#848). The run outlives the
+   *  surface that started it, so a user who navigates to another conversation
+   *  mid-run has a run still in flight whose result belongs to a conversation
+   *  that is no longer on screen. This is the id that result is written to, and
+   *  the id the hub marks as running. */
+  runConversationId: string | null;
   /** Model round-trips so far, for the post-run summary. */
   iterations: number;
   /** Notes read in full, same purpose. */
@@ -125,6 +142,34 @@ export interface AgentState {
   undoable: AppliedRun | null;
   /** A failure to report, as an already-localized string. */
   error: string | null;
+  /**
+   * **Conversations with a finished run the user has not looked at**
+   * (myne-md/myne#848).
+   *
+   * ── The failure this closes ─────────────────────────────────────────────
+   * A run outlives the view by design: it keeps going while the user reads
+   * another note, opens another conversation, or leaves the AI surface
+   * entirely. Nothing said so when it landed. The rail's card showed a RUNNING
+   * line and nothing else, so a conversation whose run had just finished looked
+   * exactly like one that had never run, and the answer, or the proposed
+   * edits, sat in a conversation the user had no reason to reopen.
+   *
+   * ── Why it is HERE rather than derived from `end` ────────────────────────
+   * `end` survives until the next run or the vault lock, so a mark derived from
+   * it would come back the moment the user switched away from the conversation,
+   * however long ago they had read it. The missing fact is the second one:
+   * whether the user has SEEN this result. That is a set, and it belongs beside
+   * the run that produced it: it is set by a settle and cleared by looking,
+   * both of which this store is the record of.
+   *
+   * It is a SET rather than a single id because the store holds one live run:
+   * a second conversation's run replaces the first's `end`, and the first's
+   * result is still unread.
+   *
+   * Cleared by `clearAgentForLock`, NOT by `clearAgent`: closing the review
+   * screen is not a vault-leaving event, and the other conversations' results
+   * are as unread as they were. */
+  unreadConversations: readonly string[];
 }
 
 const EMPTY_PROPOSAL: Proposal = { edits: [], newNotes: [], summary: "" };
@@ -134,6 +179,8 @@ const INITIAL: AgentState = {
   proposal: EMPTY_PROPOSAL,
   end: null,
   running: false,
+  startedAtMillis: null,
+  runConversationId: null,
   iterations: 0,
   notesRead: 0,
   charsOffDevice: null,
@@ -149,6 +196,7 @@ const INITIAL: AgentState = {
   autoApplying: false,
   undoable: null,
   error: null,
+  unreadConversations: [],
 };
 
 let state: AgentState = INITIAL;
@@ -206,8 +254,15 @@ let legBase = { iterations: 0, notesRead: 0, charsOffDevice: null as number | nu
  *  `docs/decisions/ai/0515` promises; merely starting a second run ends
  *  neither. Resetting it here dropped the previous run's offer from the surface
  *  while the host still held it, so the undo the user had been told about
- *  became unreachable by the ordinary act of asking for something else. */
-export function beginRun(): void {
+ *  became unreachable by the ordinary act of asking for something else.
+ *
+ *  `conversationId` is REQUIRED rather than defaulted (myne-md/myne#848). A
+ *  default would let a new call site start a run with no owner, and the failure
+ *  is silent in the direction that matters: the settle would fall back to
+ *  "whatever is on screen", which is the bug this parameter exists to remove.
+ *  Pass `null` deliberately when the conversation could not be created, the
+ *  caller that knows is `startAgentRun`, and it says so in words. */
+export function beginRun(conversationId: string | null): void {
   // **Starting a run is a vault-leaving event for the PREVIOUS run's step.**
   // The epoch's own note below `clearAgentForLock` names a lock, a vault switch
   // and a new conversation; a new RUN is the same class and was not covered,
@@ -226,6 +281,8 @@ export function beginRun(): void {
   legBase = { iterations: 0, notesRead: 0, charsOffDevice: null };
   set({
     ...INITIAL,
+    runConversationId: conversationId,
+    startedAtMillis: Date.now(),
     undoable: state.undoable,
     // Kept for the same reason `undoable` is: a new run is not a vault-leaving
     // event, and the user chose this mode for the session rather than for one
@@ -234,6 +291,11 @@ export function beginRun(): void {
     // Same: the backend has not changed because a second run started, and
     // re-probing would spend the provider requests again for every message.
     probeVerdict: state.probeVerdict,
+    // Same, and this is the call site `clearAgent`'s note is about: starting a
+    // run says nothing about whether the OTHER conversations' results have been
+    // read, and `INITIAL` carries the empty set, so a run start used to wipe
+    // every mark on every message.
+    unreadConversations: state.unreadConversations,
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
@@ -401,6 +463,38 @@ export function resumeRun(): void {
   // awaiting anything the moment the approval is sent, which is exactly what
   // `running: true` beside it says.
   set({ running: true, error: null, end: null });
+}
+
+/** A run settled for this conversation and the user has not looked at it yet.
+ *
+ *  Called for EVERY settled run, including one that lands while its own
+ *  conversation is open: `ConversationSurface` clears the mark whenever it is
+ *  displaying the conversation, so "is the user looking at it" is answered by
+ *  the surface that would know rather than guessed at here from an id
+ *  comparison. Guessing was wrong in the case this field exists for, the run
+ *  completing while the AI surface is closed but that conversation is still the
+ *  active one. */
+export function markConversationUnread(conversationId: string): void {
+  if (state.unreadConversations.includes(conversationId)) return;
+  set({
+    unreadConversations: [...state.unreadConversations, conversationId],
+  });
+}
+
+/** The user is looking at this conversation: the result has been seen.
+ *
+ *  Called by `ConversationSurface` while it displays the conversation, so the
+ *  rule is "a mark exists only while nothing is showing it". **Not by the rail**
+ *  (review finding): the doc claimed a rail call that does not exist, and the
+ *  difference is visible in one case, opening the conversation that is ALREADY
+ *  the bound one, where the surface never mounts and the mark would stay. */
+export function markConversationRead(conversationId: string): void {
+  if (!state.unreadConversations.includes(conversationId)) return;
+  set({
+    unreadConversations: state.unreadConversations.filter(
+      (id) => id !== conversationId,
+    ),
+  });
 }
 
 /** Toggle one edit's rejection. */
@@ -699,6 +793,12 @@ export function clearAgent(): void {
     // the host. That is the defect this field was added to fix; resetting it here
     // would reintroduce it at the one call site that matters.
     applySeq: state.applySeq,
+    // Kept, and this is the call site that would quietly break it: letting go
+    // of a run happens when the review screen closes and when a new
+    // conversation starts, and neither means the OTHER conversations' results
+    // have been read. Clearing here would make a mark disappear because the
+    // user read something else.
+    unreadConversations: state.unreadConversations,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
     appliedEdits: new Set(),
@@ -730,11 +830,16 @@ export function clearAgentForLock(): void {
   // of a backend that is no longer the one in use, in either direction: a
   // refusal earned by the previous vault's model would block a capable one, and
   // a pass would let the composer skip the check on a model nobody measured.
+  // **And the unread marks.** They name conversations of the vault being left:
+  // the next vault's ids are different ones, so a mark that survived would
+  // describe a conversation that does not exist and could never be cleared by
+  // reading it.
   set({
     undoable: null,
     autoApply: false,
     autoApplying: false,
     probeVerdict: null,
+    unreadConversations: [],
   });
 }
 

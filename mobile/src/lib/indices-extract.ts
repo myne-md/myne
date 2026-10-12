@@ -13,6 +13,7 @@ import { extractProperties } from "@myne/editor/host/notes/propertyTyping";
 import { extractWikilinkEdges } from "@myne/editor/host/notes/graphModel";
 import { extractBlockAnchorEntries } from "@myne/editor/host/notes/blockAnchors";
 import { parseTags } from "./tags";
+import { isLiveNote, readNoteFlags } from "./note-organize";
 import type { WikilinkEdge, TagEntry, IndexRecord } from "./vault-indices";
 
 /**
@@ -79,5 +80,8 @@ export function extractRecord(noteId: string, title: string, folder: string | nu
     // with the frontmatter guard applied, so this is a map over a result that is
     // already in hand. Identical to desktop's `reindexNoteFromBody`.
     headings: parsed.headings.map((h) => ({ text: h.text, level: h.level })),
+    // myne-md/myne#848: the same working-set predicate `EditorFlow` filters the
+    // list with, so the agent's scope here is the set the user sees.
+    live: isLiveNote(readNoteFlags(body)),
   };
 }

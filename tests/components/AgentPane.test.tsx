@@ -23,6 +23,14 @@ vi.mock("../../src/notes/workspaceContext", () => ({
   }),
 }));
 
+vi.mock("../../src/notes/sidebarState", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/sidebarState")>()),
+  // The rail's anchor pill reads a note's NAME from the sidebar's cache
+  // (myne-md/myne#848). The provider is not mounted here, and mounting the whole
+  // sidebar to render a pane would be a different test.
+  useSelectedNote: () => ({ cache: new Map() }),
+}));
+
 vi.mock("../../src/lib/chats", () => ({
   // The roster notifier the wrappers fire (myne-md/myne#771). Mocked to a
   // no-op unsubscribe: what these files drive is the list, not the signal, and
@@ -89,6 +97,20 @@ describe("AgentPane: one screen, both columns", () => {
       />,
     );
   }
+
+  it("pins the composer's scope when the view is anchored to a note", () => {
+    // **The wiring, not the composer's own rule** (myne-md/myne#848): the pane's
+    // view carries the conversation's anchor, and this is the assertion that the
+    // anchor reaches the composer. A composer test can only prove the rule; a
+    // pane that forgot to pass it would leave the picker on screen for exactly
+    // the session the user asked it to disappear from.
+    paneAt({ conversationId: "c-1", noteId: "n-9" });
+    expect(screen.queryByTestId("ai.composer-scope")).toBeNull();
+    cleanup();
+    // And a vault-general view keeps it: there is a scope to choose.
+    paneAt({ conversationId: "c-2" });
+    expect(screen.getByTestId("ai.composer-scope")).toBeTruthy();
+  });
 
   it("mounts the rail and the conversation together, both showing", () => {
     // `getByTestId` alone is not enough and an injection proved it: an element
@@ -291,7 +313,7 @@ describe("AgentPane: the pane's top row", () => {
     const pane = screen.getByTestId("agent.pane");
     expect(pane.getAttribute("data-agent-running")).toBe(null);
     act(() => {
-      beginRun();
+      beginRun(null);
     });
     expect(pane.getAttribute("data-agent-running")).toBe("true");
   });

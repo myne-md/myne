@@ -87,6 +87,38 @@ const NOTES_FIXTURE: Fixture = {
   },
 };
 
+/** The composer's own host read, answered two ways.
+ *
+ *  `agent_preview_grant` is what the composer asks for the size of its scope,
+ *  and the two states that come from it are the ones a story has to be able to
+ *  reach: a scope the clamp emptied, and a count that has not arrived yet. The
+ *  unhandled default (`[]`) reads as "not empty, not known", which is the third
+ *  state and the one the idle story already shows. */
+const EMPTY_SCOPE_FIXTURE: Fixture = {
+  ...NOTES_FIXTURE,
+  description: "one unlocked vault whose scope resolves to no notes",
+  handlers: {
+    ...NOTES_FIXTURE.handlers,
+    "plugin:agent|agent_preview_grant": () => ({
+      noteCount: 0,
+      excludedCount: 0,
+      unknownCount: 0,
+      newTotal: 0,
+    }),
+  },
+};
+
+const PENDING_SCOPE_FIXTURE: Fixture = {
+  ...NOTES_FIXTURE,
+  description: "one unlocked vault, the scope's size still in flight",
+  handlers: {
+    ...NOTES_FIXTURE.handlers,
+    // Never settles, which is the state: the composer has asked and has no
+    // answer, and it must say so rather than claim the vault is empty.
+    "plugin:agent|agent_preview_grant": () => new Promise(() => {}),
+  },
+};
+
 /** A frame that centres a panel so it is judged in its own box, not the stage. */
 function Frame({ children }: { children: React.ReactNode }) {
   return (
@@ -1281,6 +1313,74 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
+            surface="sidebar"
+            openNoteId="n1"
+            folders={["Projects/"]}
+            onNotesWritten={action("onNotesWritten")}
+          />
+        </div>
+      </Box>
+    ),
+  },
+  {
+    id: "notes/chatcomposer/anchored-session",
+    group: "components",
+    surface: "ChatComposer",
+    state: "anchored-session",
+    description:
+      "A session opened FROM a note: its scope is that note, so it renders no scope picker at all and the note cannot be moved out of the run by accident. Widening a session is a session-level decision, a new conversation starts vault-wide (myne-md/myne#848).",
+    tags: ["notes", "ai", "agent", "composer", "scope", "anchored"],
+    fixture: NOTES_FIXTURE,
+    render: () => (
+      <Box width={320} height={220}>
+        <div style={{ padding: "var(--space-3)" }}>
+          <ChatComposer
+            surface="sidebar"
+            openNoteId="n1"
+            anchoredNoteId="n1"
+            folders={["Projects/"]}
+            onNotesWritten={action("onNotesWritten")}
+          />
+        </div>
+      </Box>
+    ),
+  },
+  {
+    id: "notes/chatcomposer/scope-empty",
+    group: "components",
+    surface: "ChatComposer",
+    state: "scope-empty",
+    description:
+      "The scope resolved to no notes: the field refuses the keystroke, the picker is outlined, and the placeholder says why. The count and the excluded figure stay on the line, they are the disclosure, not the picker (myne-md/myne#848).",
+    tags: ["notes", "ai", "agent", "composer", "blocked", "excluded"],
+    fixture: EMPTY_SCOPE_FIXTURE,
+    render: () => (
+      <Box width={320} height={220}>
+        <div style={{ padding: "var(--space-3)" }}>
+          <ChatComposer
+            surface="sidebar"
+            openNoteId="n1"
+            folders={["Projects/"]}
+            onNotesWritten={action("onNotesWritten")}
+          />
+        </div>
+      </Box>
+    ),
+  },
+  {
+    id: "notes/chatcomposer/count-pending",
+    group: "components",
+    surface: "ChatComposer",
+    state: "count-pending",
+    description:
+      "The host has not yet answered how many notes the scope holds: the box says it is getting ready rather than making a claim about the vault. Unanswered is not the same as empty, which the previous state shows (myne-md/myne#848).",
+    tags: ["notes", "ai", "agent", "composer", "loading", "pending"],
+    fixture: PENDING_SCOPE_FIXTURE,
+    render: () => (
+      <Box width={320} height={220}>
+        <div style={{ padding: "var(--space-3)" }}>
+          <ChatComposer
+            surface="sidebar"
             openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}

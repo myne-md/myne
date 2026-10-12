@@ -815,7 +815,11 @@
 
 .myne-scrollarea-thumb {
   position: absolute;
-  inset-inline-end: 3px;
+  /* 2 + 6 = `--space-2`, the gutter `.myne-scrollarea` reserves as a margin, so
+     the indicator never covers content (myne-md/myne#848). Two literals rather
+     than one token because they are this element's own geometry; the sum is
+     what a token describes, and it is asserted in the primitive's spec. */
+  inset-inline-end: 2px;
   width: 6px;
   border-radius: var(--radius-2);
   background: var(--line-3);

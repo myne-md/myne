@@ -30,13 +30,14 @@ import { consentIsDeviceScoped } from "@myne/copy";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
-import { openUrl } from "../../platform/opener";
+import { openUrl, revealItemInDir } from "../../platform/opener";
 
 import type {
   EndpointRejection,
@@ -74,9 +75,17 @@ import {
   type AiTrustState,
 } from "../../lib/load-bearing-copy";
 import { Input } from "../primitives/Input";
+import { Icon } from "../primitives/Icon";
+import type { IconName } from "../../lib/icons";
+import { IconButton } from "../primitives/IconButton";
+import { AnchoredPanel } from "../primitives/AnchoredPanel";
 import { Button } from "../primitives/Button";
 import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
+import {
+  listFolderPaths,
+  type FolderPathOption,
+} from "../../notes/listFolderPaths";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
@@ -91,6 +100,7 @@ import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
 import {
   BLOCK_STYLE,
+  CONTROL_SLOT_STYLE,
   MULTILINE_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
@@ -105,6 +115,30 @@ const TITLE_STYLE: CSSProperties = {
   color: "var(--fg-1)",
 };
 
+
+/** The intent headings: **a rule and a title, not a bold label**
+ *  (myne-md/myne#848).
+ *
+ *  They used to be the panel's title style one step DOWN, which made a heading
+ *  smaller than the row labels it grouped and left nothing marking where one
+ *  category ended and the next began. Scrolling this panel, that reads as one
+ *  flat list of settings: the user cannot tell they have crossed from "what the
+ *  agent may read" into "where the bytes go".
+ *
+ *  So the heading is a divider: a hairline across the panel, air under it, and
+ *  a title at the panel's own label size rather than below it. A separate
+ *  constant rather than an inline object at each of the five call sites, so the
+ *  groups cannot drift apart. */
+const GROUP_HEADING_STYLE: CSSProperties = {
+  margin: 0,
+  marginTop: "var(--space-2)",
+  paddingTop: "var(--space-4)",
+  borderTop: "1px solid var(--line-1)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
 const LINK_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--accent)",
@@ -249,8 +283,186 @@ interface AiPanelProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
+/** The excluded-folders box, read as folder paths: one per line, trimmed, blanks
+ *  dropped.
+ *
+ *  **One reading of the box, two callers** (myne-md/myne#848). The commit path
+ *  and the picker's append path each spelled this same split/trim/filter out,
+ *  which meant the picker's own "already in the list" test compared against a
+ *  second opinion about what the list contained. */
+function folderLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/** The last segment of a path, for a control that has room for one word rather
+ *  than a full location. Both separators: a stored path is whatever the host
+ *  returned, and the Windows shape reaches this panel on Windows. */
+function fileNameOf(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+/**
+ * **A model file's location is a folder, not a paragraph** (myne-md/myne#848).
+ *
+ * Both model rows used to print the full path inline. On this machine that is
+ * `/Users/<name>/Library/Application Support/md.myne.desktop/models/…`, longer
+ * than the panel, so it either ran past the edge or squeezed the label beside it
+ * into one word per line, and the panel read as broken. A path is also the least
+ * useful thing to print: the part a user recognises is the file name, and the
+ * part they need when they act on it is the folder.
+ *
+ * So the location is a button. It is DISABLED when there is no file (nothing to
+ * reveal), its accessible name and tooltip carry the file name, short, which is
+ * what a tooltip is for, and pressing it opens the full path with the one
+ * action that path enables: show it in the folder.
+ */
+function ModelPathButton(props: {
+  path: string | null;
+  /** The row's role, for the accessible name: "Show the location of …". */
+  label: string;
+  revealLabel: string;
+  testId: string;
+  panelTestId: string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  const path = props.path;
+  const name = path === null ? props.label : fileNameOf(path);
+  return (
+    <>
+      <span ref={anchorRef} style={{ display: "inline-flex" }}>
+        <IconButton
+          icon="folder"
+          iconSize={14}
+          label={t("settings.ai.modelShowLocation", { name })}
+          tooltip
+          disabled={path === null}
+          expanded={open}
+          testId={props.testId}
+          onClick={() => setOpen((o) => !o)}
+        />
+      </span>
+      <AnchoredPanel
+        open={open && path !== null}
+        onClose={() => setOpen(false)}
+        anchorRef={anchorRef}
+        minWidth={300}
+        align="end"
+        style={PATH_PANEL_STYLE}
+        testId={props.panelTestId}
+      >
+        <span data-testid={`${props.panelTestId}-path`} style={PATH_TEXT_STYLE}>
+          {path}
+        </span>
+        <Button
+          variant="secondary"
+          data-testid={`${props.testId}-reveal`}
+          onClick={() => {
+            // Reveal failure is swallowed: the path is on screen and the user
+            // can copy it, which is the fallback the action was offering.
+            void revealItemInDir(path ?? "").catch(() => {});
+            setOpen(false);
+          }}
+        >
+          {props.revealLabel}
+        </Button>
+      </AnchoredPanel>
+    </>
+  );
+}
+
+/**
+ * **What is answering, as a glyph** (myne-md/myne#848).
+ *
+ * The trust block's sentence already says where the notes go, and it is
+ * load-bearing copy that must not be reworded. What it lacked was a form: three
+ * plain paragraphs in the middle of a panel read as one more setting, and the
+ * one question a user arrives at this panel with, "does anything of mine leave
+ * this machine?", had no answer you could take in without reading.
+ *
+ * So the state picks the glyph AND the tint, and the three are the honest three:
+ * on-device compute, a program on this computer, and the network. `cpu` is the
+ * AI panel's own rail glyph and `globe` is what `cloud-off` is the negation of;
+ * neither is a mood.
+ */
+function trustGlyph(kind: AiTrustState["kind"]): {
+  icon: IconName;
+  fg: string;
+  bg: string;
+} {
+  switch (kind) {
+    case "in-process":
+      return { icon: "cpu", fg: "var(--success)", bg: "var(--success-soft)" };
+    case "local-runtime":
+      return { icon: "hard-drive", fg: "var(--info)", bg: "var(--info-soft)" };
+    case "remote":
+      return { icon: "globe", fg: "var(--warning)", bg: "var(--warning-soft)" };
+  }
+}
+
+/** The banner's own box: the panel's recessed surface, with a rule. */
+const TRUST_BANNER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "var(--space-3)",
+  padding: "var(--space-3)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  alignSelf: "stretch",
+};
+
+const TRUST_GLYPH_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "none",
+  width: 28,
+  height: 28,
+  borderRadius: "var(--radius-2)",
+};
+
+const TRUST_BODY_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  minWidth: 0,
+  flex: 1,
+};
+
+const TRUST_LINE_STYLE: CSSProperties = {
+  ...LABEL_STYLE,
+  lineHeight: 1.5,
+  margin: 0,
+};
+
+/** The path disclosure's own box: monospace, wrapping, selectable. A path is
+ *  text to copy as often as it is a thing to click. */
+const PATH_PANEL_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  padding: "var(--space-2)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+};
+
+const PATH_TEXT_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+  overflowWrap: "anywhere",
+  userSelect: "text",
+};
+
 /** A single model role's block: heading → recommended-model browser link + the
- *  required-files hint → the side-load path + "Choose…" picker. */
+ *  required-files hint → the side-load file name + the folder + "Choose…". */
 function ModelRoleBlock(props: {
   roleLabel: string;
   filesText: string;
@@ -265,6 +477,7 @@ function ModelRoleBlock(props: {
   testIdSelect: string;
   testIdChoose: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div style={{ marginTop: "var(--space-3)" }}>
       <label style={LABEL_STYLE}>{props.roleLabel}</label>
@@ -282,29 +495,42 @@ function ModelRoleBlock(props: {
       </div>
       <p style={{ ...HELPER_STYLE, margin: "2px 0 0" }}>{props.filesText}</p>
       <div style={{ ...TOGGLE_ROW_STYLE, marginTop: "var(--space-1)" }}>
+        {/* **The file NAME, never the path** (myne-md/myne#848). The path is a
+            paragraph on this machine and it squeezed the label beside it into
+            one word per line; the name is the part a user recognises, and the
+            folder button beside the picker holds the rest. */}
         <span
           data-testid={props.testIdSelect}
           style={{
             fontSize: "var(--text-sm)",
             color: props.path === null ? "var(--fg-3)" : "var(--fg-1)",
             fontFamily: "var(--font-mono)",
+            minWidth: 0,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
-          title={props.path ?? undefined}
         >
-          {props.path ?? props.noneLabel}
+          {props.path === null ? props.noneLabel : fileNameOf(props.path)}
         </span>
-        <Button
-          variant="secondary"
-          data-testid={props.testIdChoose}
-          disabled={props.disabled}
-          onClick={props.onChoose}
-          style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
-        >
-          {props.chooseLabel}
-        </Button>
+        <div style={{ ...CONTROL_SLOT_STYLE, minWidth: 0 }}>
+          <ModelPathButton
+            path={props.path}
+            label={props.roleLabel}
+            revealLabel={t("settings.ai.modelShowInFolder")}
+            testId={`${props.testIdChoose}-location`}
+            panelTestId={`${props.testIdChoose}-location-panel`}
+          />
+          <Button
+            variant="secondary"
+            data-testid={props.testIdChoose}
+            disabled={props.disabled}
+            onClick={props.onChoose}
+            style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
+          >
+            {props.chooseLabel}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -471,14 +697,42 @@ function DownloadedModelRow(props: {
                 ? t("settings.ai.downloadInstalled")
                 : t("settings.ai.downloadNotInstalled")}
             </span>
-            <Button
-              variant="secondary"
-              disabled={!props.aiEnabled || busy}
-              onClick={() => void startModelDownload(props.artifact)}
-              data-testid={`ai.download-button-${props.artifact}`}
-            >
-              {t("settings.ai.downloadReinstall")}
-            </Button>
+            {/* **Which FILE this row is using** (myne-md/myne#848). Two rows
+                that both said "Installed" were two unexplained rows: a model
+                fetched by the app and one chosen from a file picker are
+                different promises about where the bytes came from, and the one
+                fact that is always true and always knowable is the path. The
+                path is the provenance; a mechanism ("downloaded", "side-loaded")
+                would be a claim the panel cannot make from `loadModelPath`
+                alone, and the download store resets with the session.
+
+                **It is a folder button, not a printed path.** Printing it here
+                ran the line past the panel's edge on this machine, over the
+                label above it. The button's name and tooltip carry the file,
+                which is the short, recognisable half, and pressing it shows the
+                whole location with the one action the location enables. */}
+            <ModelPathButton
+              path={props.path}
+              label={props.label}
+              revealLabel={t("settings.ai.modelShowInFolder")}
+              testId={`ai.model-provenance-${props.artifact}`}
+              panelTestId={`ai.model-provenance-panel-${props.artifact}`}
+            />
+            {/* **No download action once the model is here** (myne-md/myne#848).
+                A "Download" button beside every installed model reads as "this is
+                not installed" on the very row whose job is to say that it is. A
+                re-download stays reachable the honest way: remove it first,
+                which is one click away and says what it does. */}
+            {props.path === null ? (
+              <Button
+                variant="secondary"
+                disabled={!props.aiEnabled || busy}
+                onClick={() => void startModelDownload(props.artifact)}
+                data-testid={`ai.download-button-${props.artifact}`}
+              >
+                {t("settings.ai.downloadInstall")}
+              </Button>
+            ) : null}
             {props.path && (
               <Button
                 variant="ghost"
@@ -931,16 +1185,50 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     }
   };
 
-  const commitExcluded = () => {
-    const folders = excludedDraft
-      .split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+  const commitExcluded = (text: string = excludedDraft) => {
+    const folders = folderLines(text);
     void setAiExcludedFolders(mutationFrom(excludedSeedRef.current, folders), folders);
     excludedSeedRef.current = folders;
     // The draft now IS the seed, so a later prefs change may re-seed again.
     excludedTouchedRef.current = false;
   };
+
+  // **A picker, because a path typed by hand is a path that does not match.**
+  // The box below is the authority and stays (a user may paste a list, and an
+  // exclusion is a privacy control that must not require a picker to work);
+  // this only makes the common case typo-free, by appending the picked prefix to
+  // the draft and committing it (myne-md/myne#848).
+  const [folderPaths, setFolderPaths] = useState<FolderPathOption[]>([]);
+  useEffect(() => {
+    let live = true;
+    void listFolderPaths()
+      .then((paths) => {
+        if (live) setFolderPaths(paths);
+      })
+      .catch(() => {
+        // A vault whose folders cannot be listed leaves the picker out and the
+        // box exactly as it was: the typed path is the authority, so a failed
+        // convenience must not take the control away.
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const appendExcludedFolder = (picked: string): void => {
+    if (picked.trim().length === 0) return;
+    const lines = folderLines(excludedDraft);
+    if (lines.includes(picked)) return; // already excluded: not a no-op to say so twice
+    const next = [...lines, picked].join("\n");
+    excludedTouchedRef.current = true;
+    setExcludedDraft(next);
+    commitExcluded(next);
+  };
+
+  const excludedFolderOptions = useMemo(
+    () => folderPaths.map((f) => ({ value: f.path, label: f.label })),
+    [folderPaths],
+  );
 
   // The catalogue, filtered to what this arm can actually use. Myne's remote
   // path calls nothing but chat/completion, so a model that does not read AND
@@ -978,74 +1266,14 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     <div data-testid="settings.ai-panel" style={PANEL_ROOT_STYLE}>
       <h3 style={TITLE_STYLE}>{t("settings.ai.title")}</h3>
 
-      {/* Opt-in toggle. */}
-      <SettingRow
-        anchorId="ai.enable"
-        label={t("settings.ai.enableLabel")}
-        helper={t("settings.ai.enableHelper")}
-        control={(helperId) => (
-          <Switch
-            checked={aiEnabled}
-            onChange={(next) => void setAiEnabled(next)}
-            ariaLabel={t("settings.ai.enableLabel")}
-            ariaDescribedBy={helperId}
-            testId="ai.enable-toggle"
-          />
-        )}
-      />
+      {/* **Auto-tag**: grouped by INTENT (myne-md/myne#848): a setting
+          belongs under the question the user arrived with, not under the feature
+          that implements it. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupAutoTag")}</h4>
 
-      {/* Trust affordance — load-bearing copy, rendered verbatim (SYNC-16 /
-          SYNC-7). One INVARIANT sentence, always shown, plus one STATE
-          sentence selected by which backend is answering: a provider IS a
-          server, so the old flat "runs entirely on your device" claim is false
-          the moment one is named (`decisions.md` 2026-08-09). */}
-      <div style={BLOCK_STYLE}>
-        <p data-testid="ai.trust-invariant" style={{ ...LABEL_STYLE, lineHeight: 1.5 }}>
-          {AI_TRUST_INVARIANT}
-        </p>
-        <p data-testid="ai.trust-headline" style={{ ...LABEL_STYLE, lineHeight: 1.5 }}>
-          {aiTrustHeadline(trustState)}
-        </p>
-        <button
-          type="button"
-          className="myne-text-link"
-          data-testid="ai.trust-disclosure-toggle"
-          aria-expanded={disclosureOpen}
-          onClick={() => setDisclosureOpen((o) => !o)}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            marginTop: "var(--space-1)",
-            color: "var(--fg-2)",
-            font: "inherit",
-            fontSize: "var(--text-sm)",
-            cursor: "pointer",
-          }}
-        >
-          {t("settings.ai.disclosureToggle")}
-        </button>
-        {disclosureOpen && (
-          <p data-testid="ai.trust-disclosure" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
-            {aiTrustDisclosure(trustState)}
-          </p>
-        )}
-        {/* What is answering RIGHT NOW (#191 task 5, SYNC-13). A read-only
-            caption, deliberately NOT a `SettingRow`: a caption adds no setting,
-            and a setting would owe a `settingsSearchIndex.ts` entry plus a
-            control the user could operate — which SYNC-19 removed from scope.
-            It sits in the trust block because it is the same question that
-            block answers, one level more concrete. */}
-        <p data-testid="ai.active-provider" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
-          {activeProviderName === undefined
-            ? t("settings.ai.providerNothingAnswering")
-            : t("settings.ai.providerActive", { name: activeProviderName })}
-        </p>
-      </div>
-
-      {/* Auto-tag (MYND-651) — a sub-feature of the beta, so it follows the
-          enable toggle rather than sitting in Models: the tag pass runs on a
-          BUNDLED model, nothing to side-load. Disabled (not hidden) while the
+      {/* Auto-tag (MYND-651): the tag pass runs on a BUNDLED model, so it
+          carries no model picker and no download; its own group, because "tag my
+          notes as I write" is a thing a user came for. Disabled (not hidden) while the
           beta is off, matching every other dependent control in this panel; the
           host re-reads both flags before it loads a model, so this surface is
           discovery, not enforcement.
@@ -1078,83 +1306,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         )}
       </SettingRow>
 
-      {/* How much of the visible conversation an agent run is seeded with
-          (myne-md/myne#617).
-
-          **A bound, presented as one.** The number is multiplied by the loop's
-          iteration ceiling and, on a remote provider, by characters that leave
-          the device, so the helper says what it costs rather than what it
-          enables. The host CLAMPS it at the write, which is why this input does
-          not: a bound enforced in the control is a bound the next caller does
-          not inherit, and `usePrefs` re-reads after a successful write so the
-          number shown is the number that stuck rather than the one typed.
-
-          Empty means unset, and unset means the host's own default. That is a
-          real third state, not a zero: zero would mean "seed nothing", which is
-          the pre-#617 behaviour and a legitimate thing to want. */}
-      <SettingRow
-        anchorId="ai.history-budget"
-        label={t("settings.ai.historyBudgetLabel")}
-        helper={t("settings.ai.historyBudgetHelper")}
-        control={(helperId) => (
-          <Input
-            id="ai-history-budget"
-            type="number"
-            // `SettingRow` renders its label as a `span`, not a `label
-            // htmlFor`, so the `id` binds to nothing and the control would be
-            // announced as an unnamed spin button carrying a long helper
-            // sentence. Every other `SettingRow`-hosted control in this tree
-            // supplies its own name for the same reason.
-            aria-label={t("settings.ai.historyBudgetLabel")}
-            // Gated like every other control in this panel. The budget bounds
-            // what an agent run sends, and with AI off there is no run, so an
-            // editable field here would be the one row that says otherwise.
-            disabled={!aiEnabled}
-            min={0}
-            max={CHAT_HISTORY_BUDGET_MAX}
-            value={historyBudgetDraft}
-            onChange={(e) => setHistoryBudgetDraft(e.target.value)}
-            onBlur={(e) => {
-              // **`badInput` before the empty check, and that order is the
-              // whole fix.** For `type="number"` the value IDL attribute
-              // returns "" whenever the control holds something it cannot
-              // parse, so "abc", "1e" and "--5" all arrive here as the empty
-              // string and used to take the clear-the-override branch. A user
-              // who select-alls, mistypes and tabs away had their bound reset
-              // to the host default with no feedback, which is the opposite of
-              // what the comment two lines down promises.
-              if (e.target.validity.badInput) {
-                setHistoryBudgetDraft(
-                  prefs.chat_history_budget === null
-                    ? ""
-                    : String(prefs.chat_history_budget),
-                );
-                return;
-              }
-              const raw = historyBudgetDraft.trim();
-              if (raw === "") {
-                void setChatHistoryBudget(null);
-                return;
-              }
-              const parsed = Number.parseInt(raw, 10);
-              if (!Number.isFinite(parsed) || parsed < 0) {
-                // Reject rather than coerce: silently turning nonsense into a
-                // number would store a bound the user did not choose. Restoring
-                // the shown value is the effect above's job, so this only has to
-                // avoid writing.
-                setHistoryBudgetDraft(
-                  prefs.chat_history_budget === null ? "" : String(prefs.chat_history_budget),
-                );
-                return;
-              }
-              void setChatHistoryBudget(parsed);
-            }}
-            aria-describedby={helperId}
-            data-testid="ai.history-budget-input"
-            style={{ width: "8ch" }}
-          />
-        )}
-      />
+      {/* **Voice and meetings**: grouped by INTENT (myne-md/myne#848): a setting
+          belongs under the question the user arrived with, not under the feature
+          that implements it. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupVoice")}</h4>
 
       {/* Meeting AI prompt (meeting-ai): the user's replacement for the meeting
           AI pass's reduce instruction. Empty means the built-in default. */}
@@ -1175,6 +1330,12 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
               disabled={!aiEnabled}
               aria-label={t("settings.ai.meetingPromptLabel")}
               data-testid="ai.meeting-prompt-input"
+              // **`MULTILINE_STYLE`, which exists for exactly this**
+              // (myne-md/myne#848). An unstyled `<textarea>` falls back to the
+              // WebView's own white field, so this one was a white box on a dark
+              // panel, the only control in the panel that did not come from the
+              // tokens.
+              style={MULTILINE_STYLE}
               rows={4}
             />
             <Button
@@ -1191,6 +1352,11 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           </>
         }
       />
+
+      {/* **Writing and chat**: grouped by INTENT (myne-md/myne#848): a setting
+          belongs under the question the user arrived with, not under the feature
+          that implements it. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupWriting")}</h4>
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded
@@ -1641,6 +1807,98 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         )}
       </div>
 
+      {/* **Privacy and limits**: grouped by INTENT (myne-md/myne#848): a setting
+          belongs under the question the user arrived with, not under the feature
+          that implements it. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupPrivacy")}</h4>
+
+      {/* Opt-in toggle. */}
+      <SettingRow
+        anchorId="ai.enable"
+        label={t("settings.ai.enableLabel")}
+        helper={t("settings.ai.enableHelper")}
+        control={(helperId) => (
+          <Switch
+            checked={aiEnabled}
+            onChange={(next) => void setAiEnabled(next)}
+            ariaLabel={t("settings.ai.enableLabel")}
+            ariaDescribedBy={helperId}
+            testId="ai.enable-toggle"
+          />
+        )}
+      />
+
+      {/* Trust affordance, load-bearing copy, rendered verbatim (SYNC-16 /
+          SYNC-7). One INVARIANT sentence, always shown, plus one STATE
+          sentence selected by which backend is answering: a provider IS a
+          server, so the old flat "runs entirely on your device" claim is false
+          the moment one is named (`decisions.md` 2026-08-09). */}
+      <div style={TRUST_BANNER_STYLE} data-testid="ai.trust-banner">
+        {/* Decorative: the headline beside it says the same thing in words, and
+            a screen reader announcing a glyph would only repeat it. */}
+        <span
+          aria-hidden="true"
+          data-testid="ai.trust-glyph"
+          // Both, because they answer different questions: `data-state` is
+          // which state the panel derived, `data-icon` is which glyph it chose
+          // for it. Asserting only the first would pass on a mapping that
+          // painted one glyph for all three (myne-md/myne#848).
+          data-state={trustState.kind}
+          data-icon={trustGlyph(trustState.kind).icon}
+          style={{
+            ...TRUST_GLYPH_STYLE,
+            background: trustGlyph(trustState.kind).bg,
+            color: trustGlyph(trustState.kind).fg,
+          }}
+        >
+          <Icon name={trustGlyph(trustState.kind).icon} size={16} />
+        </span>
+        <div style={TRUST_BODY_STYLE}>
+        <p data-testid="ai.trust-invariant" style={TRUST_LINE_STYLE}>
+          {AI_TRUST_INVARIANT}
+        </p>
+        <p data-testid="ai.trust-headline" style={TRUST_LINE_STYLE}>
+          {aiTrustHeadline(trustState)}
+        </p>
+        <button
+          type="button"
+          className="myne-text-link"
+          data-testid="ai.trust-disclosure-toggle"
+          aria-expanded={disclosureOpen}
+          onClick={() => setDisclosureOpen((o) => !o)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            marginTop: "var(--space-1)",
+            color: "var(--fg-2)",
+            font: "inherit",
+            fontSize: "var(--text-sm)",
+            cursor: "pointer",
+            alignSelf: "flex-start",
+          }}
+        >
+          {t("settings.ai.disclosureToggle")}
+        </button>
+        {disclosureOpen && (
+          <p data-testid="ai.trust-disclosure" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
+            {aiTrustDisclosure(trustState)}
+          </p>
+        )}
+        {/* What is answering RIGHT NOW (#191 task 5, SYNC-13). A read-only
+            caption, deliberately NOT a `SettingRow`: a caption adds no setting,
+            and a setting would owe a `settingsSearchIndex.ts` entry plus a
+            control the user could operate, which SYNC-19 removed from scope.
+            It sits in the trust block because it is the same question that
+            block answers, one level more concrete. */}
+        <p data-testid="ai.active-provider" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
+          {activeProviderName === undefined
+            ? t("settings.ai.providerNothingAnswering")
+            : t("settings.ai.providerActive", { name: activeProviderName })}
+        </p>
+        </div>
+      </div>
+
       {/* Excluded folders — same canonical set encoding as deliberate_folders. */}
       <div
         style={BLOCK_STYLE}
@@ -1650,6 +1908,16 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <label style={LABEL_STYLE} htmlFor="ai-excluded-folders">
           {t("settings.ai.excludedLabel")}
         </label>
+        {excludedFolderOptions.length > 0 ? (
+          <SearchableSelect
+            testId="ai.excluded-folders-picker"
+            aria-label={t("settings.ai.excludedPickLabel")}
+            options={excludedFolderOptions}
+            selected={[]}
+            placeholder={t("settings.ai.excludedPickPlaceholder")}
+            onChange={(next) => appendExcludedFolder(next[0] ?? "")}
+          />
+        ) : null}
         <textarea
           id="ai-excluded-folders"
           data-testid="ai.excluded-folders"
@@ -1659,7 +1927,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             excludedTouchedRef.current = true;
             setExcludedDraft(e.target.value);
           }}
-          onBlur={commitExcluded}
+          onBlur={() => commitExcluded()}
           rows={3}
           spellCheck={false}
           placeholder={t("settings.ai.excludedPlaceholder")}
@@ -1668,6 +1936,89 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <p style={HELPER_STYLE}>{t("settings.ai.excludedHelper")}</p>
       </div>
 
+      {/* **Advanced**: grouped by INTENT (myne-md/myne#848): a setting
+          belongs under the question the user arrived with, not under the feature
+          that implements it. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupAdvanced")}</h4>
+
+      {/* How much of the visible conversation an agent run is seeded with
+          (myne-md/myne#617).
+
+          **A bound, presented as one.** The number is multiplied by the loop's
+          iteration ceiling and, on a remote provider, by characters that leave
+          the device, so the helper says what it costs rather than what it
+          enables. The host CLAMPS it at the write, which is why this input does
+          not: a bound enforced in the control is a bound the next caller does
+          not inherit, and `usePrefs` re-reads after a successful write so the
+          number shown is the number that stuck rather than the one typed.
+
+          Empty means unset, and unset means the host's own default. That is a
+          real third state, not a zero: zero would mean "seed nothing", which is
+          the pre-#617 behaviour and a legitimate thing to want. */}
+      <SettingRow
+        anchorId="ai.history-budget"
+        label={t("settings.ai.historyBudgetLabel")}
+        helper={t("settings.ai.historyBudgetHelper")}
+        control={(helperId) => (
+          <Input
+            id="ai-history-budget"
+            type="number"
+            // `SettingRow` renders its label as a `span`, not a `label
+            // htmlFor`, so the `id` binds to nothing and the control would be
+            // announced as an unnamed spin button carrying a long helper
+            // sentence. Every other `SettingRow`-hosted control in this tree
+            // supplies its own name for the same reason.
+            aria-label={t("settings.ai.historyBudgetLabel")}
+            // Gated like every other control in this panel. The budget bounds
+            // what an agent run sends, and with AI off there is no run, so an
+            // editable field here would be the one row that says otherwise.
+            disabled={!aiEnabled}
+            min={0}
+            max={CHAT_HISTORY_BUDGET_MAX}
+            value={historyBudgetDraft}
+            onChange={(e) => setHistoryBudgetDraft(e.target.value)}
+            onBlur={(e) => {
+              // **`badInput` before the empty check, and that order is the
+              // whole fix.** For `type="number"` the value IDL attribute
+              // returns "" whenever the control holds something it cannot
+              // parse, so "abc", "1e" and "--5" all arrive here as the empty
+              // string and used to take the clear-the-override branch. A user
+              // who select-alls, mistypes and tabs away had their bound reset
+              // to the host default with no feedback, which is the opposite of
+              // what the comment two lines down promises.
+              if (e.target.validity.badInput) {
+                setHistoryBudgetDraft(
+                  prefs.chat_history_budget === null
+                    ? ""
+                    : String(prefs.chat_history_budget),
+                );
+                return;
+              }
+              const raw = historyBudgetDraft.trim();
+              if (raw === "") {
+                void setChatHistoryBudget(null);
+                return;
+              }
+              const parsed = Number.parseInt(raw, 10);
+              if (!Number.isFinite(parsed) || parsed < 0) {
+                // Reject rather than coerce: silently turning nonsense into a
+                // number would store a bound the user did not choose. Restoring
+                // the shown value is the effect above's job, so this only has to
+                // avoid writing.
+                setHistoryBudgetDraft(
+                  prefs.chat_history_budget === null ? "" : String(prefs.chat_history_budget),
+                );
+                return;
+              }
+              void setChatHistoryBudget(parsed);
+            }}
+            aria-describedby={helperId}
+            data-testid="ai.history-budget-input"
+            style={{ width: "8ch" }}
+          />
+        )}
+      />
+
       {/* Agent memory + personality (myne-md/myne#697): the settings half of
           the memory surface (the chat popover is the other). Absent, not
           disabled, when off (task 7, the mobile twin's posture): with AI off
@@ -1675,6 +2026,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       {aiEnabled ? (
         <MemorySection onShowToast={onShowToast ?? (() => {})} aiEnabled={aiEnabled} />
       ) : null}
+
     </div>
   );
 }

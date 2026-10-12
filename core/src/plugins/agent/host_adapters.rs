@@ -137,7 +137,14 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
         let mut plaintext = String::from("---\n");
         plaintext.push_str(&format!("title: {}\n", note.title));
         if let Some(folder) = note.folder.as_deref().filter(|f| !f.is_empty()) {
-            plaintext.push_str(&format!("folder: {folder}\n"));
+            // **Quoted, for the same reason `move_note` quotes its destination**
+            // (myne-md/myne#848): the excluded-folder clamp reads this line with
+            // the Rust scalar reader while the app reads it with js-yaml, and an
+            // unquoted `#` makes the two disagree. A folder this verb cannot
+            // write faithfully is refused rather than written differently.
+            let scalar = crate::plugins::agent::edit::yaml_folder_scalar(folder)
+                .map_err(|_| AgentError::WriteFailed)?;
+            plaintext.push_str(&format!("folder: {scalar}\n"));
         }
         plaintext.push_str("---\n\n");
         plaintext.push_str(&note.body);

@@ -69,6 +69,12 @@ export interface ConversationEntry {
    *  new blob family: the roster already syncs, so the Hub lists anchors without
    *  reading each conversation file. */
   note_id?: string;
+  /** The folder this conversation is scoped to, when it is
+   *  (myne-md/myne#848). Additive and optional in the same way `note_id` is: a
+   *  row written before the field existed reads back without it, and the Hub
+   *  renders that as a vault-general conversation. A conversation carries at
+   *  most one of `note_id` / `folder`. */
+  folder?: string;
 }
 
 /**
@@ -138,11 +144,15 @@ export async function chatsCreate(
   // Optional and additive: a conversation created without it is vault-general,
   // which is the Hub's own case.
   noteId?: string | null,
+  // The folder this conversation is scoped to, when it is (myne-md/myne#848).
+  // Same optional shape; at most one of the two is ever set.
+  folder?: string | null,
 ): Promise<string> {
   const id = await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
     ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
     ...(noteId !== undefined && noteId !== null ? { noteId } : {}),
+    ...(folder !== undefined && folder !== null ? { folder } : {}),
   });
   // After the await, so a failed create announces nothing: a listener that
   // re-read on a refusal would replace a correct list with the same list, and

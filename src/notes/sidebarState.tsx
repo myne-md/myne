@@ -1125,6 +1125,16 @@ export function SidebarStateProvider({
       try {
         await trashNote(id);
         await refreshOne(id);
+        // **The INDEX has to hear about this too** (myne-md/myne#848 review).
+        // Trashing is deliberately not routed through the autosave path (see the
+        // note above), so nothing re-indexes the note, and `live` is now a
+        // persisted field the agent's scope is resolved from rather than a
+        // read-time filter. `refreshOne` reloads the SIDEBAR's cache and not the
+        // index, so without this a note trashed in this session stayed `live` and
+        // inside the run's default scope, and one restored after a reconcile
+        // stayed out of every later run. Best-effort, like every other caller:
+        // `reindexNote` reads, parses and applies, and swallows its own failure.
+        void reindexNote(id);
       } catch (err) {
         setState((prev) => rollbackOptimisticTrashedFlag(prev, id, snapshot));
         throw err;
@@ -1148,6 +1158,10 @@ export function SidebarStateProvider({
       try {
         await restoreNote(id);
         await refreshOne(id);
+        // Same index obligation as the trash path above: `refreshOne` reloads
+        // the sidebar cache, not the index, and `live` is the scope permission
+        // now (myne-md/myne#848 review).
+        void reindexNote(id);
       } catch (err) {
         setState((prev) => rollbackOptimisticTrashedFlag(prev, id, snapshot));
         throw err;
@@ -1175,6 +1189,10 @@ export function SidebarStateProvider({
       try {
         await archiveNote(id);
         await refreshOne(id);
+        // Same index obligation as the trash path above: `refreshOne` reloads
+        // the sidebar cache, not the index, and `live` is the scope permission
+        // now (myne-md/myne#848 review).
+        void reindexNote(id);
       } catch (err) {
         setState((prev) => rollbackOptimisticArchivedFlag(prev, id, snapshot));
         throw err;
@@ -1200,6 +1218,10 @@ export function SidebarStateProvider({
       try {
         await unarchiveNote(id);
         await refreshOne(id);
+        // Same index obligation as the trash path above: `refreshOne` reloads
+        // the sidebar cache, not the index, and `live` is the scope permission
+        // now (myne-md/myne#848 review).
+        void reindexNote(id);
       } catch (err) {
         setState((prev) => rollbackOptimisticArchivedFlag(prev, id, snapshot));
         throw err;

@@ -111,16 +111,25 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
  *  manual and pre-release since myne-md/myne#579, so nothing reddened. Found by
  *  running it (myne-md/myne#596).
  *
- *  The wait is now `ai.composer-scope-current`, the caption that states what the
- *  run will be scoped to. It replaces a wait on `ai.composer-scope`, which still
- *  exists but moved behind the "change" disclosure and so never appears
- *  unprompted. The caption is the better target anyway: it renders whenever the
- *  composer does and it carries the fact a scenario actually depends on, which
+ *  The wait is now `ai.composer-scope`, the scope TRIGGER itself, which the
+ *  composer always renders (myne-md/myne#848 removed the "change" disclosure
+ *  this used to sit behind). It replaces a wait on `ai.composer-scope-current`,
+ *  a caption that no longer exists anywhere in the tree, so the helper timed
+ *  out at 5s and took this file's scenarios down the same way the mode click
+ *  had. The caption would carry the stronger fact a scenario depends on, which
  *  is that a scope is resolved before Send. */
 async function openComposer(session: Session): Promise<void> {
   await runPaletteAction(session, "ai.open-chat", "chat");
   await session.waitForElement(testIdSelector("ai.composer"), { timeoutMs: 15_000 });
-  await session.waitForElement(testIdSelector("ai.composer-scope-current"), {
+  // **`ai.composer-scope`, which is the trigger itself** (myne-md/myne#848).
+  // This waited on `ai.composer-scope-current`, a caption that no longer exists
+  // anywhere in the tree, so every scenario using this helper timed out at 5s
+  // inside `openComposer`, which is the failure this comment block records
+  // happening once already (myne-md/myne#596). The gate has to be something the
+  // composer ALWAYS renders: the count caption would be the stronger claim
+  // ("a scope resolved"), but it is absent when the probe fails, and a helper
+  // that times out on a failed probe reports the wrong thing entirely.
+  await session.waitForElement(testIdSelector("ai.composer-scope"), {
     timeoutMs: 5_000,
   });
 }
@@ -567,7 +576,10 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         // and losing it routes every folder-scale run through the
         // model-originated expansion instead, which is the injection-reachable
         // path.
-        expect((await s.byTestIdAll("ai.composer-scope-current")).length).toBe(1);
+        // The TRIGGER, which the composer always renders: the caption this
+        // used to assert was `ai.composer-scope-current`, gone from the tree,
+        // so the count was 0 and this failed (myne-md/myne#848).
+        expect((await s.byTestIdAll("ai.composer-scope")).length).toBe(1);
 
         // Ask, from that one input.
         const ask = await s.byTestId("ai.composer-input");

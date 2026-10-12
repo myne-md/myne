@@ -95,6 +95,9 @@ describe("the tappable helper", () => {
  * Keyed by file, because a line number goes stale on the next edit.
  */
 const NOT_CONTROLS: Record<string, string> = {
+  "mobile/src/app/flows/AiHistorySheet.tsx":
+    "The row div keeps a plain onClick as a touch convenience; the CONTROL is its title button, because the row also contains the three-dot trigger whose menu holds Rename and Delete, a control inside a control is nested-interactive and would swallow those labels into the row's name (myne-md/myne#848). Same split as ViewsSheet and the note row.",
+
   "mobile/src/app/flows/editor/sheets/ViewsSheet.tsx":
     "The row div keeps a plain onClick as a touch convenience; the CONTROL is its text block, because the row also contains an Edit button and a control inside a control is nested-interactive. Same split as the note row.",
   "mobile/src/app/flows/CreateVaultFlow.tsx":

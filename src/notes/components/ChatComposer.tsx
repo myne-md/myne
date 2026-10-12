@@ -43,19 +43,20 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
-import { SearchableSelect } from "../../components/primitives/SearchableSelect";
-import { Select, type SelectOption } from "../../components/primitives/Select";
+import { Icon } from "../../components/primitives/Icon";
+import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
+import type { IconName } from "../../lib/icons";
 import { Spinner } from "../../components/Spinner";
 import {
   agentCancel,
   agentCapability,
   agentPreviewGrant,
   type GrantPreview,
-  type ProbeProgress,
   type ProbeVerdict,
   type ScopeGrant,
 } from "../../lib/agent-run";
 import { providerErrorKey } from "../../lib/engine-error";
+import { defaultGrantFor } from "../../lib/agent-protocol";
 import {
   getAgent,
   setAutoApply,
@@ -64,11 +65,41 @@ import {
 } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import { useConversationEpoch } from "../ai/chatStore";
+import { useIndexNonce } from "../indexNonce";
 import { CAPTION_STYLE } from "./sharedStyles";
 
+/**
+ * Which host this composer is in (myne-md/myne#848).
+ *
+ * Defined HERE and re-exported by `ConversationSurface`, rather than the other
+ * way round: the surface imports the composer, so a type declared up there would
+ * be a cycle for the sake of one union.
+ */
+export type ChatComposerSurface = "agent" | "sidebar";
+
 export interface ChatComposerProps {
+  /** Which host this composer is in. Required: the zero state says different
+   *  things in the two, and a default would let a third mount inherit the wrong
+   *  sentence silently. */
+  surface: ChatComposerSurface;
   /** The open note: the default scope when no folder is attached. */
   openNoteId: string | null;
+  /**
+   * The note this SESSION is anchored to, when the session was opened from one
+   * (myne-md/myne#848, on the user's ask).
+   *
+   * Non-null means the scope is settled: the run reads this note, and the picker
+   * is not rendered at all. A conversation opened from a note ("open the agent
+   * on this note", the Hub's anchored card) is ABOUT that note by construction,
+   * so a control whose only sensible setting is the one already in force is a
+   * control that invites a mistake, and the user's read is that widening a
+   * session is a SESSION-level decision: a new conversation starts vault-wide.
+   *
+   * Deliberately NOT `openNoteId`. That one is "the note open beside the box",
+   * which is what the LIGHT panel's runs default to and where changing the scope
+   * for one message is the point; this one is "the session was opened from this
+   * note", which is the agent pane's Focus view. Two facts, two props. */
+  anchoredNoteId?: string | null;
   /** Folders the user can attach as a scope. */
   folders: readonly string[];
   /** Called with the ids of notes an automatic apply wrote, so the open pane
@@ -83,7 +114,12 @@ const INPUT_STYLE: CSSProperties = {
   // Auto-grown by the effect below; these two bound it. Neither is a spacing
   // token the theme owns, so neither is a hardcoded visual value.
   minHeight: 32,
-  maxHeight: 132,
+  // **Five lines, and then it scrolls** (myne-md/myne#848). Expressed in `em`
+  // rather than px so it follows the type scale: the line box is 1.4em by the
+  // declaration below, so 7em IS five lines at whatever `--text-sm` resolves to.
+  // A px ceiling was 132, which happened to be about six lines at today's
+  // font size and would drift out of agreement with its own comment at another.
+  maxHeight: "7em",
   resize: "none",
   overflowY: "auto",
   fontFamily: "var(--font-sans)",
@@ -96,15 +132,133 @@ const INPUT_STYLE: CSSProperties = {
   padding: "var(--space-1) var(--space-2)",
 };
 
+/** A control under the field: icon, value, and a glyph that says it opens. */
+const CONTROL_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  padding: "var(--space-1) var(--space-2)",
+  fontSize: "var(--text-sm)",
+  whiteSpace: "nowrap",
+};
+
+/** One dropdown on the composer's row: glyph, value, chevron, and a menu.
+ *
+ *  **Two controls, one shape** (myne-md/myne#848). The scope control was a
+ *  dropdown and the permission mode was a button that toggled on press, so the
+ *  same row held two different idioms for the same kind of choice, and the
+ *  toggle said "Apply automatically" without saying that "Review first" was the
+ *  other option, or which of the two it was on. A control whose value is a
+ *  word from a set is a dropdown; the glyph says which KIND of choice it is and
+ *  the text says which one. */
+function ComposerDropdown(props: {
+  /** Base testids: `<base>`, `<base>-value`, `<base>-menu`, `<base>-option`. */
+  base: string;
+  /** The accessible name, the QUESTION this control answers. */
+  label: string;
+  icon: IconName;
+  value: string;
+  options: { value: string; label: string; active: boolean }[];
+  onPick: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  return (
+    <>
+      <span ref={anchorRef} style={{ display: "inline-flex" }}>
+        <Button
+          variant="ghost"
+          data-testid={props.base}
+          aria-expanded={open}
+          aria-label={props.label}
+          onClick={() => setOpen((o) => !o)}
+          style={CONTROL_STYLE}
+        >
+          <Icon name={props.icon} size={14} />
+          <span data-testid={`${props.base}-value`}>{props.value}</span>
+          <Icon name="chevron-down" size={12} />
+        </Button>
+      </span>
+      {/* `AnchoredPanel` rather than an absolutely positioned box inside the
+          row: two controls on one row cannot both anchor a menu at the row's
+          left edge, which is what `left: 0` gave the second one. The panel is
+          drawn in the body against its OWN trigger, and it owns the dismissal
+          (outside press, Escape, reflow) so this component does not need a
+          document listener of its own. */}
+      <AnchoredPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={anchorRef}
+        minWidth={160}
+        align="start"
+        style={SCOPE_MENU_STYLE}
+        testId={`${props.base}-menu`}
+      >
+        {props.options.map((option) => (
+          <Button
+            key={option.value}
+            variant="ghost"
+            data-testid={`${props.base}-option`}
+            data-value={option.value}
+            data-active={option.active ? "true" : "false"}
+            onClick={() => {
+              props.onPick(option.value);
+              setOpen(false);
+            }}
+            style={SCOPE_MENU_ITEM_STYLE}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </AnchoredPanel>
+    </>
+  );
+}
+
+/** The scope menu's chrome. Its placement belongs to `AnchoredPanel`. */
+const SCOPE_MENU_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  padding: "var(--space-1)",
+  gap: "var(--space-1)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+};
+
+/** Only what the primitive does not already do. */
+const SCOPE_MENU_ITEM_STYLE: CSSProperties = {
+  textAlign: "left",
+  justifyContent: "flex-start",
+  width: "100%",
+  padding: "var(--space-1) var(--space-2)",
+};
+
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   alignItems: "center",
+  // The scope menu is absolutely positioned against this row.
+  position: "relative",
   gap: "var(--space-2)",
 };
 
+/**
+ * The picker value that means "the whole vault" (myne-md/myne#848).
+ *
+ * The picker's values are folder paths, and `""` is already the sentinel for
+ * "the open note". A NUL byte cannot occur in a canonical folder path, so this
+ * cannot collide with a real one, and the alternative shape (a second piece of
+ * state beside `attached`) is two values that have to be kept in step, which is
+ * exactly the class of bug this control's `conversationEpoch` reset exists to
+ * avoid.
+ */
+export const VAULT_SCOPE_SENTINEL = "\u0000vault";
+
 export function ChatComposer({
+  surface,
   openNoteId,
+  anchoredNoteId = null,
   folders,
   onNotesWritten,
 }: ChatComposerProps) {
@@ -149,7 +303,6 @@ export function ChatComposer({
    *  call THIS composer has in flight, so a composer that unmounts takes it
    *  with it. The VERDICT is the thing that has to outlive the component, and
    *  it lives in the store. */
-  const [probeAt, setProbeAt] = useState<ProbeProgress | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const verdict = typeof probe === "object" ? probe : null;
 
@@ -163,7 +316,12 @@ export function ChatComposer({
     if (typeof known === "object" && known !== null) return known;
     setProbing(true);
     try {
-      const v = await agentCapability(setProbeAt);
+      // **No per-attempt callback** (myne-md/myne#848, on the user's read): the
+      // probe reports "attempt 2 of 3" through `onAttempt`, which fed a caption
+      // that no longer exists. The fraction is about Myne's retry loop rather
+      // than about anything the user can act on, and the button's own
+      // "Checking" says the part that matters.
+      const v = await agentCapability();
       setProbeVerdict(v);
       return v;
     } catch {
@@ -174,9 +332,66 @@ export function ChatComposer({
       return null;
     } finally {
       setProbing(false);
-      setProbeAt(null);
     }
   }
+
+  // Memoized, because the preview effect below keys on it: an object literal
+  // rebuilt per render would re-issue `agentPreviewGrant` on every streamed
+  // token (the same reason `scopeKey` exists).
+  // **An anchored session ignores the picker entirely** (myne-md/myne#848): the
+  // scope is the note it was opened from, so `attached` cannot move it. The
+  // state still exists for the unanchored case, and the conversation epoch still
+  // resets it, so a session that stops being anchored does not inherit a scope
+  // chosen for another one.
+  const anchored = anchoredNoteId !== null && anchoredNoteId !== "";
+  const grant: ScopeGrant = useMemo(
+    () =>
+      anchored
+        ? defaultGrantFor(anchoredNoteId)
+        : attached === VAULT_SCOPE_SENTINEL
+          ? { kind: "vault" }
+          : attached !== null
+            ? { kind: "folder", value: attached }
+            : defaultGrantFor(openNoteId),
+    [anchored, anchoredNoteId, attached, openNoteId],
+  );
+
+  /**
+   * The glyph for the scope, which states the KIND rather than the value: a
+   * glyph cannot name a folder, and the tooltip does. The three kinds are the
+   * same three the conversation hub draws.
+   */
+  // The menus' dismissal lives in `AnchoredPanel` now: each control owns its
+  // own anchor, so there is one implementation of "outside press, Escape,
+  // reflow" rather than one per menu (myne-md/myne#848).
+
+
+  const scopeIcon: "folder" | "file-text" | "message-square" =
+    attached !== null && attached !== VAULT_SCOPE_SENTINEL
+      ? "folder"
+      : openNoteId !== null && openNoteId !== "" && attached === null
+        ? "file-text"
+        : "message-square";
+
+  /**
+   * The label the run records for its scope, and what the icon's accessible
+   * name says.
+   *
+   * **It mirrors the GRANT, not the picker.** The icon is the only place the
+   * value is readable now, so it has to answer the same question
+   * `defaultGrantFor` answers: an unattached scope with no note open is the
+   * WHOLE VAULT, and a label that said "This note" there would name a note that
+   * does not exist, the same lie the picker's old placeholder was fixed for
+   * (myne-md/myne#848).
+   */
+  const scopeLabel =
+    attached === VAULT_SCOPE_SENTINEL
+      ? t("agent.composer.scopeAllVault")
+      : attached !== null
+        ? attached
+        : openNoteId !== null && openNoteId !== ""
+          ? t("agent.composer.scopeOpenNote")
+          : t("agent.composer.scopeAllVault");
 
   // The count comes from the HOST, resolved by the same code the commit runs.
   // Counting here would leave out the `ai_excluded_folders` clamp, so the number
@@ -186,11 +401,39 @@ export function ChatComposer({
   // answer up while the next one resolves showed one folder's size beside
   // another folder's name, and collapsing a failed call into `null` made "we
   // could not find out" look identical to "nothing is attached".
+  //
+  // **Every scope shape is previewed, not only a folder** (myne-md/myne#848).
+  // The guard used to be `if (attached === null) return`, which was right while
+  // the default was "nothing to run against": there was no scope to describe.
+  // The default is the whole vault now, and the count is exactly what makes a
+  // number the user did not expect explainable, so silence here would hide the
+  // exclusions on the one scope that has the most of them.
+  // **And again whenever the vault INDEX changes** (myne-md/myne#848, on the
+  // user's report). `vault.indices` hydrates at unlock and the notes changed
+  // since its snapshot are re-applied afterwards, so a count asked for in that
+  // window is answered against a half-filled index, which is how a composer
+  // that had just mounted came to say "nothing for the agent to work on yet:
+  // every note is excluded from AI, or the vault is empty" on a vault with 431
+  // notes, and then to sit on it, because nothing else was going to re-ask.
+  // The nonce is the index's own chokepoint signal (myne#277), so this is the
+  // answer to "the scope's size changed because the index did".
+  const indexNonce = useIndexNonce();
+  // **A GRANT change invalidates the answer; an INDEX change does not.**
+  // (myne-md/myne#848, on the user's report: the placeholder flickered between
+  // "Getting ready…" and "Ask the AI…" while the count caught up.) Clearing on
+  // both was over-applied: the reason to clear first is that a stale number
+  // would be read against a new scope's name, and an index bump is the SAME
+  // scope, the count is being corrected, not replaced. So the previous number
+  // stays on screen and is overwritten when the new one arrives, and only a
+  // different scope shows the waiting state.
+  const askedFor = useRef<ScopeGrant | null>(null);
   useEffect(() => {
-    setPreview(null);
-    if (attached === null) return;
+    if (askedFor.current !== grant) {
+      askedFor.current = grant;
+      setPreview(null);
+    }
     let live = true;
-    void agentPreviewGrant({ kind: "folder", value: attached })
+    void agentPreviewGrant(grant)
       .then((p) => {
         if (live) setPreview(p);
       })
@@ -200,7 +443,7 @@ export function ChatComposer({
     return () => {
       live = false;
     };
-  }, [attached]);
+  }, [grant, indexNonce]);
 
   /**
    * The attached scope belongs to ONE conversation (myne-md/myne#771).
@@ -238,13 +481,6 @@ export function ChatComposer({
   // height would then be a property of the COPY: translate the placeholder into
   // a longer language and the empty composer grows, in every locale, with
   // nothing in the code to point at.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (el === null) return;
-    el.style.height = "auto";
-    if (message === "") return;
-    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
-  }, [message]);
 
   /**
    * The scope choices.
@@ -260,6 +496,9 @@ export function ChatComposer({
    */
   const scopeOptions = useMemo(
     () => [
+      // The whole vault first: it is what a new conversation opens on, so it is
+      // the entry the trigger reads back most of the time (myne-md/myne#848).
+      { value: VAULT_SCOPE_SENTINEL, label: t("agent.composer.scopeAllVault") },
       ...(openNoteId !== null && openNoteId !== ""
         ? [{ value: "", label: t("agent.composer.scopeOpenNote") }]
         : []),
@@ -267,36 +506,34 @@ export function ChatComposer({
     ],
     [folders, openNoteId, t],
   );
-  // `SearchableSelect` memoizes its selected set and its trigger summary on this
-  // array's identity, so a literal would rebuild both on every keystroke and on
-  // every streamed token.
-  const scopeSelected = useMemo(() => [attached ?? ""], [attached]);
-
-  // Memoized for the same reason every options list on this surface is: the
-  // transcript re-renders once per streamed token, and a fresh array identity
-  // per render is a fresh identity handed to every consumer downstream. (It was
-  // `Segmented`'s layout-effect thumb measurement that made it load-bearing
-  // rather than tidy; the control is a `<Select>` now and the habit is still
-  // right.)
-  const permissionOptions: readonly SelectOption<"ask" | "auto">[] = useMemo(
-    () => [
-      { value: "ask", label: t("agent.composer.permissionAsk") },
-      { value: "auto", label: t("agent.composer.permissionAuto") },
-    ],
-    [t],
-  );
-
-  const grant: ScopeGrant | null = attached
-    ? { kind: "folder", value: attached }
-    : openNoteId
-      ? { kind: "notes", value: [openNoteId] }
-      : null;
-
   // Before the first probe there is no verdict, so Edit mode is offered and the
   // check happens on Send. After one, it gates.
   const refused = probe === "failed" || verdict?.passed === false;
   const empty = message.trim().length === 0;
-  const blocked = empty || busy || probing || refused || grant === null;
+  /**
+   * **The scope would resolve to nothing** (myne-md/myne#848). The host resolves
+   * the grant before sending and refuses an empty set (`AgentError::EmptyGrant`),
+   * and the composer learns the same answer one step earlier from its own
+   * preview, so the field can refuse the keystroke instead of the send.
+   *
+   * `preview === null` is NOT this state: that is "the host has not answered
+   * yet", and treating it as empty would disable the box on every mount.
+   */
+  const scopeEmpty = preview !== null && preview !== "failed" && preview.noteCount === 0;
+  const blocked = empty || busy || probing || refused || scopeEmpty;
+
+  // **Except while the field is BLOCKED, where the copy IS the message.**
+  // (myne-md/myne#848.) The rule above exists so an empty composer does not grow
+  // because a translation is long. A blocked field is the other case: it has
+  // nothing else to say, and clipping its sentence at the first line hides the
+  // only explanation on screen. So it measures like a typed message does.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el === null) return;
+    el.style.height = "auto";
+    if (message === "" && !scopeEmpty) return;
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  }, [message, scopeEmpty]);
   // While a run works there is no second Stop control: this button turns
   // into it, in place, like the mobile composer already does. The id may
   // genuinely be null on the first leg (before `agentStart` reports the
@@ -312,7 +549,6 @@ export function ChatComposer({
     if (running) return;
     if (blocked) return;
     const text = message.trim();
-    if (grant === null) return;
     const verdict = await ensureCapability();
     // The refusal is rendered by the notice below; keep what the user typed so
     // switching backend and sending again does not cost them the message.
@@ -324,8 +560,15 @@ export function ChatComposer({
         text,
         grant,
         {
-          scopeLabel: attached ?? t("agent.composer.scopeOpenNote"),
+          scopeLabel,
           startFailed: t("agent.composer.startFailed"),
+          // The two sentences a leg that RAN can owe, which the start path only
+          // reaches through `legFailureSentence`'s arms (myne-md/myne#848).
+          legFailed: t("agent.progress.legFailed"),
+          rootGrant: t("agent.progress.expandFailed"),
+          // The host's own cause for a gate refusal (no credential, consent
+          // missing, not ready), whose sentence names the control that fixes it.
+          byCause: (cause) => t(providerErrorKey(cause)),
           autoApplyFailed: t("agent.composer.autoApplyFailed"),
           providerRejected: t("agent.composer.providerRejected"),
           // Resolved through the shared taxonomy key rather than a second
@@ -425,9 +668,28 @@ export function ChatComposer({
               void submit();
             }
           }}
-          placeholder={t("agent.composer.placeholder")}
+          // **The copy is the PLACEHOLDER, not a line under the field.** The
+          // graph had a caption warning that Send was off, and the highlight on
+          // the picker plus a field that refuses the keystroke already say it.
+          // The sentence only had to say WHAT is needed, so it moved into the
+          // field the user is trying to type into (myne-md/myne#848).
+          placeholder={
+            // **Unanswered is not the same as empty** (myne-md/myne#848, on the
+            // user's report): the scope's size comes from the host, and while
+            // that read is in flight the composer knows nothing about the
+            // scope. It used to say so in the vault's words, "every note is
+            // excluded from AI, or the vault is empty", which is a claim about
+            // the vault made before the vault was asked.
+            preview === null
+              ? t("agent.composer.preparing")
+              : scopeEmpty
+                ? surface === "agent"
+                  ? t("agent.composer.blockedScope")
+                  : t("agent.composer.blockedScopeSidebar")
+                : t("agent.composer.placeholder")
+          }
           aria-label={t("agent.composer.placeholder")}
-          disabled={busy}
+          disabled={busy || scopeEmpty}
           style={INPUT_STYLE}
         />
         {running ? (
@@ -447,41 +709,35 @@ export function ChatComposer({
             data-testid="ai.composer-send"
             disabled={blocked}
           >
-            {/* The label does NOT change with the probe. It did, and the label
-                it changed to was long enough to collapse the textarea beside
-                it: a button that resizes while you are typing into the control
-                it is stealing width from. The spinner says work is in flight,
-                the count is in the row above, and the button stays the size it
-                was. */}
+            {/* **The probe reports ON the button** (myne-md/myne#848, on the
+                user's read). It used to print a caption under the row,
+                "Checking the model… (2/3)", which is a line of prose for a
+                state the user is already looking at the control for, and the
+                fraction is about Myne's own retry loop rather than about
+                anything the user can act on.
+
+                The label DOES change here, and the earlier note that it must
+                not was about a longer sentence: this is one word, swapped in a
+                window that opens when the user has just pressed Send and closes
+                when the field is cleared, not while they are typing into it. */}
             {probing ? <Spinner size={14} style={{ borderWidth: 2 }} /> : null}
-            {t("editor.chrome.rightPanel.aiChat.send")}
+            {probing
+              ? t("agent.composer.checking")
+              : t("editor.chrome.rightPanel.aiChat.send")}
           </Button>
         )}
       </form>
 
-      {/* **A disabled Send says why** (myne-md/myne#771). A run needs a scope
-          the host will accept: `defaultGrantFor` resolves it to the open note
-          or to `null`, and a vault-wide grant is refused outright
-          (`is_root_grant`). So with no note open and no folder chosen there is
-          genuinely nothing to run against — and the surface said so with a
-          greyed button and nothing else, which reads as a broken app rather
-          than as a choice the user has not made yet.
+      {/* **The scope line is gone, because there is no longer a scope-less
+          state** (myne-md/myne#848). It used to warn that Send was off while
+          `defaultGrantFor` returned `null` (no note open, no folder chosen),
+          and a vault-wide grant was refused outright. The composer now defaults
+          to the whole vault, so the only thing that sentence could say is that
+          the app is broken, and it is unreachable: `grant` is never null.
+          `agent.composer.needsScope` stays in the catalogs for the blocked
+          zero-state the pane design reintroduces (task 11), which is a case
+          where a run genuinely cannot be formed. */}
 
-          Only when there is something to send: a scope missing while the box
-          is empty is not yet a problem, and a line that appears before the
-          user has typed is a scolding.
-
-          It sits between the input and the control row it points at, and the
-          copy says "below" — the settings moved UNDER the composer in this
-          same epic and the sentence was written against where they used to be.
-          A direction in copy is a fact about the layout, so it belongs beside
-          the layout rather than in a catalog nobody re-reads when a row moves.
-          `tests/components/ChatComposer.test.tsx` pins the pair. */}
-      {grant === null && !empty && !busy ? (
-        <p data-testid="ai.composer-needs-scope" style={CAPTION_STYLE}>
-          {t("agent.composer.needsScope")}
-        </p>
-      ) : null}
 
       {/* **One control row, UNDER the input** (myne-md/myne#771). The scope and
           the permission mode were two full-width rows ABOVE it — a caption, a
@@ -500,7 +756,16 @@ export function ChatComposer({
           control on the composer, because taking it away routes every
           folder-scale run through the model-originated expansion instead, which
           is the injection-reachable path. What changes is that it costs one row
-          instead of two, and one click instead of two. */}
+          instead of two, and one click instead of two.
+
+          **One exception, and it is recorded rather than taken**
+          (myne-md/myne#848, `decisions/ai/0663`): an ANCHORED session, one
+          opened from a note, renders no picker, because its scope is the note
+          by construction and widening belongs to the session, not the message. A
+          new conversation starts vault-wide, which is the user-originated path
+          that replaces the picker here. The disclosure is unaffected: the count
+          and the excluded figure stay, and they are what 0515 names as the
+          mitigation. */}
       <div style={ROW_STYLE}>
         {/* **The picker is the control, not a disclosure over one.** It used to
             render a caption plus a Change button, and pressing Change REPLACED
@@ -509,37 +774,108 @@ export function ChatComposer({
             control that already is a disclosure, in service of an argument
             ("reading a dropdown before typing is friction") that the two-step
             version cost more of than the dropdown ever did. */}
-        <SearchableSelect
-          testId="ai.composer-scope"
-          aria-label={t("agent.composer.scopeLabel")}
-          options={scopeOptions}
-          selected={scopeSelected}
-          // The placeholder is what the trigger reads when nothing is chosen,
-          // so it names the CHOICE rather than a value: with no note open there
-          // is nothing selected and "This note" would be the same lie the
-          // option list used to tell.
-          placeholder={
-            openNoteId !== null && openNoteId !== ""
-              ? t("agent.composer.scopeOpenNote")
-              : t("agent.composer.scopeChoose")
+        {anchored ? null : (
+        <span
+          data-testid="ai.composer-scope-wrap"
+          data-blocked={scopeEmpty ? "true" : "false"}
+          style={
+            scopeEmpty
+              ? {
+                  borderRadius: "var(--radius-1)",
+                  outline: "2px solid var(--accent)",
+                  outlineOffset: "1px",
+                  display: "inline-flex",
+                }
+              : { display: "inline-flex" }
           }
-          onChange={(next) => setAttached(next[0] ? next[0] : null)}
+        >
+        {/* **The controls under the field are icons** (myne-md/myne#848). They
+            were a `SearchableSelect` and a `Select`, each spending a panel-width
+            box on a choice set once and left, in a 280px sidebar. The glyph
+            states the KIND (a note, a folder, or the whole vault) and the
+            tooltip and the accessible name carry the full value, because a glyph
+            cannot state which folder. The count beside it is what actually has
+            to stay legible: it is the disclosure `docs/decisions/ai/0515` names,
+            not a nicety. */}
+        {/* **The value is WRITTEN beside the icon** (myne-md/myne#848). An
+            icon-only control states a kind and hides the value; the reference a
+            user brought back is a trigger that reads `icon + value + chevron`,
+            and the value is what the run will actually use. The glyph keeps its
+            job of saying WHICH KIND, and the text says which one. */}
+        <ComposerDropdown
+          base="ai.composer-scope"
+          label={t("agent.composer.scopeLabel")}
+          icon={scopeIcon}
+          value={scopeLabel}
+          options={scopeOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+            // **Mirrors `grant`, not `attached`** (review finding): with a note
+            // open and nothing attached the grant is THAT NOTE, so a menu keyed
+            // on `attached` alone marked "All notes" as current while the trigger
+            // and the icon said "This note". A control that misstates its own
+            // value is the thing this menu's own comment calls worse than one
+            // with nothing in it.
+            active:
+              option.value ===
+              (anchored
+                ? ""
+                : attached !== null
+                  ? attached
+                  : openNoteId !== null && openNoteId !== ""
+                    ? ""
+                    : VAULT_SCOPE_SENTINEL),
+          }))}
+          onPick={(value) => {
+            // The sentinel means the vault, `""` means the open note, and
+            // anything else is a folder path.
+            setAttached(
+              value === VAULT_SCOPE_SENTINEL
+                ? VAULT_SCOPE_SENTINEL
+                : value === ""
+                  ? null
+                  : value,
+            );
+          }}
         />
+        </span>
+        )}
 
-        {/* **The permission mode is a dropdown, not a segmented control**
-            (myne-md/myne#771). A segment is for a choice you flip often enough
-            that both options should be one click away; this one is set once and
-            left, and it was spending a full panel-width row saying so. What the
-            automatic side is bounded by is stated where it is enforced
+        {/* **The permission mode is a dropdown too** (myne-md/myne#848, and
+            a dropdown since myne-md/myne#771). It was a BUTTON that toggled on
+            press, which made the row hold two idioms for the same kind of
+            choice: the scope control said what it was set to and offered the
+            alternatives, and this one said what it was set to and hid the
+            alternative behind a press that also CHANGED it. A control whose
+            value is a word from a set is a dropdown, the glyph says which kind
+            of choice, the text says which one, and the menu is where the other
+            one is.
+            What the automatic side is bounded by is stated where it is enforced
             (`autoApplyRun`), not here: it stays inside the scope the user
             approved, and a removal still needs its own act because the host
             refuses one inside a bulk approval whatever the caller sends. */}
-        <Select
-          testId="ai.composer-permission"
-          aria-label={t("agent.composer.permissionLabel")}
-          value={agent.autoApply ? "auto" : "ask"}
-          onChange={(v: "ask" | "auto") => setAutoApply(v === "auto")}
-          options={permissionOptions}
+        <ComposerDropdown
+          base="ai.composer-permission"
+          label={t("agent.composer.permissionLabel")}
+          icon={agent.autoApply ? "play" : "columns-2"}
+          value={
+            agent.autoApply
+              ? t("agent.composer.permissionAuto")
+              : t("agent.composer.permissionAsk")
+          }
+          options={[
+            {
+              value: "ask",
+              label: t("agent.composer.permissionAsk"),
+              active: !agent.autoApply,
+            },
+            {
+              value: "auto",
+              label: t("agent.composer.permissionAuto"),
+              active: agent.autoApply,
+            },
+          ]}
+          onPick={(value) => setAutoApply(value === "auto")}
         />
 
         {/* **A failed preview says so rather than showing nothing.** An absent
@@ -552,33 +888,26 @@ export function ChatComposer({
             {t("agent.composer.scopeCountUnavailable")}
           </span>
         ) : null}
-        {attached !== null && preview !== null && preview !== "failed" ? (
+        {preview !== null && preview !== "failed" ? (
           <>
             <span data-testid="ai.composer-scope-count" style={CAPTION_STYLE}>
               {t("agent.composer.scopeCount", { count: preview.noteCount })}
             </span>
-            {preview.excludedCount > 0 ? (
-              <span data-testid="ai.composer-scope-excluded" style={CAPTION_STYLE}>
-                {t("agent.scope.excluded", { count: preview.excludedCount })}
-              </span>
-            ) : null}
+            {/* **Rendered at zero too** (myne-md/myne#848). Hiding it when the
+                clamp removed nothing made its absence ambiguous: "no exclusions"
+                and "we did not check" read the same, and the second is the one
+                that gets a user to approve a scope they did not mean. The
+                sentence has a singular/plural pair for one and many, and the
+                `_other` form for zero reads "0 notes are excluded and stay out",
+                which is exactly the reassurance the line is for. */}
+            <span data-testid="ai.composer-scope-excluded" style={CAPTION_STYLE}>
+              {t("agent.composer.scopeExcluded", {
+                count: preview.excludedCount,
+              })}
+            </span>
           </>
         ) : null}
 
-        {/* The probe's progress, here rather than inside the Send button.
-            The button's label grew to "Checking the model… (2/3)", which in a
-            flex row with a `flex: 1` textarea meant the input collapsed to
-            three characters wide mid-keystroke — the user's own text squeezed
-            out of the way by a status about the model. A caption in a row that
-            already exists costs nothing and moves nothing. */}
-        {probing && probeAt !== null ? (
-          <span data-testid="ai.composer-probe-at" style={CAPTION_STYLE}>
-            {t("agent.composer.checkingAt", {
-              attempt: probeAt.attempt,
-              of: probeAt.of,
-            })}
-          </span>
-        ) : null}
       </div>
     </div>
   );

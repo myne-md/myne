@@ -10,6 +10,17 @@
 import { invoke } from "../platform/core";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
+import {
+  readArchivedFromFmBody,
+  readConflictFromFmBody,
+  readDeletedFromFmBody,
+  readTemplateFromFmBody,
+  readTrashedFromFmBody,
+} from "../dialect";
+import {
+  isLiveNote,
+  type NoteFlags,
+} from "@myne/editor/host/notes/selectors";
 import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
 import type { ParseResult, WikilinkRef } from "../dialect/types";
 import { collectFrontmatterTags } from "./frontmatterTags";
@@ -102,6 +113,40 @@ export function extractTags(parsed: ParseResult): TagEntry[] {
   return out;
 }
 
+/**
+ * The note's working-set flags, read exactly as the sidebar cache reads them
+ * (SYNC-1): the five shared dialect readers, over the same frontmatter body
+ * `loadNoteBatch` hands them.
+ *
+ * **Not exported** (review finding): the comment here used to say a test held it
+ * to `isLiveNote` directly and no test imported it, which is worse than either
+ * half. The behaviour is pinned where it is OBSERVABLE instead,
+ * `tests/notes/vaultIndices.test.ts`'s "the working-set (`live`) leg" block drives
+ * the real `reindexNoteFromBody` and asserts the `live` value it sends for every
+ * marker, which is the stronger test: this function is the one place a note's
+ * liveness is computed **for the index**, and the agent's scope reads that answer
+ * rather than forming a second opinion about it (myne-md/myne#848).
+ */
+function noteFlagsFromParsed(parsed: ParseResult): NoteFlags {
+  const fmBody = parsed.frontmatter.raw ?? "";
+  return {
+    trashed: readTrashedFromFmBody(fmBody),
+    deleted: readDeletedFromFmBody(fmBody),
+    archived: readArchivedFromFmBody(fmBody),
+    template: readTemplateFromFmBody(fmBody),
+    conflict: readConflictFromFmBody(fmBody),
+  };
+}
+
+/**
+ * `isLiveNote` over {@link noteFlagsFromParsed}, the sidebar tree's working
+ * set. One predicate, used by the index producer so the agent's scope and the
+ * tree can never disagree about which notes exist.
+ */
+export function liveNote(parsed: ParseResult): boolean {
+  return isLiveNote(noteFlagsFromParsed(parsed));
+}
+
 /** Upsert a note's index contribution (title + folder + wikilink edges + tags
  *  + typed frontmatter properties + line-tasks). */
 export async function vaultIndicesApply(
@@ -114,6 +159,12 @@ export async function vaultIndicesApply(
   blockAnchors: ReadonlyArray<BlockAnchorEntry>,
   tasks: ReadonlyArray<LineTask>,
   headings: ReadonlyArray<HeadingEntry>,
+  /**
+   * Whether this note is in the user's WORKING SET (myne-md/myne#848).
+   * `liveNote(parsed)` at every call site, so the Rust index carries the
+   * sidebar's own verdict rather than deriving one.
+   */
+  live: boolean,
 ): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_apply", {
     noteId,
@@ -139,6 +190,10 @@ export async function vaultIndicesApply(
     // unconditionally for the same replace-semantics reason as `tasks` — a note
     // whose last heading was just deleted must overwrite the stored vector.
     headings,
+    // myne-md/myne#848: the sidebar's working-set verdict, so the agent's scope
+    // resolves against what the tree shows instead of re-deriving liveness from
+    // the markers in Rust.
+    live,
   });
   // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
   // post-mutation chokepoint) so reader surfaces re-query.
@@ -301,6 +356,10 @@ export async function reindexNoteFromBody(
       // that is already in hand. That is the whole reason the picker can stop
       // re-reading every note in the vault on every index change.
       parsed.headings.map((h) => ({ text: h.text, level: h.level })),
+      // myne-md/myne#848: the sidebar's own working-set verdict, over the parse
+      // already in hand. This is what lets the agent's scope be the set the tree
+      // shows, rather than a second reader of the marker set.
+      liveNote(parsed),
     );
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.

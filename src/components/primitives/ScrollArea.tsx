@@ -33,6 +33,7 @@
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -84,14 +85,30 @@ export function ScrollArea({
   contentStyle,
   testId,
   ariaLabel,
+  scrollerRef: externalRef,
+  onScroll: onScrolled,
 }: {
   children: ReactNode;
   style?: CSSProperties;
   contentStyle?: CSSProperties;
   testId?: string;
   ariaLabel?: string;
+  /**
+   * The scroller element itself, for a caller that OWNS the scroll position
+   * rather than only reading it (the agent transcript pins itself to the bottom
+   * as turns arrive).
+   *
+   * Two props rather than a callback-ref because they are one relationship: a
+   * caller that needs the element is a caller that also needs to know when the
+   * reader moved it, and the transcript is the case that needs both, it
+   * auto-scrolls, and it must stop doing so the moment the reader scrolls up.
+   */
+  scrollerRef?: RefObject<HTMLDivElement | null>;
+  /** Called after every scroll the reader or the caller causes. */
+  onScroll?: () => void;
 }) {
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const ownRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = externalRef ?? ownRef;
   const [geometry, setGeometry] = useState<Geometry>(EMPTY_GEOMETRY);
   // Two independent reasons to show the bar, because they end differently: a
   // pointer leaves when it leaves, and a scroll goes quiet after a moment. One
@@ -113,7 +130,18 @@ export function ScrollArea({
     );
   }, []);
 
+  // **The caller's callback lives in a ref** (review finding): it is passed as an
+  // inline arrow by the transcript's mount, so putting it in the deps below
+  // rebuilt the scroll listener plus both observers on EVERY render, which for
+  // that surface is once per streamed token.
+  const scrolledRef = useRef(onScrolled);
+  scrolledRef.current = onScrolled;
+
   const onScroll = useCallback(() => {
+    // The caller's own hook FIRST: it may move the scroll position (the
+    // transcript's pin-to-bottom), and measuring before that would publish the
+    // thumb at the offset the reader just left.
+    scrolledRef.current?.();
     measure();
     setScrolling(true);
     if (idleTimer.current !== null) clearTimeout(idleTimer.current);
@@ -223,6 +251,20 @@ export function ScrollArea({
           minHeight: 0,
           overflowY: "auto",
           overflowX: "hidden",
+          // **The content stops before the indicator's gutter**
+          // (myne-md/myne#848, on the user's read: "the scrollbar still
+          // overlaps the chat boxes"). The thumb is an ELEMENT positioned
+          // against this wrapper, so it is drawn over the scroller's last
+          // 8px, and content aligned to the end of its column ends exactly
+          // there. A chat bubble on the right therefore had a grey bar across
+          // its corner, and a full-width row lost its last characters.
+          //
+          // `--space-2` is the gutter, and the thumb's own geometry adds up to
+          // it (`inset-inline-end: 2px` + `width: 6px`, in the sheet): one
+          // number, so the two cannot drift into a 1px overlap. A margin
+          // rather than padding, so a caller's own `contentStyle` padding is
+          // additive instead of being replaced.
+          marginInlineEnd: "var(--space-2)",
           // Stop a flick past the last row from scrolling whatever is behind it.
           overscrollBehavior: "contain",
           ...contentStyle,

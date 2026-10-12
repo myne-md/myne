@@ -26,7 +26,7 @@
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
@@ -41,6 +41,27 @@ import { type Session, testIdSelector } from "./support/webdriver";
 
 /** The agent tab's stable DOM handle — the singleton workspace-item key. */
 const AGENT_TAB_KEY = "agent:agent";
+
+/**
+ * The AI-lane gate, defined here the way `agent-run.e2e.ts` and `ai-chat.e2e.ts`
+ * define it: scenarios that need a model to ANSWER are skipped unless the lane
+ * asks for them, because the default lane's reruns must not depend on one.
+ * `ah5` is such a scenario for a structural reason (see its own comment): a
+ * conversation card only exists once a conversation does, and a conversation is
+ * written when a run settles.
+ */
+const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
+
+/** One message, then the review screen it raises closed again. The stub proposes
+ *  for any task, so every send takes the screen (`docs/decisions/ai/0524`). */
+async function sendAndDismiss(s: Session, message: string): Promise<void> {
+  const composer = await s.byTestId("ai.composer-input", { timeoutMs: 15_000 });
+  await composer.sendKeys(message);
+  await (await s.byTestId("ai.composer-send")).click();
+  await s.waitForElement(testIdSelector("agentReview.screen"), { timeoutMs: 30_000 });
+  await (await s.byTestId("agentReview.close")).click();
+  await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
+}
 
 const TITLE = "ah1noteanchoredq7w2e9r4t1y6u3";
 
@@ -198,6 +219,86 @@ describeE2E("ah4 the tab remembers which conversation it was left on", () => {
         await runPaletteAction(s, "ai.open-agent-vault", "agent");
         await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
         expect(await agentTabCount(s)).toBe(1);
+      },
+    );
+  });
+});
+
+aiDescribe("ah5 a conversation card is one target with its own controls", () => {
+  // myne-md/myne#848. The row WAS a title plus two always-visible icon buttons,
+  // so a list of titles read as a list of controls and the two destructive ones
+  // were the widest thing on every line. Now the whole card opens the
+  // conversation, one icon states what the conversation is about, and rename and
+  // delete live behind a menu that appears when you point at the card or reach
+  // it with the keyboard.
+  //
+  // **Under the AI gate, and that is a correction rather than a convenience**
+  // (review finding): the rail renders a card per row of `chatsList`, and a
+  // conversation row is written when a run settles. This scenario used to claim
+  // that opening the agent on a note created that conversation, waited for a card
+  // that could never appear, and then asserted the at-rest opacity of a card on a
+  // vault that has none. Two runs are what make two cards, and only the second
+  // one's card is at rest.
+  // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
+  it("opens from the card body, states its target, and reveals its actions on hover", async () => {
+    let password = "";
+    await scenario(
+      "ah5-agent-card",
+      { seed: (dir) => { password = seedVault(dir).password; } },
+      async (app) => {
+        const s = app.session;
+        await readyWithAi(s, password);
+        await createNote(s, TITLE);
+        await runPaletteAction(s, "ai.open-agent-note", "agent");
+        await s.byTestId("agent.pane", { timeoutMs: 15_000 });
+
+        // A note-anchored conversation: the pane was opened FROM the note, so the
+        // row this run writes carries `note_id`.
+        await sendAndDismiss(s, "what is this note about?");
+
+        // A second, vault-general conversation, so the first card is no longer
+        // the OPEN one. The rail's own new-conversation control clears the pane
+        // without persisting anything, so the second row comes from the send that
+        // follows it.
+        await (await s.byTestId("agent.hub-new")).click();
+        await sendAndDismiss(s, "and the vault as a whole?");
+
+        // Newest first, so the note-anchored card is the LAST of the two.
+        const cards = await s.byTestIdAll("agent.hub-card");
+        expect(cards.length).toBe(2);
+        const card = cards[cards.length - 1]!;
+
+        // The target is stated as a glyph AND as an accessible name, so the fact
+        // is not in the icon alone.
+        const target = await s.waitForElement(
+          testIdSelector("agent.hub-target", { "data-target": "note" }),
+          { timeoutMs: 10_000 },
+        );
+        expect((await target.attribute("aria-label")) ?? "").not.toBe("");
+
+        // The controls are present but invisible at rest on a card that is not
+        // the open one and has no run in flight. Every query here is the LAST
+        // match, for the same reason the card is.
+        const lastActions = async () => {
+          const all = await s.byTestIdAll("agent.hub-row-actions");
+          return all[all.length - 1]!;
+        };
+        expect(await (await lastActions()).attribute("style")).toContain("opacity: 0");
+
+        // Point at the card: the cluster is revealed, and the menu opens from it.
+        await card.hover();
+        await s.waitUntil(
+          async () =>
+            (await (await lastActions()).attribute("style"))?.includes("opacity: 1")
+              ? true
+              : null,
+          { label: "hover reveals the card's actions", timeoutMs: 10_000 },
+        );
+        const menus = await s.byTestIdAll("agent.hub-menu");
+        await menus[menus.length - 1]!.click();
+        await s.waitForElement(testIdSelector("agent.hub-menu-list"), { timeoutMs: 10_000 });
+        await s.byTestId("agent.hub-rename");
+        await s.byTestId("agent.hub-delete");
       },
     );
   });

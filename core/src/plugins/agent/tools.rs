@@ -80,6 +80,44 @@ pub struct ScopeEntry {
     /// list tool exists so the model can pick what to read, and handing it
     /// content here would make the read tool decorative.
     pub title: Option<String>,
+    /// The note's `folder:` field as the note itself carries it, or `None` for
+    /// a root note.
+    ///
+    /// **This field is a fix, not a nicety** (myne-md/myne#848, on the user's
+    /// report). A listing of ids and titles cannot answer a folder-shaped
+    /// question ("analyze the notes in my inbox folder") and the model asked
+    /// one had nothing to filter by. What it did instead was take the single
+    /// title that happened to match the folder's own name, read it, find a
+    /// `folder_index: true` note with no content, and report that the folder
+    /// held exactly one note: the folder's index note standing in for the
+    /// folder. The notes the user was asking about were all in that folder and
+    /// none of them were named after it.
+    ///
+    /// The RAW value rather than a canonical key: it is what the user sees in
+    /// the note's frontmatter, and the model needs the name it can act on.
+    /// `move_note` takes a folder the same way. Scope RESOLUTION still uses the
+    /// canonical form (`scope.rs`); this is what gets rendered.
+    pub folder: Option<String>,
+}
+
+/// One scope entry as the model reads it: `<note_id> | <folder> | <title>`.
+///
+/// **`|`, not a space.** A folder is a path that may contain spaces (`00 -
+/// INBOX/` is one this app produced) and a title is free text, so a
+/// space-separated triple is ambiguous at exactly the values that matter here.
+///
+/// `(root)` and `(untitled)` are placeholders rather than values, which is the
+/// same convention the title already used. A note whose folder or title is
+/// literally `(root)` would be indistinguishable from one that has none; that
+/// costs a model one `read_note` to settle, and the alternative, quoting, or a
+/// second escaping layer, costs every reader of every line.
+pub fn render_scope_entry(entry: &ScopeEntry) -> String {
+    format!(
+        "{} | {} | {}",
+        entry.note_id,
+        entry.folder.as_deref().unwrap_or("(root)"),
+        entry.title.as_deref().unwrap_or("(untitled)")
+    )
 }
 
 /// One hit from the search tool.
@@ -136,8 +174,12 @@ pub async fn list_scope(
         .into_iter()
         .filter(|note_id| !record_excluded(records, note_id, &excluded))
         .map(|note_id| {
-            let title = records.get(&note_id).and_then(|r| r.title.clone());
-            ScopeEntry { note_id, title }
+            let record = records.get(&note_id);
+            ScopeEntry {
+                title: record.and_then(|r| r.title.clone()),
+                folder: record.and_then(|r| r.folder.clone()),
+                note_id,
+            }
         })
         .collect())
 }
@@ -303,6 +345,18 @@ pub async fn search_vault(
         // The SYNC-14 clamp first, and before the in-scope test rather than
         // after it: an excluded note must not reach either arm.
         if record_excluded(records, &hit.note_id, &excluded) {
+            continue;
+        }
+        // **And a note outside the WORKING SET reaches neither arm either**
+        // (review finding). `scope.rs`'s own header states the rule this arm was
+        // breaking: "A hidden note is absent from the resolved set and from the
+        // count … so it is absent from every read tool as well". A trashed,
+        // tombstoned, archived, template or conflict copy the run may not read
+        // still contributed its folder name and a count to the model's context,
+        // which is both a disclosure the header denies and a wrong number for the
+        // folder-shaped question this tool exists to answer. Fails closed on an
+        // id the snapshot does not carry, like `record_excluded` above.
+        if !records.get(&hit.note_id).is_some_and(|r| r.live) {
             continue;
         }
         if keep {
@@ -524,6 +578,36 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].note_id, "a");
         assert_eq!(listed[0].title.as_deref(), Some("In"));
+    }
+
+    #[test]
+    fn list_carries_the_note_s_folder_and_renders_it() {
+        // **The folder is what makes a folder-shaped question answerable**
+        // (myne-md/myne#848, on the user's report). Without it the model took
+        // the one title that matched a folder's name, read the folder's own
+        // index note, and reported that the folder held exactly one note.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b", "c"]));
+        let recs = records_in(&[
+            ("a", "00 - INBOX", Some("00 - INBOX/")),
+            ("b", "Loose thought", Some("00 - INBOX/")),
+            ("c", "Elsewhere", Some("01 - Projects/")),
+        ]);
+        let listed = block(list_scope(&runs, "r", &recs, &no_exclusions())).unwrap();
+        assert_eq!(listed[0].folder.as_deref(), Some("00 - INBOX/"));
+        assert_eq!(listed[2].folder.as_deref(), Some("01 - Projects/"));
+
+        // And the line the model reads separates the fields, because a folder
+        // path and a title both contain spaces in this app.
+        let lines: Vec<String> = listed.iter().map(render_scope_entry).collect();
+        assert_eq!(lines[0], "a | 00 - INBOX/ | 00 - INBOX");
+        // A root note says so rather than rendering an empty field.
+        let root = ScopeEntry {
+            note_id: "d".into(),
+            title: None,
+            folder: None,
+        };
+        assert_eq!(render_scope_entry(&root), "d | (root) | (untitled)");
     }
 
     #[test]
@@ -853,6 +937,41 @@ mod tests {
         assert!(
             out.elsewhere.is_empty(),
             "an excluded folder must not appear even as a number"
+        );
+    }
+
+    #[test]
+    fn a_hidden_note_is_not_counted_either() {
+        // **The same rule the exclusion arm follows, for the other kind of
+        // invisible note** (review finding): `scope.rs`'s header says a note
+        // outside the working set "is absent from the resolved set and from the
+        // count … so it is absent from every read tool as well". A trashed note
+        // is not excluded by `ai_excluded_folders`, so this arm is the only one
+        // that could leak it, and its folder name plus a number is exactly what
+        // the run must not learn about a note it cannot read.
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let searcher = StubSearcher(vec![hit("a", 0.9), hit("x", 0.8)]);
+        let mut recs = records_in(&[
+            ("a", "mine", Some("Work")),
+            ("x", "trashed but still searchable", Some("Old")),
+        ]);
+        recs.get_mut("x").expect("x is in the fixture").live = false;
+        let out = block(search_vault(
+            &runs,
+            "r",
+            "q",
+            10,
+            &searcher,
+            &recs,
+            &no_exclusions(),
+        ))
+        .unwrap();
+
+        assert_eq!(out.in_scope.len(), 1);
+        assert!(
+            out.elsewhere.is_empty(),
+            "a note outside the working set must not appear even as a number"
         );
     }
 

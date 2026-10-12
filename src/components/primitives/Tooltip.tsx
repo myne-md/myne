@@ -250,7 +250,18 @@ export function Tooltip({
         style={
           stretch
             ? { display: "flex", alignItems: "center", flex: 1, minWidth: 0 }
-            : { display: "inline-flex", alignItems: "center" }
+            : // **`minWidth: 0` in BOTH arms, and the non-stretch one needs it
+              // for the opposite reason to `stretch`'s.** A flex item's
+              // automatic minimum size is its min-content size, so this wrapper
+              // refuses to shrink below whatever it wraps, which is right for
+              // an icon button and wrong for a caller that TRUNCATES: a title
+              // with `white-space: nowrap` inside it reports the whole string as
+              // its min-content, so the wrapper held that width, the slot around
+              // it could not shrink, and the text ran past its container with no
+              // ellipsis (myne-md/myne#848, on the user's screenshot). Zeroing
+              // the floor lets the caller's own `overflow`/`text-overflow` do
+              // the truncating, which is the only place that knows it wants one.
+              { display: "inline-flex", alignItems: "center", minWidth: 0 }
         }
         onMouseEnter={(e) => open(e.clientX)}
         // While open the bubble rides the pointer; while still dwelling this

@@ -54,7 +54,7 @@ const ORDINARY: ProposedEdit = {
 };
 
 function settleWith(edits: ProposedEdit[], newNotes: ProposedNote[] = []) {
-  beginRun();
+  beginRun(null);
   settleStep({
     view: {
       runId: "run-1",
@@ -74,7 +74,12 @@ function settleWith(edits: ProposedEdit[], newNotes: ProposedNote[] = []) {
 
 function mount() {
   render(
-    <AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} />,
+    <AgentReview
+      onClose={() => {}}
+      onNotesWritten={() => {}}
+      titleOf={() => null}
+      folderOf={() => null}
+    />,
   );
 }
 

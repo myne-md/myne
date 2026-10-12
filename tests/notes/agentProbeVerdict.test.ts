@@ -53,7 +53,7 @@ describe("the probe verdict outlives the composer", () => {
     // A second message does not change the backend, and re-probing would spend
     // the provider requests again for every message the user sends.
     setProbeVerdict(PASSED);
-    beginRun();
+    beginRun(null);
     expect(getAgent().probeVerdict).toEqual(PASSED);
   });
 
@@ -71,7 +71,7 @@ describe("the probe verdict outlives the composer", () => {
     // next message would silently reopen a door the probe closed, and the user
     // would pay for the same three requests to have it closed again.
     setProbeVerdict("failed");
-    beginRun();
+    beginRun(null);
     expect(getAgent().probeVerdict).toBe("failed");
   });
 });

@@ -48,6 +48,10 @@ const COPY = {
   autoApplyFailed: "auto apply failed",
   providerRejected: "provider rejected",
   scopeExcluded: "scope excluded",
+  // The two sentences a leg that RAN can owe (myne-md/myne#848).
+  legFailed: "the run stopped",
+  rootGrant: "the scope could not be widened",
+  byCause: (cause: string) => `cause:${cause}`,
 };
 
 const ORDINARY: ProposedEdit = {
