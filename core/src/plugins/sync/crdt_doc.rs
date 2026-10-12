@@ -56,6 +56,31 @@ pub fn fresh_actor_bytes() -> Result<[u8; ACTOR_ID_LEN], getrandom::Error> {
     Ok(bytes)
 }
 
+/// The Automerge actor for a note authored on **this device** (`SYNC-42`): the
+/// enrolled `device_id` bytes **verbatim**, or a fresh CSPRNG draw when the vault
+/// has no device identity.
+///
+/// The two are the same width on purpose, `ACTOR_ID_LEN == DEVICE_ID_LEN == 16`
+///, so the mapping is the identity on bytes, not a hash or a truncation. That
+/// is what makes a note's revisions attributable to the DEVICE that wrote them:
+/// every replica commits under its own `device_id`, and `collab-provenance`
+/// resolves that id to a name for the version-history UI.
+///
+/// `None` (a never-enrolled / local-only vault, where there is no device to
+/// attribute to) falls back to [`fresh_actor_bytes`], which is exactly the
+/// pre-`SYNC-42` behaviour there, an unattributed note is no worse than an
+/// arbitrary one. Taking the id as a parameter, never reading it here, is what
+/// keeps the derivation pure and testable; the disk read that produces it is
+/// [`crate::plugins::sync::state::read_device_actor`].
+pub fn note_actor_bytes(
+    device_id: Option<[u8; ACTOR_ID_LEN]>,
+) -> Result<[u8; ACTOR_ID_LEN], getrandom::Error> {
+    match device_id {
+        Some(id) => Ok(id),
+        None => fresh_actor_bytes(),
+    }
+}
+
 /// Commit the document's open changes with an explicit timestamp taken from the
 /// injected host clock, never automerge's default `commit()`.
 ///
@@ -137,6 +162,24 @@ mod tests {
     fn fresh_actor_bytes_are_the_right_width() {
         let bytes = fresh_actor_bytes().expect("csprng available");
         assert_eq!(bytes.len(), ACTOR_ID_LEN);
+    }
+
+    #[test]
+    fn note_actor_is_the_device_id_verbatim_or_a_fresh_draw() {
+        // `SYNC-42`: the actor IS the device id, unmapped (same width, no hash).
+        let device = [0x5Au8; ACTOR_ID_LEN];
+        assert_eq!(
+            note_actor_bytes(Some(device)).expect("ok"),
+            device,
+            "the actor is the device id, not a transform of it"
+        );
+        // No device identity (never enrolled) → a fresh draw: right width, never
+        // the zero vector, and two draws differ.
+        let a = note_actor_bytes(None).expect("csprng available");
+        let b = note_actor_bytes(None).expect("csprng available");
+        assert_eq!(a.len(), ACTOR_ID_LEN);
+        assert_ne!(a, [0u8; ACTOR_ID_LEN]);
+        assert_ne!(a, b, "two fresh draws differ");
     }
 
     #[test]

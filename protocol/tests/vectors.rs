@@ -218,6 +218,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/aad-construction/v0.2/cases.json"),
         ),
         (
+            "awareness-frame",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/awareness-frame/v0.2/cases.json"),
+        ),
+        (
             "agent-memory-blob",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/agent-memory-blob/v0.1/cases.json"),
@@ -1394,6 +1399,8 @@ fn hkdf_sha256_vectors() {
             let role = match role_str {
                 "membership-key" => SubkeyRole::MembershipKey,
                 "person-vault-carrier" => SubkeyRole::PersonVaultCarrier,
+                "awareness-room-id" => SubkeyRole::AwarenessRoomId,
+                "awareness-key" => SubkeyRole::AwarenessKey,
                 other => panic!("[{id}] unexpected v0.2 role {other:?}"),
             };
             let expected = hex_decode(
@@ -3399,9 +3406,9 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_agent_memory_blob_v0_2, aad_membership_blob, aad_membership_roster_blob,
-        aad_password_wrap_v0_2, aad_person_binding_blob, aad_recovery_wrap_v0_2,
-        aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
+        aad_agent_memory_blob_v0_2, aad_awareness_frame, aad_membership_blob,
+        aad_membership_roster_blob, aad_password_wrap_v0_2, aad_person_binding_blob,
+        aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -3486,6 +3493,10 @@ fn aad_construction_v0_2_vectors() {
             }
             "aad_person_keypair" => protocol::person_key::aad_person_keypair(),
             "aad_vault_invite" => protocol::person_invite::aad_vault_invite(),
+            "aad_awareness_frame" => {
+                let epoch = case.get("input_group_key_epoch").and_then(|v| v.as_u64());
+                aad_awareness_frame(&account_number_hash(), epoch)
+            }
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
             ),
@@ -3547,7 +3558,7 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 11] = [
+    let required: [&str; 12] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
@@ -3559,6 +3570,7 @@ fn aad_construction_v0_2_vectors() {
         "aad_person_wrap",
         "aad_person_keypair",
         "aad_vault_invite",
+        "aad_awareness_frame",
     ];
     for builder in required {
         assert!(
@@ -3582,6 +3594,186 @@ fn aad_construction_v0_2_vectors() {
         lengths.len() >= 2,
         "the pinned aad_singleton_blob_v0_2 roles must differ in LENGTH, not just in value — \
          same-length roles cannot catch a hardcoded length prefix (got lengths {lengths:?})"
+    );
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn awareness_frame_vectors() {
+    use protocol::{
+        open_awareness_frame, seal_awareness_frame_raw, AwarenessPayload, FrameType,
+        AWARENESS_FRAME_VERSION, AWARENESS_HEADER_LEN, AWARENESS_ROOM_ID_LEN,
+        PRESENCE_ASSERTION_PREFIX,
+    };
+
+    let Some(raw) = cases_json_v0_2("awareness-frame") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[awareness-frame/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "awareness-frame");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("awareness-frame/v0.2", cases);
+
+    fn parse_payload(v: &serde_json::Value, id: &str) -> AwarenessPayload {
+        let frame_type = match v["frame_type"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] frame_type"))
+        {
+            "join" => FrameType::Join,
+            "presence" => FrameType::Presence,
+            o => panic!("[{id}] bad frame_type {o:?}"),
+        };
+        AwarenessPayload {
+            frame_type,
+            note_id: hex_decode_array(
+                v["note_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] note_id")),
+            ),
+            actor_id: hex_decode_array(
+                v["actor_id_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] actor_id")),
+            ),
+            seq: v["seq"].as_u64().unwrap_or_else(|| panic!("[{id}] seq")),
+            cursor: v.get("cursor").and_then(|x| x.as_u64()).map(|x| x as u32),
+            selection: v.get("selection").and_then(|x| x.as_array()).map(|a| {
+                (
+                    a[0].as_u64().expect("selection anchor") as u32,
+                    a[1].as_u64().expect("selection head") as u32,
+                )
+            }),
+            label: v.get("label").and_then(|x| x.as_str()).map(str::to_string),
+            change: v.get("change_hex").and_then(|x| x.as_str()).map(hex_decode),
+            ts: v.get("ts").and_then(|x| x.as_u64()),
+        }
+    }
+
+    let mut saw_frame = false;
+    let mut saw_assertion = false;
+
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["kind"].as_str().expect("kind");
+        match kind {
+            "frame" => {
+                saw_frame = true;
+                let room_key: [u8; 32] = hex_decode_array(
+                    case["room_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] room_key")),
+                );
+                let room_id: [u8; 16] = hex_decode_array(
+                    case["room_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] room_id")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] nonce")),
+                );
+                let account_hash: [u8; 16] = hex_decode_array(
+                    case["account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] account_number_hash")),
+                );
+                let epoch = case.get("group_key_epoch").and_then(|v| v.as_u64());
+                let payload = parse_payload(&case["payload"], id);
+                let expected = hex_decode(
+                    case["expected_frame_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_frame_hex")),
+                );
+
+                let frame = seal_awareness_frame_raw(
+                    &room_key,
+                    &room_id,
+                    &nonce,
+                    &account_hash,
+                    epoch,
+                    &payload,
+                )
+                .expect("seal");
+                assert_eq!(frame, expected, "[{id}] awareness frame bytes mismatch");
+
+                // Header shape: room_id || nonce || version, no magic.
+                assert!(frame.len() >= AWARENESS_HEADER_LEN);
+                assert_eq!(&frame[..AWARENESS_ROOM_ID_LEN], &room_id[..]);
+                assert_eq!(frame[AWARENESS_HEADER_LEN - 1], AWARENESS_FRAME_VERSION);
+                assert!(
+                    !frame.starts_with(b"MY"),
+                    "[{id}] awareness frame must carry no magic"
+                );
+
+                let open_room: [u8; 16] = hex_decode_array(
+                    case["open_room_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] open_room_id_hex")),
+                );
+                let open_epoch = case.get("open_group_key_epoch").and_then(|v| v.as_u64());
+                let expect_ok = case["expect_open_ok"]
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("[{id}] expect_open_ok"));
+                let mut to_open = expected.clone();
+                if case["tamper_last_byte"].as_bool().unwrap_or(false) {
+                    let last = to_open.len() - 1;
+                    to_open[last] ^= 0x01;
+                }
+                let opened = open_awareness_frame(
+                    &room_key,
+                    &open_room,
+                    &account_hash,
+                    open_epoch,
+                    &to_open,
+                );
+                assert_eq!(opened.is_ok(), expect_ok, "[{id}] open outcome mismatch");
+                if expect_ok {
+                    assert_eq!(
+                        opened.expect("open"),
+                        payload,
+                        "[{id}] payload round-trip mismatch"
+                    );
+                }
+            }
+            "assertion_message" => {
+                saw_assertion = true;
+                let actor: [u8; 16] = hex_decode_array(
+                    case["actor_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] actor_id")),
+                );
+                let person: [u8; 32] = hex_decode_array(
+                    case["person_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] person_id")),
+                );
+                let expected = hex_decode(
+                    case["expected_message_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_message_hex")),
+                );
+                let mut msg = Vec::new();
+                msg.extend_from_slice(PRESENCE_ASSERTION_PREFIX);
+                msg.extend_from_slice(&actor);
+                msg.extend_from_slice(&person);
+                assert_eq!(msg, expected, "[{id}] presence message bytes mismatch");
+                // The class prefix is the load-bearing identifier; pin it whole.
+                assert_eq!(PRESENCE_ASSERTION_PREFIX, b"myne.awareness-presence v1|");
+            }
+            other => panic!("[{id}] unknown awareness-frame kind {other:?}"),
+        }
+    }
+    assert!(
+        saw_frame,
+        "awareness-frame must carry at least one frame case"
+    );
+    assert!(
+        saw_assertion,
+        "awareness-frame must carry the assertion message-class case"
     );
 }
 

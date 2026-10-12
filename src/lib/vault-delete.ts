@@ -38,6 +38,7 @@
 import { invoke } from "../platform/core";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetPersonIdentityState } from "../components/sync/personIdentityState";
+import { clearAwareness } from "../notes/collab/awarenessStore";
 import { has as hasCapability } from "../platform/capabilities";
 import { appDataDir, join } from "../platform/path";
 import type { VaultDeleteError } from "../types/vault-delete-error";
@@ -255,5 +256,10 @@ export async function deleteVault(vaultId: string): Promise<void> {
   // the WebView half (myne-md/myne#609, found in review).
   resetDateTimeDisplayForLock();
   resetPersonIdentityState();
+  // The live-presence peers (`collab-presence-ui` task 3), on the same reasoning one
+  // step over: the store is module scope and holds the editors of the vault being
+  // erased, so without this they stay resident after the vault that named them is
+  // gone. `myne-core` drops its half in `vault_delete`; this is the WebView half.
+  clearAwareness();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

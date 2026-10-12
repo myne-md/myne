@@ -55,6 +55,7 @@ import {
   type TaskQueryRender,
   type TaskQueryRowEventDetail,
 } from "./decorations/task-query-block";
+import { setAwareness, type AwarenessPush } from "./decorations/awareness";
 import {
   setTagSuggestions,
   TAG_SUGGESTION_ACCEPT_EVENT,
@@ -131,6 +132,12 @@ export type CMEditorProps = {
    *  selection or document change so selection-scoped document statistics stay
    *  live. Ref-backed like `onChange` - no view rebuild. */
   onSelectionChange?: (selectedText: string) => void;
+  /** The live-collaboration presence observer (`collab-presence-ui`): the caret
+   *  and selection as UTF-16 code units from the document start, fired on a
+   *  selection or document change. `selection` is `[anchor, head]` for a range or
+   *  `null` for a bare caret, so a peer renders a caret or a selection tint.
+   *  Ref-backed like `onSelectionChange` - no view rebuild. */
+  onCursorChange?: (cursor: number | null, selection: [number, number] | null) => void;
   /** Composed alongside `myneExtensions`. v0 baseline does not use this. */
   extensions?: readonly Extension[];
   /** WL-5: the live resolver note-set. Pushed into the editor's note-set
@@ -186,6 +193,12 @@ export type CMEditorProps = {
    *  one): a suggestion surface that is off by default must not reserve a strip
    *  of every note. */
   tagSuggestions?: readonly TagSuggestionChip[];
+  /**
+   * Live-collaboration awareness (`collab-presence-ui` task 2): the peers to draw
+   * for THIS note. Absent or a list with no peer for `noteId` renders nothing; a new
+   * push replaces the previous set. Purely presentational, the host owns the store.
+   */
+  awareness?: AwarenessPush;
   /** MYND-651: a suggestion chip was activated. Relayed from
    *  `myne-tag-suggestion-accept`; the host performs the frontmatter write
    *  (`acceptTagIntoView`) - this package never writes bytes. */
@@ -296,12 +309,13 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, valueBase, onChange, onBlur, onSelectionChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, revealLine = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, noteTitle = null, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, valueBase, onChange, onBlur, onSelectionChange, onCursorChange, extensions, noteSet, recentNotes, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, tagSuggestions, awareness, onAcceptTagSuggestion, onDismissTagSuggestion, onOpenWikilink, scrollAnchor = null, revealLine = null, lineNumbers = false, vimMode = false, keymapOverrides, drawingIo = null, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, noteId, noteTitle = null, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onCursorChangeRef = useRef(onCursorChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
   const onTaskQueryToggleRef = useRef(onTaskQueryToggle);
   const onTaskQueryOpenRef = useRef(onTaskQueryOpen);
@@ -318,6 +332,7 @@ export function CMEditor(props: CMEditorProps) {
   const vaultBlockAnchorsRef = useRef(vaultBlockAnchors);
   const taskQueryResultsRef = useRef(taskQueryResults);
   const tagSuggestionsRef = useRef(tagSuggestions);
+  const awarenessRef = useRef(awareness);
   const lineNumbersRef = useRef(lineNumbers);
   const viewModeRef = useRef(viewMode);
   const readOnlyRef = useRef(readOnly);
@@ -364,6 +379,9 @@ export function CMEditor(props: CMEditorProps) {
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
 
   // Mount + destroy lifecycle. The view is built once; subsequent `value`
   // changes from outside are mirrored via `dispatch` in the effect below.
@@ -381,6 +399,14 @@ export function CMEditor(props: CMEditorProps) {
       }
       if (update.selectionSet || update.docChanged) {
         onSelectionChangeRef.current?.(selectedRangesText(update.state));
+        // Live presence (`collab-presence-ui`): the caret and selection as UTF-16
+        // code units. CM6 positions ARE UTF-16 units, so `main.head` needs no
+        // conversion; the awareness codec uses the same unit.
+        const main = update.state.selection.main;
+        const selection: [number, number] | null = main.empty
+          ? null
+          : [main.anchor, main.head];
+        onCursorChangeRef.current?.(main.head, selection);
       }
     });
     const blurHandler = EditorView.domEventHandlers({
@@ -486,6 +512,12 @@ export function CMEditor(props: CMEditorProps) {
       // feature looking broken.
       if (tagSuggestionsRef.current !== undefined) {
         v.dispatch({ effects: setTagSuggestions.of(tagSuggestionsRef.current) });
+      }
+      // `collab-presence-ui` task 2: a `setState` swap resets the awareness field
+      // too, so a peer's caret would vanish when switching back to a note the swap
+      // cache holds. Re-push the current push (absent = leave it cleared).
+      if (awarenessRef.current !== undefined) {
+        v.dispatch({ effects: setAwareness.of(awarenessRef.current) });
       }
       // MYND-534 × MYND-313: the vim layer is a compartment too, and it is seeded
       // OFF (`vimExtension()` → `vimCompartment.of([])`), so a `setState` swap
@@ -662,6 +694,16 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || tagSuggestions === undefined) return;
     view.dispatch({ effects: setTagSuggestions.of(tagSuggestions) });
   }, [tagSuggestions]);
+
+  // collab-presence-ui task 2: push the awareness set into the view whenever the
+  // prop changes. `undefined` is "this host does not drive awareness" (push nothing);
+  // an explicit push replaces the previous set (an empty peer list clears it).
+  useEffect(() => {
+    awarenessRef.current = awareness;
+    const view = viewRef.current;
+    if (view === null || awareness === undefined) return;
+    view.dispatch({ effects: setAwareness.of(awareness) });
+  }, [awareness]);
 
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref

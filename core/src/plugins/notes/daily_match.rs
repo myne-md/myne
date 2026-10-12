@@ -351,6 +351,13 @@ pub fn fm_deleted_value_strict(frontmatter: &[u8]) -> Option<String> {
     fm_timestamp_value_strict(frontmatter, "deleted")
 }
 
+/// Read the `updated:` stamp value-strict (the `collab-editor-bridge` task 7
+/// MAX-OBSERVED rule). A free-text `updated:` is not a value here, exactly as for
+/// the other timestamp markers.
+pub fn fm_updated_value_strict(frontmatter: &[u8]) -> Option<String> {
+    fm_timestamp_value_strict(frontmatter, "updated")
+}
+
 /// Read the `archived:` marker value-strict — mirrors
 /// `readArchivedFromFmBody`, the exact value-strict twin of
 /// [`fm_trashed_value_strict`].

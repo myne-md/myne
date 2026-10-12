@@ -44,6 +44,8 @@ pub mod chats;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod export;
 pub mod graph_layout;
+/// The live co-editing session core (epic live-collab, `collab-editor-bridge`).
+pub mod live;
 pub mod memory;
 pub mod notes;
 pub mod prefs;

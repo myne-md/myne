@@ -60,7 +60,14 @@ export type NoteUpdateError =
    * hash; every other caller (and mobile) omits it and keeps legacy
    * last-write-wins, so they never see this variant.
    */
-  | { kind: "BaseMismatch" };
+  | { kind: "BaseMismatch" }
+  /**
+   * A live co-editing session owns this note (`SYNC-33`): the session is the
+   * single durable writer, so a stateless `note_update` is refused rather than
+   * racing the session's persistence. Nothing was written; the editor should be
+   * driving the live command for this note.
+   */
+  | { kind: "LiveSessionOpen" };
 
 /** Type-narrowing helper for the `Io` variant. */
 export function isUpdateIoError(

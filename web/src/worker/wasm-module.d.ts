@@ -68,8 +68,17 @@ declare module "*/wasm/pkg/myne_web_wasm.js" {
   export function sync_signal(kind: string): void;
 
   /** `{"endpoint","token"}` JSON for the poke stream, or `undefined` when sync
-   *  is not usable yet (no endpoint, or this device is not enrolled). */
+   *  is not usable yet (no endpoint, or this device is not enrolled). The
+   *  awareness reader shares this export (live-collab, collab-client-transport
+   *  task 4). */
   export function sync_poke_target(): Promise<string | undefined>;
+
+  /**
+   * Deliver one opaque awareness frame the Worker read off `/sync/awareness`
+   * (the SSE `data:` payload verbatim, prefix stripped). Stored opaque in the
+   * wasm awareness inbox; never parsed. The up-path POST rides `sync_tick`.
+   */
+  export function sync_awareness_deliver(payload: string): void;
 
   /**
    * `true` iff two 32-byte CSPRNG draws succeeded and differed. Called once at

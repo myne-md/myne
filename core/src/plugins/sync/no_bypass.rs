@@ -113,22 +113,45 @@ const DIRECT_CONNECT_SITES: &[(&str, usize, &str)] = &[
 /// dropped the second would leave a stream whose route is decided once.
 ///
 /// A file absent from this table opens no socket it keeps.
-const LONG_LIVED_SOCKETS: &[(&str, &str, &[&str], &str)] = &[(
-    "poke_listener.rs",
-    "the `/sync/poke` SSE stream — one connection per unlocked enrolled vault, \
-     held open for hours",
-    &[
-        "stream_identity_over(snap, &proxy::installed_for(&host))",
-        "route: gate.route().ok()?",
-    ],
-    "The route the gate answers for this endpoint is part of the worker's \
+const LONG_LIVED_SOCKETS: &[(&str, &str, &[&str], &str)] = &[
+    (
+        "stream_supervisor.rs",
+        "the shared route-invalidation machinery both long-lived SSE supervisors use \
+     (`poke_listener.rs`'s `/sync/poke` stream and `awareness_listener.rs`'s \
+     `/sync/awareness` stream), one connection per unlocked enrolled vault, held \
+     open for hours",
+        &[
+            "stream_identity_over_rooms(snap, &proxy::installed_for(&host), rooms)",
+            "route: gate.route().ok()?",
+        ],
+        "The route the gate answers for this endpoint is part of the worker's \
      `StreamIdentity`, re-read every supervisor tick, so a Tor toggle (or a \
      bootstrap completing, or a sidecar dying) makes the live stream a \
      DIFFERENT identity and the supervisor tears it down. Without this term the \
      stream survives the toggle: `SSE_READ_TIMEOUT` is deliberately above the \
      server's heartbeat cadence, so a healthy direct connection never times out \
-     and keeps exposing the source IP while the UI reports Tor is on.",
-)];
+     and keeps exposing the source IP while the UI reports Tor is on. The two \
+     listeners are single-homed here so the rule cannot drift between them.",
+    ),
+    (
+        "awareness_listener.rs",
+        "the live-awareness SSE stream (`/sync/awareness`), one connection per \
+     unlocked enrolled vault, held open for hours in `connect_and_stream`'s \
+     `sock_slot`",
+        &[
+            "stream_identity_rooms(s, rooms_fp)",
+            "decide(worker.as_ref().map(|w| w.identity), wanted)",
+        ],
+        "This file owns its own `spawn_worker`/`connect_and_stream` socket rather than \
+     calling the shared supervisor's, so it needs its own row: the identity it \
+     re-decides every tick folds the route gate AND the subscribed room set \
+     (`stream_identity_rooms` resolves `proxy::installed_for`), so a Tor toggle, a \
+     bootstrap completing, a sidecar dying or a note being opened makes the held \
+     stream a DIFFERENT identity and the tick tears it down. Without the gate term \
+     the stream survives the toggle and keeps exposing the source IP while the UI \
+     reports Tor is on.",
+    ),
+];
 
 /// The keep-alive request socket in `http_transport.rs` is deliberately NOT in
 /// [`LONG_LIVED_SOCKETS`]: it is loopback-only by construction (see

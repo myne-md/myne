@@ -47,9 +47,24 @@ afterEach(cleanup);
 
 // Three snapshots, newest-first — the order `snapshot_list` returns.
 const SNAPS: SnapshotMeta[] = [
-  { snapshot_uuid: "s-newest", captured_at_ms: 3_000, size_bytes: 300 },
-  { snapshot_uuid: "s-middle", captured_at_ms: 2_000, size_bytes: 200 },
-  { snapshot_uuid: "s-oldest", captured_at_ms: 1_000, size_bytes: 100 },
+  {
+    snapshot_uuid: "s-newest",
+    captured_at_ms: 3_000,
+    size_bytes: 300,
+    resolved_author: { kind: "Unknown" },
+  },
+  {
+    snapshot_uuid: "s-middle",
+    captured_at_ms: 2_000,
+    size_bytes: 200,
+    resolved_author: { kind: "Unknown" },
+  },
+  {
+    snapshot_uuid: "s-oldest",
+    captured_at_ms: 1_000,
+    size_bytes: 100,
+    resolved_author: { kind: "Unknown" },
+  },
 ];
 
 const BODY: Record<string, string> = {
@@ -228,5 +243,18 @@ describe("<SnapshotsPanel> — compare-against selector", () => {
     fireEvent.click(screen.getByTestId("snapshots.restore-confirm-cta"));
 
     await waitFor(() => expect(restoreMock).toHaveBeenCalledWith("note-1", "s-middle"));
+  });
+});
+
+describe("<SnapshotsPanel>, resolved author (collab-provenance)", () => {
+  it("renders the author as a name, never a raw id or hash, with Unknown as copy", async () => {
+    renderPanel();
+    const authors = await screen.findAllByTestId("snapshots.author");
+    expect(authors.length).toBeGreaterThan(0);
+    // The fixture's revisions resolve to `unknown` → the localized copy.
+    expect(authors[0]?.textContent).toBe("Unknown device");
+    expect(authors[0]?.getAttribute("data-author-kind")).toBe("Unknown");
+    // No raw 32-hex actor id or hash reaches the DOM.
+    expect(document.body.innerHTML).not.toMatch(/\b[0-9a-f]{32}\b/i);
   });
 });

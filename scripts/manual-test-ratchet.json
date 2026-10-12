@@ -684,6 +684,18 @@
     "CEILING RAISED 10926 -> 11066 by myne-md/myne#768, in the sanctioned direction: a new surface that genuinely needs a human, on four clients with no automated UI lane. What added the minutes, named so the raise is an argument: + the identity-first first run on the three desktop clients, 20 minutes each (60 total), core. The re-hide on window blur and on tab-hidden needs a real window losing focus or a real tab switch, which no harness produces, and the pinned certificate fingerprint needs a real TLS server whose leaf the runner can compare. The component tests assert hidden-until-revealed and the capability caveats; what a person checks is the walk-away behaviour itself. + the mobile identity flow on ios and android, 40 minutes each (80 total), core. Two real devices on one network with a configured server, a real 24-word ceremony and a real invite relay are all outside the flow-logic tier, which drives mocks against no device. Both items are core, so the gate WIDENS: the release now waits on a human having walked the identity-first route on macOS, Windows, iOS and Android. That is the point. The feature changes the ROUTE to a vault and makes a server a precondition of the identity path, on four clients whose only eyes would otherwise be the Linux WebKitGTK container and a mocked Chromium flow tier. gatedMinutes is NOT edited: the rule is that gating may not fall by more than total does, and both rose.",
     "CEILING RAISED 11450 -> 11525 by desktop-self-update, in the sanctioned direction: a new surface that genuinely needs a human. What added the minutes: + the desktop self-update flow, 25 minutes, core, on macOS, Windows and Linux. The in-place bundle replacement and the keychain item's survival (biometric quick-unlock, the vault-label cache) can only be observed on a signed, notarized macOS build on real hardware, and no CI lane builds a signed macOS app or holds a login keychain. The item is core, so the gate WIDENS: a release now waits on a human having updated a real installed build and confirmed the keychain-backed features survived. gatedMinutes is NOT edited: gating may not fall by more than total does, and both rose."
   ],
+  "$comment10": [
+    "CEILING RAISED 11525 -> 11610 by the live-collab epic (collab-verification task 5), in the sanctioned direction: a NEW surface that genuinely needs a human, on every client the epic ships. What added the minutes, named so the raise is an argument:",
+    "",
+    "  + two-device co-edit on the three desktop clients (5 min each = 15). The container's two devices share one host clock and one loopback; a real two-OS pair, a real network interruption and real clock skew are exactly the coupling a live-convergence assertion cannot remove, and the identity label a peer advertises is resolved from real device names or a real roster.",
+    "  + cursor/tint legibility and label non-overlap on desktop-macos (10) and desktop-windows (10). Whether a selection tint is legible against a theme's text, and whether a name label overlaps the character under it, is a reading of a rendered frame; the container judges no pixels and renders WebKitGTK rather than WKWebView or WebView2.",
+    "  + a real two-browser co-edit on the web client, Chromium (10) and Safari (10). The web lane is deliberately thin and drives a single session under Chromium only; two real browser sessions, the cross-tab single-tab lock, and Safari's engine and CSP handling are outside it.",
+    "  + live multi-device on ios and android (15 each = 30). The foreground/background presence gate is an OS lifecycle event: iOS suspension and Android activity recreation decide whether the stream stays open, and the Playwright flow tier runs in desktop Chromium with mock IPC and produces neither. No CI lane builds for either platform.",
+    "",
+    "Every item is standard tier, so gatedMinutes is unchanged: the rule is that gating may not fall by more than total does, and both rose. The automated half is named in the entry's automatedBy (the shared desktop convergence, the presence decoration, the leak-budget stand-in, and the web seam), so the manual half does not re-test what a lane already covers.",
+    "",
+    "RESOLVED (2026-10-11): the runs happened. The desktop lane was unblocked (host disk freed, colima restarted, the e2e image and the Linux server binary rebuilt, and the desktop binary built at opt-level=0 + --no-default-features, the only setting whose single myne_desktop_lib rustc fits this host) and collab-convergence (4/4), collab-presence (1/1) and collab-leak-budget (1/1) each ran green three times consecutively in one warm container; the web lane was unblocked with Chrome + chromedriver and collab-web-seam ran green three times on the host. scripts/e2e-scenario-floor.json was therefore raised 367 -> 373 in the same change (see _comment_367_to_373), which this note previously forbade."
+  ],
   "gatedTiers": [
     "core"
   ],
@@ -696,7 +708,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11525,
+  "totalMinutesCeiling": 11610,
   "gatedMinutes": 3837,
   "$comment6": [
     "CEILING RAISED 11096 -> 11120 by myne-md/myne#788, in the sanctioned",

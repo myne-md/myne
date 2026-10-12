@@ -475,6 +475,16 @@ export function SnapshotsPanel({
               ) : (
                 snaps.map((s, idx) => {
                   const isSel = s.snapshot_uuid === selected;
+                  // The resolved author (`collab-provenance` task 4): a readable
+                  // name, never a raw actor id or hash. `Unknown` is localized copy.
+                  const author = s.resolved_author;
+                  const authorLabel =
+                    author.kind === "Device"
+                      ? author.name ??
+                        t("notes.snapshots.deviceFallback", { code: author.code })
+                      : author.kind === "Person"
+                        ? author.name
+                        : t("notes.snapshots.unknownAuthor");
                   return (
                     <button
                       key={s.snapshot_uuid}
@@ -498,6 +508,13 @@ export function SnapshotsPanel({
                         {t("notes.snapshots.encryptedSize", {
                           size: formatBytes(s.size_bytes),
                         })}
+                      </span>
+                      <span
+                        style={ROW_META_STYLE}
+                        data-testid="snapshots.author"
+                        data-author-kind={author.kind}
+                      >
+                        {authorLabel}
                       </span>
                     </button>
                   );
