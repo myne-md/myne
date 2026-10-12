@@ -59,6 +59,18 @@ pub async fn vault_indices_apply_from_host(
     // stays compatible in both directions.
     tasks: Option<Vec<TaskRecord>>,
     headings: Option<Vec<HeadingEntry>>,
+    // myne-md/myne#848: whether the producer's `isLiveNote` classified this note
+    // as part of the working set.
+    //
+    // **REQUIRED, unlike the three vectors above** (review finding): those are
+    // display data and an absent one costs an empty list, while this is a
+    // PERMISSION input. A default would fail OPEN (every note in the agent's
+    // scope) and the wire-compat reason the neighbours give does not exist here:
+    // the WebView ships in the same binary, mobile's own wrapper takes `live` as
+    // required, and the web dispatcher does not reach this command. So an absent
+    // field is a deserialization failure, which the wrapper reports, rather than
+    // a silent widening.
+    live: bool,
     runtime: &VaultRuntimeState,
     indices: &VaultIndicesState,
 ) -> Result<(), VaultIndicesError> {
@@ -87,6 +99,9 @@ pub async fn vault_indices_apply_from_host(
             // Unlike the two fields above, TS reads these off the parse it
             // already ran — no additional extraction pass.
             headings: headings.unwrap_or_default(),
+            // myne-md/myne#848: the producer's verdict, not a re-derivation. The
+            // agent's scope reads this so the working set is the sidebar's.
+            live,
         },
     );
     Ok(())
@@ -118,6 +133,13 @@ pub async fn vault_indices_apply(
     tasks: Option<Vec<TaskRecord>>,
     // myne#216: the note's headings, same `Option` wire-compat shape again.
     headings: Option<Vec<HeadingEntry>>,
+    // myne-md/myne#848: the producer's `isLiveNote` verdict. **Not `Option`**,
+    // unlike the three vectors above: those carry display data and an omission
+    // costs an empty list, while this is the permission the agent's scope reads,
+    // so an omission must be a refusal rather than a default. Every client in
+    // this tree sends it (the desktop and mobile wrappers both take it as
+    // required), and the web dispatcher does not reach this command.
+    live: bool,
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
@@ -132,6 +154,7 @@ pub async fn vault_indices_apply(
         block_anchors,
         tasks,
         headings,
+        live,
         runtime.inner(),
         indices.inner(),
     )

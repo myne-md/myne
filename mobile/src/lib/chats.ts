@@ -57,6 +57,13 @@ export interface ConversationEntry {
    *  The create-side `noteId` parameter is deliberately NOT mirrored: anchoring
    *  happens where a note is open beside an agent run, and mobile has neither. */
   note_id?: string;
+  /** The folder this conversation is scoped to, when it is
+   *  (myne-md/myne#848). Mirrored for the same reason `note_id` is, and NOT
+   *  mirrored on the create side for the same reason either: the rows sync, so
+   *  a folder-scoped conversation created on a computer arrives here carrying
+   *  the field and the Hub has to render it, while mobile has no surface that
+   *  creates one. A conversation carries at most one of the two anchors. */
+  folder?: string;
 }
 
 /** Mirror of Rust `ConversationListRow`: what `chatsList` returns. */
@@ -125,11 +132,16 @@ export async function chatsCreate(
   // surface that needs to anchor would either add the parameter and find the
   // two files had drifted for months, or reach past the wrapper to `invoke`.
   noteId?: string | null,
+  // The folder this conversation is scoped to, when it is (myne-md/myne#848).
+  // Same argument as `noteId` above, one kind over: the command has it, so the
+  // mirror carries it, even though no mobile surface passes it yet.
+  folder?: string | null,
 ): Promise<string> {
   const id = await invoke<string>("plugin:chats|chats_create", {
     firstTurnPayload,
     ...(requestedIdHex !== undefined ? { requestedIdHex } : {}),
     ...(noteId !== undefined && noteId !== null ? { noteId } : {}),
+    ...(folder !== undefined && folder !== null ? { folder } : {}),
   });
   // After the await, so a failed create announces nothing: a listener that
   // re-read on a refusal would replace a correct list with the same list, and

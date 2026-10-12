@@ -79,6 +79,12 @@ export type AgentTurnEnd =
  *  frozen proposal may quote a note that has since changed, been trashed, or
  *  moved folders (myne-md/myne#675). */
 export interface AgentTurnSummary {
+  /** How long the run took, in milliseconds, or absent when it cannot be known
+   *  (a summary persisted before this field existed, or a run whose start was
+   *  not recorded). Optional rather than defaulted to zero: "instant" and
+   *  "unknown" are different statements, and the footprint renders them
+   *  differently, the same discipline `charsOffDevice` keeps for null. */
+  durationMillis?: number;
   runId: string;
   /** The model's closing summary, or "" when it finished without one.
    *
@@ -468,6 +474,34 @@ export function getPendingAnchorNoteId(): string | null {
  *  any vault-leaving path. */
 export function clearPendingAnchorNoteId(): void {
   pendingAnchorNoteId = null;
+  pendingAnchorFolderId = null;
+}
+
+/**
+ * The FOLDER a conversation is scoped to, when the run's scope was one
+ * (myne-md/myne#848). A third anchor kind beside the note id, held and cleared
+ * exactly the same way and for the same reasons: it is written into the catalog
+ * row at create time, so it has to survive a retry, and an anchor set for a
+ * conversation that was never created must not leak into the next one.
+ *
+ * A conversation has at most one of the two: a run is anchored to a note, to a
+ * folder, or to neither (vault-general).
+ */
+let pendingAnchorFolderId: string | null = null;
+
+/** Set (or clear) the folder the next created conversation is scoped to. */
+export function setPendingAnchorFolderId(folder: string | null): void {
+  pendingAnchorFolderId = folder;
+}
+
+/** Read the pending folder anchor without clearing it. */
+export function getPendingAnchorFolderId(): string | null {
+  return pendingAnchorFolderId;
+}
+
+/** Clear the pending folder anchor once a conversation has been created with it. */
+export function clearPendingAnchorFolderId(): void {
+  pendingAnchorFolderId = null;
 }
 
 // The persistence listener: called after every terminal reduce (finalize,
@@ -671,6 +705,7 @@ export function clearChat(): void {
   // this, starting a fresh chat on a different note would keep the previous
   // note's anchor (myne-md/myne#771).
   pendingAnchorNoteId = null;
+  pendingAnchorFolderId = null;
   runEpoch += 1;
   bumpConversationEpoch();
   dispatchChat({ type: "CLEARED" });
@@ -688,6 +723,7 @@ export function clearChat(): void {
 export function discardChat(): void {
   activeConversationId = null;
   pendingAnchorNoteId = null;
+  pendingAnchorFolderId = null;
   runEpoch += 1;
   bumpConversationEpoch();
   dispatchChat({ type: "CLEARED" });
@@ -705,6 +741,7 @@ export function hydrateChatTurns(turns: ChatTurn[]): void {
 export function __resetChatForTest(): void {
   activeConversationId = null;
   pendingAnchorNoteId = null;
+  pendingAnchorFolderId = null;
   persister = null;
   current = CHAT_INITIAL;
   listeners.clear();

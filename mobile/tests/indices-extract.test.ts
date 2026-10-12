@@ -173,4 +173,29 @@ describe("vaultIndicesApply puts the whole record on the wire", () => {
     expect(args.headings).toEqual([]);
     expect(args.blockAnchors).toEqual([]);
   });
+
+  // myne-md/myne#848: the working-set verdict is on the wire too, and it is the
+  // one field the command takes as REQUIRED rather than `Option` (review
+  // finding): a dropped field is a deserialization failure, not a fail-open
+  // default, because a default here would put every note back inside a run's
+  // reach. The two other trailing fields are display data and keep their
+  // `Option`; this one does not.
+  it("sends the working-set verdict, false for a trashed note", async () => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
+    await vaultIndicesApply(
+      extractRecord("n3", "Ev", null, "---\ntrashed: 2026-08-01T00:00:00Z\n---\nbody\n"),
+    );
+    const [, args] = invoke.mock.calls[0] as [string, Record<string, unknown>];
+    expect(Object.keys(args)).toContain("live");
+    expect(args.live).toBe(false);
+  });
+
+  it("sends live: true for an ordinary note", async () => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
+    await vaultIndicesApply(extractRecord("n4", "Ev", null, "sade bir not\n"));
+    const [, args] = invoke.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.live).toBe(true);
+  });
 });

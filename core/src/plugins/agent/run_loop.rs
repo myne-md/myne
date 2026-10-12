@@ -28,7 +28,10 @@ use super::prompt::{
 };
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
-use super::tools::{list_scope, read_note, search_scope, search_vault, NoteReader, ScopeSearcher};
+use super::tools::{
+    list_scope, read_note, render_scope_entry, search_scope, search_vault, NoteReader,
+    ScopeSearcher,
+};
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -174,20 +177,23 @@ async fn opening_scope(
     }
     let rendered = entries
         .iter()
-        .map(|e| {
-            format!(
-                "{} {}",
-                e.note_id,
-                e.title.as_deref().unwrap_or("(untitled)")
-            )
-        })
+        .map(render_scope_entry)
         .collect::<Vec<_>>()
         .join("\n");
     Ok(tool_result(
         format!(
-            "Your scope holds {} notes, one per line as `<note_id> <title>`, so \
-             you do not need list_scope. Read one with read_note, or finish if \
-             you already have what you need.",
+            // **The folder is in the listing, and the sentence says so**
+            // (myne-md/myne#848, on the user's report): a folder-shaped question
+            // ("what is in my inbox?") is answerable from this line and was not
+            // answerable from ids and titles, which is how a run came to report
+            // that a folder held one note, the folder's own index note.
+            "Your scope holds {} notes, one per line as `<note_id> | <folder> | \
+             <title>`. The folder is the note's `folder:` field, and `(root)` \
+             means it has none; a folder holds every note whose path starts with \
+             it, subfolders included. So a question about a folder can be \
+             answered from this list (filter it by that folder) and you do not \
+             need list_scope. Read one with read_note, or finish if you already \
+             have what you need.",
             entries.len()
         ),
         Some(rendered),
@@ -212,6 +218,82 @@ fn repeat_notice() -> Message {
                 .into(),
         )],
     }
+}
+
+/// What one body-only edit did, so the caller can set its own `productive`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyEditOutcome {
+    /// The note is in scope and the edit is in the proposal.
+    Recorded,
+    /// The note is outside the run's scope, and the model has been told.
+    /// `fresh` is whether this exact refusal is new, a repeat is not progress.
+    Refused { fresh: bool },
+}
+
+/// **Record a body-only edit: an append or a move** (myne-md/myne#848).
+///
+/// The two are the same act with different nouns: neither has anything to anchor
+/// to, both refuse when the note is outside the run's scope, and both are
+/// acknowledged the same way. They were two forty-line arms differing in four
+/// words, which is the shape where the next fix lands in one copy and not the
+/// other, so the scope check, the refusal and both replies live here once.
+///
+/// **`Replace` deliberately does not come through here.** Its refusal talks the
+/// model out of asking for a wider scope after a bad copy, which is a lesson the
+/// other two do not need, and its edit carries an anchor. `propose_edit` keeps
+/// its own arm.
+// Nine arguments, and every one is a piece of the loop's own state rather than a
+// parameter a caller chooses: the run to check against, the edit's own four
+// fields, and the three sinks every tool result writes to. Bundling the sinks
+// into a struct was the alternative and it buys a type in this file's vocabulary
+// for one call site, twice.
+#[allow(clippy::too_many_arguments)]
+fn record_body_edit(
+    runs: &AgentRunState,
+    run_id: &str,
+    kind: EditKind,
+    // What the replies call this act: "append", "move".
+    verb: &str,
+    note_id: String,
+    replacement: String,
+    asked: &mut BTreeSet<String>,
+    proposal: &mut Proposal,
+    transcript: &mut Vec<Message>,
+) -> Result<BodyEditOutcome, AgentError> {
+    if !runs.contains(run_id, &note_id)? {
+        let fresh = asked.insert(format!("{verb}_refused:{note_id}"));
+        transcript.push(Message {
+            role: Role::User,
+            content: vec![
+                Content::Trusted("Note ".into()),
+                Content::note(note_id),
+                Content::Trusted(format!(
+                    " is not one of the notes in your scope, so that {verb} was discarded. \
+                     Copy an id from your scope exactly, or use request_scope if the note you \
+                     need is genuinely not among them."
+                )),
+            ],
+        });
+        return Ok(BodyEditOutcome::Refused { fresh });
+    }
+    proposal.edits.push(ProposedEdit {
+        note_id,
+        kind,
+        // Nothing to anchor to: empty rather than absent because the field is
+        // shared with the replace shape, and `apply_edit` routes on the kind
+        // rather than on which fields happen to be populated.
+        anchor: String::new(),
+        replacement,
+    });
+    transcript.push(Message {
+        role: Role::User,
+        content: vec![Content::Trusted(format!(
+            "{} recorded. Propose another change, or finish.",
+            // The acknowledgement opens with the verb, as it always has.
+            verb[..1].to_uppercase() + &verb[1..]
+        ))],
+    });
+    Ok(BodyEditOutcome::Recorded)
 }
 
 /// Why the loop stopped.
@@ -730,13 +812,7 @@ async fn drive_inner(
                     } else {
                         let rendered = entries
                             .iter()
-                            .map(|e| {
-                                format!(
-                                    "{} {}",
-                                    e.note_id,
-                                    e.title.as_deref().unwrap_or("(untitled)")
-                                )
-                            })
+                            .map(render_scope_entry)
                             .collect::<Vec<_>>()
                             .join("\n");
                         // Titles come out of note plaintext, so the payload is
@@ -744,7 +820,8 @@ async fn drive_inner(
                         transcript.push(tool_result(
                             format!(
                                 "list_scope returned the {} note(s) in your scope, one per \
-                                 line as `<note_id> <title>`. Read one with read_note, or \
+                                 line as `<note_id> | <folder> | <title>`, where `(root)` \
+                                 means the note has no folder. Read one with read_note, or \
                                  finish if you already have what you need.",
                                 entries.len()
                             ),
@@ -1111,50 +1188,42 @@ async fn drive_inner(
                     });
                 }
                 AgentAction::AppendToNote { note_id, text } => {
-                    // The same scope check the edit arm makes, and for the same
-                    // reason: catching it here means the model is told and can
-                    // correct itself, rather than the user seeing a proposal
-                    // that was always going to be refused.
-                    //
-                    // Deliberately NOT sharing the edit arm's long id-correction
-                    // message. That one talks the model out of asking for a
-                    // wider scope after a copy error, which is a lesson it has
-                    // already been taught by the time it reaches here, and
-                    // reproducing it would be a second copy to keep in step.
-                    if !runs.contains(run_id, &note_id)? {
-                        productive |= asked.insert(format!("append_refused:{note_id}"));
-                        transcript.push(Message {
-                            role: Role::User,
-                            content: vec![
-                                Content::Trusted("Note ".into()),
-                                Content::note(note_id.clone()),
-                                Content::Trusted(
-                                    " is not one of the notes in your scope, so that append was \
-                                     discarded. Copy an id from your scope exactly, or use \
-                                     request_scope if the note you need is genuinely not among them."
-                                        .into(),
-                                ),
-                            ],
-                        });
-                        continue;
-                    }
-                    productive = true;
-                    proposal.edits.push(ProposedEdit {
+                    match record_body_edit(
+                        runs,
+                        run_id,
+                        EditKind::Append,
+                        "append",
                         note_id,
-                        kind: EditKind::Append,
-                        // An append has nothing to anchor to. Empty rather than
-                        // absent because the field is shared with the replace
-                        // shape, and `apply_edit` routes on the kind rather than
-                        // on whether this happens to be populated.
-                        anchor: String::new(),
-                        replacement: text,
-                    });
-                    transcript.push(Message {
-                        role: Role::User,
-                        content: vec![Content::Trusted(
-                            "Append recorded. Propose another change, or finish.".into(),
-                        )],
-                    });
+                        text,
+                        &mut asked,
+                        &mut proposal,
+                        &mut *transcript,
+                    )? {
+                        BodyEditOutcome::Recorded => productive = true,
+                        BodyEditOutcome::Refused { fresh } => {
+                            productive |= fresh;
+                            continue;
+                        }
+                    }
+                }
+                AgentAction::MoveNote { note_id, folder } => {
+                    match record_body_edit(
+                        runs,
+                        run_id,
+                        EditKind::Move,
+                        "move",
+                        note_id,
+                        folder,
+                        &mut asked,
+                        &mut proposal,
+                        &mut *transcript,
+                    )? {
+                        BodyEditOutcome::Recorded => productive = true,
+                        BodyEditOutcome::Refused { fresh } => {
+                            productive |= fresh;
+                            continue;
+                        }
+                    }
                 }
                 AgentAction::ProposeNote {
                     title,
@@ -3454,6 +3523,39 @@ mod tests {
         );
     }
 
+    /// A reader whose body is LONG, for the one test that asks whether vault
+    /// text moves the off-device figure.
+    ///
+    /// **The length is the test, not the fixture** (myne-md/myne#848). The stub
+    /// reader answers six characters, and against six characters the
+    /// scaffold's own prose dominates: the two arms differ by "a second body
+    /// came back" versus "a listing came back", so lengthening either tool's
+    /// sentence flipped the inequality and the test went red for a wording
+    /// change it is not about. A body hundreds of characters long makes the
+    /// surplus the thing being measured.
+    /// The body's own length, named so the assertion below is a bound on the
+    /// FIXTURE rather than a comparison between two scaffolds.
+    const LONG_BODY_PAD: usize = 400;
+
+    struct LongReader;
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl NoteReader for LongReader {
+        async fn read_body(&self, id: &str) -> Result<String, AgentError> {
+            Ok(format!("body-{id}-{}", "x".repeat(LONG_BODY_PAD)))
+        }
+    }
+
+    fn deps_with_long_body<'a>(
+        engine: &'a ScriptEngine,
+        recs: &'a BTreeMap<String, NoteRecord>,
+    ) -> LoopDeps<'a> {
+        LoopDeps {
+            reader: &LongReader,
+            ..deps(engine, recs)
+        }
+    }
+
     #[test]
     fn the_offdevice_figure_counts_the_note_body_that_was_actually_sent() {
         // The point of the disclosure is that it tracks vault text, so a run
@@ -3473,34 +3575,42 @@ mod tests {
             "r",
             "task",
             &mut with_read,
-            &deps(&read_engine, &recs),
+            &deps_with_long_body(&read_engine, &recs),
             &mut BTreeSet::new(),
         ))
         .unwrap();
 
+        // **The control asks for nothing**, and that is what makes the
+        // assertion a bound rather than a coincidence (myne-md/myne#848). It
+        // used to call `list_scope`, so the two arms differed by "a second body
+        // came back" versus "a listing came back", words against words, with
+        // the scaffolds in the same order of magnitude, and lengthening the
+        // listing's own prose by one character flipped the inequality. A
+        // finish-only run sends one request and returns no note text at all, so
+        // the read run's surplus is at least the body it re-sent, and any
+        // wording change anywhere leaves that bound untouched.
         let mut without = Vec::new();
         let runs2 = AgentRunState::default();
         runs2.start("r".into(), ids(&["a"]));
-        let list_engine = ScriptEngine::remote(&[
-            r#"{"action":"list_scope"}"#,
-            r#"{"action":"finish","summary":"ok"}"#,
-        ]);
-        let listed = block_on(drive(
+        let bare_engine = ScriptEngine::remote(&[r#"{"action":"finish","summary":"ok"}"#]);
+        let bare = block_on(drive(
             &runs2,
             "r",
             "task",
             &mut without,
-            &deps(&list_engine, &recs),
+            &deps_with_long_body(&bare_engine, &recs),
             &mut BTreeSet::new(),
         ))
         .unwrap();
 
-        assert_eq!(read.iterations, listed.iterations, "same request count");
+        let read_chars = read
+            .chars_off_device
+            .expect("a remote run must report a figure, not None");
         assert!(
-            read.chars_off_device.unwrap() > listed.chars_off_device.unwrap(),
-            "reading a note has to move the figure: {:?} vs {:?}",
-            read.chars_off_device,
-            listed.chars_off_device
+            read_chars >= bare.chars_off_device.unwrap() + LONG_BODY_PAD,
+            "reading a note has to move the figure by at least the note's own \
+             length: {read_chars} vs {:?}",
+            bare.chars_off_device
         );
     }
 }

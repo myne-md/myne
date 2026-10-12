@@ -19,7 +19,7 @@
 // action; the no-provider state says what to fix. Search/filter arrives in task 5
 // and adds the third variant.
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
@@ -32,33 +32,31 @@ import { EmptyState } from "../../components/primitives/EmptyState";
 import {
   chatsDelete,
   chatsList,
+  chatsRead,
   chatsRename,
   subscribeConversationRoster,
   type ConversationListRow,
 } from "../../lib/chats";
-import { clearChatPersistForLock, openConversation } from "../ai/chatPersist";
+import {
+  clearChatPersistForLock,
+  openConversation,
+  parseTranscript,
+} from "../ai/chatPersist";
 import { discardChat, getActiveConversationId } from "../ai/chatStore";
-
-/** Newest first: the list order, applied to every fetch path. */
-function byUpdatedDesc(rows: ConversationListRow[]): ConversationListRow[] {
-  return [...rows].sort((a, b) => b.updated_at - a.updated_at);
-}
-
-function relativeDay(
-  updatedAt: number,
-  locale: string,
-  timeZone: string | null,
-): string {
-  const date = new Date(updatedAt);
-  const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-    ...(timeZone === null ? {} : { timeZone }),
-  });
-}
+import { useAgent } from "./agentStore";
+import { useSelectedNote } from "../sidebarState";
+import { generateNoteTitle } from "../ai/noteTitle";
+import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
+import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
+import { noteRead } from "../readNote";
+import { usePrefs } from "../../hooks/usePrefs";
+import { loadModelPath } from "../../lib/ai-model-store";
+import { formatDuration, useElapsedMillis } from "./components/AgentFootprint";
+import { endStatusLabel } from "./components/AgentProgress";
+import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
+import { Spinner } from "../../components/Spinner";
+import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
+import { byUpdatedDesc, relativeDay } from "../ai/conversationList";
 
 /**
  * A rail row: the title on one line, its meta and actions on the next.
@@ -73,6 +71,17 @@ function relativeDay(
  * `overflow-x: hidden` now, so a future row that outgrows it truncates rather
  * than reintroducing the scroll.
  */
+/** What a conversation is about, as the card states it: the three kinds a
+ *  catalog row can carry, in the order the row can be trusted. */
+type HubTarget = "folder" | "note" | "vault";
+
+/** The glyph per kind, so the card answers "which shape" in one place. */
+const TARGET_ICON: Record<HubTarget, "folder" | "file-text" | "book-open"> = {
+  folder: "folder",
+  note: "file-text",
+  vault: "book-open",
+};
+
 const ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -80,7 +89,10 @@ const ROW_STYLE: CSSProperties = {
   gap: "var(--space-1)",
   padding: "var(--space-2)",
   borderRadius: "var(--radius-2)",
-  border: "1px solid var(--line-1)",
+  // **No border, deliberately** (myne-md/myne#848). This style is shared, so a
+  // hairline here is a box around every conversation, which read as "every card
+  // is highlighted" and left the open one indistinguishable. Rows are separated
+  // by a rule between them, and the open one carries an inset accent ring.
   textAlign: "left",
   minWidth: 0,
 };
@@ -93,6 +105,81 @@ const ROW_TOP_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
+/** The title action's line: what it is doing, or why it could not. Same row as
+ *  the date, and the same reason it carries no top margin. */
+const TITLE_NOTICE_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+};
+
+/** The card's state line: the run's own status, beside the date.
+ *
+ *  **No `marginTop`** (myne-md/myne#848, on the user's read: "these two texts
+ *  are not aligned"). It is a flex item of `ROW_META_STYLE`, which is a ROW with
+ *  `align-items: center`, so a top margin does not push it onto its own line,
+ *  it pushes it four pixels DOWN inside the row it shares with the date, which
+ *  is exactly the misalignment. The stacking intent was in the comment rather
+ *  than in the layout. */
+const RUN_STATE_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  minWidth: 0,
+};
+
+/** The unread mark: the accent, at rest, at the end of the title line. */
+const UNREAD_DOT_STYLE: CSSProperties = {
+  flex: "none",
+  width: 8,
+  height: 8,
+  borderRadius: "50%",
+  background: "var(--accent)",
+  // A ring in the rail's own surface, so the dot reads as sitting ON the card
+  // rather than as a bullet of the title.
+  boxShadow: "0 0 0 2px var(--bg-1)",
+};
+
+/** The hover menu: a small panel anchored to the row's action cluster. */
+const MENU_STYLE: CSSProperties = {
+  // Chrome only. **Placement belongs to `AnchoredPanel`** (myne-md/myne#848):
+  // it decides `position: fixed`, the stacking level, the side with room and the
+  // offset, and re-declaring any of them here would be a second answer to a
+  // question the primitive already owns.
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 120,
+  padding: "var(--space-1)",
+  gap: "var(--space-1)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+};
+
+/** Only what the primitive does not already do: a menu item is left-aligned and
+ *  full width, where a `Button` centres its label and hugs it. */
+const MENU_ITEM_STYLE: CSSProperties = {
+  textAlign: "left",
+  justifyContent: "flex-start",
+  width: "100%",
+  padding: "var(--space-1) var(--space-2)",
+};
+
+/**
+ * The opening words, short enough to be a TOOLTIP.
+ *
+ * **A tooltip is not a paragraph** (myne-md/myne#848): the bubble is one line
+ * (`white-space: nowrap`), so a full first message rendered as a 900px ribbon
+ * across the window. Sixty scalar values is about a line of the rail's width and
+ * enough to tell two similar conversations apart, which is the whole job.
+ */
+function previewOf(text: string): string {
+  const points = [...text.trim()];
+  return points.length <= 60 ? points.join("") : points.slice(0, 60).join("") + "\u2026";
+}
+
 /** The meta line: what it is about, and when it was last used. */
 const ROW_META_STYLE: CSSProperties = {
   display: "flex",
@@ -101,8 +188,33 @@ const ROW_META_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
+/** The anchor pill: it may shrink, so the date beside it never moves. The
+ *  `.myne-pill` class ships `flex-shrink: 0` (right for a fixed label, wrong for
+ *  a note name of any length), so the shrink is restored here and the inner
+ *  span does the ellipsizing, `text-overflow` on the pill itself would be inert
+ *  over an anonymous flex item. */
+const ANCHOR_PILL_STYLE: CSSProperties = {
+  flex: "0 1 auto",
+  minWidth: 0,
+};
+
+const ANCHOR_TITLE_STYLE: CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+/** The title's slot: sized to the text, able to shrink, and deliberately NOT
+ *  the row's flexible cell (myne-md/myne#848, see the call site). */
+const TITLE_SLOT_STYLE: CSSProperties = {
+  display: "flex",
+  flex: "0 1 auto",
+  minWidth: 0,
+};
+
 const TITLE_STYLE: CSSProperties = {
-  flex: 1,
+  maxWidth: "100%",
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -117,21 +229,26 @@ const TITLE_STYLE: CSSProperties = {
 };
 
 /**
- * The row's two actions, pushed to the far edge.
+ * The row's actions, pinned to the far edge.
  *
- * `TITLE_STYLE` already carries `flex: 1`, and it was not enough: the title
- * button is wrapped in a `<Tooltip>`, so the FLEX ITEM is the tooltip's
- * wrapper and the `flex: 1` sits on a child of it, where the row's free space
- * never reaches. The result is the actions hugging the end of the title —
- * "hi ✏🗑" — so the two controls land in a different place on every row and
- * a column of them reads as ragged rather than as a column.
+ * A title with `flex: 1` was not enough: the title button is wrapped in a
+ * `<Tooltip>`, so the FLEX ITEM is the tooltip's wrapper and the `flex: 1` sat
+ * on a child of it, where the row's free space never reaches. The actions ended
+ * up hugging the end of each title ("hi ✏🗑") so the two controls landed in a
+ * different place on every row and a column of them read as ragged rather than
+ * as a column.
  *
  * `margin-inline-start: auto` is the fix rather than fixing the title's flex,
  * because it holds however the title is wrapped: a tooltip, a badge, a second
  * label later. `flex: none` so the pair never shrinks into each other on a
  * narrow rail — the title is what ellipsizes.
+ *
+ * And since myne-md/myne#848 that is also what lets the title NOT grow: the
+ * tooltip's trigger is the title's own box, so the title must be sized to its
+ * text, and this auto margin is what keeps the right edge held while it is.
  */
 const ROW_ACTIONS_STYLE: CSSProperties = {
+  position: "relative",
   display: "flex",
   alignItems: "center",
   gap: "var(--space-1)",
@@ -143,6 +260,9 @@ const META_STYLE: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
   whiteSpace: "nowrap",
+  // The date is the row's fixed half: the note name beside it is what gives way
+  // when the rail is narrow.
+  flex: "none",
 };
 
 const ERROR_STYLE: CSSProperties = {
@@ -213,12 +333,81 @@ export function AgentHubList({
 }: AgentHubListProps) {
   const { t } = useTranslation();
   const { locale, timeZone } = useDateTimeDisplay();
+  // **Which conversation has a run in flight** (myne-md/myne#848). The run
+  // belongs to its conversation rather than to the surface, so it can be
+  // working while the user is somewhere else entirely, and a list that shows
+  // neither the run nor where it is leaves "did my message go?" unanswerable
+  // without opening every row. `running` is the whole guard: a settled or
+  // cancelled run clears it in the same action that settles the step, so the
+  // mark cannot outlive the run.
+  const agent = useAgent();
+  const unreadConversations = agent.unreadConversations;
+  // The note titles, from the cache the sidebar already fills, the same source
+  // `useRunViewContext` resolves a title from by id, and an in-memory read
+  // rather than an IPC call per card. The RAW cache, not the live working set:
+  // a conversation anchored to a note that has since been trashed is still
+  // anchored to it, and its name is still the truth about which note that is.
+  const { cache } = useSelectedNote();
+  const noteTitle = useCallback(
+    (id: string): string | null => {
+      const title = cache.get(id)?.title ?? null;
+      return title !== null && title.trim() !== "" ? title : null;
+    },
+    [cache],
+  );
+  const runningId = agent.running ? agent.runConversationId : null;
+  /**
+   * **The card you pressed is marked at once** (myne-md/myne#848).
+   *
+   * The active id comes from the surface, which learns it after a round trip
+   * (read the conversation, bind the transcript), so a rail keyed only off it
+   * marked the PREVIOUS row for as long as the open took. That lag was invisible
+   * while the mark was a background a shade off the rail; with the accent border
+   * it read as "every card I press highlights the wrong one". The pending id is
+   * cleared the moment the surface reports one, so the two cannot disagree for
+   * longer than the open itself.
+   */
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
+  /**
+   * **The card menu hangs off the row's actions, and is drawn in the BODY.**
+   *
+   * It used to render inside the card, absolutely positioned under the trigger,
+   * and the list's own `overflow: auto` clipped it: a menu on the last visible
+   * card lost its lower half, and one near the rail's edge lost a side. Nothing
+   * reported it, because the panel and its items were in the DOM and every test
+   * that finds one by testid passed. `AnchoredPanel` owns the portal, the
+   * placement and the three ways out.
+   */
+  const menuTriggerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (activeConversationId !== null) setPendingOpenId(null);
+  }, [activeConversationId]);
+  /** When the running run started, for the card's duration. Read from the store
+   *  rather than tracked here: the run outlives this component, so a rail that
+   *  mounted mid-run has to show the time already spent. */
+  const runningSince = agent.running ? agent.startedAtMillis : null;
+  // **The hook's VALUE is the figure, and it used to be thrown away**
+  // (myne-md/myne#848): the call was made for its re-render alone and the same
+  // number recomputed below with `Date.now()`, which is the hook's own body. The
+  // rail and the transcript now cannot count a run differently, which is what
+  // the comment claimed while the arithmetic was written twice.
+  const elapsedMillis = useElapsedMillis(runningSince, true);
   const [rows, setRows] = useState<ConversationListRow[] | null>(null);
   const [error, setError] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // Which row the pointer or the keyboard is on, which row's menu is open, and
+  // the opening-words preview for the hovered one. Local rather than store state:
+  // all three describe the POINTER, not the catalog.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [hover, setHover] = useState<{ id: string; text: string | null } | null>(null);
+  /** Conversation id → opening words, `null` for one that has none. A Map so a
+   *  row hovered twice reads once; component-scoped rather than module-scoped so
+   *  a lock that unmounts the hub takes the plaintext with it. */
+  const hoverCache = useRef(new Map<string, string | null>());
   /**
    * What just happened, announced (task 13 of myne-md/myne#771).
    *
@@ -233,8 +422,114 @@ export function AgentHubList({
    */
   const [announcement, setAnnouncement] = useState("");
   // The workspace's selection when the pane supplies one, the live transcript
-  // otherwise (the light panel mounts this list with neither).
-  const activeId = activeConversationId ?? getActiveConversationId();
+  // otherwise (the light panel mounts this list with neither), and the card the
+  // user just PRESSED first of all, until the surface reports one (myne-md/myne#848).
+  const activeId = pendingOpenId ?? activeConversationId ?? getActiveConversationId();
+
+  /**
+   * **The note-title action** (myne-md/myne#848, on the user's ask).
+   *
+   * Three pieces of state, because the press has three possible endings and the
+   * surface owes a different sentence to each: a local generation model that is
+   * missing (disabled item), a model that answered with nothing usable, and a
+   * write that failed. The SUCCESS needs no line, the anchor pill beside it
+   * renames itself, because the sidebar cache updates on the write, and it gets
+   * an announcement instead, for the reader who cannot see the pill change.
+   */
+  const [hasTitleModel, setHasTitleModel] = useState(false);
+  const [titleBusyId, setTitleBusyId] = useState<string | null>(null);
+  const [titleNotice, setTitleNotice] = useState<
+    { id: string; key: string } | null
+  >(null);
+  // Read once per mount. `plugin:local-inference` does not exist on every client
+  // (the web bundle has no local engine), so a missing command is "no model"
+  // rather than an error to report.
+  useEffect(() => {
+    void loadModelPath("generation").then(
+      (path) => setHasTitleModel(path !== null),
+      () => setHasTitleModel(false),
+    );
+  }, []);
+  // Renamed on destructure: the hub's own `commitRename` renames the
+  // CONVERSATION, and this one renames a NOTE through the sidebar's
+  // transactional path. Two different writes under one word is how the wrong one
+  // gets called.
+  const { commitRename: commitNoteRename } = useSelectedNote();
+  const { prefs } = usePrefs();
+  // **Whether an AI read of this note is allowed at all** (SYNC-14): the same
+  // predicate every other AI entry point uses, against the same pref, read from
+  // the cache the card already has in hand. It is checked before the model is
+  // asked and again at the menu item, because the guarantee is that AI never
+  // runs for an excluded note, and a gate that only hides the control is a gate
+  // the next caller can forget.
+  const titleReadAllowed = useCallback(
+    (noteId: string): boolean =>
+      !isNoteAiExcluded(
+        cache.get(noteId)?.folder ?? "",
+        prefs.ai_excluded_folders,
+      ),
+    [cache, prefs.ai_excluded_folders],
+  );
+  const generateTitle = useCallback(
+    // **Two ids, and both are needed**: the NOTE is what gets renamed, and the
+    // CONVERSATION is the card that reports what happened. Keying the busy and
+    // notice state on the note id left both lines rendering for no card at all,
+    // `row.id` is a conversation id.
+    async (conversationId: string, noteId: string): Promise<void> => {
+      setTitleNotice(null);
+      setTitleBusyId(conversationId);
+      const outcome = await generateNoteTitle(noteId, titleReadAllowed(noteId));
+      setTitleBusyId(null);
+      switch (outcome.kind) {
+        case "ready":
+          try {
+            // **The note's own rename path, not a title write**
+            // (myne-md/myne#848): `commitRename` is §8.3's transactional batch,
+            // which also rewrites every inbound `[[Old Title]]` and flushes open
+            // panes before reading them. Writing the frontmatter here would
+            // leave every link to this note pointing at a title that no longer
+            // exists.
+            //
+            // **The body is read HERE, not when the model was asked** (review
+            // finding): the generation takes seconds, and a body read before it
+            // overwrote whatever landed in between. Flush, then read, then
+            // commit, which is the order `executeRenameCommit` uses.
+            await flushBeforeFrontmatterWrite();
+            const bytes = await noteRead(noteId);
+            await commitNoteRename(noteId, bytes, outcome.title);
+            setAnnouncement(
+              t("agent.hub.titleGenerated", { name: outcome.title }),
+            );
+          } catch {
+            setTitleNotice({
+              id: conversationId,
+              key: "agent.hub.titleSaveFailed",
+            });
+          }
+          return;
+        case "excluded":
+          // Reachable only if the pref changed between the menu opening and the
+          // press, since the item is not offered otherwise.
+          setTitleNotice({
+            id: conversationId,
+            key: "agent.hub.generateTitleExcluded",
+          });
+          return;
+        case "unavailable":
+          setHasTitleModel(false);
+          setTitleNotice({
+            id: conversationId,
+            key: "agent.hub.generateTitleNeedsModel",
+          });
+          return;
+        case "no-title":
+        case "failed":
+          setTitleNotice({ id: conversationId, key: "agent.hub.titleFailed" });
+          return;
+      }
+    },
+    [commitNoteRename, t, titleReadAllowed],
+  );
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -279,10 +574,14 @@ export function AgentHubList({
 
   const handleOpen = useCallback(
     async (id: string): Promise<void> => {
+      // Marked BEFORE the await, which is the whole point of the pending id: the
+      // press is the user's intent and it is known now.
+      setPendingOpenId(id);
       if (id !== getActiveConversationId()) {
         const outcome = await openConversation(id);
         if (outcome !== "opened") {
           setError(true);
+          setPendingOpenId(null);
           return;
         }
       }
@@ -297,6 +596,31 @@ export function AgentHubList({
     },
     [onOpenFocus, rows],
   );
+
+  /** Read ONE conversation's opening words, for the hovered row only.
+   *
+   *  Lazy and cached on purpose: the roster carries no preview field, and
+   *  reading every conversation to render a list of titles would decrypt the
+   *  whole vault on every mount. The id is carried with the text so a reply that
+   *  lands after the pointer moved cannot put one conversation's words on
+   *  another's card. */
+  const loadHoverText = useCallback(async (id: string): Promise<void> => {
+    const cached = hoverCache.current.get(id);
+    if (cached !== undefined) {
+      setHover({ id, text: cached });
+      return;
+    }
+    try {
+      const turns = parseTranscript(await chatsRead(id));
+      const first = turns?.find((t) => t.role === "user" && t.text.trim().length > 0);
+      const text = first === undefined ? null : first.text;
+      hoverCache.current.set(id, text);
+      setHover({ id, text });
+    } catch {
+      hoverCache.current.set(id, null);
+      setHover({ id, text: null });
+    }
+  }, []);
 
   const commitRename = useCallback(
     async (id: string): Promise<void> => {
@@ -489,11 +813,55 @@ export function AgentHubList({
         />
       ) : (
         <div data-testid="agent.hub-list" style={LIST_STYLE}>
-          {visible.map((row) => (
+          {visible.map((row, index) => {
+            // **The unread mark** (myne-md/myne#848): a run settled for this
+            // conversation and nothing has displayed it since. Read from the run
+            // store, which is where the settle writes it and where the surface
+            // that shows the conversation clears it.
+            const isUnread = unreadConversations.includes(row.id);
+            // `null` when the note is not in the cache (a deleted note, or a
+            // vault whose sidebar has not filled yet): the pill then falls back
+            // to saying the KIND of anchor rather than inventing a name.
+            const anchorTitle =
+              row.note_id === undefined ? null : noteTitle(row.note_id);
+            // What the conversation is ABOUT: a folder scope, a note anchor, or
+            // neither, the whole vault. The two optional fields are additive
+            // and a row carries at most one of them.
+            // Whether the generation may read this note at all (SYNC-14).
+            const titleAllowed =
+              row.note_id === undefined || titleReadAllowed(row.note_id);
+            const titleReason = !titleAllowed
+              ? t("agent.hub.generateTitleExcluded")
+              : hasTitleModel
+                ? null
+                : t("agent.hub.generateTitleNeedsModel");
+            const target: HubTarget =
+              row.folder !== undefined
+                ? "folder"
+                : row.note_id !== undefined
+                  ? "note"
+                  : "vault";
+            // Only the run the store still HOLDS can say what it produced; an
+            // older unread conversation keeps the dot alone, because the count
+            // would be a claim about a run this store no longer has.
+            const changes =
+              row.id === agent.runConversationId && agent.end !== null
+                ? agent.proposal.edits.length + agent.proposal.newNotes.length
+                : 0;
+            return (
             <div
               key={row.id}
               data-testid="agent.hub-row"
               data-conversation-id={row.id}
+              data-running={row.id === runningId ? "true" : "false"}
+              // **A separator BETWEEN conversations, not a box around each**
+              // (myne-md/myne#848). A hairline under every row but the last is
+              // what makes a list read as a list; a border on all four sides of
+              // every row reads as a grid of highlighted boxes.
+              style={{
+                borderBottom:
+                  index < visible.length - 1 ? "1px solid var(--line-1)" : undefined,
+              }}
             >
               {deletingId === row.id ? (
                 <div
@@ -501,6 +869,10 @@ export function AgentHubList({
                     ...ROW_STYLE,
                     flexDirection: "column",
                     alignItems: "stretch",
+                    // The one place the hairline stays: this panel is a
+                    // confirmation inside the row, and without an edge it reads
+                    // as the row's own content (myne-md/myne#848).
+                    border: "1px solid var(--line-1)",
                   }}
                 >
                   <p
@@ -568,71 +940,307 @@ export function AgentHubList({
                 </div>
               ) : (
                 <div
-                  style={ROW_STYLE}
+                  style={{
+                    ...ROW_STYLE,
+                    cursor: "pointer",
+                    // **The card's own edges, so a title can never reach them**
+                    // (myne-md/myne#848). A title that ellipsizes needs a flex item
+                    // it can shrink inside, and the row has to be able to shrink
+                    // with it: without `minWidth: 0` here the title's own
+                    // `min-width: 0` never gets free space to give up, so the text
+                    // ran to the card's border and was CUT rather than ellipsized.
+                    minWidth: 0,
+                    // **NO `overflow: hidden` here.** It was added for the title
+                    // and it CROPPED the two things that hang off the card: the
+                    // three-dot menu is absolutely positioned past the card's
+                    // edge, and the rename field renders below it. The title's
+                    // ellipsis does not need it, because the title BUTTON carries
+                    // its own `overflow: hidden` with `text-overflow: ellipsis`.
+                    paddingInline: "var(--space-2)",
+                    borderRadius: "var(--radius-1)",
+                    // **No border of our own, and the open card is an INSET
+                    // ring** (myne-md/myne#848). A hairline box around every row
+                    // read as "every card is highlighted"; a ring drawn INSIDE
+                    // the open card marks exactly one and cannot reflow the list
+                    // by a pixel, which a border would.
+                    ...(row.id === activeId
+                      ? {
+                          background: "var(--bg-2)",
+                          boxShadow: "inset 0 0 0 1px var(--accent)",
+                        }
+                      : {}),
+                  }}
+                  data-testid="agent.hub-card"
+                  data-conversation-id={row.id}
                   data-active={row.id === activeId ? "true" : "false"}
-                  // The conversation currently open in the surface. `aria-current`
-                  // is what carries that to a reader; `data-active` paints it and
-                  // carries nothing. They were one attribute doing one of the two
-                  // jobs.
                   aria-current={row.id === activeId ? "true" : undefined}
+                  data-hover-preview={
+                    hoveredId === row.id && hover?.id === row.id && hover.text !== null
+                      ? "true"
+                      : "false"
+                  }
+                  onMouseEnter={() => {
+                    setHoveredId(row.id);
+                    void loadHoverText(row.id);
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredId(null);
+                    setMenuId(null);
+                  }}
+                  // The whole card is the open target, not only its title. The
+                  // keyboard path stays on the title button, which is the
+                  // accessible name of the row; this is the mouse's larger
+                  // target. `stopPropagation` on every inner control keeps a
+                  // click on the anchor pill, the menu or an action from also
+                  // opening the conversation.
+                  onClick={() => void handleOpen(row.id)}
                 >
                   <div style={ROW_TOP_STYLE}>
-                    {/* The row's own label ellipsizes, so the full title has to be
-                    reachable somewhere — through `<Tooltip>` rather than the
-                    native attribute, which waits ~1s, ignores the theme, clips
-                    at the window edge and never appears on keyboard focus
-                    (`scripts/check-tooltip-convention.mjs`). The button keeps
-                    its text as its accessible name; the tooltip is visual only.
+                    {/* **What the conversation is ABOUT** (myne-md/myne#848).
+                        Three kinds, in the order the row can be trusted: a
+                        folder scope, a note anchor, or neither, the whole
+                        vault. `folder` and `note_id` are both optional additive
+                        fields on the catalog row, and a conversation carries at
+                        most one of them. */}
+                    <span
+                      // **Three STATIC `t()` call sites, not one computed key**
+                      // (myne-md/myne#848). `scripts/check-i18n.mjs` verifies
+                      // static call sites, so a key assembled from a variable is
+                      // a key it cannot see, and the guard's count dropping is
+                      // how that would be noticed at all.
+                      aria-label={
+                        target === "folder"
+                          ? t("agent.hub.targetFolder")
+                          : target === "note"
+                            ? t("agent.hub.targetNote")
+                            : t("agent.hub.targetVault")
+                      }
+                      data-testid="agent.hub-target"
+                      // **`role="img"`, because `aria-label` on a bare
+                      // `<span>` is prohibited** (myne-md/myne#848): axe calls
+                      // it `aria-prohibited-attr`, and it was caught the moment
+                      // this rail got a story, nothing in the app ever ran axe
+                      // over it. The glyph IS the announcement here (the label
+                      // names the kind of target), which is exactly what an
+                      // image role is for; without a role the name was dropped
+                      // by every assistive technology and the glyph read as
+                      // decoration.
+                      role="img"
+                      // **One derivation of the kind, three readers**
+                      // (myne-md/myne#848): the name, the attribute and the glyph
+                      // each spelled the same three-way ternary out again, so a
+                      // fourth kind would have been four edits and one of them
+                      // would have been missed.
+                      data-target={target}
+                      style={{
+                        display: "inline-flex",
+                        flex: "none",
+                        color: "var(--fg-3)",
+                      }}
+                    >
+                      <Icon name={TARGET_ICON[target]} size={12} />
+                    </span>
+                    {/* **The tooltip's trigger is the TITLE's box, not the row's
+                        free space** (myne-md/myne#848). It was `stretch`
+                        (`flex: 1`), which made the tooltip's wrapper the flexible
+                        cell of the row, so its hover area was the empty band
+                        between the title and the `...`, and the bubble appeared
+                        while the pointer was nowhere near the text.
 
-                    Its title is the row's PRIMARY target, so it stays a plain
-                    button with a text style rather than becoming a `<Button>`:
-                    a ghost button's padding and hover fill would turn a list of
-                    titles into a list of chips. Recorded rather than converted,
-                    which is what `check-primitive-adoption.mjs` asks for when
-                    an element genuinely is not a primitive. */}
-                    <Tooltip label={row.title}>
-                      <button
-                        type="button"
-                        data-testid="agent.hub-open"
-                        onClick={() => void handleOpen(row.id)}
-                        style={TITLE_STYLE}
+                        The wrapper here takes `flex: 0 1 auto` instead: it grows
+                        to the text, shrinks when the row runs out of room, and the
+                        button inside ellipsizes against it. The actions cluster is
+                        what holds the right edge, its own
+                        `margin-inline-start: auto` absorbs the slack, so nothing
+                        needs the title to be the growing cell. */}
+                    <span data-testid="agent.hub-title-slot" style={TITLE_SLOT_STYLE}>
+                      <Tooltip
+                        label={
+                          hover?.id === row.id && hover.text !== null
+                            ? previewOf(hover.text)
+                            : row.title
+                        }
                       >
-                        {row.title}
-                      </button>
-                    </Tooltip>
-                    {/* Icon-only, and that is what makes the row fit: "Rename" and
-                    "Delete" as words are most of a 248px rail on their own,
-                    which is how the list came to scroll sideways. They carry
-                    their labels as tooltips and as accessible names, per the
-                    epic's tooltip convention. */}
-                    <div style={ROW_ACTIONS_STYLE} data-testid="agent.hub-row-actions">
+                        <button
+                          type="button"
+                          data-testid="agent.hub-open"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleOpen(row.id);
+                          }}
+                          style={TITLE_STYLE}
+                        >
+                          {row.title}
+                        </button>
+                      </Tooltip>
+                    </span>
+                    {/* **The unread mark** (myne-md/myne#848): a dot rather
+                        than a count, because one conversation holds at most one
+                        finished run and a number would always be 1, the "inbox
+                        +1" a user reads is the dot itself. It is drawn at REST,
+                        which is what separates it from the `...` cluster beside
+                        it: a notification nobody can see without pointing at it
+                        is not a notification. The words go to a screen reader,
+                        which cannot see a dot. */}
+                    {isUnread ? (
+                      <span
+                        data-testid="agent.hub-unread"
+                        style={{ display: "inline-flex", flex: "none" }}
+                      >
+                        <span aria-hidden="true" style={UNREAD_DOT_STYLE} />
+                        <span style={VISUALLY_HIDDEN}>
+                          {t("agent.hub.unread")}
+                        </span>
+                      </span>
+                    ) : null}
+                    {/* The run mark, beside the title it belongs to. A spinner
+                    rather than a word: the rail is 248px and the mark has to sit
+                    next to a title that already ellipsizes, so the label is the
+                    accessible name and the tooltip (myne-md/myne#848). */}
+                    {row.id === runningId ? (
+                      <span
+                        data-testid="agent.hub-running"
+                        // **`role="img"`, or axe drops the name** (myne-md/myne#848):
+                        // `aria-label` is prohibited on a bare span, so the
+                        // accessible name this mark rests on does not exist without
+                        // it. Same fix, same reason, as the target glyph below.
+                        role="img"
+                        aria-label={t("agent.hub.running")}
+                        style={{ display: "flex", flex: "none" }}
+                      >
+                        <Spinner size={12} />
+                      </span>
+                    ) : null}
+                    {/* **Renaming and deleting moved behind a menu** (myne-md/myne#848).
+                        Two always-visible icon buttons per row made a list of
+                        titles read as a list of controls, and the two destructive
+                        ones were the widest thing on every line. The menu is
+                        revealed by hover and by focus: `opacity` rather than
+                        `display`, so the trigger stays in the tab order and
+                        revealing it on focus is what makes it reachable without
+                        a mouse. */}
+                    <div
+                      // **Only the OPEN row's cluster is the anchor**
+                      // (myne-md/myne#848). One ref on every row is one ref
+                      // pointing at whichever row rendered last, so the menu was
+                      // placed against a row that had nothing to do with the
+                      // press. React detaches the ref from the others on the
+                      // render that opens this one, so the measurement below sees
+                      // exactly this cluster.
+                      ref={menuId === row.id ? menuTriggerRef : undefined}
+                      style={{
+                        ...ROW_ACTIONS_STYLE,
+                        opacity:
+                          hoveredId === row.id ||
+                          menuId === row.id ||
+                          row.id === activeId ||
+                          // **A RUNNING row shows its controls at rest**
+                          // (myne-md/myne#848). The cluster is revealed by
+                          // pointing at it, and a run in flight is precisely the
+                          // case where the user is looking elsewhere, the run
+                          // outlives navigation by design. Hiding the controls
+                          // there hid them on the one row whose state the list
+                          // is reporting.
+                          row.id === runningId
+                            ? 1
+                            : 0,
+                      }}
+                      data-testid="agent.hub-row-actions"
+                      // The actions cluster swallows clicks so the card's own
+                      // handler does not fire on them. Done here rather than on
+                      // `IconButton`, whose `onClick` takes no event: a primitive
+                      // that started promising an event would change for every
+                      // caller to serve one.
+                      onClick={(e) => e.stopPropagation()}
+                      // Keyboard reveal. Focus events BUBBLE, so a `focusin` from
+                      // the trigger inside reaches this wrapper, which is what
+                      // keeps the menu reachable without a mouse even though the
+                      // cluster is invisible until something points at it.
+                      onFocus={() => setHoveredId(row.id)}
+                    >
                       <IconButton
-                        icon="pencil"
+                        icon="more-horizontal"
                         iconSize={14}
-                        label={t(
-                          "editor.chrome.rightPanel.aiChat.historyRename",
-                        )}
+                        label={t("agent.hub.menu")}
                         tooltip
-                        testId="agent.hub-rename"
-                        onClick={() => {
-                          setDeletingId(null);
-                          setDraft(row.title);
-                          setRenamingId(row.id);
-                        }}
-                      />
-                      <IconButton
-                        icon="trash-2"
-                        iconSize={14}
-                        label={t(
-                          "editor.chrome.rightPanel.aiChat.historyDelete",
-                        )}
-                        tooltip
-                        testId="agent.hub-delete"
+                        testId="agent.hub-menu"
                         onClick={() => {
                           setRenamingId(null);
-                          setDeletingId(row.id);
+                          setDeletingId(null);
+                          setMenuId(menuId === row.id ? null : row.id);
                         }}
                       />
+                      <AnchoredPanel
+                        open={menuId === row.id}
+                        onClose={() => setMenuId(null)}
+                        anchorRef={menuTriggerRef}
+                        style={MENU_STYLE}
+                        testId="agent.hub-menu-list"
+                      >
+                          {/* **A model-written title for the note this
+                              conversation is about** (myne-md/myne#848, on the
+                              user's ask). Only for a note-anchored
+                              conversation: a vault-general one has no note to
+                              name, and a folder-scoped one is not ABOUT a note.
+                              Disabled rather than hidden when there is no local
+                              generation model: the reason goes in its name. The
+                              action cannot run anywhere else, because the
+                              request class bars a provider, and a control that
+                              silently disappears teaches the user nothing about
+                              why. */}
+                          {row.note_id !== undefined ? (
+                            <Button
+                              variant="ghost"
+                              data-testid="agent.hub-generate-title"
+                              disabled={
+                                !hasTitleModel ||
+                                titleBusyId === row.id ||
+                                !titleAllowed
+                              }
+                              // One reason, in both places: a note in an
+                              // excluded folder states that, and a device with
+                              // no local model states that. The control stays
+                              // rendered rather than disappearing, so the user
+                              // learns why the action is not available.
+                              aria-label={
+                                titleReason ?? t("agent.hub.generateTitle")
+                              }
+                              title={titleReason ?? undefined}
+                              style={MENU_ITEM_STYLE}
+                              onClick={() => {
+                                setMenuId(null);
+                                void generateTitle(row.id, row.note_id!);
+                              }}
+                            >
+                              {t("agent.hub.generateTitle")}
+                            </Button>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            data-testid="agent.hub-rename"
+                            style={MENU_ITEM_STYLE}
+                            onClick={() => {
+                              setDeletingId(null);
+                              setDraft(row.title);
+                              setRenamingId(row.id);
+                              setMenuId(null);
+                            }}
+                          >
+                            {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            data-testid="agent.hub-delete"
+                            style={MENU_ITEM_STYLE}
+                            onClick={() => {
+                              setRenamingId(null);
+                              setDeletingId(row.id);
+                              setMenuId(null);
+                            }}
+                          >
+                            {t("editor.chrome.rightPanel.aiChat.historyDelete")}
+                          </Button>
+                      </AnchoredPanel>
                     </div>
                   </div>
                   <div style={ROW_META_STYLE}>
@@ -647,6 +1255,11 @@ export function AgentHubList({
                     overflow, so a text label in it is a label nobody can read.
                     Right instinct, wrong class. */}
                     {row.note_id !== undefined ? (
+                      // **A `<Tooltip>`, not the native attribute** (myne-md/myne#848):
+                      // the same rule the title slot above follows, and the same
+                      // wrapper behaviour (the Tooltip's own `minWidth: 0` is what
+                      // lets the pill inside ellipsize).
+                      <Tooltip label={anchorTitle ?? t("agent.hub.targetNote")}>
                       <button
                         type="button"
                         className="myne-pill"
@@ -656,20 +1269,142 @@ export function AgentHubList({
                         data-testid="agent.hub-anchor"
                         data-note-id={row.note_id}
                         disabled={onOpenNote === undefined}
-                        onClick={() => onOpenNote?.(row.note_id!)}
+                        // **The note's NAME, not the words "On a note"**
+                        // (myne-md/myne#848, on the user's ask). "On a note"
+                        // told a reader the KIND of anchor and nothing else, on
+                        // the one line where the answer to "which note?" was
+                        // available all along: the sidebar's cache holds every
+                        // title, and the conversation row carries the id.
+                        //
+                        // A NAME IS CONTENT, so the question is whether this is
+                        // a new disclosure. It is not: the card already renders
+                        // the conversation's own title (often a phrase out of
+                        // the note), the sidebar beside it renders every note's
+                        // title, and the read is an in-memory lookup in the
+                        // UNLOCKED editor. Nothing here crosses a boundary,
+                        // no IPC, no sync field, no egress, no ACL grant, and
+                        // the vault's own titles are not a secret from the
+                        // vault's own UI. It is not shown anywhere a locked or
+                        // absent vault can see it, because this rail only
+                        // exists inside the unlocked editor.
+                        //
+                        // The full name is the accessible name; the visible text
+                        // ellipsizes, because the pill sits in a 248px row beside
+                        // the date.
+                        aria-label={
+                          anchorTitle === null
+                            ? t("agent.hub.targetNote")
+                            : t("agent.hub.anchorOpen", { name: anchorTitle })
+                        }
+                        style={ANCHOR_PILL_STYLE}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenNote?.(row.note_id!);
+                        }}
                       >
-                        <Icon name="file-text" size={12} />
-                        {t("agent.hub.anchorLabel")}
+                        <Icon name="link" size={12} />
+                        <span style={ANCHOR_TITLE_STYLE}>
+                          {anchorTitle ?? t("agent.hub.anchorLabel")}
+                        </span>
                       </button>
+                      </Tooltip>
                     ) : null}
                     <span style={META_STYLE}>
-                      {relativeDay(row.updated_at, locale, timeZone)}
+                      {/* **`updated_at`, or when it is unusable, the create
+                          time** (myne-md/myne#848). A row whose timestamp is
+                          zero or absent still happened, so the row states when,
+                          and a conversation with no date beside it reads as one
+                          that was never used. */}
+                      {relativeDay(
+                        row.updated_at > 0 ? row.updated_at : row.created_at,
+                        locale,
+                        timeZone,
+                      )}
                     </span>
-                  </div>
+
+                  {/* **A run in flight says so ON ITS CARD** (myne-md/myne#848).
+                      A spinner alone says "something is happening somewhere";
+                      what a user scanning the rail needs is the state: that it is
+                      still working, and how long. The run belongs to the
+                      conversation, so the card is where its state belongs, and
+                      it reads the same store the transcript does.
+
+                      **The scope figure came off** (myne-md/myne#848, on the
+                      user's read): "can change 431 notes" is the same sentence
+                      on every card, because the scope is what the composer was
+                      set to, not something about the conversation, and the
+                      composer states it two inches below, with the count the
+                      decision actually rests on. On the card it was the widest
+                      thing on the line and it said nothing a scan needs. */}
+                  {row.id === runningId ? (
+                    <div
+                      data-testid="agent.hub-state"
+                      className="myne-working-wave"
+                      data-motion="essential"
+                      style={RUN_STATE_STYLE}
+                    >
+                      <Icon name="bot" size={12} />
+                      <span>{t("agent.progress.working")}</span>
+                      {runningSince !== null ? (
+                        <>
+                          <span aria-hidden="true">&middot;</span>
+                          <span>{formatDuration(elapsedMillis ?? 0)}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : row.id === agent.runConversationId &&
+                    agent.end !== null &&
+                    isUnread ? (
+                    /* **A finished run says so too, while it is unread**
+                       (myne-md/myne#848). This is the card's half of the mark
+                       below: the dot says "there is something here", and this
+                       says what. It is the same `endStatusLabel` the transcript
+                       uses, so a run that stopped to ask for scope reads
+                       "Waiting for you" in both places. The change count is the
+                       one fact that tells a user whether opening it means
+                       reading an answer or reviewing edits. */
+                    <div
+                      data-testid="agent.hub-done"
+                      style={{ ...RUN_STATE_STYLE, color: "var(--accent)" }}
+                    >
+                      <Icon name="circle-check" size={12} />
+                      <span>{endStatusLabel(agent.end.kind, t)}</span>
+                      {changes > 0 ? (
+                        <>
+                          <span aria-hidden="true">&middot;</span>
+                          <span style={{ whiteSpace: "nowrap" }}>
+                            {t("agent.review.noteHeading", { count: changes })}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {/* **What the title action is doing, on the card it is
+                      doing it to** (myne-md/myne#848). A press that ends in
+                      nothing is the one outcome a menu item must not have: the
+                      note is renamed for the success case (the pill beside it
+                      changes), and the two ways it can fail say so here. */}
+                  {titleBusyId === row.id ? (
+                    <p
+                      data-testid="agent.hub-title-busy"
+                      style={TITLE_NOTICE_STYLE}
+                    >
+                      {t("agent.hub.titleGenerating")}
+                    </p>
+                  ) : titleNotice !== null && titleNotice.id === row.id ? (
+                    <p
+                      role="alert"
+                      data-testid="agent.hub-title-notice"
+                      style={{ ...TITLE_NOTICE_STYLE, color: "var(--fg-2)" }}
+                    >
+                      {t(titleNotice.key)}
+                    </p>
+                  ) : null}</div>
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

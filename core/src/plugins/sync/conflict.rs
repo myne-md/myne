@@ -382,15 +382,29 @@ fn chats_entry_tie_break(a: &ConversationEntry, b: &ConversationEntry) -> Orderi
     match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
         (true, false) => Ordering::Greater, // remove-wins
         (false, true) => Ordering::Less,
-        (true, true) => (a.deleted_at, a.created_at, a.updated_at, &a.title).cmp(&(
-            b.deleted_at,
-            b.created_at,
+        (true, true) => (
+            a.deleted_at,
+            a.created_at,
+            a.updated_at,
+            &a.title,
+            &a.note_id,
+            &a.folder,
+        )
+            .cmp(&(
+                b.deleted_at,
+                b.created_at,
+                b.updated_at,
+                &b.title,
+                &b.note_id,
+                &b.folder,
+            )),
+        (false, false) => (a.updated_at, &a.title, a.created_at, &a.note_id, &a.folder).cmp(&(
             b.updated_at,
             &b.title,
+            b.created_at,
+            &b.note_id,
+            &b.folder,
         )),
-        (false, false) => {
-            (a.updated_at, &a.title, a.created_at).cmp(&(b.updated_at, &b.title, b.created_at))
-        }
     }
 }
 
@@ -1252,10 +1266,33 @@ mod tests {
 
     // ---- AI conversations (myne-md/myne#675) ----
 
+    /// A live row carrying anchors, which `conv_live` leaves `None`.
+    ///
+    /// **The two fields the tie-break gained must be varied** (review finding):
+    /// the property test below builds its state space from `conv_live`/`conv_tomb`,
+    /// which hard-code `folder: None, note_id: None`, so the new arms contribute a
+    /// constant and a bug in them (a swapped field, a dropped one) is invisible to
+    /// a test whose own doc calls the space representative.
+    fn conv_anchored(
+        version: u64,
+        created_at: u64,
+        updated_at: u64,
+        title: &str,
+        folder: Option<&str>,
+        note_id: Option<&str>,
+    ) -> ConversationEntry {
+        ConversationEntry {
+            folder: folder.map(str::to_string),
+            note_id: note_id.map(str::to_string),
+            ..conv_live(version, created_at, updated_at, title)
+        }
+    }
+
     fn conv_live(version: u64, created_at: u64, updated_at: u64, title: &str) -> ConversationEntry {
         ConversationEntry {
             created_at,
             deleted_at: None,
+            folder: None,
             title: title.to_string(),
             updated_at,
             version,
@@ -1272,6 +1309,7 @@ mod tests {
         ConversationEntry {
             created_at,
             deleted_at: Some(deleted_at),
+            folder: None,
             title: String::new(),
             updated_at,
             version,
@@ -1296,6 +1334,16 @@ mod tests {
                 for title in &["alpha", "beta"] {
                     states.push(conv_live(version, ts, ts, title));
                     states.push(conv_tomb(version, ts, ts, ts + 5));
+                    // **Rows differing ONLY in an anchor**, which is the shape
+                    // the tie-break's `folder`/`note_id` arms decide. Kept to one
+                    // (version, ts, title) corner so the cubic loop below stays
+                    // cheap: the point is that the arms are EXERCISED, not that
+                    // every corner carries them.
+                    if version == 1 && ts == 1 && *title == "alpha" {
+                        states.push(conv_anchored(version, ts, ts, title, Some("F"), None));
+                        states.push(conv_anchored(version, ts, ts, title, None, Some("n1")));
+                        states.push(conv_anchored(version, ts, ts, title, Some("F"), Some("n1")));
+                    }
                 }
             }
         }

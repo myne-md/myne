@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Building the agent's request, and parsing what comes back.
 //!
-//! The action vocabulary is deliberately tiny and closed: four tools, three
+//! The action vocabulary is deliberately tiny and closed: read tools, note
 //! verbs, one finish. An unknown verb is a refusal, not a best-effort guess,
 //! because a model that emits a verb this file does not know is a model doing
 //! something nobody designed, and guessing what it meant is how a fourth
@@ -51,14 +51,28 @@ pub enum AgentAction {
     /// note, where `propose_edit` cannot help: an anchor has to be text copied
     /// out of the note, and there is none.
     AppendToNote { note_id: String, text: String },
-    /// Verb 3: propose a new note.
+    /// Verb 3: move a note to another folder.
+    ///
+    /// **The only verb that changes where a note lives, and it is a verb rather
+    /// than a relaxation of the edit rule** (myne-md/myne#848). `folder:` is what
+    /// the `ai_excluded_folders` clamp reads, so a write that can change it is a
+    /// write that can cross the boundary a user set. An anchored edit hiding
+    /// that change inside replacement text is still refused under every approval
+    /// label; naming the destination as its own field is what makes the clamp
+    /// able to read where the note lands, and the review able to show it before
+    /// the user approves.
+    ///
+    /// The folder does not have to exist: a folder in Myne IS the `folder:` field
+    /// of some note, so naming a new one creates it.
+    MoveNote { note_id: String, folder: String },
+    /// Verb 4: propose a new note.
     ProposeNote {
         title: String,
         body: String,
         #[serde(default)]
         folder: Option<String>,
     },
-    /// Verb 4: write one memory entry (`decisions/ai/0590`). The only
+    /// Verb 5: write one memory entry (`decisions/ai/0590`). The only
     /// model-initiated write that does not end in the review screen. Memory
     /// is a separate mechanism with its own gate (schema plus a
     /// 2000-character cap plus the injection scan, all at the write, on the
@@ -78,10 +92,40 @@ pub enum AgentAction {
 }
 
 impl AgentAction {
+    /// Every verb this vocabulary accepts, in the order the instructions list
+    /// them.
+    ///
+    /// **A machine-readable mirror, like `SubkeyRole::ALL`**, and here for the
+    /// same reason: the instructions and the parser are two halves of one
+    /// agreement and neither half can see the other. A verb the parser accepts
+    /// and the prompt never mentions is a capability the model is never told it
+    /// has; a verb the prompt offers and the parser rejects is a refusal the
+    /// model walks into on every run, which is what `move_note` was in
+    /// production: the model proposed folder moves through `propose_edit`, the
+    /// folder rule refused them, and nothing had told it the rule existed
+    /// (myne-md/myne#848).
+    /// `the_instructions_and_the_parser_agree_on_the_vocabulary` checks both
+    /// directions against this list.
+    pub const ALL: [&'static str; 11] = [
+        "list_scope",
+        "read_note",
+        "search_scope",
+        "search_vault",
+        "propose_edit",
+        "append_to_note",
+        "move_note",
+        "propose_note",
+        "remember",
+        "request_scope",
+        "finish",
+    ];
+
     /// The action's name, as a `&'static str` from this file's own vocabulary.
     ///
-    /// Safe to log by construction: it is one of eight compile-time strings and
-    /// cannot carry anything the model wrote. That is the whole reason it
+    /// Safe to log by construction: it is one of this vocabulary's own
+    /// compile-time strings and cannot carry anything the model wrote. (A count
+    /// used to be spelled here, "eight", and it had already drifted to eleven
+    /// variants, which is what a stated count does, myne-md/myne#848.) That is the whole reason it
     /// exists rather than a `Debug` format of the value, which would print the
     /// note id, the anchor and the replacement with it.
     pub fn verb(&self) -> &'static str {
@@ -92,6 +136,7 @@ impl AgentAction {
             Self::SearchVault { .. } => "search_vault",
             Self::ProposeEdit { .. } => "propose_edit",
             Self::AppendToNote { .. } => "append_to_note",
+            Self::MoveNote { .. } => "move_note",
             Self::ProposeNote { .. } => "propose_note",
             Self::Remember { .. } => "remember",
             Self::RequestScope { .. } => "request_scope",
@@ -180,6 +225,7 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
         "{\"action\":\"propose_edit\",\"note_id\":\"...\",\"anchor\":\"...\",\"replacement\":\"...\"}\n",
         "{\"action\":\"append_to_note\",\"note_id\":\"...\",\"text\":\"...\"}\n",
+        "{\"action\":\"move_note\",\"note_id\":\"...\",\"folder\":\"...\"}\n",
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
         "{\"action\":\"remember\",\"entry_id\":\"...\",\"text\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
@@ -200,6 +246,20 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "a single note that message carries the note's whole text as well. Use ",
         "what is there: do not call list_scope or read_note for anything you ",
         "have already been given.\n\n",
+        // **The folder is in every line of that listing, and this says why it
+        // is worth reading** (myne-md/myne#848, on the user's report). A run
+        // asked to analyze a folder took the one title that matched the
+        // folder's name, read the folder's own index note, and reported that
+        // the folder held exactly one note, which is what a folder's index
+        // note is: a note named after its folder, and one note among the
+        // folder's notes rather than a summary of them.
+        "Each line of that listing carries the note's folder, so a question ",
+        "about a folder (what is in it, what should move out of it) is ",
+        "answered from the listing: filter it by the folder's path. A folder ",
+        "holds every note whose path starts with it, subfolders included, and a ",
+        "note named after a folder is ONE of those notes, not a summary of ",
+        "them. Never report a folder's contents from a note named after it, ",
+        "and never guess a folder's contents from a title.\n\n",
         "After each action you take, the next message you receive is the ",
         "result of that action. Read it and move on: do not repeat a call you ",
         "have already made, because the answer will not have changed. When you ",
@@ -235,6 +295,21 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "whenever you are adding to the end rather than rewriting something ",
         "already there. Do not reproduce the note's existing text in an ",
         "append: send only what is new.\n\n",
+        // **The verb that replaces the refusal the model used to hit blindly**
+        // (myne-md/myne#848). The folder lock refuses an edit that rewrites the
+        // `folder:` line under every approval label, and the model was never told
+        // so: it reached for `propose_edit`, the write was refused, and the run's
+        // own summary still reported the moves as applied. Naming both halves in
+        // one paragraph is the fix. Naming only the verb leaves the model trying
+        // the edit path anyway; naming only the rule leaves it unable to do the
+        // thing the user asked for.
+        "To move a note to a different folder, use move_note. It takes the ",
+        "note's id and the folder you want it in, and it is the only way to ",
+        "change which folder a note lives in: an edit whose anchor spans the ",
+        "folder line is refused. The folder does not have to exist yet, so do ",
+        "not invent a reason to avoid naming a new one; prefer a folder you ",
+        "have already seen in a listing, and keep the user's own spelling of ",
+        "it.\n\n",
         // **The verb the model will otherwise never reach for**
         // (myne-md/myne#697). The action list above names it, and this
         // paragraph says when: a durable fact about the user worth keeping
@@ -759,6 +834,82 @@ mod tests {
         // own `}`, and the whole reply parses to nothing.
         let reply = "Here is my plan { and then\n{\"action\":\"list_scope\"}";
         assert_eq!(parse_actions(reply), vec![AgentAction::ListScope]);
+    }
+
+    /// The instructions and the parser are two halves of one agreement, and this
+    /// is the test that holds them together in both directions.
+    ///
+    /// Either direction alone passes on a tree that is wrong. A verb the parser
+    /// accepts and the instructions never name is inert: a real model only knows
+    /// the verbs it is told about, which is exactly why
+    /// `the_instructions_advertise_the_remember_verb` exists one test down. A
+    /// verb the instructions offer and the parser rejects is worse, because the
+    /// model reaches for it on every run and the write is refused for a reason
+    /// nothing explained, which is the shape myne-md/myne#848 found in
+    /// production: the model proposed folder moves through `propose_edit`, the
+    /// folder rule refused them, and the run's own summary reported them applied.
+    #[test]
+    fn the_instructions_and_the_parser_agree_on_the_vocabulary() {
+        let instructions = system_instructions(None);
+
+        // Direction 1: every verb in the vocabulary is advertised.
+        for verb in AgentAction::ALL {
+            assert!(
+                instructions.contains(&format!("{{\"action\":\"{verb}\"")),
+                "the instructions never mention `{verb}`"
+            );
+        }
+
+        // Direction 2: nothing is advertised that the vocabulary does not hold.
+        // The advertised set is SCANNED out of the instruction text rather than
+        // listed a second time here, so an action line added to
+        // `BASE_INSTRUCTIONS` without a matching variant fails in this test
+        // rather than shipping as a verb the parser silently drops.
+        let advertised: Vec<&str> = instructions
+            .split("{\"action\":\"")
+            .skip(1)
+            .map(|chunk| chunk.split('"').next().unwrap_or_default())
+            .collect();
+        assert!(
+            !advertised.is_empty(),
+            "the scan found no action lines at all, so it is checking nothing"
+        );
+        for verb in &advertised {
+            assert!(
+                AgentAction::ALL.contains(verb),
+                "the instructions advertise `{verb}`, which the vocabulary does not hold"
+            );
+        }
+        assert_eq!(
+            advertised.len(),
+            AgentAction::ALL.len(),
+            "the instructions and the vocabulary are not the same size: {advertised:?}"
+        );
+
+        // Direction 3: `ALL` cannot drift into advertising something the parser
+        // refuses, which is the failure directions 1 and 2 would both miss if
+        // the list itself were wrong.
+        for verb in AgentAction::ALL {
+            let reply = match verb {
+                "list_scope" => r#"{"action":"list_scope"}"#,
+                "read_note" => r#"{"action":"read_note","note_id":"n"}"#,
+                "search_scope" => r#"{"action":"search_scope","query":"q"}"#,
+                "search_vault" => r#"{"action":"search_vault","query":"q"}"#,
+                "propose_edit" => {
+                    r#"{"action":"propose_edit","note_id":"n","anchor":"a","replacement":"b"}"#
+                }
+                "append_to_note" => r#"{"action":"append_to_note","note_id":"n","text":"t"}"#,
+                "move_note" => r#"{"action":"move_note","note_id":"n","folder":"F"}"#,
+                "propose_note" => r#"{"action":"propose_note","title":"t","body":"b"}"#,
+                "remember" => r#"{"action":"remember","text":"t"}"#,
+                "request_scope" => r#"{"action":"request_scope","folder":"F","reason":"r"}"#,
+                "finish" => r#"{"action":"finish","summary":"s"}"#,
+                other => panic!("no fixture for `{other}`: add one when the vocabulary grows"),
+            };
+            let parsed = parse_actions(reply);
+            assert_eq!(parsed.len(), 1, "`{verb}` did not parse: {parsed:?}");
+            assert_eq!(parsed[0].verb(), verb);
+        }
     }
 
     #[test]

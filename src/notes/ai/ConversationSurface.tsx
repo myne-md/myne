@@ -34,10 +34,20 @@ import { ChatMarkdown } from "./ChatMarkdown";
 import { EmptyState } from "../../components/primitives/EmptyState";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ModalShell } from "../../components/primitives/ModalShell";
+import { ScrollArea } from "../../components/primitives/ScrollArea";
+import { copyText } from "../../lib/clipboard";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { agentLastRun, agentUndo } from "../../lib/agent-run";
 import type { AgentUndoResult, Proposal } from "../../lib/agent-protocol";
 import { providerErrorKey } from "../../lib/engine-error";
-import { useChat, type AgentTurnEnd, type ChatTurn } from "./chatStore";
+import {
+  getActiveConversationId,
+  useChat,
+  useConversationEpoch,
+  type AgentTurnEnd,
+  type ChatTurn,
+} from "./chatStore";
+import type { AgentState } from "../agent/agentStore";
 import {
   hydrateActiveConversation,
   installChatPersistence,
@@ -45,9 +55,10 @@ import {
   isChatPersistLagging,
   subscribeChatPersistHealth,
 } from "./chatPersist";
-import { useAgent } from "../agent/agentStore";
+import { markConversationRead, useAgent } from "../agent/agentStore";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
-import { RunCostLine } from "../agent/components/RunCostLine";
+import { AgentFootprint } from "../agent/components/AgentFootprint";
+import type { ChatComposerSurface } from "../components/ChatComposer";
 import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { CAPTION_STYLE } from "../components/sharedStyles";
@@ -167,6 +178,82 @@ function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
   );
 }
 
+/** The header row every turn shares: who is talking, and what can be done with
+ *  what they said. */
+const TURN_HEADER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-1)",
+};
+
+/** **Copy a turn's words** (myne-md/myne#848, on the user's ask).
+ *
+ * The transcript is the one place in the app where the text is the POINT: an
+ * answer to a question, or the task that produced it. Both are things a user
+ * takes away (into a note, into a message, into a bug report) and the only
+ * route out was selecting the bubble by hand, which drags in the speaker
+ * caption, the footprint's figures and the markdown's rendered punctuation.
+ *
+ * ── What is copied, and it is the RAW text
+ * For the agent, `turn.agentSummary.summary`, what the model wrote, markdown
+ * included, because that is what it meant and a paste elsewhere can render it.
+ * For the user, exactly what they typed. Not the rendered DOM: a copy that
+ * depends on how the bubble happened to be drawn is a copy that changes when
+ * the bubble does.
+ *
+ * ── The feedback, and why it is on the control
+ * The `inline-icon` arm: the glyph becomes a check, or a warning, and the
+ * accessible name follows it. A toast would need the frame's toast plumbing
+ * threaded into a leaf that renders once per turn, for a confirmation the user
+ * is looking at anyway, and `lib/clipboard.ts` exists so a copy names its
+ * OUTCOME rather than rendering the value, which is what both arms do here. */
+function TurnCopyButton({
+  text,
+  label,
+  testId,
+  t,
+}: {
+  text: string;
+  /** The accessible name at rest, naming WHAT is copied. */
+  label: string;
+  testId: string;
+  t: TFn;
+}) {
+  const [outcome, setOutcome] = useState<"idle" | "copied" | "failed">("idle");
+  const reset = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(reset.current), []);
+  const settle = (next: "copied" | "failed"): void => {
+    setOutcome(next);
+    window.clearTimeout(reset.current);
+    // The confirmation is transient. A control stuck on "Copied" has stopped
+    // saying what it does, and the next press would read as a no-op.
+    reset.current = window.setTimeout(() => setOutcome("idle"), 2000);
+  };
+  return (
+    <IconButton
+      icon={
+        outcome === "copied" ? "check" : outcome === "failed" ? "circle-alert" : "copy"
+      }
+      label={
+        outcome === "copied"
+          ? t("editor.chrome.rightPanel.aiChat.copied")
+          : outcome === "failed"
+            ? t("editor.chrome.rightPanel.aiChat.copyFailed")
+            : label
+      }
+      testId={testId}
+      iconSize={14}
+      onClick={() =>
+        void copyText(clipboardWriteText, text, {
+          onSuccess: { kind: "inline-icon", run: () => settle("copied") },
+          onFailure: { kind: "inline-icon", run: () => settle("failed") },
+        })
+      }
+    />
+  );
+}
+
 /** What an agent run looks like in the transcript, once it has stopped.
  *
  *  **The live strip is NOT here.** Mounting `AgentProgress` inside the bubble put
@@ -178,7 +265,7 @@ function TurnSpeaker({ isUser, t }: { isUser: boolean; t: TFn }) {
  *  What stays here is the run's OUTCOME, frozen onto the turn when it settled. */
 function AgentTurnView({
   turn,
-  working,
+  live,
   t,
   canRevert,
   onOpenDiff,
@@ -187,7 +274,11 @@ function AgentTurnView({
   undoReport,
 }: {
   turn: ChatTurn;
-  working: boolean;
+  /** The live run store, when THIS turn is the one an in-flight run renders
+   *  into, and `null` otherwise. Carried rather than a boolean because the
+   *  working footprint shows the run's running figures, and a boolean would
+   *  make the caller the place those figures are looked up (myne-md/myne#848). */
+  live: AgentState | null;
   t: TFn;
   canRevert: boolean;
   onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
@@ -195,6 +286,7 @@ function AgentTurnView({
   revertBusy: boolean;
   undoReport: AgentUndoResult | null;
 }) {
+  const working = live !== null;
   const s = turn.agentSummary;
   const hasProposal =
     s !== undefined &&
@@ -209,17 +301,22 @@ function AgentTurnView({
       data-working={working ? "true" : "false"}
       style={bubbleStyle(false)}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "var(--space-1)",
-        }}
-      >
+      <div style={TURN_HEADER_STYLE}>
         <TurnSpeaker isUser={false} t={t} />
         {s !== undefined && !working ? (
           <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0 }}>
+            {/* The answer first, because it is what most copies are for. Only
+                when there IS one: a run that proposed changes and said nothing
+                has no words of its own, and a control that copies an empty
+                string is worse than no control. */}
+            {s.summary.trim().length > 0 ? (
+              <TurnCopyButton
+                text={s.summary}
+                label={t("editor.chrome.rightPanel.aiChat.copyAnswer")}
+                testId="ai.turn-copy"
+                t={t}
+              />
+            ) : null}
             {hasProposal ? (
               <IconButton
                 icon="columns-2"
@@ -242,13 +339,63 @@ function AgentTurnView({
           </div>
         ) : null}
       </div>
-      {working && s === undefined && !turn.error ? (
-        <p
-          data-testid="ai.agent-working"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-3)", margin: "var(--space-1) 0 0" }}
-        >
-          {t("agent.progress.working")}
-        </p>
+      {/* **The run's entry, in transcript order** (myne-md/myne#848). While the
+          run works this is its working line; once it settles the SAME line
+          reports what happened and how long it took, and the figures behind it
+          are one click away. It sits above the answer because it is the run's
+          own record, and the answer is what the run produced. */}
+      {working && live !== null ? (
+        <AgentFootprint
+          // A run paused on a scope question is not working; it is waiting for
+          // the user, and the line says so rather than showing a spinner for a
+          // dialog the user has not answered yet.
+          // **`null` means WORKING, so a run that has stopped must say so.**
+          // This used to read only the awaiting-scope case, so a run that failed
+          // to start (or a turn whose settle never arrived) showed "Working"
+          // under a check glyph for as long as the transcript was open, while the
+          // error sentence sat inside the detail. The error IS the status here:
+          // it is the sentence the user has to read.
+          settledLabel={
+            live.error !== null
+              ? live.error
+              : // **`end` is enough; the two extra tests were dead**
+                // (myne-md/myne#848). `settleStep` writes the end and
+                // `running: false` in one `set`, and `resumeRun` clears the end
+                // before `running` goes true again, so an end implies "not
+                // running", and the awaiting-scope case was already caught by
+                // the arm below. Three nested ternaries for one question, with
+                // the third arm unreachable.
+                live.end !== null
+                ? endStatusLabel(live.end.kind, t)
+                : null
+          }
+          durationMillis={null}
+          startedAtMillis={live.startedAtMillis}
+          figures={{
+            iterations: live.iterations,
+            notesRead: live.notesRead,
+            charsOffDevice: live.charsOffDevice,
+            memoryUpdated: live.memoryUpdated,
+          }}
+          scopeTotal={live.view?.scopeTotal}
+          userGrants={live.view?.userGrants}
+          modelGrants={live.view?.modelGrants}
+          error={live.error}
+          failed={live.error !== null}
+        />
+      ) : null}
+      {!working && s !== undefined ? (
+        <AgentFootprint
+          settledLabel={endStatusLabel(s.end, t)}
+          durationMillis={s.durationMillis ?? null}
+          figures={{
+            iterations: s.iterations,
+            notesRead: s.notesRead,
+            charsOffDevice: s.charsOffDevice,
+            memoryUpdated: s.memoryUpdated ?? 0,
+          }}
+          failed={s.end === "cancelled" || s.end === "stalled" || s.end === "exhaustedIterations"}
+        />
       ) : null}
       {turn.error ? (
         <p
@@ -291,25 +438,14 @@ function AgentTurnView({
                   .filter((line) => line !== null)
                   .join(" ")}
           </div>
-          <RunCostLine
-            testId="ai.agent-run-cost"
-            iterations={s.iterations}
-            notesRead={s.notesRead}
-            charsOffDevice={s.charsOffDevice}
-            style={{ ...CAPTION_STYLE, display: "block" }}
-          />
-          {(s.memoryUpdated ?? 0) > 0 ? (
-            <div data-testid="ai.agent-memory-updated" style={CAPTION_STYLE}>
-              {t("editor.chrome.rightPanel.aiChat.agentTurn.memoryUpdated", {
-                count: s.memoryUpdated ?? 0,
-              })}
-            </div>
-          ) : null}
-          {s.end !== "finished" ? (
-            <div data-testid="ai.agent-run-end" style={CAPTION_STYLE}>
-              {endStatusLabel(s.end, t)}
-            </div>
-          ) : null}
+          {/* **The cost line, the memory marker and the end label MOVED to the
+              footprint** (myne-md/myne#848). They are the run's chrome, not its
+              prose: the prose (`ai.agent-summary`) says what the run decided:
+              four edits, one new note, or why it had nothing to say. That is
+              content the reader came for. The three figures are the
+              disclosure `design-notes/ai/0515` requires, and they now live
+              behind the one disclosure on the run's own line, in one place, for
+              the settled run and the running one alike. */}
           {undoReport !== null ? (
             <div data-testid="ai.undo-result" style={CAPTION_STYLE}>
               {undoResultText(undoReport, t)}
@@ -345,7 +481,23 @@ const ChatTurnView = memo(function ChatTurnView({
       data-streaming={turn.streaming ? "true" : "false"}
       style={bubbleStyle(isUser)}
     >
-      <TurnSpeaker isUser={isUser} t={t} />
+      <div style={TURN_HEADER_STYLE}>
+        <TurnSpeaker isUser={isUser} t={t} />
+        {/* Not while it is streaming: a copy of half an answer is a copy the
+            user would have to notice was half an answer. */}
+        {!turn.streaming && turn.text.length > 0 ? (
+          <TurnCopyButton
+            text={turn.text}
+            label={
+              isUser
+                ? t("editor.chrome.rightPanel.aiChat.copyYourMessage")
+                : t("editor.chrome.rightPanel.aiChat.copyAnswer")
+            }
+            testId="ai.turn-copy"
+            t={t}
+          />
+        ) : null}
+      </div>
       {turn.scopeLabel !== undefined ? (
         <div data-testid="ai.turn-scope" style={CAPTION_STYLE}>
           {t("agent.composer.scopeLabel")}: {turn.scopeLabel}
@@ -421,10 +573,26 @@ const ChatTurnView = memo(function ChatTurnView({
  *  composer, and the modals a conversation owns (diff, revert confirm, history,
  *  memory are the CALLER's frame and stay there). */
 export interface ConversationSurfaceProps {
+  /**
+   * Which surface this is (myne-md/myne#848).
+   *
+   * Required rather than defaulted: the composer's zero state says different
+   * things here, and a default would let a third mount inherit the wrong
+   * sentence without anything naming it. The two are the agent pane, where the
+   * user came looking for an agent and has to pick what it works on, and the
+   * sidebar chat, where a note is open beside the box and the scope is simply
+   * that note.
+   */
+  surface: ChatComposerSurface;
   /** Explicit "Insert into note" action for a ready summary. */
   onInsert?: (text: string) => void;
   /** The open note: the agent's default scope in the composer. */
   openNoteId?: string | null;
+  /**
+   * The note the SESSION is anchored to, when it was opened from one
+   * (myne-md/myne#848): the composer pins its scope to it and renders no picker.
+   * See `ChatComposer`'s prop for why this is not `openNoteId`. */
+  anchoredNoteId?: string | null;
   /** Folders the user can attach as an agent scope. */
   folders?: readonly string[];
   /** Called with the ids of notes an automatic apply wrote. */
@@ -477,8 +645,10 @@ export interface ConversationSurfaceStatus {
 }
 
 export function ConversationSurface({
+  surface,
   onInsert,
   openNoteId = null,
+  anchoredNoteId = null,
   folders = NO_FOLDERS,
   onNotesWritten,
   onRunUndone,
@@ -493,6 +663,21 @@ export function ConversationSurface({
   const { t } = useTranslation();
   const chat = useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // **The surface showing a conversation is what makes it read**
+  // (myne-md/myne#848). A run outlives the view, so its result can land while
+  // the user is elsewhere; the rail marks that conversation, and this is the
+  // other half, the mark clears when the conversation is actually being
+  // displayed, and not when some id comparison guesses that it might be.
+  const unread = useAgent().unreadConversations;
+  // The epoch rather than `getActiveConversationId()` as a dependency: the id
+  // is a plain module read with no notification of its own, while the epoch is
+  // the boundary the store already publishes for exactly this ("a component
+  // holding state that belongs to ONE conversation keys an effect on it").
+  const conversationEpoch = useConversationEpoch();
+  useEffect(() => {
+    const id = getActiveConversationId();
+    if (id !== null && unread.includes(id)) markConversationRead(id);
+  }, [conversationEpoch, unread]);
 
   // ONE subscription to the run store, at the surface rather than one per agent
   // turn: the transcript's turns render frozen counts, which need no live read.
@@ -607,25 +792,35 @@ export function ConversationSurface({
         </p>
       ) : null}
 
-      {/* The one scrolling region. Everything below it stays put. */}
-      <div
-        ref={scrollRef}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      {/* The one scrolling region. Everything below it stays put.
+          **`ScrollArea`, not a bare `overflowY`** (myne-md/myne#848, on the
+          user's read): the native bar is hidden and the indicator is a real
+          element, and that is the only way this scroller gets a correct one.
+          A `var()` inside `::-webkit-scrollbar-thumb` does not resolve against
+          the scrolled element's cascade, it takes the ROOT's value, which in
+          this app is the LIGHT theme's, so the transcript drew a pale bar down
+          a dark surface, and that bar paints over the messages beside it
+          (myne-md/myne#727, which this region never got). The real thumb is
+          inset from the edge, themed, and appears only while the reader is
+          actually scrolling. */}
+      <ScrollArea
+        style={{ flex: 1, minHeight: 0 }}
+        scrollerRef={scrollRef}
+        onScroll={() => {
+          const el = scrollRef.current;
+          if (el === null) return;
+          atBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
+        contentStyle={
           // A flex column only while empty, so the zero state below can FILL the
           // region and centre in it rather than sitting as a card pinned to the
           // top with the composer a screen away. A populated transcript keeps
           // the plain block flow it has always had.
-          ...(chat.turns.length === 0
-            ? { display: "flex", flexDirection: "column" as const }
-            : {}),
-        }}
+          chat.turns.length === 0
+            ? { display: "flex", flexDirection: "column" }
+            : undefined
+        }
       >
         {chat.turns.length > 0 ? (
           <div
@@ -639,7 +834,17 @@ export function ConversationSurface({
                 <AgentTurnView
                   key={turn.id}
                   turn={turn}
-                  working={agent.running && turn.id === liveAgentTurnId}
+                  // The LIVE turn is the one the store's run belongs to and that
+                  // has nothing frozen onto it yet: that is "running now" AND
+                  // "paused on a question", which is why the condition is
+                  // `agentSummary === undefined` rather than `running`
+                  // (myne-md/myne#848). A run that stopped to ask is not running,
+                  // and its turn must still carry the entry that says so.
+                  live={
+                    turn.agentSummary === undefined && turn.id === liveAgentTurnId
+                      ? agent
+                      : null
+                  }
                   t={t}
                   canRevert={
                     undo.run !== null &&
@@ -701,7 +906,7 @@ export function ConversationSurface({
             }
           />
         )}
-      </div>
+      </ScrollArea>
 
       {/* The live run: its status, its running scope total, its Stop, and the
           scope-expansion dialog it carries. OUTSIDE the scrolling region and tied
@@ -709,7 +914,9 @@ export function ConversationSurface({
       {runOpen ? <AgentProgress /> : null}
 
       <ChatComposer
+        surface={surface}
         openNoteId={openNoteId}
+        anchoredNoteId={anchoredNoteId}
         folders={folders}
         onNotesWritten={onNotesWritten}
       />

@@ -27,9 +27,12 @@ import {
   type ConversationListRow,
 } from "../../lib/chats";
 import {
+  chatReducer,
+  clearPendingAnchorFolderId,
   clearPendingAnchorNoteId,
   getActiveConversationId,
   getChat,
+  getPendingAnchorFolderId,
   getPendingAnchorNoteId,
   hydrateChatTurns,
   setActiveConversationId,
@@ -163,6 +166,19 @@ function parseAgentSummary(raw: unknown): { agentSummary: AgentTurnSummary } | n
     charsOffDevice,
     end,
   };
+  // **Optional numbers are carried, not dropped** (myne-md/myne#848). This
+  // parser builds a fresh object from a known field list, so a field the
+  // interface declares but this function does not name is silently lost on
+  // every re-hydration: the turn looks complete, and the marker it should have
+  // shown is gone by the next unlock. `memoryUpdated` shipped that way, which is
+  // how the footprint's memory chip would have vanished from every conversation
+  // the user reopened.
+  if (typeof raw["memoryUpdated"] === "number" && Number.isFinite(raw["memoryUpdated"])) {
+    out.memoryUpdated = raw["memoryUpdated"];
+  }
+  if (typeof raw["durationMillis"] === "number" && Number.isFinite(raw["durationMillis"])) {
+    out.durationMillis = raw["durationMillis"];
+  }
   if (isRecord(raw["proposal"])) {
     const proposal = raw["proposal"];
     const editsOk =
@@ -379,6 +395,9 @@ export interface ChatPersistSnapshot {
    *  (myne-md/myne#771). Read by the create path; ignored once the conversation
    *  exists, because an anchor is immutable for the life of a conversation. */
   noteId: string | null;
+  /** The folder the conversation is scoped to, captured the same way
+   *  (myne-md/myne#848). At most one of the two anchors is ever set. */
+  folder: string | null;
 }
 
 let persistSeq = 0;
@@ -408,10 +427,21 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
   }
   try {
     if (snap.id === null) {
-      const created = await chatsCreate(snap.payload, snap.clientId, snap.noteId);
+      const created = await chatsCreate(
+        snap.payload,
+        snap.clientId,
+        snap.noteId,
+        snap.folder,
+      );
       setActiveConversationId(created);
-      // The anchor rode the create; a second conversation starts clean.
+      // The anchors rode the create; a second conversation starts clean.
       clearPendingAnchorNoteId();
+  // **The folder anchor is the same lifecycle** (review finding): the two are
+  // held and cleared together everywhere else, and this site left the folder one
+  // armed, so the NEXT conversation created on this device was written as
+  // folder-scoped for a folder it was never scoped to.
+  clearPendingAnchorFolderId();
+      clearPendingAnchorFolderId();
       lastPersisted = { id: created, payload: snap.payload, seq: snap.seq };
     } else {
       await chatsAppendTurn(snap.id, snap.payload);
@@ -431,7 +461,15 @@ async function persistSnapshotOnce(attempt: number, snap: ChatPersistSnapshot): 
     // (a create replays as a create). Dropped by `clearChatPersistForLock`
     // on the vault-leaving paths: the lock wipe is total, and a replay that
     // crossed a vault switch would write vault A's turns into vault B's store.
-    unsavedAppend = { id: snap.id, payload: snap.payload, seq: snap.seq, epoch: snap.epoch, clientId: snap.clientId, noteId: snap.noteId };
+    unsavedAppend = {
+      id: snap.id,
+      payload: snap.payload,
+      seq: snap.seq,
+      epoch: snap.epoch,
+      clientId: snap.clientId,
+      noteId: snap.noteId,
+      folder: snap.folder,
+    };
     setLagging(true);
     if (attempt < PERSIST_RETRIES) {
       if (retryTimer !== null) clearTimeout(retryTimer);
@@ -478,6 +516,7 @@ export function installChatPersistence(): void {
       epoch: persistWipeEpoch,
       clientId: crypto.randomUUID().replace(/-/g, ""),
       noteId: getPendingAnchorNoteId(),
+      folder: getPendingAnchorFolderId(),
     };
     void enqueueSnapshot(0, snap).catch(() => {
       // Unreachable (persistSnapshotOnce catches internally); kept so the
@@ -507,6 +546,96 @@ export function clearChatPersistForLock(): void {
   }
   setLagging(false);
   setHydrateFailed(false);
+}
+
+/**
+ * Make the active conversation exist on disk with the transcript as it stands,
+ * and return its id (myne-md/myne#848).
+ *
+ * **The conversation list should show a conversation from the first user
+ * message, not from the first reply.** Before this, the only writer was the
+ * persister, which fires on SETTLE, so a conversation created by a message that
+ * had not been answered yet was invisible in the hub, and on a remote provider
+ * "not answered yet" is minutes. A user who sent something and switched away to
+ * do something else came back to a list that did not contain what they had just
+ * asked.
+ *
+ * Returns `null` rather than throwing when the write fails: the queue still
+ * owes the write (a settle will retry it, and `isChatPersistLagging` already
+ * says so on screen), so a run starts with no bound conversation rather than
+ * failing to start at all. That is the one state `runConversationId` documents
+ * as legitimate.
+ *
+ * Recorded in `lastPersisted`/`persistSeq` like any other write, so the
+ * settle's persist does not re-send a payload that is already on disk, and an
+ * older retry cannot land after this one.
+ */
+export async function ensureConversation(): Promise<string | null> {
+  const payload = serializeTranscript(getChat().turns);
+  const existing = getActiveConversationId();
+  try {
+    if (existing === null) {
+      const created = await chatsCreate(
+        payload,
+        crypto.randomUUID().replace(/-/g, ""),
+        getPendingAnchorNoteId(),
+        getPendingAnchorFolderId(),
+      );
+      setActiveConversationId(created);
+      // The anchors rode the create; a second conversation starts clean.
+      clearPendingAnchorNoteId();
+      clearPendingAnchorFolderId();
+      lastPersisted = { id: created, payload, seq: ++persistSeq };
+      return created;
+    }
+    if (
+      lastPersisted !== null &&
+      lastPersisted.id === existing &&
+      lastPersisted.payload === payload
+    ) {
+      return existing;
+    }
+    await chatsAppendTurn(existing, payload);
+    lastPersisted = { id: existing, payload, seq: ++persistSeq };
+    return existing;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Settle a run into a conversation that is no longer the one on screen
+ * (myne-md/myne#848).
+ *
+ * The live transcript is a single slot, so a run that outlives navigation has
+ * no live slot to settle into: `settleAgentTurn` would write its counts, its
+ * summary and its frozen proposal onto whichever conversation the user has
+ * opened since. This reads the run's OWN conversation, applies the same
+ * reducer action the live path applies, and writes it back.
+ *
+ * `AGENT_SETTLE` is the action and it targets the last agent turn, so the file
+ * must still hold the turns `startAgentRun` appended, which it does, because
+ * the conversation is created (or appended) at send time now.
+ *
+ * Silent on failure, deliberately: the live transcript is not the subject here
+ * and has nothing to roll back, and the next settle of the same conversation
+ * would carry the same summary. A missing patch is a lost freeze, not a lost
+ * run, the host's record of what it did is separate.
+ */
+export async function settleTurnInConversation(
+  id: string,
+  summary: AgentTurnSummary,
+): Promise<void> {
+  try {
+    const payload = await chatsRead(id);
+    const turns = parseTranscript(payload);
+    if (turns === null) return;
+    const next = chatReducer({ turns, streaming: false }, { type: "AGENT_SETTLE", summary });
+    await chatsAppendTurn(id, serializeTranscript(next.turns));
+  } catch {
+    // Unreachable in practice (a conversation created moments ago reads back),
+    // and the fallback is doing nothing.
+  }
 }
 
 /**
@@ -572,10 +701,20 @@ export async function hydrateActiveConversation(): Promise<void> {
     } else
     try {
       if (stash.id === null) {
-        const created = await chatsCreate(stash.payload, stash.clientId, stash.noteId);
+        const created = await chatsCreate(
+        stash.payload,
+        stash.clientId,
+        stash.noteId,
+        // **The folder anchor rides the replay too** (myne-md/myne#848). A
+        // create whose first persist failed is exactly the case where the
+        // anchor matters most, and omitting it recreated a folder-scoped
+        // conversation as vault-general with nothing said.
+        stash.folder,
+      );
         const turns = parseTranscript(stash.payload);
         setActiveConversationId(created);
         clearPendingAnchorNoteId();
+        clearPendingAnchorFolderId();
         lastPersisted = { id: created, payload: stash.payload, seq: stash.seq };
         if (turns !== null) hydrateChatTurns(turns);
       } else {

@@ -100,7 +100,9 @@ test.describe("phone conversation history", () => {
     });
     await openChatTab(page);
     await page.getByTestId("ai.history-button").click();
-    await page.getByTestId("ai.conversation-row").nth(0).getByTestId("ai.conversation-rename").click();
+    // **Rename lives behind the row's three-dot menu now** (myne-md/myne#848).
+    await page.getByTestId("ai.conversation-row").nth(0).getByTestId("ai.conversation-menu").click();
+    await page.getByTestId("ai.conversation-rename").click();
     await page.getByTestId("ai.conversation-rename-input").fill("Renamed chat");
     await page.getByTestId("ai.conversation-rename-confirm").click();
     await expect(page.getByTestId("ai.conversation-row").nth(0)).toContainText("Renamed chat");
@@ -113,7 +115,8 @@ test.describe("phone conversation history", () => {
     });
     await openChatTab(page);
     await page.getByTestId("ai.history-button").click();
-    await page.getByTestId("ai.conversation-row").nth(0).getByTestId("ai.conversation-delete").click();
+    await page.getByTestId("ai.conversation-row").nth(0).getByTestId("ai.conversation-menu").click();
+    await page.getByTestId("ai.conversation-delete").click();
     // Armed, not deleted: the row is still there awaiting confirm.
     await expect(page.getByTestId("ai.conversation-row")).toHaveCount(2);
     await page.getByTestId("ai.conversation-delete-confirm").click();

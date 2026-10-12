@@ -119,6 +119,7 @@ fn main() {
             ConversationEntry {
                 created_at: CREATED_AT,
                 deleted_at: None,
+                folder: None,
                 title: CONV_TITLE.to_string(),
                 updated_at: CREATED_AT,
                 version: 1,

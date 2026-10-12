@@ -14,6 +14,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 const chatsList = vi.fn();
 const chatsRename = vi.fn();
 const chatsDelete = vi.fn();
+const noteTitles = vi.hoisted(() => new Map<string, string>());
+vi.mock("../../src/notes/sidebarState", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/sidebarState")>()),
+  // The anchor pill reads a note's NAME from the sidebar's cache
+  // (myne-md/myne#848). The provider is not mounted here, and mounting the whole
+  // sidebar to render a rail would be a different test.
+  useSelectedNote: () => ({ cache: noteTitles }),
+}));
+
 vi.mock("../../src/lib/chats", () => ({
   // The roster notifier the wrappers fire (myne-md/myne#771). Mocked to a
   // no-op unsubscribe: what these files drive is the list, not the signal, and
@@ -60,9 +69,11 @@ describe("the open conversation says so to a reader, not only to the eye", () =>
     // `data-active` paints it and carries nothing. They were one attribute
     // doing one of the two jobs, and the one it was doing was the visible one.
     await renderHub();
-    const rows = screen.getAllByTestId("agent.hub-row");
-    const active = rows[0]!.firstElementChild as HTMLElement;
-    const inactive = rows[1]!.firstElementChild as HTMLElement;
+    // Found by testid: the card sits inside its tooltip's wrapper now, so the
+    // row's first child is that wrapper rather than the card (myne-md/myne#848).
+    const cards = screen.getAllByTestId("agent.hub-card");
+    const active = cards[0]!;
+    const inactive = cards[1]!;
     expect(active.getAttribute("data-active")).toBe("true");
     expect(active.getAttribute("aria-current")).toBe("true");
     expect(inactive.getAttribute("aria-current")).toBeNull();
@@ -86,7 +97,8 @@ describe("a change the user did not navigate to is announced", () => {
 
   it("announces a rename", async () => {
     await renderHub();
-    fireEvent.click(screen.getAllByTestId("agent.hub-rename")[0]!);
+    fireEvent.click(screen.getAllByTestId("agent.hub-menu")[0]!);
+    fireEvent.click(screen.getByTestId("agent.hub-rename"));
     const input = screen.getByTestId("agent.hub-rename-input");
     fireEvent.change(input, { target: { value: "New name" } });
     await act(async () => {
@@ -99,7 +111,8 @@ describe("a change the user did not navigate to is announced", () => {
 
   it("announces a delete", async () => {
     await renderHub();
-    fireEvent.click(screen.getAllByTestId("agent.hub-delete")[0]!);
+    fireEvent.click(screen.getAllByTestId("agent.hub-menu")[0]!);
+    fireEvent.click(screen.getByTestId("agent.hub-delete"));
     const confirm = await screen.findByTestId("agent.hub-delete-confirm");
     await act(async () => {
       fireEvent.click(confirm);

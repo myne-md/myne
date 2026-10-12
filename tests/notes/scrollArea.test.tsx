@@ -16,6 +16,7 @@
 // how a test drives the states that matter instead of hoping a fixture is tall
 // enough.
 
+import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ScrollArea } from "../../src/components/primitives/ScrollArea";
@@ -52,6 +53,58 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("the indicator's gutter", () => {
+  it("keeps the content out of the thumb's column", () => {
+    // **jsdom has no layout, so this asserts the box that decides it.** The
+    // thumb is positioned against the wrapper and drawn over the scroller's last
+    // 8px, so content that reaches the end of its column has a bar across it,
+    // which is what a right-aligned chat bubble did (myne-md/myne#848, on the
+    // user's read). The scroller reserves the gutter as a margin, and the
+    // thumb's own geometry (`inset-inline-end: 2px` + `width: 6px`) adds up to
+    // the same number.
+    renderArea();
+    const scroller = screen.getByTestId("probe").firstElementChild as HTMLElement;
+    expect(scroller.className).toContain("myne-scrollarea");
+    expect(scroller.style.marginInlineEnd).toBe("var(--space-2)");
+  });
+});
+
+describe("a caller that owns the scroll position", () => {
+  it("gets the scroller element, and its scroll events", () => {
+    // **The agent transcript's two needs** (myne-md/myne#848): it pins itself to
+    // the bottom as turns arrive, and it must stop doing that the moment the
+    // reader scrolls up. Both need the element; the second needs to know when it
+    // moved. Two props, one relationship.
+    const ref = createRef<HTMLDivElement>();
+    const onScroll = vi.fn();
+    render(
+      <ScrollArea
+        testId="probe"
+        style={{ height: 100 }}
+        scrollerRef={ref}
+        onScroll={onScroll}
+      >
+        <div>content</div>
+      </ScrollArea>,
+    );
+    expect(ref.current, "the caller never saw the scroller").not.toBeNull();
+    // And it is the SCROLLER, not the wrapper: the class is what hides the
+    // native bar, which is the whole reason this component exists.
+    expect(ref.current!.className).toContain("myne-scrollarea");
+    fireEvent.scroll(ref.current!);
+    expect(onScroll).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps working with no caller attached", () => {
+    // The default path, which every other consumer takes: no ref, no hook, and
+    // the bar still appears when the content overflows.
+    stubClientHeight = 100;
+    stubScrollHeight = 400;
+    renderArea();
+    expect(screen.getByTestId("probe-thumb")).toBeTruthy();
+  });
+});
 
 const renderArea = () =>
   render(

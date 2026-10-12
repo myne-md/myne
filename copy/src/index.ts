@@ -244,7 +244,7 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
  *  runs (at most 100 entries) and your voice preferences, each entry with a
  *  stable identifier (myne-md/myne#697). */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles and identifiers of every note in the scope you approved, before it has read any of them. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier.";
+  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles, identifiers and folder paths of the notes it may read, before it has read any of them. That set is the whole working set, minus the folders you excluded from AI, unless you narrow it. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier.";
 
 /** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
  *

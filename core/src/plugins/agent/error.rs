@@ -118,6 +118,24 @@ pub enum EditRejection {
     /// sentence: an append has no anchor by design, so telling the user there
     /// was "no text to match" describes a rule that does not apply to it.
     AppendEmpty,
+    /// A move asked for the folder the note is already in.
+    ///
+    /// Its own reason rather than a silent success. The destination is compared
+    /// canonically, so a note in `Work` moved to `work/` is the same folder, and
+    /// letting that through would rewrite the note's bytes and bump its sync
+    /// version for no change, which `apply.rs` takes care to avoid everywhere
+    /// else. Naming it also gives the review screen a sentence that explains why
+    /// nothing happened, instead of a row that looks applied.
+    MoveToSameFolder,
+    /// A move's destination is an `ai_excluded_folders` folder.
+    ///
+    /// **The second half of the two-way clamp.** The note's CURRENT folder is
+    /// checked before the batch runs ([`Self::ExcludedNow`]), which refuses
+    /// leaving an excluded folder; this one checks where the note would land, so
+    /// the two together are the clamp in both directions. Distinct from
+    /// [`Self::ExcludedFolder`], which is about a proposed NEW note and has no
+    /// current folder to compare against.
+    MoveIntoExcludedFolder,
     /// An append into a note with neither a frontmatter block nor a body would
     /// have authored one.
     ///

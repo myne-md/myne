@@ -74,6 +74,14 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+/** **Rename and delete live behind the row's three-dot menu now**
+ *  (myne-md/myne#848), so every test that presses one opens that row's menu
+ *  first. One helper, because the alternative is the same two lines at each
+ *  call site and one of them eventually forgetting. */
+async function openRowMenu(index = 0): Promise<void> {
+  fireEvent.click((await screen.findAllByTestId("ai.conversation-menu"))[index]!);
+}
+
 describe("AiHistorySheet", () => {
   it("lists the roster newest-first", async () => {
     sheet();
@@ -94,7 +102,8 @@ describe("AiHistorySheet", () => {
   it("renames through the binding and refreshes the list", async () => {
     sheet();
     await screen.findAllByTestId("ai.conversation-row");
-    fireEvent.click(screen.getAllByTestId("ai.conversation-rename")[0]!);
+    await openRowMenu();
+    fireEvent.click(screen.getByTestId("ai.conversation-rename"));
     const input = screen.getByTestId("ai.conversation-rename-input");
     fireEvent.change(input, { target: { value: "Renamed" } });
     fireEvent.click(screen.getByTestId("ai.conversation-rename-confirm"));
@@ -106,12 +115,51 @@ describe("AiHistorySheet", () => {
   it("deletes only after the confirm tap, then reports the id", async () => {
     const { onDeleted } = sheet();
     await screen.findAllByTestId("ai.conversation-row");
-    fireEvent.click(screen.getAllByTestId("ai.conversation-delete")[0]!);
+    await openRowMenu();
+    fireEvent.click(screen.getByTestId("ai.conversation-delete"));
     // Armed, not deleted: the confirm is a second tap.
     expect(mockChatsDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("ai.conversation-delete-confirm"));
     await waitFor(() => expect(mockChatsDelete).toHaveBeenCalledWith("b"));
     expect(onDeleted).toHaveBeenCalledWith("b");
+  });
+
+  it("opens the conversation from ANYWHERE on the row, not only the title", async () => {
+    // The row was four controls on one line and the title was the only target,
+    // so the obvious gesture (tap the thing you are looking at) did nothing on
+    // most of it (myne-md/myne#848).
+    const { onOpen } = sheet();
+    const rows = await screen.findAllByTestId("ai.conversation-row");
+    fireEvent.click(rows[0]!);
+    expect(onOpen).toHaveBeenCalledWith("b");
+  });
+
+  it("does not open the conversation when the MENU is used", async () => {
+    // Rename sits inside the row, and the row opens on click. Without the menu
+    // stopping the event, choosing Rename would also open the conversation.
+    const { onOpen } = sheet();
+    await screen.findAllByTestId("ai.conversation-row");
+    await openRowMenu();
+    fireEvent.click(screen.getByTestId("ai.conversation-rename"));
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("states what each row is about with a glyph and a name", async () => {
+    mockChatsList.mockResolvedValue([
+      { ...ROWS[0]!, note_id: "n1" },
+      { ...ROWS[1]!, folder: "Projects/" },
+    ]);
+    sheet();
+    const targets = (await screen.findAllByTestId("ai.conversation-target"))
+      .map((el) => el.getAttribute("data-target"))
+      .sort();
+    // Order-insensitive: the list is newest-first, so asserting a sequence would
+    // be asserting the sort rather than the glyphs.
+    expect(targets).toEqual(["folder", "note"]);
+    for (const el of screen.getAllByTestId("ai.conversation-target")) {
+      expect((el.getAttribute("aria-label") ?? "").length).toBeGreaterThan(0);
+      expect(el.querySelector("svg")).not.toBeNull();
+    }
   });
 
   it("renders the empty state when the roster is empty", async () => {

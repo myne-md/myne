@@ -91,6 +91,14 @@ const INFINITE_ALLOWLIST = new Map([
       "box the user has no way to interpret.",
   ],
   [
+    "myne-working-wave",
+    "The agent run's status line while a run works (myne-md/myne#848). " +
+      "Indeterminate progress: a long run streams nothing back, so this line is the " +
+      "only thing on screen saying work is happening, and a still label reads as " +
+      "hung rather than as calm. Carries data-motion=\"essential\" so reduced motion " +
+      "slows it rather than freezing it.",
+  ],
+  [
     "cm-attachment-transcript-pulse",
     "The transcription busy meter. Same class as the two above; it animates " +
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",

@@ -1320,6 +1320,7 @@ fn chats_concurrent_append_converges_no_ping_pong() {
     let row = || ConversationEntry {
         created_at: 1,
         deleted_at: None,
+        folder: None,
         title: "taxes".to_string(),
         updated_at: 100,
         version: 1,

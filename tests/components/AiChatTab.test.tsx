@@ -7,7 +7,14 @@
 // `usePrefs` + i18n are mocked at their module boundaries (no Tauri IPC needed).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 let aiEnabled = true;
 let aiProvider: string | null = null;
@@ -67,14 +74,27 @@ vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
 }));
 
 const stopChat = vi.fn();
+const clipboardWriteText = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  writeText: clipboardWriteText,
+}));
+
 vi.mock("../../src/lib/ai-chat", () => ({
   stopChat: (...a: unknown[]) => stopChat(...a),
 }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: { count?: number }) =>
-      opts?.count !== undefined ? `${key}:${opts.count}` : key,
+    // `provider` is interpolated so the notice popover's receiver line can be
+    // asserted with the NAME in it (myne-md/myne#848). The stub echoes keys, so
+    // without this a test could only see which branch rendered, never that the
+    // provider reached the sentence.
+    t: (key: string, opts?: { count?: number; provider?: string }) =>
+      opts?.count !== undefined
+        ? `${key}:${opts.count}`
+        : opts?.provider !== undefined
+          ? `${key}:${opts.provider}`
+          : key,
   }),
 }));
 
@@ -87,6 +107,7 @@ import {
   finalizeChatTurn,
   sendAgentTurn,
   sendChatMessage,
+  setActiveConversationId,
   settleAgentTurn,
   __resetChatForTest,
 } from "../../src/notes/ai/chatStore";
@@ -94,6 +115,8 @@ import {
   beginRun,
   clearAgent,
   currentRunEpoch,
+  getAgent,
+  markConversationUnread,
   openRun,
   setUndoable,
   settleStep,
@@ -341,6 +364,154 @@ describe("AiChatTab", () => {
 // and it offers a settings page to a build with no local AI compiled in. These
 // assert the three are DIFFERENT, which is the whole claim; a spec that checked
 // each in isolation would pass against a collapsed implementation.
+describe("AiChatTab: a turn's words can be copied (myne-md/myne#848)", () => {
+  beforeEach(() => {
+    clipboardWriteText.mockReset().mockResolvedValue(undefined);
+  });
+
+  /** This describe's own summary: the outer one is scoped to its parent
+   *  `describe`, and reaching for it was a `ReferenceError` rather than a
+   *  failing assertion. */
+  const RUN = {
+    runId: "r1",
+    summary: "",
+    edits: 0,
+    newNotes: 0,
+    notesRead: 6,
+    iterations: 3,
+    charsOffDevice: null,
+    end: "finished" as const,
+  };
+
+  it("copies the answer, and not the bubble around it", async () => {
+    // The transcript is the one place the text IS the point, and the only route
+    // out was selecting the bubble by hand, which drags in the speaker caption,
+    // the footprint's figures and the markdown's rendered punctuation.
+    sendAgentTurn("how many personal tasks", "This note");
+    settleAgentTurn({
+      ...RUN,
+      edits: 0,
+      newNotes: 0,
+      summary: "You have 16 personal tasks in this note.",
+    });
+    render(<AiChatTab />);
+    // Scoped to the ASSISTANT turn: the run also renders the task as the user's
+    // own turn, which has its own copy.
+    const assistant = await screen.findByTestId("ai.agent-answer");
+    const copy = within(
+      assistant.closest('[data-testid="ai.turn"]') as HTMLElement,
+    ).getByTestId("ai.turn-copy");
+    // The name says WHAT is copied, so the control is not a bare glyph.
+    expect(copy.getAttribute("aria-label")).toBe(
+      "editor.chrome.rightPanel.aiChat.copyAnswer",
+    );
+    fireEvent.click(copy);
+    await waitFor(() =>
+      expect(clipboardWriteText).toHaveBeenCalledWith(
+        "You have 16 personal tasks in this note.",
+      ),
+    );
+  });
+
+  it("copies what the user typed, on their own turn", async () => {
+    const token = sendChatMessage("what did I note about rust?");
+    appendChatToken(token, "you wrote…");
+    finalizeChatTurn(token);
+    render(<AiChatTab />);
+    const userTurn = screen.getAllByTestId("ai.turn")[0]!;
+    const copy = within(userTurn).getByTestId("ai.turn-copy");
+    expect(copy.getAttribute("aria-label")).toBe(
+      "editor.chrome.rightPanel.aiChat.copyYourMessage",
+    );
+    fireEvent.click(copy);
+    await waitFor(() =>
+      expect(clipboardWriteText).toHaveBeenCalledWith("what did I note about rust?"),
+    );
+  });
+
+  it("says which way it went, on the control, and then goes back", async () => {
+    // `lib/clipboard.ts` exists so a copy names its OUTCOME, and neither arm
+    // renders the value. Both directions are driven: a failed copy that looks
+    // like a successful one is the exact defect that module was created for.
+    sendAgentTurn("tidy the headings", "This note");
+    settleAgentTurn({ ...RUN, summary: "Done." });
+    render(<AiChatTab />);
+    const answer = await screen.findByTestId("ai.agent-answer");
+    const turn = answer.closest('[data-testid="ai.turn"]') as HTMLElement;
+    fireEvent.click(within(turn).getByTestId("ai.turn-copy"));
+    await waitFor(() =>
+      expect(within(turn).getByTestId("ai.turn-copy").getAttribute("aria-label")).toBe(
+        "editor.chrome.rightPanel.aiChat.copied",
+      ),
+    );
+
+    clipboardWriteText.mockRejectedValueOnce(new Error("no clipboard"));
+    fireEvent.click(within(turn).getByTestId("ai.turn-copy"));
+    await waitFor(() =>
+      expect(within(turn).getByTestId("ai.turn-copy").getAttribute("aria-label")).toBe(
+        "editor.chrome.rightPanel.aiChat.copyFailed",
+      ),
+    );
+  });
+
+  it("offers nothing to copy while an answer is still arriving", async () => {
+    const token = sendChatMessage("q");
+    appendChatToken(token, "half an ans");
+    render(<AiChatTab />);
+    // Half an answer is a copy the user would have to notice was half an answer.
+    // Scoped to the ASSISTANT turn: the user's own message is complete the
+    // moment they sent it, and its copy is still offered.
+    const assistant = screen
+      .getAllByTestId("ai.turn")
+      .find((el) => el.getAttribute("data-role") === "assistant")!;
+    expect(within(assistant).queryByTestId("ai.turn-copy")).toBeNull();
+  });
+
+  it("offers nothing for a run that said nothing", async () => {
+    sendAgentTurn("tidy the headings", "This note");
+    // Edits but no words: a control that copies an empty string is worse than
+    // no control.
+    settleAgentTurn({
+      ...RUN,
+      edits: 2,
+      newNotes: 0,
+      summary: "",
+      proposal: {
+        edits: [{ noteId: "n1", anchor: "old words", replacement: "new words" }],
+        newNotes: [],
+      },
+    });
+    render(<AiChatTab />);
+    const diff = await screen.findByTestId("ai.turn-diff");
+    const turn = diff.closest('[data-testid="ai.turn"]') as HTMLElement;
+    expect(within(turn).queryByTestId("ai.turn-copy")).toBeNull();
+  });
+});
+
+describe("AiChatTab: a finished run is read by being on screen", () => {
+  // **The other half of the rail's unread mark** (myne-md/myne#848). The settle
+  // writes the mark for every conversation; what clears it is a surface
+  // DISPLAYING the conversation, which is a fact only the surface has, an id
+  // comparison in the settle got the closed-surface case wrong.
+  it("clears the mark for the conversation it is showing", async () => {
+    setActiveConversationId("c1");
+    markConversationUnread("c1");
+    expect(getAgent().unreadConversations).toContain("c1");
+    render(<AiChatTab />);
+    await waitFor(() => expect(getAgent().unreadConversations).not.toContain("c1"));
+  });
+
+  it("leaves another conversation's mark alone", async () => {
+    // A mark that vanished because the user read something else is a mark that
+    // lied about what they had seen.
+    setActiveConversationId("c1");
+    markConversationUnread("c2");
+    render(<AiChatTab />);
+    await waitFor(() => expect(screen.getByTestId("ai.chat-tab")).toBeTruthy());
+    expect(getAgent().unreadConversations).toContain("c2");
+  });
+});
+
 describe("AiChatTab resting cause", () => {
   const chip = () => screen.getByTestId("ai.chrome-status");
   const body = () => screen.getByTestId("ai.status-no-model");
@@ -539,10 +710,13 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     expect(summary).toContain("agentTurn.proposed:4");
     expect(summary).toContain("agentTurn.newNotes:1");
 
-    // The three figures the review screen reports. The third is the one the
-    // remote arm's compensating control rests on (design-notes/ai/0515), so
-    // "the run stayed local" must not render as a zero character count.
-    const cost = screen.getByTestId("ai.agent-run-cost").textContent ?? "";
+    // The three figures the review screen reports, one click away
+    // (myne-md/myne#848). The third is the one the remote arm's compensating
+    // control rests on (design-notes/ai/0515), so "the run stayed local" must
+    // not render as a zero character count, and it must still be REACHABLE,
+    // which is why this expands rather than looking for it on the line.
+    fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
+    const cost = screen.getByTestId("agentFootprint.runCost").textContent ?? "";
     expect(cost).toContain("runSummaryRequests:3");
     expect(cost).toContain("runSummaryNotes:6");
     expect(cost).toContain("agent.review.runSummaryOnDevice");
@@ -555,7 +729,8 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     render(<AiChatTab />);
     // Remote, and nothing was sent. Not the same statement as "it stayed here",
     // and collapsing the two is what this asserts against.
-    expect(screen.getByTestId("ai.agent-run-cost").textContent).toContain(
+    fireEvent.click(screen.getByTestId("agentFootprint.disclosure"));
+    expect(screen.getByTestId("agentFootprint.runCost").textContent).toContain(
       "runSummaryOffDevice:0",
     );
   });
@@ -913,7 +1088,10 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({ ...SUMMARY, end: "cancelled" });
     render(<AiChatTab />);
-    expect(screen.getByTestId("ai.agent-run-end").textContent).toContain(
+    // The end label is the line's own status now rather than a third caption
+    // under the run: one line says how it ended, and the numbers are behind the
+    // disclosure (myne-md/myne#848).
+    expect(screen.getByTestId("agentFootprint.status").textContent).toContain(
       "agent.progress.cancelled",
     );
   });
@@ -937,7 +1115,7 @@ describe("AiChatTab: the live run's controls", () => {
    *  after `agent_start` returns `awaitingScope`. */
   function parkOnScopeQuestion() {
     sendAgentTurn("tidy the headings", "This note");
-    beginRun();
+    beginRun(null);
     settleStep({
       view: { runId: "r1", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
       proposal: { edits: [], newNotes: [], summary: "" },
@@ -965,9 +1143,63 @@ describe("AiChatTab: the live run's controls", () => {
     // up cannot be asked a question they cannot see.
     const scroller = screen.getByTestId("ai.transcript").parentElement!;
     expect(scroller.contains(screen.getByTestId("agentScope.dialog"))).toBe(false);
-    // The running scope total is one of the four bounds threat-model.md §7
-    // names; it is outside the scroller for the same reason.
-    expect(scroller.contains(screen.getByTestId("agentProgress.scopeTotal"))).toBe(false);
+    // **The run's own entry IS in the transcript** (myne-md/myne#848), and that
+    // is the point of the change: the running scope total is one of the four
+    // bounds threat-model.md §7 names, and it now lives on the turn the run
+    // belongs to, where scrolling back to it actually finds it. The DIALOG
+    // above stays out of the scroller, which is the assertion that did not move.
+    expect(scroller.contains(screen.getByTestId("agentFootprint"))).toBe(true);
+  });
+
+  it("reports the APPROVED leg's own failure, not a scope refusal", async () => {
+    // **The defect the user hit** (myne-md/myne#848): every failure of the
+    // approved leg was reported as "The scope could not be widened", so a user
+    // who had just pressed Allow was told their permission had not been taken,
+    // while `modelGrants` on the same turn showed it had, and the real cause
+    // was thrown away. Three tags are driven here, because the mapping is the
+    // whole fix and one arm would pass on any of them.
+    parkOnScopeQuestion();
+    render(<AiChatTab />);
+    await screen.findByTestId("agentScope.dialog");
+
+    agentApproveScope.mockRejectedValueOnce({ kind: "ProviderRejected" });
+    fireEvent.click(screen.getByTestId("agentScope.approve"));
+    await waitFor(() =>
+      expect(screen.getByTestId("agentFootprint").textContent).toContain(
+        "agent.composer.providerRejected",
+      ),
+    );
+    expect(screen.getByTestId("agentFootprint").textContent).not.toContain(
+      "agent.progress.expandFailed",
+    );
+  });
+
+  it("keeps the scope sentence for the ONE tag it is about", async () => {
+    // `RootGrant` is a folder grant that canonises to the vault root: the
+    // approval really cannot be honoured, and this is the sentence that says so.
+    parkOnScopeQuestion();
+    render(<AiChatTab />);
+    await screen.findByTestId("agentScope.dialog");
+    agentApproveScope.mockRejectedValueOnce({ kind: "RootGrant" });
+    fireEvent.click(screen.getByTestId("agentScope.approve"));
+    await waitFor(() =>
+      expect(screen.getByTestId("agentFootprint").textContent).toContain(
+        "agent.progress.expandFailed",
+      ),
+    );
+  });
+
+  it("says the run stopped for a tag it cannot name", async () => {
+    parkOnScopeQuestion();
+    render(<AiChatTab />);
+    await screen.findByTestId("agentScope.dialog");
+    agentApproveScope.mockRejectedValueOnce({ kind: "ProviderFailed" });
+    fireEvent.click(screen.getByTestId("agentScope.approve"));
+    await waitFor(() =>
+      expect(screen.getByTestId("agentFootprint").textContent).toContain(
+        "agent.progress.legFailed",
+      ),
+    );
   });
 
   it("New chat stops the run host-side before forgetting it", async () => {
@@ -977,11 +1209,46 @@ describe("AiChatTab: the live run's controls", () => {
     fireEvent.click(screen.getByTestId("ai.new-chat"));
     // Forgetting a run is not stopping one: the host keeps its run table, keeps
     // reading notes, and on a remote provider keeps spending the user's
-    // requests. The strip that carried Stop is gone with the transcript.
+    // requests. The turn that carried the run's entry is gone with the
+    // transcript, which was the defect the strip's independence from the
+    // transcript used to hide (myne-md/myne#848).
     expect(agentCancel).toHaveBeenCalledWith("r1");
-    expect(screen.queryByTestId("agentProgress.root")).toBeNull();
+    expect(screen.queryByTestId("agentFootprint")).toBeNull();
   });
 
+});
+
+describe("AiChatTab: the transcript's scrollbar (myne-md/myne#848)", () => {
+  it("hides the native bar, which paints over the messages", () => {
+    // **The user's read**: the bar landed on the chat messages and was annoying
+    // to look at. Two causes, one fix. The native bar is an OVERLAY on macOS, so
+    // it paints over whatever is under it; and its thumb cannot resolve this
+    // panel's tokens at all, a `var()` inside `::-webkit-scrollbar-thumb` takes
+    // the ROOT's value, which in this app is the LIGHT theme's, so the
+    // transcript drew a pale bar down a dark surface (myne-md/myne#727, which
+    // this region never got). `ScrollArea` hides the native bar and draws a
+    // themed element instead, inset from the edge and visible only while the
+    // reader is scrolling.
+    sendAgentTurn("tidy the headings", "This note");
+    settleAgentTurn({
+      runId: "r1",
+      summary: "done",
+      edits: 0,
+      newNotes: 0,
+      notesRead: 1,
+      iterations: 1,
+      charsOffDevice: null,
+      end: "finished",
+    });
+    render(<AiChatTab />);
+    const turns = screen.getByTestId("ai.transcript");
+    const scroller = turns.parentElement as HTMLElement;
+    // The class is what hides the native bar (`scrollbar-width: none` + a zero
+    // `::-webkit-scrollbar`), so its absence is the defect coming back.
+    expect(scroller.className).toContain("myne-scrollarea");
+    // And the region is still the one that scrolls: the turns live inside it.
+    expect(scroller.contains(turns)).toBe(true);
+  });
 });
 
 describe("AiChatTab: the shape of a chat", () => {
@@ -1089,7 +1356,7 @@ describe("AiChatTab: starting a new conversation", () => {
 
 describe("ChatComposer: Send turns into Stop while a run works", () => {
   function startRunning(): void {
-    beginRun();
+    beginRun(null);
     openRun(
       { runId: "r1", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
       currentRunEpoch(),
@@ -1098,7 +1365,7 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
 
   it("swaps Send for Stop and stops host-side on click", () => {
     startRunning();
-    render(<ChatComposer openNoteId="n1" folders={[]} />);
+    render(<ChatComposer surface="agent" openNoteId="n1" folders={[]} />);
     expect(screen.queryByTestId("ai.composer-send")).toBeNull();
     const stop = screen.getByTestId("ai.composer-stop");
     fireEvent.click(stop);
@@ -1107,7 +1374,7 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
 
   it("ignores Enter while running instead of sending a second run", () => {
     startRunning();
-    render(<ChatComposer openNoteId="n1" folders={[]} />);
+    render(<ChatComposer surface="agent" openNoteId="n1" folders={[]} />);
     agentStart.mockClear();
     fireEvent.change(screen.getByTestId("ai.composer-input"), {
       target: { value: "a second question" },
@@ -1317,5 +1584,65 @@ describe("AiChatTab: the status chip leads somewhere", () => {
     aiEnabled = false;
     render(<AiChatTab onOpenSettings={vi.fn()} />);
     expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
+  });
+});
+
+describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", () => {
+  // The notice is one threat-model-bounded sentence about where the user's words
+  // go, and it invites three follow-ups it could not answer: which provider,
+  // what exactly leaves, and how to stop it. This is that conversation, one
+  // click away, with the fourth answer being a LINK to the control rather than a
+  // second copy of the setting.
+
+  it("answers all four questions, naming the provider that is answering", async () => {
+    aiProvider = "openrouter";
+    backendClass = "remote";
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+
+    // Closed until asked: the notice is the claim, this is the disclosure.
+    expect(screen.queryByTestId("ai.provider-popover")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai.honesty-note"));
+    const popover = await screen.findByTestId("ai.provider-popover");
+    // What leaves, and to whom.
+    expect(popover.textContent).toContain("noticeLeaves");
+    expect(screen.getByTestId("ai.notice-receives").textContent).toContain(
+      "noticeReceiver:OpenRouter",
+    );
+    // How to stop it.
+    expect(popover.textContent).toContain("noticeRevoke");
+  });
+
+  it("says nothing leaves the machine when the local arm is answering", async () => {
+    backendClass = "in_process_local";
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("ai.honesty-note"));
+    // The other branch, and the one a wrong implementation would get by reusing
+    // the remote sentence: naming a provider nobody is using is the exact defect
+    // `activeProviderName` exists to prevent (myne-md/myne#466).
+    expect(screen.getByTestId("ai.notice-receives").textContent).toContain(
+      "noticeReceiverLocal",
+    );
+  });
+
+  it("sends the user to the control, not to the top of the panel", async () => {
+    const onOpenSettings = vi.fn();
+    backendClass = "in_process_local";
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={onOpenSettings} />);
+    fireEvent.click(screen.getByTestId("ai.honesty-note"));
+    fireEvent.click(screen.getByTestId("ai.notice-settings"));
+    expect(onOpenSettings).toHaveBeenCalledWith("ai", "ai.provider");
+  });
+
+  it("keeps the load-bearing sentence VERBATIM inside the button", async () => {
+    // The notice became a `<button>`; its text is a privacy property pinned by
+    // literal equality and rendered verbatim in every locale, so the change of
+    // element must not have changed a character of it.
+    backendClass = "in_process_local";
+    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    render(<AiChatTab onOpenSettings={vi.fn()} />);
+    expect(screen.getByTestId("ai.honesty-note").textContent).toBe(AI_CHAT_HONESTY_NOTE);
   });
 });

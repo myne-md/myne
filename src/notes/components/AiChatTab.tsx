@@ -39,6 +39,7 @@ import {
 } from "../../hooks/useAiModelReady";
 import { useChat } from "../ai/chatStore";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
+import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Tooltip } from "../../components/primitives/Tooltip";
 import { startNewConversation } from "../ai/startNewConversation";
@@ -211,6 +212,8 @@ export function AiChatTab({
    * not what a threat-model-bounded sentence is for.
    */
   const [honestyOpen, setHonestyOpen] = useState(false);
+  /** Whether the provider notice's popover is open (myne-md/myne#848). */
+  const [noticeOpen, setNoticeOpen] = useState(false);
   /**
    * Clamped exactly when there is a conversation AND the user has not opened it
    * back up. An empty transcript is the moment the claim is being made, so it
@@ -433,9 +436,19 @@ export function AiChatTab({
           takes from the thing they came for. */}
       {ready && (
         <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-1)" }}>
-          <p
+          {/* **The notice is the way IN to what it claims** (myne-md/myne#848).
+              It was a `<p>`: a threat-model-bounded sentence about where the
+              user's words go, with no way to ask the follow-up it invites
+              ("which provider? what exactly leaves? how do I stop it?"). It is a
+              button now, with the SAME constant as its text, that copy is
+              load-bearing and E2E-pinned by literal equality, so it is rendered
+              verbatim in every locale rather than paraphrased into a key. */}
+          <Button
+            variant="ghost"
             data-testid="ai.honesty-note"
             data-clamped={honestyClamped ? "true" : undefined}
+            aria-expanded={noticeOpen}
+            onClick={() => setNoticeOpen((open) => !open)}
             style={{
               fontSize: "var(--text-xs)",
               lineHeight: 1.4,
@@ -443,6 +456,12 @@ export function AiChatTab({
               margin: 0,
               flex: 1,
               minWidth: 0,
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              textAlign: "left",
+              cursor: "pointer",
               ...(honestyClamped
                 ? {
                     display: "-webkit-box",
@@ -454,7 +473,7 @@ export function AiChatTab({
             }}
           >
             {aiChatHonestyNote(activeProviderName)}
-          </p>
+          </Button>
           {chat.turns.length > 0 ? (
             <IconButton
               icon={honestyOpen ? "chevron-up" : "chevron-down"}
@@ -472,6 +491,58 @@ export function AiChatTab({
           ) : null}
         </div>
       )}
+      {/* **What leaves, who gets it, how to stop it, and where the control is**
+          (myne-md/myne#848). The notice above is one sentence; these are the four
+          answers a user needs before they decide to type into the box, and the
+          fourth is a link rather than a second copy of the setting.
+
+          Rendered only while open, unlike the notice itself: the notice is a
+          CLAIM about the feature and has to survive a text search, while this is
+          a disclosure the user asked for. */}
+      {ready && noticeOpen ? (
+        <div
+          data-testid="ai.provider-popover"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-1)",
+            padding: "var(--space-2)",
+            marginTop: "var(--space-1)",
+            background: "var(--bg-2)",
+            border: "1px solid var(--line-1)",
+            borderRadius: "var(--radius-1)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-2)",
+            lineHeight: 1.4,
+          }}
+        >
+          <span data-testid="ai.notice-leaves">
+            {t("editor.chrome.rightPanel.aiChat.noticeLeaves")}
+          </span>
+          <span data-testid="ai.notice-receives">
+            {activeProviderName === null
+              ? t("editor.chrome.rightPanel.aiChat.noticeReceiverLocal")
+              : t("editor.chrome.rightPanel.aiChat.noticeReceiver", {
+                  provider: activeProviderName,
+                })}
+          </span>
+          <span data-testid="ai.notice-revoke">
+            {t("editor.chrome.rightPanel.aiChat.noticeRevoke")}
+          </span>
+          {onOpenSettings !== undefined ? (
+            <button
+              type="button"
+              data-testid="ai.notice-settings"
+              className="myne-pill"
+              data-interactive="true"
+              onClick={() => onOpenSettings("ai", "ai.provider")}
+              style={{ alignSelf: "flex-start" }}
+            >
+              {t("editor.chrome.rightPanel.aiChat.noticeSettingsCta")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* The conversation itself, shared with the agent tab. Gated on
           `ai_enabled` so the composer is reachable in the stub E2E build and in
@@ -479,6 +550,7 @@ export function AiChatTab({
       {aiEnabled ? (
         <ConversationSurface
           testId="ai.chat-panel-surface"
+          surface="sidebar"
           {...(onInsert === undefined ? {} : { onInsert })}
           openNoteId={openNoteId}
           {...(folders === undefined ? {} : { folders })}

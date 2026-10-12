@@ -40,12 +40,14 @@ import { DiffView } from "../notes/components/DiffView";
 import { RunCostLine } from "../notes/agent/components/RunCostLine";
 import { Button } from "../components/primitives/Button";
 import { changedLineCount, diffWithSegments } from "../dialect";
+import { flushBeforeFrontmatterWrite } from "../notes/flushBeforeFrontmatterWrite";
 import {
   removalFlagLabel,
   agentApply,
   agentUndo,
   editHidesNoteAs,
   hasRefusals,
+  isMove,
   netDeletion,
   splitForBulkApproval,
   type AgentApplyResult,
@@ -86,10 +88,17 @@ interface EditRow {
   largeDeletion: boolean;
 }
 
+/** Roughly what three lines of the modal's own width hold. Past it the summary
+ *  is clamped behind a disclosure; below it the paragraph is shown whole,
+ *  because a disclosure over something already visible is a control that does
+ *  nothing. */
+const SUMMARY_CLAMP_CHARS = 320;
+
 export function AgentReview({
   onClose,
   onNotesWritten,
   titleOf,
+  folderOf,
 }: {
   onClose: () => void;
   /** Called with the ids of notes an apply CHANGED on disk.
@@ -107,10 +116,15 @@ export function AgentReview({
   /** Resolve a note id to its title. Without it the review screen shows a diff
    *  and never says which note receives it, which is not informed approval. */
   titleOf: (noteId: string) => string | null;
+  /** The folder a note sits in, for a move row's starting point. */
+  folderOf: (noteId: string) => string | null;
 }) {
   const { t } = useTranslation();
   const agent = useAgent();
   const [busy, setBusy] = useState(false);
+  /** Whether the model's summary is expanded. Session state, like every other
+   *  disclosure on this screen: a reader who opened it is reading it now. */
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [undoReport, setUndoReport] = useState<{
     reverted: number;
     failed: string[];
@@ -193,6 +207,17 @@ export function AgentReview({
     // dropped rather than written into a module-scope store.
     const epoch = currentRunEpoch();
     try {
+      // **The pane's pending autosave goes to disk FIRST** (review finding). An
+      // apply reads each note's body from disk, patches it (the move verb
+      // rewrites `folder:`) and writes the whole blob back with no compare and
+      // swap, so a dirty pane that has not autosaved yet has two silent losers:
+      // the autosave lands after the write and reverts the field, or it lands
+      // between the read and the write and the apply overwrites the typing.
+      // `ctx.reloadOpenNote()` cannot cover it, because it returns early while a
+      // pane has pending work, which is exactly this case. Same first line the
+      // other frontmatter writers use (`notes/setNoteCover.ts`,
+      // `notes/templates.ts`, `notes/trashNote.ts`).
+      await flushBeforeFrontmatterWrite();
       const outcome = await agentApply(
         agent.view.runId,
         edits,
@@ -255,6 +280,9 @@ export function AgentReview({
     }
   }
 
+  const summaryClamped =
+    !summaryOpen && agent.proposal.summary.length > SUMMARY_CLAMP_CHARS;
+
   return (
     <div
       data-testid="agentReview.screen"
@@ -296,18 +324,80 @@ export function AgentReview({
         </Button>
       </header>
 
+      {/* **The host's fact goes above the model's claim** (myne-md/myne#848).
+          A run's summary is the model's own words, and "informed approval" is
+          this screen's whole premise, so the two must not be read in the order
+          that flatters the model. A manual pass found the opposite: ten folder
+          moves were refused and the summary still reported them as applied, and
+          the user believed it until they reached the refusal list at the BOTTOM
+          of the diff. So refusals are lifted out of the bottom, pinned here, and
+          counted. The summary stays visible BELOW them rather than being
+          hidden: the point is to contradict it in front of the user, not to
+          censor it. */}
+      {agent.applied && hasRefusals(agent.applied) ? (
+        <RefusalBlock result={agent.applied} />
+      ) : null}
+
       {agent.proposal.summary ? (
-        <p
-          data-testid="agentReview.summary"
+        <div
           style={{
-            margin: 0,
             padding: "var(--space-3) var(--space-5)",
-            color: "var(--fg-2)",
             borderBottom: "1px solid var(--line-1)",
           }}
         >
-          {agent.proposal.summary}
-        </p>
+          {/* **Clamped, because a summary is not what this screen is for**
+              (myne-md/myne#848, on the user's read: "too much of a top text…
+              this should be only something about the diff"). A run that moved
+              twenty-three notes answers with the whole itinerary, and a wall of
+              prose above the diff makes the diff the small print.
+
+              Kept rather than hidden: the paragraph above argues that the
+              model's claim must stay in front of the user so a REFUSAL can
+              contradict it, and hiding it outright is a spec change rather than
+              a polish one. Three lines and a disclosure is the version that
+              serves both, the claim is on screen, the diff is what the screen
+              is about. */}
+          <p
+            data-testid="agentReview.summary"
+            data-clamped={summaryClamped ? "true" : undefined}
+            style={{
+              margin: 0,
+              color: "var(--fg-2)",
+              ...(summaryClamped
+                ? {
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical" as const,
+                    WebkitLineClamp: 3,
+                    overflow: "hidden",
+                  }
+                : {}),
+            }}
+          >
+            {agent.proposal.summary}
+          </p>
+          {/* Only when there is something to reveal: for a one-line summary a
+              disclosure is a control that does nothing. */}
+          {agent.proposal.summary.length > SUMMARY_CLAMP_CHARS ? (
+            <Button
+              variant="ghost"
+              data-testid="agentReview.summary-toggle"
+              aria-expanded={summaryOpen}
+              onClick={() => setSummaryOpen((open) => !open)}
+              style={{
+                marginTop: "var(--space-1)",
+                padding: 0,
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-3)",
+              }}
+            >
+              {t(
+                summaryOpen
+                  ? "agent.review.summaryShorten"
+                  : "agent.review.summaryShowAll",
+              )}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <div style={{ flex: 1, overflow: "auto" }}>
@@ -324,6 +414,7 @@ export function AgentReview({
               key={noteId}
               noteId={noteId}
               title={titleOf(noteId)}
+              folderOf={folderOf}
               rows={noteRows}
               rejected={agent.rejected}
               applied={agent.appliedEdits}
@@ -429,6 +520,7 @@ function NoteGroup({
   busy,
   onToggle,
   onApplyOne,
+  folderOf,
 }: {
   noteId: string;
   title: string | null;
@@ -438,6 +530,8 @@ function NoteGroup({
   busy: boolean;
   onToggle: (index: number) => void;
   onApplyOne: (edit: ProposedEdit) => void;
+  /** The folder the note sits in, for a move row's starting point. */
+  folderOf: (noteId: string) => string | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -474,6 +568,7 @@ function NoteGroup({
         <EditRowView
           key={row.index}
           row={row}
+          sourceFolder={folderOf(noteId)}
           rejected={rejected.has(row.index)}
           applied={applied.has(row.index)}
           busy={busy}
@@ -490,6 +585,7 @@ function NoteGroup({
 
 function EditRowView({
   row,
+  sourceFolder,
   rejected,
   applied,
   busy,
@@ -497,6 +593,10 @@ function EditRowView({
   onApplyOne,
 }: {
   row: EditRow;
+  /** The folder the note is in now, for a move row's left column. `null` when
+   *  the note list does not know the note, in which case the destination is
+   *  shown alone rather than a source being invented. */
+  sourceFolder: string | null;
   rejected: boolean;
   applied: boolean;
   busy: boolean;
@@ -536,9 +636,19 @@ function EditRowView({
           borderBottom: "1px solid var(--line-1)",
         }}
       >
-        <span style={{ color: "var(--fg-2)" }}>
-          {t("agent.review.changedLines", { count: changedLines })}
-        </span>
+        {/* A move has no changed lines to count: its `replacement` is a folder,
+            not text. Counting a diff of "" against a folder path would put a
+            meaningless number beside the row whose whole point is that it moves
+            something (myne-md/myne#848). */}
+        {isMove(row.edit) ? (
+          <span data-testid="agentReview.moveFlag" style={{ color: "var(--fg-2)" }}>
+            {t("agent.review.moveFlag")}
+          </span>
+        ) : (
+          <span style={{ color: "var(--fg-2)" }}>
+            {t("agent.review.changedLines", { count: changedLines })}
+          </span>
+        )}
         {/* The structural carve-out, made visible. A removing edit is not part
             of the bulk action at all, so it says so, says WHICH removal, and
             carries its own act. */}
@@ -595,12 +705,46 @@ function EditRowView({
           column is empty under a heading reading "in the note now". That is the
           honest answer for an append rather than a layout defect: it replaces
           nothing. */}
-      <DiffView
-        diff={diff}
-        mode="split"
-        leftLabel={t("agent.review.diffCurrent")}
-        rightLabel={t("agent.review.diffProposed")}
-      />
+      {/* **A move renders as its own row, not as a diff** (myne-md/myne#848).
+          A diff would draw an empty left column under "in the note now" and a
+          folder under "after this change", which describes nothing: a folder is
+          not note text. So the row shows the folder the note is in and the folder
+          it would land in, the pair a reader needs to judge the excluded-folder
+          clamp by eye. The source is resolved by the caller from the same note
+          list `titleOf` reads. */}
+      {isMove(row.edit) ? (
+        <div
+          data-testid="agentReview.moveBody"
+          style={{
+            display: "flex",
+            gap: "var(--space-5)",
+            padding: "var(--space-3)",
+            color: "var(--fg-2)",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <span>{t("agent.review.diffCurrent")}</span>
+            <span data-testid="agentReview.moveFrom" style={{ color: "var(--fg-1)" }}>
+              {sourceFolder ?? t("agent.review.vaultRoot")}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <span>{t("agent.review.diffProposed")}</span>
+            <span data-testid="agentReview.moveTo" style={{ color: "var(--fg-1)" }}>
+              {row.edit.replacement === ""
+                ? t("agent.review.vaultRoot")
+                : row.edit.replacement}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <DiffView
+          diff={diff}
+          mode="split"
+          leftLabel={t("agent.review.diffCurrent")}
+          rightLabel={t("agent.review.diffProposed")}
+        />
+      )}
     </article>
   );
 }
@@ -702,6 +846,56 @@ function NewNotesGroup({
   );
 }
 
+/** The refusals, pinned ABOVE the model's summary.
+ *
+ *  **Why it is not inside `ApplyReport` any more** (myne-md/myne#848). A run on
+ *  the first structured manual pass reported ten folder moves as applied while
+ *  every one had been refused, and the user believed the summary until they
+ *  reached the refusal list at the bottom of a 68-note diff. The host's fact now
+ *  precedes the model's claim, and it carries a count because the reader's
+ *  question is "did all of it land" rather than "which line failed".
+ *
+ *  Both kinds are counted together: a refused edit and a refused new note index
+ *  two different spaces, which is why they are two arrays on the wire, but to the
+ *  person reading they are one experience. The count is what the host's own
+ *  `hasRefusals` predicate decides on, so the two cannot disagree about whether
+ *  this block exists. */
+function RefusalBlock({ result }: { result: AgentApplyResult }) {
+  const { t } = useTranslation();
+  const count = result.refused.length + result.refusedNewNotes.length;
+  return (
+    <section
+      data-testid="agentReview.refusedBlock"
+      style={{
+        padding: "var(--space-3) var(--space-5)",
+        borderBottom: "1px solid var(--line-1)",
+        background: "var(--paper-2)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-2)",
+      }}
+    >
+      <p
+        data-testid="agentReview.refusedCount"
+        style={{ margin: 0, color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
+      >
+        {t("agent.review.refusedCount", { count })}
+      </p>
+      <ul
+        data-testid="agentReview.refusedList"
+        style={{ margin: 0, paddingInlineStart: "var(--space-5)", color: "var(--fg-2)" }}
+      >
+        {result.refused.map((r) => (
+          <li key={`e-${r.noteId}-${r.index}`}>{t(`agent.review.refused.${r.reason}`)}</li>
+        ))}
+        {result.refusedNewNotes.map((r) => (
+          <li key={`n-${r.index}`}>{t(`agent.review.refused.${r.reason}`)}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ApplyReport({ result }: { result: AgentApplyResult }) {
   const { t } = useTranslation();
   return (
@@ -723,28 +917,12 @@ function ApplyReport({ result }: { result: AgentApplyResult }) {
           {t("agent.review.createdCount", { count: result.notesCreated.length })}
         </p>
       ) : null}
-      {/* Refusals are shown with their cause. A change that could not be placed
-          must never look like a change that was not needed.
-
-          `hasRefusals` rather than the condition spelled out here, because
-          `applyWasCleanAndComplete` asks the same question to decide whether to
-          keep this dialog OPEN (myne-md/myne#596). Two copies that drifted would
-          dismiss the screen over the list it was about to draw. */}
-      {hasRefusals(result) ? (
-        <ul
-          data-testid="agentReview.refusedList"
-          style={{ margin: 0, paddingInlineStart: "var(--space-5)", color: "var(--fg-2)" }}
-        >
-          {result.refused.map((r) => (
-            <li key={`e-${r.noteId}-${r.index}`}>
-              {t(`agent.review.refused.${r.reason}`)}
-            </li>
-          ))}
-          {result.refusedNewNotes.map((r) => (
-            <li key={`n-${r.index}`}>{t(`agent.review.refused.${r.reason}`)}</li>
-          ))}
-        </ul>
-      ) : null}
+      {/* Refusals are NOT here any more. They render in `RefusalBlock`, above the
+          model's own summary, because a summary that claimed refused work was
+          applied was read first and the refusal list last (myne-md/myne#848). The
+          `hasRefusals` predicate still decides whether this surface keeps the
+          dialog OPEN (`applyWasCleanAndComplete`, myne-md/myne#596), which is why
+          it stays one function rather than being inlined in either place. */}
     </section>
   );
 }

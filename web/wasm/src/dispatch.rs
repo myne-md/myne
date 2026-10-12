@@ -165,6 +165,11 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 requested_id_hex: Option<String>,
                 #[serde(default)]
                 note_id: Option<String>,
+                // The folder this conversation is scoped to, when it is
+                // (myne-md/myne#848). `serde(default)` for the same reason the
+                // two above carry it: a page on an older bundle omits it.
+                #[serde(default)]
+                folder: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -183,6 +188,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 &a.first_turn_payload,
                 a.requested_id_hex.as_deref(),
                 a.note_id.as_deref(),
+                a.folder.as_deref(),
             )
             .await
             {

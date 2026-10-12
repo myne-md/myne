@@ -67,19 +67,26 @@ test.describe("mobile AI tab", () => {
   });
 });
 
-test.describe("the default scope is the open note, or nothing", () => {
-  test("offers no Send with no note open, rather than a vault-wide run", async ({ page }) => {
-    // The host refuses a root grant (`scope.rs::is_root_grant`), so a client
-    // that built `{ kind: "folder", value: "" }` as a "whole vault" fallback
-    // would offer a Send that cannot work and a scope figure that reads "could
-    // not be checked". Mobile shipped exactly that for a review round.
-    await installMockIpc(page, { prefs: { ai_enabled: true } });
+test.describe("the default scope is the open note, or the whole vault", () => {
+  test("opens on the whole vault with no note open, so Send works", async ({ page }) => {
+    // **myne-md/myne#848 reverses the rule this test used to pin.** It read
+    // "The host refuses a root grant, so a client that built
+    // `{ kind: "folder", value: "" }` as a whole-vault fallback would offer a
+    // Send that cannot work", and that reasoning is still correct about the
+    // FOLDER shape. What changed is that the host grew an explicit `vault`
+    // grant, so "everything" is expressible without a folder path that
+    // canonises to the root, and the default is now the whole vault minus the
+    // excluded folders rather than nothing at all.
+    await installMockIpc(page, { prefs: { ai_enabled: true }, notes: A_NOTE });
     await page.goto("/");
     await page.getByTestId("workspace.tab-chat").click();
 
     await expect(page.getByTestId("ai.scope-strip")).toBeVisible();
     await page.getByTestId("ai.composer-input").fill("do something");
-    await expect(page.getByTestId("ai.composer-send")).toBeDisabled();
+    // The vault grant covers `A_NOTE`, so there is something to run against and
+    // the button is live. Before the change this was disabled and the strip said
+    // there was nothing to work on.
+    await expect(page.getByTestId("ai.composer-send")).toBeEnabled();
   });
 });
 
@@ -88,12 +95,12 @@ test.describe("consent does not arrive with the key", () => {
     await installMockIpc(page, { prefs: CONFIGURED_ELSEWHERE, notes: A_NOTE });
     await page.goto("/");
 
-    // **A note has to be open**, and that is a real precondition rather than
-    // test scaffolding: the default scope is the open note, and with none there
-    // is no scope. Myne does NOT fall back to the whole vault, because the host
-    // refuses a root grant outright (`defaultGrantFor` in
-    // `@myne/agent-protocol` carries the reasoning), so the composer says there
-    // is nothing to work on and Send is disabled.
+    // **A note has to be open**, and that is still a real precondition rather
+    // than test scaffolding: the default scope is the open note when there is
+    // one, and the whole vault when there is not (myne-md/myne#848, it used to
+    // be "nothing at all", because a root FOLDER grant is refused outright and
+    // there was no other way to spell the vault). This scenario opens a note so
+    // the run it refuses is the one anchored to that note.
     await page.getByTestId("notes.row").first().click();
     // Back to the list, because on a phone the editor REPLACES it and the tab
     // bar is not on screen while a note is open. `editing` survives the back,

@@ -405,7 +405,7 @@ pub struct VaultHeadingRow {
 /// reverse `uuid → title-key` lookup the backlink candidate query uses in
 /// Task 3), its per-occurrence outbound wikilink `edges` (Task 2), and its
 /// `tags` (Task 4). All string content is plaintext-derived.
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteRecord {
     /// The note's `title:` (frontmatter or first-H1 derived), if any.
     pub title: Option<String>,
@@ -454,6 +454,61 @@ pub struct NoteRecord {
     /// once.
     #[serde(default)]
     pub headings: Vec<HeadingEntry>,
+    /// Whether the note is part of the user's WORKING SET as the sidebar tree
+    /// defines it (`isLiveNote`: not trashed, not tombstoned, not archived, not
+    /// a template, not a conflict copy).
+    ///
+    /// Computed **TS-side by that same predicate**: the producer calls
+    /// `isLiveNote` and ships the answer, so a change to the sidebar's rule
+    /// moves this field with it. The agent's scope resolves against `live`
+    /// rather than re-deriving liveness from the markers, because a second
+    /// reader of the marker set is a second opinion about what "live" means,
+    /// which is exactly what this index's accessors refuse to be.
+    ///
+    /// Trailing, and **deliberately with no serde default** (review finding):
+    /// a default answers `true`, which is the fail-OPEN direction for a
+    /// permission input, and the sibling wire parameter says so out loud
+    /// (`commands.rs`: "A default would fail OPEN (every note in the agent's
+    /// scope)"). An omission is therefore a deserialization failure, which is
+    /// the answer a permission field owes. It does not serve a pre-change
+    /// at-rest snapshot either way:
+    ///
+    /// **A snapshot taken before this field existed does not load as a complete
+    /// index.** The postcard blob is non-self-describing, so the read runs out of
+    /// record: at end of input for a one-record snapshot, and inside the next
+    /// record's bytes for a many-record one. `docs/spec/protocol.md` §9.8.2 names
+    /// the residual that makes the second case worth pinning rather than
+    /// assuming: `from_bytes` performs no trailing-byte check, so a read whose
+    /// remaining bytes happen to satisfy the UTF-8 and discriminant checks could
+    /// terminate SUCCESSFULLY with a wrong map. It does not here, and
+    /// `persist.rs::a_snapshot_written_before_the_live_field_does_not_load_as_a_complete_index`
+    /// holds both record counts to that, because this field is a PERMISSION input
+    /// rather than display data: a wrong map's `live` values are a wrong agent
+    /// scope, not a wrong heading list. The load path falls to a full TS rebuild
+    /// (§9.8.4), the intended rebuild-on-format-change, paid once.
+    pub live: bool,
+}
+
+/// `live: true` by hand rather than by derive, and the difference is the whole
+/// reason this impl exists: `#[derive(Default)]` would make a bare
+/// `NoteRecord::default()` NON-live, so every test and fixture that builds one
+/// with `..Default::default()` would quietly drop out of the agent's working
+/// set. A record with nothing in it is not a hidden one.
+impl Default for NoteRecord {
+    fn default() -> Self {
+        Self {
+            title: None,
+            folder: None,
+            title_key: None,
+            edges: Vec::new(),
+            tags: Vec::new(),
+            properties: Vec::new(),
+            block_anchors: Vec::new(),
+            tasks: Vec::new(),
+            headings: Vec::new(),
+            live: true,
+        }
+    }
 }
 
 impl NoteRecord {
@@ -1637,10 +1692,19 @@ mod tests {
         // Mobile has its own extractor and an older desktop build has none; both
         // must keep working against this command. `#[serde(default)]` plus the
         // `Option` invoke argument is what makes the wire compatible both ways.
-        let json = r#"{"title":"Alpha","folder":null,"title_key":null,"edges":[],"tags":[],"properties":[]}"#;
+        let json = r#"{"title":"Alpha","folder":null,"title_key":null,"edges":[],"tags":[],"properties":[],"live":true}"#;
         let parsed: NoteRecord = serde_json::from_str(json).expect("deserializes without tasks");
         assert!(parsed.tasks.is_empty());
         assert!(parsed.block_anchors.is_empty());
+        // **`live` is the one field an omission must NOT be forgiven on**
+        // (review finding): it is the agent's read/write scope, so a default
+        // here fails OPEN. The wire parameter is required for the same reason
+        // (`commands.rs`), and this pins the state-side posture.
+        let no_live = r#"{"title":"Alpha","folder":null,"title_key":null,"edges":[],"tags":[],"properties":[]}"#;
+        assert!(
+            serde_json::from_str::<NoteRecord>(no_live).is_err(),
+            "a record with no `live` deserialized; a permission field must refuse rather than default"
+        );
     }
 
     #[test]
