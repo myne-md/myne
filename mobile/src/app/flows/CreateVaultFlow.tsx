@@ -34,6 +34,7 @@ import {
 } from "../../lib/secret-export";
 import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
 import { setVaultLabel } from "../../lib/prefs";
+import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
 // The kit's file format, ALIASED to the desktop implementation rather than
 // re-derived here (`mobile/vite.config.ts` carries the reason): a kit saved on a
 // phone is read back by the recovery flow on a computer, so the document has to
@@ -85,13 +86,6 @@ function beginErrorMessage(e: unknown): string {
   const kind = (e as { kind?: string } | null)?.kind;
   if (kind === "WeakNewPassword") return "createVault.beginWeakPassword";
   return "createVault.beginGeneric";
-}
-
-/** Four distinct random word positions (0-based) to confirm by type-back. */
-function pickChallenge(): number[] {
-  const set = new Set<number>();
-  while (set.size < 4) set.add(Math.floor(Math.random() * 24));
-  return [...set].sort((a, b) => a - b);
 }
 
 // ── Shared bordered input shell (mirrors the design Field / PasswordField) ─────
@@ -662,9 +656,11 @@ export function CreateVaultFlow({
   const passwordValid = pwd.length >= 8 && pwd === confirm;
   const confirmMatch = confirm.length > 0 && pwd === confirm;
 
-  const norms = answers.map((a) => a.trim().toLowerCase());
-  const corrects = challenge.map((idx, i) => norms[i].length > 0 && norms[i] === (phraseRef.current[idx] ?? ""));
-  const allCorrect = challenge.length === 4 && corrects.every(Boolean);
+  const { matches: corrects, allCorrect } = phraseTypeBackMatches(
+    phraseRef.current,
+    challenge,
+    answers,
+  );
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const startTypeBack = () => {
@@ -1122,7 +1118,7 @@ export function CreateVaultFlow({
                 position={idx + 1}
                 value={answers[i]}
                 onChange={(v) => setAnswers((prev) => prev.map((a, j) => (j === i ? v : a)))}
-                error={norms[i].length > 0 && !corrects[i] ? t("createVault.wordMismatch", { pos: idx + 1 }) : undefined}
+                error={corrects[i] === false ? t("createVault.wordMismatch", { pos: idx + 1 }) : undefined}
               />
             ))}
           </div>

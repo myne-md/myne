@@ -387,6 +387,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/manifest/v0.1/cases.json"),
         ),
         (
+            "member-names",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/member-names/v0.2/cases.json"),
+        ),
+        (
             "myn-blob",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/myn-blob/v0.1/cases.json"),
@@ -3406,9 +3411,10 @@ fn aad_construction_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_v0_2_vectors() {
     use protocol::{
-        aad_agent_memory_blob_v0_2, aad_awareness_frame, aad_membership_blob,
-        aad_membership_roster_blob, aad_password_wrap_v0_2, aad_person_binding_blob,
-        aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2, aad_vault_items_key_wrap_v0_2,
+        aad_agent_memory_blob_v0_2, aad_awareness_frame, aad_member_names_blob,
+        aad_membership_blob, aad_membership_roster_blob, aad_password_wrap_v0_2,
+        aad_person_binding_blob, aad_recovery_wrap_v0_2, aad_singleton_blob_v0_2,
+        aad_vault_items_key_wrap_v0_2,
     };
 
     let Some(raw) = cases_json_v0_2("aad-construction") else {
@@ -3497,6 +3503,17 @@ fn aad_construction_v0_2_vectors() {
                 let epoch = case.get("input_group_key_epoch").and_then(|v| v.as_u64());
                 aad_awareness_frame(&account_number_hash(), epoch)
             }
+            // The one builder in this family whose epoch is REQUIRED rather than
+            // optional, so the case always carries it, and the runner takes it
+            // without an `Option`, matching the signature rather than the
+            // sibling's shape. A missing field is a panic here, not a silent
+            // `None` that would pin an epochless AAD no writer produces.
+            "aad_member_names_blob" => {
+                let epoch = case["input_group_key_epoch"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing input_group_key_epoch"));
+                aad_member_names_blob(&account_number_hash(), epoch)
+            }
             other => panic!(
                 "[{id}] unknown input_builder_name '{other}' — update this match arm in lockstep with the schema"
             ),
@@ -3558,7 +3575,7 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 12] = [
+    let required: [&str; 13] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
@@ -3571,6 +3588,7 @@ fn aad_construction_v0_2_vectors() {
         "aad_person_keypair",
         "aad_vault_invite",
         "aad_awareness_frame",
+        "aad_member_names_blob",
     ];
     for builder in required {
         assert!(
@@ -3774,6 +3792,481 @@ fn awareness_frame_vectors() {
     assert!(
         saw_assertion,
         "awareness-frame must carry the assertion message-class case"
+    );
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn member_names_vectors() {
+    use protocol::{
+        decode_member_names_blob, derive_group_subkey_v0_2, encode_member_names_blob_raw,
+        member_name_signed_bytes, verify_member_name, verify_member_removal, GroupKey, GroupRole,
+        MemberNameEntry, MemberNamesBlobError, MemberNamesMap, PersonPublicHalf, SubkeyRole,
+        MAX_MEMBER_NAME_LEN, MEMBER_NAMES_BLOB_AAD_ROLE, MEMBER_NAMES_BLOB_FORMAT_V1,
+        MEMBER_NAMES_BLOB_HEADER_LEN, MEMBER_NAMES_BLOB_MAGIC, MEMBER_NAME_PREFIX,
+    };
+
+    // The wire names the companion's `expected_error` vocabulary is drawn from, kept
+    // exhaustive over the enum so a new variant cannot ship without deciding its name
+    // here. This is a second copy of the mapping in the generator, and that is
+    // deliberate rather than sloppy: the generator writes the JSON and this reads it,
+    // so a rename on one side alone fails right here: the two copies cross-check each
+    // other instead of one merely restating the other.
+    fn err_name(e: &MemberNamesBlobError) -> &'static str {
+        match e {
+            MemberNamesBlobError::HeaderTooShort => "header_too_short",
+            MemberNamesBlobError::MagicMismatch => "magic_mismatch",
+            MemberNamesBlobError::ProtocolVersionMismatch => "protocol_version_mismatch",
+            MemberNamesBlobError::MemberNamesFormatUnsupported => "format_unsupported",
+            MemberNamesBlobError::CiphertextLenOverflow => "ciphertext_len_overflow",
+            MemberNamesBlobError::CiphertextTruncated => "ciphertext_truncated",
+            MemberNamesBlobError::CannotDecrypt => "cannot_decrypt",
+            MemberNamesBlobError::RandomnessUnavailable => "randomness_unavailable",
+            MemberNamesBlobError::MapMalformed => "plaintext_parse_failed",
+            MemberNamesBlobError::MapNotCanonical => "not_canonical",
+            MemberNamesBlobError::EpochZero => "epoch_zero",
+            MemberNamesBlobError::SignatureUnavailable => "signature_unavailable",
+        }
+    }
+
+    fn parse_entry(v: &serde_json::Value, id: &str) -> MemberNameEntry {
+        MemberNameEntry {
+            name: v["name"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] entry name"))
+                .to_string(),
+            version: v["version"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("[{id}] entry version")),
+            tombstone: v["tombstone"]
+                .as_bool()
+                .unwrap_or_else(|| panic!("[{id}] entry tombstone")),
+            signature_hex: v["signature_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] entry signature_hex"))
+                .to_string(),
+        }
+    }
+
+    fn parse_map(v: &serde_json::Value, id: &str) -> MemberNamesMap {
+        let obj = v
+            .as_object()
+            .unwrap_or_else(|| panic!("[{id}] input_map must be a JSON object"));
+        let mut map = MemberNamesMap::new();
+        for (k, entry) in obj {
+            map.insert(k.clone(), parse_entry(entry, id));
+        }
+        map
+    }
+
+    let Some(raw) = cases_json_v0_2("member-names") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[member-names/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "member-names");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(!cases.is_empty());
+    assert_unique_vector_ids("member-names/v0.2", cases);
+
+    // The family magic and the message-class prefix are major-version-event
+    // constants (repo-root identifier table), so pin them whole rather than only
+    // through the bytes a case happens to carry.
+    assert_eq!(&MEMBER_NAMES_BLOB_MAGIC, b"MYO5");
+    assert_eq!(MEMBER_NAME_PREFIX, b"myne.member-name v1|");
+    assert_eq!(MEMBER_NAMES_BLOB_AAD_ROLE, b"member-names-blob");
+    assert_eq!(MEMBER_NAMES_BLOB_HEADER_LEN, 34);
+    assert_eq!(MAX_MEMBER_NAME_LEN, 64);
+
+    let mut saw_encrypt = false;
+    let mut saw_decrypt_fail = false;
+    let mut saw_parse_fail = false;
+    let mut saw_encode_fail = false;
+    let mut saw_signed_bytes = false;
+    let mut saw_verify = false;
+    let mut saw_group_subkey = false;
+    let mut pinned_errors: Vec<String> = Vec::new();
+    let mut pinned_roles: Vec<String> = Vec::new();
+    let mut derived: Vec<(String, [u8; 32])> = Vec::new();
+    // The verify kind is only meaningful if it pins BOTH outcomes: a family of
+    // refusals alone is passed by a `verify` that returns `false` unconditionally.
+    let mut saw_accept = false;
+    let mut saw_refuse = false;
+
+    for case in cases {
+        let id = case["vector_id"].as_str().expect("vector_id");
+        let kind = case["case_kind"].as_str().expect("case_kind");
+
+        // Only the four blob kinds carry a key and an account hash: `signed_bytes`,
+        // `verify` and `group_subkey` are keyless by construction (they pin a message
+        // class, a verification outcome and a derivation, none of which touches the
+        // seal), and demanding the fields there would be the schema's job, not this
+        // runner's.
+        let key = || -> [u8; protocol::AEAD_KEY_LEN] {
+            hex_decode_array(
+                case["input_member_names_key_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] input_member_names_key_hex")),
+            )
+        };
+        let account_hash = || -> [u8; 16] {
+            hex_decode_array(
+                case["input_account_number_hash_hex"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] input_account_number_hash_hex")),
+            )
+        };
+
+        match kind {
+            "encrypt" => {
+                saw_encrypt = true;
+                let epoch = case["input_group_key_epoch"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] input_group_key_epoch"));
+                let nonce: [u8; protocol::AEAD_NONCE_LEN] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_nonce_hex")),
+                );
+                let map = parse_map(&case["input_map"], id);
+                let expected = hex_decode(
+                    case["expected_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_blob_hex")),
+                );
+
+                let blob =
+                    encode_member_names_blob_raw(&key(), &account_hash(), epoch, &map, &nonce)
+                        .expect("seal member-names map");
+                assert_eq!(blob, expected, "[{id}] member-names blob bytes mismatch");
+
+                // The header facts the format fixes, asserted against the case's own
+                // pins rather than only against the blob: a regenerated fixture that
+                // lost its magic would otherwise still agree with the codec.
+                assert_eq!(
+                    case["expected_magic_ascii"].as_str(),
+                    Some("MYO5"),
+                    "[{id}] expected_magic_ascii"
+                );
+                assert_eq!(&blob[..4], &MEMBER_NAMES_BLOB_MAGIC[..], "[{id}] magic");
+                assert_eq!(
+                    hex_decode(
+                        case["expected_protocol_version_byte_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] expected_protocol_version_byte_hex"))
+                    ),
+                    vec![blob[4]],
+                    "[{id}] protocol_version byte"
+                );
+                assert_eq!(
+                    hex_decode(
+                        case["expected_format_version_byte_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] expected_format_version_byte_hex"))
+                    ),
+                    vec![MEMBER_NAMES_BLOB_FORMAT_V1],
+                    "[{id}] format_version byte"
+                );
+                assert_eq!(
+                    case["informational_header_len"].as_u64(),
+                    Some(MEMBER_NAMES_BLOB_HEADER_LEN as u64),
+                    "[{id}] header length"
+                );
+                let nonce_offset = case["informational_nonce_offset"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] informational_nonce_offset"))
+                    as usize;
+                assert_eq!(nonce_offset, 6, "[{id}] nonce offset");
+                assert_eq!(
+                    &blob[nonce_offset..nonce_offset + protocol::AEAD_NONCE_LEN],
+                    &nonce[..],
+                    "[{id}] nonce must sit at the pinned offset"
+                );
+                let declared =
+                    u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
+                assert_eq!(
+                    blob.len(),
+                    MEMBER_NAMES_BLOB_HEADER_LEN + declared,
+                    "[{id}] the length field counts the ciphertext with its tag"
+                );
+
+                // The plaintext is the CANONICAL map, so a port must be able to hand
+                // the codec the same map and read the same rows back. Round-tripping
+                // is what makes `not_canonical` a contract rather than a codec quirk.
+                let opened = decode_member_names_blob(&key(), &account_hash(), epoch, &expected)
+                    .expect("open");
+                assert_eq!(opened, map, "[{id}] map round-trip mismatch");
+            }
+            "decrypt_fail" | "parse_fail" => {
+                if kind == "decrypt_fail" {
+                    saw_decrypt_fail = true;
+                } else {
+                    saw_parse_fail = true;
+                }
+                let epoch = case["input_group_key_epoch"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] input_group_key_epoch"));
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_blob_hex")),
+                );
+                let want = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] expected_error"));
+                let err = decode_member_names_blob(&key(), &account_hash(), epoch, &blob)
+                    .err()
+                    .unwrap_or_else(|| panic!("[{id}] expected {want}, got Ok"));
+                assert_eq!(
+                    err_name(&err),
+                    want,
+                    "[{id}] wrong failure variant: {err:?}"
+                );
+                pinned_errors.push(want.to_string());
+            }
+            "encode_fail" => {
+                saw_encode_fail = true;
+                let epoch = case["input_group_key_epoch"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] input_group_key_epoch"));
+                let nonce: [u8; protocol::AEAD_NONCE_LEN] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_nonce_hex")),
+                );
+                let map = parse_map(&case["input_map"], id);
+                let want = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] expected_error"));
+                let err =
+                    encode_member_names_blob_raw(&key(), &account_hash(), epoch, &map, &nonce)
+                        .err()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] expected {want} on the write side, got Ok")
+                        });
+                assert_eq!(
+                    err_name(&err),
+                    want,
+                    "[{id}] wrong failure variant: {err:?}"
+                );
+                pinned_errors.push(want.to_string());
+            }
+            "signed_bytes" => {
+                saw_signed_bytes = true;
+                let person_id: [u8; 16] = hex_decode_array(
+                    case["input_person_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_person_id_hex")),
+                );
+                let version = case["input_version"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] input_version"));
+                let tombstone = case["input_tombstone"]
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("[{id}] input_tombstone"));
+                let name = case["input_name_utf8"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] input_name_utf8"));
+                assert_eq!(
+                    case["expected_prefix_ascii"].as_str(),
+                    Some("myne.member-name v1|"),
+                    "[{id}] expected_prefix_ascii"
+                );
+                assert_eq!(
+                    case["informational_name_len_bytes"].as_u64(),
+                    Some(name.len() as u64),
+                    "[{id}] the name length is BYTES, not characters"
+                );
+                let expected = hex_decode(
+                    case["expected_message_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_message_hex")),
+                );
+                let msg = member_name_signed_bytes(&person_id, version, tombstone, name);
+                assert_eq!(msg, expected, "[{id}] signed-message bytes mismatch");
+                assert!(
+                    msg.starts_with(MEMBER_NAME_PREFIX),
+                    "[{id}] the message must open with the class prefix"
+                );
+                // The prefix is what stops a name signature being replayed as a
+                // roster, invite, transition or awareness assertion, so it is asserted
+                // as a whole constant rather than only as the message's head.
+                assert_eq!(MEMBER_NAME_PREFIX.len(), 20);
+            }
+            "verify" => {
+                saw_verify = true;
+                let verifier = case["verifier"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] verifier"));
+                let person_id: [u8; 16] = hex_decode_array(
+                    case["input_person_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_person_id_hex")),
+                );
+                let public = PersonPublicHalf::from_parts_hex(
+                    case["input_signer_kem_ek_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_signer_kem_ek_hex")),
+                    case["input_signer_ed_pk_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_signer_ed_pk_hex")),
+                    case["input_signer_mldsa_vk_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_signer_mldsa_vk_hex")),
+                )
+                .unwrap_or_else(|e| panic!("[{id}] the published public half must parse: {e}"));
+                let entry = parse_entry(&case["input_entry"], id);
+                let expected = case["expected_verified"]
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("[{id}] expected_verified"));
+
+                // The message the signature covers, published beside the row so a port
+                // can diff its own assembly against ours instead of reconstructing it.
+                let signed = hex_decode(
+                    case["informational_signed_bytes_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] informational_signed_bytes_hex")),
+                );
+                assert_eq!(
+                    signed,
+                    member_name_signed_bytes(
+                        &person_id,
+                        entry.version,
+                        entry.tombstone,
+                        &entry.name
+                    ),
+                    "[{id}] informational_signed_bytes_hex must be the message the row signs"
+                );
+
+                let got = match verifier {
+                    "person" => verify_member_name(&public, &person_id, &entry),
+                    "owner" => verify_member_removal(&public, &person_id, &entry),
+                    other => panic!("[{id}] unknown verifier {other:?}"),
+                };
+                assert_eq!(got, expected, "[{id}] verification outcome mismatch");
+                if expected {
+                    saw_accept = true;
+                } else {
+                    saw_refuse = true;
+                }
+            }
+            "group_subkey" => {
+                saw_group_subkey = true;
+                let group_key: [u8; 32] = hex_decode_array(
+                    case["input_group_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] input_group_key_hex")),
+                );
+                let role_name = case["input_role"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] input_role"));
+                let role = match role_name {
+                    "member-names-key" => GroupRole::MemberNamesKey,
+                    "member-names-sync-id" => GroupRole::MemberNamesSyncId,
+                    other => panic!(
+                        "[{id}] unknown GROUP role {other:?}: the §3.4 registry has no such role"
+                    ),
+                };
+                let expected = hex_decode(
+                    case["expected_subkey_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_subkey_hex")),
+                );
+                let derived_key = derive_group_subkey_v0_2(&GroupKey::new(group_key), role);
+                assert_eq!(
+                    derived_key.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] {role_name} subkey bytes mismatch"
+                );
+                // A derivation that returned the group key unchanged would satisfy a
+                // byte comparison only if the fixture were regenerated to match, so
+                // the separation is asserted directly.
+                assert_ne!(
+                    derived_key.as_slice(),
+                    &group_key[..],
+                    "[{id}] {role_name} must not be the raw group key"
+                );
+                pinned_roles.push(role_name.to_string());
+                derived.push((role_name.to_string(), *derived_key));
+            }
+            other => panic!("[{id}] unknown member-names case_kind {other:?}"),
+        }
+    }
+
+    for (flag, what) in [
+        (saw_encrypt, "encrypt"),
+        (saw_decrypt_fail, "decrypt_fail"),
+        (saw_parse_fail, "parse_fail"),
+        (saw_encode_fail, "encode_fail"),
+        (saw_signed_bytes, "signed_bytes"),
+        (saw_verify, "verify"),
+        (saw_group_subkey, "group_subkey"),
+    ] {
+        assert!(
+            flag,
+            "member-names/v0.2 must carry at least one {what} case"
+        );
+    }
+    assert!(
+        saw_accept && saw_refuse,
+        "the verify kind must pin BOTH outcomes: a sheet of refusals alone is passed by \
+         a `verify` that always answers false"
+    );
+
+    let mut sorted_errors = pinned_errors.clone();
+    sorted_errors.sort_unstable();
+    sorted_errors.dedup();
+    assert!(
+        sorted_errors.len() >= 8,
+        "member-names/v0.2 pins only {} distinct failure names ({sorted_errors:?}); the family's \
+         decode surface is one variant at a time and must stay that way",
+        sorted_errors.len()
+    );
+
+    // ---- the §3.4 registry-level claim the `group_subkey` kind exists for -------
+    //
+    // Both roles are GROUP-tier, and the registry statement that matters is that
+    // NEITHER has a root-tier twin: if one ever grew a `SubkeyRole`, this family could
+    // be keyed from `root_key`, and a pre-B2B vault could carry a `MYO5` blob: the
+    // exact thing the family's `NTV6`-only rule forbids. Iterating `SubkeyRole::ALL`
+    // is what makes that fail when the registry changes rather than when somebody
+    // remembers to look.
+    let mut root_tier = Vec::new();
+    for role in SubkeyRole::ALL {
+        if let Some(group) = role.shared_group_role() {
+            root_tier.push(group);
+        }
+    }
+    for forbidden in [GroupRole::MemberNamesKey, GroupRole::MemberNamesSyncId] {
+        assert!(
+            !root_tier.contains(&forbidden),
+            "{forbidden:?} has a SubkeyRole counterpart, so this family could be keyed from \
+             root_key and a pre-B2B vault could carry it: the NTV6-only rule is broken"
+        );
+        assert!(
+            GroupRole::ALL.contains(&forbidden),
+            "{forbidden:?} must be registered in GroupRole::ALL (§3.4)"
+        );
+    }
+
+    // Both roles pinned, and pinned as DISTINCT values: two names for one derivation
+    // would pass a per-case byte check while making the sync-id role a second copy of
+    // the key role.
+    let mut sorted_roles = pinned_roles.clone();
+    sorted_roles.sort_unstable();
+    sorted_roles.dedup();
+    assert_eq!(
+        sorted_roles,
+        vec![
+            "member-names-key".to_string(),
+            "member-names-sync-id".to_string()
+        ],
+        "both GROUP roles must be pinned by a case"
+    );
+    assert_ne!(
+        derived[0].1, derived[1].1,
+        "the two member-names GROUP roles must derive different subkeys"
     );
 }
 

@@ -44,6 +44,7 @@ import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
 import { prefsRead, setVaultLabel, setVaultIcon } from "../../lib/prefs";
+import { memberVaultStatus } from "../../lib/personAccount";
 import { FolderGlyph } from "../../notes/components/FolderGlyph";
 import { FOLDER_ICON_NAMES } from "../../notes/folderIcons";
 import * as capabilities from "../../platform/capabilities";
@@ -357,10 +358,14 @@ function mapChangePasswordError(
       // Force-relock variants — caller's switch dispatches via
       // `onForceRelock`. No form-level banner.
       return null;
-    case "ChangePasswordInProgress":
     case "VaultNotUnlocked":
-      // UI/router bug indicators — not user-facing.
-      return null;
+      // The Rust side returns this whenever the vault slot is not unlocked when
+      // the command runs, on any vault, not only a shared one. Never a silent
+      // no-op (myne-md/myne#858).
+      return i18n.t("settings.account.changePasswordError.vaultNotUnlocked");
+    case "ChangePasswordInProgress":
+      // A second submit while one is in flight. State it rather than swallow it.
+      return i18n.t("settings.account.changePasswordError.unexpected");
     default:
       return assertNever(e);
   }
@@ -403,6 +408,27 @@ export function AccountPanel({
   const [savedIcon, setSavedIcon] = useState<string | null>(null);
   const [iconInFlight, setIconInFlight] = useState(false);
 
+  // A member vault holds no owner tier, so `vault_change_password` refuses with
+  // `VaultNotUnlocked` at the slot peek. Offering the control anyway made that a
+  // silent no-op with the form left open (myne-md/myne#858). Probe the vault's
+  // kind once and hide the owner password section for a member.
+  const [memberVault, setMemberVault] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      if (!vaultId) return;
+      try {
+        const member = await memberVaultStatus(vaultId);
+        if (alive) setMemberVault(member === true);
+      } catch {
+        if (alive) setMemberVault(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [vaultId]);
+
   // Defensive guard against state updates after unmount (e.g., the
   // parent modal closes mid-flight via a path that bypasses our
   // in-flight gating). React would warn otherwise.
@@ -439,7 +465,7 @@ export function AccountPanel({
     onInFlightChange?.(inFlight);
   }, [inFlight, onInFlightChange]);
 
-  if (view === "change-password") {
+  if (view === "change-password" && !memberVault) {
     const handleSubmit = (currentPassword: string, newPassword: string) => {
       setInFlight(true);
       // Clear any prior form-level error before the new attempt.
@@ -489,14 +515,14 @@ export function AccountPanel({
               );
               return;
             default:
-              // ChangePasswordInProgress / VaultNotUnlocked are
-              // UI/router bug indicators — not user-facing.
+              // Never a silent no-op (myne-md/myne#858): an unexpected refusal
+              // leaves the form open with a stated reason rather than nothing.
+              setFormError(
+                i18n.t("settings.account.changePasswordError.unexpected"),
+              );
               if (import.meta.env.DEV) {
                 // eslint-disable-next-line no-console
-                console.warn(
-                  "[AccountPanel] change_password rejected (UI/router bug indicator):",
-                  e,
-                );
+                console.warn("[AccountPanel] change_password rejected:", e);
               }
               return;
           }
@@ -648,19 +674,37 @@ export function AccountPanel({
 
   return (
     <div style={ROOT_STYLE}>
-      <section style={SECTION_STYLE}>
-        <h3 style={SECTION_HEADING_STYLE}>{t("settings.account.changePasswordHeading")}</h3>
-        <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
-        <div>
-          <Button
-            variant="primary"
-            data-testid="settings.change-password-cta"
-            onClick={() => setView("change-password")}
-          >
-            {t("settings.account.changePasswordButton")}
-          </Button>
-        </div>
-      </section>
+      {/* A member vault has no owner vault password to change: the backend has
+          no `root_key` for it and refuses with `VaultNotUnlocked`. The control is
+          hidden entirely and the member fast-unlock surface (Privacy) is pointed
+          at instead, rather than offering a button that silently does nothing
+          (myne-md/myne#858). */}
+      {memberVault ? (
+        <section style={SECTION_STYLE}>
+          <h3 style={SECTION_HEADING_STYLE}>
+            {t("settings.account.changePasswordHeading")}
+          </h3>
+          <p data-testid="settings.member-vault-notice" style={HELPER_TEXT_STYLE}>
+            {t("settings.account.memberVaultNotice")}
+          </p>
+        </section>
+      ) : (
+        <section style={SECTION_STYLE}>
+          <h3 style={SECTION_HEADING_STYLE}>
+            {t("settings.account.changePasswordHeading")}
+          </h3>
+          <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
+          <div>
+            <Button
+              variant="primary"
+              data-testid="settings.change-password-cta"
+              onClick={() => setView("change-password")}
+            >
+              {t("settings.account.changePasswordButton")}
+            </Button>
+          </div>
+        </section>
+      )}
 
       <section style={SECTION_STYLE}>
         <h3 style={LABEL_EYEBROW_STYLE}>{t("settings.account.vaultLabelEyebrow")}</h3>

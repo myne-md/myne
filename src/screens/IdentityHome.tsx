@@ -32,14 +32,17 @@ import {
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
+import { PasswordCreateForm } from "../components/PasswordCreateForm";
 import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
+import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { inspectInviteCode, personLock } from "../lib/invite";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../components/sync/EnrollPhraseCredential";
+import { MemberNameGate } from "../components/sync/MemberNameGate";
 
 /** How often the pending-invite list re-polls while the identity home is
  *  mounted and visible. The relay has no push channel for a person account, so
@@ -64,27 +67,14 @@ function sameInvites(previous: InviteSummary[] | null, next: InviteSummary[]): b
  *  failure on a member device was indistinguishable from a wrong owner code
  *  (myne-md/myne#794 manual-testing finding). The invoke rejects with the
  *  serialized `SyncDeviceError`, whose `kind` is a closed enum; anything else
- *  falls back to the generic message. */
-export function acceptErrorKey(error: unknown): string {
-  const kind =
-    typeof error === "object" && error !== null && "kind" in error
-      ? (error as { kind?: unknown }).kind
-      : undefined;
-  switch (kind) {
-    case "BadRequest":
-      return "identityHome.acceptErrorBadRequest";
-    case "DeviceNotFound":
-      return "identityHome.acceptErrorNotFound";
-    case "NotEnrolled":
-      return "identityHome.acceptErrorNotEnrolled";
-    case "Unauthenticated":
-      return "identityHome.acceptErrorUnauthenticated";
-    case "Transport":
-      return "identityHome.acceptErrorTransport";
-    default:
-      return "identityHome.acceptError";
-  }
-}
+ *  falls back to the generic message.
+ *
+ *  The mapping itself now lives in `@myne/client-core/accept-invite`, because the
+ *  phone collects an accept too (myne-md/myne#851 task 14) and two copies of a
+ *  six-arm switch over a closed enum is two places the distinction above can be
+ *  lost, silently. Kept exported under this name so this screen's readers and
+ *  its test are unchanged. */
+export const acceptErrorKey = acceptInviteErrorKey;
 
 const BLOCK_STYLE: CSSProperties = {
   display: "flex",
@@ -255,6 +245,12 @@ export function IdentityHome({
   const [ownerCode, setOwnerCode] = useState("");
   const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // The required name step (myne-md/myne#851 task 8, stories 5 to 7). The accept
+  // is COMMITTED by the time this opens, and `onAccepted` (which reprobes and lands
+  // the member in the editor) is withheld until the gate completes: an accepted
+  // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
+  // the accept left it, openable and unnamed, which is story 7's "not a lockout".
+  const [nameGateOpen, setNameGateOpen] = useState(false);
   const [acceptPhraseCells, setAcceptPhraseCells] = useState<string[]>(() =>
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
@@ -342,6 +338,17 @@ export function IdentityHome({
   }, [loadInvites]);
 
   const pending = (invites ?? []).filter((i) => !i.claimed);
+
+  if (nameGateOpen) {
+    return (
+      <MemberNameGate
+        onDone={() => {
+          setNameGateOpen(false);
+          onAccepted();
+        }}
+      />
+    );
+  }
 
   return (
     <CenteredCard>
@@ -540,20 +547,38 @@ export function IdentityHome({
                                 : `identity-home.accept-phrase-cell-${index + 1}`
                             }
                           />
-                          <Button
-                            type="button"
-                            variant="primary"
-                            data-testid="identity-home.accept-submit"
-                            disabled={!confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)}
-                            onClick={async () => {
+                          {/* The REQUIRED device-local credential (myne-md/myne#851
+                              task 7). This form's own submit IS the accept button,
+                              so the phrase, the out-of-band confirmation and a
+                              password meeting the project floor are all satisfied in
+                              one gesture, and an accepted vault always carries a
+                              credential this device can open it with. The copy says
+                              plainly that this is not the owner's password. */}
+                          <PasswordCreateForm
+                            testIdPrefix="identity-home.accept"
+                            submitLabel={t("identityHome.acceptSubmit")}
+                            disabled={
+                              !confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)
+                            }
+                            autoFocus={false}
+                            helperCopy={
+                              <p
+                                data-testid="identity-home.accept-password-note"
+                                style={BODY_SMALL_STYLE}
+                              >
+                                {t("identityHome.acceptPasswordNote")}
+                              </p>
+                            }
+                            onSubmit={async (password) => {
                               try {
                                 await personAcceptInvite(
                                   inv.invite_id_hex,
                                   ownerCode.trim(),
                                   acceptPhraseCells.join(" "),
+                                  password,
                                 );
                                 setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                                onAccepted();
+                                setNameGateOpen(true);
                               } catch (error) {
                                 // Surface WHICH failure it was, not only "could
                                 // not be accepted": the kinds are a closed enum
@@ -561,9 +586,7 @@ export function IdentityHome({
                                 setAcceptError(t(acceptErrorKey(error)));
                               }
                             }}
-                          >
-                            {t("identityHome.acceptSubmit")}
-                          </Button>
+                          />
                         </div>
                       )}
                       {acceptError ? (

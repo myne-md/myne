@@ -1322,6 +1322,18 @@ pub async fn sync_list_roster<R: Runtime>(
     };
     drop(slot);
 
+    // Which row is the caller? The UI marks it "You", and it must be decided by
+    // IDENTITY (the local person's fingerprint), not by the roster role: every
+    // device sees the owner's row as `role: owner`, so keying "You" on the role
+    // made an invited member read the owner's row as themselves
+    // (myne-md/myne#859). `None` when no person identity is installed, in which
+    // case no row is marked; roles and fingerprints still render.
+    let local_fingerprint_hex = state
+        .inner()
+        .clone_person_identity()
+        .await
+        .map(|identity| crate::account::person_identity::hex_lower(identity.fingerprint()));
+
     let root = crate::paths::active_vault_root_from_base(
         &host
             .app_data_dir()
@@ -1379,12 +1391,81 @@ pub async fn sync_list_roster<R: Runtime>(
             &b2b.base.account_number_hash,
         )
         .map_err(|_| SyncDeviceError::BadRequest)?;
+
+        // Signed display names (myne-md/myne#851 task 4), from the same group tier
+        // the roster itself came from. The epoch and the account hash are the ones
+        // ALREADY parsed above rather than a second read of `vault.meta`, because a
+        // second read could observe different bytes than the roster did.
+        let names_key = crate::plugins::member_names::names_key_for_group(
+            &group_key,
+            b2b.base.account_number_hash,
+            b2b.group_key_epoch,
+        );
+        let stored_names =
+            crate::plugins::member_names::read_member_names_in_dir(&io, &root, &names_key.borrow())
+                .await;
+        // A store that cannot be read answers "no names", never an error: this is a
+        // read for display and nothing is written back, so it cannot persist that
+        // emptiness over real rows (the hazard the store's own read guards against),
+        // and a damaged name store must not make the whole member list unlistable.
+        // Every row then reports `absent`, which is honest about what this device
+        // could prove.
+        let (verified_names, unverified_names) = match stored_names {
+            Ok(map) => {
+                // Each row's OWN public half, keyed by its person id. The owner's is
+                // passed separately so an owner-signed tombstone verifies too.
+                let publics: std::collections::HashMap<
+                    String,
+                    protocol::person_key::PersonPublicHalf,
+                > = roster
+                    .members
+                    .iter()
+                    .filter_map(|m| {
+                        let id = m.person_id_hex.as_deref()?;
+                        let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
+                            &m.member_kem_ek_hex,
+                            &m.member_ed_pk_hex,
+                            &m.member_mldsa_vk_hex,
+                        )
+                        .ok()?;
+                        Some((id.to_ascii_lowercase(), public))
+                    })
+                    .collect();
+                protocol::partition_verified(
+                    &map,
+                    |id| publics.get(&id.to_ascii_lowercase()).cloned(),
+                    Some(&owner_public),
+                )
+            }
+            Err(err) => {
+                tracing::warn!(
+                    stage = "roster",
+                    event = "member_names_unreadable",
+                    error = ?err,
+                    "the member-names store could not be read; listing members without names"
+                );
+                (protocol::MemberNamesMap::new(), Vec::new())
+            }
+        };
+
         return Ok(RosterListView {
             members: roster
                 .members
                 .into_iter()
                 .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
-                .map(RosterMemberView::from_group_member)
+                .map(|m| {
+                    let (display_name, name_state) = resolve_member_name(
+                        m.person_id_hex.as_deref(),
+                        &verified_names,
+                        &unverified_names,
+                    );
+                    RosterMemberView::from_group_member(
+                        m,
+                        local_fingerprint_hex.as_deref(),
+                        display_name,
+                        name_state,
+                    )
+                })
                 .collect(),
             authority,
             group_key_epoch: Some(roster.group_key_epoch),
@@ -1413,7 +1494,7 @@ pub async fn sync_list_roster<R: Runtime>(
         members: roster
             .into_values()
             .filter(|m| !m.deleted)
-            .map(RosterMemberView::from_entry)
+            .map(|m| RosterMemberView::from_entry(m, local_fingerprint_hex.as_deref()))
             .collect(),
         authority,
         group_key_epoch: None,
@@ -1435,7 +1516,28 @@ pub struct RosterListView {
 #[derive(Debug, serde::Serialize)]
 pub struct RosterMemberView {
     pub fingerprint_hex: String,
+    /// Whether this row is the CALLER: the local person's own fingerprint. The
+    /// UI renders its "You" badge from this, never from `role`, because every
+    /// device sees the owner's row as `owner` (myne-md/myne#859).
+    pub is_self: bool,
+    /// The member's display name, resolved from the signed `vault.member-names`
+    /// store (myne-md/myne#851 task 4). Non-empty ONLY when `name_state` is
+    /// `verified`, so a record that failed its signature never puts a name in front
+    /// of the user.
+    ///
+    /// It deliberately does NOT carry the owner-signed roster's own `display_name`.
+    /// That field is the vault label captured at migration rather than a person, it
+    /// read as "Owner"/"Member" on every device, and the member list must render a
+    /// name only where a member actually chose one; the fingerprint and the role
+    /// badge are what identify a row without a name.
     pub display_name: String,
+    /// Whether the store holds a name record for this row, and whether it verified:
+    /// `verified`, `unverified` or `absent`. Three answers rather than a flag,
+    /// because "this member has not chosen a name" and "somebody wrote a row for
+    /// this member that nobody signed" are different things to say and the member
+    /// list renders them differently. `display_name` is non-empty only for
+    /// `verified`.
+    pub name_state: String,
     /// The member's vault role (`owner` or `member`), serialized lowercase.
     pub role: super::roster::RosterRole,
     pub version: u64,
@@ -1460,10 +1562,17 @@ pub struct RosterMemberView {
 }
 
 impl RosterMemberView {
-    /// Map one `NTV6` signed-roster row to the UI shape. `version`/`joined_at`
+    /// Map one `NTV6` signed-roster row to the UI shape, with the name already
+    /// resolved from the store by [`resolve_member_name`]. `version`/`joined_at`
     /// are the legacy NTV5 roster's fields and carry no `NTV6` meaning, so they
     /// are zero; the `NTV6` row's own state is `continuity`.
-    fn from_group_member(m: protocol::person_invite::GroupRosterMember) -> Self {
+    fn from_group_member(
+        m: protocol::person_invite::GroupRosterMember,
+        local_fingerprint_hex: Option<&str>,
+        display_name: String,
+        name_state: &str,
+    ) -> Self {
+        let is_self = matches!(local_fingerprint_hex, Some(f) if f == m.fingerprint_hex.as_str());
         let continuity = match m.continuity {
             protocol::person_invite::GroupKeyContinuity::Current => "current",
             protocol::person_invite::GroupKeyContinuity::Changed => "changed",
@@ -1472,7 +1581,9 @@ impl RosterMemberView {
         .to_string();
         Self {
             fingerprint_hex: m.fingerprint_hex,
-            display_name: m.display_name,
+            is_self,
+            display_name,
+            name_state: name_state.to_string(),
             role: match m.role {
                 protocol::person_invite::GroupRosterRole::Owner => super::roster::RosterRole::Owner,
                 protocol::person_invite::GroupRosterRole::Member => {
@@ -1490,10 +1601,20 @@ impl RosterMemberView {
         }
     }
 
-    fn from_entry(e: super::roster::RosterMemberEntry) -> Self {
+    fn from_entry(
+        e: super::roster::RosterMemberEntry,
+        local_fingerprint_hex: Option<&str>,
+    ) -> Self {
+        let is_self = matches!(local_fingerprint_hex, Some(f) if f == e.fingerprint_hex.as_str());
         Self {
             fingerprint_hex: e.fingerprint_hex,
-            display_name: e.display_name,
+            is_self,
+            // The legacy `MYV1`/`NTV5` roster has no member-names store (the family
+            // is `NTV6`-only), and its own `display_name` is the field this change
+            // stops surfacing. So a legacy row reports no name, and the member list
+            // falls back to the fingerprint for it.
+            display_name: String::new(),
+            name_state: "absent".to_string(),
             role: e.role,
             version: e.version,
             previous_fingerprint_hex: e.previous_fingerprint_hex,
@@ -1507,20 +1628,67 @@ impl RosterMemberView {
     }
 }
 
+/// The name a roster row reports, and whether the store's record for it verified.
+///
+/// `verified` and `unverified` come from [`protocol::partition_verified`], which is
+/// what makes this trustworthy: a record is verified against the public half of the
+/// person the ROW names, so a member cannot claim another member's name, and an owner
+/// signature is accepted on a tombstone only. The unverified ids are kept as a list
+/// precisely so this can tell a failed record from an absent one.
+fn resolve_member_name(
+    person_id_hex: Option<&str>,
+    verified: &protocol::MemberNamesMap,
+    unverified: &[String],
+) -> (String, &'static str) {
+    let Some(id) = person_id_hex else {
+        // A row migrated from a pre-B2B roster has no person account, so nothing
+        // could have named it.
+        return (String::new(), "absent");
+    };
+    // The store's keys are the family's lowercase hex and the roster's
+    // `person_id_hex` is owner-supplied, so compare case-insensitively rather than
+    // trusting one spelling: a row that differs only in case is still that person.
+    let same = |k: &str| k.eq_ignore_ascii_case(id);
+    if let Some((_, entry)) = verified.iter().find(|(k, _)| same(k)) {
+        // A verified TOMBSTONE is a cleared name (or an owner removal), which reads
+        // as no name: the live view drops tombstones for the same reason.
+        if entry.tombstone {
+            return (String::new(), "absent");
+        }
+        return (entry.name.clone(), "verified");
+    }
+    if unverified.iter().any(|u| u.eq_ignore_ascii_case(id)) {
+        return (String::new(), "unverified");
+    }
+    (String::new(), "absent")
+}
+
 /// **Remove a member from the unlocked vault** (B2B, myne-md/myne#698
 /// tasks 4 and 7).
 ///
-/// PARKED until the roster wire ships: refuses immediately with
-/// [`SyncDeviceError::RemovalUnavailable`]. The rotation this would run is
-/// local-only (no peer propagation, no tombstone convergence), so the entry
-/// point stays refused rather than stranding peers on a retired key. When the
-/// wire lands, this delegates to `member_removal::remove_member_from_host`,
-/// which rotates the vault `itemsKey`, re-wraps every note and attachment
-/// blob's per-entry key under it (content ciphertext byte-identical),
-/// tombstones the removed member's roster row, re-wraps the new `itemsKey`
-/// to every remaining member's carried public half, re-seals the roster into
-/// `vault.meta`, and re-derives the slot's `itemsKey` so the running session
-/// keeps working.
+/// LIVE and reachable: `src/lib/invite.ts::removeMember` wraps it, `useRoster`
+/// exposes it as `remove`, and `MemberRosterPanel`'s remove button plus its
+/// confirm dialog call it. It is owner-only (`require_owner`), so a member gets
+/// the typed [`SyncDeviceError::NotOwner`].
+///
+/// It runs the canonical B2B rotation rather than the parked legacy NTV5 path:
+/// `member_removal::rotate_group_from_host` rotates the vault `itemsKey` and the
+/// `group_key` to epoch + 1, re-wraps every note and attachment blob's per-entry
+/// key under the new `itemsKey` (content ciphertext byte-identical), tombstones
+/// the removed member's roster row, re-seals every shared singleton
+/// (`vault.member-names` included) to the new group tier, re-wraps the new
+/// `itemsKey` to every remaining member's carried public half, and re-derives the
+/// slot's tiers so the running session keeps working. This command then posts the
+/// per-member packages and the retirement records
+/// (`person_account::push_and_revoke_removed_member_from_host`) and marks the
+/// scheduler dirty so the re-keyed content pushes on the next cycle.
+///
+/// [`SyncDeviceError::RemovalUnavailable`] is therefore NOT reachable from here:
+/// that variant belongs to the legacy NTV5 `member_removal::remove_member_from_host`,
+/// which stays parked and which nothing in this path calls. What is genuinely not
+/// shipped is the WIRE half: a removed member's device is never told, so it keeps
+/// the retired group key until it learns of the greater epoch from `vault.meta`.
+/// That is a liveness gap on the removed side, not a refusal on ours.
 #[tauri::command]
 pub async fn sync_remove_member<R: Runtime>(
     app: AppHandle<R>,
@@ -1528,9 +1696,8 @@ pub async fn sync_remove_member<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     member_fingerprint_hex: String,
 ) -> Result<(), SyncDeviceError> {
-    // The parked pipeline refuses everyone with `RemovalUnavailable`; check
-    // the authority first so a member gets the typed `NotOwner` refusal
-    // rather than the parked one.
+    // Authority BEFORE any vault work, so a non-owner gets the typed `NotOwner`
+    // rather than a failure from a rotation that should never have started.
     let authority = {
         let slot = state.inner().slot_read_active().await;
         match &*slot {
@@ -2622,8 +2789,233 @@ mod tests {
             transition_hex: None,
             joined_at: 0,
         };
-        let view = super::RosterMemberView::from_entry(entry);
+        let view = super::RosterMemberView::from_entry(entry, None);
         assert_eq!(view.role, RosterRole::Owner);
+        // No local identity → no row is marked as the caller (myne-md/myne#859).
+        assert!(!view.is_self);
+    }
+
+    // `is_self` is decided by FINGERPRINT, never by role: every device sees the
+    // owner's row as `Owner`, so a role-keyed marker made an invited member read
+    // the owner as themselves (myne-md/myne#859).
+    #[test]
+    fn roster_member_view_marks_the_caller_by_fingerprint_not_role() {
+        use crate::plugins::sync::roster::{RosterMemberEntry, RosterRole};
+        let mine = "aa".repeat(32);
+        let row = |fingerprint_hex: String, role: RosterRole| RosterMemberEntry {
+            fingerprint_hex,
+            display_name: "Untitled vault".into(),
+            wrapped_items_key_hex: "bb".repeat(32),
+            member_kem_ek_hex: "cd".repeat(1184),
+            member_ed_pk_hex: "ef".repeat(32),
+            member_mldsa_vk_hex: "01".repeat(1952),
+            version: 1,
+            role,
+            deleted: false,
+            previous_fingerprint_hex: None,
+            transition_hex: None,
+            joined_at: 0,
+        };
+        assert!(
+            super::RosterMemberView::from_entry(row(mine.clone(), RosterRole::Member), Some(&mine))
+                .is_self
+        );
+        // A member's own row can be the OWNER role on the owner's device, and the
+        // owner's row is NOT self on the member's device.
+        assert!(
+            !super::RosterMemberView::from_entry(
+                row("ff".repeat(32), RosterRole::Owner),
+                Some(&mine)
+            )
+            .is_self
+        );
+    }
+
+    // ── the signed display name in the roster view (myne-md/myne#851 task 4) ──
+    //
+    // A row reports a NAME only where the store's record verified against the
+    // person the ROW names. The three answers are load-bearing: `verified` carries
+    // the name, `unverified` is a record that exists and failed its signature (or
+    // names someone else), and `absent` is a member who has not chosen one. The
+    // UI may render a name for the first and must not for the other two, but the
+    // last two stay distinguishable because they say different things.
+
+    fn name_pair(seed: u8) -> PersonKeyPair {
+        PersonKeyPair::generate_raw(
+            &[seed; protocol::person_key::PERSON_DK_SEED_LEN],
+            &[seed.wrapping_add(1); protocol::person_key::PERSON_ED25519_SEED_LEN],
+            &[seed.wrapping_add(2); protocol::person_key::PERSON_MLDSA_SEED_LEN],
+        )
+    }
+
+    /// A live group-roster row for `pair`, carrying whatever owner-signed
+    /// `display_name` we hand it. That field is exactly what the view must STOP
+    /// surfacing, so each fixture below sets it to something the assertions would
+    /// catch if it leaked.
+    fn group_row(
+        pair: &PersonKeyPair,
+        person_id_hex: Option<String>,
+        owner_signed_name: &str,
+    ) -> protocol::person_invite::GroupRosterMember {
+        use crate::account::person_identity::hex_lower;
+        use protocol::person_invite::{
+            GroupKeyContinuity, GroupMemberState, GroupRosterMember, GroupRosterRole,
+        };
+        let public = pair.public_half();
+        GroupRosterMember {
+            fingerprint_hex: hex_lower(pair.fingerprint()),
+            person_id_hex,
+            display_name: owner_signed_name.into(),
+            role: GroupRosterRole::Member,
+            state: GroupMemberState::Live,
+            wrapped_group_key_hex: None,
+            member_kem_ek_hex: hex_lower(public.kem_ek()),
+            member_ed_pk_hex: hex_lower(public.ed_pk()),
+            member_mldsa_vk_hex: hex_lower(public.mldsa_vk()),
+            previous_fingerprint_hex: None,
+            continuity: GroupKeyContinuity::Current,
+            transition_hex: None,
+        }
+    }
+
+    fn publics_for(
+        rows: &[protocol::person_invite::GroupRosterMember],
+    ) -> std::collections::HashMap<String, protocol::person_key::PersonPublicHalf> {
+        rows.iter()
+            .filter_map(|m| {
+                let id = m.person_id_hex.as_deref()?;
+                let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
+                    &m.member_kem_ek_hex,
+                    &m.member_ed_pk_hex,
+                    &m.member_mldsa_vk_hex,
+                )
+                .ok()?;
+                Some((id.to_ascii_lowercase(), public))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_group_row_reports_its_verified_name_and_flags_the_others() {
+        use crate::plugins::sync::roster::RosterRole;
+        use protocol::MemberNamesMap;
+
+        let ada = name_pair(0x21);
+        let bob = name_pair(0x31);
+        let mallory = name_pair(0x41);
+        let (ada_id, bob_id, mal_id) = ("ab".repeat(16), "cd".repeat(16), "ef".repeat(16));
+        // Every row's owner-signed name is a value the view must NOT surface.
+        let rows = vec![
+            group_row(&ada, Some(ada_id.clone()), "Owner"),
+            group_row(&bob, Some(bob_id.clone()), "Member"),
+            group_row(&mallory, Some(mal_id.clone()), "Member"),
+        ];
+
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let mut store = MemberNamesMap::new();
+        // Ada signs her OWN row: verifies.
+        store.insert(
+            ada_id.clone(),
+            protocol::sign_member_name(&ada, &[0xab; 16], 1, false, "Ada", &mut rng).unwrap(),
+        );
+        // Mallory's row carries a name Ada signed, so it verifies against nobody
+        // the row names: unverified, and its name must not cross the boundary.
+        store.insert(
+            mal_id.clone(),
+            protocol::sign_member_name(&ada, &[0xef; 16], 1, false, "Grace", &mut rng).unwrap(),
+        );
+
+        let publics = publics_for(&rows);
+        let (verified, unverified) = protocol::partition_verified(
+            &store,
+            |id| publics.get(&id.to_ascii_lowercase()).cloned(),
+            None,
+        );
+        assert_eq!(verified.len(), 1, "only Ada's own signature verifies");
+        assert_eq!(unverified, vec![mal_id.clone()]);
+
+        let views: Vec<_> = rows
+            .into_iter()
+            .map(|m| {
+                let (display_name, name_state) =
+                    super::resolve_member_name(m.person_id_hex.as_deref(), &verified, &unverified);
+                super::RosterMemberView::from_group_member(m, None, display_name, name_state)
+            })
+            .collect();
+
+        assert_eq!(views[0].display_name, "Ada");
+        assert_eq!(views[0].name_state, "verified");
+        assert_eq!(views[1].display_name, "", "no record means no name");
+        assert_eq!(views[1].name_state, "absent");
+        assert_eq!(
+            views[2].display_name, "",
+            "a name nobody signed never reaches the UI"
+        );
+        assert_eq!(views[2].name_state, "unverified");
+        assert_ne!(
+            views[1].name_state, views[2].name_state,
+            "an absent record and a failed one are different things to say"
+        );
+        // The owner-signed roster field is gone from every row, including the one
+        // whose store record verified: the name above comes from the store.
+        assert!(views
+            .iter()
+            .all(|v| v.display_name != "Owner" && v.display_name != "Member"));
+        // The identity affordances are untouched by this change.
+        assert_eq!(views[0].role, RosterRole::Member);
+        assert!(views.iter().all(|v| !v.is_self));
+    }
+
+    #[test]
+    fn resolve_member_name_reads_a_tombstone_and_a_missing_person_id_as_absent() {
+        use protocol::MemberNamesMap;
+
+        let ada = name_pair(0x21);
+        let id_hex = "ab".repeat(16);
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+
+        // A VERIFIED TOMBSTONE is a cleared name, which reads as no name: the live
+        // view drops tombstones for the same reason.
+        let mut cleared = MemberNamesMap::new();
+        cleared.insert(
+            id_hex.clone(),
+            protocol::sign_member_name(&ada, &[0xab; 16], 2, true, "", &mut rng).unwrap(),
+        );
+        assert_eq!(
+            super::resolve_member_name(Some(&id_hex), &cleared, &[]),
+            (String::new(), "absent")
+        );
+        // A row migrated from a pre-B2B roster has no person account, so nothing
+        // could have named it.
+        assert_eq!(
+            super::resolve_member_name(None, &cleared, &[]),
+            (String::new(), "absent")
+        );
+
+        // The store's keys are the family's lowercase hex and the roster's id is
+        // owner-supplied, so a row differing only in case is still that person.
+        let mut live = MemberNamesMap::new();
+        live.insert(
+            id_hex.clone(),
+            protocol::sign_member_name(&ada, &[0xab; 16], 1, false, "Ada", &mut rng).unwrap(),
+        );
+        assert_eq!(
+            super::resolve_member_name(Some(&id_hex.to_ascii_uppercase()), &live, &[]),
+            ("Ada".to_string(), "verified")
+        );
+        // And an id the store knows nothing about is absent, not unverified.
+        assert_eq!(
+            super::resolve_member_name(Some(&"cd".repeat(16)), &live, &[]),
+            (String::new(), "absent")
+        );
+        assert_eq!(
+            super::resolve_member_name(
+                Some(&"cd".repeat(16)),
+                &MemberNamesMap::new(),
+                &["cd".repeat(16)]
+            ),
+            (String::new(), "unverified")
+        );
     }
 
     // ── Explicit owner-approved NTV5 → NTV6 migration (myne-md/myne#712) ─────

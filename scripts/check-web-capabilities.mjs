@@ -253,6 +253,11 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",
+    // The member display-name writers (myne-md/myne#851): a separate command
+    // namespace and the same capability refusal, since a name row is signed by a
+    // person identity a served page cannot hold.
+    "plugin:member-names|member_names_set_mine",
+    "plugin:member-names|member_names_clear_mine",
   ],
 };
 

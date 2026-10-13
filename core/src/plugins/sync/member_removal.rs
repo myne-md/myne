@@ -64,10 +64,11 @@ pub const REKEY_JOURNAL: &str = ".rekey-journal";
 /// Member-removal errors. Closed enum; no path or secret ever crosses IPC.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemberRemovalError {
-    /// Member removal is parked until the roster wire ships. Every removal
-    /// entry point refuses with this before touching the vault, so the
-    /// non-converging half (local rotation without peer propagation or
-    /// tombstone convergence) cannot run.
+    /// The LEGACY `NTV5` removal path ([`remove_member_from_host`]) is parked and
+    /// refuses with this before touching the vault. The canonical B2B rotation
+    /// ([`rotate_group_from_host`], which `sync_remove_member` runs) does NOT
+    /// produce it, so a live caller never sees this variant; it survives because
+    /// the parked body is still compiled and still tested.
     RemovalUnavailable,
     /// No vault is unlocked.
     VaultLocked,
@@ -511,15 +512,28 @@ fn address_packages(
 }
 
 /// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
-/// vault: the attachments catalog, `vault.prefs` and `vault.themes` are all
+/// vault. Every shared singleton whose sync-id is derived from the GROUP key is
 /// addressed by a group-derived id (decision 0609), so a rotation to a new
-/// `group_key` retires exactly these three.
+/// `group_key` retires each of them: the attachments catalog, `vault.prefs`,
+/// `vault.themes` and `vault.member-names` (myne-md/myne#851).
+///
+/// **This list and the re-seal set are one decision, not two.** Retiring an id
+/// whose blob was not re-sealed DELETES the family server-side and leaves
+/// nothing behind, which is why `rotate_group_from_host` re-seals this same set
+/// from the old group key to the new one in the step before it queues these.
+/// `vault.member-names` is group-tier-ONLY (no `NTV5` form, so it cannot go
+/// through `vault_migrate::b2b::SHARED_SINGLETONS`, whose members are promoted
+/// from the owner root tier and whose re-seal therefore takes a
+/// `SingletonOldTier`); its re-seal is the dedicated group-to-group step in the
+/// rotation, because its AAD binds `group_key_epoch` and that helper's signature
+/// does not carry an epoch.
 fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
     let group = protocol::GroupKey::new(*old_group_key);
     [
         protocol::GroupRole::CatalogSyncId,
         protocol::GroupRole::PrefsSyncId,
         protocol::GroupRole::ThemesSyncId,
+        protocol::GroupRole::MemberNamesSyncId,
     ]
     .into_iter()
     .map(|role| {
@@ -540,7 +554,9 @@ fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
 /// 2. mint a fresh random `group_key` (epoch + 1) and a fresh `itemsKey`;
 /// 3. re-wrap every content blob's per-entry key under the new `itemsKey` —
 ///    content ciphertext and every identifier byte-identical;
-/// 4. re-seal the shared singletons from the OLD group key to the NEW one;
+/// 4. re-seal the shared singletons from the OLD group key to the NEW one,
+///    `vault.member-names` included (group-tier-only, so it takes the dedicated
+///    epoch-aware step rather than the `SHARED_SINGLETONS` loop);
 /// 5. rebuild the signed roster: the removed row becomes a tombstone, every
 ///    remaining live member gets a fresh package at the new epoch (the removed
 ///    member gets none), and emit the two owner-signed retirement records;
@@ -600,6 +616,10 @@ pub async fn rotate_group_from_host(
     let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
     let account_number_hash = b2b_meta.base.account_number_hash;
+    // Captured rather than read off `b2b_meta` later: `base` is moved out of it at
+    // step (6), while the `vault.member-names` re-seal in between needs the RETIRED
+    // epoch, which rides that family's AAD (`aad_member_names_blob`).
+    let old_epoch = b2b_meta.group_key_epoch;
 
     // (1) The current roster is sealed under the OLD group key at the current
     // epoch; open it, then verify the owner signature.
@@ -681,6 +701,49 @@ pub async fn rotate_group_from_host(
     let new_roster = protocol::person_invite::parse_group_roster(&rotated.signed_roster.payload)
         .ok_or(MemberRemovalError::InvalidVaultMeta)?;
     let packages = address_packages(rotated.packages, &new_roster)?;
+
+    // (5c) Re-seal `vault.member-names` from the retired epoch's group tier to
+    // the new one. Separate from the `SHARED_SINGLETONS` loop above for two
+    // reasons, both structural rather than stylistic: this family has NO `NTV5`
+    // (`root_key`) form, so it is always a group-to-group move while that loop's
+    // helper takes either old tier, and its AAD binds `group_key_epoch`, which
+    // that helper's signature does not carry. The retired epoch's blob opens
+    // under the key the member just removed STILL HOLDS, so skipping this would
+    // both keep the name map readable to them and leave it unreadable to everyone
+    // else, whose session moves to the new group key at step (8). It must land
+    // with the reclaim entry in `group_rotation_reclaim_sync_ids`, which retires
+    // this blob's old sync-plane id.
+    match io
+        .read(&vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE))
+        .await
+    {
+        Ok(blob) => {
+            let old_names_key =
+                protocol::derive_group_subkey_v0_2(&old_group, protocol::GroupRole::MemberNamesKey);
+            let new_names_key =
+                protocol::derive_group_subkey_v0_2(&new_group, protocol::GroupRole::MemberNamesKey);
+            let map = protocol::decode_member_names_blob(
+                &old_names_key,
+                &account_number_hash,
+                old_epoch,
+                &blob,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            let resealed = protocol::encode_member_names_blob(
+                &new_names_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &map,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+                resealed,
+            ));
+        }
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {}
+        Err(_) => return Err(MemberRemovalError::Io),
+    }
 
     // (6) Re-seal the NTV6 metadata at the new epoch.
     let mut base = b2b_meta.base;
@@ -777,8 +840,8 @@ pub async fn rotate_group_from_host(
 
 /// Re-base the sync plane for a group rotation (myne-md/myne#711 task 30,
 /// `decisions/protocol/0609`). In an `NTV6` vault the reserved sync-ids of the
-/// shared singletons (attachments catalog, prefs, themes) are derived from the
-/// group key, so a rotation to a new epoch moves them. Each retired epoch's id
+/// shared singletons (attachments catalog, prefs, themes, member names) are
+/// derived from the group key, so a rotation to a new epoch moves them. Each retired epoch's id
 /// that this device holds a baseline for is queued as an orphan tombstone (the
 /// next push flags it on the server so horizon-GC reclaims the stranded record)
 /// and its baseline dropped, the same shape as
@@ -1295,6 +1358,38 @@ mod tests {
     const ROT_ACCT: [u8; 16] = [0x44; 16];
     const ROT_ITEMS_ID: [u8; 16] = [0x07; 16];
     const ROT_ROOT: [u8; 32] = [0x11; 32];
+    /// The person id of the live `vault.member-names` row the rotation fixture seeds,
+    /// so a test can address the row it expects to survive.
+    const ROT_MEMBER_ID: [u8; 16] = [0x66; 16];
+
+    /// Seal a one-row `vault.member-names` map at `epoch` under `group_key`, through the
+    /// family's own codec, so the rotation's re-seal runs against the real shape rather
+    /// than a hand-built envelope.
+    fn seed_names_blob(
+        root: &std::path::Path,
+        owner: &PersonKeyPair,
+        group_key: &[u8; 32],
+        epoch: u64,
+        person_id: &[u8; 16],
+        name: &str,
+    ) {
+        let key = protocol::derive_group_subkey_v0_2(
+            &protocol::GroupKey::new(*group_key),
+            protocol::GroupRole::MemberNamesKey,
+        );
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let row = protocol::sign_member_name(owner, person_id, 1, false, name, &mut rng)
+            .expect("sign name row");
+        let mut map = protocol::MemberNamesMap::new();
+        map.insert(rot_hex(person_id), row);
+        let blob = protocol::encode_member_names_blob(&key, &ROT_ACCT, epoch, &map)
+            .expect("seal names blob");
+        std::fs::write(
+            root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+            blob,
+        )
+        .expect("write names blob");
+    }
 
     fn rot_pair(seed: u8) -> PersonKeyPair {
         let mut kem = [0u8; protocol::person_key::PERSON_DK_SEED_LEN];
@@ -1540,6 +1635,12 @@ mod tests {
         ));
         std::fs::write(&note_path, &note).expect("write note");
 
+        // A real vault carries a `vault.member-names` map, and it is the one shared
+        // singleton whose re-seal is NOT the `SHARED_SINGLETONS` loop (`MYO5` is
+        // group-tier only and its AAD binds the epoch), so the fixture seeds one at
+        // epoch 1. Without it a rotation test would prove nothing about step 5c.
+        seed_names_blob(&root, owner, &group_key_old, 1, &ROT_MEMBER_ID, "Member");
+
         let state = VaultRuntimeState::default();
         state
             .set_unlocked(
@@ -1655,6 +1756,50 @@ mod tests {
             .expect("note opens under the rotated key");
             assert_eq!(&decoded[..], b"rotated-body");
 
+            // (5c) `vault.member-names` moved to the new epoch. Asserted through the
+            // READER path the app uses (`resolve_names` off the live session), not
+            // through a key this test derived for itself: the property that was missing
+            // is "the name map is still readable after a removal", and a re-seal that
+            // used the wrong key or the wrong epoch would satisfy a self-derived check
+            // only if the test reproduced the same mistake.
+            let names_path = root.join(crate::plugins::member_names::MEMBER_NAMES_FILE);
+            let names_bytes = std::fs::read(&names_path).expect("the names blob is still there");
+            let resolved =
+                crate::plugins::member_names::commands::resolve_names(&StdVaultIo, &state, &root)
+                    .await
+                    .expect("the session resolves the names KEK after the rotation");
+            assert_eq!(
+                resolved.group_key_epoch, out.new_epoch,
+                "the session moved to the new epoch"
+            );
+            let reopened = protocol::decode_member_names_blob(
+                &resolved.key,
+                &resolved.account_number_hash,
+                resolved.group_key_epoch,
+                &names_bytes,
+            )
+            .expect("the re-sealed map opens under the SESSION's key at the new epoch");
+            assert!(
+                reopened.contains_key(&rot_hex(&ROT_MEMBER_ID)),
+                "the row survived the rotation"
+            );
+            assert_eq!(
+                reopened[&rot_hex(&ROT_MEMBER_ID)].name,
+                "Member",
+                "and its name is intact"
+            );
+            assert!(
+                protocol::decode_member_names_blob(
+                    &resolved.key,
+                    &resolved.account_number_hash,
+                    1,
+                    &names_bytes,
+                )
+                .is_err(),
+                "the re-sealed blob must NOT open at the retired epoch: that is what \
+                 makes the epoch binding load-bearing"
+            );
+
             // The running session moved to the new tiers.
             assert_eq!(state.active_vault_id().await, Some(id));
         });
@@ -1695,6 +1840,25 @@ mod tests {
             let tmp = ScopedTempDir::new("rotation-rebase").expect("tempdir");
             let io = StdVaultIo;
             let old_group = [0x5Au8; 32];
+
+            // `vault.member-names` is in this set (myne-md/myne#851). Pinned by NAME
+            // rather than by count, because the failure this guards is a family whose
+            // id is retired without its blob being re-sealed, and a count would still
+            // pass if an unrelated role were swapped in for it.
+            let names_id = {
+                let sub = protocol::derive_group_subkey_v0_2(
+                    &protocol::GroupKey::new(old_group),
+                    protocol::GroupRole::MemberNamesSyncId,
+                );
+                let mut id = [0u8; 16];
+                id.copy_from_slice(&sub[..16]);
+                crate::plugins::sync::to_hex(&id)
+            };
+            assert!(
+                group_rotation_reclaim_sync_ids(&old_group).contains(&names_id),
+                "the retired epoch's `vault.member-names` id must be reclaimed, or the \
+                 removed member keeps reading the map under the group key they still hold"
+            );
 
             let old_sub = protocol::derive_group_subkey_v0_2(
                 &protocol::GroupKey::new(old_group),

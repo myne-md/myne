@@ -922,6 +922,12 @@ One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2
 
 Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 
+### **device password** &nbsp; 🗝️ *Key/identifier*
+
+The password a person chooses at the moment they accept a vault invite, which becomes their **device-local** fast credential: it seals their `group_key`, `items_key` and person keypair into the device-local `vault.member-unlock` store under the `"myne.v0.2 argon2id-person-vault-member-unlock|"` salt domain, so a member vault re-opens without retyping the 24-word phrase every session (`decisions/protocol/0653`). It is THIS DEVICE's, not the vault owner's: a member vault has no owner password to type here, and the product copy says so ("the password you set on this device", `locales/en/common.json`). Since `decisions/ui/0668` it is **required** at accept, on both clients, rather than offered afterwards in Settings, so a member device now stores an extra credential on disk by default; that default and its threat-model consequence are the subject of `threat-model.md` A5/AS21. **Distinct from**: the owner's vault master password (which rides in the synced `vault.meta`), the [recovery phrase](#recovery-phrase) (device-portable, and still the portable credential on every device at every unlock screen, through `vault.member-key`, `decisions/protocol/0606`), and a [device-local credential](#device-local-credential) in general.
+
+Used in: `decisions/protocol/0653`, `decisions/ui/0668`, `core/src/plugins/sync/person_account.rs`, `spec/protocol.md` §9.29
+
 ### **Documentation node** &nbsp; 📦 *Product*
 
 The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
@@ -1911,6 +1917,20 @@ Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs
 The user's primary authentication credential. Held in user memory only. Fed to Argon2id with `salt_password` to derive `password_wrap_key`, which encrypts a copy of `root_key`. Myne recommends ≥12 characters and zxcvbn score ≥3 at signup; users with weaker passwords are protected primarily by their recovery phrase.
 
 Used in: `spec/protocol.md` §3.1, §4.1
+
+### **member display name** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+The name a member of a shared (`NTV6`) vault chooses for themselves, and that their co-members see beside their fingerprint in the Members list (`myne-md/myne#851`). It lives in its own blob family, `vault.member-names` (`MYO5`, `protocol.md` §9.29, `decisions/protocol/0666`), and NOT in the owner-signed [group roster](#group-roster), because the roster is owner-signed and compared byte-for-byte by older clients: a value any member may change cannot live there. It is group-tier sealed, so every member reads every name and only members read any; a name is vault content, encrypted and synced and backed up, readable by the whole vault and by nobody else.
+
+Three properties are load-bearing rather than incidental. Each row is signed by the person it NAMES under the `"myne.member-name v1|"` class (`decisions/protocol/0667`), so a member cannot claim another member's row; a tombstone is additionally accepted from the vault owner, which is how a removal clears a row. A name is **per vault**, so one member can be "Ada" in one vault and something else in another. And a name is a **label, not an identity**: two members may choose the same one, the fingerprint and the role badge are what identify a row, and a row whose record fails signature verification renders as [unverified](#member-name-verification-state) rather than as a name. Nothing keys on the name itself.
+
+Used in: `design-notes/protocol/0666-member-display-names-a-group-tier-sealed-myo5-family.md`; `docs/spec/protocol.md` §9.29; `src/components/sync/MemberRosterPanel.tsx`; `myne-md/myne#851`.
+
+### **member name verification state** &nbsp; 📋 *Protocol*
+
+The verdict a reader attaches to a member display-name row: `verified` (the row's signature checks out against the public half of the person the row names), `unverified` (a record exists and the signature does not check out, or names somebody else), or `absent` (no record for that person). The three are deliberately separate rather than collapsed into a boolean or into "no name", because "this member has not chosen a name" and "somebody wrote a row for this member that nobody signed" are different things to tell a reader. The verification happens where the roster's public halves are already available, and the unverified record's CONTENT is not carried out of that partition, so a tampered name never reaches a surface that could render it.
+
+Used in: `docs/spec/protocol.md` §9.29.4; `design-notes/protocol/0667-the-member-name-signature-class.md`; `protocol/src/member_names_blob.rs` (`partition_verified`).
 
 ### **member removal** &nbsp; 📦 *Product*
 
@@ -3497,6 +3517,12 @@ Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `deci
 The recorded SET of twin pairs that currently differ semantically. It may shrink, never grow: a pair appearing in it that was not there before fails the build, and `--record` REFUSES to write a grown set, so the command the failure message suggests cannot be used to make the failure go away. A set rather than a count, because the case that actually happens is one pair converging while another diverges, which leaves a count unmoved. Only the SEMANTIC field gates: 15 of the tree's byte-different pairs differ only in a comment or the platform-seam import, and gating the byte flag would redden `pre-commit` for adding a comment to either side of a byte-identical pair. Its denominator has a separate floor, `EXAMINED_FLOOR`, kept in the guard rather than in the record, because shrinking the twin roster would shrink the set for free and read as progress.
 
 Used in: `scripts/check-twin-drift-ratchet.mjs`, `scripts/twin-drift-ratchet.json`, `decisions.md` 2026-09-02 (twin-drift ratchet, myne-md/myne#473)
+
+### **type-back challenge** &nbsp; 📦 *Product*
+
+The phrase-confirmation gate at identity and vault creation: four word positions are drawn when the 24-word phrase is generated, the user retypes those four words, and the primary action stays gated until all four match. It exists because a phrase the user has not written down is a phrase they cannot recover with. It is a comprehension gate rather than a challenge-response protocol: the positions are on screen, nothing is keyed from them, and the draw is re-derived per mount, so predictability buys an attacker nothing. The draw is deliberately NOT uniform: one word comes from the first eight, two from the middle eight and one from the last eight, so a user who wrote down only the first 16 words is caught rather than having a 1-in-6 chance of passing. `decisions/ui/0665` gave the identity flow the same challenge vault creation has run since v0.1, superseding the earlier identity-first first run (`decisions/ui/0615`).
+
+Used in: `src/components/PhraseTypeBack.tsx`, `mobile/src/lib/phraseChallenge.ts`, `decisions/ui/0665`
 
 ### **`@myne/client-core`** &nbsp; 🛠️ *Tooling*
 

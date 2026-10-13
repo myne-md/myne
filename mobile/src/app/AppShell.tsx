@@ -217,7 +217,19 @@ function StageSwitch() {
       if (identityOpen) {
         return (
           <PhoneColumn>
-            <IdentityFlow onCancel={() => setIdentityOpen(false)} />
+            <IdentityFlow
+              onCancel={() => setIdentityOpen(false)}
+              // An invite was accepted, this device named itself, and the
+              // member vault is on disk and unlocked: close the overlay and
+              // re-probe, which is how the stage machine decides what the user
+              // opens next rather than the identity flow guessing
+              // (myne-md/myne#851 tasks 14 and 15). The name step withholds this
+              // until a name is saved, so a vault cannot arrive here unnamed.
+              onAccepted={() => {
+                setIdentityOpen(false);
+                reprobe();
+              }}
+            />
           </PhoneColumn>
         );
       }

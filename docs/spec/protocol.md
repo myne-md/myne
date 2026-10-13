@@ -315,9 +315,14 @@ its shared singleton material and its roster under roles derived from the shared
 `prefs-key`, `search-index-key`, `attachments-catalog-key`, `session-state-key`,
 `personal-dictionary-key`, `vault-indices-key`, `attachment-text-key`,
 `catalog-sync-id`, `prefs-sync-id`, `custom-themes-key`, `themes-sync-id`,
-`graph-layout-key`, `group-roster-key`, `awareness-room-id` and `awareness-key`
+`graph-layout-key`, `group-roster-key`, `awareness-room-id`, `awareness-key`,
+`member-names-key` and `member-names-sync-id`
 (the machine-readable mirror is the
-`GroupRole` registry in `protocol/src/subkey.rs`). They are derived from
+`GroupRole` registry in `protocol/src/subkey.rs`). The last two are the member display
+name family (§9.29, `decisions/protocol/0666`): `member-names-key` is the KEK and
+`member-names-sync-id` an identifier, and the family deliberately has **no**
+`SubkeyRole` counterpart, because it is `NTV6`-only and a pre-B2B vault has no
+`group_key` a member could read a member-writable name with. They are derived from
 `group_key` under the v0.2 context prefix. `attachments-id-hmac` is registered in
 that enum but **RESERVED**: the content-addressed attachment id stays
 `root_key`-derived so it is stable across a migration (§9.9). The owner roles
@@ -326,10 +331,12 @@ embedding/chats/memory/personality KEKs and sync-ids) stay `root_key`-derived an
 MUST NOT be derivable from a member-held `group_key`.
 
 Consequently the reserved sync-plane blob-ids of `catalog-sync-id`,
-`prefs-sync-id` and `themes-sync-id` are derived from the **group key** in an
-`NTV6` vault (`GroupRole::{Catalog,Prefs,Themes}SyncId`), so an owner and a member
-of the same epoch address the same shared blobs; in a pre-B2B (`NTV5`) vault they
-remain `root_key`-derived, which is the form the per-row table above states. The
+`prefs-sync-id`, `themes-sync-id` and `member-names-sync-id` are derived from the
+**group key** in an `NTV6` vault
+(`GroupRole::{Catalog,Prefs,Themes,MemberNames}SyncId`), so an owner and a member
+of the same epoch address the same shared blobs; in a pre-B2B (`NTV5`) vault the
+first three remain `root_key`-derived, which is the form the per-row table above
+states, while `member-names-sync-id` does not exist at all (the family is `NTV6`-only). The
 `chats-catalog-sync-id`, `agent-memory-catalog-sync-id` and
 `agent-personality-sync-id` roles have **no** group counterpart and stay
 `root_key`-derived: those families are person-private in a shared vault
@@ -563,6 +570,20 @@ substituted. Total AAD length: `10 + 1 + 16 + 8 + 16 = 51 bytes`.
 `AAD_person_vault_carrier` is the AAD bound into the AEAD seal of the device-local, vault-bound person-identity carrier (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`, myne-md/myne#792). Its KEK is `DeriveSubkey_v0_2(root_key, "person-vault-carrier")` (§3.4), owner-only, so it binds the 16-byte `vault_id` the reader expected **and** the 16-byte `person_id`, after the role string `"person-vault-carrier-blob"` (length-prefixed UTF-8: 2-B big-endian length + 25 ASCII bytes), under the **v0.2** AAD prefix (matching the person plane). Total AAD length: `10 + 1 + 27 + 16 + 16 = 70 bytes`. The `vault_id` binding stops a carrier mislaid under another vault name from opening; the `person_id` binding stops a carrier sealed for a different person from being accepted for this one.
 
 `AAD_awareness_frame` is the AAD bound into the AEAD seal of a live-collaboration awareness frame (the wire-only envelope of `live-collab`; `decisions/sync/0655`). It follows the singleton shape above with the role string `"awareness-frame"` (length-prefixed UTF-8: 2-B big-endian length + 15 ASCII bytes, total 17 bytes) and the 16-byte `account_number_hash`, so a frame sealed for one vault cannot be replayed in another. For an `NTV6` vault the 8-byte big-endian `group_key_epoch` is appended **after** the account hash (the `AAD_group_roster_blob` order), so a post-rotation frame from a retired epoch fails AEAD verification under the new group-derived room key. Total AAD length: `10 + 1 + 17 + 16 = 44` bytes, or `52` with the epoch. As with the whole `root_key`/`group_key`-derived KEK families, `items_key_id` is **not** bound: the frame has no `itemsKey` lineage. Unlike every other AAD in this section the frame carries **no §10.3 magic**: it is sync-wire-only and never at rest (§10.7).
+
+`AAD_member_names_blob` is the AAD bound into the AEAD seal of the member display-name
+map (`vault.member-names`, `MYO5`, §9.29; `decisions/protocol/0666`). It follows the
+`AAD_group_roster_blob` shape, which is the only other AAD in this document that binds
+an epoch: the role string `"member-names-blob"` (length-prefixed UTF-8: 2-B big-endian
+length + 17 ASCII bytes), then the 16-byte `account_number_hash`, then the 8-byte
+big-endian `group_key_epoch` appended **after** the account hash. Total AAD length:
+`10 + 1 + 19 + 16 + 8 = 54 bytes`. The epoch binding is what makes a blob sealed before
+a member removal fail AEAD verification afterwards, rather than opening under a
+group-derived KEK that no longer applies to it. As with the whole `group_key`-derived
+KEK family, `items_key_id` is **not** bound: the map has no `itemsKey` lineage. The role
+string is deliberately distinct from both `"member-names-key"` and
+`"member-names-sync-id"` (§3.4): the KEK, the sync discriminator and the AAD role are
+three different load-bearing strings.
 
 **The presence-assertion class string** is `"myne.awareness-presence v1|"` (`protocol/src/awareness_frame.rs::PRESENCE_ASSERTION_PREFIX`; `decisions/protocol/0656`). It is the registered signature-class prefix the per-session presence assertion's double signature (Ed25519 + ML-DSA-65) covers, ahead of the 16-byte device actor id and the 32-byte person id, exactly as `"myne.head-signature v1|"` names the head class: minted whole, so a head signature can never verify as an assertion or the reverse. It is a signature class, **not** an AAD and not a §10.3 magic. **Shipped as a codec and not yet wired**: nothing signs or verifies one on the production path yet, and the shipped presence attribution is the device actor resolved client-side (`decisions/protocol/0656`, the "Shipped state" note).
 
@@ -859,6 +880,7 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── vault.chats           ← encrypted AI conversations catalog (MYM1, §9.23)
 ├── vault.agent-memory    ← encrypted agent-memory catalog (MYN1, §9.25)
 ├── vault.personality     ← encrypted agent-personality singleton (MYZ1, §9.27)
+├── vault.member-names    ← encrypted member display-name map (MYO5, §9.29; NTV6 only)
 ├── notes/
 │   ├── 0184a2b3-...myn   ← one encrypted note per file
 │   ├── 0184a2b4-...myn
@@ -1846,6 +1868,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.agent-memory` | IN if present | The agent-memory catalog is authoritative user content (§9.25, myne-md/myne#697): a Class-1 sync member behind the `ai_enabled` gate, so `sync ⊆ backup` requires it here. Carrying the tombstones is load-bearing for the same reason the chats row states |
 | `memories/` (per-entry files) | IN if present | One `MYX1` file per catalog entry (§9.26). An entry whose catalog row is a tombstone is absent by construction, so the pair restores coherently |
 | `vault.personality` | IN if present | The agent-personality singleton is authoritative user content (§9.27, myne-md/myne#697): a Class-1 sync member behind the `ai_enabled` gate, so `sync ⊆ backup` requires it here |
+| `vault.member-names` | IN if present | The member display-name map is authoritative user content (§9.29, myne-md/myne#851): a Class-1 sync member, so `sync ⊆ backup` requires it here. Carrying the tombstones is load-bearing for the same reason the chats row states: a restore must not resurrect a name that was cleared before the backup |
 | `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
 | `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
@@ -3137,6 +3160,123 @@ a removed member's already-copied profile is not cryptographically erasable, and
 the deletion schedule is a policy input (retention owned by `example-org/operations#48`).
 The person-private sync plane ships: the vault-scoped route `PUT|GET /b2b/vaults/{account_hash}/profiles/{profile_id}` (`server-protocol.md` §3.1a) carries the sealed blob, and the client merge/transport is normative in `sync-protocol.md` §8 (`decisions/protocol/0608`, `0606`).
 
+### 9.29 Member display names (`vault.member-names`, `MYO5`)
+
+`vault.member-names` is a **shared singleton**: one `MYO5` blob per shared (`NTV6`)
+vault, holding a versioned, optionally tombstoned map of
+`person_id_hash -> { name, version, tombstone }`. It carries a member's OWN display
+name, the string their co-members see beside their fingerprint in the Members list,
+and it is the ONE family in this document that every member both reads and writes
+(`decisions/protocol/0666`).
+
+**It is `NTV6`-only.** A pre-B2B `NTV5` vault has no `group_key`, so a member-writable,
+member-readable name blob cannot exist there; the family has no `MY?1` form and no
+`SubkeyRole` counterpart, and the blob is created on first use by `member_names_set_mine`
+rather than by any migration step (the §10.4.1 cut does not write it; an absent file reads
+as the empty map). A client MUST NOT write one into an `NTV5` vault, and a reader presented
+with the file there MUST treat the vault as malformed rather than guessing a root-tier KEK
+for it.
+
+**Why the owner-signed roster does not carry this.** The owner-signed group roster
+(§9.3.2) has a `display_name` field, and it holds the vault label captured at
+migration rather than a person: the owner is the only signer, so a member could not set
+their own name without an owner round trip, and the roster payload is compared
+byte-for-byte by `parse_group_roster`, so a roster carrying a field an older client does
+not know is refused by that client and that member's whole member list errors. A name
+any member may change therefore cannot live in the roster at any point in that
+format's future.
+
+#### 9.29.1 Outer envelope layout
+
+| Offset | Size | Field | Notes |
+|---|---|---|---|
+| 0 | 4 | magic | ASCII `MYO5`, in the `MY?5` column only (§10.3) |
+| 4 | 1 | protocol_version | `0x01` (the shared-singleton family byte; the generation domain-separates on magic + AAD prefix + KEK, not on this byte) |
+| 5 | 1 | format_version | `0x01` = the canonical-JSON map below |
+| 6 | 24 | nonce | XChaCha20-Poly1305 nonce, drawn from the OS CSPRNG |
+| 30 | 4 | ciphertext_len | big-endian `u32`, `plaintext_len + 32` |
+| 34 | M | ciphertext | AEAD ciphertext + 32-byte CTX tag |
+
+Total = `34 + M`, subject to §10.3.1 strict-trailing: the envelope checks it and this
+family adds nothing past the ciphertext. `MEMBER_NAMES_BLOB_HEADER_LEN` is `34`.
+
+The inner plaintext is canonical JSON whose keys are `person_id_hash` in lowercase hex
+and whose values are `{ "name": string, "version": u64, "tombstone": bool,
+"signature_hex": string }`. Canonical means a parser re-serializes and requires byte
+equality with its input, the discipline the owner-signed roster already uses, so two
+implementations agree on which byte strings are blobs of this family. The codec owns
+the map rather than leaving it opaque, because the merge is a cross-implementation
+contract (§9.29.3).
+
+#### 9.29.2 The KEK and the AAD
+
+The KEK is `DeriveGroupSubkey_v0_2(group_key, "member-names-key")` (§3.4,
+`GroupRole::MemberNamesKey`): the GROUP tier, so every member reads every name and only
+members read any. A pre-B2B session MUST refuse the family rather than fall back to a
+root-tier key no member could read.
+
+The AAD is `AAD_member_names_blob` (§5.2): role string `"member-names-blob"`, the
+16-byte `account_number_hash`, then the 8-byte big-endian `group_key_epoch` appended
+after it in the `AAD_group_roster_blob` order. Total `54` bytes. `items_key_id` is not
+bound. A zero `group_key_epoch` MUST be refused on both the seal and the open path.
+
+#### 9.29.3 The merge, and why it is normative
+
+Newest version wins per `person_id_hash`; at EQUAL version a tombstone beats a live
+entry, so a removal cannot be resurrected by a concurrent rename. Nothing KEYS on the
+name itself, and a `person_id_hash` that only one side carries is taken as-is. A
+tombstone is KEPT in the blob rather than dropped, because a dropped one lets a stale
+copy reintroduce the name on the next merge; the live view filters tombstones out, the
+way the roster view filters its deleted rows. `version` is a counter and not a
+timestamp, so a clock skew between two devices cannot decide whose rename wins, and a
+newer write MUST take a version strictly above the row it replaces.
+
+The two arms above do not separate every reachable pair, and the case they leave open
+is the reason the rest of this section is normative rather than advisory. Two rows that
+agree on BOTH the version and the tombstone flag are separated by their remaining
+fields, compared as raw BYTES: the name bytes, then the row-signature bytes. That pair
+is reachable rather than theoretical, since one person renaming from two offline devices
+reaches one version carrying two names, and the signature arm is not decoration either,
+because a tombstone carries no name and two tombstones at an equal version are therefore
+separated by nothing else. Comparing every retained field is what makes the comparator a
+total order on DISTINCT rows, and that is what makes the merge commutative, associative
+and idempotent rather than merely stable: with any field left out, the ARGUMENT ORDER
+decides the winner, each peer keeps its own row, and the two re-push it at each other on
+every cycle instead of converging. A port MUST compare byte-wise and MUST NOT substitute
+a locale collation, or two implementations land on different rows for the same pair.
+
+#### 9.29.4 Row signatures
+
+Every row carries a hybrid Ed25519 + ML-DSA-65 signature under the
+`"myne.member-name v1|"` class (`decisions/protocol/0667`), over the person the row
+NAMES together with the row's own fields at fixed widths. It is verified on read
+against the public half of the ROW's own person, which the owner-signed roster already
+carries, so a member cannot name another member's row as theirs, and cannot alter a
+name, a version or a tombstone either. A tombstone additionally verifies against the
+vault OWNER, because a member removal has to remove the row. The codec is structural
+(it requires a well-shaped signature) and the verification verdict is a separate step,
+which MUST distinguish an unverified row from an absent one: "tampered" and "no name"
+are different things to tell a reader, and the unverified row's CONTENT MUST NOT be
+rendered as a name.
+
+#### 9.29.5 Caps
+
+The inner map is capped at 4 MiB of plaintext, and a single name is capped at 64 BYTES
+after NFC folding and trimming (a composed and a decomposed rendering of one name are
+the same name). An empty name is refused: clearing is a separate operation, which
+writes a tombstone. Roughly 600 members fit inside the map cap, because one row is
+about 6.8 KiB once its 3 373-byte signature is hex-encoded.
+
+#### 9.29.6 Sync classification and privacy
+
+The family is a **synced singleton outside the head manifest** (`sync-protocol.md` §4.2,
+§8), addressed by `DeriveGroupSubkey_v0_2(group_key, "member-names-sync-id")[0..16]`
+(§3.4), so an owner and a member of one epoch address one blob. It is Class-1 content:
+encrypted, synced, and backed up (§9.11.3 lists it among the files a backup carries).
+It never leaves the device in cleartext, and the server sees only opaque ciphertext
+under keyed pseudorandom ids. A name is readable by every MEMBER of the vault, and by
+nobody else; it is not a secret from the vault, and no surface may imply otherwise.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -3200,10 +3340,11 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Agent-memory catalog (`vault.agent-memory`) | `MYN1` | `MYN5` (allocated, v0.2) | §9.25 | myne-md/myne#697 |
 | Agent-memory entry blob (`memories/<id>`) | `MYX1` | `MYX5` (allocated, v0.2) | §9.26 | myne-md/myne#697 |
 | Agent-personality singleton (`vault.personality`) | `MYZ1` | `MYZ5` (allocated, v0.2) | §9.27 | myne-md/myne#697 |
-| Per-person private AI profile (`profiles/<profile-id>`) | — | `MYY5` (defined, v0.2 B2B) | §9.28 | myne-md/myne#712 |
-| CRDT note-type (`.myn`, v0.2) | — | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
+| Per-person private AI profile (`profiles/<profile-id>`) | none | `MYY5` (defined, v0.2 B2B) | §9.28 | myne-md/myne#712 |
+| Member display-name map (`vault.member-names`) | none | `MYO5` (allocated, v0.2 B2B) | §9.29 | myne-md/myne#851 |
+| CRDT note-type (`.myn`, v0.2) | none | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5` and `MYL5`) are still placeholders that the next major version finalizes. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic**: it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The live-collaboration **awareness frame** (`live-collab`, `decisions/sync/0655`) is a second such wire-only envelope and is likewise **not a §10.3 family**: it carries no `MY**` magic, only a `room_id || nonce || version` cleartext header (§5.2), and never rests at rest. The **CRDT note-type** row (`NC05`) is **next-major-only**: it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09, the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family). The three agent-layer rows (`MYN1`/`MYN5`, `MYX1`/`MYX5`, `MYZ1`/`MYZ5`) landed with `decisions.md` 2026-09-10 (myne-md/myne#697): `N` = *nMemory* is wrong to claim: `N` names nothing and is a free §10.3 letter, implementer-allocated like every family magic (the §9.20 `MYF1` precedent), as are `X` and `Z`; all three are **v0.1 families** (a v0.1 vault's agent-layer files carry `MYN1`/`MYX1`/`MYZ1`), so their `MY?5` rows are allocated in the same class as `MYM5`/`MYJ5`, and a v0.1→v0.2 migration re-seals them exactly as §10.4.1 re-seals the chats pair. Letters chosen from the free pool at allocation time (`M`-pool leftovers `N`/`X`/`Z` were all free; a later letter change would be a mechanical rename, not a format change, the §9.22 note).
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. `MYO5` is allocated in the same class but is **not** one of the magics that cut writes: the `vault.member-names` family is `NTV6`-only (§9.29.6), so a vault with no `group_key` has nowhere to hold it, and the blob is created by the first `member_names_set_mine` rather than by the §10.4.1 migration. It names bytes in every `NTV6` vault, and an absent file reads as the empty map. The remaining next-major values (`NT05`, `MYS5`, `MYW5`, `MYI5`, `MYB5`, `MYQ5`, `MYE5`, `MYH5`, `MYR5`, `MYK5`, `MYG5`, `MYF5`, `MYL5` and `MYU5`) are still placeholders that the next major version finalizes. `MYO5` is the member display-name map (§9.29, `decisions/protocol/0666`), and `MYU5` is **reserved in the same allocation** for the member-device-binding family of the `member-devices` feature, because the free `MY?5` letter pool held exactly two letters at that point (`O` and `U`) and a future family wanting one would need a human decision. The distinction is load-bearing rather than editorial: reading an allocated magic as an unallocated placeholder is the mental model behind myne-md/myne#638, where a reader taught only `MYA1` returned `None` for every body on a migrated vault and stopped attachment sync in both directions. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic**: it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family. The live-collaboration **awareness frame** (`live-collab`, `decisions/sync/0655`) is a second such wire-only envelope and is likewise **not a §10.3 family**: it carries no `MY**` magic, only a `room_id || nonce || version` cleartext header (§5.2), and never rests at rest. The **CRDT note-type** row (`NC05`) is **next-major-only**: it has no v0.1 form. Reserved by the `automerge-crdt-spike` (#395), its layout was **finalized as a v0.2 format by the `automerge-sync-migration` epic** (#418): the whole-vault §10.4 cutover (Reading A) turned "later, transport-determined" into "now, transport-agnostic whole-doc snapshots," so `NC05` is allocated under v0.2 and its byte layout is pinned in §10.7 (`decisions.md` 2026-08-09, the format-commitment entry, which supersedes the 2026-08-07 "reserving the magic commits no layout" clause for this family). The three agent-layer rows (`MYN1`/`MYN5`, `MYX1`/`MYX5`, `MYZ1`/`MYZ5`) landed with `decisions.md` 2026-09-10 (myne-md/myne#697): `N` = *nMemory* is wrong to claim: `N` names nothing and is a free §10.3 letter, implementer-allocated like every family magic (the §9.20 `MYF1` precedent), as are `X` and `Z`; all three are **v0.1 families** (a v0.1 vault's agent-layer files carry `MYN1`/`MYX1`/`MYZ1`), so their `MY?5` rows are allocated in the same class as `MYM5`/`MYJ5`, and a v0.1→v0.2 migration re-seals them exactly as §10.4.1 re-seals the chats pair. Letters chosen from the free pool at allocation time (`M`-pool leftovers `N`/`X`/`Z` were all free; a later letter change would be a mechanical rename, not a format change, the §9.22 note).
 
 **One row's next-major reservation means something different from every other row's: the sealed label store.** `vault.label` is **generation-independent** (§9.22): it stays `MYL1` inside a v0.2 vault, beside that vault's `NTV5` and `MY?5` neighbours, so `MYL5` is **not** the magic a version cut moves this family to. It is reserved against a future revision of **this family's own** layout, and against nothing else. What lets it be that is the key: the file is sealed under an OS-keychain `wrap_key` rather than any `root_key` product (§9.22.2), so no KDF, KEK context or AAD prefix inherited from the vault ties its bytes to a generation. §10.4.1 point 2 records the migration's matching behaviour, which is that the file is left alone.
 

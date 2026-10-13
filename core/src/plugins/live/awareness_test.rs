@@ -104,7 +104,7 @@ fn a_frame_whose_payload_names_another_note_is_refused() {
 }
 
 use super::awareness::{
-    route_incoming_frame, seal_local_frame, subscribed_rooms, AwarenessKeypair,
+    route_incoming_frame, seal_local_changes, seal_local_frame, subscribed_rooms, AwarenessKeypair,
 };
 use super::session::LiveSession;
 use crate::host::test_host::TestHost;
@@ -343,7 +343,50 @@ fn a_local_presence_is_sealed_for_the_send_half() {
     assert_eq!(opened.selection, None);
 }
 
-/// Story 18 self-echo guard (`collab-verification` task 1): the relay fans a frame
+/// myne-md/myne#857: the relay fans every frame out to its publisher too, so this
+/// device receives its OWN content frame back. Routing it must NOT report a remote
+/// change: the change is already in the doc, the text does not move, so there is
+/// nothing to dispatch and nothing to tell the user. Reporting it is what made the
+/// editing device raise its own "updated from another device" notice.
+#[test]
+fn a_devices_own_content_frame_is_not_reported_as_a_remote_change() {
+    use crate::plugins::live::apply_local::LocalSplice;
+    const LOCAL: [u8; 16] = [0xDDu8; 16];
+    let reg = LiveSessionRegistry::new();
+    let uuid = [0xAAu8; 16];
+    open_session_with_actor(&reg, uuid, LOCAL);
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+
+    // This device edits its own open note; the session queues one outgoing change.
+    reg.with_note_mut(&note_id, |s| {
+        s.apply_splices(
+            &[LocalSplice {
+                from: 0,
+                to: 0,
+                insert: "X".into(),
+            }],
+            0,
+        )
+    })
+    .expect("session")
+    .expect("edit");
+
+    // The send half seals it; the relay echoes that frame back to us.
+    let keys = owner_keys();
+    let acct = [0x55u8; 16];
+    let sealed = seal_local_changes(&reg, &keys, &acct, None);
+    assert_eq!(sealed.len(), 1, "the local edit sealed one content frame");
+    let frame = &sealed[0].1;
+
+    assert!(
+        matches!(
+            route_incoming_frame(&reg, &keys, &acct, None, frame),
+            Ok(AwarenessRoute::NoSession)
+        ),
+        "a self-echo must be a no-op, never a remote change the user is told about"
+    );
+}
+
 /// out to its publisher too, so a device receives its OWN presence frame back. It
 /// must be dropped, so an editing device never renders a participant row for itself;
 /// a frame from another actor is still a peer presence.

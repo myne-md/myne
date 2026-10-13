@@ -8,7 +8,14 @@
 // ships, so no Remove button renders and the disabled notice does.
 
 import { describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { RosterMemberView } from "../../src/lib/invite";
 import {
   resetPersonIdentityState,
@@ -19,12 +26,35 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// The member display-name writers (myne-md/myne#851 task 6). Mocked so the row
+// editor's calls, its busy state and its inline refusals are all observable
+// without a backend.
+const namesMocks = vi.hoisted(() => ({
+  setMyMemberName: vi.fn<(name: string) => Promise<unknown>>(() => Promise.resolve({})),
+  clearMyMemberName: vi.fn<() => Promise<unknown>>(() => Promise.resolve({})),
+}));
+// The REAL module is spread so `memberNameErrorKey` (its pure mapper) stays
+// available: the panel resolves the refusal copy through it, and a wholesale
+// replacement would leave the mapper undefined and the catch block throwing.
+vi.mock("../../src/lib/memberNames", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/lib/memberNames")>();
+  return {
+    ...real,
+    setMyMemberName: namesMocks.setMyMemberName,
+    clearMyMemberName: namesMocks.clearMyMemberName,
+  };
+});
+
 // The roster rows per test. `members: []` renders the invite-only empty
 // state; a non-empty list renders the rows plus the removal-disabled notice.
+// The row carries a signed name (`name_state: "verified"`), which is the only
+// state the member list is allowed to render a name from.
 let mockMembers: RosterMemberView[] = [
   {
     fingerprint_hex: "ab".repeat(32),
+    is_self: false,
     display_name: "Member One",
+    name_state: "verified",
     role: "member",
     version: 1,
     previous_fingerprint_hex: null,
@@ -32,7 +62,7 @@ let mockMembers: RosterMemberView[] = [
     member_ed_pk_hex: "cd".repeat(32),
     member_kem_ek_hex: "ef".repeat(32),
     member_mldsa_vk_hex: "01".repeat(48),
-    continuity: null,
+    continuity: "current",
   },
 ];
 
@@ -42,11 +72,21 @@ let mockAuthority: "owner" | "member" = "owner";
 // The group-key epoch per test (`null` = legacy roster, no epoch line).
 let mockGroupKeyEpoch: number | null = null;
 
+/** One row over the base fixture, so a test states only what it is about. */
+const rowView = (over: Partial<RosterMemberView>): RosterMemberView => ({
+  ...mockMembers[0],
+  ...over,
+});
+
 vi.mock("../../src/hooks/useRoster", () => ({
   useRoster: () => ({
     members: mockMembers,
     authority: mockAuthority,
     groupKeyEpoch: mockGroupKeyEpoch,
+    // The real hook derives this from the roster view's `group_key_epoch`, so
+    // the mock must too: the rename affordance is gated on the vault being
+    // shared, and a mock that always says "not shared" would hide it.
+    shared: mockGroupKeyEpoch !== null,
     loading: false,
     error: null,
     reload: vi.fn(),
@@ -140,7 +180,9 @@ describe("MemberRosterPanel key-generation state", () => {
       mockMembers = [
         {
           fingerprint_hex: "ab".repeat(32),
+          is_self: false,
           display_name: "Member One",
+          name_state: "verified",
           role: "member",
           version: 1,
           previous_fingerprint_hex: null,
@@ -148,7 +190,7 @@ describe("MemberRosterPanel key-generation state", () => {
           member_ed_pk_hex: "cd".repeat(32),
           member_kem_ek_hex: "ef".repeat(32),
           member_mldsa_vk_hex: "01".repeat(48),
-          continuity: null,
+          continuity: "current",
         },
       ];
       mockAuthority = "owner";
@@ -222,11 +264,17 @@ describe("MemberRosterPanel layout", () => {
     }
   });
 
-  it("labels the owner row You instead of the stored vault name", () => {
+  it("marks the caller's own row You by identity, not by the owner role", () => {
     mockAuthority = "owner";
     const previous = mockMembers;
     mockMembers = [
-      { ...previous[0], fingerprint_hex: "ff".repeat(32), display_name: "Untitled vault", role: "owner" },
+      {
+        ...previous[0],
+        fingerprint_hex: "ff".repeat(32),
+        display_name: "Untitled vault",
+        role: "owner",
+        is_self: true,
+      },
     ];
     render(<MemberRosterPanel />);
     try {
@@ -237,6 +285,369 @@ describe("MemberRosterPanel layout", () => {
       cleanup();
       mockMembers = previous;
       mockAuthority = "owner";
+    }
+  });
+
+  // The bug this guards (myne-md/myne#859): keying "You" on
+  // `role === "owner"` made an invited member read the OWNER's row as
+  // themselves, on the member's own device.
+  it("does not mark another person's owner row You", () => {
+    mockAuthority = "member";
+    const previous = mockMembers;
+    mockMembers = [
+      {
+        ...previous[0],
+        fingerprint_hex: "ff".repeat(32),
+        // A row migrated from a pre-B2B roster has no signed name, so the owner
+        // row reports none and falls back to the fingerprint (myne#851 task 4).
+        display_name: "",
+        name_state: "absent",
+        role: "owner",
+        is_self: false,
+      },
+      { ...previous[0], fingerprint_hex: "aa".repeat(32), is_self: true },
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      // Exactly one "You": the member's own row, whose name slot the identity
+      // badge owns.
+      const names = screen.getAllByTestId("member-roster.name");
+      expect(names).toHaveLength(1);
+      expect(names[0].textContent).toBe("sync.memberRoster.youBadge");
+      // The owner row still reads as the owner (role badge) and shows no name.
+      const roles = screen.getAllByTestId("member-roster.role");
+      expect(roles[0].textContent).toBe("sync.memberRoster.ownerBadge");
+      expect(roles[1].textContent).toBe("sync.memberRoster.memberBadge");
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockAuthority = "owner";
+    }
+  });
+});
+
+// The row identity rule (myne-md/myne#851 task 5): the VERIFIED name where there
+// is one, the short fingerprint where there is not, and a marker when a record
+// exists that nobody's signature backs. The rule keys on `name_state`, never on
+// `role`, which is what the owner-row test below pins.
+describe("MemberRosterPanel row identity rule", () => {
+  it("renders the verified name where there is one and the fingerprint where there is not", () => {
+    const previous = mockMembers;
+    const bare = "22".repeat(32);
+    mockMembers = [
+      rowView({ fingerprint_hex: "11".repeat(32), display_name: "Ada", name_state: "verified" }),
+      rowView({ fingerprint_hex: bare, display_name: "", name_state: "absent" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      const names = screen.getAllByTestId("member-roster.name");
+      expect(names).toHaveLength(1);
+      expect(names[0].textContent).toBe("Ada");
+      // Only the nameless row carries a fingerprint: the name IS the identifier
+      // where there is one.
+      const fingerprints = screen.getAllByTestId("member-roster.fingerprint");
+      expect(fingerprints).toHaveLength(1);
+      expect(fingerprints[0].textContent).toBe(bare.slice(0, 16));
+      // An absent record is not a failure, so nothing marks it.
+      expect(screen.queryByTestId("member-roster.name-unverified")).toBeNull();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+    }
+  });
+
+  it("renders the unverified marker instead of a name nobody signed", () => {
+    const previous = mockMembers;
+    mockMembers = [
+      rowView({ fingerprint_hex: "33".repeat(32), display_name: "", name_state: "unverified" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.name")).toBeNull();
+      expect(screen.getByTestId("member-roster.name-unverified").textContent).toBe(
+        "sync.memberRoster.nameUnverified",
+      );
+      // The row still carries the identifier that IS trustworthy.
+      expect(screen.getByTestId("member-roster.fingerprint")).toBeDefined();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+    }
+  });
+
+  // The assertion that fails if the name rule is replaced by the role. The row
+  // before task 5 guarded the owner's name with `m.role !== "owner"` by hand
+  // (myne#795 UI pass), so an owner row carrying a verified name rendered
+  // nothing; under the one rule it renders the name like any other row.
+  it("renders the owner's verified name on the owner's row", () => {
+    const previous = mockMembers;
+    mockMembers = [
+      rowView({
+        fingerprint_hex: "44".repeat(32),
+        display_name: "Omer",
+        name_state: "verified",
+        role: "owner",
+      }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.name").textContent).toBe("Omer");
+      expect(screen.getByTestId("member-roster.role").textContent).toBe(
+        "sync.memberRoster.ownerBadge",
+      );
+    } finally {
+      cleanup();
+      mockMembers = previous;
+    }
+  });
+
+  it("never puts a full fingerprint in the DOM", () => {
+    const previous = mockMembers;
+    const raw = "77".repeat(32);
+    mockMembers = [rowView({ fingerprint_hex: raw, display_name: "", name_state: "absent" })];
+    render(<MemberRosterPanel />);
+    try {
+      expect(document.body.innerHTML).not.toContain(raw);
+      expect(screen.getByTestId("member-roster.fingerprint").textContent).toBe(
+        raw.slice(0, 16),
+      );
+      // The repeated-row discriminator carries the same prefix the row shows,
+      // not the raw value (myne#851 task 5).
+      expect(screen.getByTestId("member-roster.row").getAttribute("data-fingerprint")).toBe(
+        raw.slice(0, 16),
+      );
+    } finally {
+      cleanup();
+      mockMembers = previous;
+    }
+  });
+});
+
+// The inline rename (myne-md/myne#851 task 6). The backend can only ever write
+// the CALLER'S OWN row, so the affordance is gated on identity (`is_self`) and on
+// the vault being shared (the store is `NTV6`-only), and the writer's refusals
+// render inline with their own copy rather than being swallowed.
+describe("MemberRosterPanel rename", () => {
+  const setup = () => {
+    mockGroupKeyEpoch = 3; // a shared (NTV6) vault: the name store exists here
+    mockAuthority = "owner";
+    namesMocks.setMyMemberName.mockClear();
+    namesMocks.clearMyMemberName.mockClear();
+  };
+
+  it("offers rename on the caller's own row and nowhere else", () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [
+      rowView({
+        fingerprint_hex: "aa".repeat(32),
+        is_self: true,
+        role: "owner",
+        display_name: "Omer",
+        name_state: "verified",
+      }),
+      rowView({ fingerprint_hex: "bb".repeat(32), is_self: false, role: "member" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      const affordances = screen.getAllByTestId("member-roster.name-edit");
+      expect(affordances).toHaveLength(1);
+      // ...and it is the own row's, not simply the first one rendered.
+      const ownRow = screen
+        .getAllByTestId("member-roster.row")
+        .find((li) => li.getAttribute("data-fingerprint") === "aa".repeat(32).slice(0, 16));
+      expect(ownRow).toBeDefined();
+      expect(within(ownRow!).getByTestId("member-roster.name-edit")).toBeDefined();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("saves the trimmed name through the writer", async () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [
+      rowView({ is_self: true, display_name: "", name_state: "absent" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      fireEvent.click(screen.getByTestId("member-roster.name-edit"));
+      fireEvent.change(screen.getByTestId("member-roster.name-input"), {
+        target: { value: "  Ada  " },
+      });
+      fireEvent.submit(screen.getByTestId("member-roster.name-save").closest("form")!);
+      await waitFor(() =>
+        expect(namesMocks.setMyMemberName).toHaveBeenCalledWith("Ada"),
+      );
+      // The editor closes on success, so the row goes back to its own rule.
+      await waitFor(() => expect(screen.queryByTestId("member-roster.name-input")).toBeNull());
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("renders a writer refusal inline, with its own copy", async () => {
+    const previous = mockMembers;
+    setup();
+    namesMocks.setMyMemberName.mockRejectedValueOnce({
+      kind: "NameTooLong",
+      detail: { max: 64 },
+    });
+    mockMembers = [rowView({ is_self: true, display_name: "Ada", name_state: "verified" })];
+    render(<MemberRosterPanel />);
+    try {
+      fireEvent.click(screen.getByTestId("member-roster.name-edit"));
+      fireEvent.submit(screen.getByTestId("member-roster.name-save").closest("form")!);
+      expect((await screen.findByTestId("member-roster.name-error")).textContent).toBe(
+        "sync.memberRoster.nameErrorTooLong",
+      );
+      // The editor stays open with the draft intact, so the refusal is fixable
+      // rather than a silent no-op.
+      expect(screen.getByTestId("member-roster.name-input")).toBeDefined();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("clears the caller's name, which returns the row to the fingerprint", async () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [rowView({ is_self: true, display_name: "Ada", name_state: "verified" })];
+    render(<MemberRosterPanel />);
+    try {
+      fireEvent.click(screen.getByTestId("member-roster.name-edit"));
+      fireEvent.click(screen.getByTestId("member-roster.name-clear"));
+      await waitFor(() => expect(namesMocks.clearMyMemberName).toHaveBeenCalled());
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+    // The tombstone reads as `absent` in the roster view (task 4), and an absent
+    // record renders the fingerprint (task 5): the two together are the rule.
+    mockMembers = [rowView({ is_self: false, display_name: "", name_state: "absent" })];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.fingerprint")).toBeDefined();
+      expect(screen.queryByTestId("member-roster.name")).toBeNull();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+    }
+  });
+});
+
+// myne-md/myne#851 task 9 (story 22): a member who accepted before the name step
+// shipped is invited once, on their OWN row, and the invitation goes away once a
+// name is set. It writes nothing and blocks nothing.
+describe("MemberRosterPanel name invitation", () => {
+  const setup = () => {
+    mockGroupKeyEpoch = 3; // shared: the store exists, so a name can be set
+    mockAuthority = "owner";
+    namesMocks.setMyMemberName.mockClear();
+    namesMocks.clearMyMemberName.mockClear();
+  };
+
+  it("invites the caller whose row has no name, and only their own row", () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [
+      rowView({
+        fingerprint_hex: "aa".repeat(32),
+        is_self: true,
+        display_name: "",
+        name_state: "absent",
+      }),
+      rowView({
+        fingerprint_hex: "bb".repeat(32),
+        is_self: false,
+        display_name: "",
+        name_state: "absent",
+      }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      const invites = screen.getAllByTestId("member-roster.name-invite");
+      expect(invites).toHaveLength(1);
+      // ...on the caller's row, and the affordance beside it sets rather than renames.
+      const ownRow = screen
+        .getAllByTestId("member-roster.row")
+        .find((li) => li.getAttribute("data-fingerprint") === "aa".repeat(32).slice(0, 16));
+      expect(within(ownRow!).getByTestId("member-roster.name-invite")).toBeDefined();
+      expect(within(ownRow!).getByTestId("member-roster.name-edit").textContent).toBe(
+        "sync.memberRoster.nameInviteCta",
+      );
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("goes away once a name is set", () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [
+      rowView({
+        fingerprint_hex: "aa".repeat(32),
+        is_self: true,
+        display_name: "Ada",
+        name_state: "verified",
+      }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
+      // The row still offers a rename: an invitation to SET a name is not the same
+      // as the standing ability to change one.
+      expect(screen.getByTestId("member-roster.name-edit").textContent).toBe(
+        "sync.memberRoster.nameEdit",
+      );
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("is dismissible, and dismissing writes nothing", () => {
+    const previous = mockMembers;
+    setup();
+    mockMembers = [
+      rowView({ is_self: true, display_name: "", name_state: "absent" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      fireEvent.click(screen.getByTestId("member-roster.name-invite-dismiss"));
+      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
+      expect(namesMocks.setMyMemberName).not.toHaveBeenCalled();
+      // The affordance stays: dismissing the ASK must not take away the ability.
+      expect(screen.getByTestId("member-roster.name-edit")).toBeDefined();
+    } finally {
+      cleanup();
+      mockMembers = previous;
+      mockGroupKeyEpoch = null;
+    }
+  });
+
+  it("does not invite on an unshared vault, where a name cannot be set", () => {
+    const previous = mockMembers;
+    mockAuthority = "owner";
+    mockGroupKeyEpoch = null; // birth-format vault: the family does not exist
+    mockMembers = [rowView({ is_self: true, display_name: "", name_state: "absent" })];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
+      expect(screen.queryByTestId("member-roster.name-edit")).toBeNull();
+    } finally {
+      cleanup();
+      mockMembers = previous;
     }
   });
 });

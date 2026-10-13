@@ -227,6 +227,21 @@ fn main() {
             ]),
         )
         .plugin(
+            "member-names",
+            // The B2B member display-name commands over the encrypted
+            // `vault.member-names` (`MYO5`) singleton, which is group-tier sealed
+            // and `NTV6`-only (`decisions/protocol/0666`). The InlinedPlugin mirror
+            // is load-bearing per the `vault-creation` note above (without it the
+            // `member-names:` permissions flatten into `__app-acl__` and never match
+            // the `plugin:member-names|<cmd>` authorize form); keep it lock-stepped
+            // with `permissions/member-names/default.toml`.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "member_names_list",
+                "member_names_set_mine",
+                "member_names_clear_mine",
+            ]),
+        )
+        .plugin(
             "notes",
             // The `commands.allow` entries in
             // `permissions/notes/default.toml` declare all four —

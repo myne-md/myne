@@ -1,0 +1,24 @@
+# Permissions for the in-app `member-names` Tauri plugin.
+# Picked up under the `member-names:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `member-names:default` (or the individual `member-names:allow-*` permissions).
+#
+# The family is the B2B member display-name store: the encrypted
+# `vault.member-names` (`MYO5`) singleton, group-tier sealed and `NTV6`-only
+# (protocol.md §9.29, decisions/protocol/0666). Every command is
+# Slot::Unlocked-gated. `member_names_set_mine` and `member_names_clear_mine` are
+# WRITE setters, and both can only ever write the CALLER'S OWN row: the row is keyed
+# by the session's own person id and signed by the session's own person key, so the
+# ACL grants no authority over another member's name. Like the other write-capable
+# plugins, v0.2 multi-window MUST NOT grant the two mutating permissions to any
+# non-main window. The `default` bundle is the only one consumed in v0.1.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the member-names plugin: list the vault's member display names, and set or clear your OWN name."
+permissions = [
+  "allow-member-names-list",
+  "allow-member-names-set-mine",
+  "allow-member-names-clear-mine",
+]

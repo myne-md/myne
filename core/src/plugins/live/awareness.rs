@@ -409,8 +409,9 @@ pub fn route_awareness_frame(
         // out to its publisher too, so this device receives its OWN presence frame
         // back. Comparing the frame's actor against the open session's local actor
         // drops it here, so an editing device never renders a participant row for
-        // itself. The content path needs no such guard, because re-applying this
-        // device's own Automerge change is idempotent.
+        // itself. The content branch below needs no actor compare: a re-applied
+        // own change moves no text and yields an empty splice list, which it now
+        // treats as a no-op too (myne-md/myne#857).
         let note_id = uuid::Uuid::from_bytes(payload.note_id).to_string();
         let is_echo = registry
             .with_note_mut(&note_id, |s| s.actor_id())
@@ -427,11 +428,17 @@ pub fn route_awareness_frame(
     let note_id = uuid::Uuid::from_bytes(payload.note_id).to_string();
     let applied = registry.with_note_mut(&note_id, |s| s.apply_remote_change(&change));
     match applied {
-        Some(Ok(splices)) => {
+        // An empty splice list means the text did not move: most often THIS
+        // device's own change, echoed back by the relay, but also a change that
+        // touched only frontmatter. Neither is a remote edit the user must be told
+        // about, so it is a no-op rather than `ChangeApplied`, which is what made
+        // an editing device raise its own "updated from another device" notice
+        // (`collab-verification`; myne-md/myne#857).
+        Some(Ok(splices)) if !splices.is_empty() => {
             registry.set_pending_splices(&note_id, splices);
             Ok(AwarenessRoute::ChangeApplied(payload.note_id))
         }
-        // No session, or the change did not apply to it, a no-op.
-        Some(Err(_)) | None => Ok(AwarenessRoute::NoSession),
+        // No session, or the change did not move the text, a no-op.
+        Some(Ok(_)) | Some(Err(_)) | None => Ok(AwarenessRoute::NoSession),
     }
 }

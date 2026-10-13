@@ -10,19 +10,20 @@
 // should not have to reconstruct. A phone keyboard autocapitalises, so
 // upper-case input is the common case rather than the odd one — which is why the
 // manual roster already carries an item about autocorrect mangling a BIP-39
-// word. And one of mobile's two normalization sites is INLINE, inside
-// `CreateVaultFlow`'s render, with no function name to grep for and nothing else
-// asserting it.
+// word. And both of mobile's normalization sites are shared now: since
+// myne-md/myne#855 the vault and identity type-backs both go through
+// `phraseChallenge.normalizeWord`, which is what this file drives directly
+// (it used to be an inline expression in `CreateVaultFlow`'s render, with no
+// function name to grep for and nothing else asserting it).
 //
 // Non-vacuity, as on the desktop side: the host's own locale mapping is replaced
 // for the duration, because the test runner's locale is English and both calls
 // agree there. The assertions then distinguish which method the code reached for.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { normalizeBip39Phrase } from "../src/lib/bip39-normalize";
+import { normalizeWord, phraseTypeBackMatches } from "../src/lib/phraseChallenge";
 
 const TURKISH_DOTLESS = "ı";
 const original = String.prototype.toLocaleLowerCase;
@@ -59,28 +60,25 @@ describe("normalizeBip39Phrase — the recover phrase-entry boundary", () => {
   });
 });
 
-describe("the type-back comparison inside CreateVaultFlow", () => {
-  it("normalizes with the locale-independent call", () => {
-    // A SOURCE assertion, and it is the honest shape here rather than a
-    // shortcut: the comparison is an inline expression in a render body, not an
-    // exported function, so there is nothing to import and call. Driving it
-    // through the rendered flow would need the whole creation walk and would
-    // then assert the keyboard's behaviour rather than the string's.
-    //
-    // What makes it a real check rather than a grep: BOTH directions. The right
-    // call must be present AND the wrong one absent, so replacing one with the
-    // other fails either way round.
-    const src = readFileSync(
-      resolve(__dirname, "..", "src", "app", "flows", "CreateVaultFlow.tsx"),
-      "utf8",
+describe("the type-back comparison, now one exported rule for both flows", () => {
+  it("normalizes locale-independently, so a Turkish I never refuses a real word", () => {
+    // This used to be a SOURCE assertion over `CreateVaultFlow`'s inline
+    // comparison, because that comparison was an expression in a render body
+    // with nothing to import. It is now `phraseChallenge.normalizeWord`, reached
+    // by the vault AND identity type-backs, so the check is behavioural: call it
+    // under the patched host locale and assert the dotless form never appears.
+    // The patch is vacuous-proofed in the first describe block above.
+    expect(normalizeWord("INCOME")).toBe("income");
+    for (const word of ["INDEX", "INJURY", "ISLAND", "INVITE", "IRON", "ICE"]) {
+      expect(normalizeWord(word)).toBe(word.toLowerCase());
+      expect(normalizeWord(word)).not.toContain(TURKISH_DOTLESS);
+    }
+    // And the gate accepts the uppercase form for a phrase of such words.
+    const gate = phraseTypeBackMatches(
+      ["income", "index", "island", "iron"],
+      [0, 1, 2, 3],
+      ["INCOME", "INDEX", "ISLAND", "IRON"],
     );
-    const line = src
-      .split("\n")
-      .find((l: string) => l.includes("const norms = answers.map"));
-    expect(line, "the type-back comparison moved or was renamed").toBeTruthy();
-    expect(line, "the type-back lowercases with the locale").not.toContain(
-      "toLocaleLowerCase",
-    );
-    expect(line, "the type-back stopped lowercasing at all").toContain("toLowerCase");
+    expect(gate.allCorrect).toBe(true);
   });
 });

@@ -513,6 +513,10 @@ const V = {
     "typed-unsupported",
     "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
   ],
+  "src/lib/memberNames.ts": [
+    "typed-unsupported",
+    "The member display-name writers (myne-md/myne#851, `plugin:member-names|*`), `Class::Unsupported` on web for the same reason as the rest of the member surface. Both of its importers are substituted out of the bundle, which is why nothing here reaches served code: `MemberRosterPanel`, and `MemberNameGate`, which only `IdentityHome` renders and `IdentityHome` is substituted too. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
+  ],
   "src/lib/personAccount.ts": [
     "excluded",
     "The person-account bindings are substituted out of the web bundle. The identity-only screens are absent and the backend is capability-refused there, so retaining these bindings would only preserve an unreachable path.",

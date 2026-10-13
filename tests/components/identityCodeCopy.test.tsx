@@ -12,6 +12,7 @@ const personListInvitesMock = vi.hoisted(() => vi.fn());
 const personAcceptInviteMock = vi.hoisted(() => vi.fn());
 const inspectInviteCodeMock = vi.hoisted(() => vi.fn());
 const startB2bMigrationMock = vi.hoisted(() => vi.fn());
+const listRosterMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: writeTextMock,
@@ -51,6 +52,11 @@ vi.mock("../../src/hooks/useRoster", () => ({
   }),
 }));
 
+vi.mock("../../src/components/PasswordInput", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/components/PasswordInput")>();
+  return { ...real, usePasswordStrength: () => ({ ready: true, result: { score: 4 } }) };
+});
+
 vi.mock("../../src/lib/personAccount", () => ({
   personListInvites: personListInvitesMock,
   personAcceptInvite: personAcceptInviteMock,
@@ -59,11 +65,20 @@ vi.mock("../../src/lib/personAccount", () => ({
 vi.mock("../../src/lib/invite", () => ({
   inspectInviteCode: inspectInviteCodeMock,
   startB2bMigration: startB2bMigrationMock,
+  listRoster: listRosterMock,
 }));
+
+vi.mock("../../src/lib/memberNames", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../src/lib/memberNames")>();
+  return { ...real, setMyMemberName: vi.fn() };
+});
 
 import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
 import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
 import { IdentityHome } from "../../src/screens/IdentityHome";
+
+/** Comfortably over the project floor and zxcvbn-clean (the hook is stubbed). */
+const ACCEPT_PASSWORD = "correct horse battery staple";
 
 const OWNER_CODE = `MYNE-PERSON-1:${"11".repeat(16)}:${"22".repeat(32)}:${"33".repeat(32)}:${"44".repeat(48)}`;
 const IDENTITY_CODE = `MYNE-PERSON-1:${"55".repeat(16)}:${"66".repeat(32)}:${"77".repeat(32)}:${"88".repeat(48)}`;
@@ -133,6 +148,31 @@ beforeEach(() => {
   personAcceptInviteMock.mockReset().mockResolvedValue(undefined);
   inspectInviteCodeMock.mockReset();
   startB2bMigrationMock.mockReset();
+  // The post-accept name gate (myne-md/myne#851 task 8) sits between the accept
+  // and `onAccepted`, which several tests here assert. This file is about the
+  // phrase and the identity code, so the caller is already named and the gate
+  // resolves on its own; the gate itself is covered by `memberNameGate.test.tsx`
+  // and by `identityHomeAccept.test.tsx`.
+  listRosterMock.mockReset().mockResolvedValue({
+    members: [
+      {
+        fingerprint_hex: "aa".repeat(32),
+        is_self: true,
+        display_name: "Ada",
+        name_state: "verified",
+        role: "member",
+        version: 0,
+        previous_fingerprint_hex: null,
+        joined_at: 0,
+        member_ed_pk_hex: "bb".repeat(32),
+        member_kem_ek_hex: "cc".repeat(32),
+        member_mldsa_vk_hex: "dd".repeat(48),
+        continuity: null,
+      },
+    ],
+    authority: "member",
+    group_key_epoch: 3,
+  });
   resetPersonIdentityState();
   resetToasts();
 });
@@ -281,16 +321,29 @@ describe("IdentityHome invite phrase", () => {
     await screen.findByTestId("identity-home.accept-sas");
     fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
     fillIdentityPhrase();
-    expect((screen.getByTestId("identity-home.accept-submit") as HTMLButtonElement).disabled).toBe(
-      false,
-    );
-    fireEvent.click(screen.getByTestId("identity-home.accept-submit"));
+    // The accept form now carries a REQUIRED device-local password (myne-md/myne#851
+    // task 7), and its own submit is the accept button: the phrase alone no longer
+    // enables it.
+    expect(
+      (screen.getByTestId("identity-home.accept.submit") as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.change(screen.getByTestId("identity-home.accept.password-input"), {
+      target: { value: ACCEPT_PASSWORD },
+    });
+    fireEvent.change(screen.getByTestId("identity-home.accept.confirm-input"), {
+      target: { value: ACCEPT_PASSWORD },
+    });
+    expect(
+      (screen.getByTestId("identity-home.accept.submit") as HTMLButtonElement).disabled,
+    ).toBe(false);
+    fireEvent.click(screen.getByTestId("identity-home.accept.submit"));
 
     await waitFor(() =>
       expect(personAcceptInviteMock).toHaveBeenCalledWith(
         "invite-1",
         OWNER_CODE,
         expectedIdentityPhrase(),
+        ACCEPT_PASSWORD,
       ),
     );
     expect(onAccepted).toHaveBeenCalledOnce();

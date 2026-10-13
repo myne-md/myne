@@ -73,6 +73,7 @@ pub mod error;
 pub mod graph_layout_blob;
 pub mod kdf;
 pub mod manifest;
+pub mod member_names_blob;
 pub mod paired_extension;
 pub mod password_policy;
 pub mod person_invite;
@@ -114,15 +115,15 @@ pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
     aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob,
     aad_awareness_frame, aad_chats_blob, aad_chats_blob_v0_2, aad_chats_catalog,
-    aad_custom_themes_blob, aad_graph_layout_blob, aad_membership_blob, aad_membership_roster_blob,
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
-    aad_person_binding_blob, aad_person_member_key_store, aad_person_member_unlock_store,
-    aad_person_profile_blob, aad_person_vault_carrier, aad_personal_dictionary_blob,
-    aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap, aad_recovery_wrap_v0_2,
-    aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
-    aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
-    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
+    aad_custom_themes_blob, aad_graph_layout_blob, aad_member_names_blob, aad_membership_blob,
+    aad_membership_roster_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
+    aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
+    aad_person_member_key_store, aad_person_member_unlock_store, aad_person_profile_blob,
+    aad_person_vault_carrier, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
+    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
+    aad_singleton_blob_v0_2, aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob,
+    aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx,
+    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
 };
 pub use agent_memory_catalog_blob::{
     decode_agent_memory_catalog_blob, decode_agent_memory_catalog_blob_versioned,
@@ -246,6 +247,16 @@ pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
     MANIFEST_DOMAIN_PREFIX, MANIFEST_FORMAT_V1, MANIFEST_HASH_LEN, MANIFEST_ID_LEN,
     MANIFEST_PROTOCOL_VERSION,
+};
+pub use member_names_blob::{
+    decode_member_names_blob, decode_member_names_or_empty, encode_member_names_blob,
+    encode_member_names_blob_raw, encode_member_names_map, live_member_names,
+    member_name_signed_bytes, merge_member_names, parse_member_names_map, partition_verified,
+    sign_member_name, verify_member_name, verify_member_removal, MemberNameEntry,
+    MemberNamesBlobError, MemberNamesMap, MAX_MEMBER_NAMES_PLAINTEXT_LEN, MAX_MEMBER_NAME_LEN,
+    MEMBER_NAMES_BLOB_AAD_ROLE, MEMBER_NAMES_BLOB_FORMAT_V1, MEMBER_NAMES_BLOB_HEADER_LEN,
+    MEMBER_NAMES_BLOB_MAGIC, MEMBER_NAME_PREFIX, MEMBER_NAME_SIGNATURE_HEX_LEN,
+    MEMBER_NAME_SIGNATURE_LEN,
 };
 pub use paired_extension::{
     canonical_encode_paired_extensions, parse_paired_extensions_array, PairedExtension,

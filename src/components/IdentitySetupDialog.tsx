@@ -28,6 +28,8 @@ import { personSetup, personStatus, type PersonSetupView } from "../lib/personAc
 import { personLock } from "../lib/invite";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
 import { SecretPhraseReveal, useLocalPhraseReveal } from "./SecretPhraseReveal";
+import { PhraseTypeBack, phraseTypeBackMatches, type TypeBackPositions } from "./PhraseTypeBack";
+import { drawConfirmPositions } from "../screens/vault-creation/reducer";
 import { FirstRunServerStep, useHasSyncEndpoint } from "./sync/FirstRunServerStep";
 
 interface IdentitySetupDialogProps {
@@ -106,6 +108,23 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   const [serverAcknowledged, setServerAcknowledged] = useState(false);
   const [serverSelectionOpen, setServerSelectionOpen] = useState(false);
 
+  // The identity phrase gets the vault ceremony's type-back (myne-md/myne#855).
+  // Section 7.1.3's "demonstrate the phrase, not memorize" is a property of the
+  // secret, not of the ceremony, and without it a user who never saved the phrase
+  // got no signal until they lost the device, and an identity cannot be recovered
+  // without it. The four positions are drawn once, in `run`, from the phrase the
+  // backend just generated; recover draws none, because typing all 24 words is
+  // already the demonstration.
+  const [confirmPositions, setConfirmPositions] = useState<TypeBackPositions | null>(null);
+  const [confirmInputs, setConfirmInputs] = useState<Record<number, string>>({});
+  const typeBack =
+    result?.phrase && confirmPositions
+      ? phraseTypeBackMatches(result.phrase.split(" "), confirmPositions, confirmInputs)
+      : null;
+  // The Done CTA is the commit here, so the challenge gates it: a checkbox, or
+  // nothing, is not evidence (section 7.1.3).
+  const doneDisabled = typeBack !== null && !typeBack.allMatch;
+
   // Read the held-identity state whenever the dialog is opened, so a device
   // that already holds a sealed keypair (from an earlier session or another
   // B2B flow) is steered to Recover rather than offered a doomed Create.
@@ -132,7 +151,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setBusy(true);
     setError(null);
     try {
-      setResult(await personSetup(phrase));
+      const view = await personSetup(phrase);
+      setResult(view);
+      setConfirmPositions(view.phrase ? drawConfirmPositions() : null);
+      setConfirmInputs({});
       setRecoveryCells(emptyRecoveryCells());
       setConfirmForget(false);
     } catch (e) {
@@ -169,6 +191,8 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     // and unmount this dialog before `result.phrase` ever renders.
     const created = result !== null;
     setResult(null);
+    setConfirmPositions(null);
+    setConfirmInputs({});
     setError(null);
     setRecoveryCells(emptyRecoveryCells());
     setHeldCode(null);
@@ -212,8 +236,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
               </div>
               {/* The phrase arrives as one space-joined string from the backend;
                   split it for the shared reveal, which renders the numbered grid.
-                  Same protections as the vault phrase, and deliberately no
-                  type-back (`decisions/ui/0615`). */}
+                  Same protections as the vault phrase. The type-back below is the
+                  gate on Done (myne-md/myne#855; reverses the original
+                  `decisions/ui/0615` "no type-back" clause, recorded in
+                  `design-notes/ui/0665`). */}
               <SecretPhraseReveal
                 phrase={result.phrase.split(" ")}
                 revealed={reveal.revealed}
@@ -223,6 +249,24 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
                 gridTestId="identity-setup.phrase"
                 saveFilename="myne-identity-phrase.txt"
               />
+              {confirmPositions ? (
+                <>
+                  <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+                    {t("identitySetup.typeBackLead")}
+                  </div>
+                  <PhraseTypeBack
+                    phrase={result.phrase.split(" ")}
+                    positions={confirmPositions}
+                    values={confirmInputs}
+                    onChange={(pos, value) =>
+                      setConfirmInputs((prev) => ({ ...prev, [pos]: value }))
+                    }
+                    labelFor={(pos) => t("identitySetup.typeBackWordAtPosition", { pos })}
+                    mismatchFor={(pos) => t("identitySetup.typeBackMismatch", { pos })}
+                    testIdPrefix="identity-setup.confirm"
+                  />
+                </>
+              ) : null}
             </>
           ) : (
             <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
@@ -243,7 +287,12 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             </div>
           ) : null}
 
-          <Button variant="primary" onClick={close} data-testid="identity-setup.close-cta">
+          <Button
+            variant="primary"
+            onClick={close}
+            disabled={doneDisabled}
+            data-testid="identity-setup.close-cta"
+          >
             {t("identitySetup.doneCta")}
           </Button>
         </div>

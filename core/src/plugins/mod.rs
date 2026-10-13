@@ -46,6 +46,7 @@ pub mod export;
 pub mod graph_layout;
 /// The live co-editing session core (epic live-collab, `collab-editor-bridge`).
 pub mod live;
+pub mod member_names;
 pub mod memory;
 pub mod notes;
 pub mod prefs;

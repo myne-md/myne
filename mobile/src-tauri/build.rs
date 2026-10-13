@@ -453,6 +453,25 @@ fn main() {
                 ]),
             )
             .plugin(
+                // The B2B member display-name commands over the encrypted
+                // `vault.member-names` (`MYO5`) singleton, which is group-tier
+                // sealed and `NTV6`-only (decisions/protocol/0666, myne-md/myne#851
+                // task 15). Shared from `myne-core`; the same three commands the
+                // desktop registers. The `InlinedPlugin` mirror is load-bearing:
+                // without it the `member-names:` permissions flatten into
+                // `__app-acl__` and never match the `plugin:member-names|<cmd>`
+                // authorize form. Keep lock-stepped with the `generate_handler!` in
+                // `plugins/member_names/mod.rs` AND with
+                // `permissions/member-names/default.toml`. All three lists must
+                // agree, and `scripts/check-mobile-plugin-acl.mjs` compares them.
+                "member-names",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "member_names_list",
+                    "member_names_set_mine",
+                    "member_names_clear_mine",
+                ]),
+            )
+            .plugin(
                 // On-device speech-to-text (MYND-563): creates the
                 // `local-inference:` ACL namespace + auto-generates
                 // `allow-transcribe` / `allow-read-transcript`. NOT feature-gated

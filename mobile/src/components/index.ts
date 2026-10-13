@@ -15,6 +15,7 @@ export {
   Segmented,
   MonoField,
   MonoBox,
+  TextField,
 } from "./inputs";
 export { Banner, Toast, Spinner, BlockingOverlay } from "./feedback";
 export { Chip, AccountNumber, Fab, Sheet, SidePanel, useEnterTransition } from "./misc";
