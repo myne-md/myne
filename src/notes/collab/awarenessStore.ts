@@ -28,6 +28,13 @@ export const AWARENESS_GRACE_MS = 3000;
 export interface PresenceUpdate {
   noteId: string;
   actorId: string;
+  /**
+   * The peer's own advertised name, present on the wire and DELIBERATELY NOT READ
+   * by `awarenessUpsert`. The label rule is `resolvePeerLabels` alone; see the
+   * comment on `awarenessUpsert` for what breaks when a frame-supplied name reaches
+   * the store. Kept in the type because it is the wire shape, not because anything
+   * here may use it.
+   */
   label: string | null;
   cursor: number | null;
   selection: { anchor: number; head: number } | null;
@@ -89,6 +96,17 @@ function normalizeSelection(selection: unknown): { anchor: number; head: number 
 /**
  * Add or replace a peer's presence, keyed by the FRAME's own note. A frame arriving
  * after a drop means the stream is back, so the drop is cleared too.
+ *
+ * Every peer enters UN-ATTRIBUTED, and the frame's own `label` is deliberately NOT
+ * read (`member-devices` task 5). The wire does carry one, so this is a decision
+ * rather than an oversight: the only label rule is `resolvePeerLabels`, which asks
+ * the backend identity resolver which person a device is bound to, and that is the
+ * same rule the version history runs. A frame-supplied name is a self-assertion by
+ * the peer, and trusting it here breaks the joint claim two ways. It names one device
+ * two ways, because the history never sees the frame and would print the resolved
+ * member name while the roster printed whatever the peer sent. And writing it flips
+ * `unAttributed` off, which is precisely the flag that makes `resolvePeerLabels` SKIP
+ * a peer, so the resolver would never run for the peers whose name disagreed.
  */
 export function awarenessUpsert(
   state: AwarenessState,
@@ -98,14 +116,9 @@ export function awarenessUpsert(
   peers.set(update.actorId, {
     id: update.actorId,
     noteId: update.noteId,
-    // The wire carries an ALREADY-RESOLVED name from the signed assertion, so it is
-    // a `text` label: a name the user authored, with nothing for us to translate.
-    // Wrapping it rather than storing the bare string is what keeps `label` a
-    // descriptor everywhere, so no surface can render half the rule.
-    label: update.label === null ? null : { kind: "text", text: update.label },
-    // The frame's own label is absent, so the assertion did not resolve a name; the
-    // surface renders the degraded form.
-    unAttributed: update.label === null,
+    // NOT `update.label`: the resolver is the one writer (`presenceLabels.ts`).
+    label: null,
+    unAttributed: true,
     caret: typeof update.cursor === "number" ? update.cursor : null,
     selection: normalizeSelection(update.selection),
     color: colorForParticipant(update.actorId),

@@ -88,6 +88,7 @@ import {
   clickNoteRow,
   createNote,
   dismissImporterOfferIfPresent,
+  openSettings,
   pageSeatInvoke,
   runPaletteAction,
   typeIntoEditor,
@@ -262,8 +263,28 @@ async function openWhoIsHere(session: Session): Promise<void> {
   );
 }
 
-/** Publish ONE presence frame from `session` for `noteId`.
+/** Every row of the vault's device list, as `{ id, text }`.
  *
+ *  Read fresh PER ROUND rather than held as handles, for the reason
+ *  `e2e/AGENTS.md` gives: the list re-renders on every sync tick, so a handle
+ *  taken before one is stale on the next and a click or read on it can only
+ *  time out. `id` is the row's `data-device-id`, which the panel deliberately
+ *  writes as the 16-character PREFIX of the device id (the full 32-hex value
+ *  never reaches the DOM), so a caller comparing against a full id slices the
+ *  same way. `text` is the whole row, which is `label + claim + [badge]`. */
+async function readDeviceRows(
+  session: Session,
+): Promise<Array<{ id: string; text: string }>> {
+  const rows = await session.byTestIdAll("device-bindings.row");
+  return Promise.all(
+    rows.map(async (row) => ({
+      id: (await row.attribute("data-device-id")) ?? "",
+      text: ((await row.text()) ?? "").trim(),
+    })),
+  );
+}
+
+/** Publish ONE presence frame from `session` for `noteId`. *
  *  `label: null` is the whole point and is also what production does: the backend
  *  command stores it verbatim (`signal.set_local_label(label)`), and the supervisor
  *  seals `sig.local_label()` into the frame, so a `None` here is what makes the frame
@@ -287,7 +308,7 @@ async function publishPresence(
 describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
   // Vault-count precondition: 1 seeded vault on the owner, 0 on each member device.
   it("joins the same vault from the phrase alone, and both devices' revisions and presence name the member", async () => {
-    await withMemberFleet(async ({ first, second, firstCode }) => {
+    await withMemberFleet(async ({ owner, first, second, firstCode }) => {
       // ---- the revision the second device has to attribute ----
       await createNote(first.session, MEMBER_NOTE_TITLE);
       await typeIntoEditor(first.session, FIRST_DEVICE_BODY);
@@ -526,6 +547,81 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
         labels.filter((l) => l.kind !== "Person").map((l) => l.kind),
         "no revision resolved to a bare device or to unknown",
       ).toEqual([]);
+
+      // ---- the owner's device list, which is what story 11 is for ----
+      //
+      // The panel reads the VAULT-scoped `device_bindings_list` and never the account
+      // roster: a member's device is enrolled on the MEMBER's own account, so
+      // `sync_list_devices` on the owner can never carry it, and there is no row on the
+      // owner's device-management panel to augment. That is why this is a read of its
+      // own rather than an assertion over a surface the scenario already had open.
+      //
+      // Read the second device's OWN id first, so the owner-side assertion is about a
+      // SPECIFIC device rather than about "some row carries a name", which a list
+      // holding only the owner's own device would satisfy. The read is a page-seat
+      // invoke of production IPC, which is the sanctioned way to reach a backend path
+      // on a device whose UI this scenario has already finished with.
+      const secondView = (await pageSeatInvoke(
+        second.session,
+        "plugin:device-binding|device_bindings_list",
+        {},
+        20_000,
+      )) as { rows?: Array<{ device_id_hex?: string; is_this_device?: boolean }> };
+      const secondDeviceId = secondView.rows?.find((row) => row.is_this_device)?.device_id_hex;
+      expect(
+        secondDeviceId,
+        "the member's second device holds a verified binding naming itself",
+      ).toBeTruthy();
+      // The panel writes the 16-character prefix, so that is the form to compare in.
+      const secondDevicePrefix = (secondDeviceId as string).slice(0, 16);
+
+      await openSettings(owner.session, "sync");
+      await owner.session.byTestId("device-bindings", { timeoutMs: 30_000 });
+
+      // The owner has to PULL the row the other device wrote, and that pull is a sync
+      // cycle against a store the join materialised in the background, so one read is a
+      // bet on the two having met. Nudge and re-read, the shape `openNoteOn` uses.
+      const nudgeOwner = makeNudger(owner.session);
+      const ownerRows = await owner.session.waitUntil(
+        async () => {
+          const rows = await readDeviceRows(owner.session);
+          if (rows.some((row) => row.id === secondDevicePrefix)) return rows;
+          await nudgeOwner();
+          return null;
+        },
+        {
+          label: "the owner's device list carries a row for the member's second device",
+          timeoutMs: SYNC_BUDGET_MS,
+        },
+      );
+
+      // Story 11, asserted: the owner's list says WHICH MEMBER that device is claimed by,
+      // so the row reads as an attribution rather than as an opaque id.
+      const secondRow = ownerRows.find((row) => row.id === secondDevicePrefix);
+      expect(
+        secondRow?.text,
+        `the owner's row for the member's second device names the member: ${JSON.stringify(ownerRows)}`,
+      ).toContain(MEMBER_NAME);
+      // Both of the member's devices, and it is not vacuous: the scenario established a
+      // hop earlier that this device's history resolved the FIRST device's revisions to a
+      // Person label, which needs that device's verified binding and the owner-signed
+      // roster, so the same two rows are in this store. A list of one would satisfy the
+      // assertion above while the panel still meant nothing.
+      expect(
+        ownerRows.filter((row) => row.text.includes(MEMBER_NAME)).length,
+        `both of the member's devices are on the owner's list: ${JSON.stringify(ownerRows)}`,
+      ).toBeGreaterThanOrEqual(2);
+
+      // Story 4, and the wording rule the panel exists to hold: the row's signature
+      // binds the row to the SIGNER and nothing to the device (`protocol.md` §9.30.4), so
+      // the honest claim is "claimed by" and never ownership. Asserted as copy rather
+      // than as a comment because a testid carries no opinion about the words.
+      expect(secondRow?.text).toContain("claimed by");
+      const ownerPanel = await owner.session.byTestId("device-bindings");
+      expect(
+        (await ownerPanel.text()) ?? "",
+        "no row on the owner's device list claims ownership",
+      ).not.toMatch(/belong|owned/i);
     });
   });
 });

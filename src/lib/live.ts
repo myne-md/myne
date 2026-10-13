@@ -61,9 +61,12 @@ export async function liveSessionClose(noteId: string): Promise<void> {
  * Report this device's local caret/selection for an open note so peers render its
  * cursor (`collab-presence-ui`). Best-effort: a note with no open session is a
  * no-op. `cursor` and `selection` are UTF-16 code units from the document start
- * (`selection` is `[anchor, head]`, or null for a bare caret); `label` is the
- * participant name this device advertises (its synced device name), or null to let
- * a peer fall back to the actor id.
+ * (`selection` is `[anchor, head]`, or null for a bare caret).
+ *
+ * `label` rides the wire and no receiver uses it: `awarenessUpsert` discards a
+ * frame-supplied name and the peer's label comes from the receiving device's own
+ * identity resolver, so one device is named the same way by the roster and the
+ * version history (`member-devices` task 5). The only caller passes null.
  */
 export async function liveSessionSetPresence(
   noteId: string,

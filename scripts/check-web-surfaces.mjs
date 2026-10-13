@@ -509,9 +509,17 @@ const V = {
     "typed-unsupported",
     "The B2B member commands are `Class::Unsupported` on web (`memberSharing` absent), and the only module that imports this hook is `MemberRosterPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
   ],
+  "src/hooks/useDeviceBindings.ts": [
+    "typed-unsupported",
+    "The device-binding commands (myne-md/myne#852) are `Class::Unsupported` on web: the store is `NTV6`-only and group-tier sealed, and `memberSharing` is absent, so a browser has neither a group key nor a person identity to reach it with. Its only importer is `DeviceAttributionPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file, exactly as `useRoster` one row up.",
+  ],
   "src/lib/invite.ts": [
     "typed-unsupported",
     "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
+  ],
+  "src/lib/deviceBindings.ts": [
+    "typed-unsupported",
+    "The device-to-person binding bindings (myne-md/myne#852, `plugin:device-binding|*`), `Class::Unsupported` on web for the same reason as the rest of the member surface: the store is `NTV6`-only and group-tier sealed. Its only importer is `DeviceAttributionPanel`, substituted out of the bundle, so nothing here reaches served code.",
   ],
   "src/lib/memberNames.ts": [
     "typed-unsupported",

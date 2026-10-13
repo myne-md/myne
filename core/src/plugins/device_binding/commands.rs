@@ -16,7 +16,8 @@
 
 use super::error::DeviceBindingError;
 use super::store::{claim_self_in_dir, read_device_bindings_in_dir, write_mutex, ClaimOutcome};
-use super::sync::{resolve_bindings_from_group_key, ResolvedBindings};
+use super::sync::ResolvedBindings;
+use crate::plugins::sync::identity_resolver::{device_attribution_view, DeviceAttributionView};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::VaultIo;
 use protocol::DeviceBindingsMap;
@@ -41,7 +42,7 @@ pub async fn resolve_bindings(
     let group = shared
         .group_bytes()
         .ok_or(DeviceBindingError::NotASharedVault)?;
-    resolve_bindings_from_group_key(io, &group, vault_dir).await
+    super::sync::resolve_bindings_from_group_key(io, &group, vault_dir).await
 }
 
 /// The session's own person identity as a signer.
@@ -82,33 +83,75 @@ pub async fn session_device_id(
         .ok_or(DeviceBindingError::NoDeviceId)
 }
 
-/// Testable core of the list command: the LIVE map, tombstones filtered out because a
-/// tombstone is a merge input rather than a row a user sees.
+/// Testable core of the list command: the vault's devices, each with the person its row is
+/// CLAIMED by, partitioned against the signed roster before any name is attached.
 ///
-/// **These rows are NOT signature-verified, so a caller MUST NOT render a row's claimed
-/// person as the device's owner.** The map is group-sealed, and that seal is precisely what
-/// makes it writable by every member; the map key is the DEVICE with the claimed person
-/// inside the row, so the only thing that makes a claim mean anything is
-/// `protocol::partition_verified_bindings` against the signed roster (§9.30.5), which this
-/// function has no access to. The rendering path today is
-/// `sync::identity_resolver::join_durable_attribution`, and it does partition. A caller
-/// added here owes the same partition before it names anyone; a device-to-member settings
-/// list is the surface that will, and it is the reason this command exists unwired.
+/// **The partition happens HERE rather than in the caller, and that is the whole point of
+/// the signature.** The map is group-sealed, and that seal is precisely what makes it
+/// writable by every member; the map key is the DEVICE with the claimed person inside the
+/// row, so the only thing that makes a claim mean anything is
+/// `protocol::partition_verified_bindings` against the signed roster (§9.30.4). A caller
+/// handed the raw map could only choose between rendering it unverified and rendering
+/// nothing, which is why this command exists unwired until the device list needs it: the
+/// frontend holds neither the roster, nor an owner public half, nor `vault.member-names`.
+///
+/// A row is a CLAIM and never an ownership (`protocol.md` §9.30.4): the signature binds the
+/// row to the person who signed it and binds nothing to the device, so the surface renders
+/// "claimed by" and a row that did not verify appears only as an id in
+/// [`DeviceAttributionView::unverified_device_ids`], never named after a person.
+///
+/// Errors rather than degrading on every gate that makes the LIST itself unknowable (a
+/// locked slot, a pre-B2B vault, an unreadable map), because an empty view is
+/// indistinguishable from "no device is bound". The roster and the names store are the
+/// opposite case: they are LABELS, so a failure to establish either leaves the rows
+/// unverified rather than failing the command
+/// ([`device_attribution_view`]'s own doc states the split).
 pub async fn device_bindings_list_with_dir(
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_dir: &Path,
-) -> Result<DeviceBindingsMap, DeviceBindingError> {
-    let resolved = resolve_bindings(io, state, vault_dir).await?;
+) -> Result<DeviceAttributionView, DeviceBindingError> {
+    // One peek and ONE `vault.meta` read for the key, the epoch and the roster envelope
+    // together. The attribution partition verifies the roster against the public half that
+    // signed it, so it needs the envelope the key's own read produced rather than a second
+    // read of the file, which could observe different bytes
+    // (`super::sync::resolve_bindings_and_meta_from_group_key` states the rule).
+    let shared = state
+        .peek_unlocked_shared_singleton_key()
+        .await
+        .ok_or(DeviceBindingError::SlotNotUnlocked)?;
+    let group = shared
+        .group_bytes()
+        .ok_or(DeviceBindingError::NotASharedVault)?;
+    let (resolved, b2b) =
+        super::sync::resolve_bindings_and_meta_from_group_key(io, &group, vault_dir).await?;
     let map = read_device_bindings_in_dir(io, vault_dir, &resolved.borrow()).await?;
-    Ok(protocol::live_device_bindings(&map))
+    // Both of these are LABELS rather than gates: a session with no installed person can
+    // still verify the roster through the owner identity code pinned at invite accept, and a
+    // never-enrolled device simply has no row to mark. Neither absence makes the list wrong,
+    // so neither is an error here, unlike in the writer path where both are required.
+    let session_person = state.clone_person_identity().await;
+    let device_id = session_device_id(io, vault_dir).await.ok();
+    Ok(device_attribution_view(
+        io,
+        vault_dir,
+        session_person.as_ref(),
+        &group,
+        &b2b,
+        &map,
+        device_id.as_ref(),
+    )
+    .await)
 }
 
 /// Testable core of the claim: write this device's own row if it is absent or stale.
 ///
-/// Returns the LIVE map, so a caller renders exactly what the list command would, plus
-/// whether the call actually wrote, which is what makes the idempotence a claim a test
-/// can assert rather than infer from a timestamp.
+/// Returns the LIVE map as WRITTEN, plus whether the call actually wrote, which is what makes
+/// the idempotence a claim a test can assert rather than infer from a timestamp. The map is
+/// the writer's own bytes and is deliberately NOT signature-verified: a caller that renders
+/// it owes [`device_bindings_list_with_dir`], which partitions it (§9.30.4). The two are one
+/// round trip apart on purpose, because the unlock hook calls this on every unlock and the
+/// attribution partition costs a roster read.
 ///
 /// Takes BOTH gates, the same pair every writer of a group-sealed singleton owes
 /// (`super::store::write_mutex` states the reasons): the family mutex against the sync
@@ -192,31 +235,36 @@ async fn active_vault_dir<R: tauri::Runtime>(
 pub async fn device_bindings_list<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
-) -> Result<DeviceBindingsMap, DeviceBindingError> {
+) -> Result<DeviceAttributionView, DeviceBindingError> {
     let host = crate::host::tauri_host::TauriHost::new(app);
     let io = crate::vault_io::StdVaultIo;
     let dir = active_vault_dir(&host, state.inner()).await?;
     device_bindings_list_with_dir(&io, state.inner(), &dir).await
 }
 
-/// Register this device's own binding and answer the live map.
+/// Register this device's own binding and answer the live, verified device list.
 ///
 /// The write is the SAME operation the unlock pipeline performs, so a caller that wants
 /// to force a re-claim (after an identity change, or after the user re-installed this
 /// device's identity) does not need a second code path. It cannot write another device's
 /// row: the row key is this device's own enrolled id and the signer is this session's own
 /// person, both read from the session rather than from the caller's arguments.
+///
+/// Answers the LIST's shape rather than the raw map, so both device commands hand the
+/// frontend one type. The extra read is a user-initiated re-claim rather than the per-unlock
+/// path, so the attribution partition is affordable here and the frontend never sees an
+/// unverified row.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn device_bindings_claim<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
-) -> Result<DeviceBindingsMap, DeviceBindingError> {
+) -> Result<DeviceAttributionView, DeviceBindingError> {
     let host = crate::host::tauri_host::TauriHost::new(app);
     let io = crate::vault_io::StdVaultIo;
     let dir = active_vault_dir(&host, state.inner()).await?;
-    let (map, _outcome) = claim_own_binding_with_dir(&io, state.inner(), &dir).await?;
-    Ok(map)
+    let (_map, _outcome) = claim_own_binding_with_dir(&io, state.inner(), &dir).await?;
+    device_bindings_list_with_dir(&io, state.inner(), &dir).await
 }
 
 #[cfg(test)]
@@ -306,25 +354,24 @@ mod tests {
         });
     }
 
-    /// The READ command refuses a session it cannot read, rather than answering an empty map.
+    /// The READ command refuses a session it cannot read, rather than answering an empty list.
     ///
-    /// `device_bindings_list` is deliberately UNWIRED today (see its own doc: the
-    /// device-to-member settings list is the surface it exists for, and it owes
-    /// `protocol::partition_verified_bindings` before it names anyone), so nothing in the
-    /// tree would notice it breaking. This test is the whole of its coverage, and it is
-    /// written against the failure that matters rather than against the happy path: an
-    /// empty `DeviceBindingsMap` is INDISTINGUISHABLE from "no device is bound", so a
-    /// reader that answered a locked or pre-B2B session with `Ok(default())` would render
-    /// "no devices" over a vault whose rows it simply could not open. Every other read in
-    /// this family is a label (`durable_attribution_in_dir` returns an empty index for the
-    /// same absences, correctly, because a blank label is the right degradation there);
-    /// this one feeds a list a user acts on, so it errs the other way.
+    /// `device_bindings_list` is the read half of the device list, whose whole reason for
+    /// existing is that the attribution partition (§9.30.4) happens in Rust: the frontend holds
+    /// neither the roster, nor an owner public half, nor `vault.member-names`. This test is
+    /// written against the failure that matters rather than against the happy path: an empty
+    /// `DeviceAttributionView` is INDISTINGUISHABLE from "no device is bound", so a reader that
+    /// answered a locked or pre-B2B session with `Ok(default())` would render "no devices" over
+    /// a vault whose rows it simply could not open. Every other read in this family is a label
+    /// (`durable_attribution_in_dir` returns an empty index for the same absences, correctly,
+    /// because a blank label is the right degradation there); this one feeds a list a user acts
+    /// on, so it errs the other way.
     ///
-    /// What it does NOT cover, stated rather than implied: the successful read. Reaching
-    /// it needs a live `NTV6` session holding the group singleton, and the read half it
-    /// would exercise (`read_device_bindings_in_dir` + `live_device_bindings`) is already
-    /// driven host-free by `store`'s own tests over a real directory. What is unique to
-    /// THIS layer is the three gates below, and each is asserted.
+    /// What it does NOT cover, stated rather than implied: the successful read. Reaching it
+    /// needs a live `NTV6` session holding the group singleton, and the read half it would
+    /// exercise (`read_device_bindings_in_dir` + the partition) is driven host-free by
+    /// `store`'s own tests and by `sync::identity_resolver`'s. What is unique to THIS layer is
+    /// the three gates below, and each is asserted.
     #[test]
     fn the_list_command_refuses_a_session_it_cannot_read_rather_than_answering_empty() {
         crate::test_support::block_on(async {
@@ -338,7 +385,7 @@ mod tests {
                     super::device_bindings_list_with_dir(&StdVaultIo, &state, &dir).await,
                     Err(super::DeviceBindingError::SlotNotUnlocked)
                 ),
-                "a locked session must be refused, never answered with an empty map"
+                "a locked session must be refused, never answered with an empty list"
             );
 
             // Gate 2: the command is unreachable from the session's own helpers either.

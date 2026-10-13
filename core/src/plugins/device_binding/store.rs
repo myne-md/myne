@@ -222,10 +222,19 @@ pub async fn merge_pulled_blob_in_dir(
 }
 
 /// Tombstone every live row bound to `person_fingerprint_hex`, signed by the vault OWNER,
-/// and persist the result. This is how a binding goes away when a member is removed from
-/// the vault, and it is the only way a row that is not the caller's own is ever written:
-/// an owner signature is accepted on the READ side for a tombstone only, never for a live
-/// row (`verify_device_binding_removal` refuses a live one).
+/// and persist the result: the read-modify-write wrapper over [`tombstone_devices_for_person`]
+/// for a caller that holds no staged batch of its own.
+///
+/// **A member removal does NOT go through here.** That path is
+/// `sync::member_removal`'s step (5d), which calls `tombstone_devices_for_person` directly and
+/// stages the result into the rotation's single commit, because this wrapper writes to disk
+/// and writing the retired epoch's ciphertext before the new one exists would open a window
+/// in which the map is on disk in a form nobody can open. So the callers of this function
+/// today are the tests that want the persisted round trip, not production; it stays because
+/// the owner tombstone write is a coherent entry point a device-retirement flow would want,
+/// and because it is the only way a row that is not the caller's own is ever written: an
+/// owner signature is accepted on the READ side for a tombstone only, never for a live row
+/// (`verify_device_binding_removal` refuses a live one).
 ///
 /// Keyed by the removed person's FINGERPRINT rather than by a device id, deliberately and
 /// not as a convenience: the operation a removal performs is "this person's devices stop

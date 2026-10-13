@@ -264,6 +264,15 @@ const CAPABILITY_BACKING = {
     // person identity a served page cannot hold.
     "plugin:member-names|member_names_set_mine",
     "plugin:member-names|member_names_clear_mine",
+    // The device-to-person binding store (myne-md/myne#852): the device list and
+    // the claim, one namespace over from the names above and refused for the
+    // same reason. The store is `NTV6`-only and group-tier sealed, the claim
+    // signs with the session's person identity, and a served page holds neither
+    // the group key nor that identity. The panel is substituted out of the web
+    // bundle entirely (`web/vite.config.ts`), so this entry is what keeps the
+    // two lists agreeing rather than the only thing hiding the affordance.
+    "plugin:device-binding|device_bindings_list",
+    "plugin:device-binding|device_bindings_claim",
   ],
 };
 

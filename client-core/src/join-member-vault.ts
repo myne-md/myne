@@ -62,8 +62,14 @@
  * not this device's person", which are one sentence: the identity being asked for is
  * not the one the phrase carries.
  *
- * The key is returned rather than the copy, so the caller resolves it at render time
- * and a language switch re-renders (the module-level-data rule in `src/AGENTS.md`).
+ * The KEY is returned rather than the copy, so this module freezes no language at module
+ * scope (the module-level-data rule in `src/AGENTS.md`). It does NOT promise that the string
+ * is resolved at render time, and a reader who takes that as a property of this module is
+ * misled: BOTH callers resolve it at the event and hold the result in state (`IdentityHome`
+ * and `IdentityFlow` each do `setX(t(key(error)))`), so a language switch does not
+ * retranslate a banner already on screen. That is the app's behaviour for every error banner
+ * and it belongs to the callers; this module's contribution is only that nothing here is
+ * fixed to one language.
  */
 export function memberJoinVaultErrorKey(error: unknown): string {
   const kind =

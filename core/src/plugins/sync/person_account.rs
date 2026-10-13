@@ -1418,7 +1418,7 @@ pub async fn member_join_vault_from_host(
     // and sync the same namespace from two directories, which is a mess no error
     // message later in the flow can explain. Refuse, and name the vault already held.
     let base = host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?;
-    if local_vault_holds_account(&base, io, &account_hash).await {
+    if local_vault_holds_account(&base, io, &account_hash).await? {
         tracing::warn!(
             stage = "join_already_held",
             "b2b join refused: this device already holds a vault for that account"
@@ -1578,16 +1578,26 @@ async fn local_vault_holds_account(
     base: &std::path::Path,
     io: &dyn VaultIo,
     account_hash: &[u8; 16],
-) -> bool {
+) -> Result<bool, SyncDeviceError> {
     let want = crate::account::person_identity::hex_lower(account_hash);
     for discovered in crate::vault_registry::discover_vaults(base) {
-        if let Ok(st) = super::state::read_sync_state(io, &discovered.root).await {
-            if st.account_hash_hex.as_deref() == Some(want.as_str()) {
-                return true;
-            }
+        // A read failure is NOT the answer "does not hold this account".
+        // Swallowing it with `if let Ok(..)` made this duplicate-copy guard
+        // skippable by a transient or corruption-class fault, and the
+        // consequence is the exact thing the guard exists to prevent: a second
+        // local copy of one remote vault, i.e. two vault directories carrying
+        // the same account hash. `read_sync_state` answers `Ok(SyncState::default())`
+        // for an ABSENT file (the ordinary pre-enrolment case, `account_hash_hex:
+        // None`, which correctly falls through), so only a present-and-unreadable
+        // one reaches this arm and it is a real fault worth reporting.
+        let st = super::state::read_sync_state(io, &discovered.root)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        if st.account_hash_hex.as_deref() == Some(want.as_str()) {
+            return Ok(true);
         }
     }
-    false
+    Ok(false)
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -4212,6 +4222,87 @@ mod tests {
                 after.len(),
                 1,
                 "the refusal must not materialize a second vault directory"
+            );
+        });
+    }
+
+    /// The OTHER half of the same guard, and the one that used to fail open: a
+    /// discovered vault whose `SyncState` is present but UNREADABLE answers
+    /// `Err(SyncConfigError::Parse)`, and swallowing that as "does not hold this
+    /// account" made the duplicate-copy guard skippable by a corruption-class
+    /// fault. The consequence is the exact thing the guard exists to prevent, so
+    /// the read failure has to refuse rather than fall through.
+    ///
+    /// Note what makes this reachable and the absent case NOT: `read_sync_state`
+    /// answers `Ok(SyncState::default())` for a file that is merely missing (the
+    /// ordinary pre-enrolment vault, `account_hash_hex: None`), which correctly
+    /// falls through. Only a present-and-undecodable file reaches the refusal.
+    #[test]
+    fn an_unreadable_sync_state_refuses_the_join_rather_than_reading_as_absence() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("join-unreadable-state").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+
+            let phrase =
+                "legal winner thank year wave sausage worth useful legal winner thank yellow";
+            let normalized = protocol::normalize_user_phrase(phrase);
+            let person_id = protocol::person_id_hash(normalized.as_str());
+
+            let auth_path = person_auth_path(&host, &io)
+                .await
+                .expect("person auth path");
+            write_person_auth(
+                &io,
+                &auth_path,
+                &PersonAuth {
+                    person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+                    device_id_hex: "44".repeat(16),
+                    token_hex: "55".repeat(32),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("write person credential");
+
+            let base = host.app_data_dir().expect("app data dir");
+            let account_hash = [0xABu8; 16];
+            let account_hash_hex = crate::account::person_identity::hex_lower(&account_hash);
+            let held = crate::vault_registry::mint_unique_vault_id(&base);
+            let held_root = base
+                .join(crate::paths::VAULTS_DIR_NAME)
+                .join(held.to_string());
+            io.create_dir_all(&held_root).await.expect("held vault dir");
+            // Present and garbage: the discovered vault's state cannot be read, so
+            // the guard cannot prove this device does not already hold the account.
+            io.write(
+                &held_root.join(crate::plugins::sync::state::SYNC_STATE_FILE),
+                b"{ this is not a SyncState",
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("write unreadable sync state");
+
+            let err = member_join_vault_from_host(
+                &host,
+                &io,
+                &state,
+                &"11".repeat(16),
+                &account_hash_hex,
+                phrase,
+                "correct horse battery staple",
+            )
+            .await
+            .unwrap_err();
+
+            assert_eq!(
+                err,
+                SyncDeviceError::Internal,
+                "an unreadable discovered SyncState is a fault, not the answer \"does not \
+                 hold this account\"; reading it as absence is what let the duplicate-copy \
+                 guard be skipped"
             );
         });
     }

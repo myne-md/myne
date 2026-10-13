@@ -763,9 +763,10 @@ export function PaneView({
     [awareness, activeId, t, i18n.language],
   );
   // Resolve each un-attributed peer's label through the backend identity resolver
-  // (`collab-provenance` task 2, `collab-presence-ui` task 1). A presence frame
-  // carries no name, so without this every roster row and caret label renders the
-  // degraded actor-id form. The store flips `unAttributed` off once resolved, so
+  // (`collab-provenance` task 2, `collab-presence-ui` task 1). A presence frame carries
+  // no name THIS STORE MAY USE, and `awarenessUpsert` discards the one the wire carries
+  // (`member-devices` task 5), so without this every roster row and caret label renders
+  // the degraded device form. The store flips `unAttributed` off once resolved, so
   // this does not re-resolve the same peer.
   //
   // The label RULE is `resolvedIdentityLabel`, shared with the version history

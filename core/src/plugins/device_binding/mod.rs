@@ -47,13 +47,13 @@ pub mod commands;
 
 pub use error::DeviceBindingError;
 pub use store::{
-    claim_self_in_dir, live_row_count, merge_pulled_blob_in_dir, read_device_bindings_in_dir,
-    tombstone_devices_for_person, tombstone_member_devices_in_dir, write_device_bindings_in_dir,
-    write_mutex, ClaimOutcome, DeviceBindingKey,
+    claim_self_in_dir, device_id_hex, live_row_count, merge_pulled_blob_in_dir,
+    read_device_bindings_in_dir, tombstone_devices_for_person, tombstone_member_devices_in_dir,
+    write_device_bindings_in_dir, write_mutex, ClaimOutcome, DeviceBindingKey,
 };
 pub use sync::{
     bindings_key_for_group, bindings_sync_id, read_verified_bindings_bytes,
-    resolve_bindings_from_group_key, ResolvedBindings,
+    resolve_bindings_and_meta_from_group_key, resolve_bindings_from_group_key, ResolvedBindings,
 };
 
 #[cfg(not(target_arch = "wasm32"))]

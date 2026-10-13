@@ -21,7 +21,9 @@ function update(over: Partial<PresenceUpdate>): PresenceUpdate {
   return {
     noteId: "note-1",
     actorId: "actor-a",
-    label: "Ada",
+    // What production sends: `reportLivePresence` passes a null label
+    // (`src/notes/liveNote.ts`). The labelled case is exercised explicitly below.
+    label: null,
     cursor: 3,
     selection: null,
     frameType: "presence",
@@ -55,16 +57,16 @@ describe("awareness store", () => {
     expect(awarenessNotePeers(s, "note-1").get("a")?.label).toBeNull();
   });
 
-  it("wraps a frame's own label as a TEXT descriptor, never as a bare string", () => {
-    // A frame's label is already resolved by the backend, and it is a NAME the user
-    // authored, so it has nothing to translate: it enters as `text`. What must not
-    // happen is a raw string landing in `label`, because that is the shape that lets
-    // a surface render half the rule (`identityLabel.ts`).
+  it("DISCARDS a frame-supplied label, so the resolver is the only writer", () => {
+    // The frame carries a name the peer asserts about itself, and the store must not
+    // use it (`member-devices` task 5). Trusting it names one device two ways, since
+    // the version history runs the resolver and never sees a frame, and it flips
+    // `unAttributed` off, which is the flag that makes `resolvePeerLabels` skip the
+    // peer. So a labelled frame lands exactly like an unlabelled one: un-attributed,
+    // and the roster shows the degraded copy until the resolver answers.
     const s = awarenessUpsert(EMPTY_AWARENESS, update({ actorId: "a", label: "Ada" }));
-    expect(awarenessNotePeers(s, "note-1").get("a")?.label).toEqual({
-      kind: "text",
-      text: "Ada",
-    });
+    expect(awarenessNotePeers(s, "note-1").get("a")?.label).toBeNull();
+    expect(awarenessNotePeers(s, "note-1").get("a")?.unAttributed).toBe(true);
   });
 
   it("normalizes a positional-array selection and rejects a malformed one", () => {

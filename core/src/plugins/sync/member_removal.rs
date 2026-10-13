@@ -744,7 +744,25 @@ pub async fn rotate_group_from_host(
                 resealed,
             ));
         }
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {}
+        // Unconditional for the same reason step (5d) below is: the sync-id is
+        // retired either way, so a device that holds no local copy must still stage
+        // an empty map at the new epoch or the server deletes the retired-epoch blob
+        // and leaves every peer stuck on bytes their new key cannot open.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+            let new_names_key =
+                protocol::derive_group_subkey_v0_2(&new_group, protocol::GroupRole::MemberNamesKey);
+            let resealed = protocol::encode_member_names_blob(
+                &new_names_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &protocol::MemberNamesMap::new(),
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+                resealed,
+            ));
+        }
         Err(_) => return Err(MemberRemovalError::Io),
     }
 
@@ -814,7 +832,35 @@ pub async fn rotate_group_from_host(
                 resealed,
             ));
         }
-        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {}
+        // The id is reclaimed whether or not this device happens to hold the blob
+        // (`group_rotation_reclaim_sync_ids` lists it unconditionally), so the
+        // re-seal has to be unconditional too. Skipping it here would have the
+        // server DELETE the retired-epoch blob and leave nothing at the new id,
+        // and a peer whose local copy is still sealed at the retired epoch could
+        // neither open it (the AAD binds `group_key_epoch`) nor repair it: its
+        // `read_verified_bindings_bytes` answers `None` for bytes that do not
+        // decode, so the sync phase computes itself clean and never replaces the
+        // file, and that device's attribution stays blank for good. An absent file
+        // and an empty map are the same thing to every reader of this family, so
+        // staging the empty map at the new epoch is what keeps the two halves of
+        // the rotation landing together.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+            let new_bindings_key = protocol::derive_group_subkey_v0_2(
+                &new_group,
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let resealed = protocol::encode_device_binding_blob(
+                &new_bindings_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &protocol::DeviceBindingsMap::new(),
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE),
+                resealed,
+            ));
+        }
         Err(_) => return Err(MemberRemovalError::Io),
     }
 
@@ -913,7 +959,8 @@ pub async fn rotate_group_from_host(
 
 /// Re-base the sync plane for a group rotation (myne-md/myne#711 task 30,
 /// `decisions/protocol/0609`). In an `NTV6` vault the reserved sync-ids of the
-/// shared singletons (attachments catalog, prefs, themes, member names) are
+/// shared singletons (attachments catalog, prefs, themes, member names and
+/// `vault.device-bindings` (`MYU5`, §9.30, myne-md/myne#852)) are
 /// derived from the group key, so a rotation to a new epoch moves them. Each retired epoch's id
 /// that this device holds a baseline for is queued as an orphan tombstone (the
 /// next push flags it on the server so horizon-GC reclaims the stranded record)
@@ -2003,6 +2050,90 @@ mod tests {
 
             // The running session moved to the new tiers.
             assert_eq!(state.active_vault_id().await, Some(id));
+        });
+    }
+
+    /// The other half of step (5d), and the one nothing else in this file reaches: a
+    /// rotation on a device that holds NO `vault.device-bindings` file.
+    ///
+    /// `group_rotation_reclaim_sync_ids` retires the family's group-derived sync-id
+    /// unconditionally, so the re-seal has to be unconditional too. Skipping it left
+    /// the server deleting the retired-epoch blob with nothing staged at the new id,
+    /// and every peer still holding a copy sealed at the retired epoch was then stuck:
+    /// its bytes no longer open (the AAD binds `group_key_epoch`), so
+    /// `read_verified_bindings_bytes` answers `None` for them, so its sync phase
+    /// computes itself clean and never replaces the file, and that device's
+    /// attribution stayed blank permanently. The assertion is the staged write, not
+    /// the absence of an error: an empty map at the NEW epoch is what makes the two
+    /// halves land together.
+    #[cfg(any(test, feature = "test-support"))]
+    #[test]
+    fn group_rotation_with_no_local_names_or_bindings_blob_still_reseals_empty_ones() {
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::StdVaultIo;
+
+        block_on(async {
+            let owner = rot_pair(0x10);
+            let member = rot_pair(0x20);
+            let base = ScopedTempDir::new("group-rotation-no-bindings").expect("tempdir");
+            let (_id, root, _old_items, _old_group, state) =
+                seed_ntv6_group_vault(base.path(), &owner, &member).await;
+            let host = crate::host::test_host::TestHost::new(base.path());
+
+            // The state this test exists for: this device never claimed itself, holds no
+            // bindings file at all, and holds no names file either. Both are the ordinary
+            // state of a member who has not yet synced those two families down, and both
+            // steps (5c and 5d) retire a sync-id unconditionally, so both owe an empty
+            // re-seal on a device that has nothing to re-seal.
+            let bindings_path = root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE);
+            std::fs::remove_file(&bindings_path).expect("the seeded bindings blob is removed");
+            let names_path = root.join(crate::plugins::member_names::MEMBER_NAMES_FILE);
+            std::fs::remove_file(&names_path).expect("the seeded names blob is removed");
+
+            rotate_group_from_host(
+                &host,
+                &StdVaultIo,
+                &state,
+                &owner,
+                &rot_hex(member.fingerprint()),
+            )
+            .await
+            .expect("rotation commits");
+
+            let bytes = std::fs::read(&bindings_path)
+                .expect("a blob is staged at the new epoch even when none was held");
+            let new_group = protocol::unlock_group_key_ntv6(
+                &protocol::parse_vault_meta_ntv6(
+                    &std::fs::read(root.join("vault.meta")).expect("meta"),
+                )
+                .expect("parse NTV6"),
+                &protocol::OwnerKey::new(ROT_ROOT),
+            )
+            .expect("group reopens");
+            let new_key = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(*new_group),
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let map = protocol::decode_device_binding_blob(&new_key, &ROT_ACCT, 2, &bytes)
+                .expect("the staged blob opens under the NEW group key at the new epoch");
+            assert!(
+                map.is_empty(),
+                "an absent file and an empty map are the same thing to every reader, so the \
+                 staged map carries no rows and resurrects nothing"
+            );
+
+            // The member-names family carries the same two halves and the same latent
+            // shape, so it is asserted here rather than in a second copy of this test.
+            let names_bytes = std::fs::read(&names_path)
+                .expect("a names blob is staged at the new epoch even when none was held");
+            let new_names_key = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(*new_group),
+                protocol::GroupRole::MemberNamesKey,
+            );
+            let names =
+                protocol::decode_member_names_blob(&new_names_key, &ROT_ACCT, 2, &names_bytes)
+                    .expect("the staged names blob opens under the NEW group key at the new epoch");
+            assert!(names.is_empty());
         });
     }
 

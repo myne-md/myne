@@ -3949,7 +3949,8 @@
         "timeFormat": "time format 24 hour 12 hour clock am pm",
         "timezone": "timezone time zone tz utc iana region today",
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
-        "syncMembers": "members, share, invite, team, collaboration, vault"
+        "syncMembers": "members, share, invite, team, collaboration, vault",
+        "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs"
       },
       "emptyBody": "Try a shorter word, or the name of a panel."
     },
@@ -4397,6 +4398,27 @@
       "identityForgetCancel": "Keep it",
       "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
       "identityForgetError": "Could not forget the identity. Try again."
+    },
+    "deviceBindings": {
+      "title": "Devices and members",
+      "heading": "Claimed devices",
+      "hint": "Each device that has claimed itself in this vault, with the member whose own signature claims it. A claim is not proof of ownership: it says which member signed the statement, not that the device is theirs.",
+      "loading": "Loading devices…",
+      "emptyTitle": "No devices claimed yet",
+      "empty": "A device appears here once it claims itself in this shared vault.",
+      "claimedBy": "claimed by {{name}}",
+      "unverified": "Not verified",
+      "unverifiedHint": "These device ids are in the vault but nothing backs a claim about them: the signature did not check out, or it names someone the member list does not have. They are shown as ids because there is no member to name beside them.",
+      "claimHint": "This device has no verified claim of its own in this vault. Claiming it again registers it under your identity, and it is also the repair for a claim that did not check out.",
+      "claim": "Claim this device",
+      "claiming": "Claiming…",
+      "unshared": "This vault is not shared yet, so there is no member to attribute a device to. Sharing it is permanent and happens the first time you invite someone.",
+      "errorLocked": "Unlock the vault to read its devices.",
+      "errorUnshared": "This vault is not shared, so it carries no device bindings.",
+      "errorNoDeviceId": "This device has not been added to your account, so it has no device identity to claim itself under.",
+      "errorConflict": "Two different claims at the same version could not be told apart, so nothing was changed. Claim this device again to replace them.",
+      "errorUnreadable": "The device list could not be read on this device. Nothing was changed.",
+      "errorGeneric": "Could not read this vault’s devices. Try again."
     },
     "nameGate": {
       "title": "Choose a display name",

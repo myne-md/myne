@@ -147,6 +147,17 @@ const MIRRORS: Mirror[] = [
     rsEnum: "MemberNamesError",
   },
   {
+    // The `MYU5` device-to-person binding family (myne-md/myne#852). Its
+    // `StoreUnreadable` arm is the one a device list must not fold into "no
+    // devices", for the reason the member-names row above carries: answering
+    // empty for a damaged store lets the next write persist that emptiness over
+    // every other device's real row.
+    ts: "client-core/src/types/device-binding-error.ts",
+    tsType: "DeviceBindingError",
+    rs: "core/src/plugins/device_binding/error.rs",
+    rsEnum: "DeviceBindingError",
+  },
+  {
     ts: "client-core/src/types/vault-change-password-error.ts",
     tsType: "VaultChangePasswordError",
     rs: "core/src/plugins/vault_change_password/error.rs",
@@ -332,6 +343,22 @@ const STRUCT_MIRRORS: StructMirror[] = [
     tsType: "MemberNameEntry",
     rs: "protocol/src/member_names_blob.rs",
     rsStruct: "MemberNameEntry",
+  },
+  {
+    // The device list's own answer (myne-md/myne#852). Two rows rather than one
+    // because the wire shape is two structs and the case compares field for
+    // field: a field the mirror is missing arrives as `undefined`, which on this
+    // one is `member_name` reading as absent for every row.
+    ts: "client-core/src/types/device-attribution.ts",
+    tsType: "DeviceAttributionRow",
+    rs: "core/src/plugins/sync/identity_resolver.rs",
+    rsStruct: "DeviceAttributionRow",
+  },
+  {
+    ts: "client-core/src/types/device-attribution.ts",
+    tsType: "DeviceAttributionView",
+    rs: "core/src/plugins/sync/identity_resolver.rs",
+    rsStruct: "DeviceAttributionView",
   },
 ];
 

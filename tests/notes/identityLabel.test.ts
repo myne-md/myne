@@ -116,31 +116,21 @@ describe("identityLabelText, the one place a label becomes a string", () => {
     expect(identityLabelText({ kind: "text", text: "" }, t)).toBe("");
   });
 
-  it("emits no raw 32-hex id for any arm it can be handed", () => {
-    const labels: IdentityLabel[] = [
-      text("Ada"),
-      text("Ada's Laptop"),
-      { kind: "device", code: "aabbcc" },
-    ];
-    for (const label of labels) {
-      expect(identityLabelText(label, t)).not.toMatch(/\b[0-9a-f]{32}\b/i);
-    }
-  });
-
-  it("emits no raw 32-hex id for any variant the RULE can be handed", () => {
-    const variants: ResolvedIdentity[] = [
-      { kind: "Person", name: "Ada" },
-      { kind: "Device", name: "Ada's Laptop", code: "aabbcc" },
-      { kind: "Device", name: null, code: "aabbcc" },
-      { kind: "Unknown" },
-    ];
-    for (const v of variants) {
-      const label = resolvedIdentityLabel(v);
-      expect(label === null ? "" : identityLabelText(label, t)).not.toMatch(
-        /\b[0-9a-f]{32}\b/i,
-      );
-    }
-  });
+  // Two tests used to sit here asserting that no arm emits a raw 32-hex actor id.
+  // They were deleted rather than fixed (`member-devices` task 5 review, D9), because
+  // no fixture this rule can be handed reaches the state they described, and the
+  // property is not even true of the rule in general: a `ResolvedIdentity` carries no
+  // actor id at all (`src/types/resolved-identity.ts`), so the only way a 32-hex
+  // string comes out is if a NAME or a device CODE is itself one, and then rendering
+  // it verbatim is correct, since a user's own words are not ours to rewrite. The
+  // 6-hex `code` the old fixtures supplied could never match a 32-hex pattern, so the
+  // assertion held for every implementation, including one that leaked.
+  //
+  // The property belongs where an actor id can actually be CHOSEN, which is a surface
+  // rendering `participant.id` instead of `participant.label`, and it is asserted
+  // there and with a real leak: `tests/notes/presenceLabels.test.tsx` renders the real
+  // roster over the real store and sweeps each row's `outerHTML` for a 32-hex run,
+  // which is the check that caught the removed `data-actor-id={participant.id}`.
 });
 
 describe("one rule, two surfaces", () => {

@@ -741,6 +741,21 @@ const PER_COMMAND: &[(&str, Class)] = &[
         "plugin:member-names|member_names_clear_mine",
         Class::Unsupported,
     ),
+    // The device-to-person binding store (`vault.device-bindings`, `MYU5`;
+    // myne-md/myne#852). A third plugin namespace on the same B2B surface, and
+    // the same refusal for the same reason as the two above: the store is
+    // group-tier sealed and `NTV6`-only, its writer keys a row by THIS device's
+    // enrolled id and signs it with the session's person identity, and a page
+    // holds neither. Porting more would not reach either command: the vault has
+    // no group key on a client with no member sharing.
+    (
+        "plugin:device-binding|device_bindings_list",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:device-binding|device_bindings_claim",
+        Class::Unsupported,
+    ),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
     // rule for display and entry alike. They are listed in `DISPATCHED` rather
