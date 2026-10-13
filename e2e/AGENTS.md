@@ -179,6 +179,22 @@
 
 ## Authoring conventions
 
+- **A `waitUntil` whose predicate RETURNS A VALUE resolves on the first non-null answer, so it is
+  not a wait unless the predicate can answer null** (myne-md/myne#850, found by the new scenario
+  failing on a race). A poll written to "wait for the count to reach two" returned the element's
+  text, which was already non-null and already said one: the wait resolved instantly on the stale
+  value and the assertion after it failed on timing rather than on behaviour, twice in a batch,
+  which reads exactly like a flaky app. **The success condition belongs IN the predicate** (`return
+  text.includes("2") ? text : null`), which is what makes the wait an assertion. Same family as the
+  helper that verifies nothing, one layer over: there the helper returned too early to have checked
+  anything, here the wait returned too early to have waited.
+- **A `waitUntil`/`expect` diff is truncated at roughly eighty characters, so a failure message that
+  hinges on the TAIL of a string has to be thrown rather than expected.** The same scenario's undo
+  assertion printed `'0 notes restored. 0 notes the run cre…'` and that cut fell exactly where the
+  distinguishing part was: a missing settings clause, a failed clause and a stale count all share
+  that opening sentence. `throw new Error(...)` with the whole value in the message cost one line and
+  named the answer immediately.
+
 - One scenario = one story; every scenario declares its **vault-count
   precondition** in a comment (0 / 1 / ≥2 / legacy). Don't merge stories to
   save a boot.

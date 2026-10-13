@@ -34,6 +34,7 @@ use crate::plugins::agent::engine::{Content, Message};
 use crate::plugins::agent::error::{AgentError, EditRejection};
 use crate::plugins::agent::probe::ProbeThreshold;
 use crate::plugins::agent::prompt::{Proposal, ProposedNote};
+use crate::plugins::agent::run::AppliedSetting;
 use crate::plugins::agent::run::{AgentRunState, AgentRunView};
 use crate::plugins::agent::run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome, RunProgress};
 use crate::plugins::agent::scope::{ExclusionSource, ScopeSource};
@@ -50,10 +51,15 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime};
 use zeroize::Zeroize;
 
-use crate::plugins::agent::apply::{apply_approved, ApplyOutcome, Approval, RefusedEdit};
+use crate::plugins::agent::apply::{
+    apply_approved, apply_settings_approved, ApplyOutcome, Approval, PrefWriter, RefusedEdit,
+    RefusedSetting, SettingRejection,
+};
 use crate::plugins::agent::engine::AgentEngine;
 use crate::plugins::agent::host_adapters::{NoteReadAdapter, RestoreAdapter, WriteAdapter};
+use crate::plugins::agent::prompt::ProposedSetting;
 use crate::plugins::agent::run::AppliedRun;
+use crate::plugins::agent::setting::{PrefTarget, SettingIntent};
 use crate::plugins::agent::tools::ScopeSearcher;
 use crate::plugins::snapshots::commands::snapshot_restore_from_host;
 
@@ -164,6 +170,18 @@ struct Session {
     /// are this run's reads, and the tools clamp them against the live
     /// exclusion set on every call.
     seed_controls: Option<super::history::SeedControls>,
+    /// The settings this client offered for this run (myne-md/myne#850).
+    ///
+    /// **Ids, not labels, and the host resolves them against its own table.**
+    /// Held here rather than passed to every `step` for the reason `language`
+    /// is: a run resumed after a scope approval re-enters the loop, and a leg
+    /// that forgot the catalogue would silently stop being able to offer a
+    /// setting halfway through a run.
+    ///
+    /// Empty is the ordinary state today: a client that has built no catalogue
+    /// offers nothing, and every `set_setting` is refused rather than accepted
+    /// into a proposal no surface could render.
+    offered_settings: Vec<String>,
     /// Which notes this run has already read, across every leg.
     ///
     /// Held here rather than re-created per `step` for the reason the transcript
@@ -237,6 +255,48 @@ impl AgentSessionState {
         for (index, edit) in approved.iter().enumerate() {
             if proposed.contains(edit) {
                 kept.push(edit.clone());
+            } else {
+                unknown.push(index);
+            }
+        }
+        (kept, unknown)
+    }
+
+    /// The setting changes the user approved, resolved against the run's own
+    /// record, keeping each one's position in the list the client sent.
+    ///
+    /// **The sibling of `retain_proposed_edits`, and its absence was a hole rather
+    /// than an omission** (found by the 2026-10-13 review). Both lists on the
+    /// settings path come from PAGE context: `agent_start` takes the offered ids
+    /// and `agent_apply` takes the approved settings. Without this check a caller
+    /// could name any of the twelve intent ids in its own start call and then write
+    /// them, which made the offer whatever the caller said it was rather than a
+    /// bound. That is what the detached-window arm of `docs/threat-model.md` §7's
+    /// first bound had been describing, and why the bullet needed correcting.
+    ///
+    /// **Compared by value, like the edit half, and the ORIGINAL index rides
+    /// along.** The screen sends a subset in its own order, and the refusal indices
+    /// the review surface subtracts with address that list, so re-numbering here
+    /// would silently mis-mark every row after a dropped one.
+    ///
+    /// A session that is gone recognises nothing, which fails closed in the same
+    /// direction the edit half does: the run is over, and an apply against a record
+    /// the host no longer holds is what this refuses.
+    pub fn retain_proposed_settings(
+        &self,
+        run_id: &str,
+        approved: &[ProposedSetting],
+    ) -> (Vec<(usize, ProposedSetting)>, Vec<usize>) {
+        let table = self.sessions.lock().expect("agent session table poisoned");
+        let proposed: &[ProposedSetting] = match table.get(run_id) {
+            Some(session) => &session.proposal.settings,
+            None => &[],
+        };
+        let mut kept = Vec::with_capacity(approved.len());
+        let mut unknown = Vec::new();
+        for (index, setting) in approved.iter().enumerate() {
+            if proposed.contains(setting) {
+                kept.push((index, setting.clone()));
             } else {
                 unknown.push(index);
             }
@@ -361,6 +421,7 @@ impl AgentSessionState {
     /// A client that wrote these two steps itself would be a client that could
     /// get the order wrong, and the failure is silent: everything works, and
     /// note plaintext outlives the run that read it.
+    #[allow(clippy::too_many_arguments)]
     pub fn open(
         &self,
         run_id: &str,
@@ -369,6 +430,7 @@ impl AgentSessionState {
         language: Option<String>,
         history: Vec<Message>,
         seed_controls: Option<super::history::SeedControls>,
+        offered_settings: Vec<String>,
     ) {
         self.prune_to(live_ids);
         self.sessions
@@ -381,6 +443,7 @@ impl AgentSessionState {
                     language,
                     history,
                     seed_controls,
+                    offered_settings,
                     ..Default::default()
                 },
             );
@@ -440,6 +503,42 @@ impl AgentSessionState {
     }
 }
 
+/// Fold one leg's proposal into the run's accumulated one.
+///
+/// **A destructure rather than a field-by-field merge, and this function exists
+/// because the merge was field-by-field** (myne-md/myne#850). It copied `edits`,
+/// `new_notes` and `summary`, and `settings` was not among them, so every
+/// setting a run proposed was dropped between the loop's own proposal and the
+/// one the client receives. What that cost is worth stating, because nothing
+/// anywhere reported it: a settings-only run arrived at the review screen as an
+/// EMPTY proposal, that screen's gate is "the run stopped and has something to
+/// show", so it never opened at all. Every gate upstream stayed green, no
+/// refusal was raised (the host had accepted the change), and the loop's own
+/// tests assert `outcome.proposal`, one layer BELOW this one, which is exactly
+/// why they passed. It was found by asking the host, through the stub, what
+/// request it had been given, and by then reading the one function between the
+/// loop and the wire.
+///
+/// The `let Proposal { .. }` is the fix for the CLASS rather than the instance:
+/// a field added to `Proposal` is now a compile error here rather than a silent
+/// drop, which is the same lock the sync classification table uses.
+fn accumulate_proposal(into: &mut Proposal, from: Proposal) {
+    let Proposal {
+        edits,
+        new_notes,
+        settings,
+        summary,
+    } = from;
+    into.edits.extend(edits);
+    into.new_notes.extend(new_notes);
+    into.settings.extend(settings);
+    // An empty summary leaves the earlier one in place: a leg that finished
+    // without saying anything must not blank what a previous leg said.
+    if !summary.is_empty() {
+        into.summary = summary;
+    }
+}
+
 /// Overwrite everything a session holds, before it is dropped.
 ///
 /// **Overwrites before dropping**, which is the difference between this and a
@@ -471,11 +570,24 @@ fn wipe_session(session: &mut Session) {
         }
     }
     session.transcript.clear();
-    for edit in &mut session.proposal.edits {
+    // **The whole proposal, destructured rather than enumerated.** This was
+    // three hand-written lists until myne-md/myne#850, which is why it missed
+    // `settings`: the `note.folder` arm below records that the same shape was
+    // already caught once before, for the same reason, and the merge beside
+    // `accumulate_proposal` dropped `settings` in the same change for the same
+    // reason again. The destructure makes a new `Proposal` field a compile
+    // error here instead of a silent omission from either half.
+    let Proposal {
+        edits,
+        new_notes,
+        settings,
+        summary,
+    } = &mut session.proposal;
+    for edit in edits.iter_mut() {
         edit.anchor.zeroize();
         edit.replacement.zeroize();
     }
-    for note in &mut session.proposal.new_notes {
+    for note in new_notes.iter_mut() {
         note.title.zeroize();
         note.body.zeroize();
         // The folder too. It is `Option<String>` rather than `String`,
@@ -487,7 +599,19 @@ fn wipe_session(session: &mut Session) {
             folder.zeroize();
         }
     }
-    session.proposal.summary.zeroize();
+    // A proposed setting is the same class of string: a folder name or a date
+    // format the model wrote, held in the same proposal. Both its fields are
+    // `Option<String>`, so both take the two lines the `folder` arm above
+    // needs.
+    for setting in settings.iter_mut() {
+        if let Some(value) = setting.value.as_mut() {
+            value.zeroize();
+        }
+        if let Some(folder) = setting.folder.as_mut() {
+            folder.zeroize();
+        }
+    }
+    summary.zeroize();
 }
 
 /// What a grant would resolve to. Every number here is the host's.
@@ -677,7 +801,16 @@ pub async fn step<R: Runtime>(
     // Claimed under the SAME lock the take happens under, so there is no window
     // between deciding to proceed and emptying the session. Released in the
     // write-back below, on every exit from this function.
-    let (task, language, mut history, mut read_ids, mut transcript, mut proposal, seed_controls) = {
+    let (
+        task,
+        language,
+        mut history,
+        mut read_ids,
+        mut transcript,
+        mut proposal,
+        seed_controls,
+        offered_settings,
+    ) = {
         let mut table = sessions
             .sessions
             .lock()
@@ -695,6 +828,7 @@ pub async fn step<R: Runtime>(
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
             s.seed_controls.clone(),
+            s.offered_settings.clone(),
         )
     };
 
@@ -750,6 +884,13 @@ pub async fn step<R: Runtime>(
         let _ = on_progress.send(p);
     };
     let deps = LoopDeps {
+        // **The client's own catalogue, resolved by the loop against this
+        // crate's intent table** (myne-md/myne#850). A client that has built
+        // none sends an empty list, and every `set_setting` is refused rather
+        // than accepted into a proposal no surface can render. `offered_ids`
+        // maps each id through `setting::writable` before it can reach the
+        // system message, so a client string is never rendered.
+        offered_settings: &offered_settings,
         engine,
         reader: &reader,
         searcher,
@@ -817,11 +958,7 @@ pub async fn step<R: Runtime>(
 
     // Accumulate across resumes: a run that paused for a scope approval and
     // resumed has one proposal, not two.
-    proposal.edits.extend(outcome.proposal.edits);
-    proposal.new_notes.extend(outcome.proposal.new_notes);
-    if !outcome.proposal.summary.is_empty() {
-        proposal.summary = outcome.proposal.summary;
-    }
+    accumulate_proposal(&mut proposal, outcome.proposal);
 
     {
         let mut table = sessions
@@ -868,6 +1005,270 @@ pub async fn step<R: Runtime>(
     })
 }
 
+/// Writes a setting through the prefs plugin, and reads the value it replaced
+/// (myne-md/myne#850).
+///
+/// **The read happens immediately before the write, in this one adapter, and
+/// that ordering is the guarantee rather than an atomicity claim.** The comment
+/// here used to say the pair "is as atomic as the prefs update path makes it",
+/// which is not true and was worth correcting rather than keeping: the read takes
+/// the prefs lock, releases it, and the write takes it again, with awaits either
+/// side, so a concurrent writer in that window (a sync merge landing on
+/// `vault.prefs`, the settings panel, another window) makes the recorded value
+/// one the write did not replace. What that costs is bounded and stated: the undo
+/// would then restore that value, which is the same last-writer-wins behaviour
+/// every other prefs write has, and the alternative is worse. Closing the window
+/// entirely means returning the old value from inside the mutation closure, the
+/// `set_deliberate_folders` cell pattern, which needs each of the seven setters
+/// to hand a value back rather than one dispatch over the target enum. That is
+/// the follow-up this comment names and does not pretend to have taken.
+///
+/// It goes through the plugin's own setters rather than writing `vault.prefs`
+/// directly, so the nonce bump every other `usePrefs` reader listens for comes
+/// for free: skipping that is how the open editor keeps showing the old value
+/// for the rest of the session.
+struct PrefWriteAdapter<'a, R: Runtime> {
+    app: AppHandle<R>,
+    vault: &'a VaultRuntimeState,
+    hooks: &'a crate::hooks::Hooks,
+}
+
+/// The value a target holds now, or `None` when it is unset.
+fn read_target(view: &protocol::PrefsView, target: &PrefTarget) -> Option<String> {
+    match target {
+        PrefTarget::PeriodicNote { period, setting } => view
+            .periodic_notes
+            .get(&format!("{period}.{setting}"))
+            .cloned(),
+        PrefTarget::DailyFolder => view.daily_folder.clone(),
+        PrefTarget::DailyTemplate => view.daily_template.clone(),
+        PrefTarget::DailyDateFormat => view.daily_date_format.clone(),
+        PrefTarget::DateFormat => view.date_format.clone(),
+        PrefTarget::TimeFormat => view.time_format.clone(),
+        PrefTarget::NewNoteLocation => view.new_note_location.clone(),
+    }
+}
+
+/// The FOLDER a target holds now, for the one target that has two fields.
+///
+/// **Split from `read_target` rather than folded into a pair, because only one
+/// arm has an answer.** `NewNoteLocation` is one setting over two pref fields (a
+/// mode and the folder that mode uses), so an undo that restores its mode without
+/// its folder writes a value the user never had; every other target takes no
+/// folder at all, which is what makes `None` here mean "nothing to restore"
+/// rather than "the read failed". The two sides are used together in
+/// `write_setting` and in the undo, so a new two-field target has one place to
+/// join them.
+fn read_target_folder(view: &protocol::PrefsView, target: &PrefTarget) -> Option<String> {
+    match target {
+        PrefTarget::NewNoteLocation => view.new_note_location_folder.clone(),
+        PrefTarget::PeriodicNote { .. }
+        | PrefTarget::DailyFolder
+        | PrefTarget::DailyTemplate
+        | PrefTarget::DailyDateFormat
+        | PrefTarget::DateFormat
+        | PrefTarget::TimeFormat => None,
+    }
+}
+
+/// Write one intent target through the prefs plugin (myne-md/myne#850).
+///
+/// **One dispatch for the apply and the undo.** The alternative is two matches
+/// over the same enum, and the failure that produces is a target one path writes
+/// and the other silently does not: the undo would report a setting put back
+/// while the value never moved.
+///
+/// **Its match is EXHAUSTIVE over `PrefTarget`, and that is why the enum has one
+/// variant per write OPERATION rather than per field name.** A new intent whose
+/// target nobody implemented then fails to compile, instead of falling through a
+/// string comparison to a runtime refusal that reads like a model error.
+///
+/// `folder` is the sub-step half of a `ModeWithFolder` setting. Every other
+/// target ignores it, which is safe because `validate` has already refused a
+/// folder that arrived for one of those.
+async fn write_target<R: Runtime>(
+    host: &TauriHost<R>,
+    vault: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    target: &PrefTarget,
+    value: Option<String>,
+    folder: Option<String>,
+) -> Result<(), AgentError> {
+    let written = match target {
+        PrefTarget::PeriodicNote { period, setting } => {
+            crate::plugins::prefs::commands::set_periodic_note_setting_from_host(
+                host,
+                vault,
+                hooks,
+                (*period).to_string(),
+                (*setting).to_string(),
+                value,
+                &StdVaultIo,
+            )
+            .await
+        }
+        PrefTarget::DailyFolder => match value {
+            // **The two targets whose setter takes a REQUIRED value, so a
+            // `None` is the undo of a setting that was unset before the run.**
+            // It is expressed as a CLEAR through the prefs plugin's own clear
+            // function (myne-md/myne#850) rather than refused: refusing it is
+            // what made "set the daily folder for the first time" unrestorable,
+            // which was the ordinary case for two of the twelve intents, and it
+            // failed permanently because a failure re-records the same setting.
+            // Storing an empty string instead is the alternative the whole clear
+            // verb exists to avoid.
+            None => {
+                return crate::plugins::prefs::commands::clear_daily_folder_from_host(
+                    host,
+                    vault,
+                    hooks,
+                    &StdVaultIo,
+                )
+                .await
+                .map_err(|_| AgentError::WriteFailed)
+            }
+            Some(v) => {
+                crate::plugins::prefs::commands::set_daily_folder_from_host(
+                    host,
+                    vault,
+                    hooks,
+                    v,
+                    &StdVaultIo,
+                )
+                .await
+            }
+        },
+        PrefTarget::DailyTemplate => {
+            crate::plugins::prefs::commands::set_daily_template_from_host(
+                host,
+                vault,
+                hooks,
+                value,
+                &StdVaultIo,
+            )
+            .await
+        }
+        PrefTarget::DailyDateFormat => match value {
+            None => {
+                return crate::plugins::prefs::commands::clear_daily_date_format_from_host(
+                    host,
+                    vault,
+                    hooks,
+                    &StdVaultIo,
+                )
+                .await
+                .map_err(|_| AgentError::WriteFailed)
+            }
+            Some(v) => {
+                crate::plugins::prefs::commands::set_daily_date_format_from_host(
+                    host,
+                    vault,
+                    hooks,
+                    v,
+                    &StdVaultIo,
+                )
+                .await
+            }
+        },
+        PrefTarget::DateFormat => {
+            crate::plugins::prefs::commands::set_date_format_from_host(
+                host,
+                vault,
+                hooks,
+                value,
+                &StdVaultIo,
+            )
+            .await
+        }
+        PrefTarget::TimeFormat => {
+            crate::plugins::prefs::commands::set_time_format_from_host(
+                host,
+                vault,
+                hooks,
+                value,
+                &StdVaultIo,
+            )
+            .await
+        }
+        PrefTarget::NewNoteLocation => {
+            // The mode and its folder go together, which is the whole reason
+            // this target is one variant rather than two settings (MYND-462).
+            crate::plugins::prefs::commands::set_new_note_location_from_host(
+                host,
+                vault,
+                hooks,
+                value,
+                folder,
+                &StdVaultIo,
+            )
+            .await
+        }
+    };
+    written.map_err(|_| AgentError::WriteFailed)
+}
+
+#[async_trait::async_trait]
+impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
+    async fn write_setting(
+        &self,
+        intent: &SettingIntent,
+        value: Option<&str>,
+        folder: Option<&str>,
+    ) -> Result<(Option<String>, Option<String>), AgentError> {
+        let host = TauriHost::new(self.app.clone());
+        // Read BEFORE the write, from the view the setter is about to rewrite, and
+        // **refuse on a DEGRADED read** (2026-10-13 review). § 9.5.5 answers a
+        // corrupt or undecodable `vault.prefs` with defaults, so the plain read
+        // cannot tell "the user never set this" from "I could not read what they
+        // set", and here the difference is a WRITE: `None` is recorded as the
+        // previous value and the undo restores it by clearing the setting. A
+        // degraded read refuses this one setting instead, leaving it retryable and
+        // recording nothing. `Absent` is a real answer and proceeds, because a vault
+        // that has never written prefs genuinely holds no value for this setting.
+        let (view, origin) =
+            crate::plugins::prefs::commands::prefs_read_from_host_reporting_origin(
+                &host,
+                self.vault,
+                &StdVaultIo,
+            )
+            .await
+            .map_err(|_| AgentError::WriteFailed)?;
+        if origin == crate::plugins::prefs::commands::PrefsOrigin::Degraded {
+            return Err(AgentError::WriteFailed);
+        }
+        let previous = read_target(&view, &intent.target);
+        let previous_folder = read_target_folder(&view, &intent.target);
+        write_target(
+            &host,
+            self.vault,
+            self.hooks,
+            &intent.target,
+            value.map(str::to_string),
+            folder.map(str::to_string),
+        )
+        .await?;
+        Ok((previous, previous_folder))
+    }
+
+    /// The ensure step, through the prefs plugin's own named seam.
+    ///
+    /// **Not the setter's registration.** The setter's is the user-act route and
+    /// wins over a removal; this one is a repair, and it reports `false` when the
+    /// folder is on record as removed so the apply can refuse the setting rather
+    /// than write one whose effect is missing (myne-md/myne#850 task 3).
+    async fn ensure_folder(&self, folder: &str) -> Result<bool, AgentError> {
+        crate::plugins::prefs::commands::ensure_deliberate_folder_from_host(
+            &TauriHost::new(self.app.clone()),
+            self.vault,
+            self.hooks,
+            folder.to_string(),
+            &StdVaultIo,
+        )
+        .await
+        .map_err(|_| AgentError::WriteFailed)
+    }
+}
+
 /// Apply the edits the user approved, and record the run so it can be undone.
 ///
 /// **Here rather than once per client, and the retype is what argued for it.**
@@ -886,6 +1287,11 @@ pub async fn apply_from_host<R: Runtime>(
     run_id: String,
     approved: Vec<ProposedEdit>,
     approved_new_notes: Vec<usize>,
+    // The setting changes the user approved (myne-md/myne#850). **A selection,
+    // like `approved_new_notes` and for the same reason**: a setting write is a
+    // write, so it needs its own approval, and handing over the run's whole
+    // recorded list is the defect the sibling parameter exists to prevent.
+    approved_settings: Vec<ProposedSetting>,
     approval: Approval,
     runs: &Arc<AgentRunState>,
     sessions: &AgentSessionState,
@@ -935,19 +1341,90 @@ pub async fn apply_from_host<R: Runtime>(
             reason: EditRejection::NotProposed,
         });
     }
+    // **Settings, through their own path** (myne-md/myne#850). A setting has no
+    // note scope to check and no restore point to take, so it does not ride
+    // `apply_approved`; what it does share is the run this stops, the approval
+    // label, and the re-derivation of what may be written at the write itself.
+    // **Resolved against the run's own record before anything is written**, which
+    // is the check that turns "the client offered these" from an argument into a
+    // bound (2026-10-13 review). The pairs keep their original positions, unlike
+    // the edit half's, because the refusal index is what the review surface
+    // subtracts with.
+    let (indexed_settings, settings_not_proposed) =
+        sessions.retain_proposed_settings(&run_id, &approved_settings);
+    let prefs = PrefWriteAdapter {
+        app: app.clone(),
+        vault,
+        hooks,
+    };
+    match apply_settings_approved(runs, &run_id, &indexed_settings, approval, &prefs).await {
+        Ok(settings) => {
+            // A `NeedsOwnAct` refusal is the bulk carve-out, reported like any
+            // other refusal so the surface can say which row was refused and why
+            // rather than skipping it silently.
+            outcome.settings_changed = settings.applied;
+            outcome.refused_settings = settings.refused;
+        }
+        // A failure here refuses every setting rather than failing the apply:
+        // the edits are already placed, and returning `Err` would discard their
+        // restore points, which is the failure mode `createFailed`'s comment
+        // records.
+        Err(err) => {
+            let reason = match err {
+                // The same rule the note path enforces, one module over: one
+                // approval act covers one change.
+                AgentError::IndividualApprovalNotSingle => SettingRejection::NeedsOwnAct,
+                // A run the user stopped, or one the host no longer holds: nothing
+                // was attempted, so this is not a write failure (myne-md/myne#850,
+                // from review). Matching explicitly rather than falling through, so
+                // the reason is chosen by meaning rather than by which arms happened
+                // to be listed first.
+                AgentError::Cancelled | AgentError::NoSuchRun => SettingRejection::RunStopped,
+                _ => SettingRejection::WriteFailed,
+            };
+            outcome.refused_settings = indexed_settings
+                .iter()
+                .map(|(index, setting)| RefusedSetting {
+                    intent_id: setting.intent_id.clone(),
+                    index: *index,
+                    reason,
+                })
+                .collect();
+        }
+    }
+    // Settings the host never recorded the model proposing are REPORTED rather
+    // than dropped, exactly as the edits above are: a row the user pressed Apply
+    // on that quietly does nothing is the failure mode the review surface exists
+    // to avoid.
+    for index in settings_not_proposed {
+        outcome.refused_settings.push(RefusedSetting {
+            intent_id: approved_settings
+                .get(index)
+                .map(|s| s.intent_id.clone())
+                .unwrap_or_default(),
+            index,
+            reason: SettingRejection::NotProposed,
+        });
+    }
     // Drop the ones that LANDED, and only those. On the `?` above nothing is
     // consumed, which is the point: the user can retry and the notes are still
     // there. A per-note `createFailed` refusal is retryable for the same reason.
     sessions.consume_created_new_notes(&run_id, &outcome.created_new_note_indices);
     // Record it under the run id, so undo survives the review screen closing.
     // Recorded only when something was actually written: an apply whose every
-    // edit was refused took no restore point, and offering to undo it would be
-    // an offer to restore nothing.
-    if !outcome.restore_points.is_empty() || !outcome.notes_created.is_empty() {
+    // row was refused took no restore point and changed no setting, and offering
+    // to undo it would be an offer to restore nothing.
+    if !outcome.restore_points.is_empty()
+        || !outcome.notes_created.is_empty()
+        || !outcome.settings_changed.is_empty()
+    {
         runs.record_applied(AppliedRun {
             run_id: run_id.clone(),
             restore_points: outcome.restore_points.clone(),
             notes_created: outcome.notes_created.len(),
+            // The settings half of the undo record, with the value each replaced
+            // so the undo can put it back.
+            settings: outcome.settings_changed.clone(),
         });
     }
     Ok(outcome)
@@ -977,6 +1454,13 @@ pub async fn undo_from_host<R: Runtime>(
     require_unlocked(vault).await?;
     let record = runs.take_applied(&run_id)?;
     let notes_created = record.notes_created;
+    // Carried back into the retry record below, and restored by the settings loop
+    // further down. **Held so that a partial note failure cannot discard the
+    // settings half of the record.** This comment said the settings undo "is not
+    // wired yet" until the 2026-10-13 review: a false wiring claim inside the
+    // function that does the wiring is the one statement that makes "is anything
+    // new wired to nothing?" unanswerable by reading.
+    let record_settings = record.settings;
     let host = TauriHost::new(app);
     let mut reverted = 0usize;
     let mut failed = Vec::new();
@@ -996,6 +1480,81 @@ pub async fn undo_from_host<R: Runtime>(
             Err(_) => failed.push((note_id, snapshot_id_for_retry)),
         }
     }
+    // **The settings half of the undo** (myne-md/myne#850). Written back through
+    // the same prefs setters the apply used, so there is one read-before-write
+    // pairing rather than two.
+    //
+    // **Every value restored here comes from the record, never from a fresh
+    // read.** Rebuilding one from live prefs is how the undo of
+    // `files.new-note-location` wrote the agent's own new folder back, reported
+    // the setting restored, and permanently replaced the folder the user had.
+    // `AppliedSetting::previous_folder` carries what the run replaced.
+    //
+    // **Three shapes of a recorded previous value, listed because this comment
+    // used to claim there was one and to say no special case was needed:**
+    //   1. a value, with no folder: restored through `write_target` directly.
+    //   2. an unset value on a target whose setter takes an `Option` (the
+    //      periodic-notes entries, the new-note-location mode): restored as a
+    //      clear, which is what `None` means on those.
+    //   3. an unset value on `DailyFolder` or `DailyDateFormat`, whose setters
+    //      take a required value: restored through the prefs plugin's own CLEAR
+    //      functions, added with this fix, which is what made "the agent set the
+    //      daily folder for the first time" undoable at all. Before them
+    //      `write_target` refused the `None` and the setting failed for good,
+    //      because a failure re-records it. The agent's clear VERB still refuses
+    //      these two, which is a policy rather than a signature, and
+    //      `PrefTarget::clearable`'s doc says so.
+    let mut settings_reverted = 0usize;
+    let mut settings_failed: Vec<String> = Vec::new();
+    let mut failed_settings: Vec<AppliedSetting> = Vec::new();
+    for setting in &record_settings {
+        let Some(intent) = crate::plugins::agent::setting::intent(&setting.intent_id) else {
+            settings_failed.push(setting.intent_id.clone());
+            failed_settings.push(setting.clone());
+            continue;
+        };
+        // **The folder to put back is the one the run REPLACED, and only where
+        // the restored VALUE takes one.** `folder_named` is the same function the
+        // apply uses, so the two cannot disagree about which value needs a
+        // folder, and it is what keeps a restored `root` from being handed a
+        // folder it does not use.
+        let restore_folder = if matches!(intent.target, PrefTarget::NewNoteLocation) {
+            crate::plugins::agent::setting::folder_named(
+                intent,
+                setting.previous.as_deref(),
+                setting.previous_folder.as_deref(),
+            )
+            .map(str::to_string)
+        } else {
+            None
+        };
+        match write_target(
+            &host,
+            vault,
+            hooks,
+            &intent.target,
+            setting.previous.clone(),
+            restore_folder,
+        )
+        .await
+        {
+            Ok(()) => settings_reverted += 1,
+            Err(_) => {
+                settings_failed.push(setting.intent_id.clone());
+                failed_settings.push(setting.clone());
+            }
+        }
+    }
+
+    // Every row this undo did not restore is reported by name, notes and settings
+    // together: the user's question is "what is left", not which of two
+    // mechanisms left it.
+    let failed_ids: Vec<String> = failed
+        .iter()
+        .map(|(id, _)| id.clone())
+        .chain(settings_failed.iter().cloned())
+        .collect();
+
     // **Put the FAILED points back, so the undo can be retried.**
     // `take_applied` consumes deliberately: a second undo of the same record
     // would restore the same snapshots over whatever the user has written since,
@@ -1004,21 +1563,29 @@ pub async fn undo_from_host<R: Runtime>(
     // retry cannot overwrite anything, and consuming the whole record made a
     // partial failure permanent. Found in the review of myne-md/myne#531.
     //
+    // **Only the settings that FAILED are carried back, which is the same
+    // property the note half has and this half did not** (myne-md/myne#850). The
+    // first version re-recorded the whole consumed list, so a setting that WAS
+    // restored got re-armed, and a retry after the user changed that preference
+    // in the meantime wrote the pre-run value over it while reporting success.
+    // The note half has always re-recorded only `failed`.
+    //
     // `notes_created` is not carried back: those notes are still there, an undo
     // never reverted them, and re-reporting the count on a retry would say the
     // second attempt left them behind as if that were news.
-    if !failed.is_empty() {
+    if !failed.is_empty() || !settings_failed.is_empty() {
         runs.record_applied(AppliedRun {
             run_id: run_id.clone(),
-            restore_points: failed.clone(),
+            restore_points: failed,
             notes_created: 0,
+            settings: failed_settings,
         });
     }
-    let failed: Vec<String> = failed.into_iter().map(|(id, _)| id).collect();
     Ok(AgentUndoResult {
         reverted,
-        failed,
+        failed: failed_ids,
         notes_created_not_reverted: notes_created,
+        settings_reverted,
     })
 }
 
@@ -1032,6 +1599,11 @@ pub struct AgentUndoResult {
     pub failed: Vec<String>,
     /// How many notes the run CREATED and this undo therefore left in place.
     pub notes_created_not_reverted: usize,
+    /// How many settings were put back (myne-md/myne#850). Counted apart from
+    /// `reverted`, which is about note text: a setting is restored by writing a
+    /// preference, not by restoring a snapshot, and folding the two into one
+    /// number would make "the run was undone" say more than it did.
+    pub settings_reverted: usize,
 }
 
 #[cfg(test)]
@@ -1064,6 +1636,7 @@ mod tests {
             Some("tr".to_string()),
             seed,
             Some(controls.clone()),
+            vec!["editor.weekly-notes-folder".to_string()],
         );
         let table = state.sessions.lock().expect("poisoned");
         let s = table.get("run-1").expect("session stored");
@@ -1298,6 +1871,14 @@ mod tests {
     /// directly, because a dropped session's memory cannot be read afterwards
     /// and a test that claimed to check it would be claiming more than its
     /// inputs can prove.
+    ///
+    /// **Emptiness rather than "every byte is zero", which is the assertion this
+    /// test used to make and which is vacuously true.** `Zeroize for String`
+    /// overwrites the buffer and then clears it, so `bytes()` sees an empty
+    /// slice and `all(|b| b == 0)` passes on an empty iterator: the old
+    /// assertion could not fail, whichever fields the wipe covered. Empty is
+    /// what is actually observable from here, and it is what a reader cares
+    /// about.
     #[test]
     fn the_prune_and_the_lock_teardown_wipe_through_one_function() {
         let mut session = Session {
@@ -1306,10 +1887,119 @@ mod tests {
         };
         session.proposal.summary = "secret summary".into();
         wipe_session(&mut session);
-        assert!(session.task.bytes().all(|b| b == 0), "task overwritten");
+        assert!(session.task.is_empty(), "task overwritten");
+        assert!(session.proposal.summary.is_empty(), "summary overwritten");
+    }
+
+    /// **The teardown half of the miss `accumulate_proposal` records**
+    /// (myne-md/myne#850). `settings` was absent from the list `wipe_session`
+    /// overwrote, so a proposed folder name, date format or new-note location
+    /// stayed resident until that allocation was reused. Both of a setting's
+    /// text fields are `Option<String>`, which is the shape that slipped past
+    /// the hand-written `note.title`/`note.body` pair twice: the `folder` arm
+    /// above carries the same story from the first time.
+    ///
+    /// Fails against the enumerating version of the wipe, which is the point:
+    /// the value and the folder survive it unemptied.
+    #[test]
+    fn a_wipe_empties_a_proposed_settings_value_and_folder() {
+        let mut session = Session {
+            task: "t".into(),
+            ..Default::default()
+        };
+        session
+            .proposal
+            .settings
+            .push(crate::plugins::agent::prompt::ProposedSetting {
+                intent_id: "files.new-note-location".into(),
+                value: Some("secret value".into()),
+                folder: Some("secret folder".into()),
+            });
+
+        wipe_session(&mut session);
+
+        let setting = &session.proposal.settings[0];
         assert!(
-            session.proposal.summary.bytes().all(|b| b == 0),
-            "summary overwritten"
+            setting.value.as_deref().unwrap_or_default().is_empty(),
+            "the proposed value is overwritten"
         );
+        assert!(
+            setting.folder.as_deref().unwrap_or_default().is_empty(),
+            "the proposed folder is overwritten"
+        );
+    }
+
+    // ---- accumulating one run's proposal across legs ----------------------
+
+    /// **The regression this function was extracted for** (myne-md/myne#850).
+    ///
+    /// The merge used to copy `edits`, `new_notes` and `summary` by hand, and
+    /// `settings` was not among them. Every setting a run proposed was dropped
+    /// between the loop's own proposal and the one the client receives, and
+    /// what that cost is worth restating here: a settings-only run arrived as
+    /// an EMPTY proposal, the review screen's gate is "the run stopped and has
+    /// something to show", so the screen never opened at all, while the host
+    /// had accepted the change, raised no refusal, and every gate in the tree
+    /// stayed green.
+    ///
+    /// **This test sits at the merge rather than at the loop deliberately, and
+    /// that is the whole lesson.** The loop's tests assert `outcome.proposal`,
+    /// which is the value BEFORE this function runs, so they all passed while
+    /// the feature did not work end to end. Asserting the layer that was wrong
+    /// is the only test that could have caught it.
+    #[test]
+    fn an_accumulated_proposal_keeps_the_settings_its_leg_proposed() {
+        let mut into = Proposal {
+            edits: Vec::new(),
+            new_notes: vec![note("first leg")],
+            settings: Vec::new(),
+            summary: "first".into(),
+        };
+        let from = Proposal {
+            edits: Vec::new(),
+            new_notes: Vec::new(),
+            settings: vec![
+                crate::plugins::agent::prompt::ProposedSetting {
+                    intent_id: "editor.weekly-notes-folder".into(),
+                    value: Some("Journals/Weekly".into()),
+                    folder: None,
+                },
+                crate::plugins::agent::prompt::ProposedSetting {
+                    intent_id: "files.new-note-location".into(),
+                    value: Some("inbox".into()),
+                    folder: Some("Notes".into()),
+                },
+            ],
+            summary: "second".into(),
+        };
+
+        accumulate_proposal(&mut into, from);
+
+        assert_eq!(
+            into.settings.len(),
+            2,
+            "a leg's settings must reach the accumulated proposal"
+        );
+        assert_eq!(into.settings[0].intent_id, "editor.weekly-notes-folder");
+        assert_eq!(into.settings[0].value.as_deref(), Some("Journals/Weekly"));
+        assert_eq!(into.settings[1].intent_id, "files.new-note-location");
+        assert_eq!(into.settings[1].folder.as_deref(), Some("Notes"));
+        // The other fields still accumulate, which is what makes this a merge
+        // rather than a replacement.
+        assert_eq!(into.new_notes.len(), 1);
+        assert_eq!(into.summary, "second");
+    }
+
+    /// A leg that finished without saying anything must not blank what an
+    /// earlier leg said. The empty check lives on the summary alone: an empty
+    /// EDIT list is a legitimate leg and clearing it would be right.
+    #[test]
+    fn an_empty_summary_leaves_the_earlier_one_in_place() {
+        let mut into = Proposal {
+            summary: "first".into(),
+            ..Default::default()
+        };
+        accumulate_proposal(&mut into, Proposal::default());
+        assert_eq!(into.summary, "first");
     }
 }

@@ -1,6 +1,14 @@
 {
   "$comment": [
     "Raised 292 -> 297 for myne-md/myne#529. `e2e/agent-run.e2e.ts` is NEW",
+    "myne-md/myne#850 adds `e2e/agent-setting-intent.e2e.ts` (ag8), measured GREEN THREE",
+    "TIMES in one warm container (./scripts/e2e-ai-buildrun.sh agent-setting-intent, three",
+    "times, PASS: 1 2 3). It does NOT move either number: the floor is a MINIMUM, so one",
+    "more executing scenario leaves it satisfied, and the ceiling is a MAXIMUM. Raising the",
+    "floor for it is a CI-measured act and has not been done here, which is stated rather",
+    "than implied so a later reader does not read the unchanged number as evidence either",
+    "way. The note sits here as its own paragraph so the sentence below still reads as one.",
+    "",
     "relative to develop and carries FIVE scenarios (ag1 through ag5), all",
     "inside `aiDescribe` and all executing where CI sets MYNE_E2E_AI=1.",
     "",

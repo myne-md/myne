@@ -68,7 +68,7 @@ import { subscribePrefsNonce } from "../notes/prefsNonce";
  * load error. Mirrors `PrefsView::default()` on the Rust side
  * (spec § 9.5.5 safer-state semantic).
  */
-const DEFAULT_PREFS: PrefsView = {
+export const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   show_note_timestamps: true,
   reminders_enabled: true,

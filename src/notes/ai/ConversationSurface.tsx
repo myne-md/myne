@@ -56,6 +56,8 @@ import {
   subscribeChatPersistHealth,
 } from "./chatPersist";
 import { markConversationRead, useAgent } from "../agent/agentStore";
+// This client's nonce, passed into the shared undo hook below.
+import { bumpPrefsNonce } from "../prefsNonce";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { AgentFootprint } from "../agent/components/AgentFootprint";
 import type { ChatComposerSurface } from "../components/ChatComposer";
@@ -688,6 +690,7 @@ export function ConversationSurface({
   const undo = useUndoLastRun({
     agentLastRun,
     agentUndo,
+    bumpPrefsNonce,
     ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
   });
   const [diffProposal, setDiffProposal] = useState<Pick<

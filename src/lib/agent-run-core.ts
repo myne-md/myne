@@ -37,6 +37,7 @@ import type {
   ProbeProgress,
   ProbeVerdict,
   ProposedEdit,
+  ProposedSetting,
   RunProgress,
   ScopeGrant,
 } from "./agent-protocol";
@@ -81,6 +82,17 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
      *  in-process; the cost that matters is what crosses TB13, and that is
      *  bounded on the other side. */
     history: readonly HistoryTurn[],
+    /** The settings this client offers the run (myne-md/myne#850).
+     *
+     *  **Ids only, never labels.** The host resolves each against its own intent
+     *  table and renders the system block from the TABLE's ids, so a string this
+     *  side sends never reaches the prompt; a label would be a second source of
+     *  truth for the same list, and the review row already resolves its own.
+     *
+     *  Empty is the honest value for a client that has built no catalogue, and
+     *  the host then refuses every setting change rather than accepting one into
+     *  a proposal no surface could render. */
+    settings: readonly string[],
     /** Called with the run's view as soon as the host has created it, which is
      *  long before this promise resolves.
      *
@@ -115,6 +127,7 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
       grant,
       language,
       history,
+      settings,
       onOpen: channel,
       onProgress: progress,
     });
@@ -186,12 +199,20 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
     runId: string,
     approved: ProposedEdit[],
     approvedNewNotes: number[],
+    /** The setting changes the user approved (myne-md/myne#850). A selection like
+     *  `approvedNewNotes`, and for the same reason: a setting write is a write,
+     *  so it needs its own approval. Sent as the proposed pairs rather than as
+     *  indices because the host re-derives both the writability and the value's
+     *  shape at the write, so an index would buy nothing it does not already
+     *  do. */
+    approvedSettings: ProposedSetting[],
     approval: Approval,
   ): Promise<AgentApplyResult> {
     return await invoke<AgentApplyResult>("plugin:agent|agent_apply", {
       runId,
       approved,
       approvedNewNotes,
+      approvedSettings,
       approval,
     });
   }

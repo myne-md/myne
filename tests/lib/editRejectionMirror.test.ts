@@ -65,7 +65,17 @@ const TS_MIRROR = "src/lib/agent-protocol.ts";
 
 function tsUnion(): string[] {
   const src = readFileSync(join(REPO, TS_MIRROR), "utf8");
-  const body = /export type EditRejection =([\s\S]*?);\n/.exec(src);
+  // **A lookahead, not a consumed delimiter.** `([\s\S]*?)";\n` leaves the last
+  // member's closing quote in the delimiter, dropping it from the member scan, and a
+  // `;` at the end of a doc-comment line terminates the capture early. The
+  // setting-side sibling of this file has both shapes, so this one uses the same
+  // read rather than waiting for its own doc comment to grow a semicolon.
+  // **The capture ENDS WITH the closing quote** and a lookahead takes the semicolon.
+  // Both halves are load-bearing: `([\s\S]*?)";\n` consumes that quote and drops the
+  // last member, and `([\s\S]*?);\n` terminates early on any doc-comment line that
+  // ends with a semicolon. The setting-side sibling of this file has both shapes, so
+  // this one takes the same read rather than waiting for its own comment to grow one.
+  const body = /export type EditRejection =([\s\S]*?")(?=;\n)/.exec(src);
   if (body === null) throw new Error(`EditRejection union not found in ${TS_MIRROR}`);
   return [...body[1].matchAll(/"([a-zA-Z0-9]+)"/g)].map((m) => m[1]);
 }

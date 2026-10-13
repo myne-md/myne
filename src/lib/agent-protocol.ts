@@ -111,10 +111,40 @@ export interface ProposedNote {
   folder: string | null;
 }
 
+/** One setting change the model proposed (myne-md/myne#850).
+ *
+ *  **It carries the settings-index id and the new value, and nothing else.**
+ *  The label and the value the setting holds now are resolved from the
+ *  client's own catalogue at render time: they are display data, and the host
+ *  does not hold them. What the host owns is which ids are writable and what
+ *  values they accept, and both are re-derived at the write. */
+export interface ProposedSetting {
+  /** The settings-index id, e.g. `editor.weekly-notes-folder`. */
+  intentId: string;
+  /** The new value, already validated against the intent's shape, or `null`
+   *  when the change is a CLEAR (myne-md/myne#850 task 3).
+   *
+   *  **`null` and `""` are different values**, which is why this is nullable
+   *  rather than a string: a clear REMOVES the setting, and an empty string is
+   *  something a folder could legitimately be compared against. The review row
+   *  renders the two differently for the same reason. */
+  value: string | null;
+  /** The second half of a setting that has one (myne-md/myne#850 task 4).
+   *  `files.new-note-location` is one setting over two pref fields, a mode and
+   *  the folder that mode uses, so the folder rides the same change rather than
+   *  a second setting that could desync from the first. Absent for every other
+   *  intent, and refused by the host when it arrives for one of those. */
+  folder?: string | null;
+}
+
 /** Everything one run has proposed so far. */
 export interface Proposal {
   edits: ProposedEdit[];
   newNotes: ProposedNote[];
+  /** Setting changes the model proposed. Optional because a payload written
+   *  before the verb existed carries none, the same tolerance the Rust side's
+   *  `#[serde(default)]` gives it. */
+  settings?: ProposedSetting[];
   /** The model's own summary, shown above the diff. Note content can steer it,
    *  so the surface presents it as the model's claim rather than as a fact. */
   summary: string;
@@ -247,6 +277,69 @@ export interface RefusedNewNote {
   reason: EditRejection;
 }
 
+/** Why a setting change did not land. Mirrors the Rust `SettingRejection`
+ *  (myne-md/myne#850). */
+export type SettingRejection =
+  /** It arrived under a bulk approval. A setting change is always its own act:
+   *  the rule that makes "approve all" safe is a bound over note grants, and a
+   *  setting sits inside no grant at all. */
+  | "needsOwnAct"
+  /** The setting is no longer writable, or never was. Re-derived at the write
+   *  rather than trusted from the proposal. */
+  | "notWritable"
+  /** The value no longer validates, for the same reason. */
+  | "invalidValue"
+  /** The folder this setting names is on record as REMOVED, so the ensure step
+   *  will not bring it back (myne-md/myne#850 task 3). Its own reason rather
+   *  than `writeFailed`, because the user's action differs: this one is "you
+   *  deleted that folder, and I am not undoing that for you". */
+  | "folderRemoved"
+  /** The setting cannot be CLEARED, because its prefs setter takes a required
+   *  value (myne-md/myne#850 task 4). Writing an empty string and calling it a
+   *  clear would store a value, which is the difference the clear verb keeps. */
+  | "notClearable"
+  /** The write itself failed. */
+  | "writeFailed"
+  /** The host never recorded the model proposing this change, so the run cannot
+   *  write it. The note half has refused this since `EditRejection::NotProposed`;
+   *  settings had no equivalent until the 2026-10-13 review, which is what made
+   *  the offer a page-supplied argument rather than a bound. */
+  | "notProposed"
+  /** The run was stopped before the write, so nothing was attempted. Its own
+   *  reason rather than `writeFailed`, which invites a retry of a run the user
+   *  deliberately stopped. */
+  | "runStopped";
+
+/** One setting change that did not land. Its own list rather than a
+ *  `RefusedEdit`, because the two index spaces are different. */
+export interface RefusedSetting {
+  intentId: string;
+  /** Its index in the list this client SENT for approval, which is what the host
+   *  enumerates, so `sent[index]` is the row. `landedSettingIndices` is the one
+   *  consumer, and it indexes the sent list rather than the proposal for exactly
+   *  this reason: the two agree only when every earlier row was approved. */
+  index: number;
+  reason: SettingRejection;
+}
+
+/** One setting change that landed, with the value it replaced. Mirrors the Rust
+ *  `AppliedSetting`. Held in memory only: it exists so an undo can put the
+ *  setting back. */
+export interface AppliedSetting {
+  intentId: string;
+  /** The value before the write, or `null` when the setting was unset, which is
+   *  what tells "put X back" apart from "clear it again". */
+  previous: string | null;
+  /** The FOLDER before the write, for the one setting that has two fields
+   *  (`files.new-note-location`). Absent for every other intent.
+   *
+   *  **Carried rather than re-read, and the difference is a data loss.** The
+   *  undo of a location change used to rebuild the folder from live prefs, which
+   *  by then held the value the run had just written, so it wrote that back and
+   *  reported the setting restored. */
+  previousFolder?: string | null;
+}
+
 /** What an apply did. Mirrors the Rust `ApplyOutcome`. */
 export interface AgentApplyResult {
   applied: number;
@@ -261,6 +354,13 @@ export interface AgentApplyResult {
    *  action. Held for the session only; a lock drops it, like everything else
    *  about a run. */
   restorePoints: [string, string][];
+  /** Setting changes that landed, with the value each replaced
+   *  (myne-md/myne#850). Optional for the same reason `Proposal.settings` is:
+   *  an apply that changed no setting, and every payload written before the verb
+   *  existed, omits it. */
+  settingsChanged?: AppliedSetting[];
+  /** Setting changes that did not land. */
+  refusedSettings?: RefusedSetting[];
 }
 
 /** One probe attempt's verdict. */
@@ -436,9 +536,16 @@ export const HIDING_MARKERS: readonly HidingMarker[] = [
  *  different space and is easy to leave out of a condition written from the
  *  edit side. */
 export function hasRefusals(
-  result: Pick<AgentApplyResult, "refused" | "refusedNewNotes">,
+  result: Pick<
+    AgentApplyResult,
+    "refused" | "refusedNewNotes" | "refusedSettings"
+  >,
 ): boolean {
-  return result.refused.length > 0 || result.refusedNewNotes.length > 0;
+  return (
+    result.refused.length > 0 ||
+    result.refusedNewNotes.length > 0 ||
+    (result.refusedSettings?.length ?? 0) > 0
+  );
 }
 
 /** What approving this removal on its own will do, in the user's words.
@@ -552,6 +659,14 @@ export interface AgentUndoResult {
    *  is a different act. Reporting the count is what keeps "the run was undone"
    *  from meaning more than it did. */
   notesCreatedNotReverted: number;
+  /** How many SETTINGS were put back, counted apart from the notes.
+   *
+   *  **Its absence here was a mirror drift**: the host has returned this since
+   *  the feature landed, the interface did not carry it, and nothing rendered
+   *  it, so a settings-only undo read as "Reverted 0 notes" with no mention of
+   *  the change that was reversed. `core/AGENTS.md` states the rule that the
+   *  mirror moves in the same commit as the Rust side. */
+  settingsReverted: number;
 }
 
 /** An applied run the user could still undo. Mirrors the Rust `AppliedRun`.
@@ -562,6 +677,11 @@ export interface AppliedRun {
   runId: string;
   restorePoints: [string, string][];
   notesCreated: number;
+  /** Settings the run changed, with the value each replaced
+   *  (myne-md/myne#850). Optional for the same reason `Proposal.settings` is:
+   *  a run that touched no setting omits it. Held in memory only, like the
+   *  restore points, because it exists so an undo can put the setting back. */
+  settings?: AppliedSetting[];
 }
 
 /** Which probe attempt is in flight (myne-md/myne#575). Counts only. */

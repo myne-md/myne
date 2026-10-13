@@ -1,0 +1,17 @@
+{
+  "$comment": "The v1 setting intents, as ONE list both languages read (myne-md/myne#850 task 4). The settings index that DECIDES a setting's agent-writability is TypeScript and the intent table that ENFORCES it is Rust, so neither side can compare itself with the other from inside one language: a Rust test would compare the table with itself and a TS test the index with itself. This file is the third thing, so a family added on one side alone fails on that side rather than shipping as a setting the agent is offered and cannot spell, or one it can spell and is never offered. Both halves assert BOTH directions, so a stale entry is as loud as a missing one.",
+  "intents": [
+    "editor.daily-notes-folder",
+    "editor.weekly-notes-folder",
+    "editor.monthly-notes-folder",
+    "editor.daily-notes-template",
+    "editor.weekly-notes-template",
+    "editor.monthly-notes-template",
+    "editor.daily-notes-date-format",
+    "editor.weekly-notes-date-format",
+    "editor.monthly-notes-date-format",
+    "files.new-note-location",
+    "editor.date-format",
+    "editor.time-format"
+  ]
+}
