@@ -16,6 +16,7 @@
 // match the other pane's binding), and either pane's unmount cleared the survivor.
 
 import { colorForParticipant, type Participant } from "./participant";
+import type { IdentityLabel } from "./identityLabel";
 
 /**
  * The grace window after a stream drop before the store clears. Aligned with the
@@ -97,7 +98,11 @@ export function awarenessUpsert(
   peers.set(update.actorId, {
     id: update.actorId,
     noteId: update.noteId,
-    label: update.label ?? "",
+    // The wire carries an ALREADY-RESOLVED name from the signed assertion, so it is
+    // a `text` label: a name the user authored, with nothing for us to translate.
+    // Wrapping it rather than storing the bare string is what keeps `label` a
+    // descriptor everywhere, so no surface can render half the rule.
+    label: update.label === null ? null : { kind: "text", text: update.label },
     // The frame's own label is absent, so the assertion did not resolve a name; the
     // surface renders the degraded form.
     unAttributed: update.label === null,
@@ -114,11 +119,15 @@ export function awarenessUpsert(
  * Fill in a peer's resolved label, from the backend identity resolver
  * (`collab-provenance` task 2), keeping their frame data. Once a peer is
  * attributed this is a no-op for them, so the caller may re-run it safely.
+ *
+ * Takes the DESCRIPTOR `resolvedIdentityLabel` returns, never a rendered string:
+ * this entry is written once and never revisited, so a string here would pin the
+ * language the peer appeared in (see `identityLabel.ts`).
  */
 export function awarenessResolveLabel(
   state: AwarenessState,
   actorId: string,
-  label: string,
+  label: IdentityLabel,
 ): AwarenessState {
   let changed = false;
   const peersByNote = new Map(state.peersByNote);

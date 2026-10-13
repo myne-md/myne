@@ -67,6 +67,7 @@ pub mod chats_blob;
 pub mod chats_catalog_blob;
 pub mod color_group;
 pub mod crdt_note_blob;
+pub mod device_binding_blob;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
@@ -115,9 +116,9 @@ pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
     aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob,
     aad_awareness_frame, aad_chats_blob, aad_chats_blob_v0_2, aad_chats_catalog,
-    aad_custom_themes_blob, aad_graph_layout_blob, aad_member_names_blob, aad_membership_blob,
-    aad_membership_roster_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
-    aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
+    aad_custom_themes_blob, aad_device_binding_blob, aad_graph_layout_blob, aad_member_names_blob,
+    aad_membership_blob, aad_membership_roster_blob, aad_note_content_encrypt,
+    aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
     aad_person_member_key_store, aad_person_member_unlock_store, aad_person_profile_blob,
     aad_person_vault_carrier, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
     aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
@@ -209,6 +210,16 @@ pub use color_group::{
 pub use crdt_note_blob::{
     decode_crdt_note_blob, encode_crdt_note_blob, encode_crdt_note_blob_raw, CannotDecryptCrdtNote,
     NC05_MAGIC, NC05_MAX_PLAINTEXT_LEN, NC05_PROTOCOL_VERSION,
+};
+pub use device_binding_blob::{
+    decode_device_binding_blob, decode_device_bindings_or_empty, device_binding_signed_bytes,
+    encode_device_binding_blob, encode_device_binding_blob_raw, encode_device_bindings_map,
+    live_device_bindings, merge_device_bindings, parse_device_bindings_map,
+    partition_verified_bindings, sign_device_binding, verify_device_binding,
+    verify_device_binding_removal, DeviceBindingBlobError, DeviceBindingEntry, DeviceBindingsMap,
+    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_HEADER_LEN,
+    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX, DEVICE_BINDING_SIGNATURE_HEX_LEN,
+    DEVICE_BINDING_SIGNATURE_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
 };
 pub use dictionary_blob::{
     decode_dictionary_blob, decode_dictionary_blob_versioned, encode_dictionary_blob,

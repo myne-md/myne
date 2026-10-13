@@ -666,7 +666,7 @@
     "measurement of the whole suite: 366 is the number the note above",
     "established and this adds exactly one scenario file entry to it."
   ],
-  "stable": 375,
+  "stable": 376,
   "stable_max_failures": 0,
   "_comment_361_to_366": [
     "Raised 361 -> 366 for myne-md/myne#728 task 18. `e2e/a11y-keyboard.e2e.ts`",
@@ -782,6 +782,30 @@
     "and it is stated as what it is: it proves the two scenarios are not vacuous,",
     "which is the property the floor needs from them, and the container lane's own",
     "green run is what the next release reads.",
+    "",
+    "`stable_max_failures` stays 0."
+  ],
+  "_comment_375_to_376": [
+    "Raised 375 -> 376 for myne-md/myne#852. ONE new scenario relative to",
+    "develop, in ONE new file, `e2e/member-devices.e2e.ts`: MD-1 (a member's",
+    "second device joining the same vault from the recovery phrase alone, with no",
+    "owner action, and both devices' revisions and the presence roster naming the",
+    "member afterwards).",
+    "",
+    "It needs the myne-server binary and self-skips without it, by the file's own",
+    "`describeCanary = ready ? describe : describe.skip` over `harnessSupported()`",
+    "AND `syncServerSupported()`. That is the same gate `_comment_373_to_375`",
+    "above carries, and the raise rests on the same argument rather than a new",
+    "one: the lane this floor measures exports MYNE_E2E_SERVER and builds that",
+    "binary in `myne-server-build`, so this executes there rather than skips.",
+    "Leaving the floor flat is the failure this file's own #529 note names, since",
+    "a silent skip of the whole new file would land executed on exactly 375 and",
+    "keep the gate green.",
+    "",
+    "MEASURED in the container rather than on the host, and this entry carries the",
+    "stronger evidence of the two: the feature's own record",
+    "(agent-tooling/features/member-devices/progress.md) reports three consecutive",
+    "green runs at MYNE_E2E_RETRIES=0 in one warm container.",
     "",
     "`stable_max_failures` stays 0."
   ]

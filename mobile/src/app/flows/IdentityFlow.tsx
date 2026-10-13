@@ -6,7 +6,9 @@ import {
   useState,
   type ChangeEvent,
   type ClipboardEvent,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -33,6 +35,7 @@ import {
   personStatus,
   personListInvites,
   personAcceptInvite,
+  personJoinVault,
   inspectInviteCode,
   personLock,
   type PersonSetupView,
@@ -43,6 +46,7 @@ import { setMyMemberName, memberNameErrorKey } from "../../lib/memberNames";
 import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
 import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
+import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
 import type { IdentityFlowProps } from "./types";
 
 type Step =
@@ -53,6 +57,7 @@ type Step =
   | "phrase"
   | "home"
   | "accept"
+  | "join"
   | "name";
 
 /** Recovery-phrase width. Frozen by BIP-39 at 24 words (256 bits) and by
@@ -306,6 +311,10 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // Names the accept step's phrase grid, which is 24 bare inputs with no visible
   // label of their own.
   const phraseLabelId = useId();
+  // …and the join step's, which is a second grid of the same 24 bare inputs. Two
+  // ids rather than one: the accept's `aria-labelledby` must not point at a label
+  // that belongs to a step that is not on screen.
+  const joinPhraseLabelId = useId();
   const [step, setStep] = useState<Step>("gate");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -349,6 +358,21 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inspecting, setInspecting] = useState(false);
 
+  // Join step (myne-md/myne#852 task 7). A member's SECOND device adding a vault
+  // this identity already belongs to. Its own state rather than the accept's,
+  // deliberately: the two steps are never both open, and sharing the fields would
+  // make "this step never inherits the other's phrase or password" a property of
+  // every reset path instead of a property of the shape.
+  const [joinInvite, setJoinInvite] = useState<InviteSummary | null>(null);
+  const [joinWords, setJoinWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+  const [joinPassword, setJoinPassword] = useState("");
+  const [joinConfirmPassword, setJoinConfirmPassword] = useState("");
+  const [joining, setJoining] = useState(false);
+  // The join's own banner. The home step renders the shared `error` in its forget
+  // block, so a refusal parked there would follow the user back onto a screen it
+  // does not belong to.
+  const [joinError, setJoinError] = useState<string | null>(null);
+
   // Name step (myne-md/myne#851 task 15). It runs after an accept lands and its
   // completion callback is withheld until it finishes, so an accepted vault cannot
   // reach the editor unnamed, the same ordering the desktop gate holds.
@@ -357,25 +381,55 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   const [nameBusy, setNameBusy] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  // Secret-wipe artefact for the accept step. Mirrors the in-flight phrase, the
-  // owner code and the device password so the unmount cleanup can drop them: V8
-  // strings are immutable, so this is best-effort on the JS side (the load-bearing
-  // zeroize is Rust-side), but the reference goes on every exit. Same mechanism as
-  // `RecoverFlow`, which holds the same two kinds of secret; the phrase is a full
-  // identity credential and the password becomes this device's
-  // `vault.member-unlock` credential.
-  const acceptSecretsRef = useRef<{ ownerCode: string; words: string[]; password: string; confirmPassword: string }>(
-    { ownerCode: "", words: [], password: "", confirmPassword: "" },
-  );
-  useEffect(() => {
-    acceptSecretsRef.current = { ownerCode, words: acceptWords, password, confirmPassword };
+  // Secret-wipe artefact for the two credential-collecting steps, accept and join.
+  // Mirrors the in-flight phrase, the owner code and the device password so the
+  // unmount cleanup can drop them: V8 strings are immutable, so this is best-effort
+  // on the JS side (the load-bearing zeroize is Rust-side), but the reference goes
+  // on every exit. Same mechanism as `RecoverFlow`, which holds the same two kinds
+  // of secret; the phrase is a full identity credential and the password becomes
+  // this device's `vault.member-unlock` credential. One artefact for both steps
+  // rather than one each: the unmount cleanup is the half that cannot be forgotten
+  // per-path, and a second object here would be a second thing to remember to wipe.
+  const acceptSecretsRef = useRef<{
+    ownerCode: string;
+    words: string[];
+    password: string;
+    confirmPassword: string;
+    joinWords: string[];
+    joinPassword: string;
+    joinConfirmPassword: string;
+  }>({
+    ownerCode: "",
+    words: [],
+    password: "",
+    confirmPassword: "",
+    joinWords: [],
+    joinPassword: "",
+    joinConfirmPassword: "",
   });
-  useEffect(
-    () => () => {
-      acceptSecretsRef.current = { ownerCode: "", words: [], password: "", confirmPassword: "" };
-    },
-    [],
-  );
+  const wipeSecrets = useCallback(() => {
+    acceptSecretsRef.current = {
+      ownerCode: "",
+      words: [],
+      password: "",
+      confirmPassword: "",
+      joinWords: [],
+      joinPassword: "",
+      joinConfirmPassword: "",
+    };
+  }, []);
+  useEffect(() => {
+    acceptSecretsRef.current = {
+      ownerCode,
+      words: acceptWords,
+      password,
+      confirmPassword,
+      joinWords,
+      joinPassword,
+      joinConfirmPassword,
+    };
+  });
+  useEffect(() => () => wipeSecrets(), [wipeSecrets]);
 
 
   // Gate on boot: if an identity already exists, skip straight to the home.
@@ -503,14 +557,14 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
    *  the unmount cleanup covers the rest, since closing the overlay unmounts the
    *  whole flow. */
   const clearAcceptSecrets = useCallback(() => {
-    acceptSecretsRef.current = { ownerCode: "", words: [], password: "", confirmPassword: "" };
+    wipeSecrets();
     setOwnerCode("");
     setOwnerFingerprint(null);
     setConfirmed(false);
     setAcceptWords(Array(PHRASE_WORDS).fill(""));
     setPassword("");
     setConfirmPassword("");
-  }, []);
+  }, [wipeSecrets]);
 
   /**
    * Open the accept step for a pending invite.
@@ -520,17 +574,38 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
    * password.
    */
   const openAccept = useCallback((invite: InviteSummary) => {
-    acceptSecretsRef.current = { ownerCode: "", words: [], password: "", confirmPassword: "" };
+    clearAcceptSecrets();
     setAcceptInvite(invite);
-    setOwnerCode("");
-    setOwnerFingerprint(null);
-    setConfirmed(false);
-    setAcceptWords(Array(PHRASE_WORDS).fill(""));
-    setPassword("");
-    setConfirmPassword("");
     setError(null);
     setStep("accept");
+  }, [clearAcceptSecrets]);
+
+  /** The join step's counterpart. Same rule, same reason: the phrase and the
+   *  device password are re-collected per invite rather than left over from the
+   *  last one. It touches no accept state, so opening a join cannot clear a form
+   *  the user is not looking at anyway. */
+  const clearJoinSecrets = useCallback(() => {
+    setJoinWords(Array(PHRASE_WORDS).fill(""));
+    setJoinPassword("");
+    setJoinConfirmPassword("");
+    setJoinError(null);
   }, []);
+
+  /**
+   * Open the join step for a CLAIMED invite: a vault this identity is already a
+   * member of, being added to this device (myne-md/myne#852 task 7).
+   *
+   * The step collects NO owner code. The owner it verifies against is the one this
+   * person's own sealed profile already pins (`decisions/protocol/0675`), which is
+   * the whole difference from the accept above it, and the reason the two steps
+   * have two error mappings: a `BadRequest` here means "no owner could be
+   * established", not "the pasted code did not verify".
+   */
+  const openJoin = useCallback((invite: InviteSummary) => {
+    clearJoinSecrets();
+    setJoinInvite(invite);
+    setStep("join");
+  }, [clearJoinSecrets]);
 
   /**
    * Read the fingerprint out of the owner's identity code, so the user can
@@ -563,23 +638,41 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     setAcceptWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
   }, []);
 
-  /** Paste-to-grid. A 24-word phrase is pasted rather than typed, so a paste
-   *  that lands whole in the first cell is the only usable shape. Fewer than two
-   *  tokens is left to the browser, so pasting a single word into a cell still
-   *  works. */
-  const pasteAcceptWords = useCallback((index: number, event: ClipboardEvent<HTMLInputElement>) => {
-    const tokens = event.clipboardData.getData("text").split(/\s+/).filter((word) => word.length > 0);
-    if (tokens.length < 2) return;
-    event.preventDefault();
-    setError(null);
-    setAcceptWords((words) => {
-      const next = [...words];
-      for (let i = 0; i < tokens.length && index + i < PHRASE_WORDS; i += 1) {
-        next[index + i] = tokens[i];
-      }
-      return next;
-    });
+  const setJoinWord = useCallback((index: number, value: string) => {
+    setJoinError(null);
+    setJoinWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
   }, []);
+
+  /** Paste-to-grid, shared by the accept grid and the join grid. A 24-word phrase
+   *  is pasted rather than typed, so a paste that lands whole in the first cell is
+   *  the only usable shape. Fewer than two tokens is left to the browser, so pasting
+   *  a single word into a cell still works. `setWords` is whichever grid's setter
+   *  was pasted into, so the two steps cannot inherit each other's words, and `onEdit`
+   *  clears the banner of the step the paste belongs to. */
+  const pasteWords = useCallback(
+    (
+      setWords: Dispatch<SetStateAction<string[]>>,
+      onEdit: () => void,
+      index: number,
+      event: ClipboardEvent<HTMLInputElement>,
+    ) => {
+      const tokens = event.clipboardData
+        .getData("text")
+        .split(/\s+/)
+        .filter((word) => word.length > 0);
+      if (tokens.length < 2) return;
+      event.preventDefault();
+      onEdit();
+      setWords((words) => {
+        const next = [...words];
+        for (let i = 0; i < tokens.length && index + i < PHRASE_WORDS; i += 1) {
+          next[index + i] = tokens[i];
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   // Every gate in one place, so the submit button and the handler cannot
   // disagree about whether the form is complete. The backend re-checks the floor
@@ -589,6 +682,14 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     acceptWords.every((word) => word.length > 0) &&
     [...password].length >= MIN_PASSWORD_LEN &&
     password === confirmPassword;
+
+  /** The join's gate: the same phrase completeness and the same device-password
+   *  floor, and deliberately NO confirmation step. There is no owner code on this
+   *  form to confirm, because there is none to collect. */
+  const joinReady =
+    joinWords.every((word) => word.length > 0) &&
+    [...joinPassword].length >= MIN_PASSWORD_LEN &&
+    joinPassword === joinConfirmPassword;
 
   /**
    * Claim the invite and materialize the member vault on this device.
@@ -626,6 +727,47 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       setBusy(false);
     }
   }, [acceptInvite, acceptReady, ownerCode, acceptWords, password, clearAcceptSecrets, t]);
+
+  /**
+   * Add a vault this identity already belongs to onto this device
+   * (myne-md/myne#852 task 7).
+   *
+   * It lands on `onAccepted` DIRECTLY, with no name step in between, which is the
+   * one deliberate difference from the accept above it. The accept creates a member,
+   * so the vault's roster has no row for this person yet and the name is the identity
+   * every other member will see. A join installs a vault the person is already a
+   * member of, under a name their first device already wrote; asking again would let a
+   * second device silently re-name a person, and the roster the name step consults is
+   * the one that already holds that name.
+   *
+   * The refusal mapping is the join's own (`@myne/client-core/join-member-vault`), not
+   * the accept's: the accept's `BadRequest` arm tells the user to check a pasted owner
+   * code, and this screen never collected one.
+   */
+  const join = useCallback(async () => {
+    if (!joinInvite || !joinReady) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      await personJoinVault(
+        joinInvite.invite_id_hex,
+        joinInvite.vault_account_hash_hex,
+        joinWords.join(" "),
+        joinPassword,
+      );
+      setJoinInvite(null);
+      clearJoinSecrets();
+      accepted.current();
+    } catch (e) {
+      // Which failure it was, not only "could not be added": the kinds are a shared
+      // closed enum and carry no secret (myne-md/myne#794). `Transport` is the arm a
+      // user will actually hit here, since a group package the owner has not
+      // published yet arrives as one, so the copy says to retry.
+      setJoinError(t(memberJoinVaultErrorKey(e)));
+    } finally {
+      setJoining(false);
+    }
+  }, [joinInvite, joinReady, joinWords, joinPassword, clearJoinSecrets, t]);
 
   // ── Name step (myne-md/myne#851 task 15) ─────────────────────────────────────
 
@@ -878,7 +1020,14 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   };
 
   const renderHome = () => {
+    // The invite list is recipient-scoped and carries CLAIMED rows too, and a
+    // claimed row is not an invitation to accept: the accept claims the invite and
+    // mints the membership, so running it on a claimed one is a re-claim of something
+    // this identity already holds a membership for. The two lists render different
+    // affordances off the same row shape, so they are split once here rather than
+    // filtered again at each use (myne-md/myne#852 task 7).
     const pending = (invites ?? []).filter((i) => !i.claimed);
+    const claimed = (invites ?? []).filter((i) => i.claimed);
     return (
       <Screen>
         <FlowHeader label={t("identityFlow.home.title")} onBack={onCancel} />
@@ -897,7 +1046,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
             <FieldLabel>{t("identityFlow.home.invitesHeading")}</FieldLabel>
             {invites === null ? (
               <Spinner />
-            ) : pending.length === 0 ? (
+            ) : pending.length === 0 && claimed.length === 0 ? (
               <div style={HINT_STYLE} data-testid="identity-flow.home-empty">
                 {t("identityFlow.home.noInvites")}
               </div>
@@ -945,6 +1094,56 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
               </div>
             )}
           </div>
+
+          {/* The second device (myne-md/myne#852 task 7). A claimed invite is a
+              vault this identity is already a member of, and before this block
+              existed it was filtered out of the list above altogether, so a phone
+              had no way to add one: the vault simply never appeared, and the
+              "No invitations yet" empty state is what a member looking at their
+              own claimed invite saw. */}
+          {claimed.length > 0 ? (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <FieldLabel>{t("identityHome.claimedHeading")}</FieldLabel>
+              <div data-testid="identity-flow.claimed-hint" style={HINT_STYLE}>
+                {t("identityHome.claimedHint")}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+                {claimed.map((inv) => (
+                  <div
+                    key={inv.invite_id_hex}
+                    data-testid="identity-flow.claimed-row"
+                    style={{
+                      background: "var(--bg-1)",
+                      border: "1px solid var(--line-1)",
+                      borderRadius: "var(--radius-2)",
+                      padding: "var(--space-3)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--fg-3)",
+                        wordBreak: "break-all",
+                        userSelect: "all",
+                      }}
+                    >
+                      {inv.vault_account_hash_hex}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      full={false}
+                      onClick={() => openJoin(inv)}
+                      style={{ marginTop: "var(--space-3)" }}
+                      data-testid="identity-flow.join-open"
+                    >
+                      {t("identityHome.join")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* Forget this identity on this device (myne-md/myne#782). Device-local:
               the server account survives and is recoverable with the phrase. */}
@@ -1078,7 +1277,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
                     }
                     label={t("sync.enroll.wordAria", { number: i + 1 })}
                     onChange={setAcceptWord}
-                    onPaste={pasteAcceptWords}
+                    onPaste={(index, event) => pasteWords(setAcceptWords, () => setError(null), index, event)}
                   />
                 ))}
               </div>
@@ -1155,6 +1354,134 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   };
 
   /**
+   * Add a vault this identity already belongs to onto this device
+   * (myne-md/myne#852 task 7).
+   *
+   * Two things are collected and the owner code is NOT one of them, which is the
+   * whole shape of the step. A second device has no out-of-band owner code, and the
+   * owner it verifies the group package against is the one this person's own sealed
+   * profile already pins (`decisions/protocol/0675`); a field here would let whatever
+   * is pasted into it become the trust anchor the pin exists to be. So there is no
+   * code field, no fingerprint compare and nothing to confirm, and the form goes
+   * straight to the phrase and this device's password.
+   *
+   * The copy is the desktop's, key for key (`identityHome.join*`): both clients render
+   * the same catalog, and a member adding a vault on a phone and on a laptop is
+   * answering the same question.
+   */
+  const renderJoin = () => {
+    const ready = joinReady && !joining;
+    return (
+      <Screen>
+        <FlowHeader
+          label={t("identityHome.join")}
+          onBack={() => {
+            clearJoinSecrets();
+            setJoinInvite(null);
+            setStep("home");
+          }}
+        />
+        <ScreenScroll style={{ padding: "18px 22px 0" }}>
+          <Title>{t("identityHome.join")}</Title>
+          <div data-testid="identity-flow.join-hint" style={HINT_STYLE}>
+            {t("identityHome.joinHint")}
+          </div>
+
+          <div
+            id={joinPhraseLabelId}
+            data-testid="identity-flow.join-phrase-label"
+            style={{ marginTop: "var(--space-5)" }}
+          >
+            <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
+          </div>
+          <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
+          <div role="group" aria-labelledby={joinPhraseLabelId} style={PHRASE_GRID_STYLE}>
+            {joinWords.map((word, i) => (
+              <PhraseCell
+                key={i}
+                index={i}
+                word={word}
+                testId={
+                  i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`
+                }
+                label={t("sync.enroll.wordAria", { number: i + 1 })}
+                onChange={setJoinWord}
+                onPaste={(index, event) =>
+                  pasteWords(setJoinWords, () => setJoinError(null), index, event)
+                }
+              />
+            ))}
+          </div>
+
+          <div
+            data-testid="identity-flow.join-password-note"
+            style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}
+          >
+            {t("identityHome.joinPasswordNote")}
+          </div>
+          <div data-testid="identity-flow.join.password-label" style={{ marginTop: "var(--space-3)" }}>
+            <FieldLabel>{t("password.createForm.passwordLabel")}</FieldLabel>
+          </div>
+          <DevicePasswordField
+            value={joinPassword}
+            onChange={(v) => {
+              setJoinPassword(v);
+              setJoinError(null);
+            }}
+            testId="identity-flow.join.password-input"
+            label={t("password.createForm.passwordLabel")}
+          />
+          <div data-testid="identity-flow.join.confirm-label" style={{ marginTop: "var(--space-3)" }}>
+            <FieldLabel>{t("password.createForm.confirmLabel")}</FieldLabel>
+          </div>
+          <DevicePasswordField
+            value={joinConfirmPassword}
+            onChange={(v) => {
+              setJoinConfirmPassword(v);
+              setJoinError(null);
+            }}
+            testId="identity-flow.join.confirm-input"
+            label={t("password.createForm.confirmLabel")}
+          />
+          {joinConfirmPassword !== "" && joinPassword !== joinConfirmPassword ? (
+            <div style={MISMATCH_STYLE} data-testid="identity-flow.join.password-mismatch">
+              {t("password.createForm.mismatch")}
+            </div>
+          ) : null}
+
+          {joinError ? (
+            <Banner kind="danger" testID="identity-flow.join-error" style={{ marginTop: "var(--space-4)" }}>
+              {joinError}
+            </Banner>
+          ) : null}
+        </ScreenScroll>
+        <FooterBar>
+          <Button
+            variant="secondary"
+            full={false}
+            onClick={() => {
+              clearJoinSecrets();
+              setJoinInvite(null);
+              setStep("home");
+            }}
+            data-testid="identity-flow.join-cancel"
+          >
+            {t("identityFlow.back")}
+          </Button>
+          <Button
+            onClick={() => void join()}
+            disabled={!ready}
+            data-testid="identity-flow.join.submit"
+          >
+            {t("identityHome.joinSubmit")}
+          </Button>
+        </FooterBar>
+        {joining && <BlockingOverlay title={t("identityHome.joinSubmit")} />}
+      </Screen>
+    );
+  };
+
+  /**
    * The required name step.
    *
    * There is no skip control and no back: story 6 of the feature makes this step
@@ -1224,6 +1551,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       {step === "phrase" && renderPhrase()}
       {step === "home" && renderHome()}
       {step === "accept" && renderAccept()}
+      {step === "join" && renderJoin()}
       {step === "name" && renderName()}
     </Screen>
   );

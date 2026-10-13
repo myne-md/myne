@@ -238,6 +238,12 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_person_list_invites",
     "plugin:sync|sync_list_vault_invites",
     "plugin:sync|sync_person_accept_invite",
+    // The SECOND device's join (myne-md/myne#852 task 7). Same refusal, same
+    // reason, one command over from the accept above: it is the accept path with
+    // the out-of-band code replaced by the owner identity PINNED in the person's
+    // own sealed profile, so it needs the held person identity for exactly the
+    // same reason and the form asks for the phrase for exactly the same reason.
+    "plugin:sync|sync_member_join_vault",
     "plugin:sync|sync_person_unlock_member_vault",
     "plugin:sync|sync_member_vault_status",
     "plugin:sync|sync_person_set_member_password",

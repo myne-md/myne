@@ -36,6 +36,7 @@
     "export-dir:default",
     "sync:default",
     "member-names:default",
+    "device-binding:default",
     "qr-scan:default",
     "reminders:default",
     "sensitive-clipboard:default"

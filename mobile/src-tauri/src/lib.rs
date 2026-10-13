@@ -263,6 +263,13 @@ pub fn run() {
         // is what calls `member_names_set_mine`, and a signed name row has no other
         // writer, so this registration IS that step's substrate.
         .plugin(plugins::member_names::init())
+        // B2B device-to-person bindings (MYU5, §9.30; the `member-devices` feature):
+        // the two shared-core commands the desktop registers, gated by a single
+        // deny-by-default `device-binding:default` capability. A member's SECOND
+        // device is the case the family exists for, and the phone is the device a
+        // person is most likely to add one on, so this registration is that flow's
+        // substrate rather than a companion to it.
+        .plugin(plugins::device_binding::init())
         // On-device speech-to-text (Whisper, MYND-563): transcription-only mobile
         // plugin. Feature-gated by `local-inference` (default-on) — the module's
         // `init()` is a no-op when the feature is off, so this stays an

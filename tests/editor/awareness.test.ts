@@ -15,6 +15,8 @@ import {
   awarenessUpsert,
   EMPTY_AWARENESS,
 } from "../../src/notes/collab/awarenessStore";
+import { identityLabelText } from "../../src/notes/collab/identityLabel";
+import i18n from "../../src/i18n";
 
 function peer(over: Partial<AwarenessPeer>): AwarenessPeer {
   return {
@@ -142,7 +144,15 @@ describe("awareness decorations", () => {
     const state = EditorState.create({ doc: "hello", extensions: [awarenessDecorations()] }).update({
       effects: setAwareness.of({
         noteId: "n1",
-        peers: peers.map((p) => ({ ...p, colorVar: "var(--group-olive)" })),
+        peers: peers.map((p) => ({
+          ...p,
+          // Exactly what `PaneView` pushes: the store holds the label as a
+          // DESCRIPTOR and the pane renders it on the way out, because the shared
+          // editor package takes plain strings and carries no i18n of its own
+          // (`identityLabel.ts`). This frame carried no label at all.
+          label: p.label === null ? "" : identityLabelText(p.label, i18n.t),
+          colorVar: "var(--group-olive)",
+        })),
       }),
     }).state;
     const drawn = ranges(state).filter((r) => r.label === "" || r.label === undefined);

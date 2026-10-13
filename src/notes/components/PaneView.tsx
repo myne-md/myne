@@ -48,7 +48,6 @@ import {
   AWARENESS_GRACE_MS,
   awarenessOnDrop,
   awarenessNotePeers,
-  awarenessResolveLabel,
   awarenessSweep,
   awarenessUpsert,
   getAwarenessSnapshot,
@@ -57,6 +56,8 @@ import {
   type PresenceUpdate,
 } from "../collab/awarenessStore";
 import { colorVarForIndex } from "../collab/participant";
+import { identityLabelText } from "../collab/identityLabel";
+import { resolvePeerLabels } from "../collab/presenceLabels";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
@@ -322,7 +323,7 @@ export function PaneView({
   insetLeft = 0,
   insetRight = 0,
 }: PaneViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   const { prefs } = usePrefs();
@@ -739,6 +740,14 @@ export function PaneView({
   // The CMEditor `awareness` prop: memoized so it is a STABLE object across renders.
   // A fresh object here re-dispatches the editor's decoration effect on EVERY render
   // of this pane, including renders caused by unrelated state.
+  //
+  // The label is RESOLVED here, because the editor package's `AwarenessPeer.label` is
+  // a plain string (its decoration widget has no translator and rebuilds on editor
+  // state, not on a language switch). Resolving at the push keeps i18n out of the
+  // shared editor package, and `i18n.language` is in the deps so the one thing that
+  // must invalidate the memo, a language change, does: without it the caret label
+  // would keep the previous language for as long as the pane stayed mounted, which
+  // is the freeze the descriptor exists to prevent one layer up.
   const paneAwareness = useMemo(
     () =>
       activeId !== null
@@ -746,31 +755,29 @@ export function PaneView({
             noteId: activeId,
             peers: [...awarenessNotePeers(awareness, activeId).values()].map((p) => ({
               ...p,
+              label: p.label === null ? "" : identityLabelText(p.label, t),
               colorVar: colorVarForIndex(p.color),
             })),
           }
         : undefined,
-    [awareness, activeId],
+    [awareness, activeId, t, i18n.language],
   );
   // Resolve each un-attributed peer's label through the backend identity resolver
   // (`collab-provenance` task 2, `collab-presence-ui` task 1). A presence frame
   // carries no name, so without this every roster row and caret label renders the
   // degraded actor-id form. The store flips `unAttributed` off once resolved, so
   // this does not re-resolve the same peer.
+  //
+  // The label RULE is `resolvedIdentityLabel`, shared with the version history
+  // (`member-devices` task 5): presence and history must name one device the same
+  // way, and the two hand-written switches had already drifted apart. The loop
+  // itself lives in `collab/presenceLabels` so it is testable without a pane
+  // harness. That loop takes no translator: what it writes into the store is the
+  // label DESCRIPTOR, resolved at each surface's own render (`identityLabel.ts`), so
+  // a resolved string cannot be frozen into the store for the life of the peer.
   useEffect(() => {
     if (activeId === null) return;
-    for (const p of awarenessNotePeers(awareness, activeId).values()) {
-      if (!p.unAttributed) continue;
-      void resolveIdentity(p.id)
-        .then((r) => {
-          const label =
-            r.kind === "Device" ? (r.name ?? r.code) : r.kind === "Person" ? r.name : null;
-          if (label !== null) setAwareness((s) => awarenessResolveLabel(s, p.id, label));
-        })
-        .catch(() => {
-          // A resolver hiccup leaves the peer unattributed; the next frame retries.
-        });
-    }
+    void resolvePeerLabels(awarenessNotePeers(awareness, activeId).values(), resolveIdentity);
   }, [awareness, activeId]);
   useEffect(() => {
     let disposed = false;

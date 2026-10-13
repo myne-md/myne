@@ -928,6 +928,12 @@ The password a person chooses at the moment they accept a vault invite, which be
 
 Used in: `decisions/protocol/0653`, `decisions/ui/0668`, `core/src/plugins/sync/person_account.rs`, `spec/protocol.md` §9.29
 
+### **device-to-person binding** &nbsp; 📋 *Protocol*
+
+The record that says which [person identity](#person-identity) a given [device_id](#device_id-vv-actor) belongs to, held in the shared singleton `vault.device-bindings` (`MYU5`, `spec/protocol.md` §9.30) as a versioned, optionally tombstoned map of `device_id -> { person_fingerprint, version, tombstone, signature_hex }`. It exists so a member's **second** device is attributed to that member rather than to the vault at large (`decisions/protocol/0669`), and it is the durable person attribution `decisions/protocol/0660` recorded as a follow-up when device-scoped provenance shipped. Every row carries a hybrid Ed25519 + ML-DSA-65 signature under the `"myne.device-binding v1|"` class, verified against the person the row CLAIMS (`decisions/protocol/0670`). **Attribution here is legibility, not proof.** The map is sealed under the GROUP tier, so any member can write it, and the signature makes a row the named person's own record rather than evidence about anything else: it is not a statement about who authored a note, which is `decisions/protocol/0660`'s limit. It carries no key material and grants no access, so a device absent from the map is unattributed, not refused. Distinct from the [device registry](#device-registry) (the server's per-account table, keyed by the same `device_id` but holding no person at all) and from the [device name](#device-name) (a device's own label, inside the sealed prefs blob).
+
+Used in: `spec/protocol.md` §9.30; `decisions/protocol/0669`, `0670`
+
 ### **Documentation node** &nbsp; 📦 *Product*
 
 The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
@@ -2258,7 +2264,7 @@ Used in: `decisions/ui/0659`; `agent-tooling/features/collab-presence-ui/`
 
 ### **per-revision attribution** &nbsp; 📦 *Product*
 
-The version history's account of who made each revision. A revision's author is the Automerge actor inside the `NC05` document, which is the DEVICE's stable id (set on every edit path), so the history shows the device that made the change, named or as a short-code fallback, and derives a person through the roster in a shared (`NTV6`) vault. It is a data-model fact a reader is shown, **not a signature**: anyone who can edit the document can set it, and a person-level attribution is derived and live-only in this release (no durable device-to-person binding exists), so the durable history shows the device. The one id hash (`myne.head-author v1|`) stays in Rust; the frontend computes none. See [live session](#live-session) and [remote cursor](#remote-cursor).
+The version history's account of who made each revision. A revision's author is the Automerge actor inside the `NC05` document, which is the DEVICE's stable id (set on every edit path), so the history shows the device that made the change, named or as a short-code fallback, and in a shared (`NTV6`) vault resolves a person for it by joining the durable [device-to-person binding](#device-to-person-binding) with the owner-signed roster and the [member display name](#member-display-name) store (`spec/protocol.md` §9.28 to §9.30, `decisions/protocol/0674`). It is a data-model fact a reader is shown, **not a signature**: anyone who can edit the document can set the actor it resolves, so a person-level attribution is legibility rather than proof, and a device whose binding is absent or tombstoned, or whose bound member has signed no name, falls back to the device label (`decisions/protocol/0660`, whose limit `0674` does not lift). The one id hash (`myne.head-author v1|`) stays in Rust; the frontend computes none. See [live session](#live-session) and [remote cursor](#remote-cursor).
 
 Used in: `decisions/protocol/0660`; `docs/spec/sync-protocol.md` §4.1; `docs/threat-model.md` §7; `agent-tooling/features/collab-provenance/`
 
@@ -2355,12 +2361,16 @@ against a pinned owner key). Shape:
 `MYNE-PERSON-1:<person_id_hex>:<kem_ek_hex>:<ed_pk_hex>:<mldsa_vk_hex>`, all
 lowercase hex. It carries **public** material only (the addressable [person
 account](#person-account) id and the [person keypair](#person-keypair) public
-halves) and never reaches the sync server: the sealed invite relay's outer frame
-is the recipient id and the vault id alone (`decisions/protocol/0603` Q10), so the
+halves). The sealed invite relay never carries it: the outer frame is the
+recipient id and the vault id alone (`decisions/protocol/0603` Q10), so the
 public halves must travel through a channel the server does not control. The owner
 pastes it (a QR is not viable: the code is roughly 6.4k hex characters), sees the
 derived [fingerprint](#bootstrap-fingerprint), and confirms it out of band before
-the invite is sealed. Not an AEAD/magic value and not an AAD role.
+the invite is sealed. Since `decisions/protocol/0675` a member's device also records
+the OWNER's code as a pin inside that person's own sealed `MYY5` profile
+(`docs/spec/protocol.md` §9.28.4), so the code DOES now reach the sync server, as
+ciphertext inside a blob keyed from the person's own phrase: the server stores it
+and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
 Used in: `design-notes/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
@@ -2438,7 +2448,13 @@ randomizer, so it opens on every client from the phrase alone and neither the
 group key nor the owner `root_key` can read it. The `profile-id` is
 `SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
 and is bound into the AAD with `account_number_hash`, so a profile moved to
-another person or vault fails verification. Provider choice, credential and
+another person or vault fails verification. The inner schema is opaque to the
+codec layer and its one non-AI field is the **pinned owner identity code**: the
+owner's public `person identity code` a member's device pins at accept, carried
+here so that member's SECOND device, which has no out-of-band code of its own,
+adopts the owner it must verify a group package against rather than trusting one.
+A device holding a different pin keeps its own and refuses
+(`decisions/protocol/0675`). Provider choice, credential and
 egress consent are deliberately NOT in this blob (device-local). Removal and
 scheduled deletion make no recall guarantee. It syncs on a vault-scoped,
 person-authorized namespace SEPARATE from the shared group manifest
@@ -2451,7 +2467,7 @@ remote container at the family layer rather than by whole-value overwrite, so a
 concurrent edit on another device is not dropped (`decisions/protocol/0610`). An
 owner or single-user vault keeps the shared families instead.
 
-Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `design-notes/protocol/0608-person-private-profile-plane.md`; `design-notes/protocol/0610-person-private-profile-family-layer-merge.md`; `docs/spec/protocol.md` §9.28
+Used in: `design-notes/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `design-notes/protocol/0608-person-private-profile-plane.md`; `design-notes/protocol/0610-person-private-profile-family-layer-merge.md`; `design-notes/protocol/0675-the-pinned-owner-identity-code-travels-in-the-per-person-myy5-profile.md`; `docs/spec/protocol.md` §9.28
 
 
 

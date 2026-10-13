@@ -52,6 +52,13 @@ pub mod memory;
 // because a signed name row has exactly one writer (`member_names_set_mine`); see
 // `member_names/mod.rs` for why mobile can write a name at all.
 pub mod member_names;
+// B2B device-to-person bindings (`vault.device-bindings`, MYU5, §9.30; the
+// `member-devices` feature): a thin re-export wrapper over
+// `myne_core::plugins::device_binding`: the two commands the desktop registers,
+// a deny-by-default `device-binding:default` capability. A member's SECOND device
+// is the case the family exists for, and a claim is how the phone becomes legible
+// to its peers; see `device_binding/mod.rs` for why the phone needs it at all.
+pub mod device_binding;
 // On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
 // `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
 // wasm-clean, so the whisper subset is copied here). Declared unconditionally;

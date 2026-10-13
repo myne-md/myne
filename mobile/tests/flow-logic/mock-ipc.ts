@@ -108,6 +108,12 @@ export interface MockConfig {
    *  then reports the accepted vault from `vault_list`, which is what makes the
    *  re-probe reach the editor. */
   acceptInviteError?: { kind: string };
+  /** `sync_member_join_vault` refusal, the SECOND-DEVICE path (myne-md/myne#852
+   *  task 7). Absent = the join lands. Kept apart from `acceptInviteError` on
+   *  purpose: the two commands answer different questions and a spec that could
+   *  not refuse one without the other could not tell which command the phone
+   *  reached. */
+  memberJoinError?: { kind: string };
   /** `sync_list_roster`: the one answer the name step asks for, and the mobile
    *  Members panel's only source. `null` (the default) makes the read REJECT,
    *  the arm the gate has to survive by asking rather than by skipping. */
@@ -1694,6 +1700,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (window as unknown as { __acceptInviteArgs?: unknown }).__acceptInviteArgs = args;
         if (config.acceptInviteError) throw config.acceptInviteError;
         acceptedVaultId = String(args?.vaultId ?? "accepted-vault");
+        return null;
+      },
+      "plugin:sync|sync_member_join_vault": (args) => {
+        // The second device's four arguments, in order: the invite id (from the
+        // recipient-scoped list, which INCLUDES the claimed row), the vault's
+        // account hash, this person's OWN recovery phrase, and the device-local
+        // password. No owner code: the owner is read from the pin this person's
+        // sealed profile already carries (`decisions/protocol/0675`), which is the
+        // whole difference from the accept above it.
+        //
+        // Recorded under its OWN global rather than the accept's, so a spec can
+        // prove the phone reached THIS command. One shared recorder would make
+        // "the join ran" and "the accept ran" indistinguishable, and routing a
+        // claimed row through the accept is the exact regression this path exists
+        // to prevent (myne-md/myne#794's shape: a plausible sentence over the
+        // wrong command).
+        (window as unknown as { __joinVaultArgs?: unknown }).__joinVaultArgs = args;
+        if (config.memberJoinError) throw config.memberJoinError;
+        // Same stateful shape as the accept: the command materializes and unlocks
+        // the slot host-side, so the shell's re-probe is what carries the user to
+        // the editor. A distinct id, so a spec asserting the editor mounted cannot
+        // be answered by a vault the accept put there.
+        acceptedVaultId = "joined-device-vault";
         return null;
       },
       "plugin:sync|sync_list_roster": () => {

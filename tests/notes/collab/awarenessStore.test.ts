@@ -52,6 +52,19 @@ describe("awareness store", () => {
   it("marks a label-less frame un-attributed", () => {
     const s = awarenessUpsert(EMPTY_AWARENESS, update({ actorId: "a", label: null }));
     expect(awarenessNotePeers(s, "note-1").get("a")?.unAttributed).toBe(true);
+    expect(awarenessNotePeers(s, "note-1").get("a")?.label).toBeNull();
+  });
+
+  it("wraps a frame's own label as a TEXT descriptor, never as a bare string", () => {
+    // A frame's label is already resolved by the backend, and it is a NAME the user
+    // authored, so it has nothing to translate: it enters as `text`. What must not
+    // happen is a raw string landing in `label`, because that is the shape that lets
+    // a surface render half the rule (`identityLabel.ts`).
+    const s = awarenessUpsert(EMPTY_AWARENESS, update({ actorId: "a", label: "Ada" }));
+    expect(awarenessNotePeers(s, "note-1").get("a")?.label).toEqual({
+      kind: "text",
+      text: "Ada",
+    });
   });
 
   it("normalizes a positional-array selection and rejects a malformed one", () => {

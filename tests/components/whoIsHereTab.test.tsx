@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WhoIsHereTab } from "../../src/notes/components/WhoIsHereTab";
 import { EMPTY_SIDEBAR_STATE, SidebarStateProvider } from "../../src/notes/sidebarState";
 import { awarenessClear, setAwareness } from "../../src/notes/collab/awarenessStore";
+import type { IdentityLabel } from "../../src/notes/collab/identityLabel";
 import type { Participant } from "../../src/notes/collab/participant";
+
+/** A user-authored name, the arm that carries no copy of ours. */
+const text = (text: string): IdentityLabel => ({ kind: "text", text });
 
 const { requestPresenceJump } = vi.hoisted(() => ({ requestPresenceJump: vi.fn() }));
 vi.mock("../../src/notes/collab/presenceJump", () => ({
@@ -18,7 +22,7 @@ function peer(over: Partial<Participant>): [string, Participant] {
   const p: Participant = {
     id: "a",
     noteId: "n",
-    label: "Ada",
+    label: { kind: "text", text: "Ada" },
     unAttributed: false,
     caret: 1,
     selection: null,
@@ -59,8 +63,8 @@ describe("WhoIsHereTab", () => {
 
   it("renders a row per participant with its name and a colour dot", () => {
     seed([
-      { id: "a", noteId: "n", label: "Ada", unAttributed: false, caret: 1, selection: null, color: 0 },
-      { id: "b", noteId: "n", label: "Bob", unAttributed: false, caret: 2, selection: null, color: 1 },
+      { id: "a", noteId: "n", label: text("Ada"), unAttributed: false, caret: 1, selection: null, color: 0 },
+      { id: "b", noteId: "n", label: text("Bob"), unAttributed: false, caret: 2, selection: null, color: 1 },
     ]);
     renderTab();
     expect(screen.getAllByTestId("editor.presence-row")).toHaveLength(2);
@@ -71,14 +75,35 @@ describe("WhoIsHereTab", () => {
 
   it("renders an un-attributed peer with the degraded label", () => {
     seed([
-      { id: "a", noteId: "n", label: "", unAttributed: true, caret: 1, selection: null, color: 3 },
+      { id: "a", noteId: "n", label: null, unAttributed: true, caret: 1, selection: null, color: 3 },
     ]);
     renderTab();
     expect(screen.getByText("Someone")).toBeTruthy();
   });
 
+  it("resolves a device descriptor itself, rather than passing it through", () => {
+    // The store holds a DESCRIPTOR, so the row's text can only appear if the ROSTER
+    // runs the rule. An un-resolved descriptor reaching the DOM would render
+    // `[object Object]`, which is what this row would show if the surface were
+    // changed back to reading a stored string.
+    seed([
+      {
+        id: "a",
+        noteId: "n",
+        label: { kind: "device", code: "bbbbbb" },
+        unAttributed: false,
+        caret: 1,
+        selection: null,
+        color: 2,
+      },
+    ]);
+    renderTab();
+    expect(screen.getByText("Device bbbbbb")).toBeTruthy();
+    expect(screen.queryByText(/object Object/)).toBeNull();
+  });
+
   it("the row is a button that jumps on click (no follow mode)", () => {
-    seed([{ id: "a", noteId: "n", label: "Ada", unAttributed: false, caret: 9, selection: null, color: 0 }]);
+    seed([{ id: "a", noteId: "n", label: text("Ada"), unAttributed: false, caret: 9, selection: null, color: 0 }]);
     renderTab();
     const row = screen.getByTestId("editor.presence-row");
     expect(row.tagName).toBe("BUTTON");

@@ -6,14 +6,21 @@
 //
 // # The colour hash is a PRESENTATION hash, not an identity hash
 //
-// `colorForParticipant` hashes the STABLE identity key carried in the awareness
-// frame, the person id in a shared (`NTV6`) vault, the device id in a
-// single-user vault, into the eight `--group-*` palette names. Two devices of one
-// person therefore share a colour in a shared vault. This is deliberately NOT the
-// authoritative id hash `SYNC-44` forbids (deriving e.g. the head-author id from
-// public halves): the palette index is cosmetic, carries no security claim, and
-// stays entirely client-side. The label, in contrast, is the backend RESOLVER's
-// string, the frontend never derives an authoritative label from an id.
+// `colorForParticipant` hashes the key the awareness frame carries, and that key is
+// this device's AUTOMERGE ACTOR: the enrolled `device_id` bytes VERBATIM (`SYNC-42`,
+// `crdt_doc::note_actor_bytes`), or a fresh CSPRNG draw in a vault with no device
+// identity. It is a device id in EVERY vault, shared ones included, never a person
+// id. One person on two devices is therefore two actors, which is why the two do
+// NOT share a colour and why the roster's header counts sessions rather than people
+// (`locales/en/common.json` -> `editor.chrome.presence.title`). Resolving an actor to
+// the person behind it is the BACKEND resolver's job (`member-devices` task 5,
+// `resolveIdentity`), which is also where every label comes from; the frontend never
+// derives an authoritative label, or a person id, from an actor. This is deliberately
+// NOT the authoritative id hash `SYNC-44` forbids (deriving e.g. the head-author id
+// from public halves): the palette index is cosmetic, carries no security claim, and
+// stays entirely client-side.
+
+import type { IdentityLabel } from "./identityLabel";
 
 /** The eight group palette names, in the token sheet's order (`client-core/src/tokens.css`). */
 export const GROUP_COLORS = [
@@ -34,14 +41,21 @@ export type GroupColor = (typeof GROUP_COLORS)[number];
  * roster and the decorations all read.
  */
 export interface Participant {
-  /** The stable identity key: person id (shared vault) or device id (single-user). */
+  /** The awareness actor for this peer: this device's Automerge actor, i.e. its
+   *  enrolled `device_id` bytes (`SYNC-42`), in EVERY vault including shared ones.
+   *  Deliberately not a person id, so one person on two devices is two
+   *  participants and the roster counts sessions rather than people. */
   id: string;
   /** The note this participant is editing, a participant bound to another note
    *  renders nothing. */
   noteId: string;
-  /** The RESOLVER's resolved display label (device name / roster person). Never
-   *  derived in the frontend from `id`. */
-  label: string;
+  /** The RESOLVER's resolved display label (device name / roster person), held as
+   *  the DESCRIPTOR `identityLabel.ts` hands back rather than as a rendered string,
+   *  or `null` when the frame carried none. Never derived in the frontend from
+   *  `id`, and never resolved here: this store outlives every render, so a string
+   *  written into it would freeze the language the peer appeared in. Each surface
+   *  renders it with `identityLabelText(label, t)` at its own render. */
+  label: IdentityLabel | null;
   /** True when the session's signed assertion did not verify: the id is trusted for
    *  colour only and the surface renders the degraded label. */
   unAttributed: boolean;

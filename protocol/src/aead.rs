@@ -367,6 +367,43 @@ pub fn aad_member_names_blob(account_number_hash: &[u8; 16], group_key_epoch: u6
     aad
 }
 
+/// Build the v0.2 AAD for the **device-to-person binding** singleton
+/// (`vault.device-bindings`, `MYU5`; `protocol.md` §9.30, the `member-devices`
+/// feature).
+///
+/// Layout: `"myne.v0.2|" || 0x02 || u16_len("device-binding-blob") ||
+/// account_number_hash (16) || group_key_epoch (8, big-endian)`. The
+/// [`aad_member_names_blob`] order, so a blob sealed in a retired epoch fails AEAD
+/// verification rather than being read under a key that no longer applies. Total:
+/// `10 + 1 + 2 + 19 + 16 + 8 = 56` bytes. `items_key_id` is NOT bound: the family has
+/// no `itemsKey` lineage, like every other group-tier singleton.
+///
+/// The family is `NTV6`-only, so there is exactly one builder here and no v0.1
+/// counterpart: a pre-B2B vault has no `group_key` to derive this family's KEK from,
+/// and therefore no member who could read a member-writable binding.
+///
+/// The role string is deliberately distinct from `"device-binding-key"`, the KEK role
+/// the same blob is sealed under: a KEK role and an AAD role share no namespace, so
+/// binding one does not bind the other, and swapping either is refused on its own
+/// side.
+pub fn aad_device_binding_blob(account_number_hash: &[u8; 16], group_key_epoch: u64) -> Vec<u8> {
+    const ROLE_STR_DEVICE_BINDING_BLOB: &[u8] = b"device-binding-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_DEVICE_BINDING_BLOB.len()
+            + account_number_hash.len()
+            + 8,
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_DEVICE_BINDING_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad.extend_from_slice(&group_key_epoch.to_be_bytes());
+    aad
+}
+
 /// Build the v0.2 AAD for a live-collaboration **awareness frame**
 /// (`protocol.md` §5.2; SYNC-2/SYNC-21).
 ///
@@ -1581,6 +1618,7 @@ fn ctx_canonical_hash(
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::device_binding_blob::DEVICE_BINDING_BLOB_AAD_ROLE;
     use crate::member_names_blob::MEMBER_NAMES_BLOB_AAD_ROLE;
     use crate::test_vector_fmt::{hex_lower, json_escape};
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;
@@ -3023,6 +3061,15 @@ mod tests {
         let aad_embeddings = aad_ai_embeddings_blob(&account_number_hash);
         let aad_dictionary = aad_personal_dictionary_blob(&account_number_hash);
         let aad_themes = aad_custom_themes_blob(&account_number_hash);
+        // The per-entry families appended after the vault singletons (chats, then agent
+        // memory). Each binds one 16-byte entry id, and both use 0x5A so the pair is told
+        // apart by its role label rather than by its id bytes.
+        let entry_id: [u8; 16] = [0x5A; 16];
+        let aad_chats_catalog = aad_chats_catalog(&account_number_hash);
+        let aad_chats_blob = aad_chats_blob(&account_number_hash, &entry_id);
+        let aad_agent_memory_catalog = aad_agent_memory_catalog(&account_number_hash);
+        let aad_agent_memory_blob = aad_agent_memory_blob(&account_number_hash, &entry_id);
+        let aad_agent_personality = aad_agent_personality_blob(&account_number_hash);
         // provider_kind = 0x02 (PIN) exercises the trailing provider_kind byte.
         let aad_quickunlock = aad_quick_unlock_blob(&account_number_hash, 0x02);
         let aad_content = aad_note_content_encrypt(&items_key_id, &note_uuid);
@@ -3056,13 +3103,25 @@ mod tests {
             account_hash_json,
             hex_lower(&attachment_id)
         );
+        // aad_chats_blob / aad_agent_memory_blob each additionally bind one per-entry id.
+        let entry_id_json = alloc::format!(
+            "      \"input_conversation_id_hex\": \"{}\",\n",
+            hex_lower(&entry_id)
+        );
+        let memory_entry_id_json = alloc::format!(
+            "      \"input_memory_entry_id_hex\": \"{}\",\n",
+            hex_lower(&entry_id)
+        );
+        let chats_blob_inputs_json = alloc::format!("{}{}", account_hash_json, entry_id_json);
+        let agent_memory_blob_inputs_json =
+            alloc::format!("{}{}", account_hash_json, memory_entry_id_json);
 
         let mut dump = String::new();
         dump.push_str("{\n");
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown — aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters — with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 15 cases, one per VAULT-SCOPED builder. The two device-local, vault-agnostic builders (aad_capture_blob / aad_share_import_blob — they bind a per-entry capture_id / share_id instead of account_number_hash, under a keychain wrap_key rather than a root_key-derived KEK) are deliberately NOT enrolled here; their bytes are pinned by the aad_capture_blob_default_matches_pinned_hex / aad_share_import_blob_default_matches_pinned_hex unit tests plus the pending-capture / share-import encrypt cases. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown (aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters) with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 20 cases, one per VAULT-SCOPED builder. The two device-local, vault-agnostic builders (aad_capture_blob / aad_share_import_blob, which bind a per-entry capture_id / share_id instead of account_number_hash, under a keychain wrap_key rather than a root_key-derived KEK) are deliberately NOT enrolled here; their bytes are pinned by the aad_capture_blob_default_matches_pinned_hex / aad_share_import_blob_default_matches_pinned_hex unit tests plus the pending-capture / share-import encrypt cases. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         let emit_case = |dump: &mut String,
@@ -3345,6 +3404,88 @@ mod tests {
                 ("account_number_hash", 16),
             ],
             &account_hash_json,
+            true,
+        );
+        // The five appended families, in landing order: the chats pair (myne-md/myne#675)
+        // then the agent trio (myne-md/myne#697). Their fixture cases were authored by hand
+        // while this emitter still stopped at aad_custom_themes_blob, so re-emitting the
+        // whole file used to delete them; the runner's pinned-builder coverage is what made
+        // that loud rather than silent.
+        emit_case(
+            &mut dump,
+            "aad_chats_catalog",
+            "AAD bound into the AEAD encryption of the vault.chats conversations catalog (§9.23.3). Length-prefixed role 'chats-catalog' (13 bytes) + account_number_hash. Binds account_number_hash and NOT items_key_id, because the catalog KEK derives directly from root_key via the 'chats-catalog-key' HKDF role and is independent of the itemsKey lineage.",
+            &aad_chats_catalog,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 13),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_chats_blob",
+            "AAD bound into the AEAD encryption of an MYJ1 per-conversation chats file (§9.24.3, MYND-675). Role 'chats-blob' (10 bytes), then conversation_id (16) + account_number_hash (16): the per-entry binding (the MYE1 archetype) that lets one KEK serve every conversation file, since a blob sealed for conversation A cannot verify as conversation B. HKDF role 'chats-key' is DISTINCT from this AAD role.",
+            &aad_chats_blob,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 10),
+                ("conversation_id", 16),
+                ("account_number_hash", 16),
+            ],
+            &chats_blob_inputs_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_agent_memory_catalog",
+            "AAD bound into the AEAD encryption of the vault.agent-memory catalog (§9.25.2). Length-prefixed role 'agent-memory-catalog' (20 bytes) + account_number_hash. Binds account_number_hash and NOT items_key_id, because the catalog KEK derives directly from root_key via the 'agent-memory-catalog-key' HKDF role.",
+            &aad_agent_memory_catalog,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 20),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_agent_memory_blob",
+            "AAD bound into the AEAD encryption of an MYX1 per-entry agent-memory file (§9.26.3, myne-md/myne#697). Role 'agent-memory-blob' (17 bytes), then memory_entry_id (16) + account_number_hash (16): the same per-entry binding as aad_chats_blob, so one KEK serves every memory entry. HKDF role 'agent-memory-key' is DISTINCT from this AAD role.",
+            &aad_agent_memory_blob,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 17),
+                ("memory_entry_id", 16),
+                ("account_number_hash", 16),
+            ],
+            &agent_memory_blob_inputs_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_agent_personality_blob",
+            "AAD bound into the AEAD encryption of the vault.personality singleton (§9.27.2). Role 'personality-blob' (16 bytes; deliberately NOT 'agent-personality-blob') + account_number_hash (16). The same vault-singleton shape as aad_custom_themes_blob with a distinct role label, which is what keeps the two singles from cross-verifying. The HKDF role for this family is 'agent-personality-key', a separate load-bearing string.",
+            &aad_agent_personality,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 16),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
             false,
         );
 
@@ -3441,7 +3582,7 @@ mod tests {
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.2\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §10.4.1 + §10.5 + §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs). These are the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 15 cases: the password/recovery wraps, the itemsKey wrap, the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders. The migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name), the per-entry memory AAD (aad_agent_memory_blob_v0_2, myne-md/myne#697), the membership-field and roster builders, the person-plane builders (person-wrap, person-keypair, vault-invite), the live-collaboration frame in both its NTV5 and NTV6-with-epoch forms, and the member-names blob AAD (aad_member_names_blob, myne-md/myne#851). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block. What they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for the v0.2 aad_* builders (protocol/src/aead.rs). These are the next-major mirrors of the v0.1 family, stamped with the AAD prefix 'myne.v0.2|' and protocol_version byte 0x02. Both are major-version-event constants: the same role under the two majors yields different AAD, which is precisely the §10.5 anti-downgrade separation that stops a v0.1 blob verifying as v0.2 or the reverse. These builders are the §10.4.1 whole-vault migration's re-seal path, so a port that gets the framing wrong migrates a vault into bytes no other implementation can open. 16 cases: the password/recovery wraps, the itemsKey wrap, the generic KEK-singleton builder shown under two different roles (v0.2 has no per-family singleton builders. The migration rebuilds any family's AAD from its role string, so the role is an INPUT here rather than baked into the function name), the per-entry memory AAD (aad_agent_memory_blob_v0_2, myne-md/myne#697), the membership-field and roster builders, the person-plane builders (person-wrap, person-keypair, vault-invite), the live-collaboration frame in both its NTV5 and NTV6-with-epoch forms, the member-names blob AAD (aad_member_names_blob, myne-md/myne#851), and the device-binding blob AAD (aad_device_binding_blob, §9.30, myne-md/myne#852). The two aad_nc05_* builders are the other half of the v0.2 family and are pinned by crdt-note-blob/v0.2's own aad_construction cases rather than duplicated here. NOTE on kdf_params: v0.2's KDF is not allocated yet, so the password/recovery cases carry the v0.1 canonical block. What they pin is the framing (where the block sits, that it is bound), not a v0.2 parameter choice. Cases generated by `cargo test -p protocol --lib emit_aad_construction_v0_2_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // `case_slug` and `builder_name` are separate on purpose: the generic
@@ -3794,6 +3935,49 @@ mod tests {
                 ("protocol_version", 1),
                 ("role_length_be16", 2),
                 ("role_label", 17),
+                ("account_number_hash", 16),
+                ("group_key_epoch", 8),
+            ],
+            &alloc::format!("{account_hash_json}      \"input_group_key_epoch\": 7,\n"),
+            true,
+        );
+        // The family AAD of `vault.device-bindings` (`MYU5`, the `member-devices`
+        // feature, decisions/protocol/0669). Same required-epoch shape as
+        // `aad_member_names_blob` one case up, and for the same reason: the blob is
+        // written per group epoch, `encode_device_binding_blob_raw` refuses epoch 0,
+        // and the epoch in the AAD is what makes a post-rotation blob fail to open
+        // under the key a member the rotation retired still holds.
+        //
+        // This branch was missing while the case was already in the committed
+        // fixture and in the runner's `required` list, so running the emitter
+        // produced a 15-case document against a 16-case file and the documented
+        // regeneration would have dropped the case. The runner's `required` assert
+        // makes that a loud failure rather than a silent one, but the emitter is
+        // what has to be right: it self-asserts at mint that the segment lengths sum
+        // to the AAD length, so the offsets below are checked rather than eyeballed.
+        let aad_device_binding = aad_device_binding_blob(&account_number_hash, 7);
+        assert_ne!(
+            aad_device_binding_blob(&account_number_hash, 7),
+            aad_device_binding_blob(&account_number_hash, 8),
+            "the device-binding AAD must bind the group_key_epoch"
+        );
+        assert!(
+            aad_device_binding
+                .windows(DEVICE_BINDING_BLOB_AAD_ROLE.len())
+                .any(|w| w == DEVICE_BINDING_BLOB_AAD_ROLE),
+            "the device-binding AAD role must appear in its own AAD"
+        );
+        emit_case(
+            &mut dump,
+            "aad_device_binding_blob",
+            "aad_device_binding_blob",
+            "AAD bound into the AEAD seal of the `vault.device-bindings` singleton (MYU5, decisions/protocol/0669). Role 'device-binding-blob', the 16-byte account_number_hash, then the 8-byte big-endian group_key_epoch. The epoch is REQUIRED rather than optional, exactly as in the member-names builder one case up: the family is written per group epoch, `encode_device_binding_blob_raw` refuses epoch 0 outright, and a post-rotation blob must fail to open under the key a removed member still holds. Two role strings are in play for this family and only one of them is here: the KEK role is the GROUP-tier subkey 'device-binding-key' (pinned by the family's own `group_subkey` case, not by hkdf-sha256, since it has no SubkeyRole counterpart), while 'device-binding-blob' is the AAD role. A KEK and an AAD role share no namespace (spec 3.4 vs 5.2).",
+            &aad_device_binding,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 19),
                 ("account_number_hash", 16),
                 ("group_key_epoch", 8),
             ],

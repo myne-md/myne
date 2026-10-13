@@ -41,6 +41,11 @@ pub mod attachments;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod captures;
 pub mod chats;
+/// The B2B device-to-person binding store (`vault.device-bindings`, `MYU5`; protocol.md
+/// §9.30, the `member-devices` feature). Ungated like its `member_names` twin: the sync
+/// engine that merges the family's blob is target-independent, and only its `commands`
+/// submodule is native-only.
+pub mod device_binding;
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod export;
 pub mod graph_layout;

@@ -11,6 +11,7 @@
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { awarenessNotePeers, getAwarenessSnapshot, subscribeAwareness } from "../collab/awarenessStore";
+import { identityLabelText } from "../collab/identityLabel";
 import type { Participant } from "../collab/participant";
 import { colorVarForIndex } from "../collab/participant";
 import { requestPresenceJump } from "../collab/presenceJump";
@@ -61,16 +62,20 @@ function WhoRow({
   onJump: () => void;
 }) {
   const { t } = useTranslation();
+  // The store holds the label as a DESCRIPTOR, so it is rendered HERE, with the
+  // translator this render holds: a string frozen into the store would keep the
+  // language the peer appeared in (`identityLabel.ts`).
+  const resolved =
+    participant.label === null ? "" : identityLabelText(participant.label, t);
   const name =
-    participant.unAttributed || participant.label.length === 0
+    participant.unAttributed || resolved.length === 0
       ? t("editor.chrome.presence.unknown")
-      : participant.label;
+      : resolved;
   return (
     <Button
       type="button"
       variant="ghost"
       data-testid="editor.presence-row"
-      data-actor-id={participant.id}
       aria-label={t("editor.chrome.presence.jumpTo", { name })}
       onClick={onJump}
       style={{
