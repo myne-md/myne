@@ -259,6 +259,20 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "sync",
     "MemberVaultUnlockCard",
   ),
+  // The device-attribution panel (myne-md/myne#852 story 11). No phrase prompt,
+  // so the reason above does not reach it; substituted because the store it
+  // reads is `NTV6`-only and group-tier sealed, its two commands are
+  // `Class::Unsupported` on web, and `memberSharing` is absent here anyway. Left
+  // in the graph it would be member-sharing surface no route can reach, at a
+  // cost in first-load budget.
+  [path.join(repoRoot, "src", "components", "sync", "DeviceAttributionPanel")]: path.join(
+    repoRoot,
+    "web",
+    "src",
+    "components",
+    "sync",
+    "DeviceAttributionPanel",
+  ),
   [path.join(repoRoot, "src", "components", "settings", "MigrateVaultForm")]: path.join(
     repoRoot,
     "web",

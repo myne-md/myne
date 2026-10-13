@@ -83,6 +83,14 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     // The owner-side invitation list (myne-md/myne#711 task 11), reached when
     // the roster reports owner authority. An unanswered one crashes the panel.
     if (cmd === "plugin:sync|sync_list_vault_invites") return [];
+    // The device-attribution panel (myne-md/myne#852 story 11). It renders under
+    // the SAME `memberSharing` gate as the roster above, so every mount that
+    // reaches `sync_list_roster` reaches this one too. The panel's own hook
+    // tolerates an unanswered command (it reads `view?.rows ?? []`), but a
+    // router arm is what makes a SyncPanel spec see a real state rather than an
+    // accidentally-empty one.
+    if (cmd === "plugin:device-binding|device_bindings_list")
+      return { rows: [], unverified_device_ids: [] };
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;

@@ -247,7 +247,7 @@ describe("the roster a resolved presence produces", () => {
     // does, and it is the only version of this test that can fail.
     // No region subtag in the code, deliberately: i18next NORMALISES a tag, so a bundle
     // added under `xx-test` is looked up as `xx-Test`, misses, and silently falls through
-    // to English — which would make this test pass without exercising anything.
+    // to English, which would make this test pass without exercising anything.
     const CODE = "xx";
     i18n.addResourceBundle(CODE, "common", {
       notes: { snapshots: { deviceFallback: "Gerät {{code}}" } },

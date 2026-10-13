@@ -3330,7 +3330,7 @@ nobody else; it is not a secret from the vault, and no surface may imply otherwi
 `vault.device-bindings` is a **shared singleton**: one `MYU5` blob per shared (`NTV6`)
 vault, holding a versioned, optionally tombstoned map of
 `device_id -> { person_fingerprint, version, tombstone, signature_hex }`. It records
-which person each device in the vault belongs to, and it is what lets a member's SECOND
+which person each device in the vault CLAIMS to belong to, and it is what lets a member's SECOND
 device be attributed to that member rather than to the vault at large. It holds no key
 material and grants no access: a device absent from the map is unattributed, not
 refused, and nothing about unlock, sync or the ACL reads it.
@@ -3342,7 +3342,9 @@ rather than by any migration step (the §10.4.1 cut does not write it; an absent
 reads as the empty map). A client MUST NOT write one into an `NTV5` vault, and a reader
 presented with the file there MUST treat the vault as malformed rather than guessing a
 root-tier KEK for it. It sits beside `vault.member-names` (§9.29) with the same
-`NTV6`-only shape and the same single registered `GroupRole`.
+`NTV6`-only shape and the same rule that every registered role is a `GroupRole`: the
+family registers two, the KEK (§9.30.2) and the sync blob-id (§9.30.6), and neither has
+a root-tier counterpart.
 
 **What a binding is worth, stated plainly.** The map is group-sealed, so every member
 can WRITE it, and that same seal is what stops the seal being an authority over who
@@ -3350,10 +3352,22 @@ bound what. Each row therefore carries its own signature (§9.30.4), which prote
 binding RECORD and nothing else: it is not a statement about the authorship of a note,
 and no surface may render a name from a binding as though it were
 (`decisions/protocol/0660` records that a revision's actor is NOT a signature;
-`decisions/protocol/0670` is this family's own). What the signature buys is that a
-device cannot be bound to a co-member by anyone but that co-member, so the label a
-reader sees beside a device is the one the named person chose to publish. **Attribution
-here is legibility, not proof.**
+`decisions/protocol/0670` is this family's own). What the signature buys runs in one
+direction: a device cannot be bound to a co-member by anyone but that co-member, so the
+fingerprint a row carries is one its named person signed. **Attribution here is
+legibility, not proof.**
+
+**What a binding does NOT bind is the device, and a reader owes that limit.** Nothing ties
+`device_id` to `person`: a member holding the group key can seal a row naming ANY device id
+under their OWN fingerprint and have it verify, so a co-member's device can be claimed as
+theirs, and because the merge orders competing rows by the writer-chosen `version`
+(§9.30.3), they can outbid the real row. A row that verifies therefore means "this person
+CLAIMS this device", never "this device belongs to this person", and no surface may render
+a verified row as ownership of a device by the person it names. Closing that (the device
+countersigning its own row, so the device is the author rather than the person) would make
+the device the subject of its own record, and it is a protocol change rather than a
+reader's improvement: it is stated here and in `protocol/src/device_binding_blob.rs` rather
+than papered over.
 
 **Why the binding lives in neither the roster nor the name map.** The owner-signed group
 roster (§9.3.2) is the owner's own record and the owner cannot learn a member's second
@@ -3436,9 +3450,16 @@ through the merge, which refuses a same-version pair of different people before 
 consults the comparator; it is kept so the comparator is total for a caller comparing
 rows directly. A port MUST compare byte-wise and MUST NOT substitute a locale collation,
 or two implementations land on different rows for the same pair. A merge MUST be
-commutative, associative and idempotent: the result of merging two maps does not depend
-on argument order, so two devices that merged in opposite orders hold the same map and
-stop re-sending it.
+commutative and idempotent: the result of merging two maps does not depend on argument
+order, so two devices that merged in opposite orders hold the same map and stop re-sending
+it. A merge is deliberately **NOT associative**, and a port MUST NOT assume it is. The
+`ConflictingBinding` refusal above short-circuits the WHOLE map rather than the one key, so
+a set of three maps containing a same-version two-person collision resolves differently under
+different nestings: with `a = {D -> (P1, v1)}`, `b = {D -> (P2, v1)}` and `c = {D -> (P2, v2)}`,
+`merge(merge(a, b), c)` is `Err` while `merge(a, merge(b, c))` is `Ok`. Commutativity and
+idempotence hold, and only those two are claimed. A port that imposes the associativity this
+paragraph does not grant resolves that collision in a way this client does not, on exactly the
+pair the symmetric refusal exists to reject.
 
 #### 9.30.4 Row signatures
 
@@ -3471,10 +3492,22 @@ live row, so an owner signature can never be used to write a binding. The codec 
 structural (it requires a well-shaped signature) and the verification verdict is a
 separate step, which MUST distinguish an unverified row from an absent one: "tampered"
 and "no binding" are different things to tell a reader, and the claimed person of an
-unverified row MUST NOT be rendered as that device's owner. The unverified device ids
+unverified row MUST NOT be rendered as that device's person. The unverified device ids
 are RETURNED by the partitioning step rather than dropped, so a caller can surface them,
 and a row naming a fingerprint no roster carries verifies against nothing and lands in
 the same unverified list.
+
+**What verification establishes, and what it does not.** A verifying signature establishes
+that the person the row names signed this row, and that the version and the tombstone flag
+are the values that person signed. It does NOT establish that the person controls, uses or
+has ever seen the device: the signed message covers the `device_id` but binds nothing to
+it, so a member holding the group key can sign a row naming any device id, including a
+co-member's, under their own fingerprint, and a writer-chosen `version` lets that row
+outbid the real one (§9.30.3). A surface that renders a person beside a device MUST
+therefore render a claim rather than an ownership: "claimed by" and "signed by", never
+"belongs to", never "owned by". The distinction is not academic at the boundary this family
+exists for, since the device list is exactly the surface a reader would take as an
+authority on who runs which machine.
 
 #### 9.30.5 Caps
 

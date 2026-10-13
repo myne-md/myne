@@ -47,6 +47,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use protocol::aead::AEAD_KEY_LEN;
+use protocol::DeviceBindingsMap;
 
 /// A resolved identity, closed. Serialized across IPC; the UI renders the label.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -257,6 +258,155 @@ async fn verified_roster(
     None
 }
 
+/// The three stores a binding row is verified against, resolved once: the public half that
+/// signed the roster, the roster itself, and `vault.member-names`.
+///
+/// The binding map is deliberately NOT here. It is the subject of both joins rather than a
+/// verifier, and the two callers reach it differently: the durable index reads it itself
+/// because it can exit before the roster is ever opened, and the device list is handed the
+/// map the command layer already read.
+struct AttributionVerifiers {
+    owner_public: protocol::person_key::PersonPublicHalf,
+    roster: protocol::person_invite::GroupRosterPayload,
+    names: protocol::MemberNamesMap,
+}
+
+impl AttributionVerifiers {
+    /// Each member's public half keyed by the FINGERPRINT a binding row names.
+    ///
+    /// A binding row's map key is the DEVICE and the claimed person lives INSIDE the row, so
+    /// this is the lookup `partition_verified_bindings` needs. Without it a co-member could
+    /// write `{any_device -> a_live_member's_fingerprint}` and have that device's revisions
+    /// render under that member's name, which is the outcome the §9.30.4 MUST ("the claimed
+    /// person of an unverified row MUST NOT be rendered as that device's person") and
+    /// `decisions/protocol/0670` both exist to prevent.
+    fn by_fingerprint(&self) -> BTreeMap<String, protocol::person_key::PersonPublicHalf> {
+        self.roster
+            .members
+            .iter()
+            .filter_map(|m| {
+                let public = public_half_of(m)?;
+                Some((m.fingerprint_hex.to_ascii_lowercase(), public))
+            })
+            .collect()
+    }
+
+    /// Each member's public half keyed by their PERSON ID, which is the key
+    /// `vault.member-names` is written under. A roster row migrated from a pre-B2B
+    /// membership roster carries no person id and so contributes nothing here.
+    fn by_person_id(&self) -> BTreeMap<String, protocol::person_key::PersonPublicHalf> {
+        self.roster
+            .members
+            .iter()
+            .filter_map(|m| {
+                let id = m.person_id_hex.as_deref()?;
+                Some((id.to_ascii_lowercase(), public_half_of(m)?))
+            })
+            .collect()
+    }
+
+    /// The member whose fingerprint a row names, whatever that member's roster state.
+    fn member_for_fingerprint(
+        &self,
+        fingerprint_hex: &str,
+    ) -> Option<&protocol::person_invite::GroupRosterMember> {
+        self.roster
+            .members
+            .iter()
+            .find(|m| m.fingerprint_hex.eq_ignore_ascii_case(fingerprint_hex))
+    }
+
+    /// The names store's rows whose signature checks out, keyed by person id.
+    ///
+    /// `partition_verified` KEEPS a tombstone in its verified set (the owner-signature arm
+    /// accepts one), so every consumer must drop a tombstone or an empty name explicitly: a
+    /// cleared name must not become an attribution.
+    fn verified_names(&self) -> BTreeMap<String, protocol::member_names_blob::MemberNameEntry> {
+        let by_person_id = self.by_person_id();
+        let (verified, _unverified) = protocol::partition_verified(
+            &self.names,
+            |id| by_person_id.get(&id.to_ascii_lowercase()).cloned(),
+            Some(&self.owner_public),
+        );
+        verified
+    }
+}
+
+/// A roster row's public half, or `None` when its three hex fields do not decode.
+fn public_half_of(
+    member: &protocol::person_invite::GroupRosterMember,
+) -> Option<protocol::person_key::PersonPublicHalf> {
+    protocol::person_key::PersonPublicHalf::from_parts_hex(
+        &member.member_kem_ek_hex,
+        &member.member_ed_pk_hex,
+        &member.member_mldsa_vk_hex,
+    )
+    .ok()
+}
+
+/// Load the verifiers from the group key and an ALREADY-PARSED `vault.meta`.
+///
+/// Takes the parsed meta rather than re-reading the file, because two reads of `vault.meta`
+/// can observe different bytes and the account hash, the epoch and the roster envelope have
+/// to come from one. `None` when the roster cannot be established at all, which is the one
+/// failure that makes verification impossible for every row.
+///
+/// A `vault.member-names` read that fails is NOT that failure: it yields an empty name map,
+/// so rows still verify and every device shows its label rather than its member's name. That
+/// is the same visible outcome the durable index had before this split, where the whole join
+/// returned empty on that read.
+async fn load_verifiers(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &Path,
+    session_person: Option<&protocol::PersonKeyPair>,
+    group_key: &[u8; AEAD_KEY_LEN],
+    b2b: &protocol::B2bVaultMeta,
+) -> Option<AttributionVerifiers> {
+    let account = b2b.base.account_number_hash;
+    let epoch = b2b.group_key_epoch;
+    let envelope = protocol::person_invite::open_group_roster(
+        group_key,
+        &account,
+        epoch,
+        &b2b.signed_roster_envelope,
+    )?;
+    let (owner_public, roster) =
+        verified_roster(io, vault_dir, session_person, &envelope, &account).await?;
+    let names_key = crate::plugins::member_names::names_key_for_group(group_key, account, epoch);
+    let names =
+        crate::plugins::member_names::read_member_names_in_dir(io, vault_dir, &names_key.borrow())
+            .await
+            .unwrap_or_default();
+    Some(AttributionVerifiers {
+        owner_public,
+        roster,
+        names,
+    })
+}
+
+/// The LIVE rows whose signatures check out, plus the device ids that did not verify.
+///
+/// The tombstone filter runs on the VERIFIED set rather than on the file, so a device is
+/// dropped because its removal was signed and not because an unauthenticated byte in the
+/// blob said so. The unverified ids are RETURNED rather than dropped, so a caller can say
+/// "this row is tampered" instead of rendering it as absent.
+fn partition_live_bindings(
+    map: &DeviceBindingsMap,
+    verifiers: &AttributionVerifiers,
+) -> (DeviceBindingsMap, Vec<String>) {
+    let by_fingerprint = verifiers.by_fingerprint();
+    let (verified, unverified) = protocol::partition_verified_bindings(
+        map,
+        |fingerprint| {
+            by_fingerprint
+                .get(&fingerprint.to_ascii_lowercase())
+                .cloned()
+        },
+        Some(&verifiers.owner_public),
+    );
+    (protocol::live_device_bindings(&verified), unverified)
+}
+
 /// Join `vault.device-bindings` with the owner-signed group roster and
 /// `vault.member-names`, producing the durable attribution index.
 ///
@@ -316,95 +466,22 @@ pub async fn join_durable_attribution(
         return DurableAttribution::empty();
     }
 
-    let Some(envelope) = protocol::person_invite::open_group_roster(
-        group_key,
-        &account,
-        epoch,
-        &b2b.signed_roster_envelope,
-    ) else {
-        return DurableAttribution::empty();
-    };
-    let Some((owner_public, roster)) =
-        verified_roster(io, vault_dir, session_person, &envelope, &account).await
+    let Some(verifiers) = load_verifiers(io, vault_dir, session_person, group_key, &b2b).await
     else {
         return DurableAttribution::empty();
     };
-
-    let names_key = crate::plugins::member_names::names_key_for_group(group_key, account, epoch);
-    let Ok(names) =
-        crate::plugins::member_names::read_member_names_in_dir(io, vault_dir, &names_key.borrow())
-            .await
-    else {
-        return DurableAttribution::empty();
-    };
-
-    // Each row's OWN public half, keyed by its person id. The owner's is passed separately
-    // so an owner-signed tombstone verifies too, the shape `sync_list_roster` uses.
-    let publics: BTreeMap<String, protocol::person_key::PersonPublicHalf> = roster
-        .members
-        .iter()
-        .filter_map(|m| {
-            let id = m.person_id_hex.as_deref()?;
-            let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
-                &m.member_kem_ek_hex,
-                &m.member_ed_pk_hex,
-                &m.member_mldsa_vk_hex,
-            )
-            .ok()?;
-            Some((id.to_ascii_lowercase(), public))
-        })
-        .collect();
-    let (verified_names, _unverified_names) = protocol::partition_verified(
-        &names,
-        |id| publics.get(&id.to_ascii_lowercase()).cloned(),
-        Some(&owner_public),
-    );
-
-    // The binding map is group-sealed, and that seal is exactly what makes it writable by
-    // EVERY member, so a row's claim is worth only what its signature says. `publics` above
-    // is keyed by person id; a binding row's map key is the DEVICE and the claimed person
-    // lives inside the row, so the lookup this partition needs is by the FINGERPRINT the
-    // row names, which is what `partition_verified_bindings` exists for. Without this, a
-    // co-member could write `{any_device -> a_live_member's_fingerprint}` and have that
-    // device's revisions render under that member's name, which is the outcome §9.30.5's
-    // MUST ("the claimed person of an unverified row MUST NOT be rendered as that device's
-    // owner") and `0670` both exist to prevent.
-    let by_fingerprint: BTreeMap<String, protocol::person_key::PersonPublicHalf> = roster
-        .members
-        .iter()
-        .filter_map(|m| {
-            let public = protocol::person_key::PersonPublicHalf::from_parts_hex(
-                &m.member_kem_ek_hex,
-                &m.member_ed_pk_hex,
-                &m.member_mldsa_vk_hex,
-            )
-            .ok()?;
-            Some((m.fingerprint_hex.to_ascii_lowercase(), public))
-        })
-        .collect();
-    let (verified_bindings, _unverified_bindings) = protocol::partition_verified_bindings(
-        &map,
-        |fingerprint| {
-            by_fingerprint
-                .get(&fingerprint.to_ascii_lowercase())
-                .cloned()
-        },
-        Some(&owner_public),
-    );
-    // Only now, over the VERIFIED rows: the tombstone filter is applied to what the
-    // signatures support rather than to what the file happens to contain.
-    let live = protocol::live_device_bindings(&verified_bindings);
+    let (live, _unverified) = partition_live_bindings(&map, &verifiers);
     if live.is_empty() {
         return DurableAttribution::empty();
     }
+    let verified_names = verifiers.verified_names();
 
     let mut durable = DurableAttribution::empty();
     for (device_hex, entry) in &live {
-        let Some(member) = roster.members.iter().find(|m| {
-            m.state == protocol::person_invite::GroupMemberState::Live
-                && m.fingerprint_hex
-                    .eq_ignore_ascii_case(&entry.person_fingerprint)
-        }) else {
+        let Some(member) = verifiers
+            .member_for_fingerprint(&entry.person_fingerprint)
+            .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
+        else {
             continue;
         };
         let Some(person_id) = member.person_id_hex.as_deref() else {
@@ -415,20 +492,133 @@ pub async fn join_durable_attribution(
         let Some(name) = verified_names.get(&person_id.to_ascii_lowercase()) else {
             continue;
         };
-        // `partition_verified` keeps a tombstone in its verified set (the owner-signature
-        // arm accepts one), so the join drops it here explicitly: a cleared name must not
-        // become an attribution. The `tombstone` half is the load-bearing one and the one
-        // `an_owner_signed_removal_is_not_an_attribution` reaches. The `is_empty` half is
-        // REDUNDANT while `member_names_blob::valid_entry` holds its rule (a live row must
-        // carry a name, a tombstone must not), and is kept so this function's correctness does
-        // not rest on a structural rule in another module that it cannot see; a reviewer who
-        // prefers the shorter form can drop it without weakening anything reachable today.
+        // The tombstone and empty arms the `MemberNameEntry` filter states: a cleared name
+        // must not become an attribution. The `tombstone` half is the load-bearing one and
+        // the one `an_owner_signed_removal_is_not_an_attribution` reaches. The `is_empty`
+        // half is REDUNDANT while `member_names_blob::valid_entry` holds its rule (a live row
+        // must carry a name, a tombstone must not), and is kept so this function's
+        // correctness does not rest on a structural rule in another module that it cannot
+        // see; a reviewer who prefers the shorter form can drop it without weakening anything
+        // reachable today.
         if name.tombstone || name.name.is_empty() {
             continue;
         }
         durable.insert(device_hex.clone(), name.name.clone());
     }
     durable
+}
+
+/// One verified, live device row: the device, the person it is claimed by, and the labels a
+/// surface renders it with (`member-devices` task 11).
+///
+/// **A row is a CLAIM, not an ownership.** `person_fingerprint_hex` is verified against the
+/// roster, which means the named person signed this row and says nothing about who runs the
+/// device: a member holding the group key can sign a row naming any device id, a co-member's
+/// included, under their own fingerprint, and the writer-chosen `version` lets that row
+/// outbid the real one (`protocol.md` §9.30.4, `decisions/protocol/0669`). A surface that
+/// renders this row MUST therefore say "claimed by" rather than "belongs to".
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct DeviceAttributionRow {
+    /// The device, lowercase hex: the row's map key, and the value a device's own label
+    /// (`vault.prefs` `device_names`) is keyed by.
+    pub device_id_hex: String,
+    /// The fingerprint the row names, lowercase hex. Verified.
+    pub person_fingerprint_hex: String,
+    /// The claiming member's addressable person id, when the roster carries one. Absent on a
+    /// member migrated from a pre-B2B membership roster, who has no person account.
+    pub person_id_hex: Option<String>,
+    /// The member's own signed display name, when a LIVE member published one. A missing name
+    /// is not a failure: the surface falls back to the device's label.
+    pub member_name: Option<String>,
+    /// True when this row's device is the device the caller is running on.
+    pub is_this_device: bool,
+}
+
+/// What a device list is handed: the verified live rows, and the device ids whose rows did
+/// not verify.
+///
+/// The two are separate fields rather than one list with a flag, because they are different
+/// statements: a row is something a reader may be shown, and an unverified device id is
+/// something a reader may only be TOLD ABOUT, never named after (`protocol.md` §9.30.4).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct DeviceAttributionView {
+    pub rows: Vec<DeviceAttributionRow>,
+    /// Device ids carried by the map whose rows did not verify, in map order. Reported rather
+    /// than dropped, so a tampered row is distinguishable from an absent one.
+    pub unverified_device_ids: Vec<String>,
+}
+
+impl DeviceAttributionView {
+    /// Every device id the map carries, unverified: what a caller answers when it cannot
+    /// verify anything. No row is named, and the ids are reported rather than hidden, which is
+    /// the honest shape rather than an empty list that would read as "no devices".
+    fn all_unverified(map: &DeviceBindingsMap) -> Self {
+        Self {
+            rows: Vec::new(),
+            unverified_device_ids: map.keys().cloned().collect(),
+        }
+    }
+}
+
+/// Build the device list over an ALREADY-READ binding map, partitioning it against the roster
+/// so no unverified row can reach a surface.
+///
+/// **Why this is a backend function rather than a rule the surface follows.** The map is
+/// group-sealed, and that seal is exactly what makes it writable by every member, so a row's
+/// claim is worth only what its signature says. The partition needs the roster, the owner's
+/// public half and the names store, none of which a frontend holds, so a surface that
+/// received the raw map could only choose between rendering it unverified and rendering
+/// nothing. `join_durable_attribution` above made the same argument for the history and
+/// presence surfaces; this is the third surface, and it is the one where a reader would most
+/// naturally read a name as an authority over a machine.
+///
+/// Infallible by construction: `io` and the session are consulted for LABELS, and a failure to
+/// establish the roster yields every device id unverified rather than an error. The command
+/// layer keeps the errors that matter (a locked slot, an `NTV5` vault, an unreadable map), so
+/// this function never has to decide between "no devices" and "could not read".
+pub async fn device_attribution_view(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &Path,
+    session_person: Option<&protocol::PersonKeyPair>,
+    group_key: &[u8; AEAD_KEY_LEN],
+    b2b: &protocol::B2bVaultMeta,
+    map: &DeviceBindingsMap,
+    this_device: Option<&[u8; 16]>,
+) -> DeviceAttributionView {
+    let Some(verifiers) = load_verifiers(io, vault_dir, session_person, group_key, b2b).await
+    else {
+        return DeviceAttributionView::all_unverified(map);
+    };
+    let (live, unverified) = partition_live_bindings(map, &verifiers);
+    let verified_names = verifiers.verified_names();
+    let this_device_hex = this_device.map(crate::plugins::device_binding::device_id_hex);
+
+    let mut rows = Vec::with_capacity(live.len());
+    for (device_hex, entry) in &live {
+        let member = verifiers.member_for_fingerprint(&entry.person_fingerprint);
+        let person_id_hex = member
+            .and_then(|m| m.person_id_hex.as_deref())
+            .map(str::to_ascii_lowercase);
+        // The name is joined only through a LIVE member, the same gate the durable index
+        // applies: a tombstoned roster row must not name a device.
+        let member_name = member
+            .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
+            .and_then(|m| m.person_id_hex.as_deref())
+            .and_then(|id| verified_names.get(&id.to_ascii_lowercase()))
+            .filter(|name| !name.tombstone && !name.name.is_empty())
+            .map(|name| name.name.clone());
+        rows.push(DeviceAttributionRow {
+            device_id_hex: device_hex.clone(),
+            person_fingerprint_hex: entry.person_fingerprint.to_ascii_lowercase(),
+            person_id_hex,
+            member_name,
+            is_this_device: this_device_hex.as_deref() == Some(device_hex.as_str()),
+        });
+    }
+    DeviceAttributionView {
+        rows,
+        unverified_device_ids: unverified,
+    }
 }
 
 /// [`join_durable_attribution`] against a live session: the group key comes from the
@@ -1039,8 +1229,8 @@ mod join_tests {
     /// the member's name over that device. Without the partition the join reads the row's
     /// CLAIMED fingerprint, finds the live roster member carrying it, verifies that member's
     /// own signed NAME row, and prints their name over the attacker's revisions: the
-    /// misattribution §9.30.5's MUST ("the claimed person of an unverified row MUST NOT be
-    /// rendered as that device's owner") and `0670` both exist to prevent.
+    /// misattribution §9.30.4's MUST ("the claimed person of an unverified row MUST NOT be
+    /// rendered as that device's person") and `0670` both exist to prevent.
     #[test]
     fn a_binding_row_the_named_person_did_not_sign_is_not_an_attribution() {
         block_on(async {
@@ -1194,6 +1384,179 @@ mod join_tests {
             assert!(join_durable_attribution(&io, dir.path(), None, &GROUP)
                 .await
                 .is_empty());
+        });
+    }
+
+    // ── The device list the settings surface renders (`member-devices` task 11) ────
+    //
+    // `device_attribution_view` is the JOIN's public shape rather than a second join: the
+    // same verifiers, the same partition, over a map the command layer already read. These
+    // tests drive it through the command's own resolution (one peek would be needed there;
+    // here the group key and the temp root are the fixture's), so a hop mistyped in the
+    // shared half fails here as well as above.
+
+    /// Build the view exactly as `device_bindings_list_with_dir` does, minus the session
+    /// accessors a unit test has no `VaultRuntimeState` for.
+    async fn view_of(
+        f: &Fixture,
+        session: Option<&protocol::PersonKeyPair>,
+        this_device: Option<&[u8; 16]>,
+    ) -> DeviceAttributionView {
+        let io = StdVaultIo;
+        let (resolved, b2b) =
+            crate::plugins::device_binding::resolve_bindings_and_meta_from_group_key(
+                &io,
+                &GROUP,
+                f.dir.path(),
+            )
+            .await
+            .expect("resolve the family keyspace and the roster envelope");
+        let map = crate::plugins::device_binding::read_device_bindings_in_dir(
+            &io,
+            f.dir.path(),
+            &resolved.borrow(),
+        )
+        .await
+        .expect("read the binding map");
+        device_attribution_view(&io, f.dir.path(), session, &GROUP, &b2b, &map, this_device).await
+    }
+
+    /// The feature end to end through the list's own shape: a verified row names its member,
+    /// carries the roster's person id for the label join, and marks exactly the device the
+    /// caller is running on.
+    ///
+    /// **This is the assertion that fails if the partition is removed from this path.**
+    /// Deleting `partition_live_bindings` from `device_attribution_view` leaves this test
+    /// green (the honest row verifies either way) and reddens
+    /// `the_device_list_never_names_a_row_the_named_person_did_not_sign` below, which is why
+    /// the pair exists rather than either alone.
+    #[test]
+    fn the_device_list_names_a_verified_row_and_marks_only_this_device() {
+        block_on(async {
+            let f = Fixture::build(NameRow::Member).await;
+            let view = view_of(&f, Some(&f.owner), Some(&DEVICE)).await;
+            assert_eq!(view.rows.len(), 1, "one bound device, one row");
+            assert!(view.unverified_device_ids.is_empty());
+            let row = &view.rows[0];
+            assert_eq!(row.device_id_hex, hex(&DEVICE));
+            assert_eq!(
+                row.member_name.as_deref(),
+                Some("Ada"),
+                "the third hop's signed name is what the list renders"
+            );
+            assert_eq!(
+                row.person_id_hex.as_deref(),
+                Some(hex(&PERSON_ID).as_str()),
+                "the row carries the roster's person id, lowercased, for the label join"
+            );
+            assert_eq!(row.person_fingerprint_hex, f.member_fingerprint_hex);
+            assert!(
+                row.is_this_device,
+                "the device passed as this device must be marked, or the list cannot say \
+                 which row is the reader's own"
+            );
+
+            // The mark is about the CALLER's device and not about the first row: another
+            // device id, or none at all, leaves every row unmarked. Without this the flag
+            // could be hardcoded true and every other assertion here would still pass.
+            let other = view_of(&f, Some(&f.owner), Some(&[0x99; 16])).await;
+            assert!(!other.rows[0].is_this_device);
+            let none = view_of(&f, Some(&f.owner), None).await;
+            assert!(!none.rows[0].is_this_device);
+        });
+    }
+
+    /// The MUST this whole change exists for, asserted at the LIST's boundary rather than at
+    /// the join's: a row a co-member sealed under their own key may be reported as an
+    /// unverified device id and must never be named after the member it claims.
+    ///
+    /// The forged row is otherwise identical to the honest one, and the name store and roster
+    /// behind it are the same, so the ONLY thing separating this from the test above is the
+    /// signature. Injecting the defect means deleting `partition_live_bindings` from
+    /// `device_attribution_view`: the row then reaches the surface carrying the member's name
+    /// and this test fails on `rows.len()`, which is the misattribution `protocol.md` §9.30.4
+    /// and `decisions/protocol/0670` both forbid.
+    #[test]
+    fn the_device_list_never_names_a_row_the_named_person_did_not_sign() {
+        block_on(async {
+            let f = Fixture::build(NameRow::Member).await;
+            f.forge_binding_signed_by_the_owner().await;
+            let view = view_of(&f, Some(&f.owner), Some(&DEVICE)).await;
+            assert!(
+                view.rows.is_empty(),
+                "a row signed by a co-member must reach no row list, whatever it claims"
+            );
+            assert_eq!(
+                view.unverified_device_ids,
+                vec![hex(&DEVICE)],
+                "and it must be REPORTED rather than dropped: a tampered row that renders as \
+                 absent is indistinguishable from a device that was never bound"
+            );
+        });
+    }
+
+    /// The tombstones the list does NOT report as tampering. A member removal writes signed
+    /// tombstones over that person's devices, and those rows VERIFY, so a view that treated
+    /// every non-live row as unverified would tell the user their vault had been tampered
+    /// with every time they removed somebody.
+    #[test]
+    fn the_device_list_drops_a_tombstoned_row_without_calling_it_unverified() {
+        block_on(async {
+            let f = Fixture::build(NameRow::Member).await;
+            let io = StdVaultIo;
+            let bindings_key =
+                crate::plugins::device_binding::bindings_key_for_group(&GROUP, ACCT, EPOCH);
+            let mut rng = UnwrapErr(crate::rng::OsRng);
+            let (_, tombstoned) = crate::plugins::device_binding::tombstone_member_devices_in_dir(
+                &io,
+                f.dir.path(),
+                &bindings_key.borrow(),
+                &f.owner,
+                &f.member_fingerprint_hex,
+                &mut rng,
+            )
+            .await
+            .expect("tombstone");
+            assert_eq!(tombstoned, 1);
+
+            let view = view_of(&f, Some(&f.owner), Some(&DEVICE)).await;
+            assert!(
+                view.rows.is_empty(),
+                "a removal is not a device in the list"
+            );
+            assert!(
+                view.unverified_device_ids.is_empty(),
+                "a signed removal verifies, so it is not the tamper channel"
+            );
+        });
+    }
+
+    /// The degrade arm: a session that cannot establish the roster (here, a member's key
+    /// naming a vault whose roster the OWNER signed, with no pinned identity code and no
+    /// owner session) answers every device id UNVERIFIED rather than failing the command or
+    /// answering an empty list.
+    ///
+    /// The direction matters and is not arbitrary: an error here would make the list
+    /// unusable on a device that simply has not pinned the owner's code yet, and an EMPTY
+    /// list would read as "no devices". Reporting the ids is the only shape that is both
+    /// truthful and useful.
+    #[test]
+    fn the_device_list_reports_every_device_unverified_when_it_cannot_verify_the_roster() {
+        block_on(async {
+            let f = Fixture::build(NameRow::Member).await;
+            let view = view_of(&f, Some(&f.member_pair), Some(&DEVICE)).await;
+            assert!(view.rows.is_empty());
+            assert_eq!(
+                view.unverified_device_ids,
+                vec![hex(&DEVICE)],
+                "an unverifiable roster must not be reported as a tampered device either"
+            );
+            assert_ne!(
+                view.unverified_device_ids.len(),
+                0,
+                "and the row must not vanish: an empty view here would be indistinguishable \
+                 from a vault with no bindings"
+            );
         });
     }
 }

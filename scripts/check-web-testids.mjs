@@ -75,6 +75,12 @@ const RENDERS_NOTHING = new Set([
   // The member-vault phrase unlock is substituted out for the same reason as
   // the member roster: a browser must not ship this credential path.
   join("web", "src", "components", "sync", "MemberVaultUnlockCard.tsx"),
+  // The device-attribution panel (myne-md/myne#852 story 11). It renders `null`
+  // by design: the store it reads is `NTV6`-only and group-tier sealed, both of
+  // its commands are `Class::Unsupported` on web, and `memberSharing` is absent
+  // here, so there is no reachable surface for a testid to name. See
+  // `web/vite.config.ts` SUBSTITUTED_MODULES.
+  join("web", "src", "components", "sync", "DeviceAttributionPanel.tsx"),
   // The identity setup dialog (myne-md/myne#768). It registers a person account
   // at a sync server, and `plugin:sync|sync_person_setup` is `Class::Unsupported`
   // on web, so the served bundle must not carry the real dialog: it renders

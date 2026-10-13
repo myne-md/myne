@@ -40,6 +40,7 @@ import { DeleteAttachmentDialog } from "@app/components/attachments/DeleteAttach
 import { DeleteVaultConfirmForm } from "@app/components/DeleteVaultConfirmForm";
 import { DestructiveBanner } from "@app/components/DestructiveBanner";
 import { DeviceJoinQr } from "@app/components/sync/DeviceJoinQr";
+import { DeviceAttributionPanel } from "@app/components/sync/DeviceAttributionPanel";
 import { DeviceManagementPanel } from "@app/components/sync/DeviceManagementPanel";
 import { Editor } from "@app/screens/Editor";
 import { EncryptingStep } from "@app/screens/vault-creation/EncryptingStep";
@@ -945,6 +946,48 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description: "Building Index State, a default state.",
     tags: ["components", "buildingindexstate", "default"],
     render: () => <BuildingIndexState building />,
+  },
+  {
+    id: "components/deviceattributionpanel/default",
+    group: "components",
+    surface: "DeviceAttributionPanel",
+    state: "default",
+    description:
+      "Device Attribution Panel, a default state: one device claimed by a named member, one claimed by a member with no name (which shows the fingerprint instead), this device's own row, and one device id whose row did not verify, which renders as a bare id under a marker.",
+    tags: ["components", "deviceattributionpanel", "default", "b2b", "member"],
+    fixture: {
+      description:
+        "shared vault whose device-binding map holds three verified rows and one id that did not verify",
+      handlers: {
+        "plugin:device-binding|device_bindings_list": () => ({
+          rows: [
+            {
+              device_id_hex: "aa".repeat(16),
+              person_fingerprint_hex: "11".repeat(32),
+              person_id_hex: "22".repeat(32),
+              member_name: "Ada",
+              is_this_device: true,
+            },
+            {
+              device_id_hex: "bb".repeat(16),
+              person_fingerprint_hex: "33".repeat(32),
+              person_id_hex: "44".repeat(32),
+              member_name: null,
+              is_this_device: false,
+            },
+            {
+              device_id_hex: "cc".repeat(16),
+              person_fingerprint_hex: "55".repeat(32),
+              person_id_hex: null,
+              member_name: "Grace",
+              is_this_device: false,
+            },
+          ],
+          unverified_device_ids: ["dd".repeat(16)],
+        }),
+      },
+    },
+    render: () => <DeviceAttributionPanel />,
   },
   {
     id: "components/devicejoinqr/default",

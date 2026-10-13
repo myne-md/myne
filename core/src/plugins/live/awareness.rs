@@ -226,9 +226,14 @@ pub fn seal_local_changes(
 /// Seal every pending LOCAL presence into an awareness frame, keyed by room id, for
 /// the transport to POST (`collab-presence-ui`). Drains each open session's pending
 /// caret/selection and its one-shot join flag; a session with neither is skipped.
-/// The frame's `actor_id` is the device actor (`SYNC-42`) and `label` is the
-/// participant name the caller resolved (`None` lets the receiver fall back to the
-/// actor id). Mirrors [`seal_local_changes`], which handles the content half.
+/// The frame's `actor_id` is the device actor (`SYNC-42`).
+///
+/// `label` rides the wire and NO receiver acts on it: the receiving store discards a
+/// frame-supplied name and resolves the peer's label from its own device-binding
+/// store instead, so one device is named identically by the presence roster and the
+/// version history (`member-devices` task 5). It is still sealed and serialized
+/// because the field is in the frame's format; the only caller passes `None`.
+/// Mirrors [`seal_local_changes`], which handles the content half.
 pub fn seal_local_presence(
     registry: &LiveSessionRegistry,
     keys: &AwarenessKeypair,

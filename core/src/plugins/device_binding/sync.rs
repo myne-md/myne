@@ -87,17 +87,34 @@ pub async fn resolve_bindings_from_group_key(
     group_key: &[u8; AEAD_KEY_LEN],
     vault_dir: &Path,
 ) -> Result<ResolvedBindings, DeviceBindingError> {
+    Ok(
+        resolve_bindings_and_meta_from_group_key(io, group_key, vault_dir)
+            .await?
+            .0,
+    )
+}
+
+/// The same resolution, and the parsed `vault.meta` with it.
+///
+/// A caller that needs the signed roster envelope as well (the attribution partition reads
+/// it to verify a row's signature) must use THIS one rather than read the file a second
+/// time: two reads of `vault.meta` can observe different bytes, which is the rule
+/// [`bindings_key_for_group`] already states for the key and the epoch. One read, one
+/// account hash, one epoch, one envelope.
+pub async fn resolve_bindings_and_meta_from_group_key(
+    io: &dyn VaultIo,
+    group_key: &[u8; AEAD_KEY_LEN],
+    vault_dir: &Path,
+) -> Result<(ResolvedBindings, protocol::B2bVaultMeta), DeviceBindingError> {
     let bytes = io
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|io_error_kind| DeviceBindingError::Io { io_error_kind })?;
     let b2b =
         protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| DeviceBindingError::NotASharedVault)?;
-    Ok(bindings_key_for_group(
-        group_key,
-        b2b.base.account_number_hash,
-        b2b.group_key_epoch,
-    ))
+    let resolved =
+        bindings_key_for_group(group_key, b2b.base.account_number_hash, b2b.group_key_epoch);
+    Ok((resolved, b2b))
 }
 
 /// The family's reserved 16-byte sync-plane blob-id:

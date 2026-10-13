@@ -110,7 +110,7 @@ The **floor** is not a strength claim: the secret is a uniformly-random 256-bit 
 
 | Route | Request fields | Success response | Semantics |
 |---|---|---|---|
-| `GET /auth/devices` | — | `{"devices": [{"device_id_hex", "approved", "retired"}]}` | The account's device roster (AS16). |
+| `GET /auth/devices` | - | `{"devices": [{"device_id_hex", "approved", "retired"}]}` | The account's device roster (AS16). |
 | `POST /auth/devices/approve` | `device_id_hex` | `{"ok": true}` | An existing approved device approves a **pending** device (the password-path gate). `404 device_not_found` for an unknown `device_id`. |
 | `POST /auth/devices/revoke` | `device_id_hex` | `{"ok": true}` | Revoke the device's token (**availability** — sync stops to that device) and retire its registry record. `device_id` is **not** destroyed (SYNC-2); this is not a cryptographic lockout or a remote wipe (§4; the honest-disclosure copy is `REMOVE_DEVICE_DISCLOSURE`). |
 
@@ -177,11 +177,11 @@ Normative points:
 | Route | Auth | Request fields | Success response | Semantics |
 |---|---|---|---|---|
 | `POST /b2b/invites` | **owner's per-vault token** | `recipient_person_id_hex`, `payload_b64` | `{"invite_id_hex", "vault_account_hash_hex", "recipient_person_id_hex"}` | Store a sealed invite addressed to the recipient for the token's vault. The vault comes from the token, not the path, so a member token is refused (`403`) and an unknown bearer is `401`. A payload over the cap is `400`. |
-| `GET /b2b/invites` | **recipient's person session** | — | `{"invites": [{"invite_id_hex", "vault_account_hash_hex", "claimed"}]}` | List the invites addressed to the caller, unclaimed and claimed alike. No payload is returned here; the claim is what releases it. |
-| `POST /b2b/invites/{invite_id}/claim` | **recipient's person session** | — | `{"payload_b64", "vault_account_hash_hex", "token_hex"}` | Release the invite, without consuming it: return the sealed payload byte-identically, create the member↔vault binding, and issue the claiming person's per-vault token (the member-facing issuance path; the owner-side bind route is the other). A wrong-account claim and an unknown id are the **same `404`**, so one person cannot confirm another's invite exists. A claim consumes nothing: the payload is retained for the invite's lifetime, so a later claim by the **same** recipient whose binding to the vault still stands is idempotent and returns the same `{"payload_b64", "vault_account_hash_hex", "token_hex"}` shape with a freshly minted token (`member-devices`); a recipient the owner has since removed is refused with the same `404`. |
-| `GET /b2b/vaults/{account_hash}/invites` | **owner's per-vault token** | — | `{"invites": [{"invite_id_hex", "recipient_person_id_hex", "claimed"}]}` | The owner-side claimed-versus-pending view: the invitations the owner sent for the token's vault, with the recipient person id it supplied. A member token is `403`; no payload is returned. (myne-md/myne#711 task 11.) |
+| `GET /b2b/invites` | **recipient's person session** | - | `{"invites": [{"invite_id_hex", "vault_account_hash_hex", "claimed"}]}` | List the invites addressed to the caller, unclaimed and claimed alike. No payload is returned here; the claim is what releases it. |
+| `POST /b2b/invites/{invite_id}/claim` | **recipient's person session** | - | `{"payload_b64", "vault_account_hash_hex", "token_hex"}` | Release the invite, without consuming it: return the sealed payload byte-identically, create the member↔vault binding, and issue the claiming person's per-vault token (the member-facing issuance path; the owner-side bind route is the other). A wrong-account claim and an unknown id are the **same `404`**, so one person cannot confirm another's invite exists. A claim consumes nothing: the payload is retained for the invite's lifetime, so a later claim by the **same** recipient whose binding to the vault still stands is idempotent and returns the same `{"payload_b64", "vault_account_hash_hex", "token_hex"}` shape with a freshly minted token (`member-devices`); a recipient the owner has since removed is refused with the same `404`. |
+| `GET /b2b/vaults/{account_hash}/invites` | **owner's per-vault token** | - | `{"invites": [{"invite_id_hex", "recipient_person_id_hex", "claimed"}]}` | The owner-side claimed-versus-pending view: the invitations the owner sent for the token's vault, with the recipient person id it supplied. A member token is `403`; no payload is returned. (myne-md/myne#711 task 11.) |
 | `PUT /b2b/vaults/{account_hash}/profiles/{profile_id}` | **person's own account session** + a membership binding to the vault | opaque `MYY5` bytes | `{"ok": true}` | Store one person's private AI profile in a vault-scoped namespace SEPARATE from the shared group manifest. `403` when the person is not bound to the vault, `401` for an unknown bearer, `400` when the body is empty or over-cap. The server records the writing account so member removal can schedule deletion after the retention grace; it reads none of the bytes. (myne-md/myne#711 task 16, `decisions/protocol/0608`.) |
-| `GET /b2b/vaults/{account_hash}/profiles/{profile_id}` | same | — | opaque `MYY5` bytes | Return the stored profile bytes byte-identically, or `404 not_found`. |
+| `GET /b2b/vaults/{account_hash}/profiles/{profile_id}` | same | - | opaque `MYY5` bytes | Return the stored profile bytes byte-identically, or `404 not_found`. |
 
 Normative points:
 
@@ -220,7 +220,7 @@ Attachment ciphertext does not travel inline in `push` (a 64 MiB blob in a one-s
 
 | Route | Request | Success response | Semantics |
 |---|---|---|---|
-| `HEAD /attachments/{id}` | — | `200` + `X-Uploaded-Length: <n>`, `X-Complete: true\|false` | Resume/dedup probe: how many bytes the server holds for this id, and whether the upload is complete. `404` for an unknown **or deleted** id (deleted-is-absent, non-distinguishing; `sync-protocol.md` §11.4). |
+| `HEAD /attachments/{id}` | - | `200` + `X-Uploaded-Length: <n>`, `X-Complete: true\|false` | Resume/dedup probe: how many bytes the server holds for this id, and whether the upload is complete. `404` for an unknown **or deleted** id (deleted-is-absent, non-distinguishing; `sync-protocol.md` §11.4). |
 | `PUT /attachments/{id}?offset=N&total=M` | raw ciphertext chunk (`application/octet-stream`) | `200` + `X-Uploaded-Length` | **Strict-sequential resumable upload**: `offset` MUST equal the server's current uploaded length (else `409` — the client re-probes with `HEAD` and resumes from the real offset); `total` is the declared final ciphertext length, checked against the 64 MiB + 32 cap (`413`) and — at `offset=0` — against the **unified AS17 quota** (§5.1) and the **per-vault attachment-id ceiling** (`507`). The upload is complete when the stored length reaches `total`. A `PUT` to a previously-deleted id restarts it as a fresh upload (re-add; `sync-protocol.md` §11.4 rule 4). |
 | `GET /attachments/{id}` | optional single `Range: bytes=start-end` | `200` (whole blob) / `206` (the range) | Download with resume. Multi-range is rejected (`400`); an unsatisfiable range is `416`; unknown/deleted id is `404`. |
 
@@ -237,7 +237,7 @@ A pull returns per-blob sync-metas, not bodies (§8.1 of `sync-protocol.md`), so
 
 | Route | Request | Success response | Semantics |
 |---|---|---|---|
-| `GET /sync/blob?id=<hex>` | — | `200` + `{ciphertext_b64, version}` | One blob. `410` `blob_reclaimed` for a Layer-2 reclaimed record, `404` `not_found` for an unknown id, `400` for a malformed one. |
+| `GET /sync/blob?id=<hex>` | - | `200` + `{ciphertext_b64, version}` | One blob. `410` `blob_reclaimed` for a Layer-2 reclaimed record, `404` `not_found` for an unknown id, `400` for a malformed one. |
 | `POST /sync/blobs` | `{"blob_ids_hex": ["<hex>", …]}` | `200` + `{blobs: [{blob_id_hex, ciphertext_b64}], omitted: [{blob_id_hex, error_code}]}` | Many blobs. The response accounts for a **prefix** of the request in order (see below). Over `MaxBlobFetchIDs` ids → `413` `too_large`; any malformed id → `400` for the whole request; an empty list is a `200` with two empty arrays. |
 
 Normative rules:

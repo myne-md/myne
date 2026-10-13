@@ -4755,9 +4755,9 @@ fn device_binding_vectors() {
                     .unwrap_or_else(|| panic!("[{id}] input_role"));
                 let role = match role_name {
                     "device-binding-key" => GroupRole::DeviceBindingKey,
+                    "device-binding-sync-id" => GroupRole::DeviceBindingSyncId,
                     other => panic!(
-                        "[{id}] unknown GROUP role {other:?}: the §3.4 registry has no such role, \
-                         and this family pins exactly one"
+                        "[{id}] unknown GROUP role {other:?}: the §3.4 registry has no such role"
                     ),
                 };
                 let expected = hex_decode(
@@ -4837,41 +4837,56 @@ fn device_binding_vectors() {
 
     // ---- the §3.4 registry-level claim the `group_subkey` kind exists for -------
     //
-    // The role is GROUP-tier, and the registry statement that matters is that it has NO
-    // root-tier twin: if it ever grew a `SubkeyRole`, this family could be keyed from
-    // `root_key`, an owner-only reader could open it, and a pre-B2B vault could carry a
-    // `MYU5` blob: the exact thing the family's `NTV6`-only rule forbids. Iterating
-    // `SubkeyRole::ALL` is what makes that fail when the registry changes rather than
-    // when somebody remembers to look.
+    // Both roles are GROUP-tier, and the registry statement that matters is that neither
+    // has a root-tier twin: if one ever grew a `SubkeyRole`, this family could be keyed
+    // from `root_key`, an owner-only reader could open it, and a pre-B2B vault could
+    // carry a `MYU5` blob: the exact thing the family's `NTV6`-only rule forbids.
+    // Iterating `SubkeyRole::ALL` is what makes that fail when the registry changes
+    // rather than when somebody remembers to look.
     let mut root_tier = Vec::new();
     for role in SubkeyRole::ALL {
         if let Some(group) = role.shared_group_role() {
             root_tier.push(group);
         }
     }
-    assert!(
-        !root_tier.contains(&GroupRole::DeviceBindingKey),
-        "GroupRole::DeviceBindingKey has a SubkeyRole counterpart, so this family could be \
-         keyed from root_key and a pre-B2B vault could carry it: the NTV6-only rule is broken"
-    );
-    assert!(
-        GroupRole::ALL.contains(&GroupRole::DeviceBindingKey),
-        "GroupRole::DeviceBindingKey must be registered in GroupRole::ALL (§3.4)"
-    );
+    for role in [GroupRole::DeviceBindingKey, GroupRole::DeviceBindingSyncId] {
+        assert!(
+            !root_tier.contains(&role),
+            "GroupRole::{role:?} has a SubkeyRole counterpart, so this family could be \
+             keyed from root_key and a pre-B2B vault could carry it: the NTV6-only rule is broken"
+        );
+        assert!(
+            GroupRole::ALL.contains(&role),
+            "GroupRole::{role:?} must be registered in GroupRole::ALL (§3.4)"
+        );
+    }
 
-    // Exactly one role is pinned here, and that is stated rather than assumed: the
-    // family's KEK role is the whole §3.4 claim this category makes. Any OTHER GROUP
-    // role a later change registers for this family lands in a case of its own or in
-    // the sibling category; nothing here licenses it silently.
+    // Both roles are pinned here, and that is stated as a SET rather than assumed: the
+    // KEK role is the key the blob is sealed under and the sync-id role is the address
+    // it is published at, so a change that registered a third GROUP role for this family
+    // (or renamed one of these) has to come through this assertion. An unpinned role is
+    // the shape that let `member-names-sync-id` ship with no vector while its KEK had
+    // one, which is why the sibling category pins both and this one now does too.
     let mut sorted_roles = pinned_roles.clone();
     sorted_roles.sort_unstable();
     sorted_roles.dedup();
     assert_eq!(
         sorted_roles,
-        vec!["device-binding-key".to_string()],
-        "the device-binding KEK role must be pinned by a case"
+        vec![
+            "device-binding-key".to_string(),
+            "device-binding-sync-id".to_string()
+        ],
+        "both GROUP roles must be pinned by a case"
     );
-    assert_eq!(derived.len(), 1, "one GROUP role is pinned by this family");
+    // The two are a KEK and an identifier, and a registry that pointed both at one
+    // context string would satisfy the byte comparison only if the fixture were
+    // regenerated to match, so the separation is asserted on the derived bytes.
+    let mut by_role = derived.clone();
+    by_role.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_ne!(
+        by_role[0].1, by_role[1].1,
+        "the two device-binding GROUP roles must derive different subkeys"
+    );
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]

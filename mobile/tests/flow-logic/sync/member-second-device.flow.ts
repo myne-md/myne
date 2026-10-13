@@ -238,6 +238,14 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     await expect(page.getByTestId("identity-flow.join-phrase-cell-24")).toHaveValue(PHRASE[23]);
   });
 
+  // The subject is the UI STATE of the submit control, and nothing here clicks it.
+  // A negative assertion on the recorded arguments used to close this test
+  // (`expect(joinArgs).toBeUndefined()`), and it was deleted rather than kept
+  // (`member-devices` task 5 review, D9): with no click in the test it holds for every
+  // implementation, so it reads as "the join was not called" while proving only that
+  // the mock was never reached. Where that claim is worth making it is made in the
+  // POSITIVE, in the join test above, which reads the recorded arguments back and
+  // checks each one.
   test("the join's device password is behind the project's floor", async ({ page }) => {
     await installMockIpc(page, {
       freshDevice: true,
@@ -264,11 +272,5 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     await expect(submit).toBeDisabled();
     await page.getByTestId("identity-flow.join.confirm-input").fill(PASSWORD);
     await expect(submit).toBeEnabled();
-
-    const joinArgs = await page.evaluate(
-      () =>
-        (window as unknown as { __joinVaultArgs?: Record<string, unknown> }).__joinVaultArgs,
-    );
-    expect(joinArgs).toBeUndefined();
   });
 });

@@ -15,8 +15,8 @@
 //! **This family is `NTV6`-only.** A pre-B2B `NTV5` vault has no `group_key`, so a
 //! member-writable, member-readable binding map cannot exist there. It has no
 //! `MY?1` form and no `SubkeyRole` counterpart, exactly like the member display-name
-//! map it sits beside (`member_names_blob.rs`, §9.29): its one registered role is a
-//! [`GroupRole`](crate::subkey::GroupRole), not a root-tier one. A pre-B2B reader
+//! map it sits beside (`member_names_blob.rs`, §9.29): both of its registered roles are
+//! [`GroupRole`](crate::subkey::GroupRole)s rather than root-tier ones. A pre-B2B reader
 //! MUST reject the file rather than guess a root-tier KEK for it, and a client MUST
 //! NOT write one into an `NTV5` vault.
 //!
@@ -33,8 +33,18 @@
 //! actor is NOT a signature: anyone who can edit the document can set it. The
 //! signature here protects the BINDING RECORD, not the authorship of a note, and the
 //! surfaces that render a name from a binding must not imply otherwise. What it buys
-//! is that a device cannot be bound to a co-member by anyone but that co-member, so
-//! the label a reader sees is the one the named person chose to publish.
+//! is one direction only: a device cannot be bound to a co-member by anyone but that
+//! co-member, so the fingerprint a row carries is one its named person signed.
+//!
+//! **It does NOT bind the device, and that is the limit a reader of a name owes.** Nothing
+//! ties `device_id` to `person`, so a member holding the group key can seal a row naming
+//! ANY device id under their OWN fingerprint and have it verify: a co-member's device can
+//! be claimed as theirs, and because the merge orders competing rows by a writer-chosen
+//! `version`, they can outbid the real row. A verified row therefore reads as "this person
+//! CLAIMS this device" and never as "this device belongs to this person", and no surface
+//! may render one as ownership. `sign_device_binding` states the same limit at the function
+//! that produces the row, and closing it (the device countersigning its own row, so the
+//! device rather than the person is the author) is a protocol change, not a codec change.
 //!
 //! ## On-disk layout
 //!
@@ -51,8 +61,15 @@
 //! 34      M     ciphertext         AEAD ciphertext + 32-byte CTX tag
 //! ```
 //!
-//! Total = `34 + M`, subject to §10.3.1 strict-trailing: the shared envelope
-//! checks it, and this module adds nothing past the ciphertext.
+//! Total = `34 + M`, and §10.3.1 strict-trailing is enforced HERE rather than
+//! inherited from the shared envelope: `decode_blob_envelope` reads exactly
+//! `ciphertext_len` bytes and ignores a tail, so a blob one byte longer than its
+//! own header declares would otherwise decode `Ok` here and be rejected by any
+//! implementation that honours the MUST. A tolerated tail is unauthenticated
+//! bytes (the AEAD tag covers the ciphertext, not the trailer) that a syncing
+//! client would persist and re-upload verbatim. Every sibling family landed
+//! immediately before this one carries the same hand-written equality check and
+//! the same byte-APPENDING test, for the same reason.
 //!
 //! ## The inner map, and why the codec owns it
 //!
@@ -142,8 +159,10 @@ const DEVICE_ID_HEX_LEN: usize = 32;
 /// raw bytes).
 const PERSON_FINGERPRINT_HEX_LEN: usize = crate::person_key::PERSON_FINGERPRINT_LEN * 2;
 
-/// One row in the binding map: which person this device belongs to, as of which
-/// version, and whether the binding has been removed.
+/// One row in the binding map: which person this device is CLAIMED by, as of which
+/// version, and whether the binding has been removed. A row is a claim and not an
+/// ownership (see the module header): the signature binds the row to the person who
+/// signed it and binds nothing to the device.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceBindingEntry {
     /// The fingerprint of the person this device claims to belong to, lowercase hex.
@@ -511,6 +530,15 @@ pub fn decode_device_binding_blob(
         blob,
     )
     .map_err(DeviceBindingBlobError::from)?;
+    // §10.3.1 strict-trailing is enforced HERE, not inherited leniently (the shared
+    // envelope reads exactly `ciphertext_len` bytes and ignores a tail; a tolerated
+    // tail is unauthenticated bytes a syncing client would persist and re-upload
+    // verbatim). The header read below is safe: the shared decode already rejected
+    // short inputs.
+    let declared = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
+    if blob.len() != DEVICE_BINDING_BLOB_HEADER_LEN + declared {
+        return Err(DeviceBindingBlobError::CiphertextTruncated);
+    }
     parse_device_bindings_map(&plaintext)
 }
 
@@ -1091,7 +1119,7 @@ mod tests {
     }
 
     #[test]
-    fn strict_trailing_holds() {
+    fn strict_trailing_rejects_a_truncated_blob() {
         let blob =
             encode_device_binding_blob(&KEY, &ACCT, EPOCH, &DeviceBindingsMap::new()).unwrap();
         let ct_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
@@ -1100,6 +1128,24 @@ mod tests {
         short.truncate(blob.len() - 1);
         assert_eq!(
             decode_device_binding_blob(&KEY, &ACCT, EPOCH, &short),
+            Err(DeviceBindingBlobError::CiphertextTruncated)
+        );
+    }
+
+    /// §10.3.1, the other direction, and the one the shared envelope does NOT cover:
+    /// a blob LONGER than its own header declares. `decode_blob_envelope` reads exactly
+    /// `ciphertext_len` bytes and ignores whatever follows, so without the module's own
+    /// equality check this decodes `Ok` while an implementation that honours the MUST
+    /// rejects it, i.e. two implementations disagreeing on which byte strings are
+    /// `MYU5` blobs, which is the whole thing §10.3.1 exists to fix.
+    #[test]
+    fn strict_trailing_rejects_an_appended_blob() {
+        let blob =
+            encode_device_binding_blob(&KEY, &ACCT, EPOCH, &DeviceBindingsMap::new()).unwrap();
+        let mut padded = blob.clone();
+        padded.push(0x00);
+        assert_eq!(
+            decode_device_binding_blob(&KEY, &ACCT, EPOCH, &padded),
             Err(DeviceBindingBlobError::CiphertextTruncated)
         );
     }
@@ -1394,7 +1440,7 @@ mod tests {
     /// truncates), `merge` (the per-device tie-break AND the refusal, which is the one
     /// arm no other family has), `signed_bytes` (the exact bytes one row's hybrid
     /// signature covers), `verify` (who may sign what, and the refusals), and
-    /// `group_subkey` (the family's one GROUP-tier derivation).
+    /// `group_subkey` (the family's two GROUP-tier derivations).
     #[test]
     #[ignore]
     fn emit_device_binding_vectors_for_paste() {
@@ -1582,7 +1628,7 @@ mod tests {
         dump.push_str(
             "  \"spec_section\": \"protocol.md \\u00a79.30 + \\u00a73.4 + \\u00a75.2\",\n",
         );
-        dump.push_str("  \"description\": \"Pins the vault.device-bindings singleton (MYU5) for an independent implementation: the AEAD envelope over a canonical device-to-person map, the decode-failure surface one variant at a time, the per-device merge with its refusal, the exact bytes one row's hybrid signature covers, the verification rules (who may sign a binding, who may sign a removal, and the refusals), and the GROUP-tier subkey derivation the family is keyed by. The family is NTV6-only: no v0.1 form exists, there is no SubkeyRole counterpart, and a pre-B2B reader must reject it. Every input_map is written in its CANONICAL byte order (keys ascending, no whitespace), so the plaintext sealed into expected_blob_hex is exactly the JSON as written. Cases generated by `cargo test -p protocol --lib emit_device_binding_vectors_for_paste -- --ignored --nocapture` (in protocol/src/device_binding_blob.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins the vault.device-bindings singleton (MYU5) for an independent implementation: the AEAD envelope over a canonical device-to-person map, the decode-failure surface one variant at a time, the per-device merge with its refusal, the exact bytes one row's hybrid signature covers, the verification rules (who may sign a binding, who may sign a removal, and the refusals), and the GROUP-tier subkey derivations the family is keyed and addressed by. The family is NTV6-only: no v0.1 form exists, there is no SubkeyRole counterpart, and a pre-B2B reader must reject it. Every input_map is written in its CANONICAL byte order (keys ascending, no whitespace), so the plaintext sealed into expected_blob_hex is exactly the JSON as written. Cases generated by `cargo test -p protocol --lib emit_device_binding_vectors_for_paste -- --ignored --nocapture` (in protocol/src/device_binding_blob.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         let case = |dump: &mut String,
@@ -2223,10 +2269,10 @@ mod tests {
         );
 
         // ===== group_subkey ===================================================
-        // The family's one role is GROUP-tier: derived from the group key, not from the
-        // root key. There is no SubkeyRole counterpart, which is why it is pinned here
-        // rather than in hkdf-sha256: that category's runner and its schema are both
-        // keyed on derive_subkey_v0_2(root_key, …).
+        // The family's two roles are GROUP-tier: derived from the group key, not from
+        // the root key. Neither has a SubkeyRole counterpart, which is why they are
+        // pinned here rather than in hkdf-sha256: that category's runner and its schema
+        // are both keyed on derive_subkey_v0_2(root_key, …).
         let subkey_case = |dump: &mut String,
                            slug: &str,
                            description: &str,
@@ -2253,6 +2299,14 @@ mod tests {
             "GroupRole::DeviceBindingKey ('device-binding-key'): the KEK the MYU5 envelope is sealed under, derived from the group key rather than the root key. The HKDF context prefix is the v0.2 one, so the same role under a later major is a different key. A pre-B2B vault has no group key and therefore no binding map at all, which is why there is no root-tier counterpart role.",
             GroupRole::DeviceBindingKey,
             "device-binding-key",
+            true,
+        );
+        subkey_case(
+            &mut dump,
+            "group-subkey-device-binding-sync-id",
+            "GroupRole::DeviceBindingSyncId ('device-binding-sync-id'): the deterministic sync blob-id for the singleton. It is a SUBKEY rather than a filename so the id is epoch-scoped and does not leak a vault-independent constant to the server. Distinct from the AAD role 'device-binding-blob': a KEK role and an AAD role share no namespace. It is the id that ROTATES on member removal, which is what makes the retired record reclaimable rather than readable to the member just removed.",
+            GroupRole::DeviceBindingSyncId,
+            "device-binding-sync-id",
             false,
         );
 
