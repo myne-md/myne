@@ -52,13 +52,15 @@ describe("participantWithColor", () => {
     const p: Participant = participantWithColor({
       id: "person:abc",
       noteId: "note-1",
-      label: "Ada's Laptop",
+      label: { kind: "text", text: "Ada's Laptop" },
       unAttributed: true,
       caret: 12,
       selection: { anchor: 4, head: 12 },
     });
     expect(p.color).toBe(colorForParticipant("person:abc"));
     expect(p.unAttributed).toBe(true);
-    expect(p.label).toBe("Ada's Laptop");
+    // The label is CARRIED THROUGH as the descriptor it arrived as, never rendered
+    // here: rendering is the surface's job, with the translator it holds at render.
+    expect(p.label).toEqual({ kind: "text", text: "Ada's Laptop" });
   });
 });

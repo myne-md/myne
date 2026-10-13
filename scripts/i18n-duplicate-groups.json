@@ -449,5 +449,13 @@
       "identitySetup.typeBackMismatch"
     ],
     "reason": "The mismatch line for that same typeback step, on the desktop identity-setup dialog and the mobile identity flow; one step, two clients, and the position placeholder interpolates identically on both."
+  },
+  {
+    "value": "Your identity is not signed in on this device. Unlock your identity and try again.",
+    "keys": [
+      "identityHome.acceptErrorUnauthenticated",
+      "identityHome.joinErrorUnauthenticated"
+    ],
+    "reason": "Same state and the same remedy on the accept and the join: the person identity is not signed in on this device, so neither command can proceed and both tell the user to unlock it. The two KEYS stay separate on purpose (the mappings are two modules, decisions/protocol/0672), so a copy edit on one cannot silently move the other; the sentence is shared because the fact is one fact, not because the errors are the same error."
   }
 ]

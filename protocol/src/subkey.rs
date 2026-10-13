@@ -272,6 +272,16 @@ const ROLE_STR_MEMBER_NAMES_KEY: &[u8] = b"member-names-key";
 /// `group_key` so an owner and a member of the same epoch address the same blob.
 /// Derives an identifier, not key material.
 const ROLE_STR_MEMBER_NAMES_SYNC_ID: &[u8] = b"member-names-sync-id";
+/// KEK for the B2B device-to-person binding singleton (`vault.device-bindings`,
+/// `MYU5`; `docs/spec/protocol.md` §9.30, the `member-devices` feature). Group-tier:
+/// a member holds the shared `group_key` and can therefore derive it, which is the
+/// point of the family.
+const ROLE_STR_DEVICE_BINDING_KEY: &[u8] = b"device-binding-key";
+/// Deterministic sync blob-id for the device-binding singleton (the
+/// `catalog-sync-id` / `prefs-sync-id` archetype), derived from the shared
+/// `group_key` so an owner and a member of the same epoch address the same blob.
+/// Derives an identifier, not key material.
+const ROLE_STR_DEVICE_BINDING_SYNC_ID: &[u8] = b"device-binding-sync-id";
 
 /// Registered role string for the v0.2 vault membership field KEK (encrypts the
 /// sealed account id in `vault.meta` §9.3.1, the account/vault split,
@@ -491,10 +501,34 @@ pub enum GroupRole {
     /// Deterministic sync blob-id for that same singleton (the `catalog-sync-id`
     /// archetype). Derives an identifier, NOT key material.
     MemberNamesSyncId,
+    /// KEK for the B2B device-to-person binding singleton (`vault.device-bindings`,
+    /// `MYU5`; `protocol.md` §9.30, the `member-devices` feature). A member holds the
+    /// shared `group_key`, so this is what makes the family readable by every member
+    /// and by nobody else. Distinct string from the AAD role `"device-binding-blob"`,
+    /// and distinct from `member-names-key`: the two families are sealed separately
+    /// even though both are member-writable, so a blob of one can never be opened as
+    /// the other.
+    ///
+    /// Like `MemberNamesKey`, this has **no** [`SubkeyRole`] counterpart: the family is
+    /// `NTV6`-only, a pre-B2B vault has no `group_key` to derive it from, and therefore
+    /// no vault in which a member-writable binding map could exist at all.
+    DeviceBindingKey,
+    /// Deterministic sync blob-id for that same singleton (the `catalog-sync-id`
+    /// archetype, and the `MemberNamesSyncId` twin one row up). Derives an
+    /// identifier, NOT key material.
+    ///
+    /// It is derived from the GROUP key rather than the owner root, which is what lets a
+    /// member address the blob the owner wrote. It therefore ROTATES with the group key on
+    /// member removal, which moves it in two halves that must be read as one: the blob is
+    /// re-sealed to the new epoch, and the retired epoch's id is queued for server reclaim.
+    /// Reclaiming without re-sealing has the server delete the record and leave nothing at
+    /// the new epoch; re-sealing without reclaiming leaves the retired record readable to
+    /// the member just removed, who still holds the old group key.
+    DeviceBindingSyncId,
 }
 
 impl GroupRole {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 21] = [
         Self::ItemsKeyWrap,
         Self::PrefsKey,
         Self::SearchIndexKey,
@@ -514,6 +548,8 @@ impl GroupRole {
         Self::AwarenessKey,
         Self::MemberNamesKey,
         Self::MemberNamesSyncId,
+        Self::DeviceBindingKey,
+        Self::DeviceBindingSyncId,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -537,6 +573,8 @@ impl GroupRole {
             Self::AwarenessKey => ROLE_STR_AWARENESS_KEY,
             Self::MemberNamesKey => ROLE_STR_MEMBER_NAMES_KEY,
             Self::MemberNamesSyncId => ROLE_STR_MEMBER_NAMES_SYNC_ID,
+            Self::DeviceBindingKey => ROLE_STR_DEVICE_BINDING_KEY,
+            Self::DeviceBindingSyncId => ROLE_STR_DEVICE_BINDING_SYNC_ID,
         }
     }
 }
@@ -1259,6 +1297,37 @@ mod tests {
     }
 
     #[test]
+    fn group_only_role_strings_match_the_spec_registry() {
+        // The five roles that exist ONLY in the group tier, and therefore have no
+        // `SubkeyRole` counterpart to be pinned beside: `subkey.rs`'s one-test-per-role
+        // convention was written for the root tier, so these had no string pin at all
+        // until this test. They need one for the reason every other role does: the role
+        // string IS the HKDF `info`, so a one-character drift silently derives a
+        // different key for a family whose blobs then stop opening, and a copy-paste of
+        // a neighbouring arm silently makes two families share one key.
+        //
+        // `roster-key` / `member-names-key` / `member-names-sync-id` are `NTV6`-only
+        // group-tier roles (§3.4, §9.3.2, §9.29); `device-binding-key` and
+        // `device-binding-sync-id` are the `member-devices` family's (§9.30). Each of the
+        // last four differs only by a hyphen or a suffix from a neighbour, which is
+        // exactly the shape a hand edit gets wrong.
+        assert_eq!(GroupRole::GroupRosterKey.role_str(), b"group-roster-key");
+        assert_eq!(GroupRole::MemberNamesKey.role_str(), b"member-names-key");
+        assert_eq!(
+            GroupRole::MemberNamesSyncId.role_str(),
+            b"member-names-sync-id"
+        );
+        assert_eq!(
+            GroupRole::DeviceBindingKey.role_str(),
+            b"device-binding-key"
+        );
+        assert_eq!(
+            GroupRole::DeviceBindingSyncId.role_str(),
+            b"device-binding-sync-id"
+        );
+    }
+
+    #[test]
     fn attachment_roles_are_distinct_subkeys() {
         // The catalog KEK and the id-HMAC key MUST be different subkeys
         // (spec § 9.10.1 note: "distinct subkeys").
@@ -1393,7 +1462,10 @@ mod tests {
     /// act, not a side effect of `cargo test`. Run with:
     /// `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored`
     ///
-    /// The 22 cases cover the v0.1 input space:
+    /// The 48 cases cover the v0.1 input space. Every case before the eight
+    /// appends shares its root with a sibling role, which is what the
+    /// independence argument below rests on; the eight appends do NOT, so they
+    /// are pinned as single inputs and the argument deliberately excludes them.
     /// - 4 baseline: `ItemsKeyWrap` + `PrefsKey` × {all-zero, all-0xFF} root
     /// - 6 pseudorandom-root: those two roles × 3 distinct SHA-256-derived
     ///   roots (alpha / beta / gamma seeds). The alpha pair carries
@@ -1424,6 +1496,23 @@ mod tests {
     ///   the `vault.dictionary` KEK, pinned in lockstep with the
     ///   `vault-dictionary` family; distinct from the AAD role
     ///   `personal-dictionary-blob`.
+    /// - 18 further roles, each as a {all-zero, alpha} pair, appended one
+    ///   feature at a time rather than as one block: `CatalogSyncId`,
+    ///   `PrefsSyncId`, `CustomThemesKey`, `ThemesSyncId`, `GraphLayoutKey`,
+    ///   `AttachmentTextKey`, `AiEmbeddingsKey`, `VaultHeadMac` and
+    ///   `ServerAuth`. The alpha half of each carries
+    ///   `informational_info_utf8_hex`, which is where the nine canonical info
+    ///   assemblies are documented for porters. The list above is grouped by
+    ///   feature rather than partitioned, so every group is named in ONE sum to
+    ///   make the 48 reconcile: 4 baseline + 6 pseudorandom + 2 search + 4
+    ///   attachments + 2 session-state + 2 vault-indices + 2 personal-dictionary
+    ///   + 18 (the nine pairs above) + 8 single-input = 48.
+    /// - 8 single-input roles: the `chats-*` family (MYM1 / MYJ1, myne-md/myne#675)
+    ///   and the `agent-*` family (MYN1 / MYX1 / MYZ1, myne-md/myne#697), each
+    ///   under the shared `chats_agent_root` (`0x42` repeated). These append
+    ///   LAST, in the order their features landed, because that is the order
+    ///   the companion file carries them; all carry
+    ///   `informational_info_utf8_hex`.
     ///
     /// Cross-role independence is implicit: every root appears with
     /// both roles; the integration runner asserts byte-equality for
@@ -1489,9 +1578,23 @@ mod tests {
         let alpha = pseudorandom_root(b"myne-test-vectors-seed-v0.1.alpha");
         let beta = pseudorandom_root(b"myne-test-vectors-seed-v0.1.beta");
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
+        // The FOURTH root, whose bytes are `0x42` repeated. It is not a
+        // `pseudorandom_root(...)` seed and it carries no prefix in its slugs:
+        // the `chats-*` (myne-md/myne#675) and `agent-*` (myne-md/myne#697) roles
+        // reached the companion fixture this way, and this emitter was not
+        // extended at the time, so for two releases the documented regeneration
+        // command below produced a 40-case document against a 48-case file. That
+        // loss is LOUD rather than silent only because the runner pins
+        // `SubkeyRole::ALL` by name; the emitter is what had to be right.
+        //
+        // It is named rather than inlined so the eight appends below say out loud
+        // that they share one input, which is what makes the three
+        // `*CatalogKey`/`*CatalogSyncId` pairs readable as domain-separation
+        // pairs rather than as eight unrelated derivations.
+        let chats_agent_root: [u8; 32] = [0x42; 32];
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 40] = [
+        let cases: [Case<'_>; 48] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -1772,6 +1875,70 @@ mod tests {
                 SubkeyRole::ThemesSyncId,
                 true,
             ),
+            // ---- the `chats-*` and `agent-*` appends -----------------------
+            //
+            // Eight cases, appended by their own features after this emitter was
+            // last touched, all under the shared `chats_agent_root` above. The
+            // slug carries no root prefix, deliberately: these are the
+            // single-input roles of their families, not a `zero-root` /
+            // `prn-alpha` pair, and naming them `zero-root-chats-key` would
+            // claim an input this file does not use.
+            (
+                "chats-catalog-key",
+                "KEK for the vault.chats conversations catalog (MYM1, §9.23). DISTINCT from the AAD role chats-catalog and from the per-file family KEK chats-key.",
+                &chats_agent_root,
+                SubkeyRole::ChatsCatalogKey,
+                true,
+            ),
+            (
+                "chats-catalog-sync-id",
+                "Phase-2 sync blob-id of vault.chats (§3.4 + sync-protocol.md §10.2.5): the FIRST 16 BYTES of the 32-byte output are the id; an IDENTIFIER derivation like catalog-sync-id, NOT a KEK (the catalog KEK stays chats-catalog-key).",
+                &chats_agent_root,
+                SubkeyRole::ChatsCatalogSyncId,
+                true,
+            ),
+            (
+                "chats-key",
+                "KEK for every per-conversation chats file (MYJ1, §9.24): one KEK serves the family, the per-entry conversation_id travels in the AAD (the MYE1 archetype). DISTINCT from the AAD role chats-blob and from the catalog KEK chats-catalog-key.",
+                &chats_agent_root,
+                SubkeyRole::ChatsKey,
+                true,
+            ),
+            (
+                "agent-memory-catalog-key",
+                "KEK for the vault.agent-memory catalog (MYN1, §9.25). DISTINCT from the AAD role agent-memory-catalog and from the per-file family KEK agent-memory-key.",
+                &chats_agent_root,
+                SubkeyRole::AgentMemoryCatalogKey,
+                true,
+            ),
+            (
+                "agent-memory-catalog-sync-id",
+                "Sync blob-id derivation for vault.agent-memory (identifier, NOT key material).",
+                &chats_agent_root,
+                SubkeyRole::AgentMemoryCatalogSyncId,
+                true,
+            ),
+            (
+                "agent-memory-key",
+                "Family KEK for the per-entry MYX1 memory blobs; per-entry separation comes from the AAD binding.",
+                &chats_agent_root,
+                SubkeyRole::AgentMemoryKey,
+                true,
+            ),
+            (
+                "agent-personality-key",
+                "KEK for the vault.personality singleton (MYZ1, §9.27).",
+                &chats_agent_root,
+                SubkeyRole::AgentPersonalityKey,
+                true,
+            ),
+            (
+                "agent-personality-sync-id",
+                "Sync blob-id derivation for vault.personality (identifier, NOT key material).",
+                &chats_agent_root,
+                SubkeyRole::AgentPersonalitySyncId,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -1779,7 +1946,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key + chats-catalog-key + chats-catalog-sync-id + chats-key. MembershipKey derives under the v0.2 prefix and is pinned by the hkdf-sha256/v0.2 category instead. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key + chats-catalog-key + chats-catalog-sync-id + chats-key + agent-memory-catalog-key + agent-memory-catalog-sync-id + agent-memory-key + agent-personality-key + agent-personality-sync-id. MembershipKey derives under the v0.2 prefix and is pinned by the hkdf-sha256/v0.2 category instead. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
@@ -2059,6 +2226,8 @@ mod tests {
                 GroupRole::AwarenessKey => 16,
                 GroupRole::MemberNamesKey => 17,
                 GroupRole::MemberNamesSyncId => 18,
+                GroupRole::DeviceBindingKey => 19,
+                GroupRole::DeviceBindingSyncId => 20,
             }
         }
 
@@ -2077,5 +2246,37 @@ mod tests {
             group_seen[index] = true;
         }
         assert!(group_seen.into_iter().all(core::convert::identity));
+
+        // Every role string is distinct, in BOTH typed tiers, for the same reason
+        // `all_covers_every_registered_role` asserts it over `SubkeyRole`: the role
+        // string is the whole of the HKDF `info` past the prefix, so two roles sharing
+        // one string derive ONE key and the domain separation the registries exist to
+        // provide is gone.
+        //
+        // The `declaration_index` bijection asserted above is NOT the same property and
+        // does not imply it: that proves each variant has its own INDEX in a hand-written
+        // match, while nothing compared the strings those variants actually derive from.
+        // Measured, not assumed: with the two loops below removed, changing
+        // `ROLE_STR_DEVICE_BINDING_KEY` to `b"member-names-key"` left the whole test file
+        // green (30 passed), which would have sealed `vault.device-bindings` and
+        // `vault.member-names` under one key with no test, guard or build saying a word.
+        for (i, a) in OwnerRole::ALL.iter().enumerate() {
+            for b in OwnerRole::ALL.iter().skip(i + 1) {
+                assert_ne!(
+                    a.role_str(),
+                    b.role_str(),
+                    "{a:?} and {b:?} share a role string, so the domain separation is lost"
+                );
+            }
+        }
+        for (i, a) in GroupRole::ALL.iter().enumerate() {
+            for b in GroupRole::ALL.iter().skip(i + 1) {
+                assert_ne!(
+                    a.role_str(),
+                    b.role_str(),
+                    "{a:?} and {b:?} share a role string, so the domain separation is lost"
+                );
+            }
+        }
     }
 }

@@ -112,9 +112,10 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Magic bytes at offset 0: ASCII `"MYO5"`. The `MY?5` letter pool is exactly two
-/// letters deep (`O` and `U`) at the time of allocation; `MYU5` is reserved in the
-/// same breath for the device-to-person binding family of the sister feature.
+/// Magic bytes at offset 0: ASCII `"MYO5"`. The `MY?5` letter pool was exactly two
+/// letters deep (`O` and `U`) at the time of allocation; `MYU5` was allocated in the
+/// same breath for the device-to-person binding family of the sister feature, which
+/// now ships (`protocol.md` §9.30).
 pub const MEMBER_NAMES_BLOB_MAGIC: [u8; 4] = *b"MYO5";
 
 /// AAD role string bound into the seal (§5.2). Distinct from every sibling role

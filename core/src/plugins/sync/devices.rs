@@ -536,6 +536,23 @@ pub enum SyncDeviceError {
     /// `invite_code_invalid`). Distinct from `InviteCodeRequired` so the field
     /// can say "that code is wrong" rather than "a code is needed".
     InviteCodeInvalid,
+    /// This device already holds a vault for the account this invite names
+    /// (member-devices task 7).
+    ///
+    /// Its own variant rather than a `BadRequest`, for the reason the comment at
+    /// the `local_vault_holds_account` call site gives: the remedy is to open the
+    /// vault already here, not to retry and not to go looking for a trust anchor.
+    /// `BadRequest` in this command already carries the OPPOSITE remedy (the
+    /// person profile has no pinned owner identity code, so the vault has to be
+    /// opened once on a device that has it and the join retried), and a single
+    /// sentence cannot name two opposite remedies: myne-md/myne#794 is the defect
+    /// `accept-invite.ts` exists as a six-arm mapper to fix. Not
+    /// `AccountMismatch` either: that is the reverse case, a container pinned to a
+    /// DIFFERENT account, whose remedy is to erase it. This is the routine arm
+    /// rather than an edge: a claimed invite row stays listed on the identity
+    /// home, so joining a vault this device already holds reaches it every time,
+    /// whether the vault was accepted here or joined here.
+    VaultAlreadyHeld,
     /// Internal (task join, IO).
     Internal,
 }

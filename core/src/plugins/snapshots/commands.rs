@@ -100,7 +100,7 @@ fn notes_dir_beside(snapshots_dir: &std::path::Path) -> Option<PathBuf> {
 pub(crate) async fn snapshot_list_in(
     snapshots_dir: PathBuf,
     state: &VaultRuntimeState,
-    device_names: &std::collections::BTreeMap<String, String>,
+    index: &crate::plugins::sync::identity_resolver::IdentityIndex,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
@@ -116,8 +116,9 @@ pub(crate) async fn snapshot_list_in(
     if let Some(notes_dir) = notes_dir_beside(&snapshots_dir) {
         let note_uuid_bytes = *note_id.as_uuid().as_bytes();
         let note_path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
-        // Cloned into the `'static` blocking closure.
-        let names_for_arm = device_names.clone();
+        // Cloned into the `'static` blocking closure. The whole index moves, not just the
+        // device names: the durable arm is what the closure needs and it is one value.
+        let index_for_arm = index.clone();
         let crdt = crate::task::run_blocking(
             move || -> Result<Option<Vec<SnapshotMeta>>, SnapshotError> {
                 let blob = match std::fs::read(&note_path) {
@@ -145,7 +146,7 @@ pub(crate) async fn snapshot_list_in(
                         .map(|r| SnapshotMeta {
                             resolved_author:
                                 crate::plugins::sync::identity_resolver::resolve_revision_author(
-                                    &names_for_arm,
+                                    &index_for_arm,
                                     crate::plugins::sync::identity_resolver::actor_from_hex(
                                         &r.actor_hex,
                                     ),
@@ -197,18 +198,27 @@ pub async fn snapshot_list_from_host(
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
     let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
-    // `collab-provenance` task 3: the vault's device names resolve each revision's
-    // actor to a device label. Read once; an unreadable prefs blob degrades to an
-    // empty map (every revision then resolves to the short-code fallback).
     let vault_dir = snapshots_dir
         .parent()
         .map(std::path::Path::to_path_buf)
         .unwrap_or_else(|| snapshots_dir.clone());
+    // `collab-provenance` task 3: the vault's device names resolve each revision's actor
+    // to a device label. Read once; an unreadable prefs blob degrades to an empty map
+    // (every revision then resolves to the short-code fallback).
     let device_names = crate::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state, io)
         .await
         .map(|v| v.device_names)
         .unwrap_or_default();
-    snapshot_list_in(snapshots_dir, state, &device_names, note_id)
+    // `member-devices` task 4: the durable half, from the group-sealed binding, roster and
+    // member-name stores. Built here rather than inside the blocking closure because the
+    // join awaits IO, and it resolves to an EMPTY index on every failure, so a vault with no
+    // group tier (or no bindings) costs one `vault.meta` read and one store read and then
+    // resolves every revision to its device label.
+    let durable =
+        crate::plugins::sync::identity_resolver::durable_attribution_in_dir(io, state, &vault_dir)
+            .await;
+    let index = crate::plugins::sync::identity_resolver::IdentityIndex::new(device_names, durable);
+    snapshot_list_in(snapshots_dir, state, &index, note_id)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -972,7 +982,7 @@ mod tests {
             assert!(snapshot_list_in(
                 sdir.clone(),
                 &state,
-                &std::collections::BTreeMap::new(),
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
                 id.clone()
             )
             .await
@@ -992,9 +1002,14 @@ mod tests {
             .await
             .unwrap();
 
-            let list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
-                .await
-                .unwrap();
+            let list = snapshot_list_in(
+                sdir,
+                &state,
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
+                id,
+            )
+            .await
+            .unwrap();
             assert_eq!(list.len(), 1);
             assert!(list[0].size_bytes > 0);
         });
@@ -1081,7 +1096,7 @@ mod tests {
             let list = snapshot_list_in(
                 sdir.clone(),
                 &state,
-                &std::collections::BTreeMap::new(),
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
                 id.clone(),
             )
             .await
@@ -1130,9 +1145,14 @@ mod tests {
 
             // The restore itself is a revision, so history GREW rather than
             // rewound — which is what makes it undoable.
-            let after_list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
-                .await
-                .unwrap();
+            let after_list = snapshot_list_in(
+                sdir,
+                &state,
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
+                id,
+            )
+            .await
+            .unwrap();
             assert_eq!(after_list.len(), 4);
         });
     }
@@ -1173,7 +1193,13 @@ mod tests {
             let state = VaultRuntimeState::default(); // Empty
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
             assert_eq!(
-                snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), phantom).await,
+                snapshot_list_in(
+                    sdir,
+                    &state,
+                    &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
+                    phantom
+                )
+                .await,
                 Err(SnapshotError::VaultNotUnlocked)
             );
         });
@@ -1213,7 +1239,7 @@ mod tests {
             let snap_uuid = snapshot_list_in(
                 sdir.clone(),
                 &state,
-                &std::collections::BTreeMap::new(),
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
                 id.clone(),
             )
             .await
@@ -1313,7 +1339,7 @@ mod tests {
             let s1 = snapshot_list_in(
                 sdir.clone(),
                 &state,
-                &std::collections::BTreeMap::new(),
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
                 id.clone(),
             )
             .await
@@ -1350,9 +1376,14 @@ mod tests {
             assert_eq!(dec.plaintext(), v1.as_bytes());
 
             // Two snapshots now: S1 (v1) + the undo point (pre-restore = v2).
-            let list = snapshot_list_in(sdir, &state, &std::collections::BTreeMap::new(), id)
-                .await
-                .unwrap();
+            let list = snapshot_list_in(
+                sdir,
+                &state,
+                &crate::plugins::sync::identity_resolver::IdentityIndex::default(),
+                id,
+            )
+            .await
+            .unwrap();
             assert_eq!(
                 list.len(),
                 2,

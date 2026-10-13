@@ -35,8 +35,14 @@ import { DestructiveBanner } from "../components/DestructiveBanner";
 import { PasswordCreateForm } from "../components/PasswordCreateForm";
 import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { personListInvites, personAcceptInvite, type InviteSummary } from "../lib/personAccount";
+import {
+  personListInvites,
+  personAcceptInvite,
+  personJoinVault,
+  type InviteSummary,
+} from "../lib/personAccount";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
+import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
 import { inspectInviteCode, personLock } from "../lib/invite";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
@@ -75,6 +81,13 @@ function sameInvites(previous: InviteSummary[] | null, next: InviteSummary[]): b
  *  lost, silently. Kept exported under this name so this screen's readers and
  *  its test are unchanged. */
 export const acceptErrorKey = acceptInviteErrorKey;
+
+/** The join-on-this-device sibling of the mapper above, and a SEPARATE mapping
+ *  rather than the same one reused: the join never collects an owner code, so its
+ *  `BadRequest` arm must not tell the user to paste one. Both live in
+ *  `@myne/client-core` for the same reason. See
+ *  `@myne/client-core/join-member-vault`. */
+export const joinErrorKey = memberJoinVaultErrorKey;
 
 const BLOCK_STYLE: CSSProperties = {
   display: "flex",
@@ -242,6 +255,15 @@ export function IdentityHome({
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [accepting, setAccepting] = useState<string | null>(null);
+  // The join-on-this-device path (myne-md/myne#852 task 7). Deliberately a SECOND
+  // set of state rather than a mode flag on the accept above: the two forms differ
+  // in what they collect (the join collects no owner code) and in what follows them
+  // (the accept owes the name gate, the join must not touch a name at all).
+  const [joining, setJoining] = useState<string | null>(null);
+  const [joinPhraseCells, setJoinPhraseCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [ownerCode, setOwnerCode] = useState("");
   const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -337,7 +359,14 @@ export function IdentityHome({
     };
   }, [loadInvites]);
 
+  // Unclaimed and claimed are two different offers, not one list with a filter. An
+  // unclaimed invite is an identity that is not a member yet and is accepted with the
+  // owner's out-of-band code; a CLAIMED one is a vault this identity already belongs
+  // to, which a second device joins without any out-of-band material at all. Hiding
+  // the claimed rows (the pre-#852 behaviour) is what made the second-device path
+  // unreachable from the identity home.
   const pending = (invites ?? []).filter((i) => !i.claimed);
+  const claimed = (invites ?? []).filter((i) => i.claimed);
 
   if (nameGateOpen) {
     return (
@@ -426,7 +455,7 @@ export function IdentityHome({
             </DestructiveBanner>
           ) : invites === null ? (
             <p style={HINT_STYLE}>{t("identityHome.invitesLoading")}</p>
-          ) : pending.length === 0 ? (
+          ) : pending.length === 0 && claimed.length === 0 ? (
             <p data-testid="identity-home.empty-invites" style={HINT_STYLE}>
               {t("identityHome.noInvites")}
             </p>
@@ -598,6 +627,131 @@ export function IdentityHome({
                   ) : null}
                 </div>
               ))}
+              {claimed.length > 0 ? (
+                <div data-testid="identity-home.claimed-invites" style={BLOCK_STYLE}>
+                  <h3 style={SECTION_HEADING_STYLE}>{t("identityHome.claimedHeading")}</h3>
+                  <p style={HINT_STYLE}>{t("identityHome.claimedHint")}</p>
+                  {claimed.map((inv) => (
+                    <div
+                      key={inv.invite_id_hex}
+                      data-testid="identity-home.claimed-row"
+                      style={INVITE_ROW_STYLE}
+                    >
+                      <span style={INVITE_HASH_STYLE}>{inv.vault_account_hash_hex}</span>
+                      <div>
+                        <Button
+                          type="button"
+                          data-testid="identity-home.join-open"
+                          onClick={() => {
+                            setJoining(inv.invite_id_hex);
+                            setJoinPhraseCells(
+                              Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+                            );
+                            setJoinError(null);
+                          }}
+                        >
+                          {t("identityHome.join")}
+                        </Button>
+                      </div>
+                      {joining === inv.invite_id_hex ? (
+                        <div data-testid="identity-home.join-form" style={ACCEPT_FORM_STYLE}>
+                          <p style={BODY_SMALL_STYLE}>{t("identityHome.joinHint")}</p>
+                          {/* There is deliberately NO owner-code field here, and the
+                              absence is load-bearing rather than a simplification: the
+                              owner this device verifies the group package against is the
+                              one its own per-(person, vault) profile already pins
+                              (`decisions/protocol/0675`). A field would let whatever is
+                              pasted into it become the trust anchor, which is the one
+                              thing the pin exists to prevent. */}
+                          <EnrollPhraseCredential
+                            baseId="identity-home-join"
+                            label={t("identityHome.joinPhraseLabel")}
+                            cells={joinPhraseCells}
+                            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
+                              setJoinError(null);
+                              setJoinPhraseCells((cells) =>
+                                cells.map((cell, cellIndex) =>
+                                  cellIndex === index
+                                    ? event.target.value.replace(/\s+/g, "")
+                                    : cell,
+                                ),
+                              );
+                            }}
+                            onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
+                              const tokens = event.clipboardData
+                                .getData("text")
+                                .split(/\s+/)
+                                .filter((token) => token.length > 0);
+                              if (tokens.length < 2) return;
+                              event.preventDefault();
+                              setJoinError(null);
+                              setJoinPhraseCells((cells) => {
+                                const next = [...cells];
+                                for (
+                                  let i = 0;
+                                  i < tokens.length && index + i < PHRASE_CELL_COUNT;
+                                  i += 1
+                                ) {
+                                  next[index + i] = tokens[i];
+                                }
+                                return next;
+                              });
+                            }}
+                            gridTestId="identity-home.join-phrase-grid"
+                            cellTestId={(index) =>
+                              index === 0
+                                ? "identity-home.join-phrase"
+                                : `identity-home.join-phrase-cell-${index + 1}`
+                            }
+                          />
+                          <PasswordCreateForm
+                            testIdPrefix="identity-home.join"
+                            submitLabel={t("identityHome.joinSubmit")}
+                            disabled={!joinPhraseCells.every((cell) => cell.length > 0)}
+                            autoFocus={false}
+                            helperCopy={
+                              <p
+                                data-testid="identity-home.join-password-note"
+                                style={BODY_SMALL_STYLE}
+                              >
+                                {t("identityHome.joinPasswordNote")}
+                              </p>
+                            }
+                            onSubmit={async (password) => {
+                              try {
+                                await personJoinVault(
+                                  inv.invite_id_hex,
+                                  inv.vault_account_hash_hex,
+                                  joinPhraseCells.join(" "),
+                                  password,
+                                );
+                                setJoinPhraseCells(
+                                  Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+                                );
+                                // Straight to the editor: a join installs a vault this
+                                // identity is ALREADY a member of, so there is no name to
+                                // set and no gate to pass. The accept above owes one
+                                // because it is what creates a member; this path must not
+                                // write a name, or a second device would silently re-name
+                                // a person its first device had already named
+                                // (myne-md/myne#852 task 7).
+                                onAccepted();
+                              } catch (error) {
+                                setJoinError(t(joinErrorKey(error)));
+                              }
+                            }}
+                          />
+                          {joinError ? (
+                            <DestructiveBanner testId="identity-home.join-error">
+                              {joinError}
+                            </DestructiveBanner>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </div>

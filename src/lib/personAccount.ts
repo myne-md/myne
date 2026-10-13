@@ -111,6 +111,41 @@ export async function personAcceptInvite(
   });
 }
 
+/**
+ * Join a vault this identity ALREADY belongs to onto THIS device.
+ *
+ * The second-device path (myne-md/myne#852 task 7), and the reason it is a second
+ * command rather than a flag on the accept. The accept is addressed to a person who
+ * is not yet a member: it collects the owner's identity code out of band and verifies
+ * the group package against THAT. A member's second device has no out-of-band code
+ * and must not be given one: the owner it verifies against is the one its own
+ * per-`(person, vault)` profile already pins (`decisions/protocol/0675`), read from
+ * the person plane before anything is claimed. Hence no `ownerCode` here, and
+ * `vaultAccountHashHex` on its own, so the pinned owner can be resolved for the named
+ * vault before the re-claim.
+ *
+ * `inviteIdHex` comes from the recipient-scoped invite list, which INCLUDES claimed
+ * rows: a re-claim by the invite's own recipient is idempotent
+ * (`decisions/protocol/0672`) and mints a fresh per-vault membership token.
+ *
+ * `phrase` is this person's OWN recovery phrase, never a vault password a member
+ * never had (`decisions/protocol/0606`). `password` is REQUIRED and becomes this
+ * device's member-unlock credential; it is not the owner's password.
+ */
+export async function personJoinVault(
+  inviteIdHex: string,
+  vaultAccountHashHex: string,
+  phrase: string,
+  password: string,
+): Promise<AcceptedInviteView> {
+  return invoke<AcceptedInviteView>("plugin:sync|sync_member_join_vault", {
+    inviteIdHex,
+    vaultAccountHashHex,
+    phrase,
+    password,
+  });
+}
+
 /** Whether a vault is a member vault (has a device-local member-key store), so
  *  the Unlock surface asks for the recovery phrase instead of a password. */
 export async function memberVaultStatus(vaultIdHex: string): Promise<boolean> {

@@ -33,6 +33,10 @@ pub mod clipper_pairing;
 // is NOT gated on `local-inference` (the loop compiles unconditionally); the
 // `ai_enabled` pref is the runtime gate, re-read per command.
 pub mod detached_window;
+// B2B device-to-person bindings (`vault.device-bindings`, `MYU5`; protocol.md §9.30,
+// the `member-devices` feature). Core in `myne-core::plugins::device_binding`; this
+// shim registers the two commands.
+pub mod device_binding;
 pub mod export;
 pub mod graph_layout;
 pub mod importer;

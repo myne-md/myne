@@ -685,6 +685,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_person_list_invites", Class::Unsupported),
     ("plugin:sync|sync_list_vault_invites", Class::Unsupported),
     ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
+    ("plugin:sync|sync_member_join_vault", Class::Unsupported),
     (
         "plugin:sync|sync_person_unlock_member_vault",
         Class::Unsupported,

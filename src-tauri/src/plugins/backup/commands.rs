@@ -332,6 +332,11 @@ fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, Bac
         // member), so the same #256 rule applies: without this line a backup
         // restores a vault whose every member fell back to a fingerprint.
         "vault.member-names",
+        // #852: the device-to-person binding map is vault CONTENT (Class-1 sync
+        // member) and carries the tombstones, so the same #256 rule applies:
+        // without this line a backup restores a vault with no bindings AND no
+        // tombstones, which is the resurrection §9.11.3's chats row names.
+        "vault.device-bindings",
     ] {
         let path = vault_dir.join(singleton);
         if path.is_file() {

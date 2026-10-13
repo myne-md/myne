@@ -242,6 +242,18 @@ fn main() {
             ]),
         )
         .plugin(
+            "device-binding",
+            // The B2B device-to-person binding commands over the encrypted
+            // `vault.device-bindings` (`MYU5`) singleton, which is group-tier sealed
+            // and `NTV6`-only (protocol.md §9.30, the member-devices feature). The
+            // InlinedPlugin mirror is load-bearing per the `vault-creation` note above
+            // (without it the `device-binding:` permissions flatten into `__app-acl__`
+            // and never match the `plugin:device-binding|<cmd>` authorize form); keep it
+            // lock-stepped with `permissions/device-binding/default.toml`.
+            tauri_build::InlinedPlugin::new()
+                .commands(&["device_bindings_list", "device_bindings_claim"]),
+        )
+        .plugin(
             "notes",
             // The `commands.allow` entries in
             // `permissions/notes/default.toml` declare all four —
@@ -680,6 +692,11 @@ fn main() {
                 "sync_person_inspect_invite_code",
                 "sync_list_vault_invites",
                 "sync_person_accept_invite",
+                // member-devices task 7: a member's SECOND device joins the
+                // vault from the phrase alone. Takes no owner code from the
+                // user: the pinned owner half is read from the person's own
+                // sealed `MYY5` profile, where the accepting device put it.
+                "sync_member_join_vault",
                 "sync_person_unlock_member_vault",
                 "sync_member_vault_status",
                 "sync_person_set_member_password",

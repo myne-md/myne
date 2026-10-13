@@ -35,6 +35,7 @@ import {
   snapshotRestore,
 } from "../snapshots";
 import type { SnapshotError, SnapshotMeta } from "../../types/snapshot-error";
+import { identityLabelText, resolvedIdentityLabel } from "../collab/identityLabel";
 import { Select, type SelectOption } from "../../components/primitives/Select";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
 import { changedLineCount, diffWithSegments, type DiffLine } from "../../dialect";
@@ -476,15 +477,16 @@ export function SnapshotsPanel({
                 snaps.map((s, idx) => {
                   const isSel = s.snapshot_uuid === selected;
                   // The resolved author (`collab-provenance` task 4): a readable
-                  // name, never a raw actor id or hash. `Unknown` is localized copy.
+                  // name, never a raw actor id or hash. The variant-to-copy rule is
+                  // shared with the live roster (`member-devices` task 5), so the
+                  // two surfaces cannot name one device two ways; only the
+                  // absent-revision copy is this list's own.
                   const author = s.resolved_author;
+                  const authorRule = resolvedIdentityLabel(author);
                   const authorLabel =
-                    author.kind === "Device"
-                      ? author.name ??
-                        t("notes.snapshots.deviceFallback", { code: author.code })
-                      : author.kind === "Person"
-                        ? author.name
-                        : t("notes.snapshots.unknownAuthor");
+                    authorRule === null
+                      ? t("notes.snapshots.unknownAuthor")
+                      : identityLabelText(authorRule, t);
                   return (
                     <button
                       key={s.snapshot_uuid}

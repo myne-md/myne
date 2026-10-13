@@ -131,6 +131,12 @@ pub enum MemberFamily {
     /// classifier rejected the path, so a backup silently dropped every member's
     /// display name and a restore lost them with nothing reporting it.
     MemberNames,
+    /// `vault.device-bindings` device-to-person map (`MYU5`, §9.30, myne-md/myne#852):
+    /// authoritative user data and a Class-1 sync member, so the same `sync ⊆ backup`
+    /// rule applies. Carrying the tombstones is load-bearing for the reason the
+    /// `ChatsCatalog` note above states: a restore that dropped them would resurrect
+    /// a binding the vault had cleared.
+    DeviceBindings,
 }
 
 /// Allocation-bound cap for a member of `family` (§9.11.6 — the exact cap
@@ -209,6 +215,12 @@ pub fn family_member_cap(family: MemberFamily) -> u64 {
         MemberFamily::MemberNames => {
             (protocol::member_names_blob::MAX_MEMBER_NAMES_PLAINTEXT_LEN
                 + protocol::member_names_blob::MEMBER_NAMES_BLOB_HEADER_LEN
+                + 32) as u64
+        }
+        // §9.30.5: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag.
+        MemberFamily::DeviceBindings => {
+            (protocol::device_binding_blob::MAX_DEVICE_BINDINGS_PLAINTEXT_LEN
+                + protocol::device_binding_blob::DEVICE_BINDING_BLOB_HEADER_LEN
                 + 32) as u64
         }
     }
@@ -353,6 +365,7 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
         "vault.agent-memory" => return Some(MemberFamily::MemoryCatalog),
         "vault.personality" => return Some(MemberFamily::Personality),
         "vault.member-names" => return Some(MemberFamily::MemberNames),
+        "vault.device-bindings" => return Some(MemberFamily::DeviceBindings),
         _ => {}
     }
     if let Some(rest) = path.strip_prefix("notes/") {

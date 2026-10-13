@@ -878,6 +878,10 @@ mod tests {
             // The member display-name map is vault CONTENT (`sync ⊆ backup`), so
             // it is allowlisted where those two are not (myne-md/myne#851).
             ("vault.member-names", Some(MemberNames)),
+            // §9.30 (`member-devices`): vault CONTENT and a Class-1 sync member, so
+            // it is allowlisted for the same reason the two member-plane families
+            // above are. This assertion is what a missing classifier arm fails.
+            ("vault.device-bindings", Some(DeviceBindings)),
             ("attachments-text/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", None),
             ("notes/whatever.txt", None),
             ("notes/0190a000-0000-7000-8000-000000000001.myn.tmp", None),
@@ -1024,6 +1028,7 @@ mod tests {
             MemberFamily::MemoryEntry => "memory-entry",
             MemberFamily::Personality => "personality",
             MemberFamily::MemberNames => "member-names",
+            MemberFamily::DeviceBindings => "device-bindings",
         }
     }
 
