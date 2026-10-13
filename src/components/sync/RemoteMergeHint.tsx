@@ -9,6 +9,13 @@
 // resolve / undo affordance: a CRDT merge is not a conflict to act on, and
 // recovery is the note's own synced history (ASM-12→B), not an undo button.
 //
+// It is ALSO silent for a LIVE peer edit, and that is a separate signal on
+// purpose (myne-md/myne#857): the live channel emits `sync://live-remote-merged`,
+// which only the pane listens to, because a change arriving in the note the user
+// is watching needs no notice. Every device sees the owner's row as `owner` too,
+// so this hint used to fire on BOTH sides of a two-person session: the editor for
+// its own echoed edit, and the peer for the live change.
+//
 // Headless: it draws no DOM of its own — the shared <Toaster> renders the toast,
 // so the merge hint looks and stacks like every other toast. The tone is
 // deliberately `info`, never `error`: a merge from your own other device is

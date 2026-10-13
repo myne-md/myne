@@ -2691,10 +2691,16 @@ export const ROSTER = Object.freeze([
       "mobile/src/app/flows/WelcomeFlow.tsx",
       "mobile/src/app/flows/IdentityFlow.tsx",
       "mobile/src/lib/personAccount.ts",
+      "mobile/src/lib/memberNames.ts",
+      "mobile/src/components/SyncSettingsPanels.tsx",
+      "mobile/src/components/layout.tsx",
+      "mobile/src-tauri/src/plugins/member_names/",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
     automatedBy: [
       "e2e/member-roster.e2e.ts",
+      "mobile/tests/flow-logic/sync/member-accept.flow.ts",
+      "mobile/tests/components/SyncMembersPanel.test.tsx",
     ],
     manual: [
       {
@@ -2709,6 +2715,13 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "Two real devices on one network with a configured server, a real recovery phrase ceremony and a real invite relay are all outside the harness; the mobile flow-logic tier drives mocks and no device.",
         clients: ["ios", "android"],
         estimateMin: 40,
+        tier: "core",
+      },
+      {
+        see: "Invite this identity to a second vault, then on the phone accept it (myne-md/myne#851 tasks 14 and 15). Confirm the owner's identity code pastes into the accept step and that Inspect renders a fingerprint a person can read aloud and compare against the owner's own screen before ticking the compare. Confirm all 24 phrase cells accept the phrase and that the on-screen keyboard does not cover the cell you are typing into or the password field below the grid. Type a password under the floor and confirm the submit stays refused, then type one that meets it and confirm the accept lands on the NAME step rather than in the editor. Confirm that step offers no way out at all (no back chevron, and a blank or whitespace-only name leaves Save refused), that saving opens the vault, and that the vault then reopens from that password after the app is killed and relaunched rather than from the phrase. Finally, on the OWNER's device, open Settings, Sync, Members and confirm this member's chosen name renders beside their fingerprint, and that a second member invited to the same vault sees the same name.",
+        whyNotAutomated: "The flow-logic tier (mobile/tests/flow-logic/sync/member-accept.flow.ts) drives this step order, the four arguments the accept forwards, the gate's refusal to continue unnamed and the error mapping, but it drives a mocked IPC, and the Members panel's own row rule is held by mobile/tests/components/SyncMembersPanel.test.tsx against a mocked roster. What it cannot hold: the accept's own work happens host-side, where Argon2id derives this device's vault.member-unlock credential and unseals the person wrap against the owner's sealed copy, so 'the vault reopens from that password' is a statement about real key material no mock performs; the name row is signed with this device's real person key and only reads back as VERIFIED on another member's device, which is the second device; the phrase grid and the password field sit under an on-screen keyboard whose height no harness here supplies; and the surface is WKWebView on iOS and Android System WebView, neither of which any harness in this tree drives.",
+        clients: ["ios", "android"],
+        estimateMin: 25,
         tier: "core",
       },
     ],
@@ -5984,13 +5997,14 @@ export const ROSTER = Object.freeze([
       "e2e/sync-usage.e2e.ts",
       "e2e/member-roster.e2e.ts",
       "e2e/sync-identity-block.e2e.ts",
+      "e2e/member-onboarding.e2e.ts",
     ],
      manual: [
        {
-         see: "On two real devices signed into one person account, create a disposable vault as the owner, copy the owner's public identity code, and send an invite to the second device. On the second device, confirm the invite appears, inspect the owner's fingerprint out of band, enter the member phrase, and accept. Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Then, while the member vault is unlocked, open Settings, Privacy, Shared vault unlock, and in turn set a password, a PIN, and (on macOS/iOS) the device biometric; after each, lock the member vault, reopen it, and confirm it unlocks with that credential (not the phrase), that the wrong credential is refused, that the PIN's five-attempt wipe works, and that sync still runs. Use the on-screen toggle to switch to the recovery phrase and confirm it still opens the same vault, and use Remove to clear the credential and confirm the phrase is then the only fast path. On the phone, confirm the same vault opens from the phrase and from the configured fast credential through the mobile unlock view. Finally, lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
-         whyNotAutomated: "The Linux E2E lane covers the local invite form, identity-home code, and a deliberately failed invitation fetch, but it does not provision two live person accounts or drive the member vault's real acceptance and re-unlock path. The pass condition is a cross-session identity handoff over a real relay and a real second device.",
+         see: "Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Then, while the member vault is unlocked, open Settings, Privacy, Shared vault unlock, and in turn set a password, a PIN, and (on macOS/iOS) the device biometric; after each, lock the member vault, reopen it, and confirm it unlocks with that credential (not the phrase), that the wrong credential is refused, that the PIN's five-attempt wipe works, and that sync still runs. Use the on-screen toggle to switch to the recovery phrase and confirm it still opens the same vault, and use Remove to clear the credential and confirm the phrase is then the only fast path. On the phone, confirm the same vault opens from the phrase and from the configured fast credential through the mobile unlock view. Finally, lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
+         whyNotAutomated: "The Linux E2E lane now drives the accept path end to end over a real relay (e2e/member-onboarding.e2e.ts: the owner's two-step share door, the invite post, the member's out-of-band compare, their own phrase, a password for that device, and the name gate, with the name read back on the OWNER's device). What it cannot reach is the half that starts after the accept: the pass condition is a cross-session handoff into a RE-LAUNCHED member vault, and a device-credential surface whose PIN arm needs five wrong entries across five real lock cycles and whose biometric arm needs a real sensor. Both are session-scoped state no single-session driver can own.",
          clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
-         estimateMin: 10,
+         estimateMin: 6,
          tier: "standard",
        },
        {

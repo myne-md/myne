@@ -397,7 +397,17 @@ export function useDevices(): DevicesHook {
 /** One vault member as the UI consumes it (mirrors the Rust `RosterMemberView`). */
 export interface RosterMemberView {
   fingerprint_hex: string;
+  /** Whether this row is the caller, decided by the backend from the local
+   *  person fingerprint. Never infer "You" from `role` (myne-md/myne#859). */
+  is_self: boolean;
+  /** The member's display name, resolved from the signed name store; non-empty
+   *  only when `name_state` is `verified`. Mirrors the Rust `RosterMemberView`
+   *  field of the same name. */
   display_name: string;
+  /** `verified` | `unverified` | `absent`: whether the signed name store holds a
+   *  record for this row and whether it verified. Not a flag, so "no name chosen"
+   *  stays distinct from "a record nobody's signature backs". */
+  name_state: "verified" | "unverified" | "absent";
   role: "owner" | "member";
   previous_fingerprint_hex: string | null;
   /** `current` | `changed` | `owner-confirmed`, or `null` on a legacy roster. */
@@ -419,6 +429,21 @@ export interface MembersHook {
 }
 
 /**
+ * Read the unlocked vault's roster once.
+ *
+ * A plain binding rather than a hook, because there are two callers with different
+ * lifetimes: [`useMembers`] below re-reads once per mount for the Members panel, and
+ * the onboarding name step (`app/flows/IdentityFlow.tsx`, myne-md/myne#851 task 15)
+ * reads it ONCE to decide whether it has to ask at all. It is the same IPC either
+ * way, so it lives in one place, and `scripts/check-ipc-binding-callers.mjs` refuses
+ * an exported binding with no production caller, which an inline `invoke` inside a
+ * hook would hide.
+ */
+export function listRoster(): Promise<RosterListView> {
+  return invoke<RosterListView>("plugin:sync|sync_list_roster");
+}
+
+/**
  * Read the unlocked vault's member roster + the caller's authority. Read-only on
  * mobile: the invite and removal flows need the person-identity prompt, which is
  * desktop-first until the member wire lands, and a member is never shown an
@@ -432,7 +457,7 @@ export function useMembers(): MembersHook {
 
   useEffect(() => {
     let cancelled = false;
-    invoke<RosterListView>("plugin:sync|sync_list_roster")
+    listRoster()
       .then((view) => {
         if (!cancelled) {
           setMembers(view.members);

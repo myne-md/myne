@@ -231,6 +231,19 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           await (await app.session.byTestId("welcome.identity-cta")).click();
           await (await app.session.byTestId("identity-setup.create-cta")).click();
           await app.session.byTestId("identity-setup.phrase");
+          // The type-back below the grid gates Done (myne-md/myne#855): reveal the
+          // grid, read the words off it, and answer the four positions the challenge
+          // asks for. Without this the scenario can never leave the dialog, which is
+          // the point of the challenge.
+          await (await app.session.byTestId("identity-setup.phrase-reveal")).click();
+          const cells = await app.session.byTestIdAll("identity-setup.phrase-word");
+          const words = (
+            await Promise.all(cells.map(async (c) => (await c.text()).trim()))
+          ).map((t) => t.replace(/^\d+/, "").trim());
+          for (const input of await app.session.byTestIdAll("identity-setup.confirm-input")) {
+            const pos = Number(await input.attribute("data-index"));
+            await input.sendKeys(words[pos - 1]);
+          }
           await (await app.session.byTestId("identity-setup.close-cta")).click();
           await app.session.byTestId("identity-home.identity-code");
           const code = await app.session.byTestId("identity-home.identity-code");

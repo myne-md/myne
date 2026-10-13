@@ -26,6 +26,19 @@ export interface IdentityFlowProps {
   /** Leave the flow. From the gate it is the skip path; from the home it
    *  dismisses the overlay. An identity, once created, is not undone here. */
   onCancel: () => void;
+  /**
+   * An invite was accepted, this device has named itself, and the member vault
+   * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell
+   * closes the overlay and re-probes, which is how every other flow hands a new
+   * vault back (`JoinFlowProps`' `onComplete` is the same shape): the vault is on
+   * disk and unlocked, so the probe is what decides where the user lands, rather
+   * than this flow guessing.
+   *
+   * NOT called by the accept itself. The name step sits between the two and reads
+   * this through a ref, so the accepted vault cannot reach an editor unnamed: the
+   * callback is the name gate's completion, not the accept's.
+   */
+  onAccepted: () => void;
 }
 
 export interface JoinFlowProps {

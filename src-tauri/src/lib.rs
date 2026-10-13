@@ -357,6 +357,7 @@ pub fn run() {
         .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::themes::init())
+        .plugin(plugins::member_names::init())
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::sync::init())

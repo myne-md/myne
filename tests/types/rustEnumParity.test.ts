@@ -54,6 +54,41 @@ type Mirror = {
   rsEnum: string;
 };
 
+/**
+ * A second shape, and the reason it is a second roster rather than a wider row.
+ *
+ * `Mirror` can only describe an enum, and its per-row case compares VARIANT
+ * NAMES, which a struct does not have. The one wire shape that needed the other
+ * comparison is `client-core/src/types/member-names-map.ts`: a hand-written
+ * mirror of `protocol::MemberNamesMap`, which is a `BTreeMap<String,
+ * MemberNameEntry>` over a plain `#[derive(Serialize, Deserialize)]` struct, not
+ * an enum (myne-md/myne#851).
+ *
+ * The defect it closes is the one this file already names twice. That file
+ * carries the `TODO(Phase-1-end)` marker, so it declares itself a mirror, and
+ * before this roster existed it was the ONE such file with no row: it
+ * type-checked, it shipped, and nothing compared it to the Rust struct, so a
+ * field renamed in `member_names_blob.rs` would have arrived on the client as
+ * `undefined` with every gate green. Widening `Mirror` instead would have meant
+ * carrying a third optional field that 34 of 35 rows leave absent, which is the
+ * "documented escape hatch" the note above warns about.
+ *
+ * Compared field for field, both ways, for the same reason the enum case
+ * compares variants both ways: a field the mirror is MISSING arrives as
+ * `undefined`, and a field the Rust struct dropped is a property the client
+ * reads that can never be set.
+ */
+type StructMirror = {
+  /** Repo-relative path of the TypeScript file. */
+  ts: string;
+  /** The exported `interface` name inside it. */
+  tsType: string;
+  /** Repo-relative path of the Rust file. */
+  rs: string;
+  /** The `pub struct` name inside it. */
+  rsStruct: string;
+};
+
 // No "deliberately omitted variant" field, and its absence is the finding
 // rather than an oversight: the first draft carried a `tsOmits` map with its
 // own filter and its own stale-entry loop, and NONE of the 22 rows used it.
@@ -104,6 +139,12 @@ const MIRRORS: Mirror[] = [
     tsType: "QuickUnlockError",
     rs: "core/src/plugins/quick_unlock/error.rs",
     rsEnum: "QuickUnlockError",
+  },
+  {
+    ts: "client-core/src/types/member-names-error.ts",
+    tsType: "MemberNamesError",
+    rs: "core/src/plugins/member_names/error.rs",
+    rsEnum: "MemberNamesError",
   },
   {
     ts: "client-core/src/types/vault-change-password-error.ts",
@@ -277,6 +318,23 @@ const MIRRORS: Mirror[] = [
   },
 ];
 
+// ---- the shape mirrors (a struct, not an enum) --------------------------
+//
+// The TS side names the `interface` whose FIELDS are compared, and the Rust side
+// the `pub struct`. On `member-names-map.ts` those two are both called
+// `MemberNameEntry`; the exported `MemberNamesMap` beside it is a
+// `Record<string, MemberNameEntry>` alias, so a rename inside the row interface
+// is what would drift, and the row that compares the row interface is the one
+// that catches it.
+const STRUCT_MIRRORS: StructMirror[] = [
+  {
+    ts: "client-core/src/types/member-names-map.ts",
+    tsType: "MemberNameEntry",
+    rs: "protocol/src/member_names_blob.rs",
+    rsStruct: "MemberNameEntry",
+  },
+];
+
 /**
  * The floor under the roster, measured rather than chosen.
  *
@@ -287,6 +345,14 @@ const MIRRORS: Mirror[] = [
  * number in the code rather than in the data it bounds, for the same reason.
  */
 const MIRROR_FLOOR = 30;
+
+/**
+ * The floor under the shape roster, measured rather than chosen: one struct
+ * mirror exists today (`MemberNamesMap`). Its own number rather than a share of
+ * the thirty above, because a union floor of 30 would stay met with this roster
+ * emptied.
+ */
+const STRUCT_MIRROR_FLOOR = 1;
 
 /**
  * Trees that may hold a mirror, walked by the both-ways denominator.
@@ -396,12 +462,76 @@ export function tsVariants(src: string, name: string): string[] {
   return [...body.matchAll(/"(\w+)"/g)].map((m) => m[1]);
 }
 
+/**
+ * Field names of `pub struct <name>`, in declaration order.
+ *
+ * `\b` after the name for the same reason `rustVariants` carries it, and the
+ * `pub` prefix is optional so a private struct is still found rather than
+ * silently parsing to nothing. Depth is tracked over braces and parentheses the
+ * way `rustVariants` tracks it, so a field typed as a tuple or a nested struct
+ * does not have its inner names read as fields.
+ */
+export function rustStructFields(src: string, name: string): string[] {
+  const body = bodyAfter(stripRust(src), new RegExp(`pub struct ${name}\\b(?:<[^>]*>)?\\s*\\{`));
+  if (body === null) return [];
+  const out: string[] = [];
+  let depth = 0;
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (depth === 0) {
+      // `pub name: Type,`, or a tuple field (`pub u8`) which has no name to
+      // compare and is therefore skipped rather than recorded as one.
+      const m = /^(?:pub\s+)?([a-z_]\w*)\s*:/.exec(line);
+      if (m) out.push(m[1]);
+    }
+    for (const ch of line) {
+      if (ch === "{" || ch === "(") depth += 1;
+      else if (ch === "}" || ch === ")") depth -= 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * Property names of `export interface <name>`, in declaration order.
+ *
+ * A `?` is accepted before the colon because an optional property is a field the
+ * Rust struct may still require, and that disagreement is worth failing on
+ * rather than skipping.
+ */
+export function tsInterfaceFields(src: string, name: string): string[] {
+  const body = bodyAfter(stripTs(src), new RegExp(`export interface ${name}\\b(?:<[^>]*>)?\\s*\\{`));
+  if (body === null) return [];
+  const out: string[] = [];
+  let depth = 0;
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (depth === 0) {
+      const m = /^([A-Za-z_$][\w$]*)\s*\??\s*:/.exec(line);
+      if (m) out.push(m[1]);
+    }
+    for (const ch of line) {
+      if (ch === "{" || ch === "(") depth += 1;
+      else if (ch === "}" || ch === ")") depth -= 1;
+    }
+  }
+  return out;
+}
+
 describe("Rust enum ↔ TypeScript mirror parity", () => {
   it("keeps at least as many mirrors as were measured", () => {
     expect(
       MIRRORS.length,
-      "the roster shrank; a mirror was removed rather than fixed, or the floor is stale",
+      "the enum roster shrank; a mirror was removed rather than fixed, or the floor is stale",
     ).toBeGreaterThanOrEqual(MIRROR_FLOOR);
+    // Bounded separately rather than folded into the union: the enum floor is
+    // 30 and the shape roster holds one row, so a union floor would stay met
+    // with that whole roster emptied, which is exactly the "a named roster with
+    // no floor is a roster that can be emptied" failure the floor exists for.
+    expect(
+      STRUCT_MIRRORS.length,
+      "the shape roster shrank; a mirror was removed rather than fixed, or the floor is stale",
+    ).toBeGreaterThanOrEqual(STRUCT_MIRROR_FLOOR);
   });
 
   it("has a row for every file that declares itself a mirror", () => {
@@ -412,7 +542,12 @@ describe("Rust enum ↔ TypeScript mirror parity", () => {
     // (`backup-export-error` twice, `import-read-error`, `pdf-export-error`
     // twice and `snapshot-error`, plus `vault-export-error`), and correcting it
     // turned up five more stale Rust paths in their headers on the way.
-    const claimed = new Set(MIRRORS.map((m) => m.ts));
+    //
+    // BOTH rosters, since the point of the check is the denominator: a row in
+    // either one claims its file, and a shape mirror claimed only by the second
+    // would otherwise read as unclaimed here and fail the branch it was added to
+    // fix.
+    const claimed = new Set([...MIRRORS, ...STRUCT_MIRRORS].map((m) => m.ts));
     const unclaimed: string[] = [];
     for (const dir of MIRROR_DIRS) {
       const abs = at(dir);
@@ -437,7 +572,9 @@ describe("Rust enum ↔ TypeScript mirror parity", () => {
     // The other direction, so a deleted mirror cannot leave a row behind that
     // then fails with `ENOENT` inside a per-mirror case and reads like a parser
     // bug rather than a stale roster.
-    const stale = [...new Set(MIRRORS.map((m) => m.ts))].filter((p) => !existsSync(at(p)));
+    const stale = [...new Set([...MIRRORS, ...STRUCT_MIRRORS].map((m) => m.ts))].filter(
+      (p) => !existsSync(at(p)),
+    );
     expect(stale, "roster rows naming TypeScript files that no longer exist").toEqual([]);
   });
 
@@ -446,9 +583,9 @@ describe("Rust enum ↔ TypeScript mirror parity", () => {
     // this test exists to prevent is a mirror compared against nothing. A path
     // that has moved must fail BY NAME here rather than produce an empty
     // variant list that then "matches" an empty TS side.
-    const missing = MIRRORS.filter((m) => !existsSync(at(m.rs))).map(
-      (m) => `${m.tsType}: ${m.rs}`,
-    );
+    const missing = [...MIRRORS, ...STRUCT_MIRRORS]
+      .filter((m) => !existsSync(at(m.rs)))
+      .map((m) => `${m.tsType}: ${m.rs}`);
     expect(missing).toEqual([]);
   });
 
@@ -468,6 +605,20 @@ describe("Rust enum ↔ TypeScript mirror parity", () => {
     expect(new Set(ts), `${m.tsType} and ${m.rsEnum} name different variants`).toEqual(
       new Set(rs),
     );
+  });
+
+  it.each(STRUCT_MIRRORS)("$tsType mirrors $rsStruct field for field", (m: StructMirror) => {
+    const rs = rustStructFields(readFileSync(at(m.rs), "utf8"), m.rsStruct);
+    const ts = tsInterfaceFields(readFileSync(at(m.ts), "utf8"), m.tsType);
+
+    // The same non-vacuity pair the enum case carries, for the same reason: a
+    // struct renamed in Rust parses to an empty list, and an interface renamed
+    // in TypeScript parses to one, and an empty-vs-empty comparison would report
+    // agreement between two things that were both absent.
+    expect(rs.length, `no fields parsed from ${m.rsStruct} in ${m.rs}`).toBeGreaterThan(0);
+    expect(ts.length, `no fields parsed from ${m.tsType} in ${m.ts}`).toBeGreaterThan(0);
+
+    expect(new Set(ts), `${m.tsType} and ${m.rsStruct} name different fields`).toEqual(new Set(rs));
   });
 
   it("parses a tagged union, a string-literal union and a generic enum", () => {
@@ -501,5 +652,45 @@ describe("Rust enum ↔ TypeScript mirror parity", () => {
     `;
     expect(tsVariants(ts, "Tagged")).toEqual(["Unit", "WithFields"]);
     expect(tsVariants(ts, "Literal")).toEqual(["One", "Two"]);
+  });
+
+  it("parses a struct's fields and an interface's properties", () => {
+    // The shape parsers, against fixtures rather than against the tree, by the
+    // same rule as the pair above. Each case here is a defect the real tree
+    // would hide: a rename makes the list empty (non-vacuity), an inline
+    // `#[serde]` attribute or a doc comment on its own line must not read as a
+    // field, and a nested struct's inner names must not either.
+    const rs = `
+      /// doc comment naming fake_field
+      #[derive(Debug, Serialize, Deserialize)]
+      pub struct Sample {
+          /// doc
+          pub name: String,
+          #[serde(rename = "v")]
+          pub version: u64,
+          pub inner: Nested,
+          pub pair: (u8, u8),
+      }
+      pub struct Nested { a: u8 }
+      pub struct SampleRow { not_sample: u8 }
+    `;
+    expect(rustStructFields(rs, "Sample")).toEqual(["name", "version", "inner", "pair"]);
+    // `\b` again, so `Sample` does not swallow `SampleRow`.
+    expect(rustStructFields(rs, "SampleRow")).toEqual(["not_sample"]);
+    // Tuple fields carry no name, so `Nested`'s one field is all that is named.
+    expect(rustStructFields(rs, "Nested")).toEqual(["a"]);
+
+    const ts = `
+      export interface Sample {
+        name: string;
+        /** a docblock naming fakeField */
+        version: number;
+        inner?: { a: number };
+      }
+    `;
+    expect(tsInterfaceFields(ts, "Sample")).toEqual(["name", "version", "inner"]);
+    // A name the fixture does not carry must be empty rather than a match for
+    // whichever interface happened to come first.
+    expect(tsInterfaceFields(ts, "Absent")).toEqual([]);
   });
 });

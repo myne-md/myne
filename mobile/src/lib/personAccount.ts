@@ -71,16 +71,24 @@ export function personListInvites(): Promise<InviteSummary[]> {
   return invoke<InviteSummary[]>("plugin:sync|sync_person_list_invites");
 }
 
-/** Claim an invite and materialize the member vault. */
+/** Claim an invite and materialize the member vault.
+ *
+ * `password` is REQUIRED, and becomes the vault's device-local fast credential
+ * (`vault.member-unlock`), written as part of installing the member session
+ * (myne-md/myne#851 task 7). It is this device's password, not the vault owner's.
+ * Both clients collect it in their own accept form: desktop's `IdentityHome` and
+ * the phone's `IdentityFlow` accept step (myne-md/myne#851 task 14). */
 export function personAcceptInvite(
   inviteIdHex: string,
   ownerCode: string,
   phrase: string,
+  password: string,
 ): Promise<void> {
   return invoke<void>("plugin:sync|sync_person_accept_invite", {
     inviteIdHex,
     ownerCode,
     phrase,
+    password,
   });
 }
 

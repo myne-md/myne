@@ -865,8 +865,23 @@ pub async fn accept_invite_from_host(
     invite_id_hex: &str,
     owner_code: &str,
     phrase: &str,
+    // The REQUIRED device-local fast credential (myne-md/myne#851 task 7).
+    password: &str,
 ) -> Result<AcceptedInviteView, SyncDeviceError> {
     use super::token_store::TokenStore as _;
+
+    // The project's ONE floor, counted the way the backend counts it (Unicode scalar
+    // values), and checked BEFORE the invite is claimed or any directory is created: a
+    // password below it must not leave a claimed invite or a half-materialized vault
+    // behind. The form gates on the same constant, so this is the enforcement rather
+    // than the message.
+    protocol::validate_min_length(password).map_err(|_| {
+        tracing::warn!(
+            stage = "accept_password_floor",
+            "b2b accept refused: the password is below the project floor"
+        );
+        SyncDeviceError::BadRequest
+    })?;
 
     let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
     let person_id = protocol::person_id_hash(normalized.as_str());
@@ -967,13 +982,23 @@ pub async fn accept_invite_from_host(
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
+    // `vault.meta` is create-only, so a failure here would leave the directory this
+    // call just created behind, and the next attempt (or the UI's vault list) reads a
+    // partial vault directory as a real vault. Remove it and refuse, the same way the
+    // missing fast credential below does.
     let meta_path = vault_dir.join("vault.meta");
-    super::enroll::write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await?;
+    if let Err(e) =
+        super::enroll::write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await
+    {
+        tracing::warn!(stage = "accept_bootstrap_meta", "b2b accept failed");
+        let _ = io.remove_dir_all(&vault_dir).await;
+        return Err(e);
+    }
 
     // Persist the member keys, sealed under the member's own phrase, so the
     // vault can be re-unlocked later without a password (task 25). Written
     // BEFORE the slot install, which consumes the key values.
-    super::member_key_store::write_member_key_store(
+    let member_key_written = super::member_key_store::write_member_key_store(
         io,
         &vault_dir,
         vault_id.as_uuid().as_bytes(),
@@ -985,11 +1010,34 @@ pub async fn accept_invite_from_host(
         &group_key,
         &items_key,
     )
-    .await
-    .map_err(|_| {
+    .await;
+    if member_key_written.is_err() {
         tracing::warn!(stage = "accept_member_key_store", "b2b accept failed");
-        SyncDeviceError::Internal
-    })?;
+        let _ = io.remove_dir_all(&vault_dir).await;
+        return Err(SyncDeviceError::Internal);
+    }
+
+    // The REQUIRED fast credential, written as part of installing the member session and
+    // BEFORE the slot install, which consumes the key values. An accepted vault that
+    // carries no fast credential would make the mandatory password a lie, so a failure
+    // here removes the directory this call just created and refuses: an invite that
+    // failed to materialize fully is one the user retries, not one they are locked out
+    // of. The phrase-sealed `vault.member-key` above stays the portable fallback.
+    write_accept_fast_credential(
+        io,
+        &vault_dir,
+        &vault_id,
+        &account_hash,
+        epoch,
+        &items_key_id,
+        &person_id,
+        &b2b.base.kdf_params,
+        password,
+        &group_key,
+        &items_key,
+        &member,
+    )
+    .await?;
 
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
@@ -1055,25 +1103,110 @@ pub async fn accept_invite_from_host(
     })
 }
 
+/// Write the fast credential an ACCEPT must carry (`vault.member-unlock`,
+/// myne-md/myne#851 task 7), or remove the vault directory and refuse.
+///
+/// Split out of [`accept_invite_from_host`] because every input is a value the accept
+/// has already derived, so this half is testable without a server: the seal is the one
+/// [`super::member_unlock_store::write_member_unlock_password`] writes for the Privacy
+/// screen and the unlock path, with the accept-time `group_key` / `items_key` /
+/// `items_key_id` / epoch / `person_id` and the same person keypair. There is exactly
+/// one credential format, so "the password set during accept opens the vault next
+/// session" is true by construction rather than by two agreeing code paths.
+///
+/// Ordering is the point. This runs BEFORE the slot install, so a failure leaves no
+/// session and no accepted vault; and it removes the directory it just populated,
+/// because `vault.meta` is create-only, so a retry over a half-written directory would
+/// fail forever. The invite is already claimed at this point (the claim is the first
+/// network call), and that is deliberate: the claim is idempotent and re-claiming on a
+/// retry returns the same package.
+#[allow(clippy::too_many_arguments)]
+async fn write_accept_fast_credential(
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+    vault_id: &crate::vault_id::VaultId,
+    account_hash: &[u8; 16],
+    group_key_epoch: u64,
+    items_key_id: &[u8; 16],
+    person_id: &[u8; 16],
+    kdf_params: &protocol::KdfParams,
+    password: &str,
+    group_key: &[u8; 32],
+    items_key: &[u8; 32],
+    pair: &protocol::PersonKeyPair,
+) -> Result<(), SyncDeviceError> {
+    let written = super::member_unlock_store::write_member_unlock_password(
+        io,
+        vault_dir,
+        vault_id.as_uuid().as_bytes(),
+        account_hash,
+        group_key_epoch,
+        items_key_id,
+        person_id,
+        kdf_params,
+        password,
+        group_key,
+        items_key,
+        pair,
+    )
+    .await;
+    if written.is_err() {
+        tracing::warn!(
+            stage = "accept_member_unlock_store",
+            "b2b accept failed: the fast credential could not be written; removing the half-materialized vault"
+        );
+        let _ = io.remove_dir_all(vault_dir).await;
+        return Err(SyncDeviceError::Internal);
+    }
+    Ok(())
+}
+
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn sync_person_accept_invite<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
     invite_id_hex: String,
     owner_code: String,
     phrase: String,
+    password: String,
 ) -> Result<AcceptedInviteView, SyncDeviceError> {
     let phrase = zeroize::Zeroizing::new(phrase);
-    accept_invite_from_host(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
-        &crate::vault_io::StdVaultIo,
+    let password = zeroize::Zeroizing::new(password);
+    let host = crate::host::tauri_host::TauriHost::new(app.clone());
+    let io = crate::vault_io::StdVaultIo;
+    let accepted = accept_invite_from_host(
+        &host,
+        &io,
         state.inner(),
         &invite_id_hex,
         &owner_code,
         &phrase,
+        &password,
     )
-    .await
+    .await?;
+    // The accepted vault is now the ACTIVE member slot, so run the shared
+    // post-unlock pipeline here too. It resolves the vault's label from the
+    // decrypted prefs and writes the device-local `vault.label`, which is what the
+    // LOCKED picker reads. Skipping it left the member reading "Vault N" until some
+    // later sync cycle or unlock (myne-md/myne#856).
+    //
+    // Best-effort: the invite is already claimed and the vault materialized, so a
+    // label hiccup must not turn a successful accept into a failure the user would
+    // retry: the retry would find the invite already claimed.
+    let vault_id = crate::vault_id::VaultId::parse(&accepted.vault_id)
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    if run_member_post_unlock(&host, state.inner(), hooks.inner(), &io, vault_id)
+        .await
+        .is_err()
+    {
+        tracing::warn!(
+            stage = "accept_post_unlock",
+            "the post-accept label pipeline did not complete; the vault name resolves on the next unlock or sync"
+        );
+    }
+    Ok(accepted)
 }
 
 /// **Re-unlock a member vault from the recovery phrase** (myne-md/myne#711
@@ -3199,6 +3332,160 @@ mod tests {
             .await
             .expect("write store");
             assert_eq!(member_key_store_epoch(&io, &root).await, Some(7));
+        });
+    }
+
+    // ── the REQUIRED accept credential (myne-md/myne#851 task 7) ─────────────
+    //
+    // The floor is checked BEFORE anything else, so a password below it cannot
+    // claim the invite or create a vault directory.
+    //
+    // **The owner code here is VALID and the transport is never built, which is
+    // what makes the assertion about the ORDER rather than about the refusal.**
+    // An earlier version of this test passed a malformed code, so it went green
+    // even with the floor check deleted: `decode_person_identity_code` answered the
+    // same `BadRequest` for the same fixture, and the fixture could not reach the
+    // state the check exists to prevent (`core/AGENTS.md`, "a fixture that cannot
+    // hold the defective state is not a test"). With a real code in hand the next
+    // thing the function does is ask the host for the auth path, and `NoopHost`
+    // refuses EVERY host call: a version that checked the floor late answers
+    // `Internal` here, and only an early check answers `BadRequest`.
+    #[test]
+    fn a_password_below_the_floor_is_refused_before_the_invite_is_claimed() {
+        let io = crate::test_support::ContainerVaultIo;
+        let state = VaultRuntimeState::default();
+        let owner_pair =
+            protocol::PersonKeyPair::generate_raw(&[0x31; 64], &[0x32; 32], &[0x33; 32]);
+        let owner_code = super::super::invite::encode_person_identity_code(
+            &protocol::person_id_hash("abandon abandon abandon"),
+            &owner_pair.public_half(),
+        );
+        let below_floor = "a".repeat(protocol::MIN_PASSWORD_LEN - 1);
+        assert_eq!(below_floor.chars().count(), protocol::MIN_PASSWORD_LEN - 1);
+        let err = crate::test_support::block_on(accept_invite_from_host(
+            &crate::host::NoopHost,
+            &io,
+            &state,
+            "invite-1",
+            &owner_code,
+            "abandon abandon abandon",
+            &below_floor,
+        ))
+        .unwrap_err();
+        assert_eq!(err, SyncDeviceError::BadRequest);
+    }
+
+    // The credential the accept writes is the SAME one the unlock path reads, with
+    // the accept-time keys, epoch and person id: "the password set during accept
+    // opens the vault next session" holds by construction, because there is one
+    // format and one writer.
+    #[test]
+    fn the_accept_credential_opens_with_the_accept_time_values() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("accept-credential").expect("temp dir");
+            let io = crate::vault_io::StdVaultIo;
+            let root = tmp.path();
+            // A fresh v7 id, the same constructor a new vault directory gets.
+            let vault_id = crate::vault_id::VaultId::mint();
+            let account_hash = [0x5c; 16];
+            let group_key = [0x71; 32];
+            let items_key = [0x72; 32];
+            let items_key_id = [0x73; 16];
+            let person_id = [0x74; 16];
+            let pair = protocol::PersonKeyPair::generate_raw(&[0x21; 64], &[0x22; 32], &[0x23; 32]);
+            let password = "correct horse battery staple";
+
+            write_accept_fast_credential(
+                &io,
+                root,
+                &vault_id,
+                &account_hash,
+                7,
+                &items_key_id,
+                &person_id,
+                &crate::test_support::FAST_TEST_KDF,
+                password,
+                &group_key,
+                &items_key,
+                &pair,
+            )
+            .await
+            .expect("the accept credential is written");
+
+            let opened = super::super::member_unlock_store::read_member_unlock_password(
+                &io,
+                root,
+                vault_id.as_uuid().as_bytes(),
+                &crate::test_support::FAST_TEST_KDF,
+                password,
+            )
+            .await
+            .expect("the unlock path opens it");
+            assert_eq!(*opened.group_key, group_key);
+            assert_eq!(*opened.items_key, items_key);
+            assert_eq!(opened.group_key_epoch, 7);
+            assert_eq!(opened.items_key_id, items_key_id);
+            assert_eq!(opened.person_id, person_id);
+            assert_eq!(opened.pair.fingerprint(), pair.fingerprint());
+            // And a wrong password still fails closed, so the credential is not a
+            // skeleton key.
+            assert!(
+                super::super::member_unlock_store::read_member_unlock_password(
+                    &io,
+                    root,
+                    vault_id.as_uuid().as_bytes(),
+                    &crate::test_support::FAST_TEST_KDF,
+                    "wrong password",
+                )
+                .await
+                .is_none()
+            );
+        });
+    }
+
+    // A credential that cannot be written removes the directory the accept just
+    // populated and refuses: `vault.meta` is create-only, so a half-materialized
+    // vault would make every retry fail. The write is forced to fail by putting a
+    // DIRECTORY where the store file goes, which no rename can replace.
+    #[test]
+    fn a_failed_credential_write_removes_the_half_materialized_vault() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("accept-credential-fail")
+                .expect("temp dir");
+            let io = crate::vault_io::StdVaultIo;
+            let vault_dir = tmp.path().join("vault");
+            io.create_dir_all(&vault_dir).await.expect("vault dir");
+            io.create_dir_all(
+                &vault_dir.join(super::super::member_unlock_store::MEMBER_UNLOCK_STORE_FILE),
+            )
+            .await
+            .expect("block the store path");
+            // A fresh v7 id, the same constructor a new vault directory gets.
+            let vault_id = crate::vault_id::VaultId::mint();
+            let pair = protocol::PersonKeyPair::generate_raw(&[0x21; 64], &[0x22; 32], &[0x23; 32]);
+
+            let err = write_accept_fast_credential(
+                &io,
+                &vault_dir,
+                &vault_id,
+                &[0x5c; 16],
+                7,
+                &[0x73; 16],
+                &[0x74; 16],
+                &crate::test_support::FAST_TEST_KDF,
+                "correct horse battery staple",
+                &[0x71; 32],
+                &[0x72; 32],
+                &pair,
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err, SyncDeviceError::Internal);
+            assert!(
+                !vault_dir.exists(),
+                "the half-materialized vault directory must be gone, so the retry is fresh"
+            );
         });
     }
 }

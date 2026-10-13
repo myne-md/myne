@@ -328,6 +328,10 @@ fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, Bac
         // offers is missing from every backup, silently).
         "vault.agent-memory",
         "vault.personality",
+        // #851: the member display-name map is vault CONTENT (Class-1 sync
+        // member), so the same #256 rule applies: without this line a backup
+        // restores a vault whose every member fell back to a fingerprint.
+        "vault.member-names",
     ] {
         let path = vault_dir.join(singleton);
         if path.is_file() {
@@ -500,6 +504,8 @@ mod tests {
         // are vault CONTENT (Class-1 sync members); a backup that omits them
         // restores a vault with the conversation history gone.
         fs::write(root.join("vault.chats"), vec![0x04; 96]).unwrap();
+        // #851: the same #256 class again. The display-name map is vault content.
+        fs::write(root.join("vault.member-names"), vec![0x05; 128]).unwrap();
         fs::create_dir_all(root.join("chats")).unwrap();
         fs::write(root.join("chats/0123456789abcdef0123456789abcdef"), b"conv").unwrap();
         fs::write(root.join(format!("notes/{NOTE_A}.myn")), b"note-a").unwrap();
@@ -540,7 +546,7 @@ mod tests {
         let dest = dir.path().join("Myne backup 2026-06-10 1200.myne-backup");
 
         let summary = export_backup_with_dir(&vault, &dest).expect("export");
-        assert_eq!(summary.members, 10); // 5 singletons + 2 notes + 1 snapshot + 1 blob + 1 conversation
+        assert_eq!(summary.members, 11); // 6 singletons + 2 notes + 1 snapshot + 1 blob + 1 conversation
         assert_eq!(summary.notes, 2);
         assert_eq!(summary.snapshots, 1);
         assert_eq!(summary.attachments, 1);
@@ -548,7 +554,7 @@ mod tests {
 
         // The destination verifies (SYNC-4: a file that exists has verified).
         let records = crate::backup_container::read_and_verify_container(&dest).expect("verify");
-        assert_eq!(records.len(), 10);
+        assert_eq!(records.len(), 11);
         let paths: Vec<&str> = records.iter().map(|r| r.path.as_str()).collect();
         // #256: custom themes are vault CONTENT — encrypted, synced, and not
         // rebuildable from anything else. A verified backup that omits them
@@ -569,6 +575,12 @@ mod tests {
         assert!(
             paths.contains(&"chats/0123456789abcdef0123456789abcdef"),
             "a verified backup must carry the conversation files"
+        );
+        // #851: the member display-name map is vault CONTENT too. A backup that
+        // omits it restores a vault where every member is a fingerprint again.
+        assert!(
+            paths.contains(&"vault.member-names"),
+            "a verified backup must carry the member display-name map"
         );
         // No temp sibling left behind.
         assert!(!temp_sibling(&dest).exists());

@@ -16,10 +16,12 @@
 // export row, because there the file being saved is the phrase AND the account
 // number — see `src/screens/vault-creation/KitStep.tsx`.
 //
-// What is deliberately NOT here: a type-back challenge. `protocol.md` §7.1.3
-// mandates one for the vault phrase and the identity phrase gets none
-// (`decisions/ui/0615`). Comprehension testing is a property of the vault
-// ceremony, not of the reveal.
+// What is deliberately NOT here: a type-back challenge. The vault flow runs its
+// own as a separate reducer step (`vault-creation/ConfirmStep.tsx`) and the
+// identity dialog composes it from `PhraseTypeBack`; both gate the commit, and a
+// bare checkbox is not evidence (`protocol.md` section 7.1.3). This file stays the
+// reveal, so a third caller inherits the challenge by composing the same two
+// pieces rather than by copying a grid.
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

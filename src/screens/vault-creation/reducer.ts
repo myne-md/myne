@@ -9,6 +9,8 @@
 // orchestrator's useEffect cleanup fires `cancel(sessionToken)` and
 // React drops the state. Window-close = OS process exit = memory wipe.
 
+import { drawPhraseChallenge } from "@myne/client-core/phrase-challenge";
+
 export type Step =
   | "briefing"
   /**
@@ -198,35 +200,33 @@ function assertNever(x: never): never {
 }
 
 /**
- * Biased random drawing of 4 confirm positions:
+ * Biased random drawing of 4 confirm positions, 1-BASED for this ceremony:
  *   [0]: one position in [1, 8]
  *   [1], [2]: two distinct positions in [9, 16]
  *   [3]: one position in [17, 24]
  *
- * The biased distribution ensures the typing challenge samples across
- * the full phrase — partial-write detection (user wrote down only the
- * first 16 words) is improved by guaranteeing one position from the
- * last third. See design session Q3 for rationale.
+ * The rule itself lives in `@myne/client-core/phrase-challenge`, shared with the mobile
+ * client, which drew four uniform positions until myne-md/myne#851 and so lost the
+ * last-third guarantee on about one screen in six. See that module's header for the whole
+ * argument. This function is the +1 map onto this ceremony's own 1-based presentation,
+ * which `PhraseTypeBack` and the reducer's `CONFIRM_INPUT_CHANGED` are keyed by; the mobile
+ * flow keeps a 0-based array. Only the DRAW is shared, not the indexing.
  */
-function drawConfirmPositions(): readonly [number, number, number, number] {
-  const early = 1 + Math.floor(Math.random() * 8); // 1..8
-  const mid = [9, 10, 11, 12, 13, 14, 15, 16];
-  const i1 = Math.floor(Math.random() * mid.length);
-  let i2 = Math.floor(Math.random() * (mid.length - 1));
-  if (i2 >= i1) i2 += 1;
-  const late = 17 + Math.floor(Math.random() * 8); // 17..24
-  return [early, mid[i1], mid[i2], late] as const;
+export function drawConfirmPositions(): readonly [number, number, number, number] {
+  const [a, b, c, d] = drawPhraseChallenge();
+  return [a + 1, b + 1, c + 1, d + 1] as const;
 }
 
 /**
- * Normalize a word for confirmation comparison: NFKD + trim + lowercase.
- * Trailing whitespace and case mismatches must not falsely block the
- * user; recovery flow (Phase 1 DoD drill) applies the same normalization
- * when accepting typed phrase input.
+ * Normalize a word for confirmation comparison: NFKD + trim + lowercase. Trailing
+ * whitespace and case mismatches must not falsely block the user; the recovery flow
+ * (Phase 1 DoD drill) applies the same normalization when accepting typed phrase input.
+ *
+ * The body moved to `@myne/client-core/phrase-challenge` in myne-md/myne#851, where the
+ * mobile client's byte-identical copy of it lived too, and is re-exported here so every
+ * existing importer of `normalizeWord` is unchanged.
  */
-export function normalizeWord(s: string): string {
-  return s.normalize("NFKD").trim().toLowerCase();
-}
+export { normalizePhraseWord as normalizeWord } from "@myne/client-core/phrase-challenge";
 
 export function vaultCreationReducer(
   state: VaultCreationState,

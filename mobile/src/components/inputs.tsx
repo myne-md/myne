@@ -1,11 +1,26 @@
-import { useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
 /**
- * Form controls. UI-only: nothing is interactive state-wise — `focused`,
- * `filled`, `checked`, `value` etc. are presentational props the screens set to
- * reproduce a particular design state. Geometry matches the design catalog.
+ * Form controls.
+ *
+ * The SPECIMENS (`Field`, `PasswordField`, `PinDots`, `RecoveryGrid`,
+ * `Checkbox`, `Switch`, `Segmented`, `MonoBox`) are UI-only: nothing in them is
+ * interactive state-wise. `focused`, `filled`, `checked`, `value` etc. are
+ * presentational props the screens set to reproduce a particular design state,
+ * and geometry matches the design catalog.
+ *
+ * The REAL fields are the two sections further down (`MonoField`, `TextField`).
+ * They hold state and call back, which is why a wired flow binds those and not
+ * the specimens above: a specimen that draws a `value` cannot collect one.
  */
 
 // ── Text field ───────────────────────────────────────────────────────────────
@@ -482,12 +497,17 @@ export function MonoField({
   placeholder,
   testId,
   inputMode,
+  dir,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   testId: string;
   inputMode?: "url";
+  /** Pin the field left-to-right where the content is frozen English (the
+   *  recovery-phrase type-back), so an RTL locale does not put the caret on the
+   *  opposite side from where the grid showed the word. */
+  dir?: "ltr";
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -510,6 +530,7 @@ export function MonoField({
         onBlur={() => setFocused(false)}
         placeholder={placeholder}
         inputMode={inputMode}
+        dir={dir}
         spellCheck={false}
         autoCapitalize="off"
         autoComplete="off"
@@ -527,6 +548,131 @@ export function MonoField({
           color: "var(--fg-1)",
         }}
       />
+    </div>
+  );
+}
+
+/** The general single-line field: a controlled `<input>` inside the bordered
+ *  envelope the specimens at the top of this file draw.
+ *
+ *  `MonoField` above is the mono-only special case of this one and stays,
+ *  because the identity code and the phrase type-back pin `dir`, `inputMode` and
+ *  letter-spacing in a way a general field should not.
+ *
+ *  This exists because `IdentityFlow` had grown three hand-rolled copies of one
+ *  envelope, each re-deriving the border, the focus ring, the inner `<input>`'s
+ *  `border: none / outline: none / background: transparent` reset and the token
+ *  padding — and one of them a third border state the other two did not have.
+ *  Three copies is how an app acquires three field designs, which is the thing
+ *  `check-primitive-adoption.mjs` counts (myne-md/myne#788).
+ *
+ *  The reveal toggle on a password stays at the CALL SITE rather than becoming
+ *  field state: `type` is a prop here, so the caller's `trailing` button owns the
+ *  toggle, and the field itself stays stateless apart from focus.
+ */
+export function TextField({
+  value,
+  onChange,
+  testId,
+  label,
+  type = "text",
+  leading,
+  trailing,
+  filled = false,
+  mono = false,
+  masked = false,
+  disabled = false,
+  autoCapitalize = "none",
+  autoComplete = "off",
+  dir,
+  onEnter,
+  onPaste,
+  style,
+  inputStyle,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  testId: string;
+  /** The accessible name. Not optional, unlike on a field that renders its own
+   *  visible `<label>`: every caller of this one is a bare input with no label
+   *  of its own, so an omitted name is a field a screen reader cannot announce. */
+  label: string;
+  type?: "text" | "password";
+  /** Rendered before the input (the phrase grid's `01` index). */
+  leading?: ReactNode;
+  /** Rendered after it (a reveal toggle). */
+  trailing?: ReactNode;
+  /** The stronger "has content" border the phrase grid draws, so a filled cell
+   *  is distinguishable from an empty one at a glance. */
+  filled?: boolean;
+  mono?: boolean;
+  /** Masked presentation: wide tracking, so bullets read as a mask rather than
+   *  as text. Pair with `type="password"`. */
+  masked?: boolean;
+  disabled?: boolean;
+  autoCapitalize?: string;
+  autoComplete?: string;
+  /** Pin the field left-to-right where its content is frozen English, so an RTL
+   *  locale does not put the caret on the opposite side from where the grid
+   *  showed the word. */
+  dir?: "ltr";
+  onEnter?: () => void;
+  onPaste?: (event: ClipboardEvent<HTMLInputElement>) => void;
+  style?: CSSProperties;
+  inputStyle?: CSSProperties;
+}) {
+  const [focused, setFocused] = useState(false);
+  const border = focused ? "var(--accent)" : filled ? "var(--line-1)" : "var(--line-2)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: leading !== undefined || trailing !== undefined ? "var(--space-2)" : undefined,
+        background: "var(--bg-1)",
+        border: `1px solid ${border}`,
+        borderRadius: "var(--radius-2)",
+        padding: "0 var(--space-3)",
+        ...style,
+      }}
+    >
+      {leading}
+      <input
+        type={type}
+        value={value}
+        data-testid={testId}
+        aria-label={label}
+        disabled={disabled}
+        dir={dir}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        onKeyDown={
+          onEnter === undefined
+            ? undefined
+            : (e) => {
+                if (e.key === "Enter") onEnter();
+              }
+        }
+        onPaste={onPaste}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        spellCheck={false}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          padding: "var(--space-3) var(--space-1)",
+          fontFamily: mono ? "var(--font-mono)" : undefined,
+          fontSize: "var(--text-base)",
+          letterSpacing: masked ? "var(--tracking-caps)" : undefined,
+          color: "var(--fg-1)",
+          ...inputStyle,
+        }}
+      />
+      {trailing}
     </div>
   );
 }

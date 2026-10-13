@@ -262,6 +262,16 @@ const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 /// sealed rather than appended in the clear. DISTINCT from the AAD role string
 /// `"group-roster-blob"`.
 const ROLE_STR_GROUP_ROSTER_KEY: &[u8] = b"group-roster-key";
+/// KEK for the B2B member-names singleton (`vault.member-names`, `MYO5`;
+/// `docs/spec/protocol.md` §9.29, `decisions/protocol/0666`). Group-tier: a member
+/// holds the shared `group_key` and can therefore derive it, which is the point of
+/// the family.
+const ROLE_STR_MEMBER_NAMES_KEY: &[u8] = b"member-names-key";
+/// Deterministic sync blob-id for the member-names singleton (the
+/// `catalog-sync-id` / `prefs-sync-id` archetype), derived from the shared
+/// `group_key` so an owner and a member of the same epoch address the same blob.
+/// Derives an identifier, not key material.
+const ROLE_STR_MEMBER_NAMES_SYNC_ID: &[u8] = b"member-names-sync-id";
 
 /// Registered role string for the v0.2 vault membership field KEK (encrypts the
 /// sealed account id in `vault.meta` §9.3.1, the account/vault split,
@@ -473,10 +483,18 @@ pub enum GroupRole {
     /// SYNC-1). The group-tier counterpart of `SubkeyRole::AwarenessKey`, so a
     /// member seals and opens the same frames as the owner.
     AwarenessKey,
+    /// KEK for the B2B member-names singleton (`vault.member-names`, `MYO5`;
+    /// `protocol.md` §9.29, `decisions/protocol/0666`). A member holds the shared
+    /// `group_key`, so this is what makes the family readable by every member and
+    /// by nobody else. Distinct string from the AAD role `"member-names-blob"`.
+    MemberNamesKey,
+    /// Deterministic sync blob-id for that same singleton (the `catalog-sync-id`
+    /// archetype). Derives an identifier, NOT key material.
+    MemberNamesSyncId,
 }
 
 impl GroupRole {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 19] = [
         Self::ItemsKeyWrap,
         Self::PrefsKey,
         Self::SearchIndexKey,
@@ -494,6 +512,8 @@ impl GroupRole {
         Self::GroupRosterKey,
         Self::AwarenessRoomId,
         Self::AwarenessKey,
+        Self::MemberNamesKey,
+        Self::MemberNamesSyncId,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -515,6 +535,8 @@ impl GroupRole {
             Self::GroupRosterKey => ROLE_STR_GROUP_ROSTER_KEY,
             Self::AwarenessRoomId => ROLE_STR_AWARENESS_ROOM_ID,
             Self::AwarenessKey => ROLE_STR_AWARENESS_KEY,
+            Self::MemberNamesKey => ROLE_STR_MEMBER_NAMES_KEY,
+            Self::MemberNamesSyncId => ROLE_STR_MEMBER_NAMES_SYNC_ID,
         }
     }
 }
@@ -2035,6 +2057,8 @@ mod tests {
                 GroupRole::GroupRosterKey => 14,
                 GroupRole::AwarenessRoomId => 15,
                 GroupRole::AwarenessKey => 16,
+                GroupRole::MemberNamesKey => 17,
+                GroupRole::MemberNamesSyncId => 18,
             }
         }
 

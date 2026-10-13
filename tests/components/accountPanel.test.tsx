@@ -19,6 +19,7 @@ const deleteVault = vi.fn();
 const prefsRead = vi.fn();
 const setVaultLabel = vi.fn();
 const listVaults = vi.fn();
+const memberVaultStatus = vi.fn();
 
 vi.mock("../../src/lib/vault-change-password", () => ({
   changePassword: (...a: unknown[]) => changePassword(...a),
@@ -41,6 +42,11 @@ vi.mock("../../src/lib/prefs", async (importOriginal) => ({
 vi.mock("../../src/lib/vault-list", () => ({
   listVaults: (...a: unknown[]) => listVaults(...a),
   orderByLastUnlock: (v: unknown[]) => v,
+}));
+// Keep every other export real; only the member-vault probe is driven.
+vi.mock("../../src/lib/personAccount", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/personAccount")>()),
+  memberVaultStatus: (...a: unknown[]) => memberVaultStatus(...a),
 }));
 vi.mock("@tauri-apps/api/path", () => ({
   appDataDir: () => Promise.resolve("/data"),
@@ -103,6 +109,7 @@ beforeEach(() => {
   setVaultLabel.mockReset().mockResolvedValue(undefined);
   prefsRead.mockReset().mockResolvedValue({ ...PREFS });
   listVaults.mockReset().mockResolvedValue({ ok: [{ id: "v-active" }] });
+  memberVaultStatus.mockReset().mockResolvedValue(false);
 });
 
 afterEach(cleanup);
@@ -138,6 +145,36 @@ describe("AccountPanel — idle view", () => {
     fireEvent.click(screen.getByTestId("pcf.cancel"));
     expect(screen.queryByTestId("pcf")).toBeNull();
     expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
+  });
+});
+
+// The backend refuses change-password with `VaultNotUnlocked` whenever the vault
+// slot is not unlocked, on any vault; it used to land in a default arm that only
+// warned in DEV and left the form open (myne-md/myne#858).
+describe("AccountPanel: member vault", () => {
+  it("hides the owner password control and points at the shared-vault unlock", async () => {
+    memberVaultStatus.mockResolvedValueOnce(true);
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.queryByTestId("settings.change-password-cta")).toBeNull(),
+    );
+    expect(memberVaultStatus).toHaveBeenCalledWith("v-active");
+    expect(screen.getByTestId("settings.member-vault-notice")).toBeTruthy();
+    expect(screen.queryByTestId("pcf")).toBeNull();
+  });
+
+  it("surfaces VaultNotUnlocked as a banner rather than a silent no-op", async () => {
+    changePassword.mockRejectedValueOnce({ kind: "VaultNotUnlocked" });
+    renderPanel();
+    fireEvent.click(screen.getByTestId("settings.change-password-cta"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("pcf.submit"));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("pcf.error").textContent).toBe(
+        "Unlock this vault before changing its password.",
+      ),
+    );
   });
 });
 

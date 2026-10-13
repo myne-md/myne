@@ -725,6 +725,21 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),
+    // The member display-name store (`vault.member-names`, `MYO5`;
+    // myne-md/myne#851). A separate plugin namespace, same refusal as the rest of
+    // the B2B member surface above: a page holds no person identity to sign a name
+    // row with, and the store is group-tier sealed and `NTV6`-only, so no part of it
+    // becomes reachable by porting more. `member_names_list` carries no binding in
+    // the shared tree to classify: the roster view already reports a row's resolved
+    // name, and `src/lib/memberNames.ts` says why it is not wrapped.
+    (
+        "plugin:member-names|member_names_set_mine",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:member-names|member_names_clear_mine",
+        Class::Unsupported,
+    ),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
     // rule for display and entry alike. They are listed in `DISPATCHED` rather

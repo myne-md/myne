@@ -428,7 +428,7 @@ Not every vault artefact syncs. The **sync taxonomy** partitions them into four 
 
 | Class | Members | Disposition |
 |---|---|---|
-| **1: Authoritative data** | `.myn` notes, `vault.prefs`, `vault.dictionary`, `vault.themes`, attachment blobs, `vault.attachments` catalog, `vault.chats` catalog, per-conversation `chats/<id>` files, `vault.agent-memory` catalog + per-entry `memories/<id>` files, `vault.personality` | **SYNC.** Merge per §10 (bodies = keep-both; prefs/dictionary/catalog = field/set merge; themes = per-name map merge, §10.2.2; chats = catalog per-id causal join + turn-list prefix/suffix merge, §10.2.5; agent-memory = catalog per-id causal join + per-entry adopt, §10.2.6; personality = whole-value LWW, §10.2.7). |
+| **1: Authoritative data** | `.myn` notes, `vault.prefs`, `vault.dictionary`, `vault.themes`, attachment blobs, `vault.attachments` catalog, `vault.chats` catalog, per-conversation `chats/<id>` files, `vault.agent-memory` catalog + per-entry `memories/<id>` files, `vault.personality`, `vault.member-names` | **SYNC.** Merge per §10 (bodies = keep-both; prefs/dictionary/catalog = field/set merge; themes = per-name map merge, §10.2.2; chats = catalog per-id causal join + turn-list prefix/suffix merge, §10.2.5; agent-memory = catalog per-id causal join + per-entry adopt, §10.2.6; personality = whole-value LWW, §10.2.7; member-names = per-person total-order merge, §10.2.8). |
 | **2 — Identity** | `vault.meta` | **SYNC**, with the §10 bespoke merge that preserves the recovery-side wrapped `root_key` (`protocol.md` §9.3). |
 | **3 — Rebuildable cache** | `vault.search` (`MYS1`), `vault.indices` (`MYI1`), `vault.embeddings` (`MYR1`), `vault.graph` (`MYG1`) | **NEVER synced — re-derived locally** from the notes via the §9.6.4 `content_nonce` reconcile. Syncing them would be redundant, create a spurious conflict class, and still require a reconcile; cold-start is bounded (first build once per device, delta thereafter). `vault.embeddings` is a *doubly* Class-3 fit: it is both rebuildable **and model-specific** — its vectors are valid only for the exact embedding model that produced them (`{model_hash, embedding_dim, chunker_version}`), so on a device holding a different model, or none, they are simply wrong; syncing them is actively incorrect, not merely redundant. |
 | **4 — Device-local** | `vault.workspace` (`MYW1`), `vault.quickunlock` (`MYQ1`), `vault.head-state` (`MYH1`, §7), `vault.label` (`MYL1`) | **NEVER synced.** `vault.workspace` is a privacy choice (graceful-exit/coalesced writes would turn at-rest mtime into a server-visible active-edit-timing channel — A13); `vault.quickunlock` is a security MUST-NOT (it wraps a device-hardware-bound copy of `root_key`); `vault.head-state` is each device's own rollback baseline; `vault.label` (`protocol.md` §9.22) is a security choice of the same shape as `vault.quickunlock`, one step weaker: its `wrap_key` is a per-vault device-local keychain item, so a synced copy would be inert on every other device, and syncing a vault's user-authored name would put that name somewhere the device-local key destruction of §9.22.5 cannot reach. |
@@ -592,6 +592,49 @@ The personality singleton (`protocol.md` §9.27) rides the same machinery as `va
 - **Rollback bound.** As with prefs: a malicious server can replay an older personality blob. The cost is an older voice, self-healing on the next edit, and bounded by the same accepted singleton-rollback limit.
 - **Gate.** Behind `ai_enabled` (device-local): a device with the opt-in off runs no personality phase and pushes/pulls nothing for this id, exactly as §10.2.5 states for the chats plane. A copy stored during an earlier opt-in era stays on disk unread (it is Class-1 vault content); it is simply not read into any system turn until that device's own opt-in is on.
 
+### 10.2.8 `vault.member-names`: per-person total-order merge, myne-md/myne#851
+
+The member display-name singleton (`MYO5`, `protocol.md` §9.29; `decisions/protocol/0666`) is the
+first Class-1 member whose merge is a **contract rather than a client detail**, because the
+codec owns the map instead of leaving it opaque:
+
+- **Identity.** Its reserved sync blob-id is `DeriveGroupSubkey(group_key, "member-names-sync-id")[0..16]`
+  (`protocol.md` §3.4), the `catalog-sync-id` / `prefs-sync-id` archetype one tier up: group-derived
+  rather than `root_key`-derived, so an owner and a member of the same epoch address the same blob
+  (§10.1's group-derived addressing paragraph), and the id rotates with the group key on member
+  removal. It derives an **identifier**, not key material; the KEK stays `member-names-key`.
+- **Transport.** The at-rest `MYO5` blob is pushed/pulled verbatim on the generic `/sync/blob`
+  channel with CAS. **Zero server changes**: an opaque blob under an opaque id.
+- **Merge: per-`person_id_hash` total order.** The plaintext is a canonical-JSON map of
+  `person_id_hash -> { name, version, tombstone }`, and each key is merged independently by a
+  **total order on distinct rows**: the higher `version` wins; at equal version a tombstone beats a
+  live entry; at equal version and equal flag the greater `name` wins, then the greater
+  `signature_hex`, **both compared as bytes**. The last two arms are load-bearing, not decoration:
+  the state they order is reachable (one person renaming from two offline devices reaches the same
+  version with two different names, and two tombstones at one version both carry an empty name), and
+  without them the relation falls through to "keep the incumbent", so `merge(a, b)` and
+  `merge(b, a)` disagree and two peers re-push their own row on every cycle instead of converging.
+  A port MUST keep the comparison byte-wise rather than reaching for a locale collation, or the two
+  implementations pick different winners for the same pair. Because the order is total on distinct
+  rows, the merge is commutative, associative and idempotent.
+- **A tombstone is a row, not an absence.** Clearing one's own name writes a tombstone at an
+  incremented `version` rather than deleting the key, for the §11.1 reason: dropping the row would
+  let a peer that still holds the old one re-introduce it on the next merge. The rendered member
+  list filters tombstones out.
+- **Write authority is per row, enforced by a signature and not by the merge.** Each row carries a
+  double signature (Ed25519 + ML-DSA-65) over `myne.member-name v1|`, the person id, the version,
+  the tombstone byte and the name bytes (`decisions/protocol/0667`). A device verifies a row against
+  the public half of the person the ROW names, so a member cannot claim another member's row by
+  writing a higher version. The order above decides which of two rows is newer, and the signature
+  decides whether a row is admissible at all. An owner signature is additionally accepted on a
+  tombstone, which is how a removal clears a row. A blob whose rows do not verify is refused rather
+  than merged.
+- **Gate: `NTV6` only.** The family has no `MY?1` form and no `SubkeyRole` counterpart: a pre-B2B
+  `NTV5` vault has no `group_key`, so a member-writable, member-readable name blob cannot exist
+  there. It arrives with the existing owner-approved B2B migration, seeded empty, and no member
+  phase runs for it in an `NTV5` vault, the §10.2.5 opt-in pattern, for a structural rather than a
+  preference reason.
+
 ### 10.3 `vault.meta` — bespoke merge
 
 `vault.meta` (class 2) is **not** field-merged. It carries two independently-wrapped copies of `root_key` (password-side and recovery-side, `protocol.md` §9.3). A concurrent change on one device (e.g. a password change rewrapping the password-side copy) must **preserve the recovery-side wrapped key** — a naive LWW would let one device's `vault.meta` strand recovery on another. The merge takes the newest password-side wrap while keeping a valid recovery-side wrap, and the KDF-params/`account_number_hash`/`items_key_id`/itemsKey-wrap invariants (which must agree across devices) are validated, not overwritten — a divergent invariant is **refused**, never papered over. (`root_key` is a single per-vault random value, not password-derived; every device holds the *same* `root_key` by unwrapping the same synced `vault.meta`, so the merge only ever reconciles the *wraps* of one shared key — never two different keys. A password change rotates only the password-side wrap; `root_key` and itemsKey are untouched, so notes stay readable and an already-unlocked session is unaffected — only the next unlock uses the new wrap.)
@@ -660,6 +703,13 @@ catalog, `vault.prefs` and `vault.themes` derive from the session's shared-tier 
 That is what lets a member, who holds no `root_key`, address the shared blobs the
 owner wrote. The ids therefore rotate with the group key on member removal, and the
 retirement record's `reclaim_sync_ids_hex` is what reclaims the superseded namespace.
+
+`vault.member-names` (`MYO5`, §10.2.8) joins that set as the **first fully group-only
+member** of it (myne-md/myne#851). The three above are group-derived in an `NTV6` vault
+and `root_key`-derived in an `NTV5` one, because there is a shared singleton to address
+in both generations; `vault.member-names` has no `NTV5` form at all, so its
+`member-names-sync-id` has no `root_key` fallback to be derived through and its KEK has
+no `SubkeyRole` counterpart. It is group-derived or it does not exist.
 The AI catalogs (`vault.chats`, `vault.agent-memory`, `vault.personality`) have no
 group role and stay `root_key`-derived: in a shared vault a member's copy of those is
 person-private and rides the `MYY5` profile plane instead (design A).

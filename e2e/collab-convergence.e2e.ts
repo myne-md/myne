@@ -186,8 +186,22 @@ describeCanary("live co-editing convergence (collab-verification)", () => {
         await ipcOk(a.session, "plugin:sync|sync_now", {});
         await ipcOk(b.session, "plugin:sync|sync_now", {});
 
-        // The calm hint is shown on the pulling device that ran the merge. Assert
-        // it HERE, before the convergence poll, because a toast auto-dismisses.
+        // The calm hint IS expected here, and this is the DURABLE path, not the live
+        // one: `writeBody` drops the live session before every write (that helper's
+        // first line), so neither device is watching this note. A merge into a note
+        // nobody has open is exactly what `sync://remote-merged` is for, and the hint
+        // is asserted on the pulling device BEFORE the convergence poll because a toast
+        // auto-dismisses (myne-md/myne#419 / #422, `decisions/sync/0470`).
+        //
+        // The LIVE path is deliberately a DIFFERENT signal (myne-md/myne#857): a peer's
+        // live edit emits `sync://live-remote-merged`, which only the pane listens to,
+        // so a change landing in front of the user raises no notice, and a device's own
+        // echoed change is no longer reported as a remote one at all. Both halves are
+        // unit-verified (`RemoteMergeHint` asserts the event it subscribes to;
+        // `a_devices_own_content_frame_is_not_reported_as_a_remote_change` in
+        // `core/src/plugins/live/awareness_test.rs`). Driving the live CONTENT path from
+        // here would mean typing into the live editor, which this suite deliberately
+        // does not do.
         await b.session.byTestId("sync.remote-merge-hint", { timeoutMs: 10_000 });
 
         // Converge: poll until both devices read the SAME bytes. A push/pull

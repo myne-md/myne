@@ -875,6 +875,9 @@ mod tests {
             // vault content, and a backup must not carry either.
             ("vault.member-key", None),
             ("vault.member-unlock", None),
+            // The member display-name map is vault CONTENT (`sync ⊆ backup`), so
+            // it is allowlisted where those two are not (myne-md/myne#851).
+            ("vault.member-names", Some(MemberNames)),
             ("attachments-text/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", None),
             ("notes/whatever.txt", None),
             ("notes/0190a000-0000-7000-8000-000000000001.myn.tmp", None),
@@ -1020,6 +1023,7 @@ mod tests {
             MemberFamily::MemoryCatalog => "memory-catalog",
             MemberFamily::MemoryEntry => "memory-entry",
             MemberFamily::Personality => "personality",
+            MemberFamily::MemberNames => "member-names",
         }
     }
 

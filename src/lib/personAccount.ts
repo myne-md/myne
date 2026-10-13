@@ -89,16 +89,25 @@ export interface AcceptedInviteView {
  * Accept a sealed invite: claim it, verify the owner's group package against
  * the owner's identity code (public halves, obtained out of band), and unlock
  * the shared vault as a Member.
+ *
+ * `password` is REQUIRED and becomes the vault's device-local fast credential
+ * (`vault.member-unlock`), written as part of installing the member session. It
+ * is this device's password, not the vault owner's, and the recovery phrase stays
+ * the portable fallback (myne-md/myne#851 task 7). The command checks the project
+ * floor before it claims anything, so a short password cannot leave a claimed
+ * invite behind.
  */
 export async function personAcceptInvite(
   inviteIdHex: string,
   ownerCode: string,
   phrase: string,
+  password: string,
 ): Promise<AcceptedInviteView> {
   return invoke<AcceptedInviteView>("plugin:sync|sync_person_accept_invite", {
     inviteIdHex,
     ownerCode,
     phrase,
+    password,
   });
 }
 

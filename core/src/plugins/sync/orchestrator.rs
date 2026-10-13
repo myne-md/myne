@@ -32,15 +32,16 @@ use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
 use crate::plugins::vault_unlock::state::SharedSingletonKey;
 use protocol::{
-    compute_manifest_hash, derive_subkey, derive_subkey_versioned,
-    encode_attachments_catalog_versioned, parse_vault_meta_any, serialize_vault_meta,
-    AttachmentsCatalog, ManifestEntry, MetaVersion, SealedHead, SubkeyRole, VaultHead, VvEntry,
-    AGENT_MEMORY_BLOB_MAGIC, AGENT_MEMORY_BLOB_V0_2_MAGIC, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
+    compute_manifest_hash, decode_member_names_blob, derive_subkey, derive_subkey_versioned,
+    encode_attachments_catalog_versioned, encode_member_names_blob, merge_member_names,
+    parse_vault_meta_any, serialize_vault_meta, AttachmentsCatalog, ManifestEntry, MetaVersion,
+    SealedHead, SubkeyRole, VaultHead, VvEntry, AGENT_MEMORY_BLOB_MAGIC,
+    AGENT_MEMORY_BLOB_V0_2_MAGIC, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
     AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_BLOB_MAGIC,
     AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CATALOG_BLOB_MAGIC, CATALOG_BLOB_V0_2_MAGIC,
     CHATS_BLOB_MAGIC, CHATS_BLOB_V0_2_MAGIC, CHATS_CATALOG_BLOB_MAGIC,
-    CHATS_CATALOG_BLOB_V0_2_MAGIC, PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC,
-    THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
+    CHATS_CATALOG_BLOB_V0_2_MAGIC, MEMBER_NAMES_BLOB_MAGIC, PREFS_BLOB_MAGIC,
+    PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -118,6 +119,12 @@ pub struct SyncSummary {
     /// surface re-reads it over IPC, and a silent peer-applied voice change
     /// is otherwise invisible.
     pub personality_applied_remote: bool,
+    /// A remote `vault.member-names` change was merged onto the on-disk store this
+    /// cycle (task 3b-ii): a member set, changed or cleared their display name on a
+    /// peer. Reported for the same reason as `themes_applied_remote`: the
+    /// orchestrator stays `AppHandle`-free, so any refresh choreography lives at the
+    /// command boundary, and the WebView re-reads the roster over IPC on demand.
+    pub member_names_applied_remote: bool,
 
     /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
     /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
@@ -892,6 +899,34 @@ fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &[&THEMES_BLOB_V0_2_MAGIC])
 }
 
+/// `vault.member-names`' reserved 16-byte sync-plane blob-id, derived through the
+/// GROUP tier (`protocol.md` §3.4, `decisions/protocol/0666`): the
+/// `themes_sync_id` archetype.
+///
+/// It cannot go through [`shared_sync_id`], and the reason is worth stating: this
+/// family is `NTV6`-only and has **no `SubkeyRole` counterpart** (there is no
+/// pre-B2B form to derive a root-tier id for), so `SubkeyRole::shared_group_role`
+/// has no arm to map and a `SubkeyRole` argument would not typecheck. `None` is
+/// therefore the whole pre-B2B answer: an `OwnerRoot` session has no such blob and
+/// the phase stands down, exactly as the command layer answers
+/// `NotASharedVault`.
+fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
+    let group = shared.group_bytes()?;
+    Some(crate::plugins::member_names::names_sync_id(&group))
+}
+
+/// The member-names blob's sync discriminator (`read_singleton_nonce` over MYO5).
+///
+/// `MYO5` is this family's ONE generation: it is born `NTV6`-only, so there is no
+/// `MYO1` form and no later `MY?5` generation to accept beside it. That is why the
+/// `later` list is empty here and not because one was forgotten, which is the shape
+/// `check-crypto-registries.mjs` rule 5 exists to catch: `MEMBER_NAMES_BLOB_MAGIC` is
+/// deliberately off the `_V<n>_<m>_MAGIC` pattern, so the family has no later magic
+/// for that rule to demand.
+fn read_member_names_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(bytes, &MEMBER_NAMES_BLOB_MAGIC, &[])
+}
+
 /// `vault.chats`' reserved 16-byte sync-plane blob-id:
 /// `DeriveSubkey(root_key, "chats-catalog-sync-id")[0..16]` (`protocol.md`
 /// § 3.4, myne-md/myne#675): the `catalog_sync_id` / `prefs_sync_id` /
@@ -1055,6 +1090,11 @@ async fn memory_sync_enabled(
 /// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
 fn themes_file_path(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("vault.themes")
+}
+
+/// `<vault>/vault.member-names`, the MYO5 member-names singleton.
+fn member_names_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE)
 }
 
 /// The pending **attachment**-tombstone queue (`sync-protocol.md` §11.4): one
@@ -3213,6 +3253,235 @@ async fn sync_themes_phase(
     })
 }
 
+/// The member-names phase's outcome (task 3b-ii).
+struct MemberNamesPhase {
+    /// The store needs a push: a local-only change, or a merge that differed from
+    /// the server's plaintext.
+    dirty: bool,
+    /// A remote change was merged onto the on-disk store this cycle.
+    applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty` (the
+    /// myne#436 single-derivation discipline: the push site never re-derives a key).
+    push_bytes: Option<Vec<u8>>,
+}
+
+impl MemberNamesPhase {
+    /// No group tier, no store: a pre-B2B vault has no `vault.member-names` and no
+    /// epoch to address one under, so there is nothing to pull, merge or push.
+    fn idle() -> Self {
+        Self {
+            dirty: false,
+            applied_remote: false,
+            push_bytes: None,
+        }
+    }
+}
+
+/// Pull-side `vault.member-names` reconciliation (task 3b-ii), the
+/// `sync_themes_phase` twin. Three things differ, and each is dictated by the family
+/// rather than chosen here:
+///
+/// 1. **It is `NTV6`-only.** The store is group-sealed and its AAD binds the group
+///    epoch, so a pre-B2B `OwnerRoot` session has neither, and the phase answers
+///    [`MemberNamesPhase::idle`] without a byte of traffic. The command layer answers
+///    `NotASharedVault` for the same vault.
+/// 2. **The KEK and its two bindings come from the family's own resolver**
+///    ([`crate::plugins::member_names::resolve_names_from_group_key`]), which reads
+///    `vault.meta` once for the account hash AND the epoch. The themes phase takes its
+///    identity from the cycle because its AAD has no epoch; here the two must come from
+///    one read, and the same resolver serves the command layer so the two can never
+///    derive different keys (the myne-md/myne#436 shape).
+/// 3. **A pulled copy that does not decode is refused, not merged as empty.** The
+///    store's own entry point states the rule; this phase honours it by decoding before
+///    it merges, because `merge(local, empty) == local` would discard a peer's rename
+///    and then write the result back over it.
+///
+/// Like every sibling it holds the family's write mutex across the read-merge-write,
+/// because the `set_mine` / `clear_mine` commands write the same map.
+#[allow(clippy::too_many_arguments)]
+async fn sync_member_names_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    shared: &SharedSingletonKey,
+    vault_root: &Path,
+    state: &mut SyncState,
+    names_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+) -> Result<MemberNamesPhase, SyncCycleError> {
+    // NTV6-only: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK
+    // to derive and no blob to address.
+    let Some(group) = shared.group_bytes() else {
+        return Ok(MemberNamesPhase::idle());
+    };
+    let resolved =
+        match crate::plugins::member_names::resolve_names_from_group_key(io, &group, vault_root)
+            .await
+        {
+            Ok(resolved) => resolved,
+            Err(err) => {
+                // Belt and braces: the cycle already parsed this `vault.meta` for the AAD
+                // identity, so this arm is unreachable in a well-formed cycle. Skipping is
+                // the safe direction either way: a name store that cannot be read must
+                // never stall note or attachment sync, and skipping adopts nothing.
+                tracing::warn!(
+                    stage = "member_names",
+                    event = "phase_skipped",
+                    error = ?err,
+                    "the member-names keyspace could not be resolved; syncing without it"
+                );
+                return Ok(MemberNamesPhase::idle());
+            }
+        };
+    // The codec refuses a zero epoch on BOTH the seal and the open path, so a `vault.meta`
+    // carrying one describes a vault this family cannot be addressed in.
+    if resolved.group_key_epoch == 0 {
+        tracing::warn!(
+            stage = "member_names",
+            event = "phase_skipped",
+            "vault.meta carries a zero group epoch; the member-names store is not addressable"
+        );
+        return Ok(MemberNamesPhase::idle());
+    }
+
+    let _guard = crate::plugins::member_names::write_mutex().lock().await;
+    // The second half of this family's write gate, taken here rather than at the
+    // `io.write` far below because the phase's read-modify-write starts immediately:
+    // a group rotation re-seals `vault.member-names` at a new epoch under the
+    // exclusive side, and a write straddling it would publish the retired epoch's
+    // ciphertext (`member_names::store::write_mutex` states the pair).
+    let _quiesce = crate::singleton_quiesce::shared().await;
+
+    let key = resolved.borrow();
+    let path = member_names_file_path(vault_root);
+    // The newest copy that DECODES, not merely the newest that parses a header
+    // (myne#301): a torn slot on the web client would otherwise supply both the local
+    // nonce and, further down, the bytes pushed to the server.
+    let local_bytes =
+        crate::plugins::member_names::read_verified_names_bytes(io, vault_root, &key).await;
+    let local_nonce = local_bytes.as_deref().and_then(read_member_names_nonce);
+
+    // Decrypting the local store costs an HKDF, a full AEAD open and a whole-map JSON
+    // parse, so it happens ONLY on the two paths that read the plaintext: the
+    // remote-reconcile merge and the virgin-store check. The steady state proves
+    // byte-cleanliness from the nonce alone and never decrypts. `local_bytes` is already
+    // the newest copy that decoded, so a `None` here means absent-or-undecryptable and
+    // reads as the empty map, the direction every other merge input takes.
+    let decode_local = || {
+        local_bytes
+            .as_deref()
+            .and_then(|b| {
+                decode_member_names_blob(key.key, key.account_number_hash, key.group_key_epoch, b)
+                    .ok()
+            })
+            .unwrap_or_default()
+    };
+
+    let id_hex = hex(names_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // A remote record whose nonce we already hold needs no download.
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+
+    // §11.3 gate. The `io.write` below is shared by both arms, so unverified junk has
+    // to be refused before anything is written. NOTE the difference from themes, which
+    // collapses an undecodable remote to empty: here that refusal is the NEXT block, and
+    // it returns instead of merging.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_member_names_nonce,
+        "member-names",
+    )?;
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        let remote_map = match decode_member_names_blob(
+            key.key,
+            key.account_number_hash,
+            key.group_key_epoch,
+            &remote_bytes,
+        ) {
+            Ok(map) => map,
+            Err(_) => {
+                // The store's rule, and the reason this arm returns rather than
+                // merging: `merge(local, empty) == local`, so an undecodable copy
+                // merged as empty would silently discard a peer's rename and then be
+                // written back over it.
+                tracing::warn!(
+                    stage = "member_names",
+                    event = "remote_refused",
+                    "the served member-names blob did not decode; no local mutation"
+                );
+                return Ok(MemberNamesPhase::idle());
+            }
+        };
+        let local_map = decode_local();
+        let merged = merge_member_names(&local_map, &remote_map);
+        let applied_remote = merged != local_map;
+
+        // `merged.is_empty()` implies `merged == remote_map` (the merge keeps every row
+        // from both sides), so the write-fresh arm below always has bytes worth writing.
+        let (bytes, dirty) = if merged == remote_map {
+            // Adopt the server bytes VERBATIM: byte-identical store and baseline == the
+            // server's (version, nonce), nothing to push. Re-encrypting an already
+            // agreeing store would churn the nonce and push forever.
+            (remote_bytes, false)
+        } else {
+            // The merge beat the server's store -> write it fresh and push it this
+            // cycle against the server's current version. The file (freshly
+            // re-encrypted) intentionally carries a different nonce from the recorded
+            // CAS base.
+            (
+                encode_member_names_blob(
+                    key.key,
+                    key.account_number_hash,
+                    key.group_key_epoch,
+                    &merged,
+                )
+                .map_err(|_| SyncCycleError::Io)?,
+                true,
+            )
+        };
+        io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        record_blob_baseline(state, &id_hex, &rec);
+        return Ok(MemberNamesPhase {
+            dirty,
+            applied_remote,
+            push_bytes: dirty.then_some(bytes),
+        });
+    }
+
+    // No (changed) remote record: dirty iff the local file drifted from the synced
+    // baseline. Every member-names write re-encrypts under a fresh nonce, so a local
+    // blob whose outer nonce still equals the baseline's is provably byte-untouched
+    // since the last sync. A vault where nobody has named yet (no store, no baseline) is
+    // deliberately NOT pushed; a store holding ONLY tombstones IS, because the tombstone
+    // is how a deletion propagates.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    // The virgin-store conjunct is ordered baseline-first so the cheap `is_none` gates
+    // the expensive decode: only a never-synced vault pays it, and only after the nonce
+    // check already proved the file drifted. Both conjuncts are pure.
+    let dirty = local_bytes.is_some()
+        && local_nonce_hex != baseline_nonce_hex
+        && !(baseline_nonce_hex.is_none() && decode_local().is_empty());
+    Ok(MemberNamesPhase {
+        dirty,
+        applied_remote: false,
+        // `dirty` already implies `local_bytes.is_some()`, and these are the VERIFIED
+        // bytes (myne#301): the same ones the push must carry.
+        push_bytes: if dirty { local_bytes } else { None },
+    })
+}
+
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
 /// [`NonceManifest`](crate::note_nonce::NonceManifest) String keys to the
@@ -4240,6 +4509,10 @@ async fn sync_cycle_attempt(
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| shared_sync_id(shared, SubkeyRole::CatalogSyncId));
     let themes_id = shared_sync_id(shared, SubkeyRole::ThemesSyncId);
+    // `vault.member-names` is addressed through the GROUP tier only (`None` on a
+    // pre-B2B `OwnerRoot` session), and it is the one shared singleton with no
+    // `SubkeyRole` counterpart, which is why it does not go through `shared_sync_id`.
+    let names_id = member_names_sync_id(shared);
     // The chats / agent-memory / agent-personality catalogs are ROOT-derived, not
     // group-derived, and are therefore `None` on a member (which holds no
     // `root_key`). `docs/decisions/protocol/0609` states it: those three families
@@ -4343,6 +4616,17 @@ async fn sync_cycle_attempt(
         .and_then(read_themes_nonce)
     {
         local.insert(themes_id, n);
+    }
+    if let Some(nid) = names_id {
+        if let Some(n) = io
+            .read(&member_names_file_path(vault_root))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(read_member_names_nonce)
+        {
+            local.insert(nid, n);
+        }
     }
     if let Some(cid) = chats_catalog_id {
         if let Some(n) = io
@@ -5011,6 +5295,31 @@ async fn sync_cycle_attempt(
     )
     .await?;
 
+    // --- member-names phase (task 3b-ii), only on a group-held (`NTV6`) session ---
+    // Like the other shared singletons it is never head-committed; its dirty blob rides
+    // the push batch below so the CAS/409 machinery covers it. `names_id` is `None` on a
+    // pre-B2B vault, where the family does not exist at all.
+    let mut names_phase = match names_id {
+        Some(nid) => {
+            let remote_names_rec = page
+                .all_metas
+                .iter()
+                .find(|m| m.id == nid && m.attachment_id.is_none());
+            sync_member_names_phase(
+                io,
+                transport,
+                token,
+                shared,
+                vault_root,
+                state,
+                &nid,
+                remote_names_rec,
+            )
+            .await?
+        }
+        None => MemberNamesPhase::idle(),
+    };
+
     // --- apply remote changes: download + write each changed NOTE blob to disk ---
     //
     // Progress (phase3-web-client task 39) is opened over the NOTE records only —
@@ -5026,6 +5335,7 @@ async fn sync_cycle_attempt(
                 && Some(c.id) != cat_id
                 && c.id != prefs_id
                 && c.id != themes_id
+                && Some(c.id) != names_id
                 && Some(c.id) != chats_catalog_id
                 && !chats_scan.contains_key(&c.id)
         })
@@ -5069,6 +5379,7 @@ async fn sync_cycle_attempt(
                 || Some(c.id) == cat_id
                 || c.id == prefs_id
                 || c.id == themes_id
+                || Some(c.id) == names_id
                 || Some(c.id) == chats_catalog_id
                 || chats_scan.contains_key(&c.id))
         })
@@ -5291,6 +5602,7 @@ async fn sync_cycle_attempt(
                     && Some(m.id) != cat_id
                     && m.id != prefs_id
                     && m.id != themes_id
+                    && Some(m.id) != names_id
                     && Some(m.id) != chats_catalog_id
                     && !chats_scan.contains_key(&m.id)
             })
@@ -5796,6 +6108,27 @@ async fn sync_cycle_attempt(
                         .unwrap_or(0);
                     to_push.push(PushBlob {
                         id: themes_id,
+                        base_version: base,
+                        content_nonce: nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+            }
+        }
+
+        // A dirty member-names store (local-only change, or a merge that beat the
+        // server's store) rides the same batch (task 3b-ii). Same single-derivation
+        // discipline as themes (myne#436): the bytes come from the phase, never
+        // re-derived here, and a nonce read that fails skips rather than pushing
+        // empty (the merge arm decides, not this one).
+        if names_phase.dirty {
+            if let (Some(bytes), Some(nid)) = (names_phase.push_bytes.take(), names_id) {
+                if let Some(nonce) = read_member_names_nonce(&bytes) {
+                    let base = state.blobs.get(&hex(&nid)).map(|b| b.version).unwrap_or(0);
+                    to_push.push(PushBlob {
+                        id: nid,
                         base_version: base,
                         content_nonce: nonce,
                         ciphertext: bytes,
@@ -6419,6 +6752,7 @@ async fn sync_cycle_attempt(
             .as_ref()
             .map(|p| p.applied_remote)
             .unwrap_or(false),
+        member_names_applied_remote: names_phase.applied_remote,
         pull_skipped,
         dropped,
         pulled_note_ids,
@@ -13921,6 +14255,427 @@ mod tests {
                 "the prior baseline stays authoritative"
             );
             assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+    }
+
+    mod member_names_phase {
+        //! `vault.member-names` (task 3b-ii): the singleton classification and the
+        //! pull-merge hook. The family is `NTV6`-only, so every fixture is a group-tier
+        //! session over a real `vault.meta`.
+
+        // The parent module's seam shims (task 86).
+        use super::{blocking, fresh_vault, meta_json, pull_body, pull_body_with_head, IO};
+
+        use super::super::*;
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+        use protocol::person_key::PersonKeyPair;
+
+        const GROUP: [u8; 32] = [0x77; 32];
+        const HASH: [u8; 16] = [0x5c; 16];
+        const EPOCH: u64 = 3;
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-namesphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn group_tier() -> SharedSingletonKey {
+            SharedSingletonKey::Group(zeroize::Zeroizing::new(GROUP))
+        }
+
+        fn names_key() -> zeroize::Zeroizing<[u8; 32]> {
+            protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(GROUP),
+                protocol::GroupRole::MemberNamesKey,
+            )
+        }
+
+        fn person(kem: u8, ed: u8, mldsa: u8) -> PersonKeyPair {
+            PersonKeyPair::generate_raw(&[kem; 64], &[ed; 32], &[mldsa; 32])
+        }
+
+        /// A structurally valid `NTV6` `vault.meta` at `epoch`, built exactly as a
+        /// migration/seal does, so `parse_vault_meta_ntv6` accepts it and the family's
+        /// resolver reads the epoch its AAD binds.
+        fn ntv6_meta_bytes(epoch: u64) -> Vec<u8> {
+            let root_key = [7u8; 32];
+            let items_key = [9u8; 32];
+            let items_key_id = [0x07u8; 16];
+            let mut base = protocol::parse_vault_meta_v0_2(
+                &protocol::encode_vault_meta_v0_2_raw(
+                    &root_key,
+                    &items_key,
+                    &items_key_id,
+                    "pw",
+                    "abandon abandon abandon",
+                    &HASH,
+                    &protocol::DEFAULT_V0_1_KDF_PARAMS,
+                    &[2u8; protocol::ARGON2_SALT_LEN],
+                    &[4u8; protocol::ARGON2_SALT_LEN],
+                    &[5u8; protocol::AEAD_NONCE_LEN],
+                    &[6u8; protocol::AEAD_NONCE_LEN],
+                    &[8u8; protocol::AEAD_NONCE_LEN],
+                )
+                .expect("encode NTV5 base"),
+            )
+            .expect("parse NTV5 base");
+            let group_key = protocol::GroupKey::new(GROUP);
+            let group_nonce = [12u8; protocol::AEAD_NONCE_LEN];
+            let items_nonce = [13u8; protocol::AEAD_NONCE_LEN];
+            let enc_group = protocol::aead_seal_ctx(
+                &protocol::derive_owner_subkey_v0_2(
+                    &protocol::OwnerKey::new(root_key),
+                    protocol::OwnerRole::GroupKeyWrap,
+                ),
+                &group_nonce,
+                &GROUP,
+                &protocol::aad_vault_group_key_wrap_v0_2(&HASH, epoch),
+            )
+            .expect("seal group key");
+            let enc_items = protocol::aead_seal_ctx(
+                &protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::ItemsKeyWrap),
+                &items_nonce,
+                &items_key,
+                &protocol::aad_vault_items_key_wrap_v0_2(&items_key_id),
+            )
+            .expect("seal items key");
+            base.items_key_nonce = items_nonce;
+            base.enc_items_key.copy_from_slice(&enc_items);
+            let signed_roster_envelope = protocol::person_invite::seal_group_roster(
+                &GROUP,
+                &HASH,
+                epoch,
+                &[0xE6; protocol::AEAD_NONCE_LEN],
+                &protocol::person_invite::SignedGroupRoster {
+                    payload: vec![0xC3; 32],
+                    signature: protocol::person_key::PersonSigned {
+                        ed25519_sig: [0xD4; protocol::person_key::PERSON_ED25519_SIG_LEN],
+                        mldsa_sig: vec![0xE5; protocol::person_key::PERSON_MLDSA_SIG_LEN],
+                    },
+                },
+            )
+            .expect("seal roster envelope");
+            protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+                base,
+                group_key_nonce: group_nonce,
+                enc_group_key: enc_group.try_into().expect("fixed group-key wrap"),
+                group_key_epoch: epoch,
+                signed_roster_envelope,
+            })
+            .expect("serialize NTV6")
+        }
+
+        fn seed_meta(dir: &Path) {
+            std::fs::write(dir.join("vault.meta"), ntv6_meta_bytes(EPOCH)).unwrap();
+        }
+
+        /// One row, signed by the person it names (the only shape the codec accepts).
+        fn row(
+            who: &PersonKeyPair,
+            person_id: &[u8; 16],
+            version: u64,
+            name: &str,
+        ) -> protocol::MemberNameEntry {
+            let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+            protocol::sign_member_name(who, person_id, version, false, name, &mut rng).unwrap()
+        }
+
+        /// A map holding exactly one row.
+        fn one_row(
+            who: &PersonKeyPair,
+            person_id: &[u8; 16],
+            version: u64,
+            name: &str,
+        ) -> protocol::MemberNamesMap {
+            let mut map = protocol::MemberNamesMap::new();
+            map.insert(hex(person_id), row(who, person_id, version, name));
+            map
+        }
+
+        fn write_local(dir: &Path, map: &protocol::MemberNamesMap) -> Vec<u8> {
+            let bytes =
+                protocol::encode_member_names_blob(&names_key(), &HASH, EPOCH, map).unwrap();
+            std::fs::write(dir.join("vault.member-names"), &bytes).unwrap();
+            bytes
+        }
+
+        /// Encode a remote store and register its blob under `/sync/blob?id=…`.
+        fn serve_remote(
+            t: &FakeTransport,
+            id: &[u8; 16],
+            bytes: &[u8],
+            version: u64,
+        ) -> ChangedBlob {
+            let nonce = read_member_names_nonce(bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(id)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *id,
+                content_nonce: nonce,
+                version,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        // The family is addressed through the GROUP tier only: a pre-B2B `OwnerRoot`
+        // session has no group key, and this family has no `SubkeyRole` counterpart to
+        // derive a root-tier id from. So the id helper answers `None`, and the phase
+        // generates no traffic at all rather than deriving a key no member could read.
+        #[test]
+        fn a_pre_b2b_session_has_no_member_names_phase() {
+            let dir = scratch("pre-b2b");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = [0x0a; 16];
+            let owner = SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new([0x33; 32]));
+            assert!(
+                member_names_sync_id(&owner).is_none(),
+                "a group-derived id must not be expressible on the root tier"
+            );
+            let phase = blocking(sync_member_names_phase(
+                &IO, &t, "tok", &owner, &dir, &mut st, &id, None,
+            ))
+            .unwrap();
+            assert!(!phase.dirty, "a pre-B2B vault has no name store to push");
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert!(
+                t.requests().is_empty(),
+                "a pre-B2B vault generates no member-names traffic"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // The id is group-derived and per-family, so an owner and a member of one epoch
+        // compute the SAME id and two families never collide on one.
+        #[test]
+        fn the_member_names_id_agrees_with_the_group_derivation_and_no_sibling() {
+            let member = group_tier();
+            let id = member_names_sync_id(&member).expect("group tier");
+            assert_eq!(id, crate::plugins::member_names::names_sync_id(&GROUP));
+            assert_ne!(id, shared_sync_id(&member, SubkeyRole::ThemesSyncId));
+            assert_ne!(id, shared_sync_id(&member, SubkeyRole::PrefsSyncId));
+            assert_ne!(id, shared_sync_id(&member, SubkeyRole::CatalogSyncId));
+        }
+
+        // A name the server has never seen ⇒ the phase reports dirty AND carries the
+        // exact bytes the push must send (the myne#436 single-derivation discipline: the
+        // push site re-reads nothing).
+        #[test]
+        fn a_local_only_name_is_dirty_and_the_phase_carries_its_bytes() {
+            let dir = scratch("local-only");
+            seed_meta(&dir);
+            let ann = person(0x11, 0x12, 0x13);
+            let ann_id = [0x21; 16];
+            write_local(&dir, &one_row(&ann, &ann_id, 1, "Ada"));
+
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = member_names_sync_id(&group_tier()).unwrap();
+            let phase = blocking(sync_member_names_phase(
+                &IO,
+                &t,
+                "tok",
+                &group_tier(),
+                &dir,
+                &mut st,
+                &id,
+                None,
+            ))
+            .unwrap();
+            assert!(phase.dirty, "an unsynced local name must push");
+            assert!(!phase.applied_remote);
+            assert_eq!(
+                phase.push_bytes.as_deref().map(|b| &b[0..4]),
+                Some(protocol::MEMBER_NAMES_BLOB_MAGIC.as_slice()),
+                "a dirty phase must hand the push its verified bytes"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // `merge(local, empty) == local`, so a pulled copy that fails the AEAD must be
+        // REFUSED with no local mutation: merging it as empty would discard a peer's
+        // rename and then write that emptiness back over it. The served bytes carry our
+        // magic and an advertised nonce, so they pass the §11.3 header check and fail
+        // only the decrypt: exactly the copy this arm exists for.
+        #[test]
+        fn a_pulled_copy_that_does_not_decode_is_refused() {
+            let dir = scratch("refuse");
+            seed_meta(&dir);
+            let ann = person(0x11, 0x12, 0x13);
+            let ann_id = [0x21; 16];
+            let before = write_local(&dir, &one_row(&ann, &ann_id, 1, "Ada"));
+
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = member_names_sync_id(&group_tier()).unwrap();
+
+            let mut junk = Vec::from(protocol::MEMBER_NAMES_BLOB_MAGIC);
+            junk.extend_from_slice(&[0x01, 0x01]);
+            junk.extend_from_slice(&[0xAB; 24]);
+            junk.extend_from_slice(&8u32.to_be_bytes());
+            junk.extend_from_slice(&[0x00; 8]);
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&id)),
+                200,
+                serde_json::to_vec(&serde_json::json!({ "ciphertext_b64": B64.encode(&junk) }))
+                    .unwrap(),
+            );
+            let rec = ChangedBlob {
+                id,
+                content_nonce: [0xAB; 24],
+                version: 9,
+                size: junk.len(),
+                attachment_id: None,
+            };
+
+            let phase = blocking(sync_member_names_phase(
+                &IO,
+                &t,
+                "tok",
+                &group_tier(),
+                &dir,
+                &mut st,
+                &id,
+                Some(&rec),
+            ))
+            .unwrap();
+            assert!(!phase.dirty, "a refused copy must not dirty the store");
+            assert!(!phase.applied_remote);
+            assert_eq!(
+                std::fs::read(dir.join("vault.member-names")).unwrap(),
+                before,
+                "the live file must be byte-untouched"
+            );
+            assert!(
+                !st.blobs.contains_key(&hex(&id)),
+                "no baseline may be adopted for a refused copy"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A remote copy is pulled and MERGED entry by entry, and the merge is reported
+        // where the WebView can see it: on the cycle summary. The remote row (Bob) and
+        // the local row (Ann) are a concurrent rename of DIFFERENT rows, so both must
+        // survive, and with the flag false the roster would keep drawing the stale name
+        // until something else happened to re-read it.
+        #[test]
+        fn a_pulled_member_name_is_merged_and_reported_at_the_cycle_boundary() {
+            use protocol::vault_head::VAULT_HEAD_FORMAT_V2;
+
+            let (dir, notes) = fresh_vault("member-names-cycle");
+            seed_meta(&dir);
+
+            let ann = person(0x11, 0x12, 0x13);
+            let ann_id = [0x21; 16];
+            let bob = person(0x31, 0x32, 0x33);
+            let bob_id = [0x41; 16];
+            write_local(&dir, &one_row(&ann, &ann_id, 1, "Ada"));
+
+            // The server holds only Bob's row, at a version it never shared.
+            let remote_bytes = protocol::encode_member_names_blob(
+                &names_key(),
+                &HASH,
+                EPOCH,
+                &one_row(&bob, &bob_id, 1, "Grace"),
+            )
+            .unwrap();
+            let names_id = member_names_sync_id(&group_tier()).unwrap();
+
+            // A signed head so the cycle adopts the server's rather than authoring a
+            // genesis (a push route this test does not need).
+            let person = person(0x51, 0x52, 0x53);
+            let person_public = person.public_half();
+            let ctx = SignedHeadCtx::new(person, HASH, vec![person_public]);
+            let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+            let head = VaultHead {
+                head_format_version: VAULT_HEAD_FORMAT_V2,
+                account_number_hash: HASH,
+                manifest_hash: [0u8; 32],
+                seq: 1,
+                prev_head_hash: Vec::new(),
+                version_vector: vec![VvEntry {
+                    device_id: [0x99; 16],
+                    counter: 1,
+                }],
+            };
+            let sealed = ctx.sign(&head, &mut rng).unwrap();
+            let head_frag = (B64.encode(&sealed.record), hex(&sealed.head_id));
+
+            let t = FakeTransport::new();
+            let remote_nonce = read_member_names_nonce(&remote_bytes).unwrap();
+            t.on(
+                HttpMethod::Get,
+                "/sync/pull?cursor=0",
+                200,
+                pull_body_with_head(&meta_json(&names_id, 4, &remote_nonce), 1, &head_frag),
+            );
+            t.on(
+                HttpMethod::Get,
+                "/sync/pull?cursor=1",
+                200,
+                pull_body("", 1),
+            );
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&names_id)),
+                200,
+                serde_json::to_vec(
+                    &serde_json::json!({ "ciphertext_b64": B64.encode(&remote_bytes) }),
+                )
+                .unwrap(),
+            );
+
+            let items_key = [0x44u8; 32];
+            let items_key_id = [0x55u8; 16];
+            let summary = blocking(run_sync_cycle(
+                &IO,
+                &t,
+                None,
+                &group_tier(),
+                HASH,
+                [0x0a; 16],
+                "tok",
+                &notes,
+                &dir,
+                PushGate::PollOnly,
+                MetaVersion::V0_2,
+                Some(AttachmentKeys {
+                    items_key: &items_key,
+                    items_key_id: &items_key_id,
+                }),
+                Some(&ctx),
+                &std::collections::HashSet::new(),
+            ))
+            .expect("cycle runs");
+
+            assert!(
+                summary.member_names_applied_remote,
+                "a merged remote name must be reported at the cycle boundary"
+            );
+            let on_disk = std::fs::read(dir.join("vault.member-names")).unwrap();
+            let merged =
+                protocol::decode_member_names_blob(&names_key(), &HASH, EPOCH, &on_disk).unwrap();
+            assert_eq!(merged.len(), 2, "both rows survive the merge");
+            assert_eq!(merged.get(&hex(&ann_id)).unwrap().name, "Ada");
+            assert_eq!(merged.get(&hex(&bob_id)).unwrap().name, "Grace");
             std::fs::remove_dir_all(&dir).ok();
         }
     }

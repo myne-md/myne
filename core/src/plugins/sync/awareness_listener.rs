@@ -591,7 +591,7 @@ pub fn spawn_awareness_supervisor<R: Runtime>(app: AppHandle<R>) {
             // with the OPEN sessions (`collab-editor-bridge` task 7). The keypair is
             // rebuilt each tick (HKDF only, no Argon2id); a carried content change is
             // applied to its session and the pane is told to drain + dispatch it as one
-            // ChangeSet (`sync://remote-merged`).
+            // ChangeSet (`sync://live-remote-merged`).
             if let (Some(sig), Some(reg), Some((acct, epoch)), Some(keys)) = (
                 signal.as_ref(),
                 app.try_state::<crate::plugins::live::LiveSessionRegistry>(),
@@ -618,7 +618,12 @@ pub fn spawn_awareness_supervisor<R: Runtime>(app: AppHandle<R>) {
                     );
                     sig.add_out_room_missed(drain.out_room_missed);
                     for note_id in drain.changed {
-                        let _ = app.emit("sync://remote-merged", note_id);
+                        // A LIVE peer edit, not a durable merge: the pane applies it in
+                        // front of the user, so it must NOT raise the "updated from
+                        // another device" hint. Only the durable merge path emits
+                        // `sync://remote-merged`, which the hint listens to
+                        // (myne-md/myne#857).
+                        let _ = app.emit("sync://live-remote-merged", note_id);
                     }
                     // Presence frames reach the awareness store (`collab-presence-ui`).
                     {

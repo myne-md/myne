@@ -687,7 +687,10 @@ pub async fn run_active_cycle_from_host(
                         )
                         .await;
                     }
-                    host.emit("sync://remote-merged", EventPayload::Text(note_id));
+                    // The pull landed in a note that is OPEN in a live session, so the
+                    // user is watching the change arrive: the live event, which the
+                    // hint does NOT listen to, not the durable one (myne-md/myne#857).
+                    host.emit("sync://live-remote-merged", EventPayload::Text(note_id));
                 } else {
                     // The session could not take the pulled revision (a blob the CRDT
                     // refuses), or it was closed between the orchestrator's scan and
@@ -758,6 +761,21 @@ pub async fn run_active_cycle_from_host(
                     if let Some(active) = state.active_vault_id().await {
                         state.set_cached_label(active, view.label.clone()).await;
                         state.set_cached_icon(active, view.icon.clone()).await;
+                        // ...and persist it, not only in RAM. A MEMBER vault gets its
+                        // name from a prefs blob that arrives BY SYNC after accept,
+                        // so without this the durable `vault.label` the LOCKED picker
+                        // reads was never written and every relaunch kept showing the
+                        // "Vault N" fallback (myne-md/myne#856). Best-effort, like
+                        // every other label writeback.
+                        crate::vault_label::writeback::persist_label_from_host(
+                            host,
+                            io,
+                            &dir_for_prefs,
+                            active,
+                            view.label.as_deref(),
+                            crate::vault_label::key::platform_keychain(),
+                        )
+                        .await;
                     }
                 }
                 host.emit(

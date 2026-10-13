@@ -39,6 +39,7 @@ pub mod importer;
 // live-collab (`collab-editor-bridge`): the collaborative-editor live-session
 // commands. Core in `myne-core::plugins::live`; this shim registers them.
 pub mod live;
+pub mod member_names;
 pub mod memory;
 // local-ai epic (MYND-406): on-device inference plugin, gated behind the
 // default-off `local-inference` cargo feature (SYNC-5). Absent — zero symbols —

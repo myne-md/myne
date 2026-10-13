@@ -1492,6 +1492,22 @@ const ROSTER = [
     reason:
       "The inference state machine, 1467 lines against 40. Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
+  {
+    a: "src-tauri/src/plugins/member_names/mod.rs",
+    b: "mobile/src-tauri/src/plugins/member_names/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Host-registration shim, and the pair is a straight instance of `SHIM_REASON` measured rather than inherited: both files carry `pub use myne_core::plugins::member_names::commands`, both `generate_handler!` rosters list the same three commands, and the two `init()` bodies are the same builder. Mobile's shim entered the record rather than being dropped as trivial because it is the whole substrate of the phone's onboarding name step (myne-md/myne#851 task 15): a member's name is a SIGNED row whose only writer is `member_names_set_mine`, so a client that does not register this plugin cannot name itself at all. What differs between the two is one layer up and is NOT a claim about the ACL: desktop wraps two of the three commands in `src/lib/memberNames.ts` and mobile wraps one, because post-onboarding name editing is out of task 15's scope and `scripts/check-ipc-binding-callers.mjs` refuses a binding with no production caller. Both keep all three registered and granted, so the later editor needs no Rust change.",
+  },
+  {
+    a: "src/lib/memberNames.ts",
+    b: "mobile/src/lib/memberNames.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "The per-client BINDING for a store neither client owns, in three parts that are worth separating rather than calling drift. The command cores and the `MYO5` codec are `myne-core` (see the shim pair above). The wire-shape mirror (`MemberNamesMap` / `MemberNameEntry`) and the refusal-to-i18n-key mapper were extracted into `@myne/client-core` in myne-md/myne#851 task 15, so a dropped `match` arm cannot fall through to a generic-but-plausible sentence on one client only; both sides now import those rather than holding a copy. What remains per-client is the `invoke` wrapper and nothing else, which is exactly the two names `scripts/check-platform-seam.mjs` requires each tree to reach through its own seam. The two files are NOT symmetric and that is recorded rather than resolved: desktop wraps `member_names_set_mine` and `member_names_clear_mine` (its Members-list row editor renames and clears), mobile wraps only the setter, because post-onboarding editing is out of task 15's scope and a binding nothing calls is the dead export `scripts/check-ipc-binding-callers.mjs` exists to refuse. `delegated` rather than `decision` because neither file holds an answer: they hold a transport.",
+  },
 ];
 
 const VERDICTS = ["decision", "screen", "absent", "delegated"];

@@ -87,6 +87,46 @@ export interface MockConfig {
   /** `sync_join_account` outcome. */
   joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null; device_id_hex?: string };
   joinError?: { kind: string };
+  // ── The person plane (myne-md/myne#851 tasks 14 and 15) ──────────────────
+  /** `sync_person_status`. The default is an unenrolled device, which is what
+   *  drops the identity flow on its gate step. */
+  personStatus?: {
+    enrolled: boolean;
+    identity_unlocked: boolean;
+    person_id_hex: string | null;
+    identity_code: string | null;
+    sealed_keypair_present: boolean;
+  };
+  /** `sync_person_list_invites`: the pending-invite roster the identity home
+   *  renders. One row is what puts an `Open` control on screen at all. */
+  personInvites?: Array<{ invite_id_hex: string; vault_account_hash_hex: string; claimed: boolean }>;
+  /** What the owner's out-of-band code decodes to (`sync_person_inspect_invite_code`),
+   *  which is the fingerprint the member compares against a channel of their own. */
+  inviteOwner?: { person_id_hex: string; fingerprint_hex: string };
+  inviteInspectError?: { kind: string };
+  /** `sync_person_accept_invite` refusal. Absent = the accept lands, and the mock
+   *  then reports the accepted vault from `vault_list`, which is what makes the
+   *  re-probe reach the editor. */
+  acceptInviteError?: { kind: string };
+  /** `sync_list_roster`: the one answer the name step asks for, and the mobile
+   *  Members panel's only source. `null` (the default) makes the read REJECT,
+   *  the arm the gate has to survive by asking rather than by skipping. */
+  roster?: {
+    members: Array<{
+      fingerprint_hex: string;
+      is_self: boolean;
+      display_name: string;
+      name_state: "absent" | "unverified" | "verified";
+      role: "owner" | "member";
+      previous_fingerprint_hex: string | null;
+      continuity: string | null;
+    }>;
+    authority: string;
+    group_key_epoch: number;
+  } | null;
+  /** `member_names_set_mine` refusal, mapped to a message by the SHARED
+   *  `@myne/client-core/member-name` switch rather than by a copy of it. */
+  memberNameError?: { kind: string };
   /** `qr-scan|scan` outcome (MYND-466 device-join QR). */
   qrScan?: { value: string | null };
   /** `qr-scan|scan` REFUSAL. The plugin's non-iOS arm answers
@@ -520,6 +560,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // scenarios read prefs before ever unlocking and gating them would rewrite
     // half this file's fixtures to prove nothing.
     let unlockedThisSession = false;
+
+    /** The vault an accepted invite produced on THIS device, or `null` while none
+     *  has (myne-md/myne#851 task 14). The accept is the only thing that sets it,
+     *  and `vault_list` / `vault_slot_kind` are the only readers, which is the
+     *  real sequence: `sync_person_accept_invite` materializes and unlocks the
+     *  slot host-side, and the shell then re-probes and finds it. */
+    let acceptedVaultId: string | null = null;
     // Vaults deleted during this session, by id. The delete escape routes by
     // re-probing rather than by navigating, so the roster is the only thing
     // that can carry the outcome — see the vault-delete handler.
@@ -615,6 +662,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // boot to Unlock (one Exists vault, Empty slot); otherwise the Unlocked
       // slot shortcuts `initialStageFromProbe` straight to the editor.
       "plugin:vault-unlock|vault_list": () => {
+        // An accepted invite OUTRANKS `freshDevice` from that point on, which is
+        // the whole observable difference the accept makes: the identity flow
+        // hands back to the shell's re-probe, and only a vault that now exists
+        // carries the user to the editor instead of back to Welcome.
+        if (acceptedVaultId !== null) {
+          return [{ id: acceptedVaultId, status: { kind: "Exists" }, label: null, icon: vaultIcon }];
+        }
         if (config.freshDevice) return [];
         if (config.corruptedVault) return [{ id: "flow-vault", status: { kind: "Corrupted" } }];
         // Anything deleted this session is gone from here on — see the
@@ -642,7 +696,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return [{ id: "flow-vault", status: { kind: "Exists" }, icon: vaultIcon }];
       },
       "plugin:vault-unlock|vault_slot_kind": () =>
-        config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault ? "Empty" : "Unlocked",
+        acceptedVaultId !== null
+          ? "Unlocked"
+          : config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault
+            ? "Empty"
+            : "Unlocked",
       "plugin:vault-unlock|vault_is_unlocked": () => true,
       "plugin:vault-unlock|report_user_activity": () => null,
       "plugin:vault-unlock|unlock": () => {
@@ -1607,6 +1665,51 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_verify_hold_begin": () => null,
       "plugin:sync|sync_verify_hold_end": () => null,
       "plugin:sync|sync_pending_conflicts": () => config.pendingConflicts ?? [],
+      // ── The person plane (myne-md/myne#851 tasks 14 and 15) ──────────────
+      // The identity flow's whole backend surface. Nothing here is stateful
+      // except `acceptedVaultId`, and that is deliberate: the accept's only
+      // durable effect on this device is a vault, and modelling the vault rather
+      // than modelling "the accept returned" is what makes the spec's assertion
+      // ("the editor mounted") a statement about the product.
+      "plugin:sync|sync_person_status": () =>
+        config.personStatus ?? {
+          enrolled: false,
+          identity_unlocked: false,
+          person_id_hex: null,
+          identity_code: null,
+          sealed_keypair_present: false,
+        },
+      "plugin:sync|sync_person_list_invites": () => config.personInvites ?? [],
+      "plugin:sync|sync_person_inspect_invite_code": (args) => {
+        // Recorded so a spec can assert the code the form forwarded rather than
+        // merely that the fingerprint appeared.
+        (window as unknown as { __inspectArgs?: unknown }).__inspectArgs = args;
+        if (config.inviteInspectError) throw config.inviteInspectError;
+        return config.inviteOwner ?? { person_id_hex: "owner-person", fingerprint_hex: "c0ffee01" };
+      },
+      "plugin:sync|sync_person_accept_invite": (args) => {
+        // The four arguments, in order, are the accept's contract (task 14): the
+        // invite id, the owner's out-of-band identity code, the recovery phrase,
+        // the device-local password. A spec reads them back from here.
+        (window as unknown as { __acceptInviteArgs?: unknown }).__acceptInviteArgs = args;
+        if (config.acceptInviteError) throw config.acceptInviteError;
+        acceptedVaultId = String(args?.vaultId ?? "accepted-vault");
+        return null;
+      },
+      "plugin:sync|sync_list_roster": () => {
+        // `roster: null` is a REFUSAL rather than an empty roster, because the two
+        // are different answers to the name step's question and the step has to
+        // treat only one of them as "no name yet".
+        if (config.roster === null || config.roster === undefined) {
+          throw { kind: "NotUnlocked" };
+        }
+        return config.roster;
+      },
+      "plugin:member-names|member_names_set_mine": (args) => {
+        (window as unknown as { __memberNameArgs?: unknown }).__memberNameArgs = args;
+        if (config.memberNameError) throw config.memberNameError;
+        return {};
+      },
       "plugin:sync|sync_enroll": (args) => {
         // Record the payload so a flow test can assert what the form forwarded.
         // MYND-548: the device name goes to the CORE (which parks it and applies

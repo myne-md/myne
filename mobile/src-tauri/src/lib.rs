@@ -257,6 +257,12 @@ pub fn run() {
         // the shared-core compiled code; this crate adds only the wrapper +
         // capability entry. The scheduler/loop stays out (MYND-460).
         .plugin(plugins::sync::init())
+        // B2B member display names (MYO5, §9.29; myne-md/myne#851 task 15): the
+        // three shared-core commands the desktop registers, gated by a single
+        // deny-by-default `member-names:default` capability. The phone's name step
+        // is what calls `member_names_set_mine`, and a signed name row has no other
+        // writer, so this registration IS that step's substrate.
+        .plugin(plugins::member_names::init())
         // On-device speech-to-text (Whisper, MYND-563): transcription-only mobile
         // plugin. Feature-gated by `local-inference` (default-on) — the module's
         // `init()` is a no-op when the feature is off, so this stays an

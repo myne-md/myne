@@ -45,6 +45,13 @@ pub mod chats;
 // `myne_core::plugins::memory`: the six memory + personality storage
 // commands, Class-1 synced vault content.
 pub mod memory;
+// B2B member display names (`vault.member-names`, MYO5, §9.29;
+// myne-md/myne#851 task 15): a thin re-export wrapper over
+// `myne_core::plugins::member_names`: the three commands the desktop registers,
+// a deny-by-default `member-names:default` capability. The name STEP needs it
+// because a signed name row has exactly one writer (`member_names_set_mine`); see
+// `member_names/mod.rs` for why mobile can write a name at all.
+pub mod member_names;
 // On-device speech-to-text (Whisper, MYND-563) — a NEW mobile plugin (not a
 // `myne-core` re-export: `local_inference` is desktop-side and `core/` must stay
 // wasm-clean, so the whisper subset is copied here). Declared unconditionally;

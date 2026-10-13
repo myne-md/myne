@@ -35,6 +35,7 @@
     "secret-export:default",
     "export-dir:default",
     "sync:default",
+    "member-names:default",
     "qr-scan:default",
     "reminders:default",
     "sensitive-clipboard:default"

@@ -672,8 +672,8 @@ export function PaneView({
   // whole-markdown save therefore cannot delete the merged-in peer text.
   useEffect(() => {
     let disposed = false;
-    let unlisten: (() => void) | null = null;
-    void listen<string>("sync://remote-merged", (event) => {
+    const unlisten: Array<() => void> = [];
+    const onRemote = (event: { payload: string }) => {
       const id = activeIdRef.current;
       if (disposed || id === null || event.payload !== id || !isLiveNote(id)) return;
       void takeRemoteSplices(id).then((splices) => {
@@ -681,13 +681,20 @@ export function PaneView({
         if (disposed || splices.length === 0 || view === null) return;
         view.dispatch(remoteDispatchSpec(view.state, splices));
       });
-    }).then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    });
+    };
+    // BOTH events carry one note id: the durable merge (`sync://remote-merged`,
+    // which also raises the calm hint) and the live peer edit
+    // (`sync://live-remote-merged`, silent on purpose, because the change is landing in
+    // front of the user, myne-md/myne#857).
+    for (const name of ["sync://remote-merged", "sync://live-remote-merged"]) {
+      void listen<string>(name, onRemote).then((fn) => {
+        if (disposed) fn();
+        else unlisten.push(fn);
+      });
+    }
     return () => {
       disposed = true;
-      if (unlisten !== null) unlisten();
+      for (const fn of unlisten) fn();
     };
   }, []);
   // The awareness store (`collab-presence-ui` task 3): the peers editing THIS pane's
