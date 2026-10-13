@@ -189,6 +189,22 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
 
 ## Gotchas
 
+- **A field added to a type that another site ENUMERATES BY HAND is invisible to every
+  compiler, and `Proposal` cost two of them in one change** (myne-md/myne#850). The merge that
+  accumulates a run's proposal across legs copied `edits`, `new_notes` and `summary` and dropped
+  `settings`, so every setting a run proposed vanished between the loop's own proposal and the one
+  the client receives, a settings-only run arrived EMPTY, and the review screen's own gate ("the
+  run stopped and has something to show") was false so the screen never opened, all while the host
+  had accepted the change and no refusal was raised. The same shape then dropped the folder half of
+  the one two-field intent from the undo record. **The fix is `let Proposal { .. } = from;`
+  destructured rather than field-by-field**, so a new field is a compile error at the merge instead
+  of a silent drop; `wipe_session`, `accumulate_proposal` and `AgentRunState::clear` all read that
+  way now. Two things made it harder to see than usual, and both generalise. The tests that should
+  have caught it assert the layer BELOW the loss (`outcome.proposal`, before the merge), which is
+  the wrong-layer class this file already warns about, so a green suite proved nothing. And the
+  field was carried by the wire type, the store and the renderer correctly: the only place it was
+  absent was the one function that copied fields by name.
+
 - **Every keychain-backed device-local secret in this crate is Apple-only today.** `quick_unlock`
   has an `apple.rs`, `captures/device_key.rs` is `#[cfg(any(target_os = "macos", target_os = "ios"))]`,
   and `vault_label::key::platform_keychain` returns `UnavailableKeychain` on every other target. So a

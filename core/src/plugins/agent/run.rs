@@ -26,6 +26,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use zeroize::Zeroize;
 
 /// Where a scope grant came from.
 ///
@@ -70,6 +71,38 @@ struct AgentRun {
     cancel: Arc<AtomicBool>,
 }
 
+/// One setting a run changed, and the value it replaced.
+///
+/// **In memory only, and it holds a preference value rather than note text.**
+/// It exists so `undo` can put the setting back, which is the other half of "a
+/// run is reversible as one action". It dies with the run, like everything else
+/// about a session's agent state, and it is never persisted: the durable record
+/// of a setting is `vault.prefs` itself, and a growing history of past values
+/// would be vault-derived state nobody asked for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppliedSetting {
+    /// The settings-index id, so the undo re-resolves which pref to write rather
+    /// than being handed a field name by a caller it cannot check.
+    pub intent_id: String,
+    /// The value in place before the write. `None` when the setting was unset,
+    /// which is what tells "put X back" apart from "clear it again".
+    pub previous: Option<String>,
+    /// The FOLDER in place before the write, for the one target that has two
+    /// fields (`files.new-note-location`; myne-md/myne#850).
+    ///
+    /// **Recorded rather than re-read at undo time, and that is the whole point
+    /// of the field.** The undo of "specific/Old/ -> specific/New/" rebuilt the
+    /// folder from whatever `vault.prefs` held when the user pressed Undo, which
+    /// is the agent's own new folder, so it wrote `New/` back, reported the
+    /// setting restored, and permanently replaced the folder the user had. The
+    /// bug was invisible in exactly the reading the code invited, because the
+    /// undo did read a folder and did write one. `None` here means the target
+    /// either has no second field or held none.
+    #[serde(default)]
+    pub previous_folder: Option<String>,
+}
+
 /// What an applied run left behind, so it can be reverted after the surface
 /// that applied it is gone.
 ///
@@ -85,6 +118,12 @@ struct AgentRun {
 /// this is not a `Zeroizing` surface. It is still vault-scoped and still dies on
 /// lock, because a `note_id` is an AS6 creation timestamp and the set of them is
 /// a statement about which notes an agent touched.
+///
+/// **`settings` IS a Zeroizing surface, and it is the one field here that is.**
+/// A previous preference value is a folder path or a date format: AS3-class vault
+/// structure the model wrote, the same class `wipe_session` overwrites. The two
+/// discard sites below therefore overwrite these values while leaving the
+/// identifier pairs to drop, which is the one place the two halves differ.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppliedRun {
@@ -95,6 +134,28 @@ pub struct AppliedRun {
     /// How many notes the run CREATED. Carried because an undo cannot revert
     /// those, and a summary that did not say so would overstate what undo does.
     pub notes_created: usize,
+    /// Settings the run changed, with the value each replaced. Empty for a run
+    /// that only touched notes, which is every run before this feature.
+    pub settings: Vec<AppliedSetting>,
+}
+
+impl AppliedRun {
+    /// Overwrite the preference values this record holds.
+    ///
+    /// **Split out because two discard sites need it and a third would otherwise
+    /// forget**: `clear` (the lock teardown) and the replace arm of
+    /// `record_applied`. The identifier pairs beside them are deliberately left
+    /// alone, which `AppliedRun`'s doc explains.
+    fn zeroize_preference_values(&mut self) {
+        for setting in &mut self.settings {
+            if let Some(previous) = setting.previous.as_mut() {
+                previous.zeroize();
+            }
+            if let Some(folder) = setting.previous_folder.as_mut() {
+                folder.zeroize();
+            }
+        }
+    }
 }
 
 /// Mint a run id.
@@ -331,7 +392,18 @@ impl AgentRunState {
         runs.clear();
         // The applied record goes with them. It names note ids of a vault that
         // is no longer unlocked, and an undo offered after a lock would target
-        // whichever vault is open next.
+        // whichever vault is open next. **Its preference VALUES are overwritten
+        // first**, because dropping the slot frees them untouched and they are the
+        // AS3-class strings `wipe_session` already overwrites elsewhere in this
+        // feature (myne-md/myne#850, from the 2026-10-13 review).
+        if let Some(record) = self
+            .applied
+            .lock()
+            .expect("agent applied slot poisoned")
+            .as_mut()
+        {
+            record.zeroize_preference_values();
+        }
         *self.applied.lock().expect("agent applied slot poisoned") = None;
     }
 
@@ -379,8 +451,29 @@ impl AgentRunState {
                     .collect();
                 prev.restore_points.extend(fresh);
                 prev.notes_created += applied.notes_created;
+                // The same merge, for the same reason, over settings: a run that
+                // applies twice and changes one setting both times must leave the
+                // EARLIEST previous value, because "undo the run" means back to
+                // before the run and not back to the midpoint.
+                let known_settings: BTreeSet<&str> =
+                    prev.settings.iter().map(|s| s.intent_id.as_str()).collect();
+                let fresh_settings: Vec<AppliedSetting> = applied
+                    .settings
+                    .into_iter()
+                    .filter(|s| !known_settings.contains(s.intent_id.as_str()))
+                    .collect();
+                prev.settings.extend(fresh_settings);
             }
-            _ => *slot = Some(applied),
+            // **The superseded record is overwritten, not dropped**
+            // (myne-md/myne#850, from review): its preference values are the same
+            // class as the ones above, and replacing the slot is the ordinary way
+            // they leave this struct.
+            _ => {
+                if let Some(previous) = slot.as_mut() {
+                    previous.zeroize_preference_values();
+                }
+                *slot = Some(applied)
+            }
         }
     }
 
@@ -629,6 +722,7 @@ mod tests {
             run_id: run_id.to_string(),
             restore_points: vec![("note-a".into(), "snap-1".into())],
             notes_created: 2,
+            settings: Vec::new(),
         }
     }
 
@@ -657,11 +751,13 @@ mod tests {
             run_id: "r".into(),
             restore_points: vec![("note-a".into(), "snap-1".into())],
             notes_created: 1,
+            settings: Vec::new(),
         });
         s.record_applied(AppliedRun {
             run_id: "r".into(),
             restore_points: vec![("note-b".into(), "snap-2".into())],
             notes_created: 2,
+            settings: Vec::new(),
         });
         let rec = s.take_applied("r").expect("the run is undoable");
         assert_eq!(
@@ -695,6 +791,7 @@ mod tests {
             run_id: "r".into(),
             restore_points: vec![("note-a".into(), "before-the-run".into())],
             notes_created: 0,
+            settings: Vec::new(),
         });
         s.record_applied(AppliedRun {
             run_id: "r".into(),
@@ -705,6 +802,7 @@ mod tests {
                 ("note-b".into(), "before-the-run".into()),
             ],
             notes_created: 0,
+            settings: Vec::new(),
         });
         let rec = s.take_applied("r").expect("the run is undoable");
         assert_eq!(
@@ -785,5 +883,96 @@ mod tests {
         s.clear();
         assert_eq!(s.last_applied(), None);
         assert!(matches!(s.take_applied("r"), Err(AgentError::NoSuchRun)));
+    }
+
+    // ---- settings in the applied record (myne-md/myne#850) -----------------
+
+    fn applied_setting(run_id: &str, intent: &str, previous: Option<&str>) -> AppliedRun {
+        AppliedRun {
+            run_id: run_id.to_string(),
+            restore_points: Vec::new(),
+            notes_created: 0,
+            settings: vec![AppliedSetting {
+                intent_id: intent.to_string(),
+                previous: previous.map(str::to_string),
+                previous_folder: None,
+            }],
+        }
+    }
+
+    /// A setting joins the record, so the undo has a value to put back.
+    #[test]
+    fn a_setting_is_recorded_with_the_value_it_replaced() {
+        let s = AgentRunState::default();
+        s.record_applied(applied_setting(
+            "r",
+            "editor.weekly-notes-folder",
+            Some("Old/"),
+        ));
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(rec.settings.len(), 1);
+        assert_eq!(rec.settings[0].intent_id, "editor.weekly-notes-folder");
+        assert_eq!(rec.settings[0].previous.as_deref(), Some("Old/"));
+    }
+
+    /// **The merge keeps the EARLIEST previous value**, which is the settings
+    /// half of the restore-point rule: "undo the run" means back to before the
+    /// run, not back to the midpoint. A run that changes the same setting twice
+    /// would otherwise leave the undo restoring the intermediate value.
+    #[test]
+    fn a_second_apply_keeps_the_earliest_previous_setting_value() {
+        let s = AgentRunState::default();
+        s.record_applied(applied_setting(
+            "r",
+            "editor.weekly-notes-folder",
+            Some("Original/"),
+        ));
+        s.record_applied(applied_setting(
+            "r",
+            "editor.weekly-notes-folder",
+            Some("Mid/"),
+        ));
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(rec.settings.len(), 1, "one setting, not two");
+        assert_eq!(
+            rec.settings[0].previous.as_deref(),
+            Some("Original/"),
+            "the earliest value is the one undo restores"
+        );
+    }
+
+    /// A second apply that changes a DIFFERENT setting adds it, which is the
+    /// direction the dedup must not swallow.
+    #[test]
+    fn a_second_apply_adds_a_genuinely_different_setting() {
+        let s = AgentRunState::default();
+        s.record_applied(applied_setting(
+            "r",
+            "editor.weekly-notes-folder",
+            Some("Original/"),
+        ));
+        s.record_applied(applied_setting("r", "files.new-note-location", None));
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(rec.settings.len(), 2);
+        assert!(rec
+            .settings
+            .iter()
+            .any(|s| s.intent_id == "files.new-note-location" && s.previous.is_none()));
+    }
+
+    /// Settings merge independently of restore points: a run whose second apply
+    /// was settings-only must not lose the note restore points from the first.
+    #[test]
+    fn settings_and_restore_points_merge_independently() {
+        let s = AgentRunState::default();
+        s.record_applied(applied("r"));
+        s.record_applied(applied_setting(
+            "r",
+            "editor.weekly-notes-folder",
+            Some("Original/"),
+        ));
+        let rec = s.take_applied("r").expect("the run is undoable");
+        assert_eq!(rec.restore_points.len(), 1, "the note point survives");
+        assert_eq!(rec.settings.len(), 1);
     }
 }

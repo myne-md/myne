@@ -132,7 +132,12 @@ export function AgentReviewTakeover({
     // changes", over the transcript where the answer belonged. This is the only
     // case that changes — one edit is still enough to open the screen, whatever
     // the end kind.
-    (agent.proposal.edits.length > 0 || agent.proposal.newNotes.length > 0) &&
+    (agent.proposal.edits.length > 0 ||
+      agent.proposal.newNotes.length > 0 ||
+      // A settings-only run is a proposal too (myne-md/myne#850). Leaving it
+      // out here is the difference between a change the user can review and one
+      // the model made and nobody ever sees.
+      (agent.proposal.settings?.length ?? 0) > 0) &&
     // **And the run is not applying itself** (myne-md/myne#551). Without this
     // clause an automatic run opens the screen it exists to skip for the frames
     // between the step settling and the apply returning. The flag is raised

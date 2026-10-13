@@ -237,6 +237,19 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
 
 ## Test observability (E2E contract — SYNC-8)
 
+- **A new refusal enum gets its OWN catalog namespace, or it breaks the mirror test of the enum it
+  borrowed** (myne-md/myne#850, found by vitest rather than by review). `SettingRejection`'s reasons
+  were first given keys inside `agent.review.refused.*`, which is the namespace
+  `tests/lib/editRejectionMirror.test.ts` holds equal to `EditRejection` in BOTH directions: the new
+  keys read as variants that no longer exist and the edits' test went red for a reason that had
+  nothing to do with edits. The settings have `agent.review.refusedSetting.*` now, and their own
+  mirror (`tests/lib/settingRejectionMirror.test.ts`), because the shape that finds a missing
+  sentence is worth one file per enum. Two traps inside that file's read, both paid for: a union
+  capture written `([\s\S]*?);\n` terminates early on any doc-comment line ending with a semicolon,
+  and `([\s\S]*?)";\n` consumes the LAST member's closing quote so the member scan drops it. The
+  read that works is `([\s\S]*?")(?=;\n)`, which ends the capture on the quote and leaves the
+  semicolon to a lookahead.
+
 The real-IPC E2E suites (`e2e/`, tauri-driver — see `e2e/AGENTS.md` +
 `docs/dev/e2e.md`; and the deliberately thin browser lane `e2e-web/`)
 locate everything by `data-testid`. **A screen without testids is invisible to

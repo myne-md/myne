@@ -68,11 +68,11 @@
       "backToHub": "All conversations",
       "openNote": "Open note"
     },
-      "footprint": {
-        "disclosure": "What this run cost",
-        "memory_one": "{{count}} memory saved",
-        "memory_other": "{{count}} memories saved"
-      },
+    "footprint": {
+      "disclosure": "What this run cost",
+      "memory_one": "{{count}} memory saved",
+      "memory_other": "{{count}} memories saved"
+    },
     "composer": {
       "placeholder": "Ask the AI…",
       "scopeLabel": "Working on",
@@ -83,7 +83,7 @@
       "blockedScope": "Nothing for the agent to work on yet: every note is excluded from AI, or the vault is empty.",
       "checking": "Checking",
       "preparing": "Getting ready…",
-      "blockedScopeSidebar": "Nothing here to ask about yet: this note\u2019s folder is excluded from AI.",
+      "blockedScopeSidebar": "Nothing here to ask about yet: this note’s folder is excluded from AI.",
       "needsScope": "Pick a folder below, or open a note, so the agent has something to work on.",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} notes",
@@ -187,6 +187,11 @@
       "undo": "Undo this run",
       "undoFailed": "The run could not be undone.",
       "undoReport": "{{reverted}} notes restored. {{kept}} notes the run created were left in place.",
+      "settingFolderFrom": "folder: {{from}} becomes {{to}}",
+      "undoReportFailed_one": "{{count}} change could not be put back.",
+      "undoReportFailed_other": "{{count}} changes could not be put back.",
+      "undoReportSettings_one": "{{count}} setting put back.",
+      "undoReportSettings_other": "{{count}} settings put back.",
       "alreadyApplied": "Applied",
       "appendFlag": "adds to the end",
       "moveFlag": "moves to another folder",
@@ -196,6 +201,16 @@
       "newNotesHeading_other": "{{count}} new notes",
       "createdCount_one": "{{count}} note created.",
       "createdCount_other": "{{count}} notes created.",
+      "settingsHeading_one": "{{count}} setting",
+      "settingsHeading_other": "{{count}} settings",
+      "settingFromValue": "{{from}} becomes {{to}}",
+      "settingFromUnset": "not set, becomes {{value}}",
+      "settingCleared": "{{from}} is removed",
+      "settingAlreadyUnset": "not set",
+      "settingFolder": "in {{folder}}",
+      "applySetting": "Apply on its own",
+      "settingsChanged_one": "{{count}} setting changed.",
+      "settingsChanged_other": "{{count}} settings changed.",
       "refusedCount_one": "{{count}} change could not be applied",
       "refusedCount_other": "{{count}} changes could not be applied",
       "runSummaryRequests_one": "{{count}} request",
@@ -204,7 +219,17 @@
       "runSummaryNotes_other": "{{count}} notes read",
       "runSummaryOffDevice_one": "about {{count}} character of your notes was sent to the provider",
       "runSummaryOffDevice_other": "about {{count}} characters of your notes were sent to the provider",
-      "runSummaryOnDevice": "nothing left this device"
+      "runSummaryOnDevice": "nothing left this device",
+      "refusedSetting": {
+        "needsOwnAct": "Not applied here: a setting change is always approved on its own.",
+        "notWritable": "Could not be applied: that setting is no longer one the agent may change.",
+        "invalidValue": "Could not be applied: that value is not accepted for this setting.",
+        "folderRemoved": "Not applied: you deleted that folder, and the agent will not bring it back.",
+        "notClearable": "Could not be cleared: this setting has no unset state. Change it to a value instead.",
+        "writeFailed": "Could not be applied: writing the setting failed. The other changes were still applied.",
+        "runStopped": "Not applied: the run was stopped, so no change was attempted.",
+        "notProposed": "Not applied: this run never proposed that change, so the host will not write it."
+      }
     },
     "undo": {
       "offer_one": "The last run changed {{count}} note.",
@@ -216,6 +241,8 @@
       "failed_other": "{{count}} notes could not be restored.",
       "createdNotReverted_one": "{{count}} note the run created was left in place.",
       "createdNotReverted_other": "{{count}} notes the run created were left in place.",
+      "revertedSettings_one": "{{count}} setting put back.",
+      "revertedSettings_other": "{{count}} settings put back.",
       "sessionOnly": "This one-tap undo lasts until you lock the vault or close the app. After that, restore notes one at a time from a note's version history."
     }
   },
@@ -1285,10 +1312,10 @@
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
           "assistant": "Assistant",
-        "copied": "Copied",
-        "copyAnswer": "Copy the answer",
-        "copyFailed": "Could not copy",
-        "copyYourMessage": "Copy your message",
+          "copied": "Copied",
+          "copyAnswer": "Copy the answer",
+          "copyFailed": "Could not copy",
+          "copyYourMessage": "Copy your message",
           "emptyTitle": "Ask about your notes",
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
@@ -2281,11 +2308,11 @@
       "myne": {
         "loading": "Looking for your other vaults…",
         "noOtherVaults": "There are no other vaults on this device to import from. Restore a backup first, and it becomes a vault you can import from here.",
-      "vaultLabel": "Import from",
-      "backupLabel": "Backup file",
-      "chooseBackup": "Choose backup file",
-      "noBackupChosen": "No backup file chosen",
-      "vaultPlaceholder": "Choose a vault",
+        "vaultLabel": "Import from",
+        "backupLabel": "Backup file",
+        "chooseBackup": "Choose backup file",
+        "noBackupChosen": "No backup file chosen",
+        "vaultPlaceholder": "Choose a vault",
         "passwordLabel": "That vault's password",
         "phraseLabel": "That vault's 24-word recovery phrase",
         "wordAria": "Word {{number}} of 24",
@@ -2297,10 +2324,10 @@
         "opening": "Opening…",
         "unnamedVault": "Vault {{n}}",
         "errors": {
-      "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
-      "busy": "Another vault operation is running. Wait for it to finish and try again.",
-      "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first.",
-      "backupInvalid": "That file could not be read as a Myne backup. Check the file and try again."
+          "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
+          "busy": "Another vault operation is running. Wait for it to finish and try again.",
+          "alreadyOpen": "That vault is already open for an import. Finish or cancel that one first.",
+          "backupInvalid": "That file could not be read as a Myne backup. Check the file and try again."
         },
         "done": {
           "sourceUnchanged": "The vault you imported from has not been changed. If you sync it, it keeps syncing.",
@@ -2322,11 +2349,11 @@
       },
       "source": {
         "myne": {
-      "label": "Myne vault",
-      "pickerTitle": "Choose the .myne-backup file to import from",
-      "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
-      "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
-      "short": "An exported .myne-backup file"
+          "label": "Myne vault",
+          "pickerTitle": "Choose the .myne-backup file to import from",
+          "survives": "Notes, folders, tags, links between the notes you import, and the attachments those notes use. Words you added to the source vault's dictionary come too.",
+          "loses": "Version history, deleted notes, and templates stay in the source vault. Attachments no imported note uses are left behind. The source vault is not changed and, if you sync it, it keeps syncing.",
+          "short": "An exported .myne-backup file"
         },
         "obsidian": {
           "label": "Obsidian",

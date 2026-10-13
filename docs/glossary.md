@@ -161,6 +161,34 @@ What the AI assistant remembers about the user across runs: a small, curated set
 
 Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; `threat-model.md` TB12/TB13 (2026-09-10 amendments)
 
+### **agent-writability verdict** &nbsp; 🛠️ *Tooling*
+
+The per-setting declaration of whether the agent may change it, carried by EVERY entry in the
+settings search index and required rather than optional, so a new setting cannot become
+agent-writable by omission. A discriminated union rather than a boolean
+(`{verdict: "writable"}` or `{verdict: "refused", reason}`), because the reason is what keeps the
+boundary reviewable: the egress and confidentiality controls are refused *because they bound what AI
+and the CLI may reach*, and a setting that simply has no [setting intent](#setting-intent) yet is
+refused for an entirely different reason. Without the reason those two are indistinguishable, and a
+blanket "not classified yet" would make the drift test vacuous.
+
+The verdict is a statement about the SETTING, not about the runtime. Whether a particular run can act
+on it is a separate question answered twice over: by the window, which offers nothing in a detached
+note window or on a build without `prefsWrite`, and by `myne-core`, which re-derives writability from
+its own table and the sync layer's classification at the write. A build or a window where the write
+cannot happen therefore omits the intent whatever the verdict says.
+
+Four verdicts exist today. Two are refusals with a policy behind them: a refused *control*, and a
+refused *per-device* setting
+(`DeviceLocal`, which syncs nothing, so an agent write would land on the machine that ran the agent and
+nowhere else). The other two are `writable`, and a refusal with no policy at all (`None`): a setting the
+agent has no intent for, which is refused because it simply was never classified, and which is the
+verdict on the large majority of the index. This entry said three until the 2026-10-13 review counted
+them, and undercounted the fourth case its own next sentence describes. The last one is why the display family has two members rather than five
+(`decisions/ai/0665`).
+
+Used in: `settingsSearchIndex.ts`; `decisions/ai/0665`; myne-md/myne#850
+
 ### **agent personality** &nbsp; 📦 *Product*
 
 *(Alias: `vault.personality`.)*
@@ -2925,6 +2953,30 @@ It exists because `deliberate_folders` is the first preference whose size grows 
 Two properties are normative rather than incidental. Refusals are **ordered** shallowest-first then alphabetically, so a full budget leaves the vault's top-level structure standing rather than an arbitrary slice, which is what makes the limit explainable. And a **removal is never refused**. That one is a property rather than an assertion: a removal does not shrink the blob, it trades a live member for a permanent tombstone, and on a folder set the tombstone is the larger of the two. What makes the promise true is that every live entry is charged for the tombstone it will one day mint, so the room a removal needs was reserved when the entry was admitted.
 
 Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
+
+### **setting intent** &nbsp; 📦 *Product*
+
+One setting the agent may change, named by the settings-index id it resolves from: the closed set that
+IS the agent's permission to write a preference (`decisions/ai/0665`). Twelve exist: the ten
+note-placement settings and the two display formats.
+
+**A closed set rather than a general `set_pref`, for the reason
+[agentic note editing](#agentic-note-editing)'s verb set is closed**: what the agent may do is stated
+once, as a list, rather than as a filter applied to everything. Each intent names its pref target, the
+shape of value it accepts, and, where the setting has one, the sub-step it carries. An intent is
+resolved against a table in `myne-core` rather than trusted from the client, so a client catalogue
+claiming more than the table allows is an offer of less.
+
+A setting change rides the review dialog as its own kind of item, with the value in place shown beside
+the one asked for, and it is **carved out of Apply automatically**: a preference sits inside no note
+grant, so the bound that makes the automatic path safe has nothing to attach to. Clearing is a
+DISTINCT verb rather than an absent value: a clear removes the pref entry, and an empty string is
+something a folder could legitimately be compared against.
+
+Distinct from an [agent-writability verdict](#agent-writability-verdict), which is the index entry's
+own declaration: an intent is the permission, a preference is the storage.
+
+Used in: `decisions/ai/0665`; `core/src/plugins/agent/setting.rs`; `scripts/agent-setting-intents.json`; myne-md/myne#850
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 

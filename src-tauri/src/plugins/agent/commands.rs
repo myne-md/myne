@@ -30,6 +30,7 @@ use myne_core::plugins::agent::host_commands::{
     AgentSessionState, AgentStepResult, AgentUndoResult, GrantPreview, HostScopeSource,
 };
 use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeVerdict};
+use myne_core::plugins::agent::prompt::ProposedSetting;
 use myne_core::plugins::agent::run::{AgentRunState, AgentRunView, AppliedRun, GrantOrigin};
 use myne_core::plugins::agent::run_loop::RunProgress;
 use myne_core::plugins::agent::scope::{expand_run, preview_grant, start_run, ScopeGrant};
@@ -62,6 +63,14 @@ pub async fn agent_start<R: Runtime>(
     // instruction; `history` is budgeted and seeded below, marked untrusted.
     language: Option<String>,
     history: Vec<HistoryTurn>,
+    // The settings this client offers the run (myne-md/myne#850). **Ids, never
+    // labels, and the host resolves them against its own intent table**: an id
+    // the table refuses is not offered, and the system block is rendered from
+    // the table's own `&'static str`, so nothing the page sends can reach the
+    // system message. A client that has built no catalogue sends an empty list,
+    // and every `set_setting` is then refused rather than accepted into a
+    // proposal no surface could render.
+    settings: Vec<String>,
     on_open: Channel<AgentRunView>,
     // The run's cost as it accrues (myne-md/myne#456). A second channel rather
     // than a variant on `on_open`, because the two say different things at
@@ -142,6 +151,7 @@ pub async fn agent_start<R: Runtime>(
         language,
         seed,
         seed_controls,
+        settings,
     );
     // **Before the loop, not after it.** This command returns once the loop has
     // stopped, which on a remote provider is minutes, and until myne-md/myne#544
@@ -356,6 +366,9 @@ pub async fn agent_apply<R: Runtime>(
     run_id: String,
     approved: Vec<ProposedEdit>,
     approved_new_notes: Vec<usize>,
+    // The setting changes the user approved (myne-md/myne#850). A selection, like
+    // `approved_new_notes`: a setting write is a write and needs its own approval.
+    approved_settings: Vec<ProposedSetting>,
     approval: Approval,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
@@ -368,6 +381,7 @@ pub async fn agent_apply<R: Runtime>(
         run_id,
         approved,
         approved_new_notes,
+        approved_settings,
         approval,
         runs.inner(),
         sessions.inner(),

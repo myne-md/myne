@@ -367,6 +367,87 @@ fn set_rules(field: &str) -> (bool, bool) {
     }
 }
 
+/// Whether the last thing recorded for `raw` in `field` was it going away.
+///
+/// "On record" is `absent from the set AND carrying a `<field>/<id>` clock`. A
+/// clock alone does not mean removed, because the stamper stamps additions too;
+/// it is the pairing with absence that says so.
+///
+/// **A function rather than a closure inline in [`apply_set_mutation`]**, because
+/// the agent's folder-naming ensure asks the identical question (myne-md/myne#850
+/// task 3). Two copies of this predicate would be two answers to "did the user
+/// delete this", and the failure they guard is a folder coming back on every
+/// device with nobody having asked for it.
+pub fn removal_on_record(prefs: &protocol::PrefsView, field: &str, raw: &str) -> bool {
+    let (folded, _) = set_rules(field);
+    let id = set_identity(folded, raw);
+    !set_field(prefs, field)
+        .iter()
+        .any(|held| set_identity(folded, held) == id)
+        && prefs.field_clocks.contains_key(&clock_key(field, &id))
+}
+
+/// Register `folder` as a deliberate folder: the **user-act** route.
+///
+/// Wins over a removal on record, which is what [`SetMutation::add`] means and
+/// what the folder picker and the folder-naming setting need: a user filing a
+/// note into a folder they deleted is asking for it back, and that is
+/// `add_unless_removed`'s own doc's "a genuine user act still wins".
+///
+/// **The named seam every folder-naming write goes through** (myne-md/myne#850
+/// task 3), so promoting the folder set out of `vault.prefs` (myne-md/myne#615)
+/// is one edit here rather than one per call site. It replaces the three
+/// hand-written `if !contains { push }` blocks that did this by pushing onto the
+/// vector, which skips the budget AND leaves the entry without the clock the
+/// merge reads.
+///
+/// **One behaviour change comes with going through the budget, and it is
+/// deliberate**: past `PREFS_PLAINTEXT_BUDGET_BYTES` the registration is REFUSED
+/// rather than written. The old push could not be refused, so it produced a blob
+/// the encoder then rejected, which failed the WHOLE preference write: the user's
+/// setting did not save either. Now the setting saves and the folder is simply
+/// not registered, which is the budget's own documented degradation ("the folder
+/// behaves as it did before myne#613: it exists while it holds a note"). The
+/// refusal count is IGNORED by the user-act callers below, which is deliberate:
+/// the setting saves, the folder is simply not registered, and the prefs-import
+/// surface is the one that reports a shortfall. **It is RETURNED rather than
+/// dropped since the 2026-10-13 review**, because the agent's ensure route is a
+/// caller that cannot ignore it: `PrefWriter::ensure_folder`'s contract is "report
+/// whether the folder now exists", and on a budget-full vault the old shape
+/// answered `true` for a registration that was refused, so the apply proceeded
+/// believing the ensure held.
+pub(crate) fn register_deliberate_folder(prefs: &mut protocol::PrefsView, folder: &str) -> usize {
+    apply_set_mutation(prefs, "deliberate_folders", &SetMutation::adding(folder))
+}
+
+/// Repair-register `folder`: it goes in ONLY where no removal of it is on
+/// record, and the return value says whether it did.
+///
+/// **The agent's route, and deliberately not the user-act one above.** The model
+/// chose the folder and the user approved a change, so what this must not do is
+/// undo a deletion the user made: the ensure runs as part of a setting write
+/// that the user reads as "the agent changed a folder", and a folder that
+/// silently came back from a delete the user performed is the exact failure
+/// [`SetMutation::add_unless_removed`] exists for.
+///
+/// `false` is a refusal the caller reports rather than a silent skip. A folder
+/// that is not registered does not appear in the sidebar until its first note, so
+/// a setting that named it and skipped the registration would look like it did
+/// nothing.
+///
+/// **Two ways to answer `false` since the 2026-10-13 review, and the second is
+/// new here:** a removal on record, which is what makes this the repair route
+/// rather than the user-act one, and a budget refusal (past
+/// `PREFS_PLAINTEXT_BUDGET_BYTES`). The budget case used to answer `true` for a
+/// registration that never happened, which is the one caller that cannot afford
+/// that answer.
+pub(crate) fn ensure_deliberate_folder(prefs: &mut protocol::PrefsView, folder: &str) -> bool {
+    if removal_on_record(prefs, "deliberate_folders", folder) {
+        return false;
+    }
+    register_deliberate_folder(prefs, folder) == 0
+}
+
 /// Apply a mutation to one of `prefs`'s set fields, in place.
 ///
 /// Takes the whole view rather than the one vector, because the budget it
@@ -485,10 +566,7 @@ pub fn apply_set_mutation(
     // tombstone rejects never competes for reserve with one that will land.
     let mut pending: Vec<String> = mutation.add.clone();
     for raw in &mutation.add_unless_removed {
-        let id = identity(raw);
-        let removed_on_record = !set_field(prefs, field).iter().any(|h| identity(h) == id)
-            && prefs.field_clocks.contains_key(&clock_key(field, &id));
-        if !removed_on_record {
+        if !removal_on_record(prefs, field, raw) {
             pending.push(raw.clone());
         }
     }
@@ -1544,5 +1622,95 @@ mod tests {
             after.iter().all(|f| f.starts_with("Archive/")),
             "some entries kept the old root"
         );
+    }
+
+    // ---- the folder-ensuring seam (myne-md/myne#850 task 3) ----------------
+
+    /// A view where `folder` was REMOVED: absent from the set, with a clock under
+    /// its folded key. That pairing is what "on record" means, a clock alone is
+    /// an addition, because the stamper stamps those too.
+    fn removed(folder: &str) -> protocol::PrefsView {
+        let mut p = protocol::PrefsView::default();
+        p.field_clocks.insert(
+            format!(
+                "deliberate_folders/{}",
+                crate::folder_key::canonical_folder(folder)
+            ),
+            1_700_000_000_000,
+        );
+        p
+    }
+
+    #[test]
+    fn the_ensure_seam_registers_a_folder_with_no_removal_on_record() {
+        let mut prefs = protocol::PrefsView::default();
+        assert!(ensure_deliberate_folder(&mut prefs, "Journals/Weekly"));
+        assert_eq!(
+            held(&mut prefs, "deliberate_folders"),
+            v(&["Journals/Weekly"])
+        );
+    }
+
+    /// **A removal on record is not resurrected by the ensure step.** It reports
+    /// `false` and writes nothing, which is what lets the caller refuse the
+    /// setting rather than land one whose folder never appears in the sidebar.
+    #[test]
+    fn the_ensure_seam_does_not_resurrect_a_removed_folder() {
+        let mut prefs = removed("Journals/Weekly");
+        assert!(!ensure_deliberate_folder(&mut prefs, "Journals/Weekly"));
+        assert!(
+            held(&mut prefs, "deliberate_folders").is_empty(),
+            "the ensure must not re-add a folder the user deleted"
+        );
+    }
+
+    /// The user-act route still wins, which is the other half of the rule and the
+    /// reason the two are separate functions: a user filing a note into a folder
+    /// they deleted is asking for it back.
+    #[test]
+    fn the_user_act_route_still_registers_a_removed_folder() {
+        let mut prefs = removed("Journals/Weekly");
+        register_deliberate_folder(&mut prefs, "Journals/Weekly");
+        assert_eq!(
+            held(&mut prefs, "deliberate_folders"),
+            v(&["Journals/Weekly"])
+        );
+    }
+
+    /// The predicate answers only for the ABSENT-and-clocked pairing, so the two
+    /// routes above differ by the removal record and nothing else.
+    #[test]
+    fn removal_on_record_answers_only_for_an_absent_clocked_entry() {
+        let plain = protocol::PrefsView::default();
+        assert!(!removal_on_record(&plain, "deliberate_folders", "J/"));
+
+        assert!(removal_on_record(
+            &removed("J/"),
+            "deliberate_folders",
+            "J/"
+        ));
+
+        // Present AND clocked is an ADDITION, not a removal.
+        let mut added = protocol::PrefsView::default();
+        register_deliberate_folder(&mut added, "J/");
+        added.field_clocks.insert(
+            format!(
+                "deliberate_folders/{}",
+                crate::folder_key::canonical_folder("J/")
+            ),
+            1_700_000_000_000,
+        );
+        assert!(!removal_on_record(&added, "deliberate_folders", "J/"));
+    }
+
+    /// And the removal is matched under the field's own FOLDING rule, so a folder
+    /// removed as `journals/weekly` is not resurrected by an ensure spelling it
+    /// `Journals/Weekly`. Without the fold, a case difference would be a way
+    /// around the record.
+    #[test]
+    fn the_removal_record_is_matched_under_the_fields_folding_rule() {
+        let mut prefs = removed("journals/weekly");
+        assert!(!ensure_deliberate_folder(&mut prefs, "Journals/Weekly"));
+        assert!(held(&mut prefs, "deliberate_folders").is_empty());
     }
 }

@@ -208,6 +208,14 @@ describe("capability descriptor", () => {
       "changePassword",
       "phraseRecovery",
       "pinQuickUnlock",
+      // A page CAN write prefs: the plugin's setters are dispatched through the
+      // Worker host, and Settings is a first-class web surface rather than a
+      // read-only view of desktop state. Recorded here rather than left implicit
+      // because the agent's setting intents are gated on this capability
+      // (myne-md/myne#850 task 5): if it ever went absent on web, the gate would
+      // silently start withholding setting changes rather than offering ones
+      // that fail.
+      "prefsWrite",
       "vaultCreation",
     ]);
   });

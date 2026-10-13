@@ -450,6 +450,29 @@ pub async fn prefs_read_from_host(
     prefs_read_with_dir(&dir, state, io).await
 }
 
+/// The same read, reporting WHERE the values came from.
+///
+/// **A second entry point rather than a change to `prefs_read_from_host`**, because
+/// the origin matters to exactly one caller and the plain value is right for
+/// everybody else: § 9.5.5 degrades an absent or undecodable blob to defaults, so
+/// "never set this" and "could not read what you set" are the same `PrefsView` and
+/// different facts. The agent's undo record is the caller that has to tell them
+/// apart (myne-md/myne#850, from the 2026-10-13 review): it stores the value a write
+/// replaced, and a `None` from a degraded read would be stored as "there was
+/// nothing here", which the undo restores by CLEARING a value nobody ever saw.
+/// `plugins::attachments::commands`'s compression gate is the older caller of the
+/// `_with_dir` form and gives the same reasoning for the same reason, one field
+/// over: a premium lost permanently against a value lost permanently.
+pub async fn prefs_read_from_host_reporting_origin(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsReadError::from)?;
+    prefs_read_with_dir_reporting_origin(&dir, state, io).await
+}
+
 /// IPC wrapper. Delegates; the command name and payload the frontend
 /// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -2326,6 +2349,64 @@ pub async fn set_deliberate_folders_with_dir(
     Ok(refused as u32)
 }
 
+/// Ensure `folder` is registered as a deliberate folder, refusing to resurrect a
+/// removal the user made (myne-md/myne#850 task 3).
+///
+/// **The agent's folder-ensuring seam**, and a separate call from the setting
+/// setter rather than folded into it, because the two answer different
+/// questions. The setter's own registration goes through the user-act route and
+/// wins over a removal, which is what a folder picker needs. This one is a
+/// repair: the model chose the folder, and the ensure must not bring back
+/// something the user deleted.
+///
+/// Returns whether the folder is registered. `false` means a removal of it is on
+/// record and nothing was written, which the caller reports as a refusal: a
+/// folder that is not registered does not appear in the sidebar until its first
+/// note, so a setting that named it and skipped this would look like it did
+/// nothing.
+pub async fn ensure_deliberate_folder_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    ensure_deliberate_folder_with_dir(&dir, state, hooks, folder, io, host).await
+}
+
+/// Testable core of [`ensure_deliberate_folder_from_host`].
+pub(crate) async fn ensure_deliberate_folder_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    // The closure runs inside the write mutex and cannot return a value, so the
+    // answer comes back through a cell, the `set_deliberate_folders` shape.
+    let mut registered = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            registered =
+                crate::plugins::prefs::set_mutation::ensure_deliberate_folder(prefs, &folder);
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Field name only, never the path (folder structure is AS3 Sensitive; see
+    // ../../AGENTS.md "Secret-handling logging discipline").
+    tracing::info!(event = "prefs_written", field = "deliberate_folders");
+    Ok(registered)
+}
+
 /// Slot::Unlocked-gated setter for the `archived_folders` set (folder-archive)
 /// — folders archived as a unit (their subtree drops out of the working-set
 /// sidebar/tree while the notes stay resolvable). Read-modify-write under the
@@ -4029,10 +4110,10 @@ pub(crate) async fn set_daily_folder_with_dir(
         |prefs| {
             prefs.daily_folder = Some(folder.clone());
             // Register as a deliberate folder so the daily folder survives empty
-            // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
-            if !prefs.deliberate_folders.contains(&folder) {
-                prefs.deliberate_folders.push(folder);
-            }
+            // (MYND-144). Through the named seam (myne-md/myne#850 task 3), which
+            // does the dedup AND stamps the per-entry clock the merge reads; the
+            // hand-written push skipped both.
+            let _ = crate::plugins::prefs::set_mutation::register_deliberate_folder(prefs, &folder);
         },
         io,
         host,
@@ -4042,6 +4123,78 @@ pub(crate) async fn set_daily_folder_with_dir(
     // Field name only — never the path (folder structure is AS3 Sensitive; see
     // ../../AGENTS.md "Secret-handling logging discipline").
     tracing::info!(event = "prefs_written", field = "daily_folder");
+    Ok(())
+}
+
+/// Clear the two pointers whose setters take a REQUIRED value (myne-md/myne#850).
+///
+/// **Two functions rather than a widened setter, and the asymmetry is the whole
+/// reason they exist.** `set_daily_folder_with_dir` and
+/// `set_daily_date_format_with_dir` take a `String`, so no call on either
+/// expresses "there was nothing here"; the agent's undo of a run that set one of
+/// them for the first time needs exactly that, and its intent table records the
+/// same fact as `clearable`. The alternative (widening both setters and every
+/// caller, including their IPC wrappers and the settings panel) is the change
+/// `PrefTarget::clearable` names as the follow-up; these two keep the agent's
+/// path honest until somebody takes it.
+///
+/// **Deliberately without an IPC wrapper, which is what keeps this free of any
+/// capability or ACL change**: the agent's own `agent_undo` command is the only
+/// caller, and it reaches the prefs plugin in-process the way `write_target`
+/// already does for every other target.
+///
+/// Written through the same `update_prefs_with_dir` as every other prefs write,
+/// so the nonce bump, the AEAD and the disk-first ordering are structural rather
+/// than re-implemented here. **The deliberate-folder registration is left alone
+/// on purpose**: the folder NAME stays on record, because that record is what
+/// keeps it alive as a virtual folder, and the pointer being cleared is exactly
+/// the state the user had before the run.
+pub async fn clear_daily_folder_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(
+        &dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.daily_folder = None;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "daily_folder");
+    Ok(())
+}
+
+/// The same, for `daily_date_format`. See `clear_daily_folder_from_host`.
+pub async fn clear_daily_date_format_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(
+        &dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.daily_date_format = None;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "daily_date_format");
     Ok(())
 }
 
@@ -4354,8 +4507,16 @@ pub(crate) async fn set_periodic_note_setting_with_dir(
                     // has no notes in it until the first period note is
                     // created, and without this it would not appear in the
                     // sidebar, so the setting would look like it did nothing.
-                    if setting == "folder" && !prefs.deliberate_folders.contains(&v) {
-                        prefs.deliberate_folders.push(v);
+                    //
+                    // **Through the named seam, not by pushing onto the
+                    // vector** (myne-md/myne#850 task 3). The push skipped the
+                    // blob budget and left the entry without the per-entry clock
+                    // the merge reads, so a registration made this way could be
+                    // shed or silently re-deleted.
+                    if setting == "folder" {
+                        let _ = crate::plugins::prefs::set_mutation::register_deliberate_folder(
+                            prefs, &v,
+                        );
                     }
                 }
                 None => {
@@ -4447,10 +4608,10 @@ pub(crate) async fn set_new_note_location_with_dir(
             prefs.new_note_location_folder = folder.clone();
             // When a specific target folder is named, register it as a deliberate folder
             // so it survives empty (MYND-144) — exactly like set_daily_folder.
+            // Through the named seam (myne-md/myne#850 task 3), not a push.
             if let Some(folder) = folder {
-                if !prefs.deliberate_folders.contains(&folder) {
-                    prefs.deliberate_folders.push(folder);
-                }
+                let _ =
+                    crate::plugins::prefs::set_mutation::register_deliberate_folder(prefs, &folder);
             }
         },
         io,

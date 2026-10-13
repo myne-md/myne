@@ -44,6 +44,7 @@ use myne_core::plugins::agent::host_commands::{
     AgentSessionState, AgentStepResult, AgentUndoResult, GrantPreview, HostScopeSource,
 };
 use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeVerdict};
+use myne_core::plugins::agent::prompt::ProposedSetting;
 use myne_core::plugins::agent::run::{
     new_run_id, AgentRunState, AgentRunView, AppliedRun, GrantOrigin,
 };
@@ -74,6 +75,11 @@ pub async fn agent_start<R: Runtime>(
     // conversation they cannot see, and nothing complains.
     language: Option<String>,
     history: Vec<HistoryTurn>,
+    // Declared for the same reason `language` and `history` above are: the
+    // shared binding sends it on every call and Tauri drops an unknown argument
+    // SILENTLY, so a phone that did not declare this would offer no settings and
+    // refuse every `set_setting` with nothing saying why (myne-md/myne#850).
+    settings: Vec<String>,
     on_open: Channel<AgentRunView>,
     on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
@@ -119,6 +125,7 @@ pub async fn agent_start<R: Runtime>(
         language,
         seed,
         seed_controls,
+        settings,
     );
     // Before the loop, not after it: this call returns only when the loop has
     // stopped, and until then the surface would have a `running` run with no id
@@ -269,6 +276,11 @@ pub async fn agent_apply<R: Runtime>(
     run_id: String,
     approved: Vec<ProposedEdit>,
     approved_new_notes: Vec<usize>,
+    // Declared for the same reason `language` and `history` are on
+    // `agent_start`: the shared binding sends it and Tauri drops an unknown
+    // argument silently, so a phone that did not declare this would refuse every
+    // setting change with nothing saying why (myne-md/myne#850).
+    approved_settings: Vec<ProposedSetting>,
     approval: Approval,
     runs: State<'_, Arc<AgentRunState>>,
     sessions: State<'_, AgentSessionState>,
@@ -281,6 +293,7 @@ pub async fn agent_apply<R: Runtime>(
         run_id,
         approved,
         approved_new_notes,
+        approved_settings,
         approval,
         runs.inner(),
         sessions.inner(),

@@ -10,14 +10,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { SettingsSearch } from "../../src/components/settings/search/SettingsSearch";
 import { SettingsSearchResults } from "../../src/components/settings/search/SettingsSearchResults";
-import type { SettingsIndexEntry } from "../../src/components/settings/search/settingsSearchIndex";
+import {
+  WRITABILITY_NONE,
+  type SettingsIndexEntry,
+} from "../../src/components/settings/search/settingsSearchIndex";
 
 afterEach(cleanup);
 
 const ENTRIES: SettingsIndexEntry[] = [
-  { id: "privacy.screen-capture", panelId: "privacy", titleKey: "settings.privacy.screenCaptureLabel" },
-  { id: "privacy.auto-lock", panelId: "privacy", titleKey: "settings.privacy.autoLockLabel" },
-  { id: "appearance.theme", panelId: "appearance", titleKey: "settings.appearance.themeLabel" },
+  { id: "privacy.screen-capture", panelId: "privacy", titleKey: "settings.privacy.screenCaptureLabel" , agentWritability: WRITABILITY_NONE },
+  { id: "privacy.auto-lock", panelId: "privacy", titleKey: "settings.privacy.autoLockLabel" , agentWritability: WRITABILITY_NONE },
+  { id: "appearance.theme", panelId: "appearance", titleKey: "settings.appearance.themeLabel" , agentWritability: WRITABILITY_NONE },
 ];
 
 describe("SettingsSearch input", () => {

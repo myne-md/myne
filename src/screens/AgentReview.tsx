@@ -51,11 +51,14 @@ import {
   netDeletion,
   splitForBulkApproval,
   type AgentApplyResult,
+  type AppliedSetting,
   type Approval,
   type HidingField,
   type ProposedEdit,
   type ProposedNote,
+  type ProposedSetting,
 } from "../lib/agent-run";
+import { bumpPrefsNonce } from "../notes/prefsNonce";
 import {
   approvedNewNoteIndices,
   currentRunEpoch,
@@ -64,11 +67,16 @@ import {
   rejectAll,
   setUndoable,
   landedEditIndices,
+  landedSettingIndices,
   settleApply,
   toggleEdit,
   toggleNewNote,
+  toggleSetting,
   useAgent,
 } from "../notes/agent/agentStore";
+import { currentSettingValue, settingChangeLine } from "../notes/agent/settingCatalogue";
+import { SETTINGS_SEARCH_INDEX } from "../components/settings/search/settingsSearchIndex";
+import { usePrefs } from "../hooks/usePrefs";
 
 
 /** A deletion this large gets a visual flag.
@@ -93,6 +101,24 @@ interface EditRow {
  *  because a disclosure over something already visible is a control that does
  *  nothing. */
 const SUMMARY_CLAMP_CHARS = 320;
+
+/**
+ * Whether the run wrote anything an undo could put back.
+ *
+ * **`restorePoints` alone is not the answer** (myne-md/myne#850, from review).
+ * A run that changed settings and no notes has none by construction, and the
+ * gate here was that alone, so the review screen offered no Undo for exactly the
+ * change it had just watched land, while the host held a record for it on
+ * purpose (`apply_from_host` records when `settings_changed` is non-empty) so
+ * that the undo would survive the screen closing. The chat strip could still
+ * reach it, which made this an inconsistency rather than a total loss.
+ */
+function hasAnythingToUndo(applied: AgentApplyResult): boolean {
+  return (
+    applied.restorePoints.length > 0 ||
+    (applied.settingsChanged?.length ?? 0) > 0
+  );
+}
 
 export function AgentReview({
   onClose,
@@ -129,6 +155,7 @@ export function AgentReview({
     reverted: number;
     failed: string[];
     notesCreatedNotReverted: number;
+    settingsReverted: number;
   } | null>(null);
 
   const rows: EditRow[] = useMemo(
@@ -193,12 +220,16 @@ export function AgentReview({
     edits: ProposedEdit[],
     newNoteIndices: number[],
     approval: Approval,
+    settings: ProposedSetting[] = [],
   ) {
     if (!agent.view) return;
     // NOT `edits.length === 0`: a run may propose only new notes, and an early
     // return on the edit count made those uncreatable in one direction while the
-    // old whole-proposal hand-off created them unreviewed in the other.
-    if (edits.length === 0 && newNoteIndices.length === 0) return;
+    // old whole-proposal hand-off created them unreviewed in the other. A
+    // settings-only run is the same case one field over (myne-md/myne#850).
+    if (edits.length === 0 && newNoteIndices.length === 0 && settings.length === 0) {
+      return;
+    }
     setBusy(true);
     const indices = edits.map((e) => agent.proposal.edits.indexOf(e));
     // Captured BEFORE the await, for the reason the undo path below and
@@ -222,12 +253,27 @@ export function AgentReview({
         agent.view.runId,
         edits,
         newNoteIndices,
+        settings,
         approval,
       );
       // The indices that actually LANDED, not the ones that were sent. The
       // subtraction lives in `landedEditIndices` rather than here, because this
       // is where it was missing and a call site is not testable.
-      if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
+      const settingIndices = landedSettingIndices(
+        agent.proposal.settings ?? [],
+        settings,
+        outcome,
+      );
+      if (
+        !settleApply(
+          outcome,
+          landedEditIndices(indices, outcome),
+          epoch,
+          settingIndices,
+        )
+      ) {
+        return;
+      }
       // The host's list, not the one that was sent: an edit can be refused at
       // apply time, so the notes that actually changed are the ones to reload.
       const changed = [...outcome.notesWritten, ...outcome.notesCreated];
@@ -263,11 +309,15 @@ export function AgentReview({
     // rather than restoring the same snapshots over later edits.
     const runId = agent.view?.runId;
     const result = agent.applied;
-    if (!runId || !result || result.restorePoints.length === 0) return;
+    if (!runId || !result || !hasAnythingToUndo(result)) return;
     setBusy(true);
     try {
       const restored = result.restorePoints.map(([noteId]) => noteId);
       const undone = await agentUndo(runId);
+      // The same reason the apply path bumps it: the undo restores preferences
+      // host-side, so nothing on this side learns the value moved and Settings
+      // keeps rendering the agent's value (myne-md/myne#850, from review).
+      if (undone.settingsReverted > 0) bumpPrefsNonce();
       setUndoReport(undone);
       // The host consumed its record, so the offer elsewhere goes with it.
       setUndoable(null, currentRunEpoch());
@@ -401,35 +451,49 @@ export function AgentReview({
       ) : null}
 
       <div style={{ flex: 1, overflow: "auto" }}>
-        {byNote.length === 0 ? (
+        {byNote.length === 0 &&
+        agent.proposal.newNotes.length === 0 &&
+        (agent.proposal.settings?.length ?? 0) === 0 ? (
           <p
             data-testid="agentReview.empty"
             style={{ padding: "var(--space-5)", color: "var(--fg-2)" }}
           >
             {t("agent.review.noChanges")}
           </p>
-        ) : (
-          byNote.map(([noteId, noteRows]) => (
-            <NoteGroup
-              key={noteId}
-              noteId={noteId}
-              title={titleOf(noteId)}
-              folderOf={folderOf}
-              rows={noteRows}
-              rejected={agent.rejected}
-              applied={agent.appliedEdits}
-              busy={busy}
-              onToggle={toggleEdit}
-              onApplyOne={(edit) => void apply([edit], [], "individual")}
-            />
-          ))
-        )}
+        ) : null}
+
+        {byNote.map(([noteId, noteRows]) => (
+          <NoteGroup
+            key={noteId}
+            noteId={noteId}
+            title={titleOf(noteId)}
+            folderOf={folderOf}
+            rows={noteRows}
+            rejected={agent.rejected}
+            applied={agent.appliedEdits}
+            busy={busy}
+            onToggle={toggleEdit}
+            onApplyOne={(edit) => void apply([edit], [], "individual")}
+          />
+        ))}
 
         {agent.proposal.newNotes.length > 0 ? (
           <NewNotesGroup
             notes={agent.proposal.newNotes}
             rejected={agent.rejectedNewNotes}
             onToggle={toggleNewNote}
+          />
+        ) : null}
+
+        {(agent.proposal.settings?.length ?? 0) > 0 ? (
+          <SettingsGroup
+            settings={agent.proposal.settings ?? []}
+            rejected={agent.rejectedSettings}
+            applied={agent.appliedSettings}
+            appliedSettings={agent.applied?.settingsChanged ?? []}
+            busy={busy}
+            onToggle={toggleSetting}
+            onApplyOne={(setting) => void apply([], [], "individual", [setting])}
           />
         ) : null}
 
@@ -453,6 +517,21 @@ export function AgentReview({
               reverted: undoReport.reverted,
               kept: undoReport.notesCreatedNotReverted,
             })}
+            {undoReport.settingsReverted > 0
+              ? ` ${t("agent.review.undoReportSettings", {
+                  count: undoReport.settingsReverted,
+                })}`
+              : ""}
+            {/* **A restore that failed has to be said out loud.** `failed` carries
+                the notes and the settings together, and the review screen rendered
+                neither its count nor its members: an undo that put nothing back
+                read as "0 notes restored" and stopped, which is the one outcome the
+                user most needs told (2026-10-13 review round two). */}
+            {undoReport.failed.length > 0
+              ? ` ${t("agent.review.undoReportFailed", {
+                  count: undoReport.failed.length,
+                })}`
+              : ""}
           </p>
         ) : null}
       </div>
@@ -480,7 +559,7 @@ export function AgentReview({
         <span style={{ flex: 1 }} />
         {/* Undo the whole run as one action. Only offered once something has
             been written, because there is nothing to revert before that. */}
-        {agent.applied && agent.applied.restorePoints.length > 0 ? (
+        {agent.applied && hasAnythingToUndo(agent.applied) ? (
           <Button
             variant="ghost"
             disabled={busy}
@@ -749,6 +828,202 @@ function EditRowView({
   );
 }
 
+/** The setting changes a run proposed (myne-md/myne#850).
+ *
+ * **The row's whole job is the delta**: "the agent changed a setting" is not
+ * reviewable, and "the weekly notes folder goes from Journals/Weekly to
+ * Reviews/Weekly" is. That is why it reads the current value and shows both on
+ * one line.
+ *
+ * The current value comes from the client's own prefs read and **never reaches
+ * the model**: the request the loop builds carries the intent's id and the value
+ * asked for, and nothing about what the setting holds now.
+ *
+ * A setting is applied on its own, never in a batch, because it sits inside no
+ * note grant. That rule is enforced host-side (`apply_settings_approved`'s bulk
+ * carve-out); the button here just does not offer the other shape.
+ */
+function SettingsGroup({
+  settings,
+  rejected,
+  applied,
+  appliedSettings,
+  busy,
+  onToggle,
+  onApplyOne,
+}: {
+  settings: ProposedSetting[];
+  rejected: ReadonlySet<number>;
+  applied: ReadonlySet<number>;
+  /** The settings the host recorded as landed, so a row that has been applied can
+   *  show the value it REPLACED rather than re-deriving one from live prefs. */
+  appliedSettings: readonly AppliedSetting[];
+  busy: boolean;
+  onToggle: (index: number) => void;
+  onApplyOne: (setting: ProposedSetting) => void;
+}) {
+  const { t } = useTranslation();
+  const { prefs } = usePrefs();
+  return (
+    <section
+      data-testid="agentReview.settingsGroup"
+      style={{
+        borderBottom: "1px solid var(--line-1)",
+        padding: "var(--space-4) var(--space-5)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-3)",
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          fontSize: "var(--text-md)",
+          fontWeight: "var(--weight-semibold)",
+        }}
+      >
+        {t("agent.review.settingsHeading", { count: settings.length })}
+      </h2>
+      {settings.map((setting, index) => {
+        const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === setting.intentId);
+        // The id is the fallback rather than the row being hidden: an entry the
+        // index has lost must still be reviewable, and showing the raw id is
+        // what makes the gap visible instead of silent.
+        // **The period heading alone does not name the setting** (myne-md/myne#850,
+        // from review). Nine of the twelve intents carry a period heading as their
+        // `titleKey`, so a run proposing the weekly folder and the weekly title
+        // format rendered two rows both headed "Weekly notes" with no way to tell
+        // which change was which. The per-setting name is the index's
+        // `descriptionKey`, which is what the settings panel itself renders as the
+        // control's label, so the row shows both: the period, then the setting.
+        const label = entry ? t(entry.titleKey) : setting.intentId;
+        const subLabel = entry?.descriptionKey
+          ? t(entry.descriptionKey)
+          : null;
+        // **The delta comes from the RECORD once the row has landed.** Reading it
+        // from live prefs re-runs `settingChangeLine` against the value the write
+        // just stored, so an applied row rendered "Archived/Weekly becomes
+        // Archived/Weekly" (or "not set", for a landed clear) beside a button
+        // reading "Applied": the row's whole job is the delta, and it showed none.
+        const current = currentSettingValue(setting.intentId, prefs);
+        const isRejected = rejected.has(index);
+        const isApplied = applied.has(index);
+        // **The delta comes from the RECORD once the row has landed.** Reading it
+        // from live prefs re-runs `settingChangeLine` against the value the write
+        // just stored, so an applied row rendered "Archived/Weekly becomes
+        // Archived/Weekly" (or "not set", for a landed clear) beside a button
+        // reading "Applied": the row's whole job is the delta, and it showed none.
+        const recorded = appliedSettings.find(
+          (a) => a.intentId === setting.intentId,
+        )?.previous;
+        const from = isApplied ? (recorded ?? null) : current;
+        // **The folder half of the delta, which was invisible for the one setting
+        // that has two fields** (2026-10-13 review): the row diffed only the mode,
+        // so a change that moved the folder while the mode stayed `specific`
+        // rendered "specific becomes specific". `previousFolder` exists for this
+        // pair and went unread.
+        const recordedSetting = appliedSettings.find(
+          (a) => a.intentId === setting.intentId,
+        );
+        const recordedFolder = isApplied ? recordedSetting?.previousFolder : undefined;
+        return (
+          <article
+            key={index}
+            data-testid="agentReview.settingChange"
+            data-setting-id={setting.intentId}
+            data-rejected={isRejected ? "true" : "false"}
+            data-applied={isApplied ? "true" : "false"}
+            style={{
+              border: "1px solid var(--line-1)",
+              borderRadius: "var(--radius-2)",
+              padding: "var(--space-3)",
+              opacity: isRejected ? 0.5 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-1)",
+                minWidth: 0,
+              }}
+            >
+              <span style={{ fontWeight: "var(--weight-semibold)" }}>{label}</span>
+              {subLabel ? (
+                <span
+                  data-testid="agentReview.settingChange.label"
+                  style={{ color: "var(--fg-2)", fontSize: "var(--text-sm)" }}
+                >
+                  {subLabel}
+                </span>
+              ) : null}
+              <span
+                data-testid="agentReview.settingChange.value"
+                style={{
+                  color: "var(--fg-2)",
+                  fontSize: "var(--text-sm)",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {settingChangeLine(setting, from, (key, opts) => t(key, opts))}
+              </span>
+              {setting.folder != null ? (
+                <span
+                  data-testid="agentReview.settingChange.folder"
+                  style={{
+                    color: "var(--fg-2)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-sm)",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {isApplied && recordedFolder !== undefined
+                    ? t("agent.review.settingFolderFrom", {
+                        from: recordedFolder ?? t("agent.review.settingAlreadyUnset"),
+                        to: setting.folder,
+                      })
+                    : t("agent.review.settingFolder", { folder: setting.folder })}
+                </span>
+              ) : null}
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
+              {/* **Nothing to reject once it has landed**, which is the same rule
+                  the edit row beside it enforces by rendering no toggle at all
+                  (2026-10-13 review). Offering it let a change already on disk be
+                  clicked into "Rejected" and dimmed to half opacity, contradicting
+                  the "Applied" label on the button next to it. */}
+              {isApplied ? null : (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => onToggle(index)}
+                data-testid="agentReview.settingReject"
+              >
+                {isRejected ? t("agent.review.restoreEdit") : t("agent.review.rejectEdit")}
+              </Button>
+              )}
+              <Button
+                variant="secondary"
+                disabled={busy || isRejected || isApplied}
+                onClick={() => onApplyOne(setting)}
+                data-testid="agentReview.settingApply"
+              >
+                {isApplied
+                  ? t("agent.review.alreadyApplied")
+                  : t("agent.review.applySetting")}
+              </Button>
+            </div>
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
 /** The proposed new notes, reviewable.
  *
  *  This group did not exist once, and its absence was the feature's worst
@@ -862,7 +1137,15 @@ function NewNotesGroup({
  *  this block exists. */
 function RefusalBlock({ result }: { result: AgentApplyResult }) {
   const { t } = useTranslation();
-  const count = result.refused.length + result.refusedNewNotes.length;
+  // **All three kinds, and the settings were missing from both halves** (from
+  // review). A refused setting change therefore rendered a block reading "0
+  // changes could not be applied" over an empty list, while the row for that same
+  // change read "Applied" and was disabled. The count is what the host's
+  // `hasRefusals` predicate decides on, so the two had come to disagree about
+  // whether the block even exists.
+  const refusedSettings = result.refusedSettings ?? [];
+  const count =
+    result.refused.length + result.refusedNewNotes.length + refusedSettings.length;
   return (
     <section
       data-testid="agentReview.refusedBlock"
@@ -891,6 +1174,16 @@ function RefusalBlock({ result }: { result: AgentApplyResult }) {
         {result.refusedNewNotes.map((r) => (
           <li key={`n-${r.index}`}>{t(`agent.review.refused.${r.reason}`)}</li>
         ))}
+        {refusedSettings.map((r) => (
+          <li key={`s-${r.intentId}-${r.index}`}>
+            {/* **Its own namespace, not the edits'.** The two enums are different
+                Rust types with different reasons, and sharing
+                `agent.review.refused.*` broke `editRejectionMirror.test.ts`, which
+                exists precisely to hold that namespace equal to `EditRejection` one
+                way and the catalog the other (2026-10-13 review). */}
+            {t(`agent.review.refusedSetting.${r.reason}`)}
+          </li>
+        ))}
       </ul>
     </section>
   );
@@ -912,6 +1205,13 @@ function ApplyReport({ result }: { result: AgentApplyResult }) {
       <p style={{ margin: 0 }} data-testid="agentReview.appliedCount">
         {t("agent.review.appliedCount", { count: result.applied })}
       </p>
+      {(result.settingsChanged?.length ?? 0) > 0 ? (
+        <p style={{ margin: 0 }} data-testid="agentReview.settingsChangedCount">
+          {t("agent.review.settingsChanged", {
+            count: result.settingsChanged?.length ?? 0,
+          })}
+        </p>
+      ) : null}
       {result.notesCreated.length > 0 ? (
         <p style={{ margin: 0 }} data-testid="agentReview.createdCount">
           {t("agent.review.createdCount", { count: result.notesCreated.length })}

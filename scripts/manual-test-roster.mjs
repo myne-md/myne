@@ -139,13 +139,14 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
     automatedBy: [
       "e2e/agent-run.e2e.ts",
+      "e2e/agent-setting-intent.e2e.ts",
       "e2e/ai-chat.e2e.ts",
       "e2e/writing-assistant.e2e.ts",
       "e2e/ai-remote-providers.e2e.ts",
     ],
     manual: [
       {
-        see: "With a real GGUF generation model loaded, run an agent edit across five notes. Time it: confirm the first proposed edit appears within about 30 seconds, the running-scope figure keeps moving, and the app stays responsive to typing. Read each proposed diff and confirm the anchor text really occurs in that note. Watch memory pressure and fan noise and confirm the machine does not swap or thermal-throttle. On Apple silicon, start an embedding pass while a chat turn is streaming and confirm the app survives.",
+        see: "With a real GGUF generation model loaded, run an agent edit across five notes. Time it: confirm the first proposed edit appears within about 30 seconds, the running-scope figure keeps moving, and the app stays responsive to typing. Read each proposed diff and confirm the anchor text really occurs in that note. Watch memory pressure and fan noise and confirm the machine does not swap or thermal-throttle. On Apple silicon, start an embedding pass while a chat turn is streaming and confirm the app survives. Then, with a run that proposed a SETTING change (\"change my weekly notes folder\"), read that row with the theme switched through all four palettes, including one imported custom theme: the label, the value it holds now and the value it would become must all stay legible on each, the focus ring must be visible on the row's two buttons as you Tab through them, and the row must not overflow at a narrow window width. The summary count is deliberately NOT walked here: `e2e/agent-setting-intent.e2e.ts` asserts it, and re-walking what a scenario covers is what naming the scenario prevents.",
         whyNotAutomated: "Every AI scenario runs StubEngine behind --features local-inference-stub, so no Candle/GGUF model ever loads; output shape, first-token latency and the memory ceiling are unmeasured, and the Metal concurrency crash class only appears when two threads hold a real MetalDevice.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
