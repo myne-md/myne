@@ -95,6 +95,35 @@ export type Capability =
    *  attachment downloads: it is the one export whose OUTPUT FORMAT, not its
    *  destination, is the platform-specific part. */
   | "pdfExport"
+  /**
+   * Writing `vault.prefs` (myne-md/myne#850).
+   *
+   * **A capability rather than an assumption, because a build without it must not
+   * offer the agent's setting changes.** The intents the agent may use are
+   * resolved into a catalogue the client sends with the run, and a client that
+   * cannot write a preference must send an EMPTY one: the alternative is a change
+   * the user approves and then watches fail, which is the shape this capability
+   * exists to prevent.
+   *
+   * Every shipping client has it today, and both readings of that are true: it is
+   * present because desktop, mobile and web all write prefs through the same
+   * plugin, and its DECLARATION here is what makes a future build that does not
+   * an edit rather than an omission.
+   *
+   * **It does NOT cover the detached note window**, and that is why the agent's
+   * catalogue is gated twice. A detached window runs the same build as the main
+   * window and holds every one of these, so the second gate is window ROLE rather
+   * than a capability: see `offeredSettingIds`.
+   *
+   * **That gate is a consistency bound, not an enforcement, and this comment
+   * claimed the `prefs:allow-set-*` ACL until the 2026-10-13 review.** The agent's
+   * setting write is an in-process call into the prefs plugin rather than a
+   * `plugin:prefs|set-*` invocation, so no per-window grant is consulted and
+   * `detached-note.json` does grant `agent:default` to `note-*` windows. What the
+   * app guarantees is that its own UI offers nothing there; the host-side window
+   * check is owed and recorded in `docs/threat-model.md` §7.
+   */
+  | "prefsWrite"
   // ── capabilities web KEEPS, and keeps by decision rather than by default ──
   //
   // A descriptor listing only absences is an absence list wearing a capability
@@ -407,6 +436,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   pinQuickUnlock: true,
   spellCheck: true,
   pdfExport: true,
+  prefsWrite: true,
   vaultRepair: true,
   localOnlyVault: true,
   hostDirectoryRead: true,

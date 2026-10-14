@@ -24,7 +24,7 @@ use super::edit::{EditKind, ProposedEdit};
 use super::engine::{AgentEngine, Content, Message, Role, AGENT_REQUEST_CLASS};
 use super::error::AgentError;
 use super::prompt::{
-    build_request, parse_actions, reply_shape, AgentAction, Proposal, ProposedNote,
+    build_request, parse_actions, reply_shape, AgentAction, Proposal, ProposedNote, ProposedSetting,
 };
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
@@ -424,6 +424,20 @@ pub struct LoopDeps<'a> {
     /// the character budget is applied, which is host policy and belongs at the
     /// command boundary, not in the loop.
     pub history: &'a [Message],
+    /// Whether the client offered a settings catalogue to this run
+    /// (myne-md/myne#850).
+    ///
+    /// **A gate rather than a formality, and the two questions it separates are
+    /// different ones.** The intent table says what the agent MAY write; this
+    /// says what the client can actually show and apply. A client that offers
+    /// nothing can do neither, so a `set_setting` it never offered is refused
+    /// here rather than accepted into a proposal no surface will render. That
+    /// refusal is the difference between an inert feature and a silent one.
+    ///
+    /// The ids are resolved through `setting::offered_ids` before use, so an id
+    /// the table refuses is not offered and a client string never reaches the
+    /// system message.
+    pub offered_settings: &'a [String],
     /// Report the run's cost as it accrues, once per model round-trip
     /// (myne-md/myne#456).
     ///
@@ -640,6 +654,14 @@ async fn drive_inner(
         None => String::new(),
     };
 
+    // **The offered settings, resolved to this table's own ids ONCE per run**
+    // (myne-md/myne#850). The client sends ids; `offered_ids` maps each through
+    // `setting::writable` and returns the table's own `&'static str`, so the
+    // system block can only ever name a setting this crate owns. Empty when the
+    // client offered nothing, which is what makes the verb inert on a client
+    // that has built no catalogue.
+    let offered = super::setting::offered_ids(deps.offered_settings);
+
     loop {
         if runs.is_cancelled(run_id)? {
             return Ok(LoopOutcome {
@@ -670,7 +692,14 @@ async fn drive_inner(
                 seed = &[];
             }
         }
-        let request = build_request(task, transcript, deps.language, seed, &memory_block);
+        let request = build_request(
+            task,
+            transcript,
+            deps.language,
+            seed,
+            &memory_block,
+            &offered,
+        );
         // The class is the constant, passed here, in the loop's own code. It is
         // never read from a payload and never varies per iteration.
         let completion = deps.engine.complete(AGENT_REQUEST_CLASS, &request).await?;
@@ -1225,6 +1254,161 @@ async fn drive_inner(
                         }
                     }
                 }
+                AgentAction::SetSetting {
+                    intent_id,
+                    value,
+                    folder,
+                } => {
+                    // **Resolved against this crate's own table, never against
+                    // the catalogue the client sent** (myne-md/myne#850). The
+                    // first two refusals are the table's answer about the
+                    // setting; the third is the client's answer about whether it
+                    // can apply one. Every refusal is model-readable, because a
+                    // model told only "no" retries the same setting next turn,
+                    // and each is a decided answer rather than a stall, so it
+                    // counts as progress and cannot burn the ceiling.
+                    match super::setting::writable(&intent_id) {
+                        Err(refusal) => {
+                            productive = true;
+                            transcript.push(tool_result(
+                                super::setting::refusal_message(refusal).into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) if !offered.contains(&intent.id) => {
+                            // The table allows it; this client did not offer it.
+                            // A client that has built no catalogue lands here for
+                            // every setting, which is what keeps the feature
+                            // inert rather than silently proposing a change no
+                            // surface can render.
+                            productive = true;
+                            transcript.push(tool_result(
+                                "set_setting refused: that setting is not one you \
+                                 were offered in this session. Use one of the \
+                                 settings you were given, or finish."
+                                    .into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) => {
+                            // **An OMITTED value is refused, never read as a
+                            // clear** (myne-md/myne#850 task 3). Clearing is its
+                            // own verb because the two WRITE different things: a
+                            // set stores a value and a clear removes the entry.
+                            // So a model that meant "remove this" is told which
+                            // verb to use, rather than getting a clear nobody
+                            // reviewed.
+                            let Some(value) = value else {
+                                productive = true;
+                                transcript.push(tool_result(
+                                    "set_setting refused: no value was given. To \
+                                     change a setting, send the value you want; to \
+                                     remove it, use clear_setting."
+                                        .into(),
+                                    None,
+                                ));
+                                continue;
+                            };
+                            match super::setting::validate(intent, &value, folder.as_deref()) {
+                                Err(err) => {
+                                    productive = true;
+                                    transcript.push(tool_result(
+                                        super::setting::value_error_message(err).into(),
+                                        None,
+                                    ));
+                                    continue;
+                                }
+                                Ok(()) => {
+                                    productive = true;
+                                    proposal.settings.push(ProposedSetting {
+                                        intent_id: intent.id.to_string(),
+                                        value: Some(value.trim().to_string()),
+                                        // The sub-step rides the proposal
+                                        // (myne-md/myne#850 task 4), trimmed
+                                        // like the value and absent when the
+                                        // value does not use one, which
+                                        // `validate` has just enforced.
+                                        folder: folder.as_deref().map(|f| f.trim().to_string()),
+                                    });
+                                    transcript.push(tool_result(
+                                        "Setting change recorded. It is shown to \
+                                         the user for approval. Propose another, or \
+                                         finish."
+                                            .into(),
+                                        None,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+                AgentAction::ClearSetting { intent_id } => {
+                    // The same two gates as `set_setting`, and a clear is a write
+                    // too, so it is offered under exactly the same conditions: a
+                    // setting the table refuses is refused here, and one this
+                    // client did not offer is refused here.
+                    //
+                    // **Plus a third that `set_setting` does not need: the
+                    // setting must HAVE an empty state.** Two targets take a
+                    // required value (`PrefTarget::clearable`), so a clear of one
+                    // of them has no setter to reach; without this arm the model's
+                    // clear would reach the proposal, be read and approved by the
+                    // user, and only then be refused at the write, which is the
+                    // "offered and then refused after approval" shape the whole
+                    // derivation exists to prevent (myne-md/myne#850).
+                    match super::setting::writable(&intent_id) {
+                        Err(refusal) => {
+                            productive = true;
+                            transcript.push(tool_result(
+                                super::setting::refusal_message(refusal).into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) if !offered.contains(&intent.id) => {
+                            productive = true;
+                            transcript.push(tool_result(
+                                "clear_setting refused: that setting is not one \
+                                 you were offered in this session. Use one of the \
+                                 settings you were given, or finish."
+                                    .into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) if !intent.target.clearable() => {
+                            productive = true;
+                            transcript.push(tool_result(
+                                "clear_setting refused: that setting always has a \
+                                 value, so it can be changed but not removed. Use \
+                                 set_setting with a new value, or finish."
+                                    .into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) => {
+                            productive = true;
+                            proposal.settings.push(ProposedSetting {
+                                intent_id: intent.id.to_string(),
+                                // `None` IS the clear, and it is the reason this
+                                // field is an option: an empty string is a value
+                                // a folder could legitimately be compared
+                                // against, so the two cannot share a spelling.
+                                value: None,
+                                folder: None,
+                            });
+                            transcript.push(tool_result(
+                                "Setting removal recorded. It is shown to the user \
+                                 for approval. Propose another, or finish."
+                                    .into(),
+                                None,
+                            ));
+                        }
+                    }
+                }
                 AgentAction::ProposeNote {
                     title,
                     body,
@@ -1655,7 +1839,20 @@ mod tests {
     fn no_progress(_: RunProgress) {}
 
     fn deps<'a>(engine: &'a ScriptEngine, recs: &'a BTreeMap<String, NoteRecord>) -> LoopDeps<'a> {
+        deps_with(engine, recs, &[])
+    }
+
+    /// The same, with a settings catalogue offered. `offered_settings` is the
+    /// gate that keeps `set_setting` inert on a client that has built no
+    /// catalogue (myne-md/myne#850), so exercising the verb needs this rather
+    /// than a second copy of the literal.
+    fn deps_with<'a>(
+        engine: &'a ScriptEngine,
+        recs: &'a BTreeMap<String, NoteRecord>,
+        offered_settings: &'a [String],
+    ) -> LoopDeps<'a> {
         LoopDeps {
+            offered_settings,
             engine,
             reader: &Reader,
             searcher: &Searcher,
@@ -1726,6 +1923,7 @@ mod tests {
         recs: &'a BTreeMap<String, NoteRecord>,
     ) -> LoopDeps<'a> {
         LoopDeps {
+            offered_settings: &[],
             engine,
             reader: &Reader,
             searcher: &NoHits,
@@ -1857,6 +2055,7 @@ mod tests {
         let recs = records_ab();
         let mut t = Vec::new();
         let deps = LoopDeps {
+            offered_settings: &[],
             engine: &engine,
             reader: &Reader,
             searcher: &Searcher,
@@ -1907,6 +2106,7 @@ mod tests {
         let recs = records_ab();
         let mut t = Vec::new();
         let deps = LoopDeps {
+            offered_settings: &[],
             engine: &engine,
             reader: &Reader,
             searcher: &Searcher,
@@ -2628,6 +2828,338 @@ mod tests {
         assert!(out.proposal.edits.is_empty());
     }
 
+    // ---- setting intents (myne-md/myne#850) -------------------------------
+
+    #[test]
+    fn a_setting_intent_reaches_the_proposal() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"editor.weekly-notes-folder","value":"J/Weekly"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "change my weekly notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert_eq!(out.proposal.settings.len(), 1);
+        assert_eq!(
+            out.proposal.settings[0].intent_id,
+            "editor.weekly-notes-folder"
+        );
+        assert_eq!(out.proposal.settings[0].value.as_deref(), Some("J/Weekly"));
+    }
+
+    /// **The gate.** The verb exists and the table accepts it, and a client that
+    /// has built no catalogue still cannot get a setting into a proposal,
+    /// because that proposal would have no surface to render it. This is the
+    /// assertion that keeps the feature inert rather than silent.
+    #[test]
+    fn a_setting_intent_is_refused_when_the_client_offers_no_catalogue() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"editor.weekly-notes-folder","value":"J/Weekly"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "change my weekly notes folder",
+            &mut t,
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(
+            out.proposal.settings.is_empty(),
+            "nothing may be proposed where the client cannot apply it"
+        );
+        // And the model is told, so it does not retry the same setting.
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("not one you were offered"))));
+    }
+
+    /// A control is refused by the derivation even when a catalogue is offered,
+    /// which is the loop half of the boundary the apply path also enforces.
+    #[test]
+    fn a_setting_intent_outside_the_table_is_refused_by_derivation() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"privacy.auto-lock","value":"60"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        // Offered, so the refusal is unambiguously the TABLE's answer about the
+        // setting rather than the client's answer about its catalogue.
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "turn off auto lock",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(
+            out.proposal.settings.is_empty(),
+            "a control must not reach the proposal"
+        );
+    }
+
+    /// An invalid value is refused before the dialog exists, so a user is never
+    /// asked to approve a change that could not be stored.
+    #[test]
+    fn an_invalid_setting_value_is_refused_before_the_proposal() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"editor.weekly-notes-folder","value":"   "}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "change my weekly notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+    }
+
+    /// **An omitted value is refused, never read as a clear** (myne-md/myne#850
+    /// task 3). Before `value` was an `Option`, a reply missing the field failed
+    /// to deserialize and the action was dropped, so the model got no answer and
+    /// retried; now it reaches this refusal, which names the verb it meant.
+    #[test]
+    fn a_setting_with_no_value_is_refused_rather_than_read_as_a_clear() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"editor.weekly-notes-folder"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "remove my weekly notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(
+            out.proposal.settings.is_empty(),
+            "an omitted value must not become a clear"
+        );
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("use clear_setting"))));
+    }
+
+    /// The clear verb reaches the proposal as `None`, which is what tells the
+    /// write path to REMOVE the entry rather than store an empty value.
+    #[test]
+    fn a_clear_reaches_the_proposal_with_no_value() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"clear_setting","intent_id":"editor.weekly-notes-folder"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "remove my weekly notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert_eq!(out.proposal.settings.len(), 1);
+        assert_eq!(
+            out.proposal.settings[0].intent_id,
+            "editor.weekly-notes-folder"
+        );
+        assert_eq!(out.proposal.settings[0].value, None);
+    }
+
+    /// A clear is refused under the same two gates a set is, because it is a
+    /// write too: a control cannot be cleared by the agent any more than it can
+    /// be set.
+    #[test]
+    fn a_clear_of_a_control_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"clear_setting","intent_id":"privacy.auto-lock"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.weekly-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "turn off auto lock",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+    }
+
+    /// **The clearable gate, which is the clear verb's third.** Two targets take
+    /// a required value, so a clear of one has no setter to reach. Without this
+    /// gate the clear reached the proposal and was refused only at the write,
+    /// after the user had read and approved the row (myne-md/myne#850).
+    ///
+    /// The catalogue is OFFERED here on purpose: with an empty one the offered
+    /// gate would refuse first and the assertion would pass for a reason that has
+    /// nothing to do with clearability.
+    #[test]
+    fn a_clear_of_a_setting_with_no_empty_state_is_refused_before_the_proposal() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"clear_setting","intent_id":"editor.daily-notes-folder"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.daily-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "remove my daily notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("can be changed but not removed"))));
+    }
+
+    /// **The offered gate, on the clear verb.** A client that cannot write
+    /// preferences offers nothing (myne-md/myne#850 task 5), so a clear arriving
+    /// against an empty catalogue is refused in `myne-core` rather than accepted
+    /// into a proposal whose write the ACL would refuse after approval.
+    #[test]
+    fn a_clear_is_refused_when_the_client_offered_nothing() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"clear_setting","intent_id":"editor.weekly-notes-folder"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "remove my weekly notes folder",
+            &mut t,
+            // `deps` offers nothing, which is what a detached window sends.
+            &deps(&engine, &recs),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("clear_setting refused"))));
+    }
+
+    /// **The sub-step reaches the proposal** (myne-md/myne#850 task 4): the mode
+    /// and the folder it needs are one change over two pref fields.
+    #[test]
+    fn a_mode_and_folder_setting_reaches_the_proposal_with_its_folder() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"files.new-note-location","value":"specific","folder":"J/Weekly"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["files.new-note-location".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "put new notes in J/Weekly",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert_eq!(out.proposal.settings.len(), 1);
+        assert_eq!(out.proposal.settings[0].value.as_deref(), Some("specific"));
+        assert_eq!(out.proposal.settings[0].folder.as_deref(), Some("J/Weekly"));
+    }
+
+    /// And the mode that needs a folder is refused without one, BEFORE the user
+    /// is asked to approve it: `specific` alone is a state the settings panel
+    /// would render as a desync.
+    #[test]
+    fn a_mode_that_needs_a_folder_is_refused_without_one() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"set_setting","intent_id":"files.new-note-location","value":"specific"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["files.new-note-location".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "put new notes somewhere",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("needs a folder"))));
+    }
+
     #[test]
     fn an_accepted_proposal_answers_the_model_so_the_turn_does_not_end_on_it() {
         // myne-md/myne#547. Two properties in one, and the second is the one
@@ -2870,6 +3402,7 @@ mod tests {
             turn: Mutex::new(0),
         };
         let d = LoopDeps {
+            offered_settings: &[],
             exclusions: &*NO_EXCL,
             memory: None,
             engine: &forever,
@@ -2916,6 +3449,7 @@ mod tests {
         let seen: StdMutex<Vec<RunProgress>> = StdMutex::new(Vec::new());
         let record = |p: RunProgress| seen.lock().unwrap().push(p);
         let d = LoopDeps {
+            offered_settings: &[],
             engine: &engine,
             reader: &Reader,
             searcher: &Searcher,
@@ -3308,6 +3842,7 @@ mod tests {
         };
         let excl = ChangesMidRun(Arc::clone(&excluded_yet));
         let deps = LoopDeps {
+            offered_settings: &[],
             engine: &engine,
             reader: &Reader,
             searcher: &Searcher,
@@ -3551,6 +4086,7 @@ mod tests {
         recs: &'a BTreeMap<String, NoteRecord>,
     ) -> LoopDeps<'a> {
         LoopDeps {
+            offered_settings: &[],
             reader: &LongReader,
             ..deps(engine, recs)
         }

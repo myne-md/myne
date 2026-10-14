@@ -81,6 +81,7 @@ pub mod run;
 /// The loop. Named `run_loop` because `loop` is a Rust keyword.
 pub mod run_loop;
 pub mod scope;
+pub mod setting;
 pub mod tools;
 
 pub use apply::{
@@ -94,7 +95,7 @@ pub use engine::{
 pub use error::{AgentError, EditRejection};
 pub use hide::edit_hides_note;
 pub use probe::{grade, run_probe, AttemptVerdict, ProbeThreshold, ProbeVerdict};
-pub use prompt::{AgentAction, Proposal, ProposedNote};
+pub use prompt::{AgentAction, Proposal, ProposedNote, ProposedSetting};
 pub use run::{AgentRunState, AgentRunView, GrantOrigin};
 pub use run_loop::{drive, LoopDeps, LoopEnd, LoopOutcome, MAX_ITERATIONS};
 pub use scope::{

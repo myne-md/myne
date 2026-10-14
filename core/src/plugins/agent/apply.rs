@@ -31,7 +31,9 @@ use super::error::{AgentError, EditRejection};
 use super::frontmatter::{edit_moves_note, folder_of};
 use super::hide::edit_hides_note;
 use super::prompt::ProposedNote;
-use super::run::AgentRunState;
+use super::prompt::ProposedSetting;
+use super::run::{AgentRunState, AppliedSetting};
+use super::setting::SettingIntent;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -75,6 +77,14 @@ pub struct ApplyOutcome {
     pub refused: Vec<RefusedEdit>,
     /// The notes that were written.
     pub notes_written: Vec<String>,
+    /// Setting changes that landed, with the value each replaced
+    /// (myne-md/myne#850). Carried on this outcome rather than on a second
+    /// reply type because the surface that renders them is the one that renders
+    /// everything else an apply did, and two replies would be two things to keep
+    /// in step.
+    pub settings_changed: Vec<AppliedSetting>,
+    /// Setting changes that did not land, with their causes.
+    pub refused_settings: Vec<RefusedSetting>,
     /// The ids of notes the run created. Separate from `notes_written` because a
     /// create has no restore point: there is nothing to revert to, and undoing
     /// one means trashing it rather than restoring a snapshot.
@@ -477,6 +487,258 @@ async fn create_notes(
 /// checked in core rather than left to whichever host does the serializing.
 fn frontmatter_safe(value: &str) -> bool {
     !value.contains('\n') && !value.contains('\r')
+}
+
+/// Writing one preference on behalf of an approved setting change.
+///
+/// **A seam rather than a direct call into the prefs plugin**, for two reasons
+/// that both come down to the undo record. The value the change replaces has to
+/// come out of the same write that replaces it, or the undo restores a value it
+/// guessed; and the write has to go through the one path that bumps the prefs
+/// nonce, so every other `usePrefs` reader hears about it. The desktop host
+/// implements this over `vault.prefs`, and a test implements it over a map.
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait PrefWriter: Send + Sync {
+    /// Write `value` for the intent's target, returning the value that was there
+    /// before.
+    ///
+    /// **`None` is a CLEAR, not an empty value** (myne-md/myne#850 task 3): the
+    /// `periodic_notes` entry is REMOVED rather than set to an empty string, and
+    /// the prefs setter takes the same `Option` for the same reason. `None` on
+    /// the return side means the setting had no value, which is what lets an undo
+    /// tell "put X back" apart from "clear it again".
+    ///
+    /// An `Err` refuses this ONE setting and leaves the rest of the batch alone,
+    /// the same contract a refused edit has.
+    ///
+    /// **It returns the whole pre-write state, not one value** (myne-md/myne#850):
+    /// `(the value it replaced, the folder it replaced)`. Returning only the
+    /// value is what let the undo of `files.new-note-location` rebuild the folder
+    /// from live prefs and write the agent's own folder back; see
+    /// `AppliedSetting::previous_folder` for the full account.
+    async fn write_setting(
+        &self,
+        intent: &SettingIntent,
+        value: Option<&str>,
+        folder: Option<&str>,
+    ) -> Result<(Option<String>, Option<String>), AgentError>;
+
+    /// Make the folder an intent names exist, and report whether it now does.
+    ///
+    /// **The ensure step's named seam** (myne-md/myne#850 task 3), so promoting
+    /// the folder set out of `vault.prefs` (myne-md/myne#615) moves this method
+    /// rather than every intent that names a folder.
+    ///
+    /// `false` means a removal of that folder is on record and nothing was
+    /// registered: the ensure must not resurrect a deletion the user made. The
+    /// caller reports that as a refusal rather than writing a setting whose
+    /// effect silently does not hold, because a folder that is not registered
+    /// does not appear in the sidebar until its first note.
+    async fn ensure_folder(&self, folder: &str) -> Result<bool, AgentError>;
+}
+
+/// Why a setting change did not land.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SettingRejection {
+    /// It arrived under a bulk approval. **A setting change is always its own
+    /// act**, because the rule that makes "approve all" safe is a bound over
+    /// note grants, and a setting sits inside no grant at all.
+    NeedsOwnAct,
+    /// The setting is no longer writable: the intent table moved under the run,
+    /// or the id was changed after the proposal. Re-derived here rather than
+    /// trusted from the proposal, which is a request and not a receipt.
+    NotWritable,
+    /// The value no longer validates, for the same reason.
+    InvalidValue,
+    /// The folder this setting names is on record as REMOVED, so the ensure step
+    /// will not bring it back (myne-md/myne#850 task 3).
+    ///
+    /// Its own reason rather than folding into `WriteFailed`, because the user's
+    /// action is different in the two cases: one is "try again", and this one is
+    /// "you deleted that folder, and I am not undoing that for you".
+    FolderRemoved,
+    /// The setting cannot be CLEARED, because the prefs setter for it takes a
+    /// required value (myne-md/myne#850 task 4). Writing an empty string and
+    /// calling it a clear would be storing a value, which is the difference the
+    /// clear verb exists to keep.
+    NotClearable,
+    /// The write itself failed.
+    WriteFailed,
+    /// The host never recorded the model proposing this change.
+    ///
+    /// **The note path has refused this since `EditRejection::NotProposed`, and
+    /// settings had no equivalent** (2026-10-13 review), which is what made the
+    /// offer a page-supplied argument rather than a bound: a caller could name a
+    /// setting in its own `agent_apply` that the run never proposed.
+    NotProposed,
+    /// The run was stopped before the write, so nothing was attempted.
+    ///
+    /// **Its own reason rather than `WriteFailed`** (myne-md/myne#850, from
+    /// review). `apply_settings_approved` opens with `runs.is_writable(run_id)?`,
+    /// whose errors are `Cancelled` and `NoSuchRun`, and the catch-all reported
+    /// both as a transient write failure: the user is invited to retry a run they
+    /// deliberately stopped, and `writeFailed`'s copy says the write failed for a
+    /// write that never happened.
+    RunStopped,
+}
+
+/// One setting change that did not land.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedSetting {
+    /// Which setting it was for.
+    pub intent_id: String,
+    /// Its index in the approved list, so the surface marks the row the user
+    /// actually looked at rather than guessing by content.
+    pub index: usize,
+    /// Why it did not land.
+    pub reason: SettingRejection,
+}
+
+/// What applying the approved setting changes did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsOutcome {
+    /// The settings that landed, with the value each replaced.
+    pub applied: Vec<AppliedSetting>,
+    /// The settings that did not, with their causes.
+    pub refused: Vec<RefusedSetting>,
+}
+
+/// Apply the setting changes the user approved.
+///
+/// **Its own function rather than a fourth parameter on [`apply_approved`]**,
+/// and the shape is the argument: a setting write has no note scope to check, no
+/// restore point to take and no batch to be atomic with, so threading it through
+/// the note pipeline would have made every call site carry a parameter it does
+/// not use on the path that writes note bodies.
+///
+/// **The bulk carve-out lives here**, the same place and for the same reason the
+/// removal carve-out lives in [`apply_approved`]: the rule is about what the user
+/// did, so a frontend filter would only ever be as true as the current frontend,
+/// and the host could not detect the mistake afterwards.
+pub async fn apply_settings_approved(
+    runs: &AgentRunState,
+    run_id: &str,
+    approved: &[(usize, ProposedSetting)],
+    approval: Approval,
+    prefs: &dyn PrefWriter,
+) -> Result<SettingsOutcome, AgentError> {
+    let mut outcome = SettingsOutcome::default();
+    if approved.is_empty() {
+        return Ok(outcome);
+    }
+    // 0. The approval LABEL is bounded first, exactly as the note path bounds
+    //    it and for the same reason: an approve-all relabelled `individual`
+    //    would otherwise carry several setting changes past a control whose
+    //    predicate is the label. Found by symmetry with myne-md/myne#531, which
+    //    is where the note-path version of this line came from.
+    if approval == Approval::Individual && approved.len() > 1 {
+        return Err(AgentError::IndividualApprovalNotSingle);
+    }
+    // Stop bounds the WRITE here too, not only the model: a run the user stopped
+    // must not change a setting on a later click any more than it may write a
+    // note.
+    runs.is_writable(run_id)?;
+    for (index, setting) in approved {
+        if approval == Approval::Bulk {
+            outcome.refused.push(RefusedSetting {
+                intent_id: setting.intent_id.clone(),
+                index: *index,
+                reason: SettingRejection::NeedsOwnAct,
+            });
+            continue;
+        }
+        // Re-derived, never trusted from the proposal: the intent table is the
+        // authority and the proposal is a request.
+        let intent = match super::setting::writable(&setting.intent_id) {
+            Ok(intent) => intent,
+            Err(_) => {
+                outcome.refused.push(RefusedSetting {
+                    intent_id: setting.intent_id.clone(),
+                    index: *index,
+                    reason: SettingRejection::NotWritable,
+                });
+                continue;
+            }
+        };
+        // Validation applies to a SET only (myne-md/myne#850 task 3). A clear has
+        // no value to check, and the removal direction is never refused, which is
+        // the set-mutation module's own stated rule.
+        if let Some(value) = setting.value.as_deref() {
+            if super::setting::validate(intent, value, setting.folder.as_deref()).is_err() {
+                outcome.refused.push(RefusedSetting {
+                    intent_id: setting.intent_id.clone(),
+                    index: *index,
+                    reason: SettingRejection::InvalidValue,
+                });
+                continue;
+            }
+        } else if !intent.target.clearable() {
+            // **A clear needs a setter that can express one** (task 4). Two of
+            // the targets route through setters taking a required value, so
+            // there is nothing to ask for the empty state with; writing an empty
+            // string instead would store a VALUE and call it a removal, which is
+            // the difference the clear verb exists to keep.
+            outcome.refused.push(RefusedSetting {
+                intent_id: setting.intent_id.clone(),
+                index: *index,
+                reason: SettingRejection::NotClearable,
+            });
+            continue;
+        }
+        // **The ensure step, before the write.** A setting that names a folder
+        // owes a registered one, and this refuses when a removal of that folder
+        // is on record, so the setting is refused BEFORE anything is written
+        // rather than landing with its effect silently missing.
+        //
+        // The folder comes from `folder_named`, not from the value alone: a
+        // mode-and-folder setting names it in the sub-step, and reading the MODE
+        // as a folder is how `root` would end up registered.
+        if let Some(folder) = super::setting::folder_named(
+            intent,
+            setting.value.as_deref(),
+            setting.folder.as_deref(),
+        ) {
+            match prefs.ensure_folder(folder).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    outcome.refused.push(RefusedSetting {
+                        intent_id: setting.intent_id.clone(),
+                        index: *index,
+                        reason: SettingRejection::FolderRemoved,
+                    });
+                    continue;
+                }
+                Err(_) => {
+                    outcome.refused.push(RefusedSetting {
+                        intent_id: setting.intent_id.clone(),
+                        index: *index,
+                        reason: SettingRejection::WriteFailed,
+                    });
+                    continue;
+                }
+            }
+        }
+        match prefs
+            .write_setting(intent, setting.value.as_deref(), setting.folder.as_deref())
+            .await
+        {
+            Ok((previous, previous_folder)) => outcome.applied.push(AppliedSetting {
+                intent_id: intent.id.to_string(),
+                previous,
+                previous_folder,
+            }),
+            Err(_) => outcome.refused.push(RefusedSetting {
+                intent_id: setting.intent_id.clone(),
+                index: *index,
+                reason: SettingRejection::WriteFailed,
+            }),
+        }
+    }
+    Ok(outcome)
 }
 
 #[cfg(test)]
@@ -1825,5 +2087,490 @@ mod tests {
             .restore_points
             .iter()
             .all(|(_, s)| s.starts_with("snap-")));
+    }
+
+    // ---- setting intents (myne-md/myne#850) -------------------------------
+
+    /// One recorded write: `(intent id, value, folder)`, each optional where the
+    /// change did not carry it. A named alias rather than the tuple inline,
+    /// because the third slot arrived with the sub-step and the type reads as
+    /// noise at every use.
+    type RecordedWrite = (String, Option<String>, Option<String>);
+
+    /// A writer that records what it was asked to write and answers with a fixed
+    /// "previous" value, so the record half can be asserted without a vault.
+    struct StubPrefs {
+        /// `(intent id, value, folder)` per write, with `None` for a CLEAR, the
+        /// distinction the clear verb exists for (myne-md/myne#850 task 3), and
+        /// the third slot carrying the sub-step a mode-and-folder setting sends.
+        writes: Mutex<Vec<RecordedWrite>>,
+        previous: Option<String>,
+        /// The FOLDER in place before the write, for the one target with two
+        /// fields. The stub returns it so a test can drive the undo of
+        /// `files.new-note-location` without a real vault.
+        previous_folder: Option<String>,
+        /// What `ensure_folder` answers. `true` is the ordinary case; `false` is
+        /// a removal on record, which is what the FolderRemoved refusal is for.
+        folder_ensured: bool,
+        fail: bool,
+    }
+
+    impl StubPrefs {
+        fn new(previous: Option<&str>) -> Self {
+            Self {
+                writes: Mutex::new(Vec::new()),
+                previous: previous.map(str::to_string),
+                previous_folder: None,
+                folder_ensured: true,
+                fail: false,
+            }
+        }
+
+        fn failing() -> Self {
+            Self {
+                writes: Mutex::new(Vec::new()),
+                previous: None,
+                previous_folder: None,
+                folder_ensured: true,
+                fail: true,
+            }
+        }
+
+        /// The same, with the ensure step reporting a removal on record.
+        fn with_removed_folder() -> Self {
+            Self {
+                writes: Mutex::new(Vec::new()),
+                previous: Some("Old/".to_string()),
+                previous_folder: None,
+                folder_ensured: false,
+                fail: false,
+            }
+        }
+
+        fn writes(&self) -> Vec<RecordedWrite> {
+            self.writes.lock().expect("stub prefs lock").clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl PrefWriter for StubPrefs {
+        async fn write_setting(
+            &self,
+            intent: &SettingIntent,
+            value: Option<&str>,
+            folder: Option<&str>,
+        ) -> Result<(Option<String>, Option<String>), AgentError> {
+            if self.fail {
+                return Err(AgentError::WriteFailed);
+            }
+            self.writes.lock().expect("stub prefs lock").push((
+                intent.id.to_string(),
+                value.map(str::to_string),
+                folder.map(str::to_string),
+            ));
+            // The whole pre-write state, matching the real adapter's contract.
+            Ok((self.previous.clone(), self.previous_folder.clone()))
+        }
+
+        async fn ensure_folder(&self, _folder: &str) -> Result<bool, AgentError> {
+            if self.fail {
+                return Err(AgentError::WriteFailed);
+            }
+            Ok(self.folder_ensured)
+        }
+    }
+
+    fn setting(id: &str, value: &str) -> ProposedSetting {
+        ProposedSetting {
+            intent_id: id.into(),
+            value: Some(value.into()),
+            folder: None,
+        }
+    }
+
+    /// The same, as a CLEAR: no value at all, which is a different proposal from
+    /// one carrying an empty string.
+    fn clearing(id: &str) -> ProposedSetting {
+        ProposedSetting {
+            intent_id: id.into(),
+            value: None,
+            folder: None,
+        }
+    }
+
+    /// The sub-step shape: a mode plus the folder it needs (myne-md/myne#850
+    /// task 4).
+    fn setting_with_folder(id: &str, value: &str, folder: &str) -> ProposedSetting {
+        ProposedSetting {
+            intent_id: id.into(),
+            value: Some(value.into()),
+            folder: Some(folder.into()),
+        }
+    }
+
+    /// A solo approval writes the setting and reports the value it replaced, so
+    /// the undo record has something to restore rather than something to guess.
+    #[test]
+    fn a_setting_write_lands_and_carries_the_previous_value() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(Some("Old/Weekly"));
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("editor.weekly-notes-folder", "J/Weekly"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.refused.is_empty());
+        assert_eq!(out.applied.len(), 1);
+        assert_eq!(out.applied[0].intent_id, "editor.weekly-notes-folder");
+        assert_eq!(out.applied[0].previous.as_deref(), Some("Old/Weekly"));
+        assert_eq!(
+            prefs.writes(),
+            vec![(
+                "editor.weekly-notes-folder".to_string(),
+                Some("J/Weekly".to_string()),
+                None
+            )]
+        );
+    }
+
+    /// **A clear is a REMOVAL, not a set to empty** (myne-md/myne#850 task 3).
+    /// The writer is handed `None`, which is what the prefs setter takes as
+    /// "remove the entry"; an empty string would be a value a folder could be
+    /// compared against, so the two must not share a spelling anywhere.
+    #[test]
+    fn a_clear_is_a_removal_rather_than_a_set_to_empty() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(Some("J/Weekly"));
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, clearing("editor.weekly-notes-folder"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.refused.is_empty());
+        assert_eq!(out.applied.len(), 1);
+        // The previous value is carried, so the undo can put it back.
+        assert_eq!(out.applied[0].previous.as_deref(), Some("J/Weekly"));
+        assert_eq!(
+            prefs.writes(),
+            vec![("editor.weekly-notes-folder".to_string(), None, None)],
+            "a clear must reach the writer as None, never as an empty value"
+        );
+    }
+
+    /// **A removal on record is not resurrected by the ensure step.** The
+    /// setting is refused BEFORE anything is written, so it does not land with
+    /// its effect silently missing.
+    #[test]
+    fn a_folder_on_record_as_removed_refuses_the_setting_before_the_write() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::with_removed_folder();
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("editor.weekly-notes-folder", "J/Weekly"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.applied.is_empty());
+        assert_eq!(out.refused.len(), 1);
+        assert_eq!(out.refused[0].reason, SettingRejection::FolderRemoved);
+        assert!(
+            prefs.writes().is_empty(),
+            "the refusal must come before the write"
+        );
+    }
+
+    /// And the ordinary direction, so the ensure gate cannot pass by refusing
+    /// everything: a folder with no removal on record writes normally.
+    #[test]
+    fn a_folder_with_no_removal_on_record_writes_normally() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("editor.weekly-notes-folder", "J/Weekly"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert_eq!(out.applied.len(), 1);
+        assert!(out.refused.is_empty());
+    }
+
+    /// A clear does not run the ensure step: there is no folder to register, and
+    /// asking about one would refuse a removal for naming a folder it is
+    /// removing.
+    #[test]
+    fn a_clear_does_not_consult_the_ensure_step() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::with_removed_folder();
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, clearing("editor.weekly-notes-folder"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert_eq!(
+            out.applied.len(),
+            1,
+            "removing a setting is never refused by a folder's removal record"
+        );
+        assert!(out.refused.is_empty());
+    }
+
+    /// **A mode-and-folder setting writes BOTH fields as one change**
+    /// (myne-md/myne#850 task 4). The mode and the folder are one setting over
+    /// two pref fields, so the folder rides the same write rather than a second
+    /// change that could desync from the first.
+    #[test]
+    fn a_mode_and_folder_setting_carries_its_folder_in_the_same_write() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(Some("root"));
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(
+                0,
+                setting_with_folder("files.new-note-location", "specific", "J/Weekly"),
+            )],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.refused.is_empty());
+        assert_eq!(out.applied.len(), 1);
+        assert_eq!(
+            prefs.writes(),
+            vec![(
+                "files.new-note-location".to_string(),
+                Some("specific".to_string()),
+                Some("J/Weekly".to_string())
+            )]
+        );
+    }
+
+    /// A folder sent to a setting that takes one as its VALUE is refused, not
+    /// ignored: the sub-step cannot be smuggled into a plain folder setting.
+    #[test]
+    fn a_folder_on_a_plain_folder_setting_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(
+                0,
+                setting_with_folder("editor.weekly-notes-folder", "J/Weekly", "Other/"),
+            )],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.applied.is_empty());
+        assert_eq!(out.refused[0].reason, SettingRejection::InvalidValue);
+        assert!(prefs.writes().is_empty());
+    }
+
+    /// **A setting whose setter takes a required value cannot be cleared**
+    /// (myne-md/myne#850 task 4). Writing an empty string and calling it a clear
+    /// would store a value, which is the difference the clear verb keeps.
+    #[test]
+    fn a_clear_of_a_setting_with_no_empty_state_is_refused() {
+        for id in [
+            "editor.daily-notes-folder",
+            "editor.daily-notes-date-format",
+        ] {
+            let runs = AgentRunState::default();
+            runs.start("r".into(), ids(&["a"]));
+            let prefs = StubPrefs::new(Some("X"));
+            let out = block_on(apply_settings_approved(
+                &runs,
+                "r",
+                &[(0, clearing(id))],
+                Approval::Individual,
+                &prefs,
+            ))
+            .expect("a solo approval is valid");
+            assert!(out.applied.is_empty(), "{id} was cleared");
+            assert_eq!(
+                out.refused[0].reason,
+                SettingRejection::NotClearable,
+                "{id}"
+            );
+            assert!(prefs.writes().is_empty(), "{id} reached the writer");
+        }
+    }
+
+    /// And the ordinary direction, so the clearable gate cannot pass by refusing
+    /// every clear: a target whose setter takes an `Option` clears normally.
+    #[test]
+    fn a_clear_of_a_setting_with_an_empty_state_lands() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(Some("YYYY-MM-DD"));
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, clearing("editor.date-format"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert_eq!(out.applied.len(), 1);
+        assert!(out.refused.is_empty());
+    }
+
+    /// A bulk approval may not carry a setting change, which
+    /// is the rule that keeps "approve all" bounded: a setting sits inside no
+    /// note grant, so nothing about the batch's shape says the user read it.
+    /// The refusal also has to land BEFORE the write, which is what the empty
+    /// write log proves.
+    #[test]
+    fn a_bulk_approval_may_not_carry_a_setting_change() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(Some("Old/Weekly"));
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[
+                (0, setting("editor.weekly-notes-folder", "J/Weekly")),
+                (1, setting("files.new-note-location", "specific")),
+            ],
+            Approval::Bulk,
+            &prefs,
+        ))
+        .expect("bulk is a valid label");
+        assert!(out.applied.is_empty(), "nothing may land under bulk");
+        assert_eq!(out.refused.len(), 2);
+        assert!(out
+            .refused
+            .iter()
+            .all(|r| r.reason == SettingRejection::NeedsOwnAct));
+        assert!(
+            prefs.writes().is_empty(),
+            "the refusal must come before the write"
+        );
+    }
+
+    /// An `individual` label carrying more than one change is refused outright,
+    /// the same bound the note path makes and for the same reason: one approval
+    /// act covers one change.
+    #[test]
+    fn an_individual_label_may_not_carry_two_setting_changes() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let err = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[
+                (0, setting("editor.weekly-notes-folder", "J/Weekly")),
+                (1, setting("files.new-note-location", "specific")),
+            ],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect_err("two changes are not one individual act");
+        assert!(matches!(err, AgentError::IndividualApprovalNotSingle));
+        assert!(prefs.writes().is_empty());
+    }
+
+    /// A setting the table does not carry is refused at the WRITE even when a
+    /// proposal names it. This is the second direction of the derivation: the
+    /// loop refuses it, and so does the path that actually writes, so a
+    /// tampered or stale proposal cannot reach the prefs blob.
+    #[test]
+    fn a_setting_outside_the_table_is_refused_at_the_write() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("appearance.theme", "dark"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.applied.is_empty());
+        assert_eq!(out.refused[0].reason, SettingRejection::NotWritable);
+        assert!(prefs.writes().is_empty());
+    }
+
+    /// An invalid value is refused before the write, for the same reason.
+    #[test]
+    fn an_invalid_value_is_refused_at_the_write() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("editor.weekly-notes-folder", "   "))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("a solo approval is valid");
+        assert!(out.applied.is_empty());
+        assert_eq!(out.refused[0].reason, SettingRejection::InvalidValue);
+        assert!(prefs.writes().is_empty());
+    }
+
+    /// A failed write is a refusal of that one setting, not a failed apply, so
+    /// the rest of a batch (and the surface's report) survives it.
+    #[test]
+    fn a_failed_write_refuses_that_setting_only() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::failing();
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[(0, setting("editor.weekly-notes-folder", "J/Weekly"))],
+            Approval::Individual,
+            &prefs,
+        ))
+        .expect("the apply itself succeeds");
+        assert!(out.applied.is_empty());
+        assert_eq!(out.refused[0].reason, SettingRejection::WriteFailed);
+    }
+
+    /// An empty list writes nothing and does not even ask for the run, which is
+    /// what lets a caller run settings and notes through their own paths without
+    /// one of them failing on an empty batch.
+    #[test]
+    fn an_empty_setting_batch_is_a_no_op() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let prefs = StubPrefs::new(None);
+        let out = block_on(apply_settings_approved(
+            &runs,
+            "r",
+            &[],
+            Approval::Bulk,
+            &prefs,
+        ))
+        .expect("an empty batch is never a refusal");
+        assert!(out.applied.is_empty());
+        assert!(out.refused.is_empty());
+        assert!(prefs.writes().is_empty());
     }
 }

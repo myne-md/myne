@@ -77,6 +77,8 @@ import {
 import { AiHistorySheet } from "./AiHistorySheet";
 import { MemorySheet } from "./MemorySheet";
 import { usePrefs } from "../../lib/use-prefs";
+// This client's own nonce, passed into the shared undo hook below.
+import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { ScreenScroll } from "../../components/layout";
@@ -266,6 +268,9 @@ export function AiChatFlow({
   const undo = useUndoLastRun({
     agentLastRun,
     agentUndo,
+    // **This client's own nonce module**, not the desktop one the hook used to
+    // import: see `UndoBindings::bumpPrefsNonce`.
+    bumpPrefsNonce,
     ...(onNotesWritten === undefined
       ? {}
       : { onReverted: (ids: readonly string[]) => onNotesWritten([...ids]) }),
@@ -567,6 +572,16 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         // the way the desktop's `visibleHistory` seeds its own. Empty when no
         // conversation is open (a run with no prior turns to refer to).
         toHistorySeed(openTurns),
+        // **No settings offered, because this client renders no setting row**
+        // (myne-md/myne#850). Mobile's review flow has no settings surface yet,
+        // so offering the catalogue would let the model propose a change this
+        // screen cannot show, approve or undo, and the host would accept it into
+        // a proposal with no route to review it. `[]` is the value the parameter
+        // documents for exactly that case: the host refuses every `set_setting`
+        // with "that setting is not one you were offered in this session", which
+        // keeps the verb inert rather than half-wired. The day a setting row
+        // lands in `AiReviewFlow`, this becomes `offeredSettingIds()`.
+        [],
         // The run becomes addressable here, long before the promise resolves.
         // Without it Stop has no id for the whole first leg.
         (view) => void openRun(view, epoch),

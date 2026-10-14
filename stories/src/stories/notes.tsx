@@ -1056,7 +1056,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
                 participantWithColor({
                   id: "device:a",
                   noteId: rosterNoteId,
-                  label: "Ada's Laptop",
+                  label: { kind: "text", text: "Ada's Laptop" },
                   unAttributed: false,
                   caret: 12,
                   selection: null,
@@ -1064,7 +1064,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
                 participantWithColor({
                   id: "device:b",
                   noteId: rosterNoteId,
-                  label: "Bob",
+                  label: { kind: "text", text: "Bob" },
                   unAttributed: false,
                   caret: 3,
                   selection: null,

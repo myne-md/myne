@@ -36,6 +36,7 @@
 // task, which is the user's own words.
 
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
+import { offeredSettingIds } from "../agent/settingCatalogue";
 import {
   agentApply,
   agentStart,
@@ -238,6 +239,10 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
     // after `agentStore` drops the live copy on lock. Read-only there: the
     // review screen stays the only surface that can apply anything.
     proposal: { edits: agent.proposal.edits, newNotes: agent.proposal.newNotes },
+    // The setting half of "did this run produce anything" (myne-md/myne#850,
+    // from the 2026-10-14 review): without it a settings-only run reads as an
+    // empty one on the strip and the hub.
+    settings: agent.proposal.settings?.length ?? 0,
   };
   // **The run outlives the view, so its result goes to its own conversation**
   // (myne-md/myne#848). The live transcript is one slot; if the user navigated
@@ -325,6 +330,11 @@ export async function startAgentRun(
       grant,
       language,
       history,
+      // What the agent may change, resolved here and re-derived host-side
+      // (myne-md/myne#850). Built at run start rather than cached: the catalogue
+      // is a read of a static registry, and a run that outlived a rebuild would
+      // otherwise offer a setting the current tree no longer carries.
+      offeredSettingIds(),
       (view) => {
         // The run has an id now, minutes before this call resolves. Same epoch
         // as the settle below, so a run the user let go of mid-flight cannot
@@ -422,7 +432,21 @@ async function autoApplyRun(
     // apply is a read-patch-write over whole note blobs, and an automatic one can
     // land while the user is typing inside the default whole-vault scope.
     await flushBeforeFrontmatterWrite();
-    const outcome = await agentApply(agent.view.runId, bulkApprovable, newNotes, "bulk");
+    const outcome = await agentApply(
+      agent.view.runId,
+      bulkApprovable,
+      newNotes,
+      // **Settings are deliberately absent from the automatic path**
+      // (myne-md/myne#850). Automatic apply exists to skip the review screen for
+      // note edits inside a grant the user already made; a setting sits inside
+      // no grant, so the bound that makes the automatic path safe has nothing to
+      // attach to here. A setting change therefore always goes to the review
+      // screen, which is also what `apply_settings_approved`'s bulk carve-out
+      // enforces host-side: this is the client half of one rule, not a second
+      // rule.
+      [],
+      "bulk",
+    );
     if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
     const changed = [...outcome.notesWritten, ...outcome.notesCreated];
     if (changed.length > 0) onNotesWritten?.(changed);

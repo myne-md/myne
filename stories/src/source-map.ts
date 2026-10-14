@@ -21,7 +21,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "AgentHubList": { file: "src/notes/agent/AgentHubList.tsx", line: 328 },
   "AgentPane": { file: "src/notes/agent/AgentPane.tsx", line: 68 },
   "AgentProgress": { file: "src/notes/agent/components/AgentProgress.tsx", line: 89 },
-  "AgentReview": { file: "src/screens/AgentReview.tsx", line: 97 },
+  "AgentReview": { file: "src/screens/AgentReview.tsx", line: 123 },
   "AgentReviewTakeover": { file: "src/notes/agent/components/AgentReviewTakeover.tsx", line: 91 },
   "AiChatTab": { file: "src/notes/components/AiChatTab.tsx", line: 148 },
   "AiHydrationProbe": { file: "src/notes/components/AiHydrationProbe.tsx", line: 103 },

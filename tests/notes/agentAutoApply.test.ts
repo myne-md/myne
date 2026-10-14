@@ -138,15 +138,22 @@ describe("automatic apply", () => {
     await startAgentRun("tidy this", { kind: "notes", value: ["n1"] }, COPY, "en", written);
 
     expect(agentApply).toHaveBeenCalledTimes(1);
-    const [runId, edits, newNotes, approval] = agentApply.mock.calls[0] as [
+    const [runId, edits, newNotes, settings, approval] = agentApply.mock.calls[0] as [
       string,
       ProposedEdit[],
       number[],
+      unknown[],
       string,
     ];
     expect(runId).toBe("r1");
     expect(edits).toEqual([ORDINARY]);
     expect(newNotes).toEqual([]);
+    // **The settings list is empty, and that is the rule rather than an
+    // omission** (myne-md/myne#850). Automatic apply exists to skip the review
+    // screen for note edits inside a grant the user already made; a setting sits
+    // inside no grant, so it always goes to the review screen. The host enforces
+    // the same thing in `apply_settings_approved`'s bulk carve-out.
+    expect(settings).toEqual([]);
     expect(approval).toBe("bulk");
     // The pane is told, or it keeps showing the pre-apply text and writes it
     // back on its next autosave.

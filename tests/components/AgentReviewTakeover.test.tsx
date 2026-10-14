@@ -174,6 +174,25 @@ describe("AgentReviewTakeover", () => {
     expect(screen.queryByTestId("editor.agent-review")).toBeNull();
   });
 
+  it("takes over for a run that only changed a setting (myne-md/myne#850)", () => {
+    // **The silent-drop gate.** Before settings, "the run proposed something"
+    // and "the run proposed a note edit" were the same fact, and a gate left on
+    // the old one does not error: the takeover simply never opens, so a change
+    // the model made is never shown and nothing anywhere says why.
+    beginRun(null);
+    settle(
+      { kind: "finished" },
+      {
+        edits: [],
+        newNotes: [],
+        settings: [{ intentId: "editor.weekly-notes-folder", value: "J/Weekly" }],
+        summary: "",
+      },
+    );
+    mount();
+    expect(screen.queryByTestId("editor.agent-review")).not.toBeNull();
+  });
+
   it("does NOT take over when the run stopped to ask for scope", () => {
     // The regression. An `awaitingScope` end is a question, not a proposal, and
     // the dialog that asks it lives underneath this overlay.

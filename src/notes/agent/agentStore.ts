@@ -19,8 +19,33 @@ import type {
   ProbeVerdict,
   Proposal,
   ProposedEdit,
+  ProposedSetting,
 } from "../../lib/agent-protocol";
 import { hasRefusals } from "../../lib/agent-protocol";
+
+/** The client's prefs-changed nonce bump (myne-md/myne#850).
+ *
+ *  **A binding rather than an import, because the nonce is per client.** This
+ *  module is aliased into the mobile tree (`mobile/vite.config.ts`, which states
+ *  the invariant this line used to break: "`agentStore.ts` imports only React and
+ *  the protocol module"), and the two clients have different nonce modules:
+ *  desktop's `usePrefs` subscribes to `src/notes/prefsNonce`, mobile's to
+ *  `mobile/src/lib/prefsNonce`. Importing desktop's module here bumped a module
+ *  nothing on the phone listens to, so a setting the agent changed would land in
+ *  `vault.prefs` while every mounted reader kept rendering the value it replaced.
+ *  The undo carries the same binding for the same reason, one file over
+ *  (`useUndoLastRun`'s `UndoBindings.bumpPrefsNonce`, whose comment records it).
+ *
+ *  Installed by each client's agent-run seam (`src/lib/agent-run.ts`,
+ *  `mobile/src/lib/agent-run.ts`). Deliberately NOT defaulted to a no-op: an
+ *  unwired client must say so at the first setting change rather than render a
+ *  stale preference forever, which is the failure this whole line prevents. */
+let clientPrefsNonceBump: (() => void) | null = null;
+
+/** Install THIS client's prefs-nonce bump, once, at the client's agent seam. */
+export function setAgentPrefsNonceBump(bump: () => void): void {
+  clientPrefsNonceBump = bump;
+}
 
 /** The whole of what a screen needs to render a run. */
 export interface AgentState {
@@ -69,12 +94,22 @@ export interface AgentState {
   rejected: ReadonlySet<number>;
   /** Indices into `proposal.newNotes` the user has rejected. Same convention. */
   rejectedNewNotes: ReadonlySet<number>;
+  /** Indices into `proposal.settings` the user has rejected
+   *  (myne-md/myne#850). Same convention as the two above, and it is the reason
+   *  a settings-only run can be reviewed at all: without it the dialog has no
+   *  per-row state to render. */
+  rejectedSettings: ReadonlySet<number>;
   /** Indices into `proposal.edits` already written by a previous apply. Kept so
    *  an applied row renders as applied rather than staying pressable: a second
    *  apply would fail its anchor and report `anchorNotFound` for an edit that in
    *  fact succeeded, which is the inverse of the confusion this screen exists to
    *  prevent. */
   appliedEdits: ReadonlySet<number>;
+  /** Indices into `proposal.settings` already written by a previous apply
+   *  (myne-md/myne#850). The settings half of `appliedEdits`, for the same
+   *  reason: an applied row must render as applied rather than staying
+   *  pressable, and the completeness rule below reads it. */
+  appliedSettings: ReadonlySet<number>;
   /** The result of the last apply, or null. */
   applied: AgentApplyResult | null;
   /** How many applies this session has settled. Monotonic, and it SURVIVES
@@ -188,7 +223,9 @@ const INITIAL: AgentState = {
   memoryUpdated: 0,
   rejected: new Set(),
   rejectedNewNotes: new Set(),
+  rejectedSettings: new Set(),
   appliedEdits: new Set(),
+  appliedSettings: new Set(),
   applied: null,
   applySeq: 0,
   autoApply: false,
@@ -299,7 +336,9 @@ export function beginRun(conversationId: string | null): void {
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+    rejectedSettings: new Set(),
     appliedEdits: new Set(),
+    appliedSettings: new Set(),
   });
 }
 
@@ -513,6 +552,26 @@ export function toggleNewNote(index: number): void {
   set({ rejectedNewNotes: next });
 }
 
+/** Toggle one proposed setting change's rejection (myne-md/myne#850). */
+export function toggleSetting(index: number): void {
+  const next = new Set(state.rejectedSettings);
+  if (next.has(index)) next.delete(index);
+  else next.add(index);
+  set({ rejectedSettings: next });
+}
+
+/** The setting changes the user has NOT rejected and that no apply has landed,
+ *  in proposal order. This is what the apply sends.
+ *
+ *  `appliedSettings` is filtered for the same reason `keptEdits` filters
+ *  `appliedEdits`: a row that landed must not be sent again, or the second apply
+ *  reports a write that in fact succeeded. */
+export function keptSettings(s: AgentState = state): ProposedSetting[] {
+  return (s.proposal.settings ?? []).filter(
+    (_, i) => !s.rejectedSettings.has(i) && !s.appliedSettings.has(i),
+  );
+}
+
 /** The indices of new notes the user has NOT rejected. This is what the apply
  *  sends; a note that is not in it is not created. */
 export function approvedNewNoteIndices(s: AgentState = state): number[] {
@@ -608,12 +667,23 @@ export function applyWasCleanAndComplete(s: AgentState = state): boolean {
   // Nothing to review means there is no review to close, so the rule does not
   // fire and the run is not dropped. Mirrors `AgentReviewTakeover`'s own
   // `reviewable`, which needs a proposal for the same reason (myne-md/myne#568).
-  if (s.proposal.edits.length === 0 && s.proposal.newNotes.length === 0) {
+  // **A settings-only run counts** (myne-md/myne#850): it is a proposal, and the
+  // takeover opens for it, so leaving it out here would make the dialog stick
+  // open on a run that has nothing left to do.
+  if (
+    s.proposal.edits.length === 0 &&
+    s.proposal.newNotes.length === 0 &&
+    (s.proposal.settings?.length ?? 0) === 0
+  ) {
     return false;
   }
   if (s.error !== null) return false;
   if (hasRefusals(applied)) return false;
   if (keptEdits(s).length > 0) return false;
+  // The settings half of the completeness rule, and it reads the same
+  // subtraction `keptEdits` does: a setting is resolved when the user rejected it
+  // or an apply landed it.
+  if (keptSettings(s).length > 0) return false;
   return approvedNewNoteIndices(s).length === 0 && applied.notesCreated.length === 0;
 }
 
@@ -638,6 +708,45 @@ export function landedEditIndices(
 ): number[] {
   const refused = new Set(outcome.refused.map((r) => sent[r.index]));
   return sent.filter((i) => !refused.has(i));
+}
+
+/**
+ * The setting rows that actually LANDED, as indices into the PROPOSAL.
+ *
+ * **The twin of `landedEditIndices`, added because the settings half shipped
+ * without it and reproduced the defect that function was extracted for**
+ * (myne-md/myne#850, found by review). The screen passed the indices it SENT, so
+ * a setting the host refused landed in `appliedSettings`, its row rendered
+ * disabled as "Already applied", and `keptSettings` filtered it out: the user
+ * could see a refusal they could never retry, on the screen whose whole premise
+ * is informed approval.
+ *
+ * **Three index spaces meet here and only one pairing is right.** `sent` is the
+ * approved list in the order it went to the host, and `refusedSettings[].index`
+ * numbers THAT list, so `sent[index]` is the refused row. `appliedSettings`
+ * holds indices into the PROPOSAL, because that is what the row components key
+ * on, so the return value is proposal indices too. Matching the refusal by
+ * `intentId` as well as by index is belt and braces: two rows naming the same
+ * intent in one proposal is degenerate, and if it happened BOTH would be treated
+ * as not landed (both stay retryable), which is the safe direction: the user
+ * sees a row they can retry rather than one they cannot.
+ */
+export function landedSettingIndices(
+  proposalSettings: readonly ProposedSetting[],
+  sent: readonly ProposedSetting[],
+  outcome: Pick<AgentApplyResult, "refusedSettings">,
+): number[] {
+  const refusedIntentIds = new Set(
+    (outcome.refusedSettings ?? [])
+      .map((r) => sent[r.index]?.intentId)
+      .filter((id): id is string => id !== undefined),
+  );
+  return sent
+    .map((setting) => proposalSettings.indexOf(setting))
+    .filter(
+      (index) =>
+        index >= 0 && !refusedIntentIds.has(proposalSettings[index].intentId),
+    );
 }
 
 /** An apply finished.
@@ -685,6 +794,7 @@ export function settleApply(
   result: AgentApplyResult,
   appliedIndices: number[],
   epoch: number,
+  appliedSettingIndices: number[] = [],
 ): boolean {
   // **The same guard `setUndoable` takes, and for the same data.**
   // `AgentApplyResult` carries `notesWritten`, `notesCreated` and
@@ -710,11 +820,52 @@ export function settleApply(
         notesWritten: [...state.applied.notesWritten, ...result.notesWritten],
         notesCreated: [...state.applied.notesCreated, ...result.notesCreated],
         restorePoints: [...state.applied.restorePoints, ...result.restorePoints],
+        // Settings accumulate like everything else here: a run can apply twice,
+        // and the report the user reads is the whole run's (myne-md/myne#850).
+        settingsChanged: [
+          ...(state.applied.settingsChanged ?? []),
+          ...(result.settingsChanged ?? []),
+        ],
+        refusedSettings: [
+          ...(state.applied.refusedSettings ?? []),
+          ...(result.refusedSettings ?? []),
+        ],
       }
     : result;
   const nextApplied = new Set(state.appliedEdits);
   for (const i of appliedIndices) nextApplied.add(i);
-  set({ applied: merged, appliedEdits: nextApplied, applySeq: state.applySeq + 1 });
+  const nextAppliedSettings = new Set(state.appliedSettings);
+  for (const i of appliedSettingIndices) nextAppliedSettings.add(i);
+  set({
+    applied: merged,
+    appliedEdits: nextApplied,
+    appliedSettings: nextAppliedSettings,
+    applySeq: state.applySeq + 1,
+  });
+  // **The prefs nonce, bumped here because a setting write happens HOST-side**
+  // (myne-md/myne#850). Every other `vault.prefs` writer goes through the TS
+  // `writePref`, which is the one path that bumps the nonce every mounted
+  // `usePrefs` subscribes to. The agent's settings write goes through the Rust
+  // setter, so nothing on this side would know a preference moved: Settings
+  // would keep rendering the old value and the open editor would keep the old
+  // format until some unrelated event re-read. Same rule as any out-of-band
+  // writer (`notes/flushBeforeFrontmatterWrite.ts` states it for note bodies),
+  // and here rather than at the call site because `settleApply` is the one
+  // writer every apply path passes through.
+  //
+  // **Through the client's own binding, not an import**: the nonce module is
+  // per client (see `setAgentPrefsNonceBump`). A client that never installed one
+  // fails here rather than silently keeping the stale value.
+  if ((result.settingsChanged?.length ?? 0) > 0) {
+    if (clientPrefsNonceBump === null) {
+      throw new Error(
+        "agentStore: no prefs-nonce bump is installed, so a setting change would " +
+          "leave every mounted prefs reader on the value it replaced. Call " +
+          "setAgentPrefsNonceBump from this client's agent-run seam.",
+      );
+    }
+    clientPrefsNonceBump();
+  }
   // Asked of the state this write just produced, not of `merged` alone: the
   // rule reads `rejected`, `appliedEdits` and `error` too. Every caller's
   // remaining work reads locals rather than the store, so the epoch bump
@@ -801,7 +952,9 @@ export function clearAgent(): void {
     unreadConversations: state.unreadConversations,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+    rejectedSettings: new Set(),
     appliedEdits: new Set(),
+    appliedSettings: new Set(),
   };
   for (const l of listeners) l();
 }
