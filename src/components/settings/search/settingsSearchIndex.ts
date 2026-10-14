@@ -526,7 +526,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.timezone",
-    agentWritability: WRITABILITY_NONE,
+    agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "editor",
     titleKey: "settings.dateTime.zoneLabel",
     descriptionKey: "settings.dateTime.zoneHelper",

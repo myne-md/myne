@@ -126,9 +126,22 @@ pub enum ValueKind {
     /// A folder path. Non-empty, no control characters, bounded in length. The
     /// folder itself is ensured by the caller, not by this module.
     FolderPath,
-    /// A short free string: a date format, or a template reference. Non-empty,
-    /// no control characters, and bounded far below the prefs budget.
+    /// A short free string: a template reference, or a note-title date pattern
+    /// (a strftime-like mini-language, so free text is the honest shape).
+    /// Non-empty, no control characters, and bounded far below the prefs budget.
     Pattern,
+    /// **A value from a CLOSED vocabulary** (myne-md/myne#850, from the
+    /// 2026-10-14 review). `editor.date-format` and `editor.time-format` write a
+    /// field the read side coerces against `DATE_FORMATS`/`TIME_FORMATS`
+    /// (`editor/src/host/lib/datetimeFormat.ts`), where an unknown value silently
+    /// becomes `system`. A free `Pattern` therefore accepted `"yyyy-MM-dd"`, the
+    /// write succeeded, the row was approved, and the setting had no effect at
+    /// all, which is the one outcome `validate` exists to prevent.
+    ///
+    /// The two lists below mirror that module, and
+    /// `tests/notes/agentSettingVocabulary.test.ts` parses them out of this file
+    /// and compares them to the editor's, so the mirror cannot drift silently.
+    OneOf { values: &'static [&'static str] },
     /// **A mode plus the folder it needs, which is ONE setting over two fields**
     /// (myne-md/myne#850 task 4, MYND-462). `folder_mode` names the one value
     /// that requires a folder; every other value must arrive WITHOUT one, which
@@ -152,6 +165,19 @@ pub struct SettingIntent {
     /// What values it accepts.
     pub kind: ValueKind,
 }
+
+/// The closed display-format vocabularies (myne-md/myne#850, from the
+/// 2026-10-14 review).
+///
+/// **Mirrors `DATE_FORMATS`/`TIME_FORMATS` in
+/// `editor/src/host/lib/datetimeFormat.ts`**, which owns the vocabulary and the
+/// coercion that turns an unknown value into `system`. The mirror is held by
+/// `tests/notes/agentSettingVocabulary.test.ts`, which parses these two lists out
+/// of this file and compares them to the editor module's, the way
+/// `settingRejectionMirror.test.ts` holds the rejection enum against its Rust
+/// original.
+pub const DATE_FORMAT_VALUES: &[&str] = &["system", "iso", "dmy", "mdy", "dmmmy"];
+pub const TIME_FORMAT_VALUES: &[&str] = &["system", "24h", "12h"];
 
 /// The intents (myne-md/myne#850).
 ///
@@ -247,12 +273,16 @@ pub const INTENTS: &[SettingIntent] = &[
     SettingIntent {
         id: "editor.date-format",
         target: PrefTarget::DateFormat,
-        kind: ValueKind::Pattern,
+        kind: ValueKind::OneOf {
+            values: DATE_FORMAT_VALUES,
+        },
     },
     SettingIntent {
         id: "editor.time-format",
         target: PrefTarget::TimeFormat,
-        kind: ValueKind::Pattern,
+        kind: ValueKind::OneOf {
+            values: TIME_FORMAT_VALUES,
+        },
     },
 ];
 
@@ -516,6 +546,16 @@ pub fn validate(
                 return Err(SettingValueError::UnexpectedFolder);
             }
             validate_pattern(value)
+        }
+        ValueKind::OneOf { values } => {
+            if folder.is_some() {
+                return Err(SettingValueError::UnexpectedFolder);
+            }
+            if values.contains(&value) {
+                Ok(())
+            } else {
+                Err(SettingValueError::NotAllowedValue)
+            }
         }
         ValueKind::ModeWithFolder { modes, folder_mode } => {
             if !modes.contains(&value) {
@@ -822,5 +862,36 @@ mod tests {
                 i.id
             );
         }
+    }
+
+    /// **The display formats are a CLOSED vocabulary, and the read side is the
+    /// reason** (myne-md/myne#850, from the 2026-10-14 review). `asDateFormat` /
+    /// `asTimeFormat` coerce an unknown value to `system`, so under a free
+    /// `Pattern` a model could send `"yyyy-MM-dd"`, have it validated and
+    /// approved, and change nothing at all.
+    #[test]
+    fn a_display_format_outside_the_vocabulary_is_refused() {
+        let date = intent("editor.date-format").expect("the date intent exists");
+        assert!(validate(date, "iso", None).is_ok());
+        assert_eq!(
+            validate(date, "yyyy-MM-dd", None),
+            Err(SettingValueError::NotAllowedValue)
+        );
+        let time = intent("editor.time-format").expect("the time intent exists");
+        assert!(validate(time, "24h", None).is_ok());
+        assert_eq!(
+            validate(time, "HH:mm", None),
+            Err(SettingValueError::NotAllowedValue)
+        );
+    }
+
+    /// **And the note-title date patterns stay FREE text**, which is why the two
+    /// kinds exist rather than one: `daily_date_format` defaults to
+    /// `"YYYY-MM-DD"`, a strftime-like pattern the display vocabulary would
+    /// refuse. Collapsing the two would break daily notes on the first write.
+    #[test]
+    fn a_note_title_date_pattern_is_not_the_display_vocabulary() {
+        let daily = intent("editor.daily-notes-date-format").expect("the intent exists");
+        assert!(validate(daily, "YYYY-MM-DD", None).is_ok());
     }
 }

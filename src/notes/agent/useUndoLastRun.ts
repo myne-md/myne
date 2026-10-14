@@ -86,7 +86,7 @@ export function undoResultText(
 ): string {
   const parts = [t("agent.undo.reverted", { count: report.reverted })];
   // **The settings are counted apart from the notes** (myne-md/myne#850), which is
-  // what decision 0665 promises and what the host has returned since the feature
+  // what decision 0676 promises and what the host has returned since the feature
   // landed. Without this clause a settings-only undo read as "0 notes restored"
   // with no mention of the change that was actually put back, which understates
   // the verb in exactly the way this function's own header warns against.

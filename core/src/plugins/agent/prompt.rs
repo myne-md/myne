@@ -476,6 +476,20 @@ pub fn render_settings_block(offered: &[&'static str]) -> String {
     for id in offered {
         out.push_str("- ");
         out.push_str(id);
+        // **A closed vocabulary is listed here, because the refusal points at
+        // it.** `value_error_message` tells the model to "use one of the values
+        // listed for it", and before this the listing existed nowhere: the model
+        // guessed, was refused, and retried the same guess until the iteration
+        // ceiling paid for it (myne-md/myne#850, from the 2026-10-14 review).
+        // The values are the table's own `&'static str`s, so a client string
+        // still has no route into the system message.
+        if let Some(setting) = super::setting::intent(id) {
+            if let super::setting::ValueKind::OneOf { values } = setting.kind {
+                out.push_str(" (one of: ");
+                out.push_str(&values.join(", "));
+                out.push(')');
+            }
+        }
         out.push('\n');
     }
     out
