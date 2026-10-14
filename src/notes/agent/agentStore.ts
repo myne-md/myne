@@ -22,7 +22,30 @@ import type {
   ProposedSetting,
 } from "../../lib/agent-protocol";
 import { hasRefusals } from "../../lib/agent-protocol";
-import { bumpPrefsNonce } from "../prefsNonce";
+
+/** The client's prefs-changed nonce bump (myne-md/myne#850).
+ *
+ *  **A binding rather than an import, because the nonce is per client.** This
+ *  module is aliased into the mobile tree (`mobile/vite.config.ts`, which states
+ *  the invariant this line used to break: "`agentStore.ts` imports only React and
+ *  the protocol module"), and the two clients have different nonce modules:
+ *  desktop's `usePrefs` subscribes to `src/notes/prefsNonce`, mobile's to
+ *  `mobile/src/lib/prefsNonce`. Importing desktop's module here bumped a module
+ *  nothing on the phone listens to, so a setting the agent changed would land in
+ *  `vault.prefs` while every mounted reader kept rendering the value it replaced.
+ *  The undo carries the same binding for the same reason, one file over
+ *  (`useUndoLastRun`'s `UndoBindings.bumpPrefsNonce`, whose comment records it).
+ *
+ *  Installed by each client's agent-run seam (`src/lib/agent-run.ts`,
+ *  `mobile/src/lib/agent-run.ts`). Deliberately NOT defaulted to a no-op: an
+ *  unwired client must say so at the first setting change rather than render a
+ *  stale preference forever, which is the failure this whole line prevents. */
+let clientPrefsNonceBump: (() => void) | null = null;
+
+/** Install THIS client's prefs-nonce bump, once, at the client's agent seam. */
+export function setAgentPrefsNonceBump(bump: () => void): void {
+  clientPrefsNonceBump = bump;
+}
 
 /** The whole of what a screen needs to render a run. */
 export interface AgentState {
@@ -704,9 +727,9 @@ export function landedEditIndices(
  * holds indices into the PROPOSAL, because that is what the row components key
  * on, so the return value is proposal indices too. Matching the refusal by
  * `intentId` as well as by index is belt and braces: two rows naming the same
- * intent in one proposal is degenerate, and if it happened both would be treated
- * as landed, which is the safe direction (the user sees a row they can retry
- * rather than one they cannot).
+ * intent in one proposal is degenerate, and if it happened BOTH would be treated
+ * as not landed (both stay retryable), which is the safe direction: the user
+ * sees a row they can retry rather than one they cannot.
  */
 export function landedSettingIndices(
   proposalSettings: readonly ProposedSetting[],
@@ -829,7 +852,20 @@ export function settleApply(
   // writer (`notes/flushBeforeFrontmatterWrite.ts` states it for note bodies),
   // and here rather than at the call site because `settleApply` is the one
   // writer every apply path passes through.
-  if ((result.settingsChanged?.length ?? 0) > 0) bumpPrefsNonce();
+  //
+  // **Through the client's own binding, not an import**: the nonce module is
+  // per client (see `setAgentPrefsNonceBump`). A client that never installed one
+  // fails here rather than silently keeping the stale value.
+  if ((result.settingsChanged?.length ?? 0) > 0) {
+    if (clientPrefsNonceBump === null) {
+      throw new Error(
+        "agentStore: no prefs-nonce bump is installed, so a setting change would " +
+          "leave every mounted prefs reader on the value it replaced. Call " +
+          "setAgentPrefsNonceBump from this client's agent-run seam.",
+      );
+    }
+    clientPrefsNonceBump();
+  }
   // Asked of the state this write just produced, not of `merged` alone: the
   // rule reads `rejected`, `appliedEdits` and `error` too. Every caller's
   // remaining work reads locals rather than the store, so the epoch bump

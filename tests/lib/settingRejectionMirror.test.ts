@@ -34,7 +34,7 @@ function rustVariants(): string[] {
   const body = /pub enum SettingRejection \{([\s\S]*?)\n\}/.exec(src);
   if (body === null) {
     throw new Error(
-      "SettingRejection not found in core/src/plugins/agent/apply.rs — if it moved, " +
+      "SettingRejection not found in core/src/plugins/agent/apply.rs. If it moved, " +
         "this test has to follow it rather than be deleted",
     );
   }

@@ -174,10 +174,13 @@ describe("AiReviewFlow", () => {
     fireEvent.click(screen.getByTestId("ai.review-apply"));
     return waitFor(() => {
       expect(agentApply).toHaveBeenCalledTimes(1);
-      const [runId, sent, newNotes, approval] = agentApply.mock.calls[0];
+      const [runId, sent, newNotes, settings, approval] = agentApply.mock.calls[0];
       expect(runId).toBe("run-1");
       // The removal is absent from the payload...
       expect(sent).toEqual([PLAIN, OTHER_NOTE]);
+      // Mobile offers no settings, so the approved-settings slot is empty and
+      // the host is told that explicitly rather than being handed an index.
+      expect(settings).toEqual([]);
       // ...and the host is TOLD this was a bulk approval, which is what makes
       // the rule real: it re-derives the removal from the note as it will
       // actually be and refuses one under `"bulk"` regardless of what was sent.

@@ -975,4 +975,47 @@ mod tests {
         assert_eq!(rec.restore_points.len(), 1, "the note point survives");
         assert_eq!(rec.settings.len(), 1);
     }
+
+    /// **The preference values are overwritten, and this is the only thing that
+    /// says so.** Both discard sites (`clear`, and the replace arm of
+    /// `record_applied`) call this, and a version whose body was emptied leaves
+    /// every other test in this file green: no assertion elsewhere reads a
+    /// value after a discard. The class is AS3 vault structure the model wrote
+    /// (myne-md/myne#850, from the 2026-10-13 review).
+    #[test]
+    fn the_record_overwrites_the_preference_values_it_holds() {
+        let mut rec = AppliedRun {
+            run_id: "r".to_string(),
+            restore_points: Vec::new(),
+            notes_created: 0,
+            settings: vec![
+                AppliedSetting {
+                    intent_id: "editor.weekly-notes-folder".to_string(),
+                    previous: Some("Old/".to_string()),
+                    previous_folder: None,
+                },
+                AppliedSetting {
+                    intent_id: "files.new-note-location".to_string(),
+                    previous: Some("specific".to_string()),
+                    previous_folder: Some("Old/".to_string()),
+                },
+                AppliedSetting {
+                    intent_id: "editor.daily-notes-date-format".to_string(),
+                    previous: None,
+                    previous_folder: None,
+                },
+            ],
+        };
+        rec.zeroize_preference_values();
+        assert_eq!(rec.settings[0].previous.as_deref(), Some(""));
+        assert_eq!(rec.settings[1].previous.as_deref(), Some(""));
+        assert_eq!(rec.settings[1].previous_folder.as_deref(), Some(""));
+        // A setting that was UNSET stays `None` rather than becoming an empty
+        // string, which is the distinction `AppliedSetting::previous` rests on:
+        // "put X back" against "clear it again".
+        assert!(rec.settings[2].previous.is_none());
+        // The identifiers are deliberately NOT overwritten, because the undo
+        // re-resolves the pref to write from them.
+        assert_eq!(rec.settings[0].intent_id, "editor.weekly-notes-folder");
+    }
 }

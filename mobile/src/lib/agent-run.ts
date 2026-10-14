@@ -23,8 +23,18 @@
 import { Channel, invoke } from "../platform/core";
 
 import { makeAgentRun } from "@myne/agent-run-core";
+import { setAgentPrefsNonceBump } from "@myne/agent-store";
+import { bumpPrefsNonce } from "./prefsNonce";
 
 export * from "@myne/agent-protocol";
+
+// The agent's setting writes happen HOST-side, so the prefs nonce has to be
+// bumped when an apply reports one (myne-md/myne#850). The store takes that bump
+// as a binding rather than importing a module, because this client's nonce
+// module is NOT desktop's; this is mobile's installation, and it is the reason
+// the shared store no longer imports `src/notes/prefsNonce` (which would have
+// bumped a module nothing on the phone listens to).
+setAgentPrefsNonceBump(bumpPrefsNonce);
 
 const bound = makeAgentRun({ invoke, Channel });
 

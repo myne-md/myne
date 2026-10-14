@@ -149,6 +149,10 @@ describe("AiChatFlow", () => {
       // non-empty case.
       "en",
       [],
+      // The offered settings, which myne-md/myne#850 made a REQUIRED argument
+      // for the same reason: an empty list is this client's honest answer, and
+      // the assertion is what makes a future argument a decision.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -164,10 +168,13 @@ describe("AiChatFlow", () => {
       (
         _task: string,
         _grant: unknown,
-        // The language and the chat-history seed sit between the grant and the
-        // callbacks since myne-md/myne#618 and #617 made them required.
+        // The language, the chat-history seed and the offered settings sit
+        // between the grant and the callbacks since myne-md/myne#618, #617 and
+        // #850 made them required. A mock that binds by position has to carry
+        // every slot or the callbacks land one argument early.
         _language: unknown,
         _history: unknown,
+        _settings: unknown,
         _onOpen: unknown,
         onProgress: (p: RunProgress) => void,
       ) => {
@@ -219,6 +226,7 @@ describe("AiChatFlow", () => {
         _grant: unknown,
         _language: unknown,
         _history: unknown,
+        _settings: unknown,
         onOpen: (v: AgentRunView) => void,
         onProgress: (p: RunProgress) => void,
       ) => {

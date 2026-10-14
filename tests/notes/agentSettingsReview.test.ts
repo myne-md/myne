@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { Proposal, ProposedSetting } from "../../src/lib/agent-run";
 import { applyOutcome } from "./_agentApplyOutcome";
-import { getPrefsNonce } from "../../src/notes/prefsNonce";
+import { bumpPrefsNonce, getPrefsNonce } from "../../src/notes/prefsNonce";
 import { settingChangeLine } from "../../src/notes/agent/settingCatalogue";
 import { currentSettingValue } from "../../src/notes/agent/settingCatalogue";
 import { DEFAULT_PREFS } from "../../src/hooks/usePrefs";
@@ -25,10 +25,19 @@ import {
   currentRunEpoch,
   getAgent,
   keptSettings,
+  setAgentPrefsNonceBump,
   settleApply,
   settleStep,
   toggleSetting,
 } from "../../src/notes/agent/agentStore";
+
+// The store takes the prefs-nonce bump as a per-client BINDING (myne-md/myne#850):
+// the nonce module differs between the desktop and mobile trees, so the store
+// imports neither. Production installs it at each client's agent-run seam; this
+// file drives the desktop one and installs it once for every settings case here.
+// The UNWIRED case has its own file (`agentPrefsNonceWiring.test.ts`), because
+// the binding is module state and can only be observed where nothing installed.
+setAgentPrefsNonceBump(bumpPrefsNonce);
 
 const VIEW = {
   runId: "run-1",

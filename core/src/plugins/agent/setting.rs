@@ -313,9 +313,15 @@ pub fn refusal_for_field(field: &str) -> Option<SettingRefusal> {
         })) => Some(SettingRefusal::EgressControl),
         Some(PrefClass::DeviceLocal) => Some(SettingRefusal::DeviceLocal),
         // Shared in any other discipline, merge metadata, and a field the table
-        // does not carry all fall through. An unknown field is refused by
-        // [`writable`] rather than here: absence from the table is not a
-        // classification, which is why `classify` returns an Option.
+        // does not carry all fall through, and this arm is PERMISSIVE: `None`
+        // means "no refusal derived here", which `writable` reads as writable.
+        // That is safe today because the classification is exhaustive over
+        // `PrefsView` (its own destructure makes a new field a compile error), so
+        // every field an intent can name has a row. The residue, and it is worth
+        // closing rather than glossing: an intent naming a field the table does
+        // not carry would be WRITABLE rather than refused, because `classify`
+        // answers `None` for an unknown name and absence is not a
+        // classification.
         _ => None,
     }
 }
