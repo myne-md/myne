@@ -1539,6 +1539,29 @@ pub async fn undo_from_host<R: Runtime>(
         } else {
             None
         };
+        // **The folder survives the same removal check the APPLY runs**
+        // (myne-md/myne#850, from the 2026-10-14 review). The apply refuses a
+        // folder the user deleted and stamped a removal for; the undo called
+        // `write_target` directly, whose setters take the USER-ACT registration
+        // route that deliberately wins over a removal, so undoing a setting
+        // resurrected a deleted folder and stamped a newer add clock over the
+        // deletion, on every device, with nobody having asked for it. The ensure
+        // seam is the repair route and answers `false` when the removal stands.
+        if let Some(folder) = restore_folder.as_deref() {
+            let kept = crate::plugins::prefs::commands::ensure_deliberate_folder_from_host(
+                &host,
+                vault,
+                hooks,
+                folder.to_string(),
+                &StdVaultIo,
+            )
+            .await;
+            if !matches!(kept, Ok(true)) {
+                settings_failed.push(setting.intent_id.clone());
+                failed_settings.push(setting.clone());
+                continue;
+            }
+        }
         match write_target(
             &host,
             vault,

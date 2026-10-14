@@ -69,6 +69,7 @@ import { VimModeSettings } from "@app/components/settings/VimModeSettings";
 import { BrowserIcon } from "@app/components/settings/browser-icons";
 import { SettingsSearch } from "@app/components/settings/search/SettingsSearch";
 import { SettingsSearchResults } from "@app/components/settings/search/SettingsSearchResults";
+import { WRITABILITY_NONE } from "@app/components/settings/search/settingsSearchIndex";
 import { action } from "../actions";
 import { Switch } from "@app/components/primitives/Switch";
 
@@ -984,6 +985,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           results={[
             {
               id: "settings.appearance.theme",
+              agentWritability: WRITABILITY_NONE,
               panelId: "appearance",
               titleKey: "settings.appearance.themeTitle",
               descriptionKey: "settings.appearance.themeHelper",

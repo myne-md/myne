@@ -4157,8 +4157,19 @@ pub async fn clear_daily_folder_from_host(
 ) -> Result<(), PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    clear_daily_folder_with_dir(&dir, state, hooks, io, host).await
+}
+
+/// Testable core of [`clear_daily_folder_from_host`].
+pub(crate) async fn clear_daily_folder_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
     update_prefs_with_dir(
-        &dir,
+        vault_dir,
         state,
         hooks,
         |prefs| {
@@ -4182,8 +4193,19 @@ pub async fn clear_daily_date_format_from_host(
 ) -> Result<(), PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    clear_daily_date_format_with_dir(&dir, state, hooks, io, host).await
+}
+
+/// Testable core of [`clear_daily_date_format_from_host`].
+pub(crate) async fn clear_daily_date_format_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
     update_prefs_with_dir(
-        &dir,
+        vault_dir,
         state,
         hooks,
         |prefs| {
@@ -6215,6 +6237,80 @@ mod tests {
                     .map(String::as_str),
                 Some("Weekly/")
             );
+        });
+    }
+
+    /// **The clear the UNDO reaches for two of the twelve intents**
+    /// (myne-md/myne#850, from the 2026-10-14 review). `set_daily_folder` takes a
+    /// required value, so the undo of "the run set this for the first time" has
+    /// no setter to reach; these two exist for exactly that state, and neither
+    /// had a test, so emptying either body left every gate green.
+    #[test]
+    fn clear_daily_folder_empties_the_pointer_and_keeps_the_folder_on_record() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_daily_folder_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "Daily/".into(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set");
+            clear_daily_folder_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.daily_folder.is_none());
+            // The NAME stays on record: that record is what keeps the folder
+            // alive as a virtual folder, and clearing the pointer is the state
+            // the user had before the run.
+            assert!(prefs.deliberate_folders.iter().any(|f| f == "Daily/"));
+        });
+    }
+
+    /// The `daily_date_format` twin, and the same deletion-test reasoning.
+    #[test]
+    fn clear_daily_date_format_empties_the_pointer() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_daily_date_format_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "YYYY-MM-DD".into(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set");
+            clear_daily_date_format_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.daily_date_format.is_none());
         });
     }
 
