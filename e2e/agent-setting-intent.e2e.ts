@@ -1,20 +1,20 @@
 // A setting change, end to end (myne-md/myne#850). Drives one run that proposes
-// TWO settings through the `agentReview.setting*` testids on the real
+// THREE settings through the `agentReview.setting*` testids on the real
 // tauri-driver harness, against the **`local-inference-stub` build variant**, so
 // it runs only when the AI-feature binary is under test, gated on
 // `MYNE_E2E_AI=1` exactly like its `agent-run.e2e.ts` siblings.
 //
-//   ag8: the agent proposes two setting changes; the review screen renders each
+//   ag8: the agent proposes three setting changes; the review screen renders each
 //         as its own kind of row with the value in place and the value asked
-//         for on one line; approving ONE on its own writes that setting and
-//         leaves the other untouched; the run summary counts the setting
+//         for on one line; approving TWO on their own writes those settings and
+//         leaves the third untouched; the run summary counts the settings
 //         alongside created and edited.
 //
-// **Two rows rather than one, and that is the scenario's design.** A run whose
+// **Three rows rather than one, and that is the scenario's design.** A run whose
 // only row is applied resolves completely, and a clean, complete apply closes
-// the review screen and takes the run summary with it. With two, the first is
-// approved on its own, the screen stays open on the second, and the summary is
-// on screen while it says "1 setting changed".
+// the review screen and takes the run summary with it. With three, two are
+// approved on their own, the screen stays open on the third, and the summary is
+// on screen while it says "2 settings changed".
 //
 // **The value is read back through production IPC, not through the UI that
 // claims to have written it.** The page-seat `prefs_read` is the vault's own
@@ -29,7 +29,7 @@
 // so the pair is what pins "its own act".
 //
 // The stub's script is fixed (`StubEngine::agent_script`), and its setting
-// branch emits the two real intent ids, so what this drives is the whole chain
+// branch emits the three real intent ids, so what this drives is the whole chain
 // rather than a stub-only path: the settings index's verdict, the catalogue the
 // client builds from it, the system block the host renders, the parser, and the
 // proposal. **What it does and does not do about skipping, stated because this

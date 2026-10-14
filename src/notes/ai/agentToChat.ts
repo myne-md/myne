@@ -239,6 +239,10 @@ export function settleRunIntoChat(result: AgentStepResult, epoch: number): void 
     // after `agentStore` drops the live copy on lock. Read-only there: the
     // review screen stays the only surface that can apply anything.
     proposal: { edits: agent.proposal.edits, newNotes: agent.proposal.newNotes },
+    // The setting half of "did this run produce anything" (myne-md/myne#850,
+    // from the 2026-10-14 review): without it a settings-only run reads as an
+    // empty one on the strip and the hub.
+    settings: agent.proposal.settings?.length ?? 0,
   };
   // **The run outlives the view, so its result goes to its own conversation**
   // (myne-md/myne#848). The live transcript is one slot; if the user navigated

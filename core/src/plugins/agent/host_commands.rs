@@ -1524,18 +1524,24 @@ pub async fn undo_from_host<R: Runtime>(
             failed_settings.push(setting.clone());
             continue;
         };
-        // **The folder to put back is the one the run REPLACED, and only where
-        // the restored VALUE takes one.** `folder_named` is the same function the
-        // apply uses, so the two cannot disagree about which value needs a
-        // folder, and it is what keeps a restored `root` from being handed a
-        // folder it does not use.
+        // **The folder the restored value NAMES, which is not the same thing as
+        // the folder `write_target` is handed.** `folder_named` answers for every
+        // kind that names one: the three `FolderPath` intents name it as the
+        // VALUE, and `files.new-note-location` names it only in its `specific`
+        // sub-step. `write_target`'s `folder` argument is that sub-step field, so
+        // it stays `NewNoteLocation`-only; the removal check below runs on
+        // `folder_named` unconditionally, which is exactly what the apply does
+        // (myne-md/myne#850, from the 2026-10-14 review: gating the CHECK on
+        // `NewNoteLocation` too left three of the four folder-naming intents
+        // still able to resurrect a deleted folder).
+        let ensure_folder = crate::plugins::agent::setting::folder_named(
+            intent,
+            setting.previous.as_deref(),
+            setting.previous_folder.as_deref(),
+        )
+        .map(str::to_string);
         let restore_folder = if matches!(intent.target, PrefTarget::NewNoteLocation) {
-            crate::plugins::agent::setting::folder_named(
-                intent,
-                setting.previous.as_deref(),
-                setting.previous_folder.as_deref(),
-            )
-            .map(str::to_string)
+            ensure_folder.clone()
         } else {
             None
         };
@@ -1547,7 +1553,7 @@ pub async fn undo_from_host<R: Runtime>(
         // resurrected a deleted folder and stamped a newer add clock over the
         // deletion, on every device, with nobody having asked for it. The ensure
         // seam is the repair route and answers `false` when the removal stands.
-        if let Some(folder) = restore_folder.as_deref() {
+        if let Some(folder) = ensure_folder.as_deref() {
             let kept = crate::plugins::prefs::commands::ensure_deliberate_folder_from_host(
                 &host,
                 vault,

@@ -132,8 +132,15 @@ describe("landedSettingIndices", () => {
   });
 
   it("treats a refusal index past the end of the sent list as refusing nothing", () => {
-    // Defensive, and the direction is deliberate: an index the client cannot
-    // resolve leaves the row retryable rather than marking it applied.
+    // **The index cannot be resolved, so nothing is refused, and the row stays
+    // landed.** The comment here said the opposite ("leaves the row retryable")
+    // while the assertion was `[0]`, which is the applied direction; the
+    // corrected sentence matches the code. The branch is defensive only: a
+    // refusal's index is a position in the SENT list, so an out-of-range one
+    // cannot come from a host that answered about this batch. Worth knowing that
+    // the direction chosen is the UNSAFE one for a caller that got here by
+    // accident (the row reads "Already applied" and cannot be retried), which is
+    // why it is written down rather than left to be discovered.
     const proposal = [setting("a")];
     const landed = landedSettingIndices(proposal, proposal, {
       refusedSettings: [settingRefusal(7, "a")],

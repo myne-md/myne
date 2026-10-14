@@ -900,11 +900,6 @@ function SettingsGroup({
         const subLabel = entry?.descriptionKey
           ? t(entry.descriptionKey)
           : null;
-        // **The delta comes from the RECORD once the row has landed.** Reading it
-        // from live prefs re-runs `settingChangeLine` against the value the write
-        // just stored, so an applied row rendered "Archived/Weekly becomes
-        // Archived/Weekly" (or "not set", for a landed clear) beside a button
-        // reading "Applied": the row's whole job is the delta, and it showed none.
         const current = currentSettingValue(setting.intentId, prefs);
         const isRejected = rejected.has(index);
         const isApplied = applied.has(index);
@@ -1129,11 +1124,11 @@ function NewNotesGroup({
  *  precedes the model's claim, and it carries a count because the reader's
  *  question is "did all of it land" rather than "which line failed".
  *
- *  Both kinds are counted together: a refused edit and a refused new note index
- *  two different spaces, which is why they are two arrays on the wire, but to the
- *  person reading they are one experience. The count is what the host's own
- *  `hasRefusals` predicate decides on, so the two cannot disagree about whether
- *  this block exists. */
+ *  All three kinds are counted together: a refused edit, a refused new note and
+ *  a refused setting change index three different spaces, which is why they are
+ *  three arrays on the wire, but to the person reading they are one experience.
+ *  The count is what the host's own `hasRefusals` predicate decides on, so the
+ *  two cannot disagree about whether this block exists. */
 function RefusalBlock({ result }: { result: AgentApplyResult }) {
   const { t } = useTranslation();
   // **All three kinds, and the settings were missing from both halves** (from
@@ -1201,9 +1196,15 @@ function ApplyReport({ result }: { result: AgentApplyResult }) {
         gap: "var(--space-2)",
       }}
     >
-      <p style={{ margin: 0 }} data-testid="agentReview.appliedCount">
-        {t("agent.review.appliedCount", { count: result.applied })}
-      </p>
+      {/* **Rendered only when something was applied** (myne-md/myne#850, from the
+          2026-10-14 review): a settings-only apply printed "0 changes applied."
+          directly above "1 setting changed.", so the report's first line denied
+          the change its second line announced. */}
+      {result.applied > 0 ? (
+        <p style={{ margin: 0 }} data-testid="agentReview.appliedCount">
+          {t("agent.review.appliedCount", { count: result.applied })}
+        </p>
+      ) : null}
       {(result.settingsChanged?.length ?? 0) > 0 ? (
         <p style={{ margin: 0 }} data-testid="agentReview.settingsChangedCount">
           {t("agent.review.settingsChanged", {

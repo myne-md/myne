@@ -484,10 +484,25 @@ pub fn render_settings_block(offered: &[&'static str]) -> String {
         // The values are the table's own `&'static str`s, so a client string
         // still has no route into the system message.
         if let Some(setting) = super::setting::intent(id) {
-            if let super::setting::ValueKind::OneOf { values } = setting.kind {
-                out.push_str(" (one of: ");
-                out.push_str(&values.join(", "));
-                out.push(')');
+            match setting.kind {
+                super::setting::ValueKind::OneOf { values } => {
+                    out.push_str(" (one of: ");
+                    out.push_str(&values.join(", "));
+                    out.push(')');
+                }
+                // **The mode family lists too, and it is the one the model
+                // cannot guess**: `root`/`current`/`specific` are three product
+                // words, and one of them additionally needs a `folder` the model
+                // must know to send (myne-md/myne#850, from the 2026-10-14
+                // review).
+                super::setting::ValueKind::ModeWithFolder { modes, folder_mode } => {
+                    out.push_str(" (one of: ");
+                    out.push_str(&modes.join(", "));
+                    out.push_str("; ");
+                    out.push_str(folder_mode);
+                    out.push_str(" also needs a folder)");
+                }
+                super::setting::ValueKind::FolderPath | super::setting::ValueKind::Pattern => {}
             }
         }
         out.push('\n');

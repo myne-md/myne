@@ -184,8 +184,8 @@ refused *per-device* setting
 nowhere else). The other two are `writable`, and a refusal with no policy at all (`None`): a setting the
 agent has no intent for, which is refused because it simply was never classified, and which is the
 verdict on the large majority of the index. This entry said three until the 2026-10-13 review counted
-them, and undercounted the fourth case its own next sentence describes. The last one is why the display family has two members rather than five
-(`decisions/ai/0676`).
+them, and undercounted the fourth case its own next sentence describes. The `DeviceLocal` refusal is
+why the display family has two members rather than five (`decisions/ai/0676`).
 
 Used in: `settingsSearchIndex.ts`; `decisions/ai/0676`; myne-md/myne#850
 
