@@ -3,7 +3,16 @@
 # as an `InlinedPlugin`. Capability files reference these as `agent:default`.
 #
 # Every command here reaches decrypted note plaintext and two of them WRITE to
-# notes (`agent_apply` and `agent_undo`). The `default` bundle was reserved
+# notes (`agent_apply` and `agent_undo`). **Those two also write `vault.prefs`**
+# (myne-md/myne#850): an approved setting change goes through the prefs plugin's
+# setters IN-PROCESS, from the agent plugin's own command, so no per-window
+# `prefs:allow-set-*` grant is consulted on it. The authority is re-derived at
+# the write from `setting::INTENTS`, which refuses the egress-control sets and
+# every `DeviceLocal` field whatever the client claims; on the detached-window
+# arm the bound is the client's own window-role check rather than this ACL, and
+# moving that check host-side is owed. `decisions/clients/0677` records that
+# qualification, and `docs/threat-model.md` §7 states it in the same terms. The
+# `default` bundle was reserved
 # main-window-only anticipating multi-window; myne#677 (epic #173, sync-ledger
 # SYNC-12) resolves that reservation: a detached (pop-out) note window is granted
 # `agent:default` via capabilities/detached-note.json (windows: ["note-*"]), the
@@ -56,12 +65,12 @@ commands.allow = ["agent_cancel"]
 
 [[permission]]
 identifier = "allow-agent-apply"
-description = "Allow invoking agent:agent_apply (Slot::Unlocked-gated; the ONLY command in this plugin that writes. Refuses anything outside the run's scope, re-reads each note as it is now, re-checks every anchor, takes the run's restore point, and only then writes transactionally. A failed restore point blocks the write)."
+description = "Allow invoking agent:agent_apply (Slot::Unlocked-gated; the ONLY command in this plugin that writes NOTES, and it also writes `vault.prefs` for an approved setting change, in-process, so no `prefs:allow-set-*` grant is consulted and the derivation refuses the egress controls and every DeviceLocal field. Refuses anything outside the run's scope, re-reads each note as it is now, re-checks every anchor, takes the run's restore point, and only then writes transactionally. A failed restore point blocks the write)."
 commands.allow = ["agent_apply"]
 
 [[permission]]
 identifier = "allow-agent-undo"
-description = "Allow invoking agent:agent_undo (Slot::Unlocked-gated; restores every note an agent run wrote from its own pre-apply snapshot, as one action. Notes the run CREATED are not reverted, and the result says how many were left, because a create has no snapshot to restore to)."
+description = "Allow invoking agent:agent_undo (Slot::Unlocked-gated; restores every note an agent run wrote from its own pre-apply snapshot, as one action, and puts back the preference values the run replaced. It runs the same folder-removal check the apply does, so a folder the user deleted is not resurrected. Notes the run CREATED are not reverted, and the result says how many were left, because a create has no snapshot to restore to)."
 commands.allow = ["agent_undo"]
 
 [[permission]]

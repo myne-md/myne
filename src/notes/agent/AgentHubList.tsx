@@ -844,9 +844,15 @@ export function AgentHubList({
             // Only the run the store still HOLDS can say what it produced; an
             // older unread conversation keeps the dot alone, because the count
             // would be a claim about a run this store no longer has.
+            //
+            // **A setting change counts** (myne-md/myne#850, from the 2026-10-14
+            // review): a settings-only run used to compute 0 here, so the card
+            // said nothing had happened.
             const changes =
               row.id === agent.runConversationId && agent.end !== null
-                ? agent.proposal.edits.length + agent.proposal.newNotes.length
+                ? agent.proposal.edits.length +
+                  agent.proposal.newNotes.length +
+                  (agent.proposal.settings?.length ?? 0)
                 : 0;
             return (
             <div
