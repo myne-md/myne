@@ -913,19 +913,18 @@ function SettingsGroup({
         // just stored, so an applied row rendered "Archived/Weekly becomes
         // Archived/Weekly" (or "not set", for a landed clear) beside a button
         // reading "Applied": the row's whole job is the delta, and it showed none.
+        //
+        // **And the folder half, which was invisible for the one setting that has
+        // two fields** (2026-10-13 review): the row diffed only the mode, so a
+        // change that moved the folder while the mode stayed `specific` rendered
+        // "specific becomes specific". `previousFolder` exists for this pair and
+        // went unread. One lookup serves both halves, because both read the same
+        // record.
         const recorded = appliedSettings.find(
           (a) => a.intentId === setting.intentId,
-        )?.previous;
-        const from = isApplied ? (recorded ?? null) : current;
-        // **The folder half of the delta, which was invisible for the one setting
-        // that has two fields** (2026-10-13 review): the row diffed only the mode,
-        // so a change that moved the folder while the mode stayed `specific`
-        // rendered "specific becomes specific". `previousFolder` exists for this
-        // pair and went unread.
-        const recordedSetting = appliedSettings.find(
-          (a) => a.intentId === setting.intentId,
         );
-        const recordedFolder = isApplied ? recordedSetting?.previousFolder : undefined;
+        const from = isApplied ? (recorded?.previous ?? null) : current;
+        const recordedFolder = isApplied ? recorded?.previousFolder : undefined;
         return (
           <article
             key={index}

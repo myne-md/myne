@@ -75,10 +75,10 @@ export function settingChangeLine(
  * and the obligation is held by a test rather than by this comment**
  * (`agentSettingsReview.test.ts` drives each id against a prefs view). This line
  * claimed the tracer bullet's two intents until the 2026-10-13 review counted the
- * switch, which resolves eleven, and it is the warning a later author is meant to
- * trust:
- * are resolved here; another intent reaching the review screen without a case
- * would render as "not set" whatever it holds, which reads like a fact.
+ * switch, which resolves twelve, and it is the warning a later author is meant to
+ * trust: every intent in the roster is resolved here, so another intent reaching
+ * the review screen without a case would render as "not set" whatever it holds,
+ * which reads like a fact.
  * `editor.daily-notes-folder` is deliberately absent: daily notes keep flat
  * top-level fields rather than a `periodic_notes` entry (`core/src/plugins/prefs/commands.rs`),
  * so its reader is written with the family that owns it rather than guessed here.

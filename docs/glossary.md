@@ -3085,7 +3085,8 @@ A setting change rides the review dialog as its own kind of item, with the value
 the one asked for, and it is **carved out of Apply automatically**: a preference sits inside no note
 grant, so the bound that makes the automatic path safe has nothing to attach to. Clearing is a
 DISTINCT verb rather than an absent value: a clear removes the pref entry, and an empty string is
-something a folder could legitimately be compared against.
+something a folder could legitimately be compared against. The two names are one concept: an intent is
+the permission to make a change, and the change itself is what the row shows.
 
 Distinct from an [agent-writability verdict](#agent-writability-verdict), which is the index entry's
 own declaration: an intent is the permission, a preference is the storage.

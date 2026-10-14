@@ -1349,6 +1349,15 @@ async fn drive_inner(
                     // too, so it is offered under exactly the same conditions: a
                     // setting the table refuses is refused here, and one this
                     // client did not offer is refused here.
+                    //
+                    // **Plus a third that `set_setting` does not need: the
+                    // setting must HAVE an empty state.** Two targets take a
+                    // required value (`PrefTarget::clearable`), so a clear of one
+                    // of them has no setter to reach; without this arm the model's
+                    // clear would reach the proposal, be read and approved by the
+                    // user, and only then be refused at the write, which is the
+                    // "offered and then refused after approval" shape the whole
+                    // derivation exists to prevent (myne-md/myne#850).
                     match super::setting::writable(&intent_id) {
                         Err(refusal) => {
                             productive = true;
@@ -1364,6 +1373,17 @@ async fn drive_inner(
                                 "clear_setting refused: that setting is not one \
                                  you were offered in this session. Use one of the \
                                  settings you were given, or finish."
+                                    .into(),
+                                None,
+                            ));
+                            continue;
+                        }
+                        Ok(intent) if !intent.target.clearable() => {
+                            productive = true;
+                            transcript.push(tool_result(
+                                "clear_setting refused: that setting always has a \
+                                 value, so it can be changed but not removed. Use \
+                                 set_setting with a new value, or finish."
                                     .into(),
                                 None,
                             ));
@@ -3015,6 +3035,41 @@ mod tests {
         ))
         .unwrap();
         assert!(out.proposal.settings.is_empty());
+    }
+
+    /// **The clearable gate, which is the clear verb's third.** Two targets take
+    /// a required value, so a clear of one has no setter to reach. Without this
+    /// gate the clear reached the proposal and was refused only at the write,
+    /// after the user had read and approved the row (myne-md/myne#850).
+    ///
+    /// The catalogue is OFFERED here on purpose: with an empty one the offered
+    /// gate would refuse first and the assertion would pass for a reason that has
+    /// nothing to do with clearability.
+    #[test]
+    fn a_clear_of_a_setting_with_no_empty_state_is_refused_before_the_proposal() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let engine = ScriptEngine::new(&[
+            r#"{"action":"clear_setting","intent_id":"editor.daily-notes-folder"}"#,
+            r#"{"action":"finish","summary":"done"}"#,
+        ]);
+        let recs = records();
+        let offered = vec!["editor.daily-notes-folder".to_string()];
+        let mut t = Vec::new();
+        let out = block_on(drive(
+            &runs,
+            "r",
+            "remove my daily notes folder",
+            &mut t,
+            &deps_with(&engine, &recs, &offered),
+            &mut BTreeSet::new(),
+        ))
+        .unwrap();
+        assert!(out.proposal.settings.is_empty());
+        assert!(t.iter().any(|m| m
+            .content
+            .iter()
+            .any(|c| c.text().contains("can be changed but not removed"))));
     }
 
     /// **The offered gate, on the clear verb.** A client that cannot write

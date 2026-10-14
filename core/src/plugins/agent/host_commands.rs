@@ -1794,6 +1794,82 @@ mod tests {
         assert_eq!(remaining(&st), vec!["A"]);
     }
 
+    fn setting(intent_id: &str, value: Option<&str>) -> ProposedSetting {
+        ProposedSetting {
+            intent_id: intent_id.to_string(),
+            value: value.map(str::to_string),
+            folder: None,
+        }
+    }
+
+    fn session_with_settings(settings: &[ProposedSetting]) -> AgentSessionState {
+        let st = AgentSessionState::default();
+        let mut table = st.sessions.lock().unwrap();
+        let mut s = Session::default();
+        s.proposal.settings = settings.to_vec();
+        table.insert("r".to_string(), s);
+        drop(table);
+        st
+    }
+
+    /// **The bound that makes the offer a bound rather than a page-supplied
+    /// argument.** `agent_start` takes the offered ids from the page and
+    /// `agent_apply` takes the approved settings from it too, so without this
+    /// check a caller could name any of the twelve intent ids in its own start
+    /// call and then write them.
+    ///
+    /// Verified by injection: replacing the `proposed.contains(setting)`
+    /// predicate with keep-everything leaves every other gate in the tree green,
+    /// because the only reader needs an `AppHandle` and is exercised by the E2E
+    /// happy path alone.
+    #[test]
+    fn retaining_approved_settings_keeps_only_what_the_run_proposed() {
+        let st = session_with_settings(&[
+            setting("editor.weekly-notes-folder", Some("J/Weekly")),
+            setting("editor.daily-notes-date-format", Some("yyyy-MM-dd")),
+        ]);
+        let approved = vec![
+            setting("editor.weekly-notes-folder", Some("J/Weekly")),
+            setting("editor.daily-notes-date-format", Some("yyyy-MM-dd")),
+            // Never proposed by this run, so it cannot be written even though
+            // the id is a real, writable intent.
+            setting("appearance.theme", Some("dark")),
+        ];
+        let (kept, unknown) = st.retain_proposed_settings("r", &approved);
+        assert_eq!(kept.len(), 2);
+        // The ORIGINAL indices ride along: the review surface subtracts its
+        // refusals with them, so re-numbering here would mis-mark every row
+        // after a dropped one.
+        assert_eq!(kept[0].0, 0);
+        assert_eq!(kept[1].0, 1);
+        assert_eq!(unknown, vec![2]);
+    }
+
+    /// **Compared by VALUE, like the edit half.** The same id carrying a value
+    /// the run never proposed is not the thing that was approved.
+    #[test]
+    fn a_setting_with_the_proposed_id_but_another_value_is_not_recognised() {
+        let st = session_with_settings(&[setting("editor.weekly-notes-folder", Some("J/Weekly"))]);
+        let (kept, unknown) = st.retain_proposed_settings(
+            "r",
+            &[setting("editor.weekly-notes-folder", Some("Other/"))],
+        );
+        assert!(kept.is_empty());
+        assert_eq!(unknown, vec![0]);
+    }
+
+    /// A session that is gone recognises nothing, which fails closed in the same
+    /// direction the edit half does: the run is over, and an apply against a
+    /// record the host no longer holds is what this refuses.
+    #[test]
+    fn retaining_approved_settings_recognises_nothing_when_the_session_is_gone() {
+        let st = AgentSessionState::default();
+        let (kept, unknown) =
+            st.retain_proposed_settings("gone", &[setting("editor.weekly-notes-folder", None)]);
+        assert!(kept.is_empty());
+        assert_eq!(unknown, vec![0]);
+    }
+
     #[test]
     fn the_probe_threshold_parses_from_the_recorded_file() {
         let t = probe_threshold();
