@@ -195,9 +195,9 @@ describe("AiChatFlow scope", () => {
 
   it("asks when the run needs more, and grants it", async () => {
     agentStart.mockImplementation(
-      // `_lang` and `_hist` are the two required arguments myne-md/myne#618
-      // and #617 added between the grant and the callbacks.
-      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang`, `_hist` and `_settings` are the required arguments
+      // myne-md/myne#618, #617 and #850 added between the grant and the callbacks.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,
@@ -249,9 +249,9 @@ describe("AiChatFlow scope", () => {
 
   it("ends the run when the expansion is declined", async () => {
     agentStart.mockImplementation(
-      // `_lang` and `_hist` are the two required arguments myne-md/myne#618
-      // and #617 added between the grant and the callbacks.
-      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang`, `_hist` and `_settings` are the required arguments
+      // myne-md/myne#618, #617 and #850 added between the grant and the callbacks.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,

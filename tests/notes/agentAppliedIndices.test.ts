@@ -17,7 +17,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { landedEditIndices } from "../../src/notes/agent/agentStore";
+import {
+  landedEditIndices,
+  landedSettingIndices,
+} from "../../src/notes/agent/agentStore";
+import type { ProposedSetting } from "../../src/lib/agent-protocol";
 
 /** `apply.rs` defines a refusal's `index` as its position in the APPROVED list,
  *  so these are indices into `sent`, not into the proposal. */
@@ -59,5 +63,88 @@ describe("landedEditIndices", () => {
     // so both are needed to pin the mapping.
     expect(landedEditIndices([0, 1], { refused: [refusal(1)] })).toEqual([0]);
     expect(landedEditIndices([5, 3], { refused: [refusal(1)] })).toEqual([5]);
+  });
+});
+
+// **The settings half of the same subtraction, which shipped without it**
+// (myne-md/myne#850, from the 2026-10-13 review). The first pass exported
+// `landedSettingIndices` and wired it, and this file is the regression test the
+// reviewer's deletion test demanded: with the helper's body replaced by `return []`
+// everything else in the tree stays green, because nothing else reads
+// `appliedSettings` in a way an assertion notices. The row that would mis-render is
+// the refused setting's, and only this test looks at it.
+describe("landedSettingIndices", () => {
+  function setting(intentId: string): ProposedSetting {
+    return { intentId, value: "V", folder: null };
+  }
+  function settingRefusal(index: number, intentId: string) {
+    return { intentId, index, reason: "notWritable" as const };
+  }
+
+  it("drops the refused setting and keeps the proposal position of the landed one", () => {
+    // The proposal holds three settings; the first two were sent for approval, and
+    // the host refused the FIRST of those. `sent[0]` is proposal index 0, so the
+    // landed set must be the proposal index of the SECOND sent row, which is 1.
+    const proposal = [
+      setting("editor.weekly-notes-folder"),
+      setting("editor.weekly-notes-template"),
+      setting("editor.date-format"),
+    ];
+    const sent = [proposal[0], proposal[1]];
+    const landed = landedSettingIndices(proposal, sent, {
+      refusedSettings: [
+        settingRefusal(0, "editor.weekly-notes-folder"),
+      ],
+    });
+    expect(landed).toEqual([1]);
+  });
+
+  it("is not confused when the sent order differs from the proposal order", () => {
+    // **The case that makes a sent-index result distinguishable from a proposal
+    // one**, which the reviewer asked for specifically: sent reversed, refusal on
+    // the first SENT row. A helper returning `sent` positions would answer 0 here
+    // (wrong: it must be a proposal index) and one returning proposal indices
+    // answers 2.
+    const proposal = [
+      setting("editor.weekly-notes-folder"),
+      setting("editor.weekly-notes-template"),
+      setting("editor.date-format"),
+    ];
+    const sent = [proposal[2], proposal[0]];
+    const landed = landedSettingIndices(proposal, sent, {
+      refusedSettings: [settingRefusal(0, "editor.date-format")],
+    });
+    expect(landed).toEqual([0]);
+  });
+
+  it("keeps every setting when nothing was refused", () => {
+    const proposal = [setting("a"), setting("b")];
+    const landed = landedSettingIndices(proposal, proposal, { refusedSettings: [] });
+    expect(landed).toEqual([0, 1]);
+  });
+
+  it("drops everything when the host refused everything", () => {
+    const proposal = [setting("a"), setting("b")];
+    const landed = landedSettingIndices(proposal, proposal, {
+      refusedSettings: [settingRefusal(0, "a"), settingRefusal(1, "b")],
+    });
+    expect(landed).toEqual([]);
+  });
+
+  it("treats a refusal index past the end of the sent list as refusing nothing", () => {
+    // **The index cannot be resolved, so nothing is refused, and the row stays
+    // landed.** The comment here said the opposite ("leaves the row retryable")
+    // while the assertion was `[0]`, which is the applied direction; the
+    // corrected sentence matches the code. The branch is defensive only: a
+    // refusal's index is a position in the SENT list, so an out-of-range one
+    // cannot come from a host that answered about this batch. Worth knowing that
+    // the direction chosen is the UNSAFE one for a caller that got here by
+    // accident (the row reads "Already applied" and cannot be retried), which is
+    // why it is written down rather than left to be discovered.
+    const proposal = [setting("a")];
+    const landed = landedSettingIndices(proposal, proposal, {
+      refusedSettings: [settingRefusal(7, "a")],
+    });
+    expect(landed).toEqual([0]);
   });
 });

@@ -18,6 +18,22 @@
     "reason": "Same step title on account entry and recover; one step, two flows."
   },
   {
+    "value": "{{count}} setting put back.",
+    "keys": [
+      "agent.review.undoReportSettings",
+      "agent.undo.revertedSettings"
+    ],
+    "reason": "Two surfaces report the same undo in the same words: the agent review screen's report line and the chat strip's. Separate keys because each surface composes its whole sentence from its own namespace, and one sentence is what the user should read in both places. Recorded rather than reworded so the two cannot drift into saying different things about the same verb (myne-md/myne#850)."
+  },
+  {
+    "value": "{{count}} settings put back.",
+    "keys": [
+      "agent.review.undoReportSettings",
+      "agent.undo.revertedSettings"
+    ],
+    "reason": "Two surfaces report the same undo in the same words: the agent review screen's report line and the chat strip's. Separate keys because each surface composes its whole sentence from its own namespace, and one sentence is what the user should read in both places. Recorded rather than reworded so the two cannot drift into saying different things about the same verb (myne-md/myne#850)."
+  },
+  {
     "value": "Transcription failed. Please try again.",
     "keys": [
       "attachments.library.transcribeFailed",

@@ -267,6 +267,10 @@ describe("ChatComposer", () => {
       { kind: "notes", value: ["n1"] },
       "en",
       expect.any(Array),
+      // The settings catalogue the client offers the run (myne-md/myne#850).
+      // Asserted in the whole-call shape below so a new argument cannot be
+      // added without a decision, which is what this expectation is for.
+      expect.arrayContaining(["editor.weekly-notes-folder"]),
       expect.any(Function),
       expect.any(Function),
     );
@@ -297,6 +301,10 @@ describe("ChatComposer", () => {
       { kind: "folder", value: "Projects" },
       "en",
       expect.any(Array),
+      // The settings catalogue the client offers the run (myne-md/myne#850).
+      // Asserted in the whole-call shape below so a new argument cannot be
+      // added without a decision, which is what this expectation is for.
+      expect.arrayContaining(["editor.weekly-notes-folder"]),
       expect.any(Function),
       expect.any(Function),
     );
@@ -816,6 +824,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
         { kind: "notes", value: ["n1"] },
         "en",
         expect.any(Array),
+        expect.arrayContaining(["editor.weekly-notes-folder"]),
         expect.any(Function),
         expect.any(Function),
       );

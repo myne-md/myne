@@ -96,6 +96,18 @@ export interface AgentTurnSummary {
   edits: number;
   /** Proposed new notes. */
   newNotes: number;
+  /** Setting changes the run proposed (myne-md/myne#850, from the 2026-10-14
+   *  review).
+   *
+   *  **Its own count, because the two surfaces that ask "did this run produce
+   *  anything" were asking it of `edits + newNotes` alone**: a settings-only run
+   *  rendered "The agent proposed no changes." on the chat strip and showed no
+   *  count on the hub card, which is the exact "the change the model made is
+   *  never shown" failure the review screen exists to prevent.
+   *
+   *  Optional so a turn persisted before this field existed reads as 0 rather
+   *  than as `undefined`, which the two readers spell `?? 0`. */
+  settings?: number;
   /** Notes the run read in full. */
   notesRead: number;
   /** Model round-trips. */

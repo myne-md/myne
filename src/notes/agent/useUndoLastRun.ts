@@ -39,6 +39,18 @@ export interface UndoBindings {
   agentLastRun: () => Promise<AppliedRun | null>;
   /** Revert a whole agent run, as one action. */
   agentUndo: (runId: string) => Promise<AgentUndoResult>;
+  /** Advance THIS client's prefs-changed nonce.
+   *
+   *  **A binding rather than an import, and the difference is a live bug on the
+   *  other client** (2026-10-13 review). This hook is shared and aliased into the
+   *  mobile tree, but the nonce is per client: desktop's `usePrefs` subscribes to
+   *  `src/notes/prefsNonce`, mobile's to `mobile/src/lib/prefsNonce`, and they are
+   *  different modules. Importing one from here bumped the desktop module on both,
+   *  so on mobile the undo would restore `vault.prefs` while every mounted reader
+   *  kept rendering the value it replaced. Inert today only because mobile offers
+   *  no settings, which is the same reasoning `AiChatFlow`'s empty offer list
+   *  gives, and the day that changes this is the bug it prevents. */
+  bumpPrefsNonce: () => void;
 }
 
 export interface UndoLastRunState {
@@ -73,6 +85,16 @@ export function undoResultText(
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const parts = [t("agent.undo.reverted", { count: report.reverted })];
+  // **The settings are counted apart from the notes** (myne-md/myne#850), which is
+  // what decision 0676 promises and what the host has returned since the feature
+  // landed. Without this clause a settings-only undo read as "0 notes restored"
+  // with no mention of the change that was actually put back, which understates
+  // the verb in exactly the way this function's own header warns against.
+  if (report.settingsReverted > 0) {
+    parts.push(
+      t("agent.undo.revertedSettings", { count: report.settingsReverted }),
+    );
+  }
   if (report.failed.length > 0) {
     parts.push(t("agent.undo.failed", { count: report.failed.length }));
   }
@@ -87,6 +109,7 @@ export function undoResultText(
 export function useUndoLastRun({
   agentLastRun,
   agentUndo,
+  bumpPrefsNonce,
   onReverted,
 }: UndoBindings & {
   /** Called after an undo changed notes on disk, so the caller can reload what
@@ -143,6 +166,14 @@ export function useUndoLastRun({
     setBusy(true);
     try {
       const r = await agentUndo(run.runId);
+      // **The undo writes preferences host-side, so this side has to say so**
+      // (myne-md/myne#850, from review). `usePrefs` and the open editor learn a
+      // preference moved only from the nonce, and `settleApply` bumps it on the
+      // apply path for exactly this reason; the undo wrote through the same
+      // host-side setters and bumped nothing, so every mounted reader kept
+      // rendering the value the undo had just replaced, on the screen where the
+      // user is watching for it to change back.
+      if (r.settingsReverted > 0) bumpPrefsNonce();
       setResult({ runId: run.runId, report: r });
       // The host consumed the record, so the offer goes with it rather than
       // waiting for the next read. A second press would report `noSuchRun`.

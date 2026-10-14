@@ -295,7 +295,13 @@ export function AiReviewFlow({
       // and mobile does not offer that yet. An empty array rather than the
       // proposal's list, because handing over the whole proposal was the exact
       // defect `approvedNewNotes` exists to prevent.
-      const outcome = await agentApply(runId, bulkApprovable, [], "bulk");
+      //
+      // **And no setting changes, for the same shape of reason** (myne-md/myne#850):
+      // this client never rendered a setting row, so nothing here could have been
+      // approved, and `agent_start` offered no ids to begin with. An empty array
+      // rather than the proposal's list, so a client that cannot show a setting
+      // cannot approve one by accident.
+      const outcome = await agentApply(runId, bulkApprovable, [], [], "bulk");
       // The indices that actually LANDED, not the ones that were sent.
       settleApply(outcome, landedEditIndices(indices, outcome), epoch);
       const changed = [...outcome.notesWritten, ...outcome.notesCreated];

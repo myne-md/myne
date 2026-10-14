@@ -20,6 +20,42 @@
 import type { PanelId } from "../../SettingsModal";
 import { has, type Capability } from "../../../platform/capabilities";
 
+/**
+ * Whether the in-app agent may change the setting this entry describes
+ * (myne-md/myne#850).
+ *
+ * The agent's setting-write capability is a closed set of named intents, and this
+ * is the field each entry declares itself in. It is REQUIRED rather than optional
+ * on purpose: the failure it prevents is a setting entering this tree and quietly
+ * becoming agent-writable, which is exactly how an AI or CLI switch would arrive.
+ * The drift test in `tests/settings-search-index.test.ts` names any entry carrying
+ * no verdict, so the question is put to whoever adds the setting, at the entry,
+ * rather than being answered by default.
+ *
+ * `refused` carries a reason, and the reason is what keeps the boundary
+ * reviewable: the egress and confidentiality controls are refused because they
+ * bound what AI and the CLI may reach, not because nobody has got to them yet.
+ * Without a reason those two are indistinguishable.
+ *
+ * This is a statement about the SETTING, not about the runtime. A build or a
+ * window where the write cannot be performed omits the intent whatever this field
+ * says; the two questions are separate.
+ */
+export type AgentWritability =
+  | { verdict: "writable" }
+  | { verdict: "refused"; reason: string };
+
+/**
+ * The refused arm of {@link AgentWritability}.
+ *
+ * Here so the two refusal constants below can carry their own `reason` as a
+ * readable field: typed as the whole union, `WRITABILITY_CONTROL.reason` is a
+ * type error at every consumer without a narrowing dance, which is exactly what
+ * `tests/settings-search-index.test.ts` hit when it compared a control's reason
+ * against the constant's.
+ */
+export type AgentRefused = Extract<AgentWritability, { verdict: "refused" }>;
+
 export interface SettingsIndexEntry {
   /** Unique, stable id. Also the `data-setting-anchor` value (Task 4). */
   id: string;
@@ -61,7 +97,64 @@ export interface SettingsIndexEntry {
    * an entry behind the gate would happily navigate into a hidden panel.
    */
   developerGated?: boolean;
+  /**
+   * Whether the in-app agent may change this setting. See
+   * {@link AgentWritability} for why this is required rather than optional.
+   */
+  agentWritability: AgentWritability;
 }
+
+/**
+ * The verdicts, as named values, so the answer at an entry is one short line
+ * rather than a repeated object literal.
+ *
+ * `WRITABILITY_CONTROL` is the one that carries a policy, and it is the reason the
+ * verdict is not a boolean: these settings bound what AI and the CLI may reach,
+ * and the shipped copy promises two of them absolutely ("Notes in these folders
+ * are never read or indexed by AI"). An agent that could write one would turn that
+ * promise into one conditional on the agent not having been steered.
+ */
+export const WRITABILITY_NONE: AgentRefused = {
+  verdict: "refused",
+  reason:
+    "not an agent-settable setting: no setting intent resolves to it, so the agent is not given it",
+};
+
+export const WRITABILITY_CONTROL: AgentRefused = {
+  verdict: "refused",
+  reason:
+    "an egress or confidentiality control, refused so the agent cannot write the value that bounds what AI and the CLI may reach",
+};
+
+/**
+ * A per-DEVICE setting, refused because a change would not travel
+ * (myne-md/myne#850).
+ *
+ * **Its own verdict rather than `WRITABILITY_CONTROL`, because the reason is
+ * different and the user's remedy is different.** A control is refused because
+ * the agent must not move a bound it runs under; one of these is refused because
+ * it is stored per machine and syncs nothing, so a change made on the computer
+ * would leave the phone showing the old value with nothing explaining why. The
+ * classification calls these `DeviceLocal`, and the agent's intent table leaves
+ * them out on exactly that basis.
+ */
+export const WRITABILITY_DEVICE_LOCAL: AgentRefused = {
+  verdict: "refused",
+  reason:
+    "a per-device setting that does not sync, so an agent write would apply on the machine that ran it and nowhere else with nothing saying why",
+};
+
+/**
+ * The setting has an intent and the agent may change it (myne-md/myne#850).
+ *
+ * **The verdict is about the SETTING; whether a run can act on it is a separate
+ * question, and that separation is why this constant exists at all.** The field
+ * says the setting is in the v1 families; the catalogue a run is offered is built
+ * from this field, and `myne-core`'s intent table is the authority that re-derives
+ * it at the write. A build or a window where the write cannot happen omits the
+ * intent whatever this says.
+ */
+export const WRITABILITY_WRITABLE: AgentWritability = { verdict: "writable" };
 
 // Ordered by rail order (account → … → about → ai), and within a panel by the
 // order the settings appear in the panel. Keeping this aligned with the panels
@@ -70,6 +163,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Account ────────────────────────────────────────────────────────────────
   {
     id: "account.vault-label",
+    agentWritability: WRITABILITY_NONE,
     panelId: "account",
     testid: "settings.label-input",
     titleKey: "settings.account.vaultLabelEyebrow",
@@ -78,6 +172,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "account.vault-icon",
+    agentWritability: WRITABILITY_NONE,
     panelId: "account",
     testid: "settings.icon-picker",
     titleKey: "settings.account.vaultIconLabel",
@@ -85,6 +180,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "account.change-password",
+    agentWritability: WRITABILITY_NONE,
     panelId: "account",
     testid: "settings.change-password-cta",
     titleKey: "settings.account.changePasswordHeading",
@@ -93,6 +189,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "account.danger-zone",
+    agentWritability: WRITABILITY_NONE,
     panelId: "account",
     testid: "settings.delete-vault-cta",
     titleKey: "settings.account.dangerZoneHeading",
@@ -103,6 +200,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Privacy ────────────────────────────────────────────────────────────────
   {
     id: "privacy.screen-capture",
+    agentWritability: WRITABILITY_CONTROL,
     // NO `capability`, and that is the asymmetry with the override entry
     // below. `PrivacyPanel` renders THIS row unconditionally, so tagging it
     // was the inverse of the rule `src/AGENTS.md` states: search filtered it
@@ -133,6 +231,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // remote-desktop user on a black window, and a setting behind Developer
     // mode cannot be found by them.
     id: "privacy.screen-capture-override",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "screenCaptureProtection",
     panelId: "privacy",
     titleKey: "settings.privacy.screenCaptureOverrideLabel",
@@ -153,6 +252,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // writes a name, and a control behind Developer mode cannot be found by
     // them.
     id: "privacy.hide-vault-names",
+    agentWritability: WRITABILITY_NONE,
     capability: "lockedVaultNames",
     panelId: "privacy",
     testid: "settings.hide-vault-names",
@@ -171,6 +271,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // why), so a user who remembers there is a way to check has to be able to
     // find it by typing "recovery" into Settings.
     id: "privacy.recovery-drill",
+    agentWritability: WRITABILITY_NONE,
     panelId: "privacy",
     testid: "settings.recovery-drill",
     titleKey: "settings.privacy.recoveryDrillLabel",
@@ -179,6 +280,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "privacy.auto-lock",
+    agentWritability: WRITABILITY_CONTROL,
     panelId: "privacy",
     testid: "settings.auto-lock-select",
     titleKey: "settings.privacy.autoLockLabel",
@@ -187,6 +289,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "privacy.quick-unlock",
+    agentWritability: WRITABILITY_NONE,
     capability: "biometricQuickUnlock",
     panelId: "privacy",
     testid: "settings.quick-unlock",
@@ -199,6 +302,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // navigate to an anchor that was never rendered.
   {
     id: "privacy.member-password",
+    agentWritability: WRITABILITY_NONE,
     capability: "memberSharing",
     panelId: "privacy",
     testid: "settings.member-password",
@@ -216,6 +320,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // Developer rail group", only "hidden while the mode is off".
   {
     id: "privacy.cli-access",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
@@ -225,6 +330,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "privacy.cli-excluded-folders",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
@@ -234,6 +340,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "privacy.cli-rate-limit",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
@@ -245,6 +352,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Sync (keys live under `sync.panel.*`, not `settings.*`) ─────────────────
   {
     id: "sync.status",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.status.label",
     descriptionKey: "sync.panel.status.helper",
@@ -252,12 +360,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.devices",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.devices.label",
     keywordsKey: "settings.search.keywords.syncDevices",
   },
   {
     id: "sync.members",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.memberRoster.title",
     descriptionKey: "sync.memberRoster.hint",
@@ -270,6 +380,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.device-bindings",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.deviceBindings.title",
     descriptionKey: "sync.deviceBindings.hint",
@@ -281,6 +392,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.add-device",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.addDevice.label",
     descriptionKey: "sync.panel.addDevice.helper",
@@ -288,6 +400,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.conflicts",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.conflicts.label",
     descriptionKey: "sync.panel.conflicts.helper",
@@ -295,6 +408,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.recovered",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.recovered.label",
     descriptionKey: "sync.panel.recovered.helper",
@@ -302,6 +416,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "sync.server",
+    agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     titleKey: "sync.panel.server.label",
     keywordsKey: "settings.search.keywords.syncServer",
@@ -310,18 +425,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Editor ─────────────────────────────────────────────────────────────────
   {
     id: "editor.text-size",
+    agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "editor",
     titleKey: "settings.typography.textSizeLabel",
     keywordsKey: "settings.search.keywords.textSize",
   },
   {
     id: "editor.line-spacing",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     titleKey: "settings.typography.lineSpacingLabel",
     keywordsKey: "settings.search.keywords.lineSpacing",
   },
   {
     id: "editor.content-width",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     titleKey: "settings.typography.contentWidthLabel",
     descriptionKey: "settings.typography.contentWidthHelper",
@@ -329,12 +447,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.font",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     titleKey: "settings.typography.fontLabel",
     keywordsKey: "settings.search.keywords.font",
   },
   {
     id: "editor.line-numbers",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.line-numbers",
     titleKey: "settings.lineNumbers.label",
@@ -347,6 +467,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // No `capability` - vim ships on every client, so this entry's gate is
     // the runtime one alone.
     id: "editor.vim-mode",
+    agentWritability: WRITABILITY_NONE,
     developerGated: true,
     panelId: "editor",
     testid: "settings.vim-mode",
@@ -362,6 +483,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // (amended 2026-10-01), so search must find the off-switch for every user
     // rather than hiding it until Developer mode is on.
     id: "editor.plain-file",
+    agentWritability: WRITABILITY_NONE,
     capability: "plainFile",
     panelId: "editor",
     testid: "settings.plain-file",
@@ -371,6 +493,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.toolbar",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.toolbar-customize",
     titleKey: "settings.toolbarCustomize.label",
@@ -379,6 +502,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.view-mode",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     titleKey: "settings.viewMode.label",
     descriptionKey: "settings.viewMode.helper",
@@ -386,6 +510,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.date-format",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dateTime.dateLabel",
     descriptionKey: "settings.dateTime.dateHelper",
@@ -393,6 +518,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.time-format",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dateTime.timeLabel",
     descriptionKey: "settings.dateTime.timeHelper",
@@ -400,6 +526,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.timezone",
+    agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "editor",
     titleKey: "settings.dateTime.zoneLabel",
     descriptionKey: "settings.dateTime.zoneHelper",
@@ -407,6 +534,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.focus-dim",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.focus-dim",
     titleKey: "settings.focusMode.dimLabel",
@@ -415,6 +543,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.focus-typewriter",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.focus-typewriter",
     titleKey: "settings.focusMode.typewriterLabel",
@@ -423,6 +552,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.spell-check",
+    agentWritability: WRITABILITY_NONE,
     capability: "spellCheck",
     panelId: "editor",
     testid: "settings.spell-check",
@@ -432,6 +562,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.spell-languages",
+    agentWritability: WRITABILITY_NONE,
     capability: "spellCheck",
     panelId: "editor",
     titleKey: "settings.spell.languagesLabel",
@@ -440,6 +571,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.daily-notes-folder",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
@@ -447,6 +579,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.daily-notes-date-format",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
@@ -454,6 +587,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.daily-notes-template",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
@@ -465,6 +599,10 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // its row, so three results are not all called "Folder".
   {
     id: "editor.weekly-notes-folder",
+    // The tracer bullet's intent (myne-md/myne#850): the first setting the
+    // agent may change, chosen because the periodic-notes setter already
+    // registers a folder backend-side, so the write needs no new seam.
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
@@ -472,6 +610,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.weekly-notes-date-format",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
@@ -479,6 +618,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.weekly-notes-template",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
@@ -486,6 +626,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.monthly-notes-folder",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
@@ -493,6 +634,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.monthly-notes-date-format",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
@@ -500,6 +642,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.monthly-notes-template",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
@@ -507,6 +650,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.reminders",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.reminders-toggle",
     titleKey: "settings.reminders.label",
@@ -514,6 +658,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.archive",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.archive-disabled",
     titleKey: "settings.archive.label",
@@ -522,6 +667,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.views",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.views-enabled",
     titleKey: "settings.views.label",
@@ -529,6 +675,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.task-chip-color",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.editor.taskChipColor",
     titleKey: "settings.editor.taskChipColor.label",
@@ -536,6 +683,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.task-chip-icon-only",
+    agentWritability: WRITABILITY_NONE,
     panelId: "editor",
     testid: "settings.editor.taskChipIconOnly",
     titleKey: "settings.editor.taskChipIconOnly.label",
@@ -545,6 +693,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Files ──────────────────────────────────────────────────────────────────
   {
     id: "files.startup-open",
+    agentWritability: WRITABILITY_NONE,
     panelId: "files",
     testid: "settings.startup-open-select",
     titleKey: "settings.files.startup.label",
@@ -553,6 +702,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "files.new-note-location",
+    agentWritability: WRITABILITY_WRITABLE,
     panelId: "files",
     testid: "settings.new-note-location-select",
     titleKey: "settings.files.newNote.label",
@@ -561,6 +711,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "files.folder-notes",
+    agentWritability: WRITABILITY_NONE,
     panelId: "files",
     testid: "settings.folder-notes-toggle",
     titleKey: "settings.folderNotes.label",
@@ -569,6 +720,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "files.attachment-compression",
+    agentWritability: WRITABILITY_NONE,
     panelId: "files",
     testid: "settings.attachment-compression",
     titleKey: "settings.attachmentCompression.label",
@@ -577,6 +729,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "files.attachment-ocr",
+    agentWritability: WRITABILITY_NONE,
     panelId: "files",
     testid: "settings.attachment-ocr",
     titleKey: "settings.attachmentOcr.label",
@@ -587,6 +740,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Transcription ──────────────────────────────────────────────────────────
   {
     id: "transcription.enabled",
+    agentWritability: WRITABILITY_NONE,
     panelId: "transcription",
     testid: "settings.transcription",
     titleKey: "settings.transcription.label",
@@ -597,6 +751,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Hotkeys (the panel has its own in-panel search; one entry routes to it) ──
   {
     id: "hotkeys.shortcuts",
+    agentWritability: WRITABILITY_NONE,
     panelId: "hotkeys",
     titleKey: "settings.shell.panels.hotkeys",
     descriptionKey: "settings.hotkeys.helper",
@@ -606,6 +761,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Appearance ─────────────────────────────────────────────────────────────
   {
     id: "appearance.theme",
+    agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "appearance",
     titleKey: "settings.appearance.themeLabel",
     descriptionKey: "settings.appearance.themeHelper",
@@ -613,6 +769,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "appearance.accent",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     testid: "settings.accent-color",
     titleKey: "settings.appearance.accentLabel",
@@ -620,6 +777,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "appearance.show-edit-times",
+    agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "appearance",
     testid: "settings.note-timestamps-toggle",
     titleKey: "settings.appearance.showEditTimesLabel",
@@ -632,6 +790,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // is exactly the question Settings search is asked, and the row it lands on
     // answers it.
     id: "appearance.graph-settings",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     testid: "settings.open-graph",
     titleKey: "settings.appearance.graphSettingsLabel",
@@ -640,12 +799,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "appearance.custom-themes",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     titleKey: "settings.customThemes.label",
     keywordsKey: "settings.search.keywords.customThemes",
   },
   {
     id: "appearance.language",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     titleKey: "settings.language.label",
     descriptionKey: "settings.language.helper",
@@ -653,6 +814,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "appearance.ribbon",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     testid: "settings.ribbon-customize",
     titleKey: "settings.ribbonCustomize.label",
@@ -661,6 +823,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "appearance.bar",
+    agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
     testid: "settings.bar-customize",
     titleKey: "settings.appearance.barCustomize.label",
@@ -671,6 +834,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Storage ────────────────────────────────────────────────────────────────
   {
     id: "storage.backup",
+    agentWritability: WRITABILITY_NONE,
     capability: "backup",
     panelId: "storage",
     titleKey: "settings.storage.backupLabel",
@@ -679,6 +843,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.export",
+    agentWritability: WRITABILITY_NONE,
     capability: "vaultExport",
     panelId: "storage",
     titleKey: "settings.storage.exportLabel",
@@ -686,12 +851,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.import",
+    agentWritability: WRITABILITY_NONE,
     panelId: "storage",
     titleKey: "settings.storage.importLabel",
     keywordsKey: "settings.search.keywords.import",
   },
   {
     id: "storage.location",
+    agentWritability: WRITABILITY_NONE,
     capability: "nativeSaveAs",
     panelId: "storage",
     titleKey: "settings.storage.locationLabel",
@@ -699,6 +866,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.auto-backup",
+    agentWritability: WRITABILITY_NONE,
     capability: "backup",
     panelId: "storage",
     testid: "settings.auto-backup",
@@ -708,6 +876,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.clipper",
+    agentWritability: WRITABILITY_NONE,
     capability: "clipper",
     panelId: "storage",
     testid: "settings.clipper-install",
@@ -719,18 +888,21 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── About ──────────────────────────────────────────────────────────────────
   {
     id: "about.build-channel",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.buildChannelLabel",
     keywordsKey: "settings.search.keywords.buildChannel",
   },
   {
     id: "about.update-channel",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.updateChannelLabel",
     capability: "selfUpdate",
   },
   {
     id: "about.update",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.updateLabel",
     descriptionKey: "settings.about.updateHelper",
@@ -740,6 +912,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "about.update-auto-check",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.updateAutoCheckLabel",
     descriptionKey: "settings.about.updateAutoCheckHelper",
@@ -749,6 +922,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "about.changelog",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.changelogLabel",
     descriptionKey: "settings.about.changelogHelper",
@@ -756,6 +930,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "about.legal",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.legalLabel",
     descriptionKey: "settings.about.legalHelper",
@@ -763,12 +938,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "about.license",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.licenseLabel",
     keywordsKey: "settings.search.keywords.license",
   },
   {
     id: "about.threat-model",
+    agentWritability: WRITABILITY_NONE,
     panelId: "about",
     titleKey: "settings.about.threatModelLabel",
     descriptionKey: "settings.about.threatModelHelper",
@@ -782,6 +959,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // (`src/AGENTS.md`) - the whole AI panel is behind Developer mode, and it
     // is absent entirely where the platform has no local-AI capability.
     id: "ai.provider",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -796,6 +974,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // - the "navigates to a panel and scrolls to nothing" failure the
     // capability gating above exists to prevent, in its runtime form.
     id: "ai.provider-model",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -806,6 +985,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.endpoint",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -815,6 +995,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.enable",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -824,6 +1005,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.auto-tag",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -839,6 +1021,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // Search that found a setting the panel never rendered would scroll to
     // nothing.
     id: "ai.history-budget",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -849,6 +1032,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.meeting-prompt",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -859,6 +1043,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.models",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -872,6 +1057,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // is, but a `localAi` host always has it, so `capability` is the right
     // predicate here rather than a new one.
     id: "ai.downloads",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -881,6 +1067,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.sideload",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -889,6 +1076,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.excluded-folders",
+    agentWritability: WRITABILITY_CONTROL,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -898,6 +1086,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.memory",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -907,6 +1096,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.personality",
+    agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
@@ -922,6 +1112,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // mode does NOT make them anonymous to Myne. Keywords are a haystack, never
     // rendered, so this broadens the match without making the claim.
     id: "network.tor-routing",
+    agentWritability: WRITABILITY_NONE,
     capability: "torRouting",
     developerGated: true,
     panelId: "network",

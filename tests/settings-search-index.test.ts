@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import en from "../locales/en/common.json";
 import {
   SETTINGS_SEARCH_INDEX,
+  WRITABILITY_CONTROL,
+  WRITABILITY_DEVICE_LOCAL,
 } from "../src/components/settings/search/settingsSearchIndex";
 import {
   searchSettings,
@@ -235,6 +237,98 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const e of nonGated) {
       expect(withGateOff.has(e.id), `${e.id} missing with gate off`).toBe(true);
       expect(withGateOn.has(e.id), `${e.id} missing with gate on`).toBe(true);
+    }
+  });
+});
+
+// The agent-writability verdict (myne-md/myne#850). A setting that reaches the
+// tree with no verdict is how an AI or CLI switch becomes agent-writable by
+// omission, so the check is structural rather than a list: every entry carries a
+// verdict, a refusal says why, and the settings that bound what AI and the CLI
+// may reach are refused as CONTROLS rather than for a generic reason. Flipping one
+// of them to writable is the change this is here to stop, which is why the third
+// assertion names them by id and compares the reason rather than just the verdict.
+const AGENT_CONTROL_IDS = [
+  "privacy.screen-capture",
+  "privacy.screen-capture-override",
+  "privacy.auto-lock",
+  "privacy.cli-access",
+  "privacy.cli-excluded-folders",
+  "privacy.cli-rate-limit",
+  "ai.enable",
+  "ai.excluded-folders",
+  "ai.provider",
+] as const;
+
+describe("agent writability", () => {
+  it("no entry arrives without a verdict", () => {
+    const missing = SETTINGS_SEARCH_INDEX.filter((e) => !e.agentWritability).map((e) => e.id);
+    expect(missing, "entries with no agent-writability verdict").toEqual([]);
+  });
+
+  it("every refusal carries a reason that says something", () => {
+    // The placeholder shapes an author writes instead of a reason. `REASON
+    // REQUIRED` is named because a seeding tool shipped it once and its own
+    // length check passed it.
+    const placeholder = /^(todo|tbd|reason required|n\/a|none yet)/i;
+    const bad = SETTINGS_SEARCH_INDEX.filter((e) => e.agentWritability.verdict === "refused")
+      .map((e) => ({
+        id: e.id,
+        reason: e.agentWritability.verdict === "refused" ? e.agentWritability.reason.trim() : "",
+      }))
+      .filter((r) => r.reason.length < 20 || placeholder.test(r.reason))
+      .map((r) => r.id);
+    expect(bad, "refused entries whose reason is a placeholder or too short").toEqual([]);
+  });
+
+  it("the settings that bound what AI and the CLI may reach are refused as controls", () => {
+    const byId = new Map(SETTINGS_SEARCH_INDEX.map((e) => [e.id, e.agentWritability]));
+    const wrong = AGENT_CONTROL_IDS.filter((id) => {
+      const v = byId.get(id);
+      // Narrowed rather than compared through the union: `reason` exists on one
+      // arm only, so a bare `v.reason` is a type error rather than a check.
+      if (v === undefined || v.verdict !== "refused") return true;
+      return v.reason !== WRITABILITY_CONTROL.reason;
+    });
+    expect(wrong, "control settings that are not refused as controls").toEqual([]);
+  });
+
+  // ---- the v1 intent roster (myne-md/myne#850 task 4) ---------------------
+
+  it("the writable verdicts are EXACTLY the roster both languages read", async () => {
+    // The comparison has to be cross-language: the index DECIDES writability and
+    // the Rust intent table ENFORCES it, so neither side can compare itself with
+    // the other from inside one language. `scripts/agent-setting-intents.json` is
+    // the third thing both read, and this half covers the index. Both directions,
+    // because a stale roster entry is as loud a failure as a missing one: it means
+    // the agent is offered a setting the table cannot spell, or can spell one it
+    // is never offered.
+    const roster = (await import("../scripts/agent-setting-intents.json")).default as {
+      intents: string[];
+    };
+    const writableIds = SETTINGS_SEARCH_INDEX.filter(
+      (e) => e.agentWritability.verdict === "writable",
+    ).map((e) => e.id);
+    const onlyIndex = writableIds.filter((id) => !roster.intents.includes(id));
+    const onlyRoster = roster.intents.filter((id) => !writableIds.includes(id));
+    expect(onlyIndex, "writable in the index but not on the roster").toEqual([]);
+    expect(onlyRoster, "on the roster but not writable in the index").toEqual([]);
+  });
+
+  it("the per-device display family is refused with its own reason", () => {
+    // myne-md/myne#850 task 4's decision. These three are `DeviceLocal`: they
+    // sync nothing, so an agent write would land on the machine that ran the
+    // agent and nowhere else. They are NOT on the roster above, and the reason
+    // distinguishes them from an egress control, because the user's remedy
+    // differs.
+    for (const id of [
+      "appearance.theme",
+      "editor.text-size",
+      "appearance.show-edit-times",
+    ]) {
+      const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id);
+      expect(entry, `${id} must be in the index`).toBeDefined();
+      expect(entry?.agentWritability, id).toEqual(WRITABILITY_DEVICE_LOCAL);
     }
   });
 });

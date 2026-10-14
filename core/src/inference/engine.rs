@@ -886,6 +886,37 @@ fn agent_script(system: &str, messages: &[ChatMessage]) -> Option<String> {
         );
     }
 
+    // **A setting change, TWO of them, asked once** (myne-md/myne#850). Keyed off
+    // the task text like the branches around it, so the scenario asks for what it
+    // needs in the sentence a user would type. **The intent ids are the real
+    // ones**, the ids the settings index marks writable and the client puts in the
+    // catalogue, so a scenario driving this proves the whole chain rather than a
+    // stub-only path: index verdict -> catalogue -> offered list -> system block
+    // -> parser -> proposal. `finish` rides the same reply because a setting-only
+    // run proposes no edits, and without it the run would idle for another
+    // provider round-trip before settling, which would make the scenario measure
+    // patience rather than the change.
+    //
+    // **Two rather than one, and that is the scenario's whole design.** A run
+    // whose only row is applied resolves completely, so the review screen closes
+    // and takes the run summary with it, and the summary is one of the two facts
+    // the scenario exists to assert. With two, the first is approved on its own,
+    // the screen stays open on the second, and the summary is on screen while it
+    // says "1 setting changed".
+    if task.contains("weekly notes folder")
+        && !messages
+            .iter()
+            .any(|m| m.content.contains("\"action\":\"set_setting\""))
+    {
+        return Some(
+            "{\"action\":\"set_setting\",\"intent_id\":\"editor.weekly-notes-folder\",\"value\":\"Archived/Weekly\"}\n\
+             {\"action\":\"set_setting\",\"intent_id\":\"editor.monthly-notes-folder\",\"value\":\"Archived/Monthly\"}\n\
+             {\"action\":\"set_setting\",\"intent_id\":\"files.new-note-location\",\"value\":\"specific\",\"folder\":\"Archived/Box\"}\n\
+             {\"action\":\"finish\",\"summary\":\"stub setting run\"}"
+                .to_string(),
+        );
+    }
+
     // **What the model has in hand, from EITHER frame the host uses.**
     //
     // The branches below used to key on `last_assistant` naming a `read_note`,
@@ -2300,5 +2331,58 @@ mod agent_script_tests {
                 .any(|a| matches!(a, AgentAction::ProposeEdit { .. })),
             "and it must be asked BEFORE anything is proposed: {actions:?}"
         );
+    }
+
+    /// **A setting change, driven the way the E2E scenario drives it**
+    /// (myne-md/myne#850). The branch keys off the task text, so this asserts the
+    /// exact sentence `e2e/agent-setting-intent.e2e.ts` sends produces two
+    /// `set_setting` actions, and that both carry ids the intent table actually
+    /// allows. A stub-only id would let that scenario pass green while the
+    /// product path refused every change, which is the class this module exists
+    /// for: three scenarios were once written against an engine that could not
+    /// produce their input, and nothing said so.
+    #[test]
+    fn the_stub_proposes_a_setting_change_for_the_task_the_scenario_sends() {
+        let reply = ask(&[turn(ChatRole::User, "change my weekly notes folder")]);
+        assert!(reply.contains("\"action\":\"set_setting\""), "{reply}");
+
+        // **It has to PARSE, not merely contain the text.** The first version of
+        // this test asserted only the substring, and the container found the
+        // difference: the reply carried both lines, `parse_actions` discarded
+        // them, the loop saw no action at all, its second turn fell through to
+        // the default script, and the scenario failed on a review screen with no
+        // setting row and no refusal message anywhere. A substring assertion
+        // cannot see any of that.
+        let actions = crate::plugins::agent::prompt::parse_actions(&reply);
+        let settings: Vec<&str> = actions
+            .iter()
+            .filter(|a| matches!(a, AgentAction::SetSetting { .. }))
+            .map(|a| a.verb())
+            .collect();
+        assert_eq!(
+            settings.len(),
+            3,
+            "every set_setting action must parse, not merely appear: {reply}"
+        );
+
+        // **Three, and the third is the point.** The scenario approves two and
+        // leaves one outstanding: a run whose every row is applied resolves
+        // completely, and the review screen takes its summary and its Undo button
+        // with it. Two of them are single-field folders; the third is
+        // `files.new-note-location`, the ONE intent whose write carries a folder
+        // beside its value, which is the arm whose undo used to lose the folder it
+        // replaced. A stub emitting only the easy two would leave that arm with no
+        // end-to-end coverage at all.
+        for id in [
+            "editor.weekly-notes-folder",
+            "editor.monthly-notes-folder",
+            "files.new-note-location",
+        ] {
+            assert!(reply.contains(id), "the stub must emit {id} by name");
+            assert!(
+                crate::plugins::agent::setting::writable(id).is_ok(),
+                "{id} is emitted by the stub but the intent table refuses it"
+            );
+        }
     }
 }

@@ -13,7 +13,10 @@ import {
   flattenGroups,
   groupResultsByPanel,
 } from "../src/components/settings/search/resultsGrouping";
-import type { SettingsIndexEntry } from "../src/components/settings/search/settingsSearchIndex";
+import {
+  WRITABILITY_NONE,
+  type SettingsIndexEntry,
+} from "../src/components/settings/search/settingsSearchIndex";
 
 /** Resolve a dotted i18n key against the raw catalog → the string, or undefined. */
 function lookup(key: string): string | undefined {
@@ -44,7 +47,7 @@ function isPanelClustered(entries: readonly SettingsIndexEntry[]): boolean {
 
 /** The exact ordering SettingsModal feeds to both keyboard nav and the list. */
 const applied = (query: string): SettingsIndexEntry[] =>
-  flattenGroups(groupResultsByPanel(searchSettings(query, t)));
+  flattenGroups(groupResultsByPanel(searchSettings(query, t, false)));
 
 describe("settings-search keyboard/visual order reconciliation", () => {
   it("reconciles an interleaved (relevance-ordered) match list into panel-clustered order", () => {
@@ -52,9 +55,9 @@ describe("settings-search keyboard/visual order reconciliation", () => {
     // hitting several panels at different scores (e.g. a Sync-panel title hit
     // above a Privacy keyword hit above more Sync hits):
     const interleaved: SettingsIndexEntry[] = [
-      { id: "sync.status", panelId: "sync", titleKey: "x" },
-      { id: "privacy.auto-lock", panelId: "privacy", titleKey: "x" },
-      { id: "sync.devices", panelId: "sync", titleKey: "x" },
+      { id: "sync.status", panelId: "sync", titleKey: "x", agentWritability: WRITABILITY_NONE },
+      { id: "privacy.auto-lock", panelId: "privacy", titleKey: "x", agentWritability: WRITABILITY_NONE },
+      { id: "sync.devices", panelId: "sync", titleKey: "x", agentWritability: WRITABILITY_NONE },
     ];
     // Precondition — this is the shape that made the highlight jump.
     expect(isPanelClustered(interleaved)).toBe(false);

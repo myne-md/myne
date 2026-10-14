@@ -56,6 +56,8 @@ import {
   subscribeChatPersistHealth,
 } from "./chatPersist";
 import { markConversationRead, useAgent } from "../agent/agentStore";
+// This client's nonce, passed into the shared undo hook below.
+import { bumpPrefsNonce } from "../prefsNonce";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { AgentFootprint } from "../agent/components/AgentFootprint";
 import type { ChatComposerSurface } from "../components/ChatComposer";
@@ -419,7 +421,7 @@ function AgentTurnView({
           style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", marginTop: "var(--space-1)" }}
         >
           <div>
-            {s.edits === 0 && s.newNotes === 0
+            {s.edits === 0 && s.newNotes === 0 && (s.settings ?? 0) === 0
               ? s.summary.trim().length > 0
                 ? null
                 : emptyRunLabel(s.end, t)
@@ -432,6 +434,16 @@ function AgentTurnView({
                   s.newNotes > 0
                     ? t("editor.chrome.rightPanel.aiChat.agentTurn.newNotes", {
                         count: s.newNotes,
+                      })
+                    : null,
+                  // **A setting change counts as output** (myne-md/myne#850,
+                  // from the 2026-10-14 review): without this clause a run whose
+                  // only proposal was a setting change rendered "The agent
+                  // proposed no changes." directly above the review screen that
+                  // showed one.
+                  (s.settings ?? 0) > 0
+                    ? t("agent.review.settingsChanged", {
+                        count: s.settings,
                       })
                     : null,
                 ]
@@ -688,6 +700,7 @@ export function ConversationSurface({
   const undo = useUndoLastRun({
     agentLastRun,
     agentUndo,
+    bumpPrefsNonce,
     ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
   });
   const [diffProposal, setDiffProposal] = useState<Pick<
