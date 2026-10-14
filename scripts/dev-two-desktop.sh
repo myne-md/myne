@@ -22,6 +22,11 @@
 #     clipper only talks to instance A
 #
 # Usage: pnpm dev:two   (or: bash scripts/dev-two-desktop.sh)
+#
+# It ALSO builds and starts a LOCAL myne-server on http://127.0.0.1:8787 (override
+# with MYNE_DEV_SYNC_PORT) and seeds that endpoint + the beta-terms acceptance
+# into both instances, so one command brings up everything a manual sync test
+# needs. The store lives under `.opencode/dev-sync-store` and survives restarts.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -47,6 +52,51 @@ trap cleanup EXIT INT TERM
 echo "==> staging the CLI + Tor sidecars (once)"
 pnpm sidecar
 
+# ---------------------------------------------------------------------------
+# Local sync server, so ONE command brings up everything a manual sync test
+# needs. A fixed loopback port (overridable with MYNE_DEV_SYNC_PORT) so both
+# instances share it, and a stable data dir under `.opencode/` (ignored) so the
+# accounts and vaults survive a restart.
+# ---------------------------------------------------------------------------
+SYNC_PORT="${MYNE_DEV_SYNC_PORT:-8787}"
+SYNC_ENDPOINT="http://127.0.0.1:${SYNC_PORT}"
+SYNC_STORE="$(pwd)/.opencode/dev-sync-store"
+SERVER_BIN="myne-server/myne-server"
+
+if command -v go >/dev/null 2>&1; then
+  echo "==> building myne-server (host binary)"
+  if ! ( cd myne-server && go build -o myne-server ./cmd/myne-server ); then
+    echo "!! could not build myne-server. Starting WITHOUT a sync server;" >&2
+    echo "!! set Settings -> Sync manually in each window." >&2
+    SERVER_BIN=""
+  fi
+else
+  echo "!! Go not found; assuming $SERVER_BIN is already a host binary"
+fi
+
+if [ -n "$SERVER_BIN" ]; then
+  mkdir -p "$SYNC_STORE"
+  echo "==> starting the local sync server on $SYNC_ENDPOINT (store: $SYNC_STORE)"
+  MYNE_SERVER_ADDR="127.0.0.1:${SYNC_PORT}" MYNE_STORAGE_PATH="$SYNC_STORE" \
+    "$SERVER_BIN" &
+  PIDS+=("$!")
+  for _ in $(seq 1 40); do
+    nc -z 127.0.0.1 "$SYNC_PORT" 2>/dev/null && break
+    sleep 0.3
+  done
+
+  # Point BOTH instances at it BEFORE they boot: `sync-config.json` is the SYNC-14
+  # endpoint surface and `legal-consent.json` the beta-terms acceptance, so no
+  # in-app Settings step is needed. macOS app-config dir is Application Support/<id>.
+  for id in "$APP_A_ID" "$APP_B_ID"; do
+    cfg="$HOME/Library/Application Support/$id"
+    mkdir -p "$cfg"
+    printf '{\n  "endpoint_url": "%s"\n}\n' "$SYNC_ENDPOINT" > "$cfg/sync-config.json"
+    printf '{\n  "beta_terms_version": "1"\n}\n' > "$cfg/legal-consent.json"
+  done
+  echo "==> both instances pre-pointed at $SYNC_ENDPOINT"
+fi
+
 if nc -z localhost 1420 2>/dev/null; then
   echo "==> :1420 already serving; reusing the running Vite"
 else
@@ -67,5 +117,11 @@ PIDS+=("$!")
 echo
 echo "==> both instances are coming up. B relinks the desktop crate once with its own"
 echo "    identifier, so it appears a little later. Ctrl-C stops both."
-echo "    In each window: Settings -> Sync -> the same endpoint."
+if [ -n "${SERVER_BIN:-}" ] && [ -n "${SYNC_ENDPOINT:-}" ]; then
+  echo "    Sync endpoint (already seeded into both): $SYNC_ENDPOINT"
+  echo "    In each window: Settings -> Sync -> Enroll to the same account, then"
+  echo "    open the SAME note on both and watch the live cursor and roster."
+else
+  echo "    In each window: Settings -> Sync -> the same endpoint."
+fi
 wait

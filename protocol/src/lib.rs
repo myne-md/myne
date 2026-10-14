@@ -58,6 +58,7 @@ pub mod agent_personality_blob;
 pub mod attachment_blob;
 pub mod attachment_text_blob;
 pub mod attachments_catalog;
+pub mod awareness_frame;
 pub mod blob;
 pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
@@ -66,12 +67,14 @@ pub mod chats_blob;
 pub mod chats_catalog_blob;
 pub mod color_group;
 pub mod crdt_note_blob;
+pub mod device_binding_blob;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
 pub mod graph_layout_blob;
 pub mod kdf;
 pub mod manifest;
+pub mod member_names_blob;
 pub mod paired_extension;
 pub mod password_policy;
 pub mod person_invite;
@@ -111,8 +114,9 @@ pub use account_number::{
 };
 pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
-    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob,
-    aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_graph_layout_blob,
+    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob,
+    aad_awareness_frame, aad_chats_blob, aad_chats_blob_v0_2, aad_chats_catalog,
+    aad_custom_themes_blob, aad_device_binding_blob, aad_graph_layout_blob, aad_member_names_blob,
     aad_membership_blob, aad_membership_roster_blob, aad_note_content_encrypt,
     aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
     aad_person_member_key_store, aad_person_member_unlock_store, aad_person_profile_blob,
@@ -174,6 +178,13 @@ pub use attachments_catalog::{
     CATALOG_BLOB_MAGIC, CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED,
     CATALOG_BLOB_V0_2_MAGIC, MAX_CATALOG_PLAINTEXT_LEN,
 };
+pub use awareness_frame::{
+    awareness_room_id, awareness_room_id_group, decode_payload_canonical, encode_payload_canonical,
+    open_awareness_frame, seal_awareness_frame, seal_awareness_frame_raw, sign_presence_assertion,
+    verify_presence_assertion, AwarenessFrameError, AwarenessPayload, FrameType, PresenceAssertion,
+    PresenceVerdict, AWARENESS_FRAME_VERSION, AWARENESS_HEADER_LEN, AWARENESS_ROOM_ID_LEN,
+    PRESENCE_ASSERTION_PREFIX,
+};
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
     DecryptError, DecryptedNote,
@@ -199,6 +210,16 @@ pub use color_group::{
 pub use crdt_note_blob::{
     decode_crdt_note_blob, encode_crdt_note_blob, encode_crdt_note_blob_raw, CannotDecryptCrdtNote,
     NC05_MAGIC, NC05_MAX_PLAINTEXT_LEN, NC05_PROTOCOL_VERSION,
+};
+pub use device_binding_blob::{
+    decode_device_binding_blob, decode_device_bindings_or_empty, device_binding_signed_bytes,
+    encode_device_binding_blob, encode_device_binding_blob_raw, encode_device_bindings_map,
+    live_device_bindings, merge_device_bindings, parse_device_bindings_map,
+    partition_verified_bindings, sign_device_binding, verify_device_binding,
+    verify_device_binding_removal, DeviceBindingBlobError, DeviceBindingEntry, DeviceBindingsMap,
+    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_HEADER_LEN,
+    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX, DEVICE_BINDING_SIGNATURE_HEX_LEN,
+    DEVICE_BINDING_SIGNATURE_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
 };
 pub use dictionary_blob::{
     decode_dictionary_blob, decode_dictionary_blob_versioned, encode_dictionary_blob,
@@ -237,6 +258,16 @@ pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
     MANIFEST_DOMAIN_PREFIX, MANIFEST_FORMAT_V1, MANIFEST_HASH_LEN, MANIFEST_ID_LEN,
     MANIFEST_PROTOCOL_VERSION,
+};
+pub use member_names_blob::{
+    decode_member_names_blob, decode_member_names_or_empty, encode_member_names_blob,
+    encode_member_names_blob_raw, encode_member_names_map, live_member_names,
+    member_name_signed_bytes, merge_member_names, parse_member_names_map, partition_verified,
+    sign_member_name, verify_member_name, verify_member_removal, MemberNameEntry,
+    MemberNamesBlobError, MemberNamesMap, MAX_MEMBER_NAMES_PLAINTEXT_LEN, MAX_MEMBER_NAME_LEN,
+    MEMBER_NAMES_BLOB_AAD_ROLE, MEMBER_NAMES_BLOB_FORMAT_V1, MEMBER_NAMES_BLOB_HEADER_LEN,
+    MEMBER_NAMES_BLOB_MAGIC, MEMBER_NAME_PREFIX, MEMBER_NAME_SIGNATURE_HEX_LEN,
+    MEMBER_NAME_SIGNATURE_LEN,
 };
 pub use paired_extension::{
     canonical_encode_paired_extensions, parse_paired_extensions_array, PairedExtension,

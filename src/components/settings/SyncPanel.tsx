@@ -19,6 +19,7 @@ import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
+import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
 import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
@@ -656,6 +657,21 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         <div style={BLOCK_STYLE} data-setting-anchor="sync.members" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>{t("sync.memberRoster.title")}</span>
           <MemberRosterPanel onDialogOpenChange={setRosterDialogOpen} />
+        </div>
+      ) : null}
+
+      {/* The vault's devices with the member each is CLAIMED by (myne-md/myne#852
+          story 11). A separate block from the device list above and not a column
+          on it: that list is the devices of THIS ACCOUNT (`sync_list_devices`),
+          while a member's device is enrolled on the member's own account, so the
+          devices story 11 is about can never appear there. Same gate as the
+          roster, for the same reason: on a client with no person-identity
+          carrier there is no member to attribute a device to, and the store
+          itself is group-tier sealed. */}
+      {hasCapability("memberSharing") ? (
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.device-bindings" data-setting-row="true">
+          <span style={SECTION_TITLE_STYLE}>{t("sync.deviceBindings.title")}</span>
+          <DeviceAttributionPanel />
         </div>
       ) : null}
 

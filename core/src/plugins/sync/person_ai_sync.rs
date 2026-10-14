@@ -21,6 +21,9 @@
 //!   the same append-preserving rule the shared chats plane uses.
 //! - **Personality**: a whole-value directive list, so the side with the greater
 //!   newest `updated_at` wins.
+//! - **Pinned owner identity code**: a trust anchor, so NOT a merge in the usual
+//!   sense. First write wins, and the two sides disagreeing keeps the local pin
+//!   and refuses to re-point it.
 //! - **Pending-tombstone queues**: device-local reclaim queues for the SHARED
 //!   plane, never carried on the profile plane; local copies are preserved.
 //!
@@ -105,6 +108,19 @@ pub async fn person_ai_sync_from_host(
         }
     };
 
+    // Seed the pinned owner identity code from device-local sync state before
+    // merging, which is how the FIRST device's pin reaches the profile plane at
+    // all. `accept_invite_from_host` already recorded the code from the
+    // out-of-band invite into `SyncState`, and this container is the one place a
+    // second device can read it from (the sync plane itself is not a trust
+    // anchor). Seeding only ever fills an EMPTY pin: a container that already
+    // carries one is left alone, so a stale sync state can never re-point it.
+    let mut local = local;
+    let seeded = match super::state::read_sync_state(io, &vault_root).await {
+        Ok(sync_state) => seed_owner_pin_from_sync_state(&mut local, &sync_state),
+        Err(_) => false,
+    };
+
     let remote =
         crate::plugins::sync::person_account::person_profile_read_from_host(host, io, state)
             .await
@@ -119,8 +135,10 @@ pub async fn person_ai_sync_from_host(
     };
 
     // Nothing changed on either side: no cache write, no server write (avoids a
-    // fresh nonce every idle cycle).
-    if merged == local {
+    // fresh nonce every idle cycle). A seeded pin counts as a change even when
+    // the merge itself was a no-op, since the point of seeding is to carry the
+    // pin to the profile plane.
+    if merged == local && !seeded {
         return Ok(());
     }
 
@@ -158,6 +176,10 @@ pub fn merge_person_ai(
     // Personality: whole-value, newest directive wins.
     out.set_personality(merge_personality(local, remote)?.as_deref());
 
+    // The pinned owner identity code: first write wins, and a CONFLICT REFUSES
+    // TO RE-POINT (see `merge_owner_identity_code`).
+    out.set_owner_identity_code(merge_owner_identity_code(local, remote).as_deref());
+
     // Pending-tombstone queues are device-local; keep ours.
     for (k, v) in &local.files {
         if k.starts_with("pending-") {
@@ -182,6 +204,61 @@ pub fn merge_person_ai(
         account_number_hash,
     )?;
     Ok(out)
+}
+
+/// The pinned owner identity code is a TRUST ANCHOR: it is the public half a
+/// group package is verified against, so a merge that silently re-pointed it
+/// would let whoever controls the profile plane redirect verification to a
+/// different owner. First write wins, and a disagreement between the two sides
+/// keeps the LOCAL pin and warns. The warning is deliberately count-free (no pin
+/// material, no account hash), because the code names a person and the account
+/// hash names a vault, and neither belongs in a log.
+fn merge_owner_identity_code(local: &PersonAiState, remote: &PersonAiState) -> Option<String> {
+    match (local.owner_identity_code(), remote.owner_identity_code()) {
+        (Some(l), Some(r)) if l != r => {
+            tracing::warn!(
+                target: "myne_core::plugins::sync::person_ai_sync",
+                "the person profile carries a different pinned owner identity than this device \
+                 holds; keeping the local pin and refusing to re-point the trust anchor"
+            );
+            Some(l.to_string())
+        }
+        (Some(l), _) => Some(l.to_string()),
+        (None, Some(r)) => Some(r.to_string()),
+        (None, None) => None,
+    }
+}
+
+/// Seed the pinned owner identity code from device-local sync state, returning
+/// whether anything was written (`member-devices` task 7).
+///
+/// This is how the FIRST device's pin reaches the profile plane at all.
+/// `accept_invite_from_host` recorded the code from the out-of-band invite into
+/// the vault's `SyncState`, which is device-local: the second device has no copy
+/// of it and the server is forbidden to serve an owner's public half. Seeding
+/// only ever fills an EMPTY pin, so a stale or tampered sync state can never
+/// re-point a pin the container already carries; re-pointing is refused in
+/// [`merge_owner_identity_code`] as well, and that is deliberate rather than
+/// redundant: this guard is what keeps a local file from being trusted, and that
+/// one is what keeps the network from being trusted.
+///
+/// Split out of the writer because the seeding is the half a test can drive
+/// without a profile plane, and because the acceptance criterion is literally
+/// "the first device pins the owner code on unlock".
+pub fn seed_owner_pin_from_sync_state(
+    local: &mut PersonAiState,
+    sync_state: &crate::plugins::sync::state::SyncState,
+) -> bool {
+    if local.owner_identity_code().is_some() {
+        return false;
+    }
+    match sync_state.owner_identity_code.as_deref() {
+        Some(code) if !code.is_empty() => {
+            local.set_owner_identity_code(Some(code));
+            true
+        }
+        _ => false,
+    }
 }
 
 fn merge_personality(local: &PersonAiState, remote: &PersonAiState) -> Result<Option<Vec<u8>>, ()> {
@@ -478,6 +555,95 @@ mod tests {
             }],
         })
         .expect("view")
+    }
+
+    #[test]
+    fn the_pinned_owner_code_is_adopted_once_and_never_re_pointed() {
+        let key = [0x11u8; 32];
+        let acct = [0x22u8; 16];
+        let merge = |l: &PersonAiState, r: &PersonAiState| {
+            merge_person_ai(l, r, MetaVersion::V0_2, &key, &acct).expect("merge")
+        };
+
+        // A first device that has no pin adopts the one the profile carries:
+        // that is the SECOND device's read, and the first device's own push
+        // (which seeded it from sync state) round-trips unchanged.
+        let empty = PersonAiState::empty();
+        let mut remote = PersonAiState::empty();
+        remote.set_owner_identity_code(Some("MYNE-PERSON-1:aa"));
+        assert_eq!(
+            merge(&empty, &remote).owner_identity_code(),
+            Some("MYNE-PERSON-1:aa")
+        );
+
+        // Equal pins on both sides stay put and are not treated as a conflict.
+        let mut same = PersonAiState::empty();
+        same.set_owner_identity_code(Some("MYNE-PERSON-1:aa"));
+        assert_eq!(
+            merge(&same, &remote).owner_identity_code(),
+            Some("MYNE-PERSON-1:aa")
+        );
+
+        // A DIFFERING pin keeps the local one: refusing to re-point the anchor
+        // is the whole point, since the remote side is the untrusted half.
+        let mut conflicting = PersonAiState::empty();
+        conflicting.set_owner_identity_code(Some("MYNE-PERSON-1:bb"));
+        assert_eq!(
+            merge(&conflicting, &remote).owner_identity_code(),
+            Some("MYNE-PERSON-1:bb")
+        );
+
+        // A local pin is never DROPPED by a remote side that has none.
+        assert_eq!(
+            merge(&conflicting, &empty).owner_identity_code(),
+            Some("MYNE-PERSON-1:bb")
+        );
+    }
+
+    // member-devices task 7, the FIRST device's half of the acceptance criterion
+    // "the first device pins the owner code on unlock, and the second device reads
+    // it". The accept path recorded the owner code into the vault's `SyncState`; a
+    // later unlock is what carries it to the profile plane, and this is that step.
+    // An `Option` pin is the whole state, so the four arms are the whole rule.
+    #[test]
+    fn an_unlock_pins_the_owner_code_from_sync_state_once_and_only_once() {
+        let sync_state = crate::plugins::sync::state::SyncState {
+            owner_identity_code: Some("MYNE-PERSON-1:from-state".to_string()),
+            ..Default::default()
+        };
+
+        // The empty container adopts it, and the adoption is REPORTED, which is what
+        // makes the writer push a container whose merge alone changed nothing.
+        let mut empty = PersonAiState::empty();
+        assert!(seed_owner_pin_from_sync_state(&mut empty, &sync_state));
+        assert_eq!(
+            empty.owner_identity_code(),
+            Some("MYNE-PERSON-1:from-state")
+        );
+
+        // A container that already carries a pin is left ALONE, even when sync state
+        // disagrees. Re-pointing the anchor from a device-local file is exactly the
+        // direction that must not be possible, and it is refused here rather than
+        // only in the merge, so the file is never the source of a change.
+        let mut held = PersonAiState::empty();
+        held.set_owner_identity_code(Some("MYNE-PERSON-1:held"));
+        assert!(!seed_owner_pin_from_sync_state(&mut held, &sync_state));
+        assert_eq!(held.owner_identity_code(), Some("MYNE-PERSON-1:held"));
+
+        // Absent and empty-string sync state are both "nothing to seed", and neither
+        // reports a change (an empty string is not a pin: `owner_identity_code()`
+        // filters it, so a container seeded with one would read as pin-less anyway).
+        let none_state = crate::plugins::sync::state::SyncState::default();
+        let mut target = PersonAiState::empty();
+        assert!(!seed_owner_pin_from_sync_state(&mut target, &none_state));
+        assert_eq!(target.owner_identity_code(), None);
+
+        let blank_state = crate::plugins::sync::state::SyncState {
+            owner_identity_code: Some(String::new()),
+            ..Default::default()
+        };
+        assert!(!seed_owner_pin_from_sync_state(&mut target, &blank_state));
+        assert_eq!(target.owner_identity_code(), None);
     }
 
     #[test]

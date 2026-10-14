@@ -71,16 +71,62 @@ export function personListInvites(): Promise<InviteSummary[]> {
   return invoke<InviteSummary[]>("plugin:sync|sync_person_list_invites");
 }
 
-/** Claim an invite and materialize the member vault. */
+/** Claim an invite and materialize the member vault.
+ *
+ * `password` is REQUIRED, and becomes the vault's device-local fast credential
+ * (`vault.member-unlock`), written as part of installing the member session
+ * (myne-md/myne#851 task 7). It is this device's password, not the vault owner's.
+ * Both clients collect it in their own accept form: desktop's `IdentityHome` and
+ * the phone's `IdentityFlow` accept step (myne-md/myne#851 task 14). */
 export function personAcceptInvite(
   inviteIdHex: string,
   ownerCode: string,
   phrase: string,
+  password: string,
 ): Promise<void> {
   return invoke<void>("plugin:sync|sync_person_accept_invite", {
     inviteIdHex,
     ownerCode,
     phrase,
+    password,
+  });
+}
+
+/** Join a vault this identity ALREADY belongs to onto THIS device.
+ *
+ * The second-device path (myne-md/myne#852 task 7), and the reason it is a second
+ * command rather than a flag on the accept. The accept is addressed to a person
+ * who is not yet a member: it collects the owner's identity code out of band and
+ * verifies the group package against THAT. A member's second device has no
+ * out-of-band code and must not be given one, so the owner it verifies against is
+ * the one its own per-`(person, vault)` profile already pins
+ * (`decisions/protocol/0675`), read from the person plane before anything is
+ * claimed. Hence no `ownerCode` here, and `vaultAccountHashHex` on its own, so the
+ * pinned owner is resolved for the named vault before the re-claim.
+ *
+ * `inviteIdHex` comes from the recipient-scoped invite list, which INCLUDES claimed
+ * rows: a re-claim by the invite's own recipient is idempotent
+ * (`decisions/protocol/0672`) and mints a fresh per-vault membership token.
+ *
+ * `phrase` is this person's OWN recovery phrase, never a vault password a member
+ * never had (`decisions/protocol/0606`). `password` is REQUIRED and becomes this
+ * device's member-unlock credential; it is not the owner's password.
+ *
+ * Typed `void` like its sibling above rather than the desktop's
+ * `AcceptedInviteView`: the shell re-probes after the call and this client's accept
+ * has never returned the view, so a return shape here would have no reader.
+ */
+export function personJoinVault(
+  inviteIdHex: string,
+  vaultAccountHashHex: string,
+  phrase: string,
+  password: string,
+): Promise<void> {
+  return invoke<void>("plugin:sync|sync_member_join_vault", {
+    inviteIdHex,
+    vaultAccountHashHex,
+    phrase,
+    password,
   });
 }
 

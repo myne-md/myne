@@ -43,6 +43,25 @@ const ACTIONS_STYLE = {
   flexWrap: "wrap" as const,
 };
 
+/** The reminder shown while this member has no fast credential at all (myne-md/myne#851
+ *  task 9). `--fg-2` and `--text-sm`: it asks, it does not flag, because a member who
+ *  joined before the password step shipped has done nothing wrong. */
+const REMINDER_STYLE = {
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+  margin: 0,
+};
+
+/** Its dismissal: link-shaped, so it does not compete with the Set button. */
+const LINK_STYLE = {
+  font: "inherit",
+  color: "var(--accent)",
+  background: "none",
+  border: 0,
+  padding: 0,
+  cursor: "pointer",
+} as const;
+
 /** Mirror of the Rust `pin::MIN_PIN_LEN`. */
 const MIN_PIN_LEN = 6;
 
@@ -50,6 +69,9 @@ export function MemberPasswordSettings() {
   const { t } = useTranslation();
   const [isMember, setIsMember] = useState(false);
   const [configured, setConfigured] = useState<MemberUnlockMethod | null>(null);
+  // Whether the status probe has answered yet. `configured === null` is ALSO the
+  // value before it resolves, so the reminder below must not read it as "no method".
+  const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<"password" | "pin" | null>(null);
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -57,6 +79,12 @@ export function MemberPasswordSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [biometricUnavailable, setBiometricUnavailable] = useState(false);
+  // The once-only reminder that this member has no fast credential (myne-md/myne#851
+  // task 9, story 22): a member who accepted before the password step shipped can
+  // re-open their vault only with the phrase. Session-scoped, like the roster
+  // invitation, and it writes nothing and blocks nothing: the row below it is where
+  // they act, and the phrase path stays exactly as it was.
+  const [reminderDismissed, setReminderDismissed] = useState(false);
 
   async function refresh(): Promise<void> {
     const id = await activeVaultId();
@@ -75,7 +103,10 @@ export function MemberPasswordSettings() {
         setIsMember(member === true);
         if (member === true) {
           const m = await memberUnlockStatus(id);
-          if (alive) setConfigured(m ?? null);
+          if (alive) {
+            setConfigured(m ?? null);
+            setLoaded(true);
+          }
         }
       } catch {
         if (alive) setIsMember(false);
@@ -148,6 +179,25 @@ export function MemberPasswordSettings() {
         </Button>
       )}
     >
+      {/* The reminder (task 9), shown only while NO method exists AND the probe has
+          answered: `null` is also the value before `memberUnlockStatus` resolves, so
+          without the `loaded` gate this flashed on a vault that does have a password.
+          It is copy, not a control; the Set button above is the action, and the
+          recovery phrase still opens the vault meanwhile. */}
+      {loaded && configured === null && !reminderDismissed ? (
+        <p data-testid="settings.member-password-reminder" style={REMINDER_STYLE}>
+          {t("settings.memberPassword.reminder")}{" "}
+          <Button
+            variant="ghost"
+            type="button"
+            data-testid="settings.member-password-reminder-dismiss"
+            onClick={() => setReminderDismissed(true)}
+            style={LINK_STYLE}
+          >
+            {t("settings.memberPassword.reminderDismiss")}
+          </Button>
+        </p>
+      ) : null}
       {editing === "password" && (
         <div style={SETUP_STYLE}>
           <PasswordInput

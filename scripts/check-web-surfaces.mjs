@@ -353,6 +353,8 @@ const V = {
     "ported",
     "Pure URL construction for the published legal documents (myne-ops#15) — no host call, no IPC, no platform branch. The only input is the i18next language tag, which both clients have. Opening the URL is the seam's job (`openUrl`), and that is already substituted.",
   ],
+  "src/lib/live.ts": ["ported", "IPC bindings for the collaborative-editor live-session commands (open / apply / apply-remote / patch-frontmatter / close). The whole `plugin:live|*` namespace is DISPATCHED in web/wasm/src/dispatch.rs, so every wrapper runs as written against the web dispatcher; the module holds no host call of its own."],
+  "src/lib/identity.ts": ["ported", "IPC binding for the identity resolver (`live-collab` / `collab-provenance`). `plugin:sync|resolve_identity` is DISPATCHED in web/wasm/src/dispatch.rs (reading vault.prefs device_names), so the wrapper runs as written; the module holds no host call of its own."],
   "src/lib/load-bearing-copy.ts": ["ported", "Re-exports `@myne/copy`; the literals are identical across clients by construction."],
   "src/lib/meeting-ai.ts": ["typed-unsupported", "Wraps the `local-inference` plugin's `infer_batch` and `chat_stop`; the whole `local-inference` plugin is `Class::Unsupported` on web (web/wasm/src/capability.rs), so on web the dispatcher answers a typed refusal. The meeting AI surface is desktop-only and is not mounted on web."],
   "src/lib/note-export-errors.ts": ["ported", "Error copy; the export destinations differ, the taxonomy does not."],
@@ -507,9 +509,21 @@ const V = {
     "typed-unsupported",
     "The B2B member commands are `Class::Unsupported` on web (`memberSharing` absent), and the only module that imports this hook is `MemberRosterPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
   ],
+  "src/hooks/useDeviceBindings.ts": [
+    "typed-unsupported",
+    "The device-binding commands (myne-md/myne#852) are `Class::Unsupported` on web: the store is `NTV6`-only and group-tier sealed, and `memberSharing` is absent, so a browser has neither a group key nor a person identity to reach it with. Its only importer is `DeviceAttributionPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file, exactly as `useRoster` one row up.",
+  ],
   "src/lib/invite.ts": [
     "typed-unsupported",
     "Same capability refusal as useRoster; every command here is `Class::Unsupported` on web.",
+  ],
+  "src/lib/deviceBindings.ts": [
+    "typed-unsupported",
+    "The device-to-person binding bindings (myne-md/myne#852, `plugin:device-binding|*`), `Class::Unsupported` on web for the same reason as the rest of the member surface: the store is `NTV6`-only and group-tier sealed. Its only importer is `DeviceAttributionPanel`, substituted out of the bundle, so nothing here reaches served code.",
+  ],
+  "src/lib/memberNames.ts": [
+    "typed-unsupported",
+    "The member display-name writers (myne-md/myne#851, `plugin:member-names|*`), `Class::Unsupported` on web for the same reason as the rest of the member surface. Both of its importers are substituted out of the bundle, which is why nothing here reaches served code: `MemberRosterPanel`, and `MemberNameGate`, which only `IdentityHome` renders and `IdentityHome` is substituted too. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
   ],
   "src/lib/personAccount.ts": [
     "excluded",

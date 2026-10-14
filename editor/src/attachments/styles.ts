@@ -125,6 +125,22 @@ const CSS = `
   .cm-attachment-progress-bar::after { animation-duration: 2.4s; }
 }
 
+/* Live-collaboration awareness caret (live-collab, collab-presence-ui): a peer's
+   caret fades in ONCE when it joins and is otherwise static, a one-shot fade, never
+   a loop or a blink. The @keyframes lives here (the CM theme's StyleModule can't
+   emit it, exactly as the progress chip above); reduced motion removes the fade
+   rather than slowing a looping one, since there is no loop to slow. */
+@keyframes myne-awareness-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.cm-awareness-caret {
+  animation: myne-awareness-fade-in 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-awareness-caret { animation: none; }
+}
+
 /* Click-to-preview lightbox (dogfooding fix #3). Centered, size-capped image
    shown directly on an OPAQUE backdrop — no white frame/padding/box. Mounts to
    document.body so it escapes the CM theme scope. Esc / backdrop-click / the

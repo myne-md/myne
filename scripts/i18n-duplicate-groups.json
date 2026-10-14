@@ -180,7 +180,7 @@
     "reason": "Same delete failure on the archive and trash twins; identical operations, identical string."
   },
   {
-    "value": "\u201c{{name}}\u201d and its {{count}} note",
+    "value": "“{{name}}” and its {{count}} note",
     "keys": [
       "notes.archive.folderDeleteBody",
       "notes.list.deleteFolderBody"
@@ -188,7 +188,7 @@
     "reason": "Same folder-delete dialog body from the archive and the notes list, singular form; one dialog, two entry points."
   },
   {
-    "value": "\u201c{{name}}\u201d and its {{count}} notes",
+    "value": "“{{name}}” and its {{count}} notes",
     "keys": [
       "notes.archive.folderDeleteBody",
       "notes.list.deleteFolderBody"
@@ -449,5 +449,29 @@
       "vaultPicker.accountUnreadable"
     ],
     "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
+  },
+  {
+    "value": "To confirm you saved it, type these four words from the phrase above.",
+    "keys": [
+      "identityFlow.phrase.typebackLead",
+      "identitySetup.typeBackLead"
+    ],
+    "reason": "The desktop identity-setup dialog and the mobile identity flow run the SAME phrase-typeback step, so the question a user must answer is one sentence. Rewording per client would let the two clients ask a different question about the same phrase."
+  },
+  {
+    "value": "That does not match word #{{pos}}.",
+    "keys": [
+      "identityFlow.phrase.wordMismatch",
+      "identitySetup.typeBackMismatch"
+    ],
+    "reason": "The mismatch line for that same typeback step, on the desktop identity-setup dialog and the mobile identity flow; one step, two clients, and the position placeholder interpolates identically on both."
+  },
+  {
+    "value": "Your identity is not signed in on this device. Unlock your identity and try again.",
+    "keys": [
+      "identityHome.acceptErrorUnauthenticated",
+      "identityHome.joinErrorUnauthenticated"
+    ],
+    "reason": "Same state and the same remedy on the accept and the join: the person identity is not signed in on this device, so neither command can proceed and both tell the user to unlock it. The two KEYS stay separate on purpose (the mappings are two modules, decisions/protocol/0672), so a copy edit on one cannot silently move the other; the sentence is shared because the fact is one fact, not because the errors are the same error."
   }
 ]

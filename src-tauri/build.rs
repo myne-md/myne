@@ -9,6 +9,20 @@ fn main() {
             "vault-creation",
             tauri_build::InlinedPlugin::new().commands(&["begin", "commit", "cancel"]),
         )
+        // live-collab (`collab-editor-bridge` task 3): the collaborative-editor
+        // live-session commands. The plugin namespace must be declared or the
+        // permissions under `permissions/live/` flatten into `__app-acl__` and
+        // never match `plugin:live|…`.
+        .plugin(
+            "live",
+            tauri_build::InlinedPlugin::new().commands(&[
+                "live_session_open",
+                "live_session_patch_frontmatter",
+                "live_session_take_remote_splices",
+                "live_session_set_presence",
+                "live_session_close",
+            ]),
+        )
         .plugin(
             "vault-unlock",
             // Task 2 of `vault-unlock-password` ships `unlock`;
@@ -211,6 +225,33 @@ fn main() {
                 "themes_export",
                 "themes_delete",
             ]),
+        )
+        .plugin(
+            "member-names",
+            // The B2B member display-name commands over the encrypted
+            // `vault.member-names` (`MYO5`) singleton, which is group-tier sealed
+            // and `NTV6`-only (`decisions/protocol/0666`). The InlinedPlugin mirror
+            // is load-bearing per the `vault-creation` note above (without it the
+            // `member-names:` permissions flatten into `__app-acl__` and never match
+            // the `plugin:member-names|<cmd>` authorize form); keep it lock-stepped
+            // with `permissions/member-names/default.toml`.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "member_names_list",
+                "member_names_set_mine",
+                "member_names_clear_mine",
+            ]),
+        )
+        .plugin(
+            "device-binding",
+            // The B2B device-to-person binding commands over the encrypted
+            // `vault.device-bindings` (`MYU5`) singleton, which is group-tier sealed
+            // and `NTV6`-only (protocol.md §9.30, the member-devices feature). The
+            // InlinedPlugin mirror is load-bearing per the `vault-creation` note above
+            // (without it the `device-binding:` permissions flatten into `__app-acl__`
+            // and never match the `plugin:device-binding|<cmd>` authorize form); keep it
+            // lock-stepped with `permissions/device-binding/default.toml`.
+            tauri_build::InlinedPlugin::new()
+                .commands(&["device_bindings_list", "device_bindings_claim"]),
         )
         .plugin(
             "notes",
@@ -603,11 +644,13 @@ fn main() {
                 "sync_unsynced_edits",
                 "sync_materialisation_progress",
                 "sync_now",
+                "resolve_identity",
                 "sync_list_devices",
                 "sync_account_status",
                 "sync_approve_device",
                 "sync_remove_device",
                 "sync_pending_conflicts",
+                "sync_awareness_stats",
                 "sync_take_conflict",
                 "sync_resolve_conflict",
                 "sync_mark_tombstone",
@@ -649,6 +692,11 @@ fn main() {
                 "sync_person_inspect_invite_code",
                 "sync_list_vault_invites",
                 "sync_person_accept_invite",
+                // member-devices task 7: a member's SECOND device joins the
+                // vault from the phrase alone. Takes no owner code from the
+                // user: the pinned owner half is read from the person's own
+                // sealed `MYY5` profile, where the accepting device put it.
+                "sync_member_join_vault",
                 "sync_person_unlock_member_vault",
                 "sync_member_vault_status",
                 "sync_person_set_member_password",

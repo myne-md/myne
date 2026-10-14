@@ -194,6 +194,17 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
         crate::plugins::agent::teardown_on_lock(&self.app);
     }
     fn detached_windows_teardown_on_lock(&self) {}
+    /// Drop every open live co-editing session (epic live-collab,
+    /// `collab-editor-bridge`): a session holds decrypted note plaintext, so none
+    /// may survive a lock, a switch, a delete or a force-relock.
+    fn live_session_teardown_on_lock(&self) {
+        if let Some(reg) = self
+            .app
+            .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
+        {
+            reg.clear();
+        }
+    }
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
         // Native screen-capture protection lives in `crate::screen_guard`,

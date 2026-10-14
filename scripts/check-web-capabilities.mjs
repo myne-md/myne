@@ -208,6 +208,19 @@ const CAPABILITY_BACKING = {
   // myne#678 (epic #173): the pop-out spawn plugin. Desktop-only; a browser page
   // cannot open a second OS window.
   detachedWindows: ["detached-window"],
+  // Live-collab `SYNC-31`. Deliberately empty, for the same reason
+  // `localOnlyVault` and `imageCompression` are: this is a pure UI/identity
+  // concern with no refused command of its own. The awareness transport exposes
+  // wasm exports, not an IPC command, and the person/membership commands it would
+  // rely on are already refused under `memberSharing`. Pointing this at those
+  // would double-count an absence that capability already covers.
+  liveCollabMultiUser: [],
+  // Live-collab `collab-presence-ui`. The awareness CURSOR consumer is a native
+  // SSE supervisor and the web Worker-side consumer is not built, so the local
+  // presence report is refused there. Named per command (the whole `live` plugin
+  // ships and dispatches its session commands), so a future cursor port on web
+  // must move this entry rather than inherit a blanket absence.
+  liveCollabAwarenessCursors: ["plugin:live|live_session_set_presence"],
   // myne-md/myne#698: the B2B member-sharing surface (person keypairs, the
   // roster, the invite and the removal rekey). Named per command, NOT as the
   // whole `sync` plugin, which ships on web and dispatches most of its surface.
@@ -225,6 +238,12 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_person_list_invites",
     "plugin:sync|sync_list_vault_invites",
     "plugin:sync|sync_person_accept_invite",
+    // The SECOND device's join (myne-md/myne#852 task 7). Same refusal, same
+    // reason, one command over from the accept above: it is the accept path with
+    // the out-of-band code replaced by the owner identity PINNED in the person's
+    // own sealed profile, so it needs the held person identity for exactly the
+    // same reason and the form asks for the phrase for exactly the same reason.
+    "plugin:sync|sync_member_join_vault",
     "plugin:sync|sync_person_unlock_member_vault",
     "plugin:sync|sync_member_vault_status",
     "plugin:sync|sync_person_set_member_password",
@@ -240,6 +259,20 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",
+    // The member display-name writers (myne-md/myne#851): a separate command
+    // namespace and the same capability refusal, since a name row is signed by a
+    // person identity a served page cannot hold.
+    "plugin:member-names|member_names_set_mine",
+    "plugin:member-names|member_names_clear_mine",
+    // The device-to-person binding store (myne-md/myne#852): the device list and
+    // the claim, one namespace over from the names above and refused for the
+    // same reason. The store is `NTV6`-only and group-tier sealed, the claim
+    // signs with the session's person identity, and a served page holds neither
+    // the group key nor that identity. The panel is substituted out of the web
+    // bundle entirely (`web/vite.config.ts`), so this entry is what keeps the
+    // two lists agreeing rather than the only thing hiding the affordance.
+    "plugin:device-binding|device_bindings_list",
+    "plugin:device-binding|device_bindings_claim",
   ],
 };
 

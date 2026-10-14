@@ -363,7 +363,43 @@ export type Capability =
    * so the About/banner affordances are omitted instead of shown against a
    * command that refuses. See `src-tauri/src/update` and the `update` plugin.
    */
-  | "selfUpdate";
+  | "selfUpdate"
+  // ── capabilities web keeps / drops for the live-collab epic ────────────────
+  /**
+   * A live co-editing SESSION: this client can open one for an open note, making
+   * it the single durable writer and letting a sync pull's peer revision land in
+   * the session rather than clobber in-flight typing (live-collab, `SYNC-31`).
+   * Present on all three clients: a browser can hold a vault and its socket like
+   * any other client.
+   */
+  | "liveCollabPeerPresence"
+  /**
+   * An awareness CURSOR consumer: this client renders peers' cursors, selections
+   * and live typing (`collab-presence-ui`).
+   *
+   * **Absent on web**, split from `liveCollabPeerPresence` on purpose. The
+   * awareness supervisor is a native SSE consumer (`AwarenessSignal` +
+   * `AppHandle`) and the web Worker-side consumer is not built, so the local
+   * presence report (`live_session_set_presence`) is refused there. Kept distinct
+   * so a web session still opens for its own devices' convergence while the
+   * cursor affordance is omitted rather than rendered against a command that
+   * refuses.
+   */
+  | "liveCollabAwarenessCursors"
+  /**
+   * Multi-user (B2B) live collaboration: different PEOPLE sharing a vault over
+   * the group substrate, co-editing one note live (live-collab, `SYNC-31`).
+   *
+   * **Absent on web**, split from `liveCollabPeerPresence` on purpose. A browser
+   * origin cannot hold a person identity, the person keypair is a device-local
+   * sealed file outside browser storage and the panel's recovery-phrase prompt is
+   * substituted out of the served bundle, so multi-user is absent for exactly
+   * the reasons `memberSharing` is, and one undivided `liveCollab` flag would
+   * have implied multi-user worked in the browser. Absent rather than disabled:
+   * the multi-user affordance is omitted, never rendered against commands that
+   * refuse.
+   */
+  | "liveCollabMultiUser";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -415,6 +451,9 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   detachedWindows: true,
   plainFile: true,
   selfUpdate: true,
+  liveCollabPeerPresence: true,
+  liveCollabAwarenessCursors: true,
+  liveCollabMultiUser: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

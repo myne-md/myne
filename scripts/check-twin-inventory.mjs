@@ -713,7 +713,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "IPC wrapper and DTO mirror over the shared person-account sync core, the chats-twin shape (myne-md/myne#768). Desktop's wrapper is async and carries AcceptedInviteView; mobile's is a sync 1:1 port of the six `sync_person_*` commands plus inspectInviteCode and PersonStatusView. Mobile calls only setup/status/list-invites today; the four member-vault bindings are recorded in scripts/ipc-binding-callers.json as the unbuilt mobile surface, which is a per-command absence question rather than a divergence in the wrapper shape.",
+      "IPC wrapper and DTO mirror over the shared person-account sync core, the chats-twin shape (myne-md/myne#768). Desktop's wrapper is async and carries AcceptedInviteView; mobile's is a sync 1:1 port of the six `sync_person_*` commands plus inspectInviteCode and PersonStatusView. The one return-shape divergence is personJoinVault, added on both sides for member-devices (myne-md/myne#852): AcceptedInviteView on desktop, void on mobile, because mobile's shell re-probes after the call and its accept has never returned the view. Both sides call every member-vault binding, each from its own identity screen (desktop's src/screens/IdentityHome.tsx, mobile's mobile/src/app/flows/IdentityFlow.tsx), so this reason used to claim two things that were no longer true: that mobile called only setup/status/list-invites, and that the member-vault bindings were recorded as unbuilt in scripts/ipc-binding-callers.json, which carries no personAccount entry at all.",
   },
   {
     a: "src/lib/prefs.ts",
@@ -1491,6 +1491,30 @@ const ROSTER = [
     destination: "myne-core",
     reason:
       "The inference state machine, 1467 lines against 40. Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
+  },
+  {
+    a: "src-tauri/src/plugins/member_names/mod.rs",
+    b: "mobile/src-tauri/src/plugins/member_names/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Host-registration shim, and the pair is a straight instance of `SHIM_REASON` measured rather than inherited: both files carry `pub use myne_core::plugins::member_names::commands`, both `generate_handler!` rosters list the same three commands, and the two `init()` bodies are the same builder. Mobile's shim entered the record rather than being dropped as trivial because it is the whole substrate of the phone's onboarding name step (myne-md/myne#851 task 15): a member's name is a SIGNED row whose only writer is `member_names_set_mine`, so a client that does not register this plugin cannot name itself at all. What differs between the two is one layer up and is NOT a claim about the ACL: desktop wraps two of the three commands in `src/lib/memberNames.ts` and mobile wraps one, because post-onboarding name editing is out of task 15's scope and `scripts/check-ipc-binding-callers.mjs` refuses a binding with no production caller. Both keep all three registered and granted, so the later editor needs no Rust change.",
+  },
+  {
+    a: "src/lib/memberNames.ts",
+    b: "mobile/src/lib/memberNames.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "The per-client BINDING for a store neither client owns, in three parts that are worth separating rather than calling drift. The command cores and the `MYO5` codec are `myne-core` (see the shim pair above). The wire-shape mirror (`MemberNamesMap` / `MemberNameEntry`) and the refusal-to-i18n-key mapper were extracted into `@myne/client-core` in myne-md/myne#851 task 15, so a dropped `match` arm cannot fall through to a generic-but-plausible sentence on one client only; both sides now import those rather than holding a copy. What remains per-client is the `invoke` wrapper and nothing else, which is exactly the two names `scripts/check-platform-seam.mjs` requires each tree to reach through its own seam. The two files are NOT symmetric and that is recorded rather than resolved: desktop wraps `member_names_set_mine` and `member_names_clear_mine` (its Members-list row editor renames and clears), mobile wraps only the setter, because post-onboarding editing is out of task 15's scope and a binding nothing calls is the dead export `scripts/check-ipc-binding-callers.mjs` exists to refuse. `delegated` rather than `decision` because neither file holds an answer: they hold a transport.",
+  },
+  {
+    a: "src-tauri/src/plugins/device_binding/mod.rs",
+    b: "mobile/src-tauri/src/plugins/device_binding/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Host-registration shim, the same instance of `SHIM_REASON` its `member_names` sibling above records, measured the same way rather than inherited: both files carry `pub use myne_core::plugins::device_binding::commands`, both `generate_handler!` rosters list the same two commands (`device_bindings_list` / `device_bindings_claim`), and the two `init()` bodies are the same builder over the same plugin name, `Builder::<R>::new(\"device-binding\")`. What differs is one doc paragraph: mobile's says why the phone needs the family at all (a member's SECOND device is the case it exists for, and `claim_own_binding_best_effort` is how that device becomes legible to its peers). Mobile's shim entered the record rather than being dropped as trivial for the reason the sibling's did: the family's whole shared core already sat in `myne-core` while the phone registered nothing, so the feature was reachable from no mobile surface. `member_names`' entry declines to claim the two ACLs match, deferring to myne-md/myne#473; this pair's claim is one step stronger and worth stating precisely rather than by analogy. Each host's THREE-way lockstep IS machine-checked, by a self-test in each shim that reads `OUT_DIR/acl-manifests.json` and asserts the `default` bundle, the registered commands and the capability grant agree. The two hosts are deliberately NOT compared to each other, by that test or by `scripts/check-mobile-plugin-acl.mjs`, which walks one tree. So what is verified is that neither side is inert, not that the two sides agree, and the difference is one permission list. What is not a claim here at all: either command has a caller today. Neither does, and both shims say so.",
   },
 ];
 

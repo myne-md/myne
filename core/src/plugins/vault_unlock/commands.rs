@@ -228,6 +228,9 @@ pub async fn unlock_from_host(
         // myne#679: destroy vault A's detached (pop-out) note windows before
         // vault B hydrates: its plaintext must not survive the switch.
         hooks.detached_windows_teardown_on_lock();
+        // live-collab: drop the prior vault's live co-editing sessions before
+        // vault B hydrates, a session holds decrypted note plaintext.
+        hooks.live_session_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -445,6 +448,38 @@ pub(crate) async fn run_post_unlock_pipeline(
     #[cfg(not(target_arch = "wasm32"))]
     crate::plugins::sync::person_vault_carrier::install_from_carrier_best_effort(host, io, state)
         .await;
+
+    // ---- member-devices: this device claims its own binding ----
+    //
+    // LAST, and the position is the whole reason this step can work at all. It needs a
+    // person session (that is what signs the row), and on an owner vault the session
+    // arrives one step above, from the vault-bound carrier; a claim placed anywhere
+    // before it would stand down on a vault whose identity is perfectly well installed.
+    // The invite-accept path installs its own session and claims separately
+    // (`sync::person_account::accept_invite_from_host`), because it never runs this
+    // pipeline.
+    //
+    // NOT under the stamp permit above, deliberately: that permit serializes
+    // `vault.meta`-lifecycle mutations, and this step writes a different file at the
+    // vault root. What it takes instead is the pair every writer of a group-sealed
+    // singleton owes (`device_binding::store::write_mutex` states them), and it takes
+    // them in the store's own command core rather than here so that the unlock hook and
+    // the command cannot diverge. Best-effort end-to-end: a failed claim logs and never
+    // blocks the unlock.
+    //
+    // Native-only: the family's `commands` submodule borrows the person account plane's
+    // session accessors, which do not exist on `wasm32`, and a web session has no
+    // `group_key` to derive the family's KEK from in the first place.
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(active) = state.active_vault_id().await {
+        if let Ok(base) = host.app_data_dir() {
+            let vault_dir = crate::paths::vault_root_for_id_from_base(&base, active);
+            crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                io, state, &vault_dir,
+            )
+            .await;
+        }
+    }
 }
 
 /// The unlock-time membership stamp, extracted so the permit gate above reads
@@ -1480,6 +1515,9 @@ pub async fn lock_from_host(
     // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
+    // live-collab: drop every open live co-editing session on the manual lock ,
+    // a session holds decrypted note plaintext, so locking means locked for it too.
+    hooks.live_session_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -2616,6 +2654,7 @@ mod tests {
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
                     "detached_windows_teardown_on_lock",
+                    "live_session_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

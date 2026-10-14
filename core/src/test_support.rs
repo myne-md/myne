@@ -439,6 +439,9 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn detached_windows_teardown_on_lock(&self) {
         self.record("detached_windows_teardown_on_lock");
     }
+    fn live_session_teardown_on_lock(&self) {
+        self.record("live_session_teardown_on_lock");
+    }
     fn clear_staged_descriptor(&self) {
         self.record("clear_staged_descriptor");
     }

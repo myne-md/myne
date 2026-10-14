@@ -185,9 +185,9 @@ nowhere else). The other two are `writable`, and a refusal with no policy at all
 agent has no intent for, which is refused because it simply was never classified, and which is the
 verdict on the large majority of the index. This entry said three until the 2026-10-13 review counted
 them, and undercounted the fourth case its own next sentence describes. The last one is why the display family has two members rather than five
-(`decisions/ai/0665`).
+(`decisions/ai/0676`).
 
-Used in: `settingsSearchIndex.ts`; `decisions/ai/0665`; myne-md/myne#850
+Used in: `settingsSearchIndex.ts`; `decisions/ai/0676`; myne-md/myne#850
 
 ### **agent personality** &nbsp; 📦 *Product*
 
@@ -393,6 +393,24 @@ Used in: `vision.md`; `threat-model.md` §7; `decisions.md` 2026-07-01, 2026-07-
 An observation that was proposed as a manual item and ruled out because an existing or plausible `e2e/`, `e2e-web/`, Vitest or cargo test could honestly assert it. Paying it is the only thing that lowers `totalMinutesCeiling`, so it is the mechanism by which the roster shrinks and the gate widens rather than a backlog of nice-to-haves. Tracked as issues rather than as a file, because a second list beside the roster is the drift the roster exists to stop: myne-md/myne#554 and its four lane sub-issues carry the 265 observations the first derivation ruled out.
 
 Used in: `decisions.md` 2026-08-25 (manual test roster, myne-md/myne#548), myne-md/myne#554
+
+### **awareness frame** &nbsp; 📋 *Protocol*
+
+The unit of the live-collaboration awareness plane: an opaque, end-to-end-sealed frame carried over the `/sync/awareness` relay, holding either a live note change (opaque Automerge change bytes) or awareness (cursor, selection, presence). Sealed under a per-vault awareness key, group-derived for a shared (`NTV6`) vault; the relay reads no note id, cursor or content. Ephemeral and RAM-only: never persisted, synced or backed up. A per-session signed identity assertion is specified for it and **ships as an unwired codec** (nothing signs or verifies one on the production path yet), so a peer's attribution is the device actor resolved client-side. Distinct from the zero-payload [contentless poke](#contentless-poke), which is a separate stream. See [awareness room](#awareness-room).
+
+Used in: `threat-model.md` §7, AS24; `decisions/sync/0655`; `myne-agents/epics/live-collab/`
+
+### **awareness room** &nbsp; 📋 *Protocol*
+
+The note-scoped routing key of the live-collaboration awareness plane: a **per-note** room id, derived client-side and **note-unlinkable** (the relay cannot invert it to a note id), scoping the relay's fan-out. The relay indexes on it verbatim and never parses it, and keeps its room table RAM-only, so it sees only that a vault has live editing rooms and how active each is (A13), never which notes. A post-rotation frame from a retired group-key epoch is refused by the frame AAD. See [awareness frame](#awareness-frame).
+
+Used in: `decisions/sync/0655`; `myne-agents/epics/live-collab/`
+
+### **awareness plane** &nbsp; 📋 *Protocol*
+
+The live-collaboration layer of two things together: the [awareness frame](#awareness-frame) and the [live-awareness relay](#live-awareness-relay) that fans it out, distinct from the durable note plane and from the poke. It is **not at rest**: an awareness frame is sync-wire-only with no §10.3 magic (`spec/protocol.md` §5.2/§10.7), and the relay holds its room table in RAM only. Its client half is the native awareness supervisor plus the presence surface; its server half is stateless fan-out with a rate sub-bucket of its own. See [awareness frame](#awareness-frame), [live session](#live-session).
+
+Used in: `decisions/sync/0655`; `docs/spec/server-protocol.md` §3.5; `myne-agents/epics/live-collab/`
 
 ### **backup schedule** &nbsp; 📦 *Product*
 
@@ -680,7 +698,7 @@ Used in: `spec/protocol.md` §5.2
 
 ### **contentless poke** &nbsp; 📋 *Protocol*
 
-The Phase 2 sync change-notification signal: a **zero-payload** "vault changed, come pull" message carrying **no note-id, no version, no count, no cursor** — anything beyond mere arrival would leak which/what/how-much changed to the untrusted server or a network observer (A13). Polling is the **privacy-default baseline** (a device appears online only at poll time); the poke (over SSE) is an **opt-in low-latency** layer. Presence + timing of a poke is intrinsic A13 (a push already reveals it) and accepted; no payload is added on top. See [sync cursor](#sync-cursor). Phase 2.
+The Phase 2 sync change-notification signal: a **zero-payload** "vault changed, come pull" message carrying **no note-id, no version, no count, no cursor**, anything beyond mere arrival would leak which/what/how-much changed to the untrusted server or a network observer (A13). Polling is the **privacy-default baseline**; since 2026-07-12 the poke (over SSE) is **baseline while the vault is unlocked** (mobile: and foregrounded), which supersedes the earlier opt-in posture (`decisions.md` 2026-07-12). Presence + timing of a poke is intrinsic A13 (a push already reveals it) and accepted; no payload is added on top. It stays literally zero-payload and is a SEPARATE stream from the [awareness frame](#awareness-frame) plane. See [sync cursor](#sync-cursor). Phase 2.
 
 Used in: `spec/sync-protocol.md` §8
 
@@ -710,9 +728,9 @@ Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-08-15 "Note cov
 
 ### **CRDT (Conflict-free Replicated Data Type)** &nbsp; 🏗️ *Construction*
 
-A class of data structures that allow concurrent edits across multiple replicas to be merged without coordination. Myne uses [Automerge](#automerge) (a Rust CRDT library) as its CRDT — for the next-major note-body CRDT note-type (`automerge-sync-migration`, `decisions.md` 2026-08-09) and, later, Phase-4 real-time collaborative editing. CRDTs are not in v0.1.
+A class of data structures that allow concurrent edits across multiple replicas to be merged without coordination. Myne uses [Automerge](#automerge) (a Rust CRDT library) as its CRDT: for the `NC05` note-body CRDT note-type (`automerge-sync-migration`, `decisions.md` 2026-08-09), which is the at-rest format, and since 2026-10-10 for [real-time collaboration](#real-time-collaboration), which ships in the next release (`decisions/sync/0655`).
 
-Used in: `vision.md` (Phase 4 scope); `decisions.md` 2026-08-09
+Used in: `vision.md`; `decisions.md` 2026-08-09, `decisions/sync/0655`
 
 ### **credential phishing** &nbsp; ⚠️ *Threat*
 
@@ -931,6 +949,18 @@ Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
 One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): a preference that describes how *this device* presents, secures, or operates on the vault — security posture (`auto_lock_seconds`, `screen_capture_protection`), presentation (`theme`, the `editor_*` fields), input (`keymap`), screen-dependent UI layout, and device state (`last_backup_at`, `paired_extensions`). A device-local pref never crosses the merge — the local value always survives — even though the whole encrypted blob transits the server (the same bytes already leave the device inside backups). Contrast [shared pref](#shared-pref). Not to be confused with a [device-local credential](#device-local-credential), which is a *key-material* class.
 
 Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
+
+### **device password** &nbsp; 🗝️ *Key/identifier*
+
+The password a person chooses at the moment they accept a vault invite, which becomes their **device-local** fast credential: it seals their `group_key`, `items_key` and person keypair into the device-local `vault.member-unlock` store under the `"myne.v0.2 argon2id-person-vault-member-unlock|"` salt domain, so a member vault re-opens without retyping the 24-word phrase every session (`decisions/protocol/0653`). It is THIS DEVICE's, not the vault owner's: a member vault has no owner password to type here, and the product copy says so ("the password you set on this device", `locales/en/common.json`). Since `decisions/ui/0668` it is **required** at accept, on both clients, rather than offered afterwards in Settings, so a member device now stores an extra credential on disk by default; that default and its threat-model consequence are the subject of `threat-model.md` A5/AS21. **Distinct from**: the owner's vault master password (which rides in the synced `vault.meta`), the [recovery phrase](#recovery-phrase) (device-portable, and still the portable credential on every device at every unlock screen, through `vault.member-key`, `decisions/protocol/0606`), and a [device-local credential](#device-local-credential) in general.
+
+Used in: `decisions/protocol/0653`, `decisions/ui/0668`, `core/src/plugins/sync/person_account.rs`, `spec/protocol.md` §9.29
+
+### **device-to-person binding** &nbsp; 📋 *Protocol*
+
+The record that says which [person identity](#person-identity) a given [device_id](#device_id-vv-actor) **claims** to belong to, held in the shared singleton `vault.device-bindings` (`MYU5`, `spec/protocol.md` §9.30) as a versioned, optionally tombstoned map of `device_id -> { person_fingerprint, version, tombstone, signature_hex }`. It exists so a member's **second** device is attributed to that member rather than to the vault at large (`decisions/protocol/0669`), and it is the durable person attribution `decisions/protocol/0660` recorded as a follow-up when device-scoped provenance shipped. Every row carries a hybrid Ed25519 + ML-DSA-65 signature under the `"myne.device-binding v1|"` class, verified against the person the row CLAIMS (`decisions/protocol/0670`). **Attribution here is legibility, not proof.** The map is sealed under the GROUP tier, so any member can write it, and the signature makes a row the named person's own record rather than evidence about anything else: it is not a statement about who authored a note, which is `decisions/protocol/0660`'s limit. **It also binds no device**: the signed message covers the `device_id` but ties nothing to it, so any member can sign a row naming any device id, a co-member's included, under their own fingerprint, and the writer-chosen version lets that row outbid the real one. A verified row is therefore a **claim** ("this person says this device is theirs"), never an ownership, and a surface that shows a person beside a device renders "claimed by" rather than "belongs to". It carries no key material and grants no access, so a device absent from the map is unattributed, not refused. Distinct from the [device registry](#device-registry) (the server's per-account table, keyed by the same `device_id` but holding no person at all) and from the [device name](#device-name) (a device's own label, inside the sealed prefs blob).
+
+Used in: `spec/protocol.md` §9.30; `decisions/protocol/0669`, `0670`
 
 ### **Documentation node** &nbsp; 📦 *Product*
 
@@ -1304,6 +1334,12 @@ public half; neither `root_key` nor a root-derived membership key participates.
 Used in: `docs/spec/protocol.md` §9.3.3
 
 
+### **reserved frontmatter region** &nbsp; 📋 *Protocol*
+
+The managed keys of a note's frontmatter (`title:`, `folder:`, `updated:`, `deleted:`, `trashed:`, `archived:`, `template:`) treated as a non-spliced region on the live-collaboration plane. The block is part of the one Automerge `Text` (`spec/protocol.md` §10.7), but the live splice LIST never carries it: the splices a peer's change produces are clamped to the body span before the editor dispatches them, and the managed region is re-derived at durable boundaries (`spec/markdown-dialect.md` §3.6). The clamp is on the splice list, not on the document: a peer change that reached the region is still applied to the session's `Text`. This is why a tombstone routes to the §11.1 remove-wins rule on the durable plane instead of being text-merged, merging two managed-frontmatter edits interleaves to a well-formed value neither device wrote (#431). Unknown frontmatter keys survive, because the frontmatter is never parsed into CRDT fields. See [live session](#live-session).
+
+Used in: `spec/sync-protocol.md` §10.1; `decisions/sync/0658`; `myne-agents/epics/live-collab/`
+
 ### **run indicator** &nbsp; 📦 *Product*
 
 *(Alias: the orb.)*
@@ -1331,6 +1367,12 @@ both signature halves are mandatory, so an untrusted server cannot forge a
 retirement.
 
 Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/spec/protocol.md` §9.3.4
+
+### **rotation-package delivery** &nbsp; 📋 *Protocol*
+
+The blind, latest-per-recipient relay that carries each remaining member's [group package](#group-package) to that member after an owner group-key rotation (`collab-b2b-sessions`, extending `decisions/protocol/0603` + `0607`). A group rotation produces one owner-double-signed package per REMAINING live member (the removed member gets none, its roster row being a tombstone with no wrap); the owner POSTs each to the vault-scoped, person-addressed route `PUT /b2b/vaults/{account_hash}/group-packages/{person_id}`, and a member GETs its own under its person session plus a membership binding. The server parses no payload; only `epoch` is cleartext, and a write at an epoch not greater than the stored one is ignored. Unlike an invite the package is **not one-shot consumed**: it stays retrievable until the recipient's next sync catches up. A member whose `vault.meta` epoch is strictly greater than its device-local member-key epoch fetches its package, verifies the owner signature against the owner public half pinned at accept, and installs the rotated `group_key`. See [group package](#group-package), [awareness room](#awareness-room).
+
+Used in: `docs/spec/server-protocol.md` §3.4a; `docs/decisions/protocol/0661-member-rotation-package-delivery-and-awareness-stream-termination.md`
 
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
@@ -1451,6 +1493,12 @@ The on-device optical-character-recognition generation of [attachment text extra
 Deliberately **not** an AI feature and **not** behind the AI opt-in — it is search correctness, and gating a background indexer behind a beta toggle would mean it effectively never ran. It therefore ships in every build, including the `--no-default-features` auditable one.
 
 Two limits are honest, measured properties rather than bugs. **Turkish diacritics do not survive reliably** — no available on-device model reproduces them, so the search index carries a diacritic-folded token variant for attachment documents to compensate; the *stored* text is whatever OCR produced. And recognition below a per-word confidence floor is discarded, so an image with no readable text is cached as empty rather than indexed with hallucinated words. (`spec/protocol.md` §9.15; MYND-441)
+
+### **identity colour** &nbsp; 📦 *Product*
+
+The categorical colour a live-collaboration peer is drawn in: a deterministic hash of the participant's STABLE identity key (the person id in a shared `NTV6` vault, the device id in a single-user vault) into the eight existing `--group-*` colours. Two devices of one person share a colour in a shared vault; collisions are accepted and more than eight participants wrap. Cosmetic and client-side only: the colour never travels in the awareness frame and the server never chooses it, so this is deliberately NOT the authoritative id hash `SYNC-44` governs (that rule is about deriving e.g. the head-author id from public halves). See [participant list](#participant-list) and [remote cursor](#remote-cursor).
+
+Used in: `decisions/ui/0659`; `docs/design/`; `myne-agents/features/collab-presence-ui/`
 
 ### **ignored invariant test** &nbsp; 🛠️ *Tooling*
 
@@ -1778,6 +1826,18 @@ Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
 
 The right-panel tab answering **both** directions of a note's [bidirectional links](#bidirectional-links) in two counted sections: "linked from" (incoming — the notes that link to the open note) and "links to" (outgoing — the notes it links to). Each direction lists clickable rows that open the target note and shows an explicit empty state when it has none; both recompute from the in-RAM [VaultIndices](#vaultindices) on an index-nonce bump, keeping the previous row array when the result is unchanged so a no-op reindex does not re-render. Renamed from "Backlinks" when the outgoing half landed (MYND-604); the **tab id stays `backlinks`** — it is persisted in every user's `right_panel_tab_order` / `right_panel_hidden_tabs` (`spec/protocol.md` §9.5.2), so only the label changed. Distinct from the sibling **Unlinked** tab, which surfaces [unlinked mentions](#unlinked-mention) rather than explicit links.
 
+### **live session** &nbsp; 📋 *Protocol*
+
+The per-note single durable writer of the live-collaboration editor plane (`collab-editor-bridge`; `SYNC-33`/`SYNC-34`). Keyed `(vault, note)`, it holds one Automerge document and is the ONLY writer for its note while open: a stateless `note_update` on the same note is refused, and a second open attaches to the existing session rather than opening a second. Its live frame path is **body-only into the editor**, the managed frontmatter is a [reserved frontmatter region](#reserved-frontmatter-region) whose splices are clamped so a peer change touching it is never dispatched into the editor, and a tombstone routes to the §11.1 remove-wins rule on the durable plane rather than being text-merged, so the live plane adds no third conflict-resolution path. Each revision is authored under the device's Automerge actor (`SYNC-42`). See [awareness frame](#awareness-frame).
+
+Used in: `spec/sync-protocol.md` §10.1; `decisions/sync/0658`; `myne-agents/epics/live-collab/`
+
+### **live-awareness relay** &nbsp; 📋 *Protocol*
+
+The `/sync/awareness` server surface that fans [awareness frames](#awareness-frame) out to a [room](#awareness-room)'s subscribers and accepts publishes: a blind, RAM-only SSE fan-out that holds its subscriber and room tables in memory, never logs a frame beyond the IP-free access line, spends a rate sub-bucket separate from push/pull (so awareness can neither starve sync nor be starved by it), and terminates a removed member's open streams the moment their revoked token is seen. It cannot read a frame (the seal is end-to-end) and stores none. Distinct from the [contentless poke](#contentless-poke), which shares the SSE shape and nothing else. See [awareness plane](#awareness-plane).
+
+Used in: `docs/spec/server-protocol.md` §3.5; `decisions/sync/0657`; `myne-agents/epics/live-collab/`
+
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
 On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, on the user's machine by default. **Amended 2026-08-09:** "on the user's machine, always" is no longer the whole story — a user may name an [AI provider](#ai-provider), and a [remote AI provider](#remote-ai-provider) receives note text off-device. What survives unconditionally is **no telemetry, ever**, and **no model download the user did not ask for**; a model is fetched only on explicit user action from Myne's own origin and verified against a compiled-in digest (myne-md/myne#805, `decisions/ai/0628`), and *nothing leaves until the user names a provider*. *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Developer → AI (`ai_enabled` pref, default off), reachable only once [Developer mode](#developer-mode) is on (`decisions.md` 2026-07-30), and the denylist gate (`ai-no-network-check.sh`) proves what it can actually prove — *no third-party crate in the closure originates outbound requests* — which is a crate-level property, not "this binary cannot reach the network" (`decisions.md` 2026-08-04). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, [auto-tag](#auto-tag), and the writing-assistant ([ghost-text](#ghost-text) + slash commands). **Three classes of model now, and the distinctions are load-bearing:** the generation and embedding roles are the **user's own side-loaded files** (untrusted input — Myne does not vouch for them), while the *task-models* — transcription (`decisions.md` 2026-07-19) and auto-tag (`decisions.md` 2026-07-31, unbundled by myne-md/myne#805) — are **first-party weights**: transcription still ships bundled inside the desktop build, while the tag model is fetched on explicit user action from Myne's own origin and verified against a compiled-in digest, or side-loaded. (This entry said "the signed, reproducible desktop build" until 2026-08-25 and both words were wrong for desktop: see **code-signed releases** and **reproducible builds** in this file, and entry 0534.) The never-downloaded commitment is superseded (myne-md/myne#805, `decisions/ai/0628`): the tag model is fetched on explicit user action from Myne's own origin and verified against a compiled-in digest, which is the one runtime fetch path on the AI surface. The third class is a **provider-served** model — weights Myne never sees at all, held by a [local model runtime](#local-model-runtime) or a [remote AI provider](#remote-ai-provider). v0.1 runs the runtime in-process for the first two classes, with a sandboxed keyless sidecar deferred as pre-default-on hardening — so a bundled model narrows the supply-chain surface but earns no key-isolation claim. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
@@ -1819,6 +1879,12 @@ Used in: `decisions.md` 2026-08-09, 2026-08-04; `dev/ai-no-egress.md`
 Sealing a device-local secret-bearing entry **at the moment it arrives**, while the vault is locked and `root_key` is unavailable, under a **device-local keychain `wrap_key`** rather than a `root_key`-derived subkey. The watch meeting-capture lane is its worked example: each `transferFile` audio chunk is sealed by the phone's receiver as soon as it is delivered, rather than being left for a later drain the way a dictated capture is staged for the Rust seal. Two things this does NOT do, stated because an earlier revision claimed the stronger version: the OS writes each delivered chunk to the app's inbox in plaintext under Data Protection before any of our code sees it (that window is real and disk-backed, bounded to the delivery-and-seal round-trip), and the receiver MOVES that file into an app-owned inbox rather than leaving it for the OS to reclaim. The seal reuses the share-import queue's existing device-local codec (`MYF1`, `spec/protocol.md` §9.20) and its device key (`md.myne.shareimport`, §9.20.2, deliberately distinct from the capture queue's `md.myne.captures` so the two queues rotate independently), so the window it narrows is a timing property rather than a new format. See also [pending meeting](#pending-meeting), [pending capture](#pending-capture). (`decisions/clients/0647`)
 
 Used in: `decisions/clients/0647`; `spec/protocol.md` §9.20, §9.20.2; `threat-model.md` §7
+
+### **remote cursor** &nbsp; 📦 *Product*
+
+A peer's live caret and its name label, drawn in the open note as one CodeMirror point widget; their selection is a range mark in the same [identity colour](#identity-colour). Presentation only: the frame codec and the per-session signed assertion are `collab-awareness-crypto`, and the LOCAL caret/selection stay the editor's own single `drawSelection`: the awareness layer installs no second one. The label always sits beside the caret, so colour is never the sole channel, and a caret published for another note never renders (the decoration gates on the note id the view holds). A peer's caret fades in once on join and is otherwise static, with no looping or blinking. Distinct from the [contentless poke](#contentless-poke) and the [awareness frame](#awareness-frame), which carry it. See [participant list](#participant-list).
+
+Used in: `decisions/ui/0659`; `myne-agents/features/collab-presence-ui/`
 
 ### **policy refusal** &nbsp; 📦 *Product*
 
@@ -1885,6 +1951,20 @@ Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs
 The user's primary authentication credential. Held in user memory only. Fed to Argon2id with `salt_password` to derive `password_wrap_key`, which encrypts a copy of `root_key`. Myne recommends ≥12 characters and zxcvbn score ≥3 at signup; users with weaker passwords are protected primarily by their recovery phrase.
 
 Used in: `spec/protocol.md` §3.1, §4.1
+
+### **member display name** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+The name a member of a shared (`NTV6`) vault chooses for themselves, and that their co-members see beside their fingerprint in the Members list (`myne-md/myne#851`). It lives in its own blob family, `vault.member-names` (`MYO5`, `protocol.md` §9.29, `decisions/protocol/0666`), and NOT in the owner-signed [group roster](#group-roster), because the roster is owner-signed and compared byte-for-byte by older clients: a value any member may change cannot live there. It is group-tier sealed, so every member reads every name and only members read any; a name is vault content, encrypted and synced and backed up, readable by the whole vault and by nobody else.
+
+Three properties are load-bearing rather than incidental. Each row is signed by the person it NAMES under the `"myne.member-name v1|"` class (`decisions/protocol/0667`), so a member cannot claim another member's row; a tombstone is additionally accepted from the vault owner, which is how a removal clears a row. A name is **per vault**, so one member can be "Ada" in one vault and something else in another. And a name is a **label, not an identity**: two members may choose the same one, the fingerprint and the role badge are what identify a row, and a row whose record fails signature verification renders as [unverified](#member-name-verification-state) rather than as a name. Nothing keys on the name itself.
+
+Used in: `docs/decisions/protocol/0666-member-display-names-a-group-tier-sealed-myo5-family.md`; `docs/spec/protocol.md` §9.29; `src/components/sync/MemberRosterPanel.tsx`; `myne-md/myne#851`.
+
+### **member name verification state** &nbsp; 📋 *Protocol*
+
+The verdict a reader attaches to a member display-name row: `verified` (the row's signature checks out against the public half of the person the row names), `unverified` (a record exists and the signature does not check out, or names somebody else), or `absent` (no record for that person). The three are deliberately separate rather than collapsed into a boolean or into "no name", because "this member has not chosen a name" and "somebody wrote a row for this member that nobody signed" are different things to tell a reader. The verification happens where the roster's public halves are already available, and the unverified record's CONTENT is not carried out of that partition, so a tampered name never reaches a surface that could render it.
+
+Used in: `docs/spec/protocol.md` §9.29.4; `docs/decisions/protocol/0667-the-member-name-signature-class.md`; `protocol/src/member_names_blob.rs` (`partition_verified`).
 
 ### **member removal** &nbsp; 📦 *Product*
 
@@ -2204,6 +2284,18 @@ The rendering rule every [ornament primitive](#ornament-primitive) obeys: orname
 
 Used in: `decisions.md` 2026-08-06
 
+### **participant list** &nbsp; 📦 *Product*
+
+The right-panel "Who's here" tab listing the peers editing the open note: one row per participant carrying the resolved name and their [identity colour](#identity-colour). Title Case for a name in the list, sentence case for the product copy around it. Clicking a row jumps the view to that peer's [remote cursor](#remote-cursor); there is no follow mode (the camera never locks onto a peer). A participant whose per-session assertion did not verify renders the degraded label. The name comes from the shared backend resolver (device name for a single-user vault, roster person for a shared one), never a frontend id hash.
+
+Used in: `decisions/ui/0659`; `myne-agents/features/collab-presence-ui/`
+
+### **per-revision attribution** &nbsp; 📦 *Product*
+
+The version history's account of who made each revision. A revision's author is the Automerge actor inside the `NC05` document, which is the DEVICE's stable id (set on every edit path), so the history shows the device that made the change, named or as a short-code fallback, and in a shared (`NTV6`) vault resolves a person for it by joining the durable [device-to-person binding](#device-to-person-binding) with the owner-signed roster and the [member display name](#member-display-name) store (`spec/protocol.md` §9.28 to §9.30, `decisions/protocol/0674`). It is a data-model fact a reader is shown, **not a signature**: anyone who can edit the document can set the actor it resolves, so a person-level attribution is legibility rather than proof, and a device whose binding is absent or tombstoned, or whose bound member has signed no name, falls back to the device label (`decisions/protocol/0660`, whose limit `0674` does not lift). The one id hash (`myne.head-author v1|`) stays in Rust; the frontend computes none. See [live session](#live-session) and [remote cursor](#remote-cursor).
+
+Used in: `decisions/protocol/0660`; `docs/spec/sync-protocol.md` §4.1; `docs/threat-model.md` §7; `myne-agents/features/collab-provenance/`
+
 ### **partitioning oracle** &nbsp; ⚠️ *Threat*
 
 An attack class against non-key-committing AEAD where an attacker constructs a single ciphertext that decrypts validly under multiple keys (Len–Grubbs–Ristenpart, USENIX Security 2021). With a partial-decrypt oracle, this enables binary-search-style brute-force across a password dictionary, dramatically faster than naive offline attack. Myne's CTX commitment construction (§5.1) closes this attack vector.
@@ -2257,6 +2349,12 @@ Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
 
 
+### **presence assertion** &nbsp; 🗝️ *Key/identifier*
+
+The per-session double-signed record that binds a live-collaboration peer's Automerge device actor to its person id, under the signature class `"myne.awareness-presence v1|"` (`protocol.md` §5.2/§10.7; `decisions/protocol/0656`, `SYNC-11`). It is what lets the presence surface name a peer rather than render an unattributed label when the signature cannot be verified. Ephemeral and RAM-only like the [awareness frame](#awareness-frame) that carries it. **Recorded but not yet wired**: the codec and the class prefix ship, but nothing signs or verifies one on the production path yet, so a frame's identity is not currently checked. See [awareness frame](#awareness-frame), [participant list](#participant-list).
+
+Used in: `docs/decisions/protocol/0656`; `docs/spec/protocol.md` §5.2, §10.7
+
 ### **person account** &nbsp; 📦 *Product*
 
 A person-level server account independent of any vault (`decisions/protocol/0603`, myne-md/myne#711). It authenticates with SCRAM whose secret derives from the person's recovery phrase under `"myne.v0.2 argon2id-person-server-auth|"` plus `person_id_hash`, so one person holds one account across every vault they belong to. A vault keeps its own `account_number` as its public id, its namespace and its pre-auth `GET /vault.meta` bootstrap key. Access to a vault is an authenticated membership binding (owner at registration, member at acceptance) that issues a per-vault bearer token, so revoking one binding affects one vault and no other. The server knows the pseudonymous person-to-vault mapping, which is the collaboration social graph accepted by decisions 0459, but reads no roster plaintext.
@@ -2291,12 +2389,16 @@ against a pinned owner key). Shape:
 `MYNE-PERSON-1:<person_id_hex>:<kem_ek_hex>:<ed_pk_hex>:<mldsa_vk_hex>`, all
 lowercase hex. It carries **public** material only (the addressable [person
 account](#person-account) id and the [person keypair](#person-keypair) public
-halves) and never reaches the sync server: the sealed invite relay's outer frame
-is the recipient id and the vault id alone (`decisions/protocol/0603` Q10), so the
+halves). The sealed invite relay never carries it: the outer frame is the
+recipient id and the vault id alone (`decisions/protocol/0603` Q10), so the
 public halves must travel through a channel the server does not control. The owner
 pastes it (a QR is not viable: the code is roughly 6.4k hex characters), sees the
 derived [fingerprint](#bootstrap-fingerprint), and confirms it out of band before
-the invite is sealed. Not an AEAD/magic value and not an AAD role.
+the invite is sealed. Since `decisions/protocol/0675` a member's device also records
+the OWNER's code as a pin inside that person's own sealed `MYY5` profile
+(`docs/spec/protocol.md` §9.28.4), so the code DOES now reach the sync server, as
+ciphertext inside a blob keyed from the person's own phrase: the server stores it
+and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
 Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
@@ -2374,7 +2476,13 @@ randomizer, so it opens on every client from the phrase alone and neither the
 group key nor the owner `root_key` can read it. The `profile-id` is
 `SHA-256("myne.person-profile-id v1|" || person_id_hash || account_number_hash)[:16]`
 and is bound into the AAD with `account_number_hash`, so a profile moved to
-another person or vault fails verification. Provider choice, credential and
+another person or vault fails verification. The inner schema is opaque to the
+codec layer and its one non-AI field is the **pinned owner identity code**: the
+owner's public `person identity code` a member's device pins at accept, carried
+here so that member's SECOND device, which has no out-of-band code of its own,
+adopts the owner it must verify a group package against rather than trusting one.
+A device holding a different pin keeps its own and refuses
+(`decisions/protocol/0675`). Provider choice, credential and
 egress consent are deliberately NOT in this blob (device-local). Removal and
 scheduled deletion make no recall guarantee. It syncs on a vault-scoped,
 person-authorized namespace SEPARATE from the shared group manifest
@@ -2387,7 +2495,7 @@ remote container at the family layer rather than by whole-value overwrite, so a
 concurrent edit on another device is not dropped (`decisions/protocol/0610`). An
 owner or single-user vault keeps the shared families instead.
 
-Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/decisions/protocol/0608-person-private-profile-plane.md`; `docs/decisions/protocol/0610-person-private-profile-family-layer-merge.md`; `docs/spec/protocol.md` §9.28
+Used in: `docs/decisions/protocol/0594-b2b-group-key-and-revocation-hierarchy.md`; `docs/decisions/protocol/0608-person-private-profile-plane.md`; `docs/decisions/protocol/0610-person-private-profile-family-layer-merge.md`; `docs/decisions/protocol/0675-the-pinned-owner-identity-code-travels-in-the-per-person-myy5-profile.md`; `docs/spec/protocol.md` §9.28
 
 
 
@@ -2406,7 +2514,7 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
-Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: **P1** = single-user desktop, plus the self-hostable sync server (which moved into Phase 1 — `vision.md`, 2026-07-18); **P2** = the *managed hosted* account and paid tier on top of that server; **P3** = mobile clients and the desktop-**browser** client; **P4** = sharing, real-time collaboration, plugin API. The older "P2 = sync server + optional web client" reading is superseded on both halves: the server shipped in P1, and the web client is a P3 desktop-browser client with a deliberately narrower capability set, not an "optional" variant of the desktop one.
+Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: **P1** = single-user desktop, plus the self-hostable sync server (which moved into Phase 1, `vision.md`, 2026-07-18); **P2** = the *managed hosted* account and paid tier on top of that server; **P3** = mobile clients and the desktop-**browser** client; **P4** = the remaining sharing maturity and the plugin API. **Real-time collaboration was pulled out of P4 and ships in the next release** (`decisions/sync/0655`). The older "P2 = sync server + optional web client" reading is superseded on both halves: the server shipped in P1, and the web client is a P3 desktop-browser client with a deliberately narrower capability set, not an "optional" variant of the desktop one.
 
 Used in: `vision.md`, `decisions.md`
 
@@ -2675,6 +2783,12 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 The read-only variant of the [`Slot`] enum, holding a second vault's keys for the length of a [vault import](#vault-import) (myne-md/myne#464). Carries `root_key`, `items_key`, `items_key_id` in `Zeroizing` wrappers plus `opened_at`, exactly as **Recovering** does, and for the same reason: the whole credential chain is verified when the slot is created rather than at first use. It is NOT an unlock and has no transition into one: every editor command matches `Slot::Unlocked` and so rejects it at compile time, and the only ways out are the import ending, the [target vault](#target-vault) locking or switching, and an independent 30-minute TTL swept by the idle timer. It does not count against the one-`Unlocked` invariant, because it is not an `Unlocked` entry: two vaults' keys can be resident at once, which is the one thing about this feature the threat model had to be amended for (`threat-model.md` A6).
 
 Used in: `threat-model.md` A6, `decisions.md` 2026-08-30 "A vault opened for READING is a slot, not an unlock"
+### **real-time collaboration** &nbsp; 📦 *Product*
+
+The capability, shipping in the next release, that lets two clients edit one note at the same time and see each other's live typing and cursors. It covers the same person's own devices and different people sharing a vault over the B2B substrate. It builds on the `NC05` Automerge note-type for content and a live-awareness plane (downstream SSE plus upstream authenticated POST on `/sync/awareness`) for presence, and it reverses the v1 anti-feature (`decisions/sync/0655`). Its accepted metadata cost (active-note presence, active-edit timing, and, for shared vaults, a temporal co-editing graph) is `threat-model.md` §7 and the AS24 asset.
+
+Used in: `vision.md`; `decisions/sync/0655`; `myne-agents/epics/live-collab/`
+
 ### **removal clock** &nbsp; 📋 *Protocol*
 
 The per-entry timestamp that lets a set-union preference express a DELETION (myne-md/myne#613). A union alone cannot: an entry removed on one device is an absence, indistinguishable from "this device never had the entry", so the peer's copy is restored by the next union and the deletion undoes itself within two rounds, with no concurrency required. The clock is the tombstone that makes the difference legible.
@@ -2957,7 +3071,7 @@ Used in: `spec/protocol.md` §9.5.4; myne-md/myne#613
 ### **setting intent** &nbsp; 📦 *Product*
 
 One setting the agent may change, named by the settings-index id it resolves from: the closed set that
-IS the agent's permission to write a preference (`decisions/ai/0665`). Twelve exist: the ten
+IS the agent's permission to write a preference (`decisions/ai/0676`). Twelve exist: the ten
 note-placement settings and the two display formats.
 
 **A closed set rather than a general `set_pref`, for the reason
@@ -2976,7 +3090,7 @@ something a folder could legitimately be compared against.
 Distinct from an [agent-writability verdict](#agent-writability-verdict), which is the index entry's
 own declaration: an intent is the permission, a preference is the storage.
 
-Used in: `decisions/ai/0665`; `core/src/plugins/agent/setting.rs`; `scripts/agent-setting-intents.json`; myne-md/myne#850
+Used in: `decisions/ai/0676`; `core/src/plugins/agent/setting.rs`; `scripts/agent-setting-intents.json`; myne-md/myne#850
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 
@@ -3471,6 +3585,12 @@ Used in: `scripts/check-twin-inventory.mjs`, `docs/dev/twin-inventory.md`, `deci
 The recorded SET of twin pairs that currently differ semantically. It may shrink, never grow: a pair appearing in it that was not there before fails the build, and `--record` REFUSES to write a grown set, so the command the failure message suggests cannot be used to make the failure go away. A set rather than a count, because the case that actually happens is one pair converging while another diverges, which leaves a count unmoved. Only the SEMANTIC field gates: 15 of the tree's byte-different pairs differ only in a comment or the platform-seam import, and gating the byte flag would redden `pre-commit` for adding a comment to either side of a byte-identical pair. Its denominator has a separate floor, `EXAMINED_FLOOR`, kept in the guard rather than in the record, because shrinking the twin roster would shrink the set for free and read as progress.
 
 Used in: `scripts/check-twin-drift-ratchet.mjs`, `scripts/twin-drift-ratchet.json`, `decisions.md` 2026-09-02 (twin-drift ratchet, myne-md/myne#473)
+
+### **type-back challenge** &nbsp; 📦 *Product*
+
+The phrase-confirmation gate at identity and vault creation: four word positions are drawn when the 24-word phrase is generated, the user retypes those four words, and the primary action stays gated until all four match. It exists because a phrase the user has not written down is a phrase they cannot recover with. It is a comprehension gate rather than a challenge-response protocol: the positions are on screen, nothing is keyed from them, and the draw is re-derived per mount, so predictability buys an attacker nothing. The draw is deliberately NOT uniform: one word comes from the first eight, two from the middle eight and one from the last eight, so a user who wrote down only the first 16 words is caught rather than having a 1-in-6 chance of passing. `decisions/ui/0665` gave the identity flow the same challenge vault creation has run since v0.1, superseding the earlier identity-first first run (`decisions/ui/0615`).
+
+Used in: `src/components/PhraseTypeBack.tsx`, `mobile/src/lib/phraseChallenge.ts`, `decisions/ui/0665`
 
 ### **`@myne/client-core`** &nbsp; 🛠️ *Tooling*
 

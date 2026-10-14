@@ -412,6 +412,11 @@ fn main() {
                     "sync_person_inspect_invite_code",
                     "sync_list_vault_invites",
                     "sync_person_accept_invite",
+                    // member-devices task 7: a member's SECOND device joins the
+                    // vault from the phrase alone. Takes no owner code from the
+                    // user: the pinned owner half is read from the person's own
+                    // sealed `MYY5` profile, where the accepting device put it.
+                    "sync_member_join_vault",
                     "sync_person_unlock_member_vault",
                     "sync_member_vault_status",
                     "sync_person_set_member_password",
@@ -451,6 +456,41 @@ fn main() {
                     "sync_lifecycle_resume",
                     "sync_decode_join_qr",
                 ]),
+            )
+            .plugin(
+                // The B2B member display-name commands over the encrypted
+                // `vault.member-names` (`MYO5`) singleton, which is group-tier
+                // sealed and `NTV6`-only (decisions/protocol/0666, myne-md/myne#851
+                // task 15). Shared from `myne-core`; the same three commands the
+                // desktop registers. The `InlinedPlugin` mirror is load-bearing:
+                // without it the `member-names:` permissions flatten into
+                // `__app-acl__` and never match the `plugin:member-names|<cmd>`
+                // authorize form. Keep lock-stepped with the `generate_handler!` in
+                // `plugins/member_names/mod.rs` AND with
+                // `permissions/member-names/default.toml`. All three lists must
+                // agree, and `scripts/check-mobile-plugin-acl.mjs` compares them.
+                "member-names",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "member_names_list",
+                    "member_names_set_mine",
+                    "member_names_clear_mine",
+                ]),
+            )
+            .plugin(
+                // The B2B device-to-person binding commands over the encrypted
+                // `vault.device-bindings` (`MYU5`) singleton, which is group-tier
+                // sealed and `NTV6`-only (protocol.md §9.30, the `member-devices`
+                // feature). Shared from `myne-core`; the same two commands the
+                // desktop registers. The `InlinedPlugin` mirror is load-bearing:
+                // without it the `device-binding:` permissions flatten into
+                // `__app-acl__` and never match the `plugin:device-binding|<cmd>`
+                // authorize form. Keep lock-stepped with the `generate_handler!` in
+                // `plugins/device_binding/mod.rs` AND with
+                // `permissions/device-binding/default.toml`. All three lists must
+                // agree, and `scripts/check-mobile-plugin-acl.mjs` compares them.
+                "device-binding",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["device_bindings_list", "device_bindings_claim"]),
             )
             .plugin(
                 // On-device speech-to-text (MYND-563): creates the

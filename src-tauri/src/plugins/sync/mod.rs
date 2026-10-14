@@ -48,12 +48,14 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_unsynced_edits,
             commands::sync_materialisation_progress,
             commands::sync_now,
+            identity_resolver::resolve_identity,
             commands::sync_person_unlock,
             person_account::sync_person_setup,
             person_account::sync_person_status,
             person_account::sync_person_list_invites,
             person_account::sync_list_vault_invites,
             person_account::sync_person_accept_invite,
+            person_account::sync_member_join_vault,
             person_account::sync_person_unlock_member_vault,
             person_account::sync_member_vault_status,
             person_account::sync_person_set_member_password,
@@ -77,6 +79,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_approve_device,
             commands::sync_remove_device,
             commands::sync_pending_conflicts,
+            // Read-only awareness transport counters for the leak budget
+            // (`collab-verification` task 3); desktop-only (the web client has no
+            // awareness supervisor).
+            awareness_listener::sync_awareness_stats,
             commands::sync_take_conflict,
             commands::sync_resolve_conflict,
             commands::sync_mark_tombstone,

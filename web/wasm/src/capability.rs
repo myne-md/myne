@@ -297,6 +297,10 @@ pub const DISPATCHED: &[&str] = &[
     // With no background loop yet it is the browser's only way to sync, which is
     // why the core's honest `NotEnrolled`-not-`Idle` mapping matters here.
     "plugin:sync|sync_now",
+    // The identity resolver (`collab-provenance` task 2): map an Automerge actor to
+    // a {Device, Person, Unknown} identity, reading `vault.prefs` device_names. No id
+    // hash crosses to the page.
+    "plugin:sync|resolve_identity",
     // Enrolment (task 84) — what puts this browser INTO the device roster, and
     // task 33's remaining half. The first dispatched command whose core carries
     // key material: the credential is `Zeroizing`-wrapped and dies with the
@@ -391,6 +395,14 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:vault-indices|vault_indices_property_keys",
     "plugin:vault-indices|vault_indices_persist",
     "plugin:vault-indices|vault_indices_hydrate",
+    // live-collab, collab-editor-bridge task 3, the collaborative-editor
+    // live-session commands. Dispatched on web: single-user multi-device presence
+    // is a web capability (SYNC-31); the absent half is multi-user, which is a
+    // person identity, not these commands.
+    "plugin:live|live_session_open",
+    "plugin:live|live_session_patch_frontmatter",
+    "plugin:live|live_session_take_remote_splices",
+    "plugin:live|live_session_close",
 ];
 
 /// Whole plugins with one classification. An entry applies to every command
@@ -673,6 +685,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_person_list_invites", Class::Unsupported),
     ("plugin:sync|sync_list_vault_invites", Class::Unsupported),
     ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
+    ("plugin:sync|sync_member_join_vault", Class::Unsupported),
     (
         "plugin:sync|sync_person_unlock_member_vault",
         Class::Unsupported,
@@ -713,6 +726,36 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),
+    // The member display-name store (`vault.member-names`, `MYO5`;
+    // myne-md/myne#851). A separate plugin namespace, same refusal as the rest of
+    // the B2B member surface above: a page holds no person identity to sign a name
+    // row with, and the store is group-tier sealed and `NTV6`-only, so no part of it
+    // becomes reachable by porting more. `member_names_list` carries no binding in
+    // the shared tree to classify: the roster view already reports a row's resolved
+    // name, and `src/lib/memberNames.ts` says why it is not wrapped.
+    (
+        "plugin:member-names|member_names_set_mine",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:member-names|member_names_clear_mine",
+        Class::Unsupported,
+    ),
+    // The device-to-person binding store (`vault.device-bindings`, `MYU5`;
+    // myne-md/myne#852). A third plugin namespace on the same B2B surface, and
+    // the same refusal for the same reason as the two above: the store is
+    // group-tier sealed and `NTV6`-only, its writer keys a row by THIS device's
+    // enrolled id and signs it with the session's person identity, and a page
+    // holds neither. Porting more would not reach either command: the vault has
+    // no group key on a client with no member sharing.
+    (
+        "plugin:device-binding|device_bindings_list",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:device-binding|device_bindings_claim",
+        Class::Unsupported,
+    ),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
     // rule for display and entry alike. They are listed in `DISPATCHED` rather
@@ -817,6 +860,15 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // page. Answering `stopped` would read as "not protected" to a user who is
     // in fact running the whole browser over Tor.
     ("plugin:sync|sync_get_tor_state", Class::Unsupported),
+    // The local presence half of the awareness plane (`collab-presence-ui`):
+    // `live_session_set_presence` records this device's caret/selection for the
+    // awareness supervisor, which owns a native SSE stream (`AwarenessSignal` +
+    // `AppHandle`). The web Worker-side awareness consumer is not built, so the
+    // command has no consumer here and is `Unsupported` rather than `Pending`: this
+    // is a scope decision (a browser cursor plane is its own feature), not a port
+    // on the current list. The frontend does not call it on web,
+    // `liveCollabAwarenessCursors` is absent there, so no refusal is fired.
+    ("plugin:live|live_session_set_presence", Class::Unsupported),
 ];
 
 /// Classify one IPC command name.

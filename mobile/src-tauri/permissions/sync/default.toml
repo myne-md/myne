@@ -38,6 +38,7 @@ permissions = [
     "allow-sync-person-inspect-invite-code",
     "allow-sync-list-vault-invites",
     "allow-sync-person-accept-invite",
+    "allow-sync-member-join-vault",
     "allow-sync-person-unlock-member-vault",
     "allow-sync-member-vault-status",
     "allow-sync-person-set-member-password",
@@ -140,6 +141,11 @@ commands.allow = ["sync_list_vault_invites"]
 identifier = "allow-sync-person-accept-invite"
 description = "Allow invoking sync:sync_person_accept_invite (B2B: claim a sealed invite from the relay with the person token, verify the owner-signed group package against the owner's public half from the out-of-band owner identity code, unwrap the group key, derive the itemsKey, materialize a local member vault and install a member slot with no root key). The keys stay backend-side."
 commands.allow = ["sync_person_accept_invite"]
+
+[[permission]]
+identifier = "allow-sync-member-join-vault"
+description = "Allow invoking sync:sync_member_join_vault (B2B, member-devices task 7: join a shared vault as a member's SECOND device from the recovery phrase alone, with no owner action and no fresh invite). Reads the pinned owner identity code from the joining person's own sealed MYY5 profile, re-claims the invite (idempotent for its own recipient) for a fresh per-vault membership token, verifies the retained group package against the pinned owner half, and materializes + installs the member slot. No owner code is collected from the user and none is taken from the package; the phrase and the device-local password cross IPC once, and no key material does."
+commands.allow = ["sync_member_join_vault"]
 
 [[permission]]
 identifier = "allow-sync-person-unlock-member-vault"

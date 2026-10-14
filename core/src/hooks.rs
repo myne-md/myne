@@ -132,6 +132,18 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// `scripts/check-lock-teardown.mjs` keys a PAIRS row on that registry so a
     /// client that holds it cannot ship the body empty.
     fn detached_windows_teardown_on_lock(&self);
+    /// Drop every open live co-editing session on lock (epic live-collab,
+    /// `collab-editor-bridge`).
+    ///
+    /// A live session holds decrypted note plaintext (the whole note is the
+    /// Automerge `Text`) for as long as it is open, so a lock, a vault switch, a
+    /// delete or a change-password force-relock that left one resident would
+    /// recreate the `myne-md/myne#454` class: a locked vault's content in RAM, and
+    /// records leaking into the next vault. The client holds `LiveSessionRegistry`
+    /// (`app.manage` on desktop/mobile, a `OnceLock` on web) and clears it here;
+    /// `scripts/check-lock-teardown.mjs` keys a PAIRS row on that registry so an
+    /// empty body cannot ship.
+    fn live_session_teardown_on_lock(&self);
     fn clear_staged_descriptor(&self);
     /// `site` is the `&'static str` tracing tag the desktop free-fn expects.
     fn apply_screen_capture(&self, enabled: bool, site: &'static str);
@@ -296,6 +308,7 @@ impl VaultLifecycleHooks for NoopHooks {
     fn pdf_export_teardown_on_lock(&self) {}
     fn agent_teardown_on_lock(&self) {}
     fn detached_windows_teardown_on_lock(&self) {}
+    fn live_session_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, _: bool, _: &'static str) {}
 
@@ -421,6 +434,7 @@ pub mod test_hooks {
         fn pdf_export_teardown_on_lock(&self) {}
         fn agent_teardown_on_lock(&self) {}
         fn detached_windows_teardown_on_lock(&self) {}
+        fn live_session_teardown_on_lock(&self) {}
         fn clear_staged_descriptor(&self) {}
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}

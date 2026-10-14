@@ -257,6 +257,19 @@ pub fn run() {
         // the shared-core compiled code; this crate adds only the wrapper +
         // capability entry. The scheduler/loop stays out (MYND-460).
         .plugin(plugins::sync::init())
+        // B2B member display names (MYO5, §9.29; myne-md/myne#851 task 15): the
+        // three shared-core commands the desktop registers, gated by a single
+        // deny-by-default `member-names:default` capability. The phone's name step
+        // is what calls `member_names_set_mine`, and a signed name row has no other
+        // writer, so this registration IS that step's substrate.
+        .plugin(plugins::member_names::init())
+        // B2B device-to-person bindings (MYU5, §9.30; the `member-devices` feature):
+        // the two shared-core commands the desktop registers, gated by a single
+        // deny-by-default `device-binding:default` capability. A member's SECOND
+        // device is the case the family exists for, and the phone is the device a
+        // person is most likely to add one on, so this registration is that flow's
+        // substrate rather than a companion to it.
+        .plugin(plugins::device_binding::init())
         // On-device speech-to-text (Whisper, MYND-563): transcription-only mobile
         // plugin. Feature-gated by `local-inference` (default-on) — the module's
         // `init()` is a no-op when the feature is off, so this stays an
@@ -330,6 +343,16 @@ pub fn run() {
             // token. Mirrors the desktop wiring.
             app.manage(myne_core::plugins::sync::poke_listener::SsePokeSignal::default());
             myne_core::plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
+            // Live-awareness stream (live-collab): sibling of the poke supervisor,
+            // same gate, opaque frames. Mirrors the desktop wiring.
+            app.manage(myne_core::plugins::sync::awareness_listener::AwarenessSignal::default());
+            myne_core::plugins::sync::awareness_listener::spawn_awareness_supervisor(
+                app.handle().clone(),
+            );
+            // Live co-editing sessions (live-collab, `collab-editor-bridge`): the
+            // per-device registry of open notes' Automerge documents, cleared on
+            // every vault-leaving hook. Mirrors the desktop wiring.
+            app.manage(myne_core::plugins::live::LiveSessionRegistry::default());
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`
