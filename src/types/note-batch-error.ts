@@ -56,7 +56,8 @@ export type NoteBatchError =
    */
   | { kind: "CommittedPendingPublish"; detail: { io_error_kind: IoFailureKind } }
   /** `tokio::task::spawn_blocking` panic / runtime shutdown. */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  | { kind: "LiveSessionOpen" };
 
 /** Type-narrowing helper for the `Io` variant. */
 export function isBatchIoError(

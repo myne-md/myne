@@ -47,9 +47,24 @@ afterEach(cleanup);
 
 // Three snapshots, newest-first — the order `snapshot_list` returns.
 const SNAPS: SnapshotMeta[] = [
-  { snapshot_uuid: "s-newest", captured_at_ms: 3_000, size_bytes: 300 },
-  { snapshot_uuid: "s-middle", captured_at_ms: 2_000, size_bytes: 200 },
-  { snapshot_uuid: "s-oldest", captured_at_ms: 1_000, size_bytes: 100 },
+  {
+    snapshot_uuid: "s-newest",
+    captured_at_ms: 3_000,
+    size_bytes: 300,
+    resolved_author: { kind: "Unknown" },
+  },
+  {
+    snapshot_uuid: "s-middle",
+    captured_at_ms: 2_000,
+    size_bytes: 200,
+    resolved_author: { kind: "Unknown" },
+  },
+  {
+    snapshot_uuid: "s-oldest",
+    captured_at_ms: 1_000,
+    size_bytes: 100,
+    resolved_author: { kind: "Unknown" },
+  },
 ];
 
 const BODY: Record<string, string> = {
@@ -228,5 +243,75 @@ describe("<SnapshotsPanel> — compare-against selector", () => {
     fireEvent.click(screen.getByTestId("snapshots.restore-confirm-cta"));
 
     await waitFor(() => expect(restoreMock).toHaveBeenCalledWith("note-1", "s-middle"));
+  });
+});
+
+describe("<SnapshotsPanel>, resolved author (collab-provenance)", () => {
+  it("renders the author as a name, never a raw id or hash, with Unknown as copy", async () => {
+    renderPanel();
+    const authors = await screen.findAllByTestId("snapshots.author");
+    expect(authors.length).toBeGreaterThan(0);
+    // The fixture's revisions resolve to `unknown` → the localized copy.
+    expect(authors[0]?.textContent).toBe("Unknown device");
+    expect(authors[0]?.getAttribute("data-author-kind")).toBe("Unknown");
+    // No raw 32-hex id can reach this cell, and that is a property of the TYPES
+    // rather than of the markup: `resolved_author` is a `ResolvedIdentity`, whose
+    // union carries a name or a six-char code and no id at all, so `tsc` is the
+    // check and it runs on every build. The `document.body.innerHTML` sweep that
+    // used to stand here could not fail over any fixture this file can build,
+    // because `SnapshotMeta` has no field an actor id could arrive in: it asserted
+    // the fixture rather than the code (`AGENTS.md`, "A fixture that cannot hold
+    // the defective state is not a test"). The shape of the code the resolver hands
+    // over is pinned where it is produced, by
+    // `identity_resolver::tests::the_device_code_is_the_first_six_hex_chars`, and the
+    // DOM half of the same guarantee is swept on the presence row, which is the
+    // surface where an id genuinely had somewhere to hide
+    // (`tests/notes/presenceLabels.test.tsx`).
+  });
+
+  // `member-devices` task 4: the durable resolver now names a PERSON, so the list
+  // has three arms to render and each is asserted here. The named row is the one
+  // the feature exists for, and it is the row a regression would silently turn
+  // back into a device label while every other check stayed green.
+  it("names a bound device's revision by the member's name", async () => {
+    listMock.mockResolvedValue([
+      {
+        snapshot_uuid: "s-newest",
+        captured_at_ms: 3_000,
+        size_bytes: 300,
+        resolved_author: { kind: "Person", name: "Ada" },
+      },
+      ...SNAPS.slice(1),
+    ]);
+    renderPanel();
+    const authors = await screen.findAllByTestId("snapshots.author");
+    expect(authors[0]?.textContent).toBe("Ada");
+    expect(authors[0]?.getAttribute("data-author-kind")).toBe("Person");
+    // A person's name is the whole row: no device label, no code.
+    expect(authors[0]?.textContent).not.toContain("Device");
+  });
+
+  it("falls back to the device code for an unbound device, and to its label when it has one", async () => {
+    listMock.mockResolvedValue([
+      {
+        snapshot_uuid: "s-newest",
+        captured_at_ms: 3_000,
+        size_bytes: 300,
+        resolved_author: { kind: "Device", name: null, code: "aabbcc" },
+      },
+      {
+        snapshot_uuid: "s-middle",
+        captured_at_ms: 2_000,
+        size_bytes: 200,
+        resolved_author: { kind: "Device", name: "Ada's Laptop", code: "aabbcc" },
+      },
+      SNAPS[2]!,
+    ]);
+    renderPanel();
+    const authors = await screen.findAllByTestId("snapshots.author");
+    expect(authors[0]?.textContent).toBe("Device aabbcc");
+    expect(authors[0]?.getAttribute("data-author-kind")).toBe("Device");
+    // The user-chosen label outranks the code, the same order the roster uses.
+    expect(authors[1]?.textContent).toBe("Ada's Laptop");
   });
 });

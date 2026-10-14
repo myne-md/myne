@@ -441,6 +441,7 @@ export interface EditorHost {
      *  act inside makes two controls that do the same thing. */
     remove: (noteId: string | null) => void;
   };
+
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

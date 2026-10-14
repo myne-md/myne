@@ -165,6 +165,27 @@ export const TEARDOWN_CALLS = [
     },
   },
   {
+    call: "clearAwareness",
+    declaredIn: "src/notes/collab/awarenessStore.ts",
+    holds:
+      "the live-presence peers for the open note: other devices' or people's names, cursors and selections",
+    // The store is MODULE scope and outlives every pane, so a vault-leaving path that
+    // skips the clear leaves the previous vault's participants resident into the next
+    // session. It holds no note plaintext, but a name and a cursor are still a record
+    // of who was editing what. Asserted at the lock choke point and on the switch and
+    // delete paths, which reach the editor without the pane necessarily unmounting.
+    appliesTo: ["desktop-lock", "desktop-switch", "desktop-delete"],
+    skips: {
+      "desktop-create": SKIP_CREATE,
+      "mobile-lock":
+        "mobile compiles `src/notes/collab/awarenessStore.ts` (shared tree), but its live-awareness channel is not wired yet, so nothing populates the store on mobile and there is nothing resident to drop. When mobile's channel lands, this row MUST wire `clearAwareness()` into mobile's `lockVault` and delete this skip.",
+      "mobile-background":
+        "same as mobile-lock: mobile's live-awareness channel is not wired, so the store is always empty there. The skip is coupled to the mobile-lock one; both go together when the channel lands.",
+      "mobile-delete":
+        "same as mobile-lock: mobile's live-awareness channel is not wired, so the store is always empty there.",
+    },
+  },
+  {
     call: "resetDateTimeDisplayForLock",
     declaredIn: "editor/src/host/lib/datetimeFormat.ts",
     holds:

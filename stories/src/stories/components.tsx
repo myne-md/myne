@@ -40,6 +40,7 @@ import { DeleteAttachmentDialog } from "@app/components/attachments/DeleteAttach
 import { DeleteVaultConfirmForm } from "@app/components/DeleteVaultConfirmForm";
 import { DestructiveBanner } from "@app/components/DestructiveBanner";
 import { DeviceJoinQr } from "@app/components/sync/DeviceJoinQr";
+import { DeviceAttributionPanel } from "@app/components/sync/DeviceAttributionPanel";
 import { DeviceManagementPanel } from "@app/components/sync/DeviceManagementPanel";
 import { Editor } from "@app/screens/Editor";
 import { EncryptingStep } from "@app/screens/vault-creation/EncryptingStep";
@@ -48,6 +49,7 @@ import { NameStep } from "@app/screens/vault-creation/NameStep";
 import { AuthShell } from "@app/screens/AuthShell";
 import { ChoiceRow } from "@app/components/ChoiceList";
 import { PhraseGrid } from "@app/components/PhraseGrid";
+import { PhraseTypeBack } from "@app/components/PhraseTypeBack";
 import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
 import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
@@ -65,6 +67,7 @@ import { ImportPlainFileButton } from "@app/components/plain/ImportPlainFileButt
 import { IntegrityAlertBanner } from "@app/components/sync/IntegrityAlertBanner";
 import { JoinDeviceModal } from "@app/components/sync/JoinDeviceModal";
 import { Keycaps } from "@app/components/primitives/Keycaps";
+import { MemberNameGate } from "@app/components/sync/MemberNameGate";
 import { MemberRosterPanel } from "@app/components/sync/MemberRosterPanel";
 import { MemberVaultUnlockCard } from "@app/components/sync/MemberVaultUnlockCard";
 import { ModalShell } from "@app/components/primitives/ModalShell";
@@ -945,6 +948,48 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <BuildingIndexState building />,
   },
   {
+    id: "components/deviceattributionpanel/default",
+    group: "components",
+    surface: "DeviceAttributionPanel",
+    state: "default",
+    description:
+      "Device Attribution Panel, a default state: one device claimed by a named member, one claimed by a member with no name (which shows the fingerprint instead), this device's own row, and one device id whose row did not verify, which renders as a bare id under a marker.",
+    tags: ["components", "deviceattributionpanel", "default", "b2b", "member"],
+    fixture: {
+      description:
+        "shared vault whose device-binding map holds three verified rows and one id that did not verify",
+      handlers: {
+        "plugin:device-binding|device_bindings_list": () => ({
+          rows: [
+            {
+              device_id_hex: "aa".repeat(16),
+              person_fingerprint_hex: "11".repeat(32),
+              person_id_hex: "22".repeat(32),
+              member_name: "Ada",
+              is_this_device: true,
+            },
+            {
+              device_id_hex: "bb".repeat(16),
+              person_fingerprint_hex: "33".repeat(32),
+              person_id_hex: "44".repeat(32),
+              member_name: null,
+              is_this_device: false,
+            },
+            {
+              device_id_hex: "cc".repeat(16),
+              person_fingerprint_hex: "55".repeat(32),
+              person_id_hex: null,
+              member_name: "Grace",
+              is_this_device: false,
+            },
+          ],
+          unverified_device_ids: ["dd".repeat(16)],
+        }),
+      },
+    },
+    render: () => <DeviceAttributionPanel />,
+  },
+  {
     id: "components/devicejoinqr/default",
     group: "components",
     surface: "DeviceJoinQr",
@@ -1037,6 +1082,41 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description: "Join Device Modal, a default state.",
     tags: ["components", "joindevicemodal", "default"],
     render: () => <JoinDeviceModal onCancel={action("onCancel")} onJoined={action("onJoined")} onRecovering={action("onRecovering")} />,
+  },
+  {
+    id: "components/membernamegate/default",
+    group: "components",
+    surface: "MemberNameGate",
+    state: "default",
+    description:
+      "The required name step right after an accept (myne-md/myne#851 task 8). The caller's own roster row carries no verified name, so the gate asks for one: there is no skip control, the copy says the name is how the other members will see them, and the gate writes nothing until Save, so quitting here leaves the accepted vault openable and unnamed.",
+    tags: ["components", "membernamegate", "default", "onboarding"],
+    fixture: {
+      description: "an accepted member vault whose caller has not set a name",
+      handlers: {
+        "plugin:sync|sync_list_roster": () => ({
+          members: [
+            {
+              fingerprint_hex: "aa".repeat(32),
+              is_self: true,
+              display_name: "",
+              name_state: "absent",
+              role: "member",
+              version: 0,
+              previous_fingerprint_hex: null,
+              joined_at: 0,
+              member_ed_pk_hex: "bb".repeat(32),
+              member_kem_ek_hex: "cc".repeat(32),
+              member_mldsa_vk_hex: "dd".repeat(48),
+              continuity: null,
+            },
+          ],
+          authority: "member",
+          group_key_epoch: 3,
+        }),
+      },
+    },
+    render: () => <MemberNameGate onDone={action("onDone")} />,
   },
   {
     id: "components/memberrosterpanel/default",
@@ -1838,6 +1918,28 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onReveal={action("onReveal")}
         onHide={action("onHide")}
         testIdPrefix="stories.phrase"
+      />
+    ),
+  },
+  {
+    id: "components/phrasetypeback/default",
+    group: "components",
+    surface: "PhraseTypeBack",
+    state: "default",
+    description:
+      "The recovery-phrase type-back challenge the vault and identity ceremonies share: four labelled fields in a 2x2 grid, one per drawn word position. The frame shows one answered field, a WRONG answer with its inline mismatch line beneath the input, and the remaining fields empty.",
+    tags: ["components", "phrasetypeback", "default"],
+    // Three states in one frame on purpose: an answered field, a WRONG answer
+    // (the inline mismatch), and one still empty.
+    render: () => (
+      <PhraseTypeBack
+        phrase={PHRASE}
+        positions={[2, 11, 14, 21]}
+        values={{ 2: PHRASE[1], 11: "wrong", 21: "" }}
+        onChange={action("onChange")}
+        labelFor={(pos) => `Word #${pos}`}
+        mismatchFor={(pos) => `That does not match word #${pos}.`}
+        testIdPrefix="stories.confirm"
       />
     ),
   },

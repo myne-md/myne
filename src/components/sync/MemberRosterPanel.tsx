@@ -26,6 +26,7 @@ import { Input } from "../primitives/Input";
 import { HELPER_STYLE, MULTILINE_STYLE } from "../settings/panel-styles";
 import { SettingsSection } from "../settings/SettingsSection";
 import { toast } from "../toast/toastStore";
+import { clearMyMemberName, memberNameErrorKey, setMyMemberName } from "../../lib/memberNames";
 import {
   setPersonIdentityState,
   usePersonIdentityState,
@@ -110,6 +111,51 @@ const ERROR_STYLE: CSSProperties = {
   color: "var(--danger)",
 };
 
+/** The invitation on an unnamed caller's own row (myne-md/myne#851 task 9, story
+ *  22). `--fg-2`, not `--warning`: a member who joined before this shipped has done
+ *  nothing wrong, and the copy asks, it does not flag. */
+const INVITE_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+};
+
+/** The dismissal inside that invitation: a link-shaped button, not a second
+ *  control competing with the one that sets the name. */
+const LINK_STYLE: CSSProperties = {
+  font: "inherit",
+  color: "var(--accent)",
+  background: "none",
+  border: 0,
+  padding: 0,
+  cursor: "pointer",
+};
+
+/** The unverified-name marker (`myne-md/myne#851` task 5). `--warning` rather
+ *  than `--danger`: a name record whose signature does not check out is a fact to
+ *  state plainly, not an alarm about a vault that is broken here and now, and the
+ *  row keeps the fingerprint beside it as the identifier that IS trustworthy. */
+const WARNING_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--warning)",
+};
+
+/** The inline rename form on the caller's own row. It WRAPS rather than laying
+ *  the buttons out on a second block, so the row keeps one line at the widths the
+ *  members list is read at and the buttons drop below only when they must. */
+const NAME_FORM_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
+/** A writer failure under the field, on its own line of that wrapped form. */
+const NAME_ERROR_STYLE: CSSProperties = {
+  ...ERROR_STYLE,
+  flexBasis: "100%",
+};
+
+
 export function MemberRosterPanel({
   onDialogOpenChange,
 }: {
@@ -150,6 +196,59 @@ export function MemberRosterPanel({
   const [forgetAck, setForgetAck] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetError, setForgetError] = useState(false);
+  // The inline name editor (myne-md/myne#851 task 6). Only ever open on the
+  // caller's OWN row: the backend keys a name row by the session's own person id
+  // and signs it with the session's own key, so there is no other row it could
+  // write. Held by FINGERPRINT rather than by the row object, so a reload that
+  // replaces the row array does not silently close the editor mid-typing.
+  const [nameEdit, setNameEdit] = useState<{
+    fingerprint: string;
+    draft: string;
+  } | null>(null);
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  // The once-only invitation for a member who accepted before this shipped (task 9,
+  // story 22). Session-scoped on purpose: making the dismissal durable would mean a
+  // new preference field, whose registration chain is a dozen sites (src/AGENTS.md),
+  // and the invitation asks rather than blocks, so re-asking next session is
+  // tolerable where a silently-persisted "never ask again" would not be.
+  const [nameOfferDismissed, setNameOfferDismissed] = useState(false);
+
+  const openNameEditor = (m: RosterMember) => {
+    setNameError(null);
+    setNameEdit({ fingerprint: m.fingerprint_hex, draft: m.display_name });
+  };
+  const closeNameEditor = () => {
+    setNameEdit(null);
+    setNameError(null);
+  };
+  const saveName = async () => {
+    if (!nameEdit) return;
+    setNameBusy(true);
+    setNameError(null);
+    try {
+      await setMyMemberName(nameEdit.draft.trim());
+      closeNameEditor();
+      reload();
+    } catch (e) {
+      setNameError(memberNameErrorKey(e));
+    } finally {
+      setNameBusy(false);
+    }
+  };
+  const clearName = async () => {
+    setNameBusy(true);
+    setNameError(null);
+    try {
+      await clearMyMemberName();
+      closeNameEditor();
+      reload();
+    } catch (e) {
+      setNameError(memberNameErrorKey(e));
+    } finally {
+      setNameBusy(false);
+    }
+  };
 
   const forgetIdentity = async () => {
     setForgetBusy(true);
@@ -400,29 +499,95 @@ export function MemberRosterPanel({
         <>
           <ul data-testid="member-roster.list" style={LIST_STYLE}>
             {members.map((m) => (
-              <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex} style={ROW_STYLE}>
-                {/* The owner row's stored name is the vault label captured at
-                    migration, which is not a person and read as "Untitled
-                    vault" (myne#795 UI pass). Render "You" for the owner and a
-                    name only when one is actually known; the fingerprint beside
-                    it is the identity. */}
-                {m.role === "owner" ? (
+              /* The row's `data-fingerprint` discriminator carries the SAME
+                 16-char prefix the row renders, never the raw 32-hex value: a
+                 DOM that holds more than the user can see is a DOM that leaks
+                 whatever the extra characters are, and `key` already carries the
+                 full value without writing it to the document. */
+              <li key={m.fingerprint_hex} data-testid="member-roster.row" data-fingerprint={m.fingerprint_hex.slice(0, 16)} style={ROW_STYLE}>
+                {/* ONE RULE FOR EVERY ROW (myne-md/myne#851 task 5): the
+                    VERIFIED name where there is one, the short fingerprint where
+                    there is not, and a marker when a record exists that nobody's
+                    signature backs. Nothing here keys on `role`: the owner's row
+                    follows the same rule as every other, which is what retires the
+                    migration-captured vault label the hand-written role guard used
+                    to suppress (myne#795 UI pass). A tampered record is never
+                    rendered as a name; it is absent from the payload entirely,
+                    since `partition_verified` drops it, so the marker says the
+                    record failed rather than showing what it claimed. */}
+                {nameEdit?.fingerprint === m.fingerprint_hex ? (
+                  <NameEditor
+                    draft={nameEdit.draft}
+                    busy={nameBusy}
+                    errorKey={nameError}
+                    onChange={(draft) => setNameEdit({ fingerprint: m.fingerprint_hex, draft })}
+                    onSave={() => void saveName()}
+                    onClear={() => void clearName()}
+                    onCancel={closeNameEditor}
+                  />
+                ) : m.is_self ? (
                   <span data-testid="member-roster.name" style={NAME_STYLE}>
                     {t("sync.memberRoster.youBadge")}
                   </span>
-                ) : m.display_name ? (
+                ) : m.name_state === "verified" ? (
                   <span data-testid="member-roster.name" style={NAME_STYLE}>
                     {m.display_name}
                   </span>
-                ) : null}
+                ) : (
+                  <>
+                    <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
+                      {m.fingerprint_hex.slice(0, 16)}
+                    </span>
+                    {m.name_state === "unverified" ? (
+                      <span data-testid="member-roster.name-unverified" style={WARNING_STYLE}>
+                        {t("sync.memberRoster.nameUnverified")}
+                      </span>
+                    ) : null}
+                  </>
+                )}
                 <span data-testid="member-roster.role" style={CODE_STYLE}>
                   {m.role === "owner"
                     ? t("sync.memberRoster.ownerBadge")
                     : t("sync.memberRoster.memberBadge")}
                 </span>
-                <span data-testid="member-roster.fingerprint" style={CODE_STYLE}>
-                  {m.fingerprint_hex.slice(0, 16)}
-                </span>
+                {/* The rename affordance, on the caller's own row only, the
+                    owner's included: `is_self` is the identity-based test the
+                    backend enforces in the key, and `shared` is here because the
+                    family is `NTV6`-only, so on a birth-format vault the control
+                    would only ever answer `NotASharedVault`. Omitted rather than
+                    shown broken, per the platform-seam rule. */}
+                {m.is_self && shared && nameEdit === null ? (
+                  <Button
+                    type="button"
+                    variant={m.name_state === "verified" ? "ghost" : "secondary"}
+                    data-testid="member-roster.name-edit"
+                    onClick={() => openNameEditor(m)}
+                  >
+                    {m.name_state === "verified"
+                      ? t("sync.memberRoster.nameEdit")
+                      : t("sync.memberRoster.nameInviteCta")}
+                  </Button>
+                ) : null}
+                {/* The invitation, on the caller's OWN row and only there: a member
+                    who joined before this shipped never saw the accept name step.
+                    Dismissible, and it writes nothing until they act. */}
+                {m.is_self &&
+                shared &&
+                m.name_state !== "verified" &&
+                !nameOfferDismissed ? (
+                  <span data-testid="member-roster.name-invite" style={INVITE_STYLE}>
+                    {t("sync.memberRoster.nameInvite")}{" "}
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      data-testid="member-roster.name-invite-dismiss"
+                      onClick={() => setNameOfferDismissed(true)}
+                      style={LINK_STYLE}
+                    >
+                      {t("sync.memberRoster.nameInviteDismiss")}
+                    </Button>
+                  </span>
+                ) : null}
                 {/* A cryptographic key change and an owner-confirmed relink are
                     DIFFERENT states and must read differently: the first is a
                     new identity the owner has not vouched for, the second is the
@@ -658,6 +823,78 @@ export function MemberRosterPanel({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** The inline rename editor, rendered on the caller's OWN row and nowhere else
+ *  (myne-md/myne#851 task 6). A `<form>` rather than a click handler, so Enter
+ *  saves; Escape cancels rather than silently discarding, which matters because
+ *  the row would otherwise keep a half-typed name with no way back. `Clear` is a
+ *  distinct action from saving an empty name, because the backend refuses the
+ *  latter by design: a tombstone is what makes a cleared name win a merge. */
+function NameEditor({
+  draft,
+  busy,
+  errorKey,
+  onChange,
+  onSave,
+  onClear,
+  onCancel,
+}: {
+  draft: string;
+  busy: boolean;
+  errorKey: string | null;
+  onChange: (next: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <form
+      style={NAME_FORM_STYLE}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave();
+      }}
+    >
+      <Input
+        data-testid="member-roster.name-input"
+        aria-label={t("sync.memberRoster.nameLabel")}
+        value={draft}
+        disabled={busy}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <Button type="submit" data-testid="member-roster.name-save" disabled={busy}>
+        {t("sync.memberRoster.nameSave")}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        data-testid="member-roster.name-clear"
+        disabled={busy}
+        onClick={onClear}
+      >
+        {t("sync.memberRoster.nameClear")}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        data-testid="member-roster.name-cancel"
+        disabled={busy}
+        onClick={onCancel}
+      >
+        {t("sync.memberRoster.nameCancel")}
+      </Button>
+      {errorKey ? (
+        <span data-testid="member-roster.name-error" role="alert" style={NAME_ERROR_STYLE}>
+          {t(errorKey)}
+        </span>
+      ) : null}
+    </form>
   );
 }
 

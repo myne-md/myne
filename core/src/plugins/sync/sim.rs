@@ -14,6 +14,20 @@
 //! is widened, a v0.2 behaviour proven nowhere else does not get to claim this
 //! file as its coverage (myne-md/myne#638).
 //!
+//! **ONE EXCEPTION, and it is not a widening** (member-devices task 7):
+//! `member_second_device_joins_from_the_phrase_alone` is an `NTV6` (v0.2 B2B)
+//! vault, and it is here rather than in a unit test for a reason the paragraph
+//! above does not cover. It does not go through `Device` and reaches none of the
+//! v0.1-only free functions, so the gap described above is untouched by it: what
+//! it needs from a real server is authority, not storage. Whether a member's
+//! SECOND device may read its vault's meta, re-claim an already-claimed invite,
+//! read the pin out of its own person profile and materialize a vault is decided
+//! entirely by the server's binding rules, and a hand-rolled loopback stub (which
+//! is what the flow's own unit tests use) answers canned bytes and can falsify
+//! none of them. So the v0.1 gap stands as written for every other scenario here,
+//! and the `NTV6` vault this one builds is deliberately not a template for
+//! widening the harness.
+//!
 //! WHY THIS EXISTS. The pre-existing two-device tests (`orchestrator.rs` tests,
 //! `e2e/sync-replication.e2e.ts`) feed the engine its *idealized* inputs — a
 //! direct `note_update`, the *correct* `deleted:`-marker tombstone encoding — and
@@ -59,6 +73,12 @@ use crate::plugins::sync::orchestrator::{
     run_sync_cycle, SyncSummary,
 };
 use crate::plugins::sync::transport::SyncTransport;
+// The two seams the person-plane scenario reaches directly, rather than through
+// a `_from_host` command: `HostCtx` for a device's own app dirs and `VaultIo` for
+// the two writes that stand in for a phase the scenario is not testing. Both are
+// trait methods, so the trait has to be named to call them.
+use crate::host::HostCtx;
+use myne_format::vault_io::VaultIo;
 
 // ---------------------------------------------------------------------------
 // Server lifecycle (self-contained copy of the orchestrator-test spawn logic).
@@ -408,6 +428,16 @@ impl Device {
     /// [`Device::sync`] without the panic-on-error — the fault-injection
     /// scenarios assert on the error shape instead.
     fn try_sync(&self) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
+        self.try_sync_with_live(&std::collections::HashSet::new())
+    }
+
+    /// [`Device::try_sync`] with a caller-supplied set of blob ids treated as OPEN
+    /// in a live session, so the pull DEFERS their remote revision instead of
+    /// writing it (`collab-editor-bridge` task 7).
+    fn try_sync_with_live(
+        &self,
+        live: &std::collections::HashSet<[u8; 16]>,
+    ) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
         // `run_sync_cycle` became `async` with task 86; the sim's scenarios are
         // synchronous by design (they drive a deterministic two-device timeline
         // step by step), so each cycle is driven on a runtime. The engine under
@@ -433,6 +463,7 @@ impl Device {
                 items_key_id: &self.acct.items_key_id,
             }),
             None,
+            live,
         ))
     }
 
@@ -479,6 +510,7 @@ impl Device {
         let upd = crate::plugins::notes::crdt::encode_note_edit(
             &existing,
             markdown,
+            Some(&self.device_id),
             &self.acct.items_key,
             &self.acct.items_key_id,
             &nb,
@@ -1052,6 +1084,37 @@ fn genuine_concurrent_edit_stages_a_real_conflict() {
     assert!(
         a.pending_conflicts().is_empty(),
         "the winner has no conflict"
+    );
+}
+
+/// Task 7: a note OPEN in a live session has its pulled remote revision DEFERRED,
+/// not written, the session is the single durable writer (`SYNC-33`), so the
+/// orchestrator hands the bytes back (`deferred_live_pulls`) for the caller to merge
+/// (remove-wins) into the session.
+#[test]
+fn a_pull_of_a_live_note_is_deferred_and_not_written() {
+    let (_guard, url) = server_or_skip!("live_pull_deferral");
+    let acct = Account::new(0x6b);
+    let devices = enroll_devices(&acct, &url, 2);
+    let (a, b) = (&devices[0], &devices[1]);
+
+    let n = a.create_note(b"live-base");
+    a.sync();
+    // A publishes a newer revision B has not seen.
+    a.edit_note(&n, b"peer-revision");
+    a.sync();
+
+    let id = *n.as_uuid().as_bytes();
+    let live: std::collections::HashSet<[u8; 16]> = [id].into_iter().collect();
+    let summary = b.try_sync_with_live(&live).expect("cycle");
+
+    assert!(
+        summary.deferred_live_pulls.iter().any(|(i, _, _)| *i == id),
+        "the live note's pulled revision must be deferred: {summary:?}"
+    );
+    assert!(
+        !b.blob_path(&n).exists(),
+        "a deferred live pull must NOT be written to disk"
     );
 }
 
@@ -2332,4 +2395,556 @@ fn sim_fs_server_restart_preserves_cursor_and_head() {
         d.assert_all_blobs_decrypt();
     }
     let _ = std::fs::remove_dir_all(&storage);
+}
+
+// ---------------------------------------------------------------------------
+// member-devices task 7: a member's SECOND device, from the phrase alone.
+// ---------------------------------------------------------------------------
+//
+// The ONE scenario here whose vault is not v0.1. `member-devices` task 7 is about
+// a shared `NTV6` (v0.2 B2B) vault, so the whole-harness KNOWN GAP at the top of
+// this file ("every scenario here is a v0.1 vault") has exactly one exception and
+// this is it. Nothing below reaches a v0.1-only helper except the note encoder,
+// which the assertions do not use.
+//
+// WHY IT LIVES IN THE SIM RATHER THAN BESIDE THE FLOW'S UNIT TESTS. The unit
+// tests in `person_account.rs` drive `member_join_vault_from_host` against a
+// hand-rolled loopback stub that answers canned bytes, which pins request ORDER
+// and the typed refusals but says nothing about whether the real server's
+// authority rules let the flow complete at all. Those rules are the load-bearing
+// part and none of them is visible from the client: `PUT /vault.meta` accepts a
+// device token only while the vault has no owner binding and then only the
+// owner's per-vault token; the owner binding itself is bootstrapped by the
+// vault's own device session; the claim route needs the recipient's person
+// session; and the sealed profile carrying the pin can only be written by a
+// person who is BOUND to the vault. So the second device's whole path depends on
+// a chain of server-side facts no stub can falsify, and this scenario is the one
+// place they are exercised together, end to end, with real crypto.
+
+/// The owner's `NTV6` `vault.meta` bytes plus the group key behind them, built the
+/// way the one production writer builds them
+/// (`vault_migrate::b2b::migrate_owner_vault_to_ntv6`): a fresh group key, the
+/// vault's `itemsKey` wrapped under the GROUP tier, the group key wrapped to the
+/// owner under the OWNER tier, and a signed-then-sealed roster carrying the owner
+/// row.
+///
+/// The password and recovery root wraps in `base` are deterministic filler, and
+/// this paragraph is the reason rather than an apology: the member path never
+/// opens them. It reaches `itemsKey` through `unlock_items_key_ntv6`, which is the
+/// group wrap above, and a real 256 MiB Argon2id wrap per call would buy this
+/// scenario nothing. Everything the member path DOES verify against is genuine:
+/// the owner double signature on the package, the group wrap, and the sealed
+/// roster.
+fn owner_ntv6_meta(
+    account_hash: &[u8; 16],
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+    owner: &protocol::person_key::PersonKeyPair,
+    epoch: u64,
+) -> (Vec<u8>, zeroize::Zeroizing<[u8; 32]>) {
+    use protocol::person_invite as pi;
+
+    let mut group_bytes = zeroize::Zeroizing::new([0u8; 32]);
+    getrandom::getrandom(group_bytes.as_mut()).expect("group key");
+    let group_key = protocol::GroupKey::new(*group_bytes);
+
+    let mut group_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    let mut items_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut group_key_nonce).expect("nonce");
+    getrandom::getrandom(&mut items_key_nonce).expect("nonce");
+
+    let enc_group_key = protocol::aead_seal_ctx(
+        &protocol::derive_owner_subkey_v0_2(
+            &protocol::OwnerKey::new([0x77; 32]),
+            protocol::OwnerRole::GroupKeyWrap,
+        ),
+        &group_key_nonce,
+        group_bytes.as_ref(),
+        &protocol::aad_vault_group_key_wrap_v0_2(account_hash, epoch),
+    )
+    .expect("seal the group key to the owner");
+    let enc_items_key = protocol::aead_seal_ctx(
+        &protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::ItemsKeyWrap),
+        &items_key_nonce,
+        &items_key[..],
+        &protocol::aad_vault_items_key_wrap_v0_2(items_key_id),
+    )
+    .expect("seal itemsKey under the group key");
+
+    let owner_public = owner.public_half();
+    let owner_fingerprint_hex =
+        crate::account::person_identity::hex_lower(owner_public.fingerprint());
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let roster = pi::GroupRosterPayload {
+        account_number_hash_hex: crate::account::person_identity::hex_lower(account_hash),
+        group_key_epoch: epoch,
+        owner_fingerprint_hex: owner_fingerprint_hex.clone(),
+        members: vec![pi::GroupRosterMember {
+            fingerprint_hex: owner_fingerprint_hex,
+            person_id_hex: None,
+            display_name: String::new(),
+            role: pi::GroupRosterRole::Owner,
+            state: pi::GroupMemberState::Live,
+            wrapped_group_key_hex: None,
+            member_kem_ek_hex: crate::account::person_identity::hex_lower(owner_public.kem_ek()),
+            member_ed_pk_hex: crate::account::person_identity::hex_lower(owner_public.ed_pk()),
+            member_mldsa_vk_hex: crate::account::person_identity::hex_lower(
+                owner_public.mldsa_vk(),
+            ),
+            previous_fingerprint_hex: None,
+            continuity: pi::GroupKeyContinuity::Current,
+            transition_hex: None,
+        }],
+    };
+    let signed = pi::sign_group_roster(owner, &roster, &mut rng).expect("sign the roster");
+    let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut roster_nonce).expect("nonce");
+    let sealed_roster =
+        pi::seal_group_roster(&group_bytes, account_hash, epoch, &roster_nonce, &signed)
+            .expect("seal the roster");
+
+    let mut enc_items = [0u8; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_items.copy_from_slice(&enc_items_key);
+    let mut enc_group = [0u8; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_group.copy_from_slice(&enc_group_key);
+    let bytes = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+        base: protocol::VaultMeta {
+            account_number_hash: *account_hash,
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [0x01; protocol::VAULT_META_SALT_RANDOM_LEN],
+            random_salt_recovery: [0x02; protocol::VAULT_META_SALT_RANDOM_LEN],
+            nonce_password_wrap: [0x03; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_password: [0x04; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            nonce_recovery_wrap: [0x05; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_recovery: [0x06; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            items_key_id: *items_key_id,
+            items_key_nonce,
+            enc_items_key: enc_items,
+            membership: None,
+            person_binding: None,
+        },
+        group_key_nonce,
+        enc_group_key: enc_group,
+        group_key_epoch: epoch,
+        signed_roster_envelope: sealed_roster,
+    })
+    .expect("serialize NTV6");
+    (bytes, group_bytes)
+}
+
+/// One simulated person on one device: its own app dirs, the endpoint configured,
+/// and the identity set up from `phrase`, so both the person SCRAM account and the
+/// device-scoped `PersonAuth` are real rather than hand-written. Two devices of the
+/// same person derive the SAME keypair from the same phrase, which is the property
+/// the whole second-device story rests on.
+struct PersonDevice {
+    _tmp: crate::test_support::ScopedTempDir,
+    host: crate::host::test_host::TestHost,
+    state: crate::plugins::vault_unlock::state::VaultRuntimeState,
+    identity_code: String,
+}
+
+async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
+    use crate::plugins::sync::config::{config_path_from_host, write_config, SyncEndpointConfig};
+    use crate::plugins::sync::person_account::person_setup_from_host;
+
+    let tmp = crate::test_support::ScopedTempDir::new(name).expect("temp dir");
+    let host = crate::host::test_host::TestHost::new(tmp.path());
+    let io = crate::vault_io::StdVaultIo;
+    io.create_dir_all(&host.app_data_dir().expect("data dir"))
+        .await
+        .expect("data dir");
+    io.create_dir_all(&host.app_config_dir().expect("config dir"))
+        .await
+        .expect("config dir");
+    let cfg = config_path_from_host(&host, &io)
+        .await
+        .expect("config path");
+    write_config(
+        &io,
+        &cfg,
+        &SyncEndpointConfig {
+            endpoint_url: Some(url.to_string()),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("write config");
+
+    let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
+    let view = person_setup_from_host(&host, &io, &state, Some(phrase.to_string()))
+        .await
+        .expect("the person identity sets up against the real server");
+    assert!(view.approved, "the person plane admits this device");
+    PersonDevice {
+        _tmp: tmp,
+        host,
+        state,
+        identity_code: view.identity_code,
+    }
+}
+
+/// member-devices task 7, end to end against the real `myne-server`.
+///
+/// The four things the task names, in one linear story:
+///
+///   (a) a member's SECOND device reaches the same vault from the phrase alone,
+///       with no owner action and no fresh invite;
+///   (b) a wrong phrase installs nothing;
+///   (c) an owner the pin cannot vouch for is refused;
+///   (d) a package that is not on the server is a typed retry, not a refusal and
+///       not a silent install of keys this device never received.
+///
+/// The owner is ABSENT throughout the second device's half: nothing in the join
+/// consults the owner's device, and the pin the join verifies against was
+/// published by the member's own first device and opened with the member's own
+/// phrase.
+#[test]
+fn member_second_device_joins_from_the_phrase_alone() {
+    use crate::plugins::sync::devices::SyncDeviceError;
+    use crate::plugins::sync::http_transport::build_transport;
+    use crate::plugins::sync::member_key_store::read_member_key_store;
+    use crate::plugins::sync::person_account::{
+        accept_invite_from_host, bind_owner_request, member_join_vault_from_host,
+        person_list_invites_from_host, person_profile_write_from_host, post_invite_request,
+        unlock_member_vault_from_host,
+    };
+    use crate::plugins::sync::person_ai_store::{encode_person_ai_state, PersonAiState};
+    use crate::vault_io::StdVaultIo;
+
+    // BIP39 test vectors, so `normalize_user_phrase` accepts each one.
+    const OWNER_PHRASE: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank yellow";
+    const MEMBER_PHRASE: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const OTHER_PHRASE: &str = "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong";
+    const MEMBER_PASSWORD: &str = "correct horse battery staple";
+
+    let (_guard, url) = server_or_skip!("member_second_device_joins_from_the_phrase_alone");
+    let io = StdVaultIo;
+
+    crate::test_support::block_on(async {
+        // ---- the owner's vault, and the owner's own identity ----------------
+
+        let acct = Account::new(0xA7);
+        let account_hash = acct.account_hash;
+        let account_hash_hex = hex(&account_hash);
+        let bootstrap = build_transport(&url).expect("transport");
+        enroll::register_verifier(bootstrap.as_ref(), &acct.account_hash, &acct.secret())
+            .expect("register the vault's own account");
+        let device = enroll::enroll(
+            bootstrap.as_ref(),
+            &acct.account_hash,
+            &acct.secret(),
+            EnrollPath::Recovery,
+            "a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7",
+            enroll::generate_device_id(),
+        )
+        .expect("enrol the owner's device on the vault account");
+        assert!(
+            device.approved && !device.token.is_empty(),
+            "owner enrolled"
+        );
+        let device_token = hex(&device.token);
+
+        let owner = person_device("t7-owner", &url, OWNER_PHRASE).await;
+        let owner_pair = crate::account::person_identity::open_person_identity_without_mutation(
+            &owner.host,
+            &io,
+            &protocol::normalize_user_phrase(OWNER_PHRASE),
+        )
+        .await
+        .expect("the owner's sealed identity opens from the phrase");
+
+        let (meta_v1, group_v1) = owner_ntv6_meta(
+            &account_hash,
+            &acct.items_key,
+            &acct.items_key_id,
+            &owner_pair,
+            1,
+        );
+
+        // The vault.meta PUT must precede the owner binding: `vaultMetaWriteAccount`
+        // accepts the vault's DEVICE token only while the vault has no owner, and
+        // answers `owner_required` afterwards. Getting this order wrong is invisible
+        // client-side (both calls "just fail"), which is why the scenario does it.
+        enroll::put_vault_meta(bootstrap.as_ref(), &device_token, &meta_v1)
+            .expect("the vault.meta write lands before the owner binding exists");
+        let owner_token = bind_owner_request(
+            bootstrap.as_ref(),
+            &device_token,
+            &account_hash_hex,
+            owner
+                .identity_code
+                .split(':')
+                .nth(1)
+                .expect("the owner identity code carries the person id"),
+        )
+        .expect("the vault's own device session bootstraps the owner binding");
+
+        // ---- the member's FIRST device: person account, then accept ---------
+
+        let member_first = person_device("t7-member-first", &url, MEMBER_PHRASE).await;
+        let member_public = {
+            let normalized = protocol::normalize_user_phrase(MEMBER_PHRASE);
+            let pair = crate::account::person_identity::open_person_identity_without_mutation(
+                &member_first.host,
+                &io,
+                &normalized,
+            )
+            .await
+            .expect("the member's sealed identity opens from the phrase");
+            pair.public_half()
+        };
+        let member_person_id_hex = member_first
+            .identity_code
+            .split(':')
+            .nth(1)
+            .expect("the member identity code carries the person id")
+            .to_string();
+
+        let package = protocol::person_invite::create_group_package(
+            &owner_pair,
+            &member_public,
+            &group_v1,
+            &account_hash,
+            1,
+            &mut rand_core::UnwrapErr(crate::rng::OsRng),
+        )
+        .expect("wrap the group key to the member");
+        let frame = protocol::person_invite::encode_signed_group_package(&package)
+            .expect("encode the sealed package");
+        post_invite_request(
+            bootstrap.as_ref(),
+            &owner_token,
+            &member_person_id_hex,
+            &frame,
+        )
+        .expect("the owner addresses the invite to the member's person id");
+
+        let invite = {
+            let listed = person_list_invites_from_host(&member_first.host, &io)
+                .await
+                .expect("the recipient lists its own invites");
+            assert_eq!(listed.len(), 1, "exactly the one invite addressed to it");
+            assert!(!listed[0].claimed, "nothing has claimed it yet");
+            listed[0].clone()
+        };
+
+        let accepted = accept_invite_from_host(
+            &member_first.host,
+            &io,
+            &member_first.state,
+            &invite.invite_id_hex,
+            &owner.identity_code,
+            MEMBER_PHRASE,
+            MEMBER_PASSWORD,
+        )
+        .await
+        .expect("the member's first device accepts the invite");
+        assert_eq!(accepted.group_key_epoch, 1);
+
+        // The pin reaches the profile plane the way production puts it there: the
+        // accepting device holds the pin in its own `SyncState`, and the profile is
+        // its first publication of it. The claim just performed is what makes the
+        // profile PUT authorized at all (the route needs a BINDING to the vault).
+        {
+            let mut own = PersonAiState::empty();
+            own.set_owner_identity_code(Some(&owner.identity_code));
+            let plaintext = encode_person_ai_state(&own).expect("encode the pin");
+            person_profile_write_from_host(
+                &member_first.host,
+                &io,
+                &member_first.state,
+                &plaintext,
+            )
+            .await
+            .expect("the accepting device publishes the pinned owner code");
+        }
+
+        // ---- (b) a wrong phrase, on the second device, before anything else --
+
+        let member_second = person_device("t7-member-second", &url, MEMBER_PHRASE).await;
+        assert_eq!(
+            member_join_vault_from_host(
+                &member_second.host,
+                &io,
+                &member_second.state,
+                &invite.invite_id_hex,
+                &account_hash_hex,
+                OTHER_PHRASE,
+                MEMBER_PASSWORD,
+            )
+            .await
+            .unwrap_err(),
+            SyncDeviceError::NotEnrolled,
+            "a phrase that is not this device's person installs nothing"
+        );
+        let second_base = member_second.host.app_data_dir().expect("data dir");
+        assert_eq!(
+            crate::vault_registry::discover_vaults(&second_base).len(),
+            0,
+            "a refused join materializes no vault"
+        );
+
+        // ---- (a) the same device, the right phrase, no owner action ---------
+
+        // Item 6: the vault is ENUMERATED through a route that already exists. The
+        // invite stays listed after the first device claimed it (`claimed: true`),
+        // which is exactly what lets a second device find a vault it never accepted.
+        let listed = person_list_invites_from_host(&member_second.host, &io)
+            .await
+            .expect("the second device lists the same inbox");
+        assert_eq!(listed.len(), 1);
+        assert!(
+            listed[0].claimed,
+            "the first device's claim is what is listed"
+        );
+        assert_eq!(listed[0].vault_account_hash_hex, account_hash_hex);
+
+        let joined = member_join_vault_from_host(
+            &member_second.host,
+            &io,
+            &member_second.state,
+            &listed[0].invite_id_hex,
+            &listed[0].vault_account_hash_hex,
+            MEMBER_PHRASE,
+            MEMBER_PASSWORD,
+        )
+        .await
+        .expect("the second device joins with the phrase alone");
+
+        assert_eq!(joined.vault_account_hash_hex, account_hash_hex);
+        assert_eq!(joined.group_key_epoch, 1);
+        assert_eq!(
+            joined.owner_fingerprint_hex,
+            crate::account::person_identity::hex_lower(owner_pair.fingerprint()),
+            "the pin the first device published is what the package was verified against"
+        );
+
+        // The keys really are the same vault's, not merely well-formed: the store the
+        // join sealed opens with the member's own phrase and yields the owner's own
+        // `itemsKey` and group key.
+        let joined_vault_id =
+            crate::vault_id::VaultId::parse(&joined.vault_id).expect("a canonical vault id");
+        let joined_dir = crate::paths::vault_dir_for_id_from_host_io(
+            &member_second.host,
+            &io,
+            Some(joined_vault_id),
+        )
+        .await
+        .expect("joined vault dir");
+        let keys = read_member_key_store(
+            &io,
+            &joined_dir,
+            joined_vault_id.as_uuid().as_bytes(),
+            &crate::test_support::FAST_TEST_KDF,
+            &protocol::normalize_user_phrase(MEMBER_PHRASE),
+        )
+        .await
+        .expect("the joined vault's member-key store opens with the phrase");
+        assert_eq!(
+            &keys.items_key[..],
+            &acct.items_key[..],
+            "the second device holds the SAME itemsKey as the vault the owner built"
+        );
+        assert_eq!(
+            &keys.group_key[..],
+            group_v1.as_ref(),
+            "and the same group key, so a rotation is detectable rather than silent"
+        );
+        assert_eq!(keys.account_hash, account_hash);
+
+        // ---- (d) an unreachable package is a typed retry ---------------------
+
+        // The owner rotates: epoch 2, a fresh group key, published under the owner's
+        // own per-vault token. No package is delivered to the member, which is the
+        // ordinary state between a rotation and its delivery.
+        let (meta_v2, group_v2) = owner_ntv6_meta(
+            &account_hash,
+            &acct.items_key,
+            &acct.items_key_id,
+            &owner_pair,
+            2,
+        );
+        enroll::put_vault_meta(bootstrap.as_ref(), &owner_token, &meta_v2)
+            .expect("the owner publishes the rotated meta under its per-vault token");
+        // The member sees the rotation the way the sync meta phase shows it: the
+        // rotated bytes land in its own vault directory. Written directly because the
+        // meta phase is the orchestrator's, and driving a full member sync cycle would
+        // test that instead of this.
+        io.write(
+            &joined_dir.join("vault.meta"),
+            &meta_v2,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+        .expect("the rotated meta lands on the member's device");
+
+        let unlock = unlock_member_vault_from_host(
+            &member_second.host,
+            &io,
+            &member_second.state,
+            joined_vault_id,
+            MEMBER_PHRASE,
+        )
+        .await;
+        assert_eq!(
+            unlock.unwrap_err(),
+            SyncDeviceError::Transport,
+            "an absent package on a reachable server is a typed RETRY, not a refusal"
+        );
+
+        // ---- (c) an owner the pin cannot vouch for is refused ---------------
+
+        // A pin naming somebody else, published by a device that is legitimately
+        // bound to the vault. The package the server serves is unchanged and genuine;
+        // only the pin moved, and that alone must stop the join.
+        let impostor = protocol::PersonKeyPair::generate_raw(&[0x91; 64], &[0x92; 32], &[0x93; 32]);
+        let impostor_code = crate::plugins::sync::invite::encode_person_identity_code(
+            &[0x94u8; 16],
+            &impostor.public_half(),
+        );
+        {
+            let mut own = PersonAiState::empty();
+            own.set_owner_identity_code(Some(&impostor_code));
+            let plaintext = encode_person_ai_state(&own).expect("encode the impostor pin");
+            person_profile_write_from_host(
+                &member_first.host,
+                &io,
+                &member_first.state,
+                &plaintext,
+            )
+            .await
+            .expect("the tampered pin is published by a genuinely bound device");
+        }
+
+        let member_third = person_device("t7-member-third", &url, MEMBER_PHRASE).await;
+        assert_eq!(
+            member_join_vault_from_host(
+                &member_third.host,
+                &io,
+                &member_third.state,
+                &invite.invite_id_hex,
+                &account_hash_hex,
+                MEMBER_PHRASE,
+                MEMBER_PASSWORD,
+            )
+            .await
+            .unwrap_err(),
+            SyncDeviceError::BadRequest,
+            "a package that does not open under the PINNED owner half is refused"
+        );
+        let third_base = member_third.host.app_data_dir().expect("data dir");
+        assert_eq!(
+            crate::vault_registry::discover_vaults(&third_base).len(),
+            0,
+            "an unverifiable owner installs nothing"
+        );
+
+        // The rotation in (d) never landed, so the member's live store is untouched.
+        assert!(
+            &group_v2[..] != group_v1.as_ref(),
+            "the rotation really is a different group key"
+        );
+    });
 }

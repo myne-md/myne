@@ -379,6 +379,18 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "memberSharing",
   },
   {
+    id: "sync.device-bindings",
+    agentWritability: WRITABILITY_NONE,
+    panelId: "sync",
+    titleKey: "sync.deviceBindings.title",
+    descriptionKey: "sync.deviceBindings.hint",
+    keywordsKey: "settings.search.keywords.syncDeviceBindings",
+    // Same gate as `sync.members` above, and for the same reason: the block is
+    // rendered only under `hasCapability("memberSharing")`, so an ungated entry
+    // would scroll to an anchor that never renders on a client without it.
+    capability: "memberSharing",
+  },
+  {
     id: "sync.add-device",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",

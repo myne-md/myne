@@ -13,6 +13,7 @@
 // `./useAutosave.ts` (Tasks 12 + 26 of the `notes-sidebar-autosave` PRD).
 
 import { invoke } from "../platform/core";
+import { patchLiveNote } from "./liveNote";
 
 /**
  * Re-encrypt an existing `.myn` note in place. Stateless idempotent
@@ -32,6 +33,14 @@ export async function noteUpdate(
   plaintext: string,
   expectedBaseHashHex?: string,
 ): Promise<void> {
+  // Live funnel (`collab-editor-bridge` task 7): while a live session owns the
+  // note it is the SINGLE durable writer (`SYNC-33`), so the backend refuses this
+  // stateless overwrite with `LiveSessionOpen`. Route the same bytes through the
+  // session's durable frontmatter entry point instead, which applies a minimal
+  // `update_text` (merge-safe, myne#428). The session is the only writer, so
+  // `expectedBaseHashHex` has nothing to race and is not consulted here.
+  if (await patchLiveNote(noteId, plaintext)) return;
+
   await invoke<void>(
     "plugin:notes|note_update",
     expectedBaseHashHex === undefined

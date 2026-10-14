@@ -67,6 +67,14 @@ pub struct PersonAiState {
     /// `chats/<id>`, the pending-tombstone queues), hex-encoded.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub files: BTreeMap<String, String>,
+    /// The PINNED owner identity code for this `(person, vault)` membership
+    /// (`MYNE-PERSON-1:…`), so a second device of the same person can tell
+    /// which owner it is joining before it trusts anything the sync plane
+    /// offers it. Additive on the same container version: an older reader
+    /// ignores the field, and its presence is not a section the family layer
+    /// owns (nothing here is hex, so it stays out of the hex validation loop).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_identity_code: Option<String>,
 }
 
 impl PersonAiState {
@@ -86,6 +94,19 @@ impl PersonAiState {
     /// Set (or clear, with `None`) the personality section.
     pub fn set_personality(&mut self, bytes: Option<&[u8]>) {
         self.personality_hex = bytes.map(hex_lower);
+    }
+
+    /// The pinned owner identity code for this membership, if one is recorded.
+    pub fn owner_identity_code(&self) -> Option<&str> {
+        self.owner_identity_code
+            .as_deref()
+            .filter(|c| !c.is_empty())
+    }
+
+    /// Set (or clear, with `None`) the pinned owner identity code. An empty
+    /// string clears it, so a caller cannot pin a value that reads back absent.
+    pub fn set_owner_identity_code(&mut self, code: Option<&str>) {
+        self.owner_identity_code = code.filter(|c| !c.is_empty()).map(str::to_string);
     }
 }
 
@@ -528,6 +549,7 @@ mod tests {
         state
             .files
             .insert("vault.agent-memory".to_string(), "00ff".to_string());
+        state.set_owner_identity_code(Some("MYNE-PERSON-1:aa:bb:cc:dd"));
 
         let bytes = encode_person_ai_state(&state).expect("encode");
         let decoded = decode_person_ai_state(&bytes).expect("decode");
@@ -536,6 +558,12 @@ mod tests {
         assert_eq!(
             decoded.files.get("vault.agent-memory").map(String::as_str),
             Some("00ff")
+        );
+        // The pin is a plain string section, so it survives the hex validation
+        // loop that every OTHER section must pass.
+        assert_eq!(
+            decoded.owner_identity_code(),
+            Some("MYNE-PERSON-1:aa:bb:cc:dd")
         );
 
         // An unknown version is refused rather than read as this one.
@@ -556,6 +584,30 @@ mod tests {
         let bytes = encode_person_ai_state(&state).expect("encode");
         assert!(!String::from_utf8_lossy(&bytes).contains("personality_hex"));
         assert!(!String::from_utf8_lossy(&bytes).contains("files"));
+    }
+
+    #[test]
+    fn the_pin_section_is_absent_by_default_and_an_empty_string_clears_it() {
+        // A container written before the pin existed decodes to no pin, which
+        // is what lets an older device's copy merge without inventing one.
+        let before = br#"{"v":1,"personality_hex":"00"}"#;
+        let decoded = decode_person_ai_state(before).expect("decode");
+        assert_eq!(decoded.owner_identity_code(), None);
+
+        // Absent by default, so an encoding carries no empty pin section.
+        let empty = PersonAiState::empty();
+        let bytes = encode_person_ai_state(&empty).expect("encode");
+        assert!(!String::from_utf8_lossy(&bytes).contains("owner_identity_code"));
+
+        // An empty string is not a pin: the setter refuses it and the accessor
+        // reads it back as absent, so a caller cannot pin "no owner".
+        let mut cleared = PersonAiState::empty();
+        cleared.set_owner_identity_code(Some("MYNE-PERSON-1:aa:bb:cc:dd"));
+        assert!(cleared.owner_identity_code().is_some());
+        cleared.set_owner_identity_code(Some(""));
+        assert_eq!(cleared.owner_identity_code(), None);
+        let bytes = encode_person_ai_state(&cleared).expect("encode");
+        assert!(!String::from_utf8_lossy(&bytes).contains("owner_identity_code"));
     }
 
     #[test]

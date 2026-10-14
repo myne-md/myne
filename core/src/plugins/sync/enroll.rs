@@ -773,6 +773,34 @@ mod tests {
         assert!(out.token.is_empty());
     }
 
+    // The declared path is what the server's approval gate reads, so the string
+    // that goes on the wire is load-bearing and not an implementation detail: a
+    // person device that declares the wrong one lands pending with no releaser
+    // (server-protocol §3.1a). The sibling tests above drive the same canned
+    // server, but their responses hardcode `approved` and never look at the
+    // request, so all of them stay green if `EnrollPath::wire` returns one
+    // constant. This is the case that fails when it does.
+    #[test]
+    fn the_declared_path_is_what_reaches_the_final_body() {
+        for (path, wire) in [
+            (EnrollPath::Password, "password"),
+            (EnrollPath::Recovery, "recovery"),
+        ] {
+            let t = FakeTransport::new();
+            let dev = [0x0bu8; 16];
+            wire_server(&t, &dev, true, "aa");
+            enroll(&t, &ACCOUNT, SECRET, path, "cn", dev).expect("handshake");
+
+            let final_req = t
+                .requests()
+                .into_iter()
+                .find(|r| r.1 == "/auth/scram/final")
+                .unwrap_or_else(|| panic!("no /auth/scram/final request for {path:?}"));
+            let body: serde_json::Value = serde_json::from_slice(&final_req.2).expect("final json");
+            assert_eq!(body["path"], wire, "{path:?} declared the wrong gate");
+        }
+    }
+
     #[test]
     fn put_vault_meta_authed_puts_raw_bytes() {
         // F1: the credential-change push PUTs the raw vault.meta bytes under the

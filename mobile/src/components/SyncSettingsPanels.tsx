@@ -1221,8 +1221,18 @@ export function SyncDevicesPanel() {
  * group-key epoch, and states the removal limits honestly. The invite and
  * removal flows need the person-identity phrase prompt, which stays desktop-first
  * until the member wire lands, so this panel never renders an owner-only control
- * a phone cannot use. Plain English by mobile convention (no i18n). Styling goes
- * through the shared primitives + tokens, never inline literals.
+ * a phone cannot use. Copy comes from the shared `sync.memberRoster.*` catalog keys
+ * through `useTranslation`. The "plain English, no i18n" note this comment used to
+ * carry was already false when it was written. Styling goes through the shared
+ * primitives + tokens, never inline literals.
+ *
+ * Each row's identity follows the desktop list's ONE RULE (myne-md/myne#851 task 15,
+ * `src/components/sync/MemberRosterPanel.tsx`): the you-badge on the caller's OWN row
+ * and never their name, the VERIFIED name where the signed store holds one, the short
+ * fingerprint otherwise, and a marker when a record exists that no signature backs.
+ * Read-only here means no rename affordance, not a second rule: a member reads the same
+ * three answers on a phone as on a computer, so "who is this" cannot depend on which
+ * client happens to be open.
  */
 export function SyncMembersPanel() {
   const { t } = useTranslation();
@@ -1262,8 +1272,33 @@ export function SyncMembersPanel() {
           members.map((m, i) => (
             <Row key={m.fingerprint_hex} first={i === 0} testId="sync.members.row">
               <div style={MEMBERS_STACK}>
-                <span style={MEMBERS_VALUE}>{m.display_name}</span>
-                <span style={MEMBERS_FINGERPRINT}>{m.fingerprint_hex.slice(0, 16)}</span>
+                {/* The one rule, in the desktop list's arm ORDER: own row first, so a
+                    member reading its own entry sees the you-badge rather than the name
+                    it just wrote (which is also why "the name is in the list" is only
+                    observable from the other device). Then a VERIFIED name, then the
+                    fingerprint. `unverified` is a real third answer rather than a
+                    missing one: a record exists and nothing backs it, which is what the
+                    marker says, and the name it claimed is never rendered. */}
+                {m.is_self ? (
+                  <span data-testid="sync.members.name" style={MEMBERS_VALUE}>
+                    {t("sync.memberRoster.youBadge")}
+                  </span>
+                ) : m.name_state === "verified" ? (
+                  <span data-testid="sync.members.name" style={MEMBERS_VALUE}>
+                    {m.display_name}
+                  </span>
+                ) : (
+                  <>
+                    <span data-testid="sync.members.fingerprint" style={MEMBERS_FINGERPRINT}>
+                      {m.fingerprint_hex.slice(0, 16)}
+                    </span>
+                    {m.name_state === "unverified" ? (
+                      <span data-testid="sync.members.name-unverified" style={MEMBERS_WARNING}>
+                        {t("sync.memberRoster.nameUnverified")}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </div>
               <div style={MEMBERS_STACK}>
                 <span style={MEMBERS_MUTED}>
@@ -1316,6 +1351,16 @@ const MEMBERS_MUTED: CSSProperties = {
 
 const MEMBERS_ERROR: CSSProperties = {
   color: "var(--danger)",
+  fontSize: "var(--text-sm)",
+};
+
+// The unverified-name marker (`myne-md/myne#851` task 5). `--warning` rather than
+// `--danger`: a name record whose signature does not check out is a fact to state
+// plainly, not an alarm about a vault that is broken here and now. The desktop twin
+// (`src/components/sync/MemberRosterPanel.tsx`'s `WARNING_STYLE`) states the same rule,
+// so the two lists cannot drift again.
+const MEMBERS_WARNING: CSSProperties = {
+  color: "var(--warning)",
   fontSize: "var(--text-sm)",
 };
 

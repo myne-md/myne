@@ -1390,8 +1390,17 @@
           "backlinks": "Links",
           "outline": "Outline",
           "tasks": "Tasks",
-          "unlinked": "Unlinked mentions"
+          "unlinked": "Unlinked mentions",
+          "whoIsHere": "Who's here"
         }
+      },
+      "presence": {
+        "editing": "is editing",
+        "empty": "You're the only one here",
+        "jumpTo": "Jump to {{name}}",
+        "title_one": "{{count}} here now",
+        "title_other": "{{count}} here now",
+        "unknown": "Someone"
       },
       "sidebarToggle": {
         "hideBacklinks": "Hide backlinks sidebar",
@@ -2586,6 +2595,7 @@
       "confirmBody": "Your current note will be saved as a snapshot first, so you can undo this.",
       "confirmTitle": "Restore this snapshot?",
       "decrypting": "Decrypting…",
+      "deviceFallback": "Device {{code}}",
       "emptyState": "No snapshots yet. Snapshots are saved automatically as you edit and kept for about 7 days. They’re encrypted, and disappear when the note is permanently deleted.",
       "encryptedSize": "Encrypted · {{size}}",
       "errorCannotDecrypt": "This snapshot couldn't be decrypted.",
@@ -2603,6 +2613,7 @@
       "restoredStatus": "Restored. The version you had is saved as a snapshot.",
       "selectPlaceholder": "Select a snapshot to preview what changed since then.",
       "title": "Snapshots",
+      "unknownAuthor": "Unknown device",
       "untitled": "Untitled"
     },
     "tabStrip": {
@@ -3024,10 +3035,13 @@
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
         "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password, and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
+        "unexpected": "That password change did not go through. Please try again.",
+        "vaultNotUnlocked": "Unlock this vault before changing its password.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
       "changePasswordHelper": "Rotate your master password while keeping the same vault. Recovery phrase stays the same.",
+      "memberVaultNotice": "This is a shared vault. It has no vault password. Use Shared vault unlock in Privacy to add a password or PIN.",
       "dangerZoneHeading": "Danger zone",
       "dangerZoneHelper": "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
       "localEraseHeading": "This browser",
@@ -3717,6 +3731,8 @@
       "setupButton": "Set up quick unlock"
     },
     "memberPassword": {
+      "reminder": "You have no fast unlock on this device yet, so this vault asks for your recovery phrase each time.",
+      "reminderDismiss": "Not now",
       "title": "Shared vault unlock",
       "helperConfigured": "This shared vault opens with {{method}} stored on this device.",
       "helperNotConfigured": "Set a password or PIN so you don't retype your recovery phrase every time.",
@@ -3960,7 +3976,8 @@
         "timeFormat": "time format 24 hour 12 hour clock am pm",
         "timezone": "timezone time zone tz utc iana region today",
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
-        "syncMembers": "members, share, invite, team, collaboration, vault"
+        "syncMembers": "members, share, invite, team, collaboration, vault",
+        "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs"
       },
       "emptyBody": "Try a shorter word, or the name of a panel."
     },
@@ -4347,6 +4364,21 @@
       "ownerBadge": "Owner",
       "memberBadge": "Member",
       "youBadge": "You",
+      "nameUnverified": "Name not verified",
+      "nameLabel": "Your display name",
+      "nameEdit": "Rename",
+      "nameSave": "Save",
+      "nameClear": "Clear",
+      "nameCancel": "Cancel",
+      "nameErrorEmpty": "Enter a name, or use Clear to remove yours.",
+      "nameErrorTooLong": "That name is too long.",
+      "nameErrorUnreadable": "The name store could not be read on this device. Nothing was saved.",
+      "nameErrorUnshared": "Names can be set once this vault is shared.",
+      "nameErrorLocked": "Unlock the vault to change your name.",
+      "nameErrorGeneric": "Could not save your name. Try again.",
+      "nameInvite": "You have no display name yet. The other members see your fingerprint.",
+      "nameInviteCta": "Set a name",
+      "nameInviteDismiss": "Not now",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Remove {{name}}? Once the key rotation completes they lose access to future changes. This cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
@@ -4393,6 +4425,34 @@
       "identityForgetCancel": "Keep it",
       "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
       "identityForgetError": "Could not forget the identity. Try again."
+    },
+    "deviceBindings": {
+      "title": "Devices and members",
+      "heading": "Claimed devices",
+      "hint": "Each device that has claimed itself in this vault, with the member whose own signature claims it. A claim is not proof of ownership: it says which member signed the statement, not that the device is theirs.",
+      "loading": "Loading devices…",
+      "emptyTitle": "No devices claimed yet",
+      "empty": "A device appears here once it claims itself in this shared vault.",
+      "claimedBy": "claimed by {{name}}",
+      "unverified": "Not verified",
+      "unverifiedHint": "These device ids are in the vault but nothing backs a claim about them: the signature did not check out, or it names someone the member list does not have. They are shown as ids because there is no member to name beside them.",
+      "claimHint": "This device has no verified claim of its own in this vault. Claiming it again registers it under your identity, and it is also the repair for a claim that did not check out.",
+      "claim": "Claim this device",
+      "claiming": "Claiming…",
+      "unshared": "This vault is not shared yet, so there is no member to attribute a device to. Sharing it is permanent and happens the first time you invite someone.",
+      "errorLocked": "Unlock the vault to read its devices.",
+      "errorUnshared": "This vault is not shared, so it carries no device bindings.",
+      "errorNoDeviceId": "This device has not been added to your account, so it has no device identity to claim itself under.",
+      "errorConflict": "Two different claims at the same version could not be told apart, so nothing was changed. Claim this device again to replace them.",
+      "errorUnreadable": "The device list could not be read on this device. Nothing was changed.",
+      "errorGeneric": "Could not read this vault’s devices. Try again."
+    },
+    "nameGate": {
+      "title": "Choose a display name",
+      "body": "This is how the other members of this vault will see you in the member list. Your fingerprint stays beside it, and you can change the name later.",
+      "label": "Your display name",
+      "checking": "Checking your name…",
+      "save": "Continue"
     }
   },
   "tasks": {
@@ -5015,7 +5075,9 @@
       "title": "Save your identity phrase",
       "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
       "reveal": "Reveal",
-      "ack": "I have saved these 24 words somewhere safe.",
+      "typebackLead": "To confirm you saved it, type these four words from the phrase above.",
+      "wordNumber": "Word #{{position}}",
+      "wordMismatch": "That does not match word #{{pos}}.",
       "continue": "Continue"
     },
     "home": {
@@ -5043,6 +5105,9 @@
     "intro": "An identity lets people address an invite to you before you own any vault. It creates no vault and stores no notes.",
     "pending": "This device is waiting for another device on the account to approve it.",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
+    "typeBackLead": "To confirm you saved it, type these four words from the phrase above.",
+    "typeBackMismatch": "That does not match word #{{pos}}.",
+    "typeBackWordAtPosition": "Word #{{pos}}",
     "recoverCta": "Recover an identity",
     "recoverIntro": "Identity recovery phrase",
     "recovered": "Identity recovered.",
@@ -5076,6 +5141,7 @@
     "acceptConfirm": "I confirmed this fingerprint with the owner out of band",
     "acceptSubmit": "Accept and unlock",
     "acceptPhraseLabel": "Your recovery phrase",
+    "acceptPasswordNote": "Choose a password for this device. It is separate from the vault owner’s password and from your recovery phrase: it unlocks this vault on this device, and your phrase remains the portable way back in.",
     "acceptError": "The invite could not be accepted.",
     "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
     "acceptErrorNotFound": "This invitation is no longer available. It may already have been used or withdrawn. Ask the owner to send a new invite.",
@@ -5083,6 +5149,20 @@
     "acceptErrorTransport": "Could not reach the sync server. Check your connection and try again.",
     "acceptErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
     "acceptInvalid": "That is not a valid owner identity code.",
+    "claimedHeading": "Invites you have already claimed",
+    "claimedHint": "Add one to this device with your recovery phrase. If the vault owner has since removed you from the vault, it cannot be added here.",
+    "join": "Add to this device",
+    "joinHint": "This vault is already shared with your identity. Enter your recovery phrase to install it on this device.",
+    "joinPhraseLabel": "Your recovery phrase",
+    "joinPasswordNote": "Choose a password for this device. It is separate from the vault owner's password: it unlocks this vault here, and your recovery phrase remains the portable way back in.",
+    "joinSubmit": "Add and unlock",
+    "joinError": "The vault could not be added to this device.",
+    "joinErrorAlreadyHeld": "This device already holds this vault, so there is nothing to add. Open the vault you already have here.",
+    "joinErrorBadRequest": "This device could not confirm which owner this vault belongs to, so it did not add the vault. If this is the first time you sign in to this vault here, open it once on a device that already has it, then try again.",
+    "joinErrorNotEnrolled": "This recovery phrase is not the identity this vault was shared with. Check that you entered the phrase for the identity that was invited.",
+    "joinErrorNotConfigured": "Sync is not set up on this device. Set your sync server, then try again.",
+    "joinErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
+    "joinErrorTransport": "Could not reach the sync server, or this vault is not published there yet. Check your connection and try again.",
     "shareCodeHeading": "Your invite code",
     "shareCodeHint": "Share this code with whoever invites you. It contains only public information (your identity id and public keys), never your phrase.",
     "title": "Your identity",

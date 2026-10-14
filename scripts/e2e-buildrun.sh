@@ -10,6 +10,21 @@ IMAGE=myne-e2e
 
 # `--features voice-capture-stub`: see scripts/e2e-local.sh (myne#389 item D).
 #
+# `--features local-inference-stub` is the second half of that list and its
+# absence here was a defect, not a default. Every other lane builds with it:
+# `.woodpecker/e2e.yml`'s release binary, `main.yml`'s `tauri-compile` (so the
+# stub arms cannot bit-rot), and `scripts/e2e-local.sh`, whose own comment names
+# this exact consequence. Bare defaults pull the real Candle engine, the final
+# `myne_desktop_lib` rustc then instantiates candle + tokenizers generic code on
+# top of tauri, webkit and the app, and that single invocation does not fit a
+# constrained VM: measured 2026-10-12 at 145 MiB free against an 11.9 GiB colima VM
+# with an unrelated 4 GiB container stack running, which is what produced a
+# `(signal: 9, SIGKILL)` on that crate that reads as a compile error and is the
+# OOM killer (e2e/AGENTS.md). The stub keeps the `local-inference` feature and its
+# deps ENABLED while compiling the stub body, so the binary matches the one CI
+# tests and the `MYNE_E2E_AI=1` suites work here rather than reaching for a model
+# no runner has. Nothing on this runner wants the Candle engine.
+#
 # The `touch` is load-bearing and cost an hour to find. The frontend is EMBEDDED
 # in the binary at compile time, and a change confined to `src/` (or any other
 # frontend tree) leaves every Rust source untouched, so cargo relinks nothing and
@@ -31,7 +46,7 @@ if [ -n "${MYNE_E2E_RETRIES:-}" ]; then
   RETRY_FLAG="--retry=${MYNE_E2E_RETRIES}"
 fi
 
-INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub; set +e; PASS=""; FAIL="";'
+INNER='set -e; pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub; set +e; PASS=""; FAIL="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
   INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"

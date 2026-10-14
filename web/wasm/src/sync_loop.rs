@@ -180,6 +180,15 @@ pub async fn tick() -> String {
     // is the same predicate the desktop loop uses.
     let unlocked = state.active_vault_id().await.is_some();
 
+    // Up-path: drain any queued awareness frames through the shared ~100 ms
+    // coalescer and POST one batch if a window is due, gated on the same unlock
+    // predicate the down-stream reader runs under (`SYNC-30`). A no-op until the
+    // editor bridge queues a frame, which is why it is safe to call on every
+    // tick.
+    if unlocked {
+        crate::awareness::flush(now).await;
+    }
+
     let action = SCHED.with(|s| {
         let mut s = s.borrow_mut();
         s.set_unlocked(unlocked);
@@ -222,6 +231,7 @@ pub async fn tick() -> String {
         crate::dispatch::vault_io(),
         state,
         crate::session::hooks(),
+        crate::session::live_sessions(),
         allow_push,
     )
     .await;

@@ -285,6 +285,39 @@ export const myneTheme = EditorView.theme({
   // the line's hard left edge: at x≈0 the top-level •/*/+ markers fell 6px into
   // the gutter and read as "no marker at all".
 
+  // Live-collaboration awareness (live-collab, `collab-presence-ui`): a peer's
+  // caret, its name label and their selection band. Every value binds a `var(*)`
+  // token; the per-participant colour arrives as `--cm-awareness-color` (the widget
+  // sets it to the peer's `var(--group-*)`). The label is ALWAYS drawn beside the
+  // caret, so colour is never the sole channel. The caret's one-shot fade-in lives
+  // as global `@keyframes` in `attachments/styles.ts` (the CM theme's StyleModule
+  // cannot emit `@keyframes`) with a `prefers-reduced-motion` arm that removes it.
+  ".cm-awareness-caret": {
+    position: "relative",
+    borderInlineStart: "2px solid var(--cm-awareness-color, var(--accent))",
+    marginInline: "-1px",
+    pointerEvents: "none",
+  },
+  ".cm-awareness-label": {
+    position: "absolute",
+    top: "-1.35em",
+    insetInlineStart: "-2px",
+    padding: "1px var(--space-1)",
+    borderRadius: "var(--radius-1)",
+    background: "var(--cm-awareness-color, var(--accent))",
+    color: "var(--accent-on, #ffffff)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-xs, 10px)",
+    fontWeight: "var(--weight-medium)",
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+  },
+  ".cm-awareness-selection": {
+    background:
+      "color-mix(in srgb, var(--cm-awareness-color, var(--accent)) 30%, transparent)",
+    borderBottom: "1px solid var(--cm-awareness-color, var(--accent))",
+  },
+
   // Inline typography — highlight / sub / sup from inline-typography.ts
   // (MYND-156). `.cm-highlight` is the SYNC-6 shared class reused by
   // embedded-html-rendering's `<mark>`. Sub/sup reuse the footnote-marker

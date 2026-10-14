@@ -30,6 +30,7 @@
 // needs a "you have unsaved changes" prompt.
 
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearAwareness } from "../notes/collab/awarenessStore";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
@@ -121,6 +122,12 @@ export async function leaveActiveVault(deps: {
   // `teardown_on_lock` on the `lockVault()` above; this is the WebView half,
   // and `decisions/ai/0515` rests its "nothing survives a lock" claim on both.
   clearAgentForLock();
+  // The live-presence peers (`collab-presence-ui` task 3): the names, cursors and
+  // selections of the editors of the vault being left. The store is module scope and
+  // this path does not reload the WebView, so without this the next vault would show
+  // the previous one's participants. The `lockVault()` above clears it too; asserted
+  // separately here for the same reason the two below are.
+  clearAwareness();
   // And the chat transcript, for the reason that is specific to a CHANGE: the
   // questions and answers describe the vault being left, so carrying them into
   // the next one would show a second vault a first vault's conversation. The

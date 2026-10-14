@@ -5,6 +5,7 @@
 //   - core/src/plugins/snapshots/commands.rs            (SnapshotMeta)
 
 import type { IoFailureKind } from "./vault-unlock-error";
+import type { ResolvedIdentity } from "./resolved-identity";
 
 /**
  * Single error type returned across the IPC boundary by the `snapshots`
@@ -31,7 +32,8 @@ export type SnapshotError =
   /** Residual filesystem failure, reduced to a closed kind. */
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /** `spawn_blocking` panic / runtime shutdown. */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  | { kind: "LiveSessionOpen" };
 
 /**
  * Decrypt-free metadata for one snapshot, as returned by `snapshot_list`.
@@ -44,4 +46,7 @@ export interface SnapshotMeta {
   captured_at_ms: number;
   /** On-disk size of the snapshot blob, bytes. */
   size_bytes: number;
+  /** The resolved author of THIS revision (`collab-provenance` task 3): the device
+   *  that made the change, or `unknown` for the `MY01` arm / an unmappable actor. */
+  resolved_author: ResolvedIdentity;
 }

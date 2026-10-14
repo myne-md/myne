@@ -1,0 +1,29 @@
+# Permissions for the in-app `member-names` Tauri plugin (mobile).
+# Picked up under the `member-names:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `member-names:default` (or the individual `member-names:allow-*` permissions).
+#
+# The family is the B2B member display-name store: the encrypted
+# `vault.member-names` (`MYO5`) singleton, group-tier sealed and `NTV6`-only
+# (protocol.md §9.29, decisions/protocol/0666). Ported from the desktop
+# `src-tauri/permissions/member-names/default.toml`: the same three commands, no
+# mobile-only addition and none dropped. Every command is Slot::Unlocked-gated.
+# `member_names_set_mine` and `member_names_clear_mine` are WRITE setters, and both
+# can only ever write the CALLER'S OWN row: the row is keyed by the session's own
+# person id and signed by the session's own person key, so the ACL grants no
+# authority over another member's name. Like the other write-capable plugins, v0.2
+# multi-window MUST NOT grant the two mutating permissions to any non-main window.
+# Only `member_names_set_mine` has a mobile caller today (the onboarding name step,
+# myne-md/myne#851 task 15); the other two are granted so the command names in
+# `build.rs`, this file and the plugin's `generate_handler!` stay lock-stepped, which
+# is what `scripts/check-mobile-plugin-acl.mjs` compares in both directions.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the member-names plugin: list the vault's member display names, and set or clear your OWN name."
+permissions = [
+  "allow-member-names-list",
+  "allow-member-names-set-mine",
+  "allow-member-names-clear-mine",
+]

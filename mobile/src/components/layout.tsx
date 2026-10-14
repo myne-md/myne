@@ -75,7 +75,16 @@ export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSP
   );
 }
 
-/** The "Create a vault · 2 of 5" style flow header with a back chevron. */
+/** The "Create a vault · 2 of 5" style flow header with a back chevron.
+ *
+ *  The chevron renders only when `onBack` is given, which is why it is optional
+ *  rather than required. It used to render unconditionally, with `onClick={undefined}`
+ *  on the callers that pass nothing: a chevron that is plainly tappable and does
+ *  nothing. Two steps are deliberately forward-only and both were carrying one: the
+ *  recovery-phrase reveal, which has nothing to go back to once the phrase is on
+ *  screen, and the post-accept name step, whose whole design is that an accepted vault
+ *  cannot reach the editor unnamed (`sync.nameGate.*`, myne-md/myne#851 task 15). A
+ *  header cannot promise an exit the step refuses to take. */
 export function FlowHeader({
   label,
   onBack,
@@ -97,13 +106,15 @@ export function FlowHeader({
         ...style,
       }}
     >
-      <button
-        onClick={onBack}
-        aria-label={t("common.back")}
-        style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}
-      >
-        <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
-      </button>
+      {onBack ? (
+        <button
+          onClick={onBack}
+          aria-label={t("common.back")}
+          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}
+        >
+          <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
+        </button>
+      ) : null}
       <Eyebrow>{label}</Eyebrow>
     </div>
   );

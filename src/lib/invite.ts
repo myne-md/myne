@@ -28,7 +28,22 @@ export type VaultAuthority = "owner" | "member";
 /** One roster row as the UI consumes it. */
 export interface RosterMemberView {
   fingerprint_hex: string;
+  /** Whether this row is the CALLER. The backend decides it by comparing the
+   *  row's fingerprint to the local person identity, so the UI never infers
+   *  "You" from the row's role (myne-md/myne#859). */
+  is_self: boolean;
+  /** The member's display name, resolved from the signed `vault.member-names`
+   *  store. Non-empty only when `name_state` is `verified`, so a record whose
+   *  signature nobody can vouch for never reaches the UI. It does NOT carry the
+   *  owner-signed roster's own name field, which the member list no longer
+   *  renders: that value is the vault label captured at migration, not a person. */
   display_name: string;
+  /** `verified` | `unverified` | `absent`: whether the signed name store holds a
+   *  record for this row at all, and whether it verified against the row's own
+   *  person. Three answers rather than a flag, because "this member has not
+   *  chosen a name" and "somebody wrote a row for this member that nobody signed"
+   *  are different things to say, and the member list renders them differently. */
+  name_state: "verified" | "unverified" | "absent";
   /** The member's vault role, serialized lowercase by the backend. */
   role: VaultAuthority;
   version: number;

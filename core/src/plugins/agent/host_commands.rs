@@ -1461,7 +1461,17 @@ pub async fn undo_from_host<R: Runtime>(
     // function that does the wiring is the one statement that makes "is anything
     // new wired to nothing?" unanswerable by reading.
     let record_settings = record.settings;
-    let host = TauriHost::new(app);
+    // The REAL live-session registry (`SYNC-33`), read BEFORE the app handle moves
+    // into the host: the undo writes notes back through `snapshot_restore`, which
+    // refuses a note a live session owns. A throwaway registry would make that
+    // refusal inert, and the notes an undo reverses were written by the same paths a
+    // live session can own.
+    let registry = {
+        use tauri::Manager as _;
+        app.try_state::<crate::plugins::live::LiveSessionRegistry>()
+    };
+    let registry: Option<&crate::plugins::live::LiveSessionRegistry> = registry.as_deref();
+    let host = TauriHost::new(app.clone());
     let mut reverted = 0usize;
     let mut failed = Vec::new();
     for (note_id, snapshot_id) in record.restore_points {
@@ -1473,6 +1483,7 @@ pub async fn undo_from_host<R: Runtime>(
             note_id.clone(),
             snapshot_id,
             &StdVaultIo,
+            registry,
         )
         .await
         {

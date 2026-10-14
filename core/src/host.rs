@@ -299,6 +299,13 @@ pub mod tauri_host {
         pub fn new(app: AppHandle<R>) -> Self {
             Self { app }
         }
+
+        /// The wrapped app handle, for a shared core that needs another piece of
+        /// Tauri-managed state than the host itself (the live-session registry the
+        /// single-writer guard reads, `SYNC-33`).
+        pub fn app(&self) -> &AppHandle<R> {
+            &self.app
+        }
     }
 
     impl<R: Runtime> HostCtx for TauriHost<R> {

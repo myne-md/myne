@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
   type ReactNode,
@@ -38,6 +39,25 @@ const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { saveNote } from "../saveNote";
+import { closeLiveNote, isLiveNote, openLiveNote, reportLivePresence, takeRemoteSplices } from "../liveNote";
+import { PRESENCE_JUMP_EVENT, type PresenceJumpDetail } from "../collab/presenceJump";
+import { resolveIdentity } from "../../lib/identity";
+import { listen } from "../../platform/event";
+import { remoteDispatchSpec } from "@myne/editor/live-bridge";
+import {
+  AWARENESS_GRACE_MS,
+  awarenessOnDrop,
+  awarenessNotePeers,
+  awarenessSweep,
+  awarenessUpsert,
+  getAwarenessSnapshot,
+  setAwareness,
+  subscribeAwareness,
+  type PresenceUpdate,
+} from "../collab/awarenessStore";
+import { colorVarForIndex } from "../collab/participant";
+import { identityLabelText } from "../collab/identityLabel";
+import { resolvePeerLabels } from "../collab/presenceLabels";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
@@ -191,6 +211,12 @@ const OUTLINE_ACTIVE_OFFSET_PX = 8;
  *  stopping. */
 const SCROLL_SETTLE_MS = 120;
 
+/** How long this pane's local caret/selection waits before being reported on the
+ *  live channel (`collab-presence-ui`). Matches the awareness coalescing floor
+ *  (`SYNC-5`, ~100 ms): a trailing throttle, so a fast caret sends one frame per
+ *  window rather than one per keystroke. */
+const PRESENCE_REPORT_MS = 100;
+
 /**
  * A trailing-edge debounce that owns its own handle.
  *
@@ -297,7 +323,7 @@ export function PaneView({
   insetLeft = 0,
   insetRight = 0,
 }: PaneViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ws = useWorkspace();
   const ctx = useSelectedNote();
   const { prefs } = usePrefs();
@@ -630,6 +656,195 @@ export function PaneView({
   useEffect(() => {
     focusedRef.current = focused;
   }, [focused]);
+  // Close this pane's live session when the pane unmounts (`collab-editor-bridge`
+  // task 8). Read through the ref so the effect runs the CURRENT note id and is
+  // not re-subscribed on every note switch.
+  useEffect(
+    () => () => {
+      const id = activeIdRef.current;
+      if (id !== null) void closeLiveNote(id);
+    },
+    [],
+  );
+  // Deliver a sync pull's merge into the OPEN live note (`collab-editor-bridge`
+  // task 7): the cycle already merged it into the session + disk and queued the body
+  // diff; here the pane drains it and dispatches it as ONE CodeMirror ChangeSet, so
+  // the buffer catches up WITHOUT the reload a dirty pane skips, and its next
+  // whole-markdown save therefore cannot delete the merged-in peer text.
+  useEffect(() => {
+    let disposed = false;
+    const unlisten: Array<() => void> = [];
+    const onRemote = (event: { payload: string }) => {
+      const id = activeIdRef.current;
+      if (disposed || id === null || event.payload !== id || !isLiveNote(id)) return;
+      void takeRemoteSplices(id).then((splices) => {
+        const view = outlineViewRef.current;
+        if (disposed || splices.length === 0 || view === null) return;
+        view.dispatch(remoteDispatchSpec(view.state, splices));
+      });
+    };
+    // BOTH events carry one note id: the durable merge (`sync://remote-merged`,
+    // which also raises the calm hint) and the live peer edit
+    // (`sync://live-remote-merged`, silent on purpose, because the change is landing in
+    // front of the user, myne-md/myne#857).
+    for (const name of ["sync://remote-merged", "sync://live-remote-merged"]) {
+      void listen<string>(name, onRemote).then((fn) => {
+        if (disposed) fn();
+        else unlisten.push(fn);
+      });
+    }
+    return () => {
+      disposed = true;
+      for (const fn of unlisten) fn();
+    };
+  }, []);
+  // The awareness store (`collab-presence-ui` task 3): the peers editing THIS pane's
+  // note, fed from the live channel (`sync://awareness`) and pushed into the editor.
+  // Reset on a note change (awareness for note A never reaches note B); cleared on
+  // unmount, which is how a lock / vault leave reaches a pane.
+  //
+  // `dropFlushRef` carries THIS pane's durable flush into the drop listener below
+  // (`collab-editor-bridge` task 7). It is a ref rather than a captured closure
+  // because the flush is defined far below (it needs the autosave hook), while
+  // this listener is registered once on mount.
+  const dropFlushRef = useRef<(() => Promise<boolean>) | null>(null);
+  // Live presence (`collab-presence-ui`): this pane's local caret/selection is
+  // reported to the awareness supervisor so peers render its cursor. Trailing-
+  // throttled to the awareness coalescing floor (`SYNC-5`) so a fast caret does not
+  // flood the IPC; a no-op for a note with no live session.
+  const presenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const presenceLastRef = useRef<{ cursor: number | null; selection: [number, number] | null } | null>(
+    null,
+  );
+  const handleCursorChange = useCallback(
+    (cursor: number | null, selection: [number, number] | null) => {
+      presenceLastRef.current = { cursor, selection };
+      if (presenceTimerRef.current !== null) return;
+      presenceTimerRef.current = setTimeout(() => {
+        presenceTimerRef.current = null;
+        const noteId = activeIdRef.current;
+        const latest = presenceLastRef.current;
+        if (noteId === null || latest === null) return;
+        reportLivePresence(noteId, latest.cursor, latest.selection);
+      }, PRESENCE_REPORT_MS);
+    },
+    [],
+  );
+  useEffect(
+    () => () => {
+      if (presenceTimerRef.current !== null) clearTimeout(presenceTimerRef.current);
+    },
+    [],
+  );
+  const awareness = useSyncExternalStore(subscribeAwareness, getAwarenessSnapshot);
+  // The CMEditor `awareness` prop: memoized so it is a STABLE object across renders.
+  // A fresh object here re-dispatches the editor's decoration effect on EVERY render
+  // of this pane, including renders caused by unrelated state.
+  //
+  // The label is RESOLVED here, because the editor package's `AwarenessPeer.label` is
+  // a plain string (its decoration widget has no translator and rebuilds on editor
+  // state, not on a language switch). Resolving at the push keeps i18n out of the
+  // shared editor package, and `i18n.language` is in the deps so the one thing that
+  // must invalidate the memo, a language change, does: without it the caret label
+  // would keep the previous language for as long as the pane stayed mounted, which
+  // is the freeze the descriptor exists to prevent one layer up.
+  const paneAwareness = useMemo(
+    () =>
+      activeId !== null
+        ? {
+            noteId: activeId,
+            peers: [...awarenessNotePeers(awareness, activeId).values()].map((p) => ({
+              ...p,
+              label: p.label === null ? "" : identityLabelText(p.label, t),
+              colorVar: colorVarForIndex(p.color),
+            })),
+          }
+        : undefined,
+    [awareness, activeId, t, i18n.language],
+  );
+  // Resolve each un-attributed peer's label through the backend identity resolver
+  // (`collab-provenance` task 2, `collab-presence-ui` task 1). A presence frame carries
+  // no name THIS STORE MAY USE, and `awarenessUpsert` discards the one the wire carries
+  // (`member-devices` task 5), so without this every roster row and caret label renders
+  // the degraded device form. The store flips `unAttributed` off once resolved, so
+  // this does not re-resolve the same peer.
+  //
+  // The label RULE is `resolvedIdentityLabel`, shared with the version history
+  // (`member-devices` task 5): presence and history must name one device the same
+  // way, and the two hand-written switches had already drifted apart. The loop
+  // itself lives in `collab/presenceLabels` so it is testable without a pane
+  // harness. That loop takes no translator: what it writes into the store is the
+  // label DESCRIPTOR, resolved at each surface's own render (`identityLabel.ts`), so
+  // a resolved string cannot be frozen into the store for the life of the peer.
+  useEffect(() => {
+    if (activeId === null) return;
+    void resolvePeerLabels(awarenessNotePeers(awareness, activeId).values(), resolveIdentity);
+  }, [awareness, activeId]);
+  useEffect(() => {
+    let disposed = false;
+    let unlistenUpdate: (() => void) | null = null;
+    let unlistenDrop: (() => void) | null = null;
+    let sweepTimer: ReturnType<typeof setTimeout> | null = null;
+    void listen<PresenceUpdate>("sync://awareness", (event) => {
+      if (disposed) return;
+      setAwareness((s) => awarenessUpsert(s, event.payload));
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlistenUpdate = fn;
+    });
+    // A stream drop starts the grace window; the peers are cleared only if the
+    // stream does not come back within it, so a reconnect does not flicker.
+    void listen("sync://awareness-dropped", () => {
+      if (disposed) return;
+      // Eager flush (`collab-editor-bridge` task 7): the live channel may not come
+      // back, and a pending durable save must land either way. Firing the pane's
+      // own flush here is also what lets the next durable pull's reload run ,
+      // `ctx.reloadOpenNote()` early-returns while this pane has pending work, so a
+      // dropped channel with an unflushed keystroke would otherwise hold the pane
+      // on its stale buffer. The durable blob plane (the `note_update` funnel plus
+      // the periodic sync pull) does not depend on the awareness stream, so this
+      // flush is the whole of the editor-side fallback. Fire-and-forget; the
+      // autosave state machine surfaces any failure in its own status.
+      if (dropFlushRef.current !== null) void dropFlushRef.current();
+      setAwareness((s) => awarenessOnDrop(s, Date.now()));
+      if (sweepTimer !== null) clearTimeout(sweepTimer);
+      sweepTimer = setTimeout(() => {
+        setAwareness((s) => awarenessSweep(s, Date.now()));
+      }, AWARENESS_GRACE_MS);
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlistenDrop = fn;
+    });
+    // The roster's click-to-jump (`collab-presence-ui` task 4): the "Who's here"
+    // row dispatches this event; the pane whose ACTIVE note matches reveals the
+    // peer's line. Without this listener the roster's click is inert.
+    const onPresenceJump = (e: Event) => {
+      if (disposed) return;
+      const detail = (e as CustomEvent<PresenceJumpDetail>).detail;
+      const id = activeIdRef.current;
+      if (detail === undefined || id === null || detail.noteId !== id) return;
+      const before = contentRef.current.slice(0, Math.max(0, detail.offset));
+      setRevealLine({
+        noteId: id,
+        line: before.split("\n").length - 1,
+        text: before.slice(before.lastIndexOf("\n") + 1),
+        nonce: Date.now(),
+      });
+    };
+    window.addEventListener(PRESENCE_JUMP_EVENT, onPresenceJump);
+    return () => {
+      disposed = true;
+      if (unlistenUpdate !== null) unlistenUpdate();
+      if (unlistenDrop !== null) unlistenDrop();
+      window.removeEventListener(PRESENCE_JUMP_EVENT, onPresenceJump);
+      if (sweepTimer !== null) clearTimeout(sweepTimer);
+      // NO `clearAwareness()` here. The store is MODULE-scope, so an unmount clear
+      // would wipe the peers a SURVIVING split pane is still rendering (closing one
+      // of two panes unmounts only that one). The vault-leaving paths that must drop
+      // it (lock, switch, delete) call `clearAwareness()` themselves, and
+      // `check-frontend-lock-teardown.mjs` holds each of them to it.
+    };
+  }, []);
 
   // Resolve the heading currently at the top of the viewport: the last heading
   // whose block sits at or above the viewport top. The editor GROWS to fit its
@@ -1073,6 +1288,13 @@ export function PaneView({
     // every way of opening a note converges, whatever opened it.
     if (activeId !== null) noteBecameActive(activeId);
 
+    // Live-session lifecycle (`collab-editor-bridge` task 8): the incoming note
+    // opens a session (idempotent, a second pane showing the same note ATTACHES
+    // to the one session), and the outgoing note's session is closed AFTER its
+    // buffer is flushed, in the `flushOutgoing().then` blocks below. Best-effort:
+    // a drawing note or a locked vault stays on the durable path.
+    if (activeId !== null) void openLiveNote(activeId);
+
     if (activeId === null) {
       setContent("");
       setLoading(false);
@@ -1124,6 +1346,10 @@ export function PaneView({
         // (and every view over it) reads "Untitled".
         const outgoingId = prevId;
         void autosaveRef.current?.flushOutgoing().then(() => {
+          // Flush the outgoing buffer through its live session FIRST, then close
+          // the session (task 8). Closing before the flush would drop the session
+          // before the autosave lands and fall the save back to the stateless path.
+          if (outgoingId !== null) void closeLiveNote(outgoingId);
           if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
         });
         autosaveRef.current?.acceptReloadedBody(doc);
@@ -1164,6 +1390,10 @@ export function PaneView({
         // (and every view over it) reads "Untitled".
         const outgoingId = prevId;
         void autosaveRef.current?.flushOutgoing().then(() => {
+          // Flush the outgoing buffer through its live session FIRST, then close
+          // the session (task 8). Closing before the flush would drop the session
+          // before the autosave lands and fall the save back to the stateless path.
+          if (outgoingId !== null) void closeLiveNote(outgoingId);
           if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
         });
         autosaveRef.current?.acceptReloadedBody(body);
@@ -1403,6 +1633,16 @@ export function PaneView({
     registerFlush(leaf.id, flushAndReport);
     return () => unregisterFlush(leaf.id);
   }, [leaf.id, flushAndReport, registerFlush, unregisterFlush]);
+  // Publish this pane's flush to the awareness-drop listener above
+  // (`collab-editor-bridge` task 7): an eager flush on live-channel disconnect so
+  // no pending durable save is stranded if the stream does not return, and so the
+  // next durable pull's reload is not skipped by the pending-work gate.
+  useEffect(() => {
+    dropFlushRef.current = flushAndReport;
+    return () => {
+      dropFlushRef.current = null;
+    };
+  }, [flushAndReport]);
 
   // Surgical sidebar refresh after a successful save (title/H1 edits
   // propagate to the row label). Tracks the `saved.at` identity.
@@ -1816,6 +2056,10 @@ export function PaneView({
             onChange={setContent}
             onBlur={handleBlur}
             onSelectionChange={handleSelectionChange}
+            // Live presence (`collab-presence-ui`): report this pane's local caret
+            // so peers see it. The reading companion below is a mirror and reports
+            // nothing.
+            onCursorChange={handleCursorChange}
             noteSet={notes}
             vaultHeadings={vaultHeadings}
             vaultBlockAnchors={vaultBlockAnchors}
@@ -1839,6 +2083,11 @@ export function PaneView({
             tagSuggestions={tagSuggestions}
             onAcceptTagSuggestion={handleAcceptTagSuggestion}
             onDismissTagSuggestion={handleDismissTagSuggestion}
+            // collab-presence-ui task 3: the peers editing THIS note. Empty once the
+            // store is reset/cleared, which renders nothing (never stale). Only the
+            // editable primary editor gets it - the read-only mirror below draws no
+            // cursors.
+            awareness={paneAwareness}
             scrollAnchor={activeScrollAnchor}
             revealLine={revealLine}
             // outline-scroll-tracking: hand the live view to the pane so it can

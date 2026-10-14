@@ -654,7 +654,7 @@ mod tests {
             dump.push_str(&alloc::format!(
                 "      \"description\": \"{}\",\n",
                 json_escape(
-                    "supported_tokens() returns exactly the registered token names in registry order: the five v1 names followed by the two period tokens myne#177 appended, which land at the end so the v1 names keep their positions. The order is load-bearing for UI parity (the {{ autocomplete lists tokens in this order); the SET is load-bearing for render parity, since a port advertising a token it does not substitute (or vice versa) has split the single registry this category exists to pin."
+                    "supported_tokens() returns exactly the registered token names in registry order: the five v1 names followed by the two period tokens myne#177 appended, which land at the end so the v1 names keep their positions. The order is load-bearing for UI parity (the {{ autocomplete lists tokens in this order); the SET is load-bearing for render parity, since a port advertising a token it does not substitute (or vice versa) has split the single registry this category exists to pin. The two period names are APPENDED rather than interleaved, so the five v1 names keep their positions and the v1 order remains a prefix of this one; a port that sorts the registry fails here."
                 )
             ));
             dump.push_str("      \"case_kind\": \"token_registry\",\n");

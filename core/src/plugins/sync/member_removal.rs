@@ -64,10 +64,11 @@ pub const REKEY_JOURNAL: &str = ".rekey-journal";
 /// Member-removal errors. Closed enum; no path or secret ever crosses IPC.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemberRemovalError {
-    /// Member removal is parked until the roster wire ships. Every removal
-    /// entry point refuses with this before touching the vault, so the
-    /// non-converging half (local rotation without peer propagation or
-    /// tombstone convergence) cannot run.
+    /// The LEGACY `NTV5` removal path ([`remove_member_from_host`]) is parked and
+    /// refuses with this before touching the vault. The canonical B2B rotation
+    /// ([`rotate_group_from_host`], which `sync_remove_member` runs) does NOT
+    /// produce it, so a live caller never sees this variant; it survives because
+    /// the parked body is still compiled and still tested.
     RemovalUnavailable,
     /// No vault is unlocked.
     VaultLocked,
@@ -448,12 +449,29 @@ async fn rekey_content_blobs(
     Ok(staged)
 }
 
+/// One remaining member's delivery package, addressed by its server-side
+/// `person_id_hash` (lowercase hex) so the owner can POST it to the vault-scoped
+/// route `PUT /b2b/vaults/{account_hash}/group-packages/{person_id}`
+/// (`collab-b2b-sessions` task 1). The removed member is never a recipient.
+pub struct GroupPackageDelivery {
+    pub person_id_hex: String,
+    pub package: protocol::person_invite::SignedGroupPackage,
+}
+
 /// The outcome of one local canonical group rotation. The retirement records are
 /// returned rather than persisted: they are sync-plane records whose transport
 /// and retention are Grill 4's, and this model deliberately writes none of them
 /// into the vault.
 pub struct GroupRotationOutput {
     pub new_epoch: u64,
+    /// One owner-signed group package per REMAINING live member that carries a
+    /// `person_id_hex` (`collab-b2b-sessions` task 1): the delivery half of the
+    /// rotation. The removed member gets none, its roster row is a tombstone
+    /// with no wrap. The owner POSTs each to the recipient's vault-scoped route;
+    /// a member fetches its own, verifies against the pinned owner public half
+    /// and unwraps the new `group_key`. A remaining member migrated from a
+    /// pre-B2B roster has no person account to address, so it is skipped here.
+    pub packages: Vec<GroupPackageDelivery>,
     pub retirements: Vec<protocol::person_invite::SignedGroupRetirement>,
     /// The retired epoch's shared-singleton sync-ids (hex), for the owner-only
     /// namespace-retirement call (`reclaim_sync_ids_hex`). Empty when the local
@@ -461,16 +479,64 @@ pub struct GroupRotationOutput {
     pub reclaim_sync_ids_hex: Vec<String>,
 }
 
+/// Address each rotation package by its recipient's `person_id_hex`, joined
+/// against the NEW signed roster. A package's payload names the recipient
+/// FINGERPRINT; the roster row for that fingerprint carries the
+/// `person_id_hash` the delivery route `PUT /b2b/vaults/{account_hash}/
+/// group-packages/{person_id}` is keyed on. A remaining member with no person
+/// account (a row migrated from the pre-B2B roster) has no server address and is
+/// skipped rather than addressed with a placeholder.
+fn address_packages(
+    packages: Vec<protocol::person_invite::SignedGroupPackage>,
+    roster: &protocol::person_invite::GroupRosterPayload,
+) -> Result<Vec<GroupPackageDelivery>, MemberRemovalError> {
+    let mut addressed = Vec::with_capacity(packages.len());
+    for package in packages {
+        let payload: protocol::person_invite::GroupPackagePayload =
+            serde_json::from_slice(&package.payload)
+                .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+        let Some(person_id_hex) = roster
+            .members
+            .iter()
+            .find(|m| m.fingerprint_hex == payload.recipient_fingerprint_hex)
+            .and_then(|m| m.person_id_hex.clone())
+        else {
+            continue;
+        };
+        addressed.push(GroupPackageDelivery {
+            person_id_hex,
+            package,
+        });
+    }
+    Ok(addressed)
+}
+
 /// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
-/// vault: the attachments catalog, `vault.prefs` and `vault.themes` are all
+/// vault. Every shared singleton whose sync-id is derived from the GROUP key is
 /// addressed by a group-derived id (decision 0609), so a rotation to a new
-/// `group_key` retires exactly these three.
+/// `group_key` retires each of them: the attachments catalog, `vault.prefs`,
+/// `vault.themes`, `vault.member-names` (myne-md/myne#851) and
+/// `vault.device-bindings` (`MYU5`, §9.30, myne-md/myne#852).
+///
+/// **This list and the re-seal set are one decision, not two.** Retiring an id
+/// whose blob was not re-sealed DELETES the family server-side and leaves
+/// nothing behind, which is why `rotate_group_from_host` re-seals this same set
+/// from the old group key to the new one in the step before it queues these.
+/// `vault.member-names` and `vault.device-bindings` are group-tier-ONLY: no
+/// `NTV5` form, so neither can go through
+/// `vault_migrate::b2b::SHARED_SINGLETONS`, whose members are promoted from
+/// the owner root tier and whose re-seal therefore takes a `SingletonOldTier`.
+/// Each re-seal is the dedicated group-to-group step in the rotation, because
+/// their AAD binds `group_key_epoch` and that helper's signature does not carry
+/// an epoch.
 fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
     let group = protocol::GroupKey::new(*old_group_key);
     [
         protocol::GroupRole::CatalogSyncId,
         protocol::GroupRole::PrefsSyncId,
         protocol::GroupRole::ThemesSyncId,
+        protocol::GroupRole::MemberNamesSyncId,
+        protocol::GroupRole::DeviceBindingSyncId,
     ]
     .into_iter()
     .map(|role| {
@@ -491,7 +557,9 @@ fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
 /// 2. mint a fresh random `group_key` (epoch + 1) and a fresh `itemsKey`;
 /// 3. re-wrap every content blob's per-entry key under the new `itemsKey` —
 ///    content ciphertext and every identifier byte-identical;
-/// 4. re-seal the shared singletons from the OLD group key to the NEW one;
+/// 4. re-seal the shared singletons from the OLD group key to the NEW one,
+///    `vault.member-names` included (group-tier-only, so it takes the dedicated
+///    epoch-aware step rather than the `SHARED_SINGLETONS` loop);
 /// 5. rebuild the signed roster: the removed row becomes a tombstone, every
 ///    remaining live member gets a fresh package at the new epoch (the removed
 ///    member gets none), and emit the two owner-signed retirement records;
@@ -551,6 +619,10 @@ pub async fn rotate_group_from_host(
     let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
     let account_number_hash = b2b_meta.base.account_number_hash;
+    // Captured rather than read off `b2b_meta` later: `base` is moved out of it at
+    // step (6), while the `vault.member-names` re-seal in between needs the RETIRED
+    // epoch, which rides that family's AAD (`aad_member_names_blob`).
+    let old_epoch = b2b_meta.group_key_epoch;
 
     // (1) The current roster is sealed under the OLD group key at the current
     // epoch; open it, then verify the owner signature.
@@ -625,6 +697,172 @@ pub async fn rotate_group_from_host(
         &mut rng,
     )
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+
+    // (5b) Address each remaining member's package by its server-side
+    // `person_id_hash` so the owner can POST it to the vault-scoped delivery
+    // route (`collab-b2b-sessions` task 1).
+    let new_roster = protocol::person_invite::parse_group_roster(&rotated.signed_roster.payload)
+        .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    let packages = address_packages(rotated.packages, &new_roster)?;
+
+    // (5c) Re-seal `vault.member-names` from the retired epoch's group tier to
+    // the new one. Separate from the `SHARED_SINGLETONS` loop above for two
+    // reasons, both structural rather than stylistic: this family has NO `NTV5`
+    // (`root_key`) form, so it is always a group-to-group move while that loop's
+    // helper takes either old tier, and its AAD binds `group_key_epoch`, which
+    // that helper's signature does not carry. The retired epoch's blob opens
+    // under the key the member just removed STILL HOLDS, so skipping this would
+    // both keep the name map readable to them and leave it unreadable to everyone
+    // else, whose session moves to the new group key at step (8). It must land
+    // with the reclaim entry in `group_rotation_reclaim_sync_ids`, which retires
+    // this blob's old sync-plane id.
+    match io
+        .read(&vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE))
+        .await
+    {
+        Ok(blob) => {
+            let old_names_key =
+                protocol::derive_group_subkey_v0_2(&old_group, protocol::GroupRole::MemberNamesKey);
+            let new_names_key =
+                protocol::derive_group_subkey_v0_2(&new_group, protocol::GroupRole::MemberNamesKey);
+            let map = protocol::decode_member_names_blob(
+                &old_names_key,
+                &account_number_hash,
+                old_epoch,
+                &blob,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            let resealed = protocol::encode_member_names_blob(
+                &new_names_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &map,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+                resealed,
+            ));
+        }
+        // Unconditional for the same reason step (5d) below is: the sync-id is
+        // retired either way, so a device that holds no local copy must still stage
+        // an empty map at the new epoch or the server deletes the retired-epoch blob
+        // and leaves every peer stuck on bytes their new key cannot open.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+            let new_names_key =
+                protocol::derive_group_subkey_v0_2(&new_group, protocol::GroupRole::MemberNamesKey);
+            let resealed = protocol::encode_member_names_blob(
+                &new_names_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &protocol::MemberNamesMap::new(),
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+                resealed,
+            ));
+        }
+        Err(_) => return Err(MemberRemovalError::Io),
+    }
+
+    // (5d) Tombstone the removed member's device bindings and re-seal
+    // `vault.device-bindings` into the new epoch, in ONE staged write.
+    //
+    // The two halves are one operation rather than two, and that is the whole shape of
+    // this step. Re-sealing alone would carry the removed member's live rows into a blob
+    // they can no longer read, which leaves every other member's device list claiming a
+    // person who is not in the vault. Tombstoning alone, into the retired epoch's blob,
+    // would be invisible to everyone the moment step (8) moves their session to the new
+    // group key.
+    //
+    // The tombstone is signed by the OWNER, and that is the only signer the read side
+    // accepts for a row that is not the caller's own (`verify_device_binding_removal`).
+    // It is written HERE rather than through the store's own entry point because that
+    // entry point writes to disk, and writing the retired epoch's ciphertext first would
+    // leave a window in which the map is on disk in a form nobody can open.
+    //
+    // Only rows bound to the REMOVED person tombstone. A retired device keeps its binding:
+    // its past revisions were genuinely that person's, so revoking one device is not a
+    // fact this family has anything to say about, and `sync::devices::revoke_device` writes
+    // nothing here.
+    match io
+        .read(&vault_root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE))
+        .await
+    {
+        Ok(blob) => {
+            let old_bindings_key = protocol::derive_group_subkey_v0_2(
+                &old_group,
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let new_bindings_key = protocol::derive_group_subkey_v0_2(
+                &new_group,
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let mut map = protocol::decode_device_binding_blob(
+                &old_bindings_key,
+                &account_number_hash,
+                old_epoch,
+                &blob,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            let mut tombstone_rng = rand_core::UnwrapErr(crate::rng::OsRng);
+            map = match crate::plugins::device_binding::tombstone_devices_for_person(
+                map,
+                owner,
+                removed_fingerprint_hex,
+                &mut tombstone_rng,
+            ) {
+                Ok((map, _tombstoned)) => map,
+                // A malformed row (a key that is not 16 hex bytes, a fingerprint that is
+                // not 32) cannot be tombstoned and cannot be trusted either. Refusing the
+                // whole rotation is the honest answer: the alternative is a re-seal that
+                // silently carries a row nobody could verify.
+                Err(_) => return Err(MemberRemovalError::InvalidVaultMeta),
+            };
+            let resealed = protocol::encode_device_binding_blob(
+                &new_bindings_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &map,
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE),
+                resealed,
+            ));
+        }
+        // The id is reclaimed whether or not this device happens to hold the blob
+        // (`group_rotation_reclaim_sync_ids` lists it unconditionally), so the
+        // re-seal has to be unconditional too. Skipping it here would have the
+        // server DELETE the retired-epoch blob and leave nothing at the new id,
+        // and a peer whose local copy is still sealed at the retired epoch could
+        // neither open it (the AAD binds `group_key_epoch`) nor repair it: its
+        // `read_verified_bindings_bytes` answers `None` for bytes that do not
+        // decode, so the sync phase computes itself clean and never replaces the
+        // file, and that device's attribution stays blank for good. An absent file
+        // and an empty map are the same thing to every reader of this family, so
+        // staging the empty map at the new epoch is what keeps the two halves of
+        // the rotation landing together.
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => {
+            let new_bindings_key = protocol::derive_group_subkey_v0_2(
+                &new_group,
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let resealed = protocol::encode_device_binding_blob(
+                &new_bindings_key,
+                &account_number_hash,
+                rotated.new_epoch,
+                &protocol::DeviceBindingsMap::new(),
+            )
+            .map_err(|_| MemberRemovalError::CannotDecrypt)?;
+            staged.push((
+                vault_root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE),
+                resealed,
+            ));
+        }
+        Err(_) => return Err(MemberRemovalError::Io),
+    }
 
     // (6) Re-seal the NTV6 metadata at the new epoch.
     let mut base = b2b_meta.base;
@@ -710,6 +948,10 @@ pub async fn rotate_group_from_host(
 
     Ok(GroupRotationOutput {
         new_epoch: rotated.new_epoch,
+        // The per-member delivery packages the rotation already built, now
+        // addressed by recipient `person_id_hash` for the delivery route
+        // (`collab-b2b-sessions` task 1).
+        packages,
         retirements: rotated.retirements,
         reclaim_sync_ids_hex,
     })
@@ -717,8 +959,9 @@ pub async fn rotate_group_from_host(
 
 /// Re-base the sync plane for a group rotation (myne-md/myne#711 task 30,
 /// `decisions/protocol/0609`). In an `NTV6` vault the reserved sync-ids of the
-/// shared singletons (attachments catalog, prefs, themes) are derived from the
-/// group key, so a rotation to a new epoch moves them. Each retired epoch's id
+/// shared singletons (attachments catalog, prefs, themes, member names and
+/// `vault.device-bindings` (`MYU5`, §9.30, myne-md/myne#852)) are
+/// derived from the group key, so a rotation to a new epoch moves them. Each retired epoch's id
 /// that this device holds a baseline for is queued as an orphan tombstone (the
 /// next push flags it on the server so horizon-GC reclaims the stranded record)
 /// and its baseline dropped, the same shape as
@@ -1235,6 +1478,98 @@ mod tests {
     const ROT_ACCT: [u8; 16] = [0x44; 16];
     const ROT_ITEMS_ID: [u8; 16] = [0x07; 16];
     const ROT_ROOT: [u8; 32] = [0x11; 32];
+    /// The person id of the live `vault.member-names` row the rotation fixture seeds,
+    /// so a test can address the row it expects to survive.
+    const ROT_MEMBER_ID: [u8; 16] = [0x66; 16];
+    /// The one enrolled device the fixture binds to the member who is removed. Nothing in
+    /// the removal reads it except to carry it into the tombstone, so a fixed value holds
+    /// the shape step (5d) acts on.
+    const ROT_DEVICE_ID: [u8; 16] = [0x77; 16];
+
+    /// Seal a one-row `vault.member-names` map at `epoch` under `group_key`, through the
+    /// family's own codec, so the rotation's re-seal runs against the real shape rather
+    /// than a hand-built envelope.
+    fn seed_names_blob(
+        root: &std::path::Path,
+        owner: &PersonKeyPair,
+        group_key: &[u8; 32],
+        epoch: u64,
+        person_id: &[u8; 16],
+        name: &str,
+    ) {
+        let key = protocol::derive_group_subkey_v0_2(
+            &protocol::GroupKey::new(*group_key),
+            protocol::GroupRole::MemberNamesKey,
+        );
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let row = protocol::sign_member_name(owner, person_id, 1, false, name, &mut rng)
+            .expect("sign name row");
+        let mut map = protocol::MemberNamesMap::new();
+        map.insert(rot_hex(person_id), row);
+        let blob = protocol::encode_member_names_blob(&key, &ROT_ACCT, epoch, &map)
+            .expect("seal names blob");
+        std::fs::write(
+            root.join(crate::plugins::member_names::MEMBER_NAMES_FILE),
+            blob,
+        )
+        .expect("write names blob");
+    }
+
+    /// A real vault carries a `vault.device-bindings` map too, and step (5d) re-seals it
+    /// into the new epoch the same way step (5c) re-seals the names map, with one thing
+    /// more: it tombstones every row bound to the removed person, signed by the OWNER.
+    /// Without a live row here the rotation's `io.read` hits the `NotFound` arm, writes
+    /// nothing, and the step's whole body is unexercised while the test stays green, so
+    /// this seeds one device bound to the member who is about to be removed.
+    ///
+    /// The device id is arbitrary: a real row is keyed by the enrolled device id that
+    /// device's own unlock wrote, and nothing in this step reads the id except to carry
+    /// it into the tombstone, so a fixed one holds the shape the removal acts on.
+    fn seed_bindings_blob(
+        root: &std::path::Path,
+        claimant: &PersonKeyPair,
+        group_key: &[u8; 32],
+        epoch: u64,
+        person_fingerprint_hex: &str,
+        device_id: &[u8; 16],
+    ) {
+        use protocol::{sign_device_binding, DeviceBindingsMap};
+        let key = protocol::derive_group_subkey_v0_2(
+            &protocol::GroupKey::new(*group_key),
+            protocol::GroupRole::DeviceBindingKey,
+        );
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        // Signed by the CLAIMING person, which is the member: a row is only ever accepted
+        // against the public half of the person it names, and the owner's signature is
+        // accepted on a tombstone alone. A row signed by the owner here would make the
+        // `verify_device_binding_removal` assertion below pass for the wrong reason.
+        let mut fingerprint = [0u8; protocol::person_key::PERSON_FINGERPRINT_LEN];
+        fingerprint
+            .copy_from_slice(&decode_hex_32(person_fingerprint_hex).expect("a 64-hex fingerprint"));
+        let row = sign_device_binding(claimant, device_id, &fingerprint, 1, false, &mut rng)
+            .expect("sign binding row");
+        let mut map = DeviceBindingsMap::new();
+        map.insert(
+            crate::plugins::device_binding::store::device_id_hex(device_id),
+            row,
+        );
+        let blob = protocol::encode_device_binding_blob(&key, &ROT_ACCT, epoch, &map)
+            .expect("seal bindings blob");
+        std::fs::write(
+            root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE),
+            blob,
+        )
+        .expect("write bindings blob");
+    }
+
+    fn decode_hex_32(s: &str) -> Option<Vec<u8>> {
+        if s.len() != 64 {
+            return None;
+        }
+        (0..32)
+            .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok())
+            .collect()
+    }
 
     fn rot_pair(seed: u8) -> PersonKeyPair {
         let mut kem = [0u8; protocol::person_key::PERSON_DK_SEED_LEN];
@@ -1276,6 +1611,78 @@ mod tests {
             continuity: GroupKeyContinuity::Current,
             transition_hex: None,
         }
+    }
+
+    /// `address_packages` joins a package's recipient FINGERPRINT to the new
+    /// roster row's `person_id_hex`, and skips a remaining member with no person
+    /// account (a row migrated from the pre-B2B roster).
+    #[test]
+    fn address_packages_keys_each_delivery_on_its_recipient_person_id() {
+        let owner = PersonKeyPair::generate_raw(&[0xB1u8; 64], &[0xB2u8; 32], &[0xB3u8; 32]);
+        let addressed_member =
+            PersonKeyPair::generate_raw(&[0xC1u8; 64], &[0xC2u8; 32], &[0xC3u8; 32]);
+        let legacy_member =
+            PersonKeyPair::generate_raw(&[0xD1u8; 64], &[0xD2u8; 32], &[0xD3u8; 32]);
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let group_key = [0x7Au8; 32];
+        let p_addressed = protocol::person_invite::create_group_package(
+            &owner,
+            &addressed_member.public_half(),
+            &group_key,
+            &ROT_ACCT,
+            2,
+            &mut rng,
+        )
+        .expect("package addressed");
+        let p_legacy = protocol::person_invite::create_group_package(
+            &owner,
+            &legacy_member.public_half(),
+            &group_key,
+            &ROT_ACCT,
+            2,
+            &mut rng,
+        )
+        .expect("package legacy");
+        let pid = "12".repeat(16);
+        let mut roster = GroupRosterPayload {
+            account_number_hash_hex: rot_hex(&ROT_ACCT),
+            group_key_epoch: 2,
+            owner_fingerprint_hex: rot_hex(owner.fingerprint()),
+            members: vec![
+                rot_row(
+                    &addressed_member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    None,
+                ),
+                rot_row(
+                    &legacy_member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    None,
+                ),
+            ],
+        };
+        // Stamp the server-side person id on ONE remaining member only.
+        for m in &mut roster.members {
+            if m.fingerprint_hex == rot_hex(addressed_member.fingerprint()) {
+                m.person_id_hex = Some(pid.clone());
+            }
+        }
+
+        let addressed =
+            address_packages(vec![p_addressed.clone(), p_legacy], &roster).expect("address");
+        assert_eq!(
+            addressed.len(),
+            1,
+            "only the member carrying a person id is addressed"
+        );
+        assert_eq!(addressed[0].person_id_hex, pid);
+        assert_eq!(
+            protocol::person_invite::encode_signed_group_package(&addressed[0].package),
+            protocol::person_invite::encode_signed_group_package(&p_addressed),
+            "the delivered package is the one the rotation built"
+        );
     }
 
     /// Build a real `NTV6` vault at `<base>/data/vaults/<id>/` with one note
@@ -1408,6 +1815,25 @@ mod tests {
         ));
         std::fs::write(&note_path, &note).expect("write note");
 
+        // A real vault carries a `vault.member-names` map, and it is the one shared
+        // singleton whose re-seal is NOT the `SHARED_SINGLETONS` loop (`MYO5` is
+        // group-tier only and its AAD binds the epoch), so the fixture seeds one at
+        // epoch 1. Without it a rotation test would prove nothing about step 5c.
+        seed_names_blob(&root, owner, &group_key_old, 1, &ROT_MEMBER_ID, "Member");
+
+        // And the binding map, for step (5d) and for exactly the reason above: the
+        // rotation re-seals `MYU5` into the new epoch and tombstones the removed
+        // member's rows on the way, and with no row to act on both halves of that step
+        // are skipped over a green test.
+        seed_bindings_blob(
+            &root,
+            member,
+            &group_key_old,
+            1,
+            &rot_hex(member.fingerprint()),
+            &ROT_DEVICE_ID,
+        );
+
         let state = VaultRuntimeState::default();
         state
             .set_unlocked(
@@ -1447,6 +1873,14 @@ mod tests {
 
             assert_eq!(out.new_epoch, 2);
             assert_eq!(out.retirements.len(), 2);
+            // `collab-b2b-sessions` task 1: the delivery packages are carried out.
+            // This vault's ONLY member is the one removed, so there are none to
+            // deliver; `person_invite`'s own rotation test covers the remaining-member
+            // case (one package per remaining member, none for the removed one).
+            assert!(
+                out.packages.is_empty(),
+                "a removed member gets no package and no member remains"
+            );
             for record in &out.retirements {
                 let payload = protocol::person_invite::verify_group_retirement(
                     &owner.public_half(),
@@ -1515,8 +1949,191 @@ mod tests {
             .expect("note opens under the rotated key");
             assert_eq!(&decoded[..], b"rotated-body");
 
+            // (5c) `vault.member-names` moved to the new epoch. Asserted through the
+            // READER path the app uses (`resolve_names` off the live session), not
+            // through a key this test derived for itself: the property that was missing
+            // is "the name map is still readable after a removal", and a re-seal that
+            // used the wrong key or the wrong epoch would satisfy a self-derived check
+            // only if the test reproduced the same mistake.
+            let names_path = root.join(crate::plugins::member_names::MEMBER_NAMES_FILE);
+            let names_bytes = std::fs::read(&names_path).expect("the names blob is still there");
+            let resolved =
+                crate::plugins::member_names::commands::resolve_names(&StdVaultIo, &state, &root)
+                    .await
+                    .expect("the session resolves the names KEK after the rotation");
+            assert_eq!(
+                resolved.group_key_epoch, out.new_epoch,
+                "the session moved to the new epoch"
+            );
+            let reopened = protocol::decode_member_names_blob(
+                &resolved.key,
+                &resolved.account_number_hash,
+                resolved.group_key_epoch,
+                &names_bytes,
+            )
+            .expect("the re-sealed map opens under the SESSION's key at the new epoch");
+            assert!(
+                reopened.contains_key(&rot_hex(&ROT_MEMBER_ID)),
+                "the row survived the rotation"
+            );
+            assert_eq!(
+                reopened[&rot_hex(&ROT_MEMBER_ID)].name,
+                "Member",
+                "and its name is intact"
+            );
+            assert!(
+                protocol::decode_member_names_blob(
+                    &resolved.key,
+                    &resolved.account_number_hash,
+                    1,
+                    &names_bytes,
+                )
+                .is_err(),
+                "the re-sealed blob must NOT open at the retired epoch: that is what \
+                 makes the epoch binding load-bearing"
+            );
+
+            // (5d) `vault.device-bindings` moved to the new epoch AND the removed
+            // member's row tombstoned, in the one staged write. Asserted here for the
+            // reason step (5c) is asserted two blocks up and by the same fixture: a
+            // re-seal that used the wrong key or the wrong epoch, or a tombstone signed
+            // by the wrong person, satisfies every other check in this test. The
+            // fixture seeds one live row bound to the member (`seed_bindings_blob`), so
+            // the tombstone half has something to act on.
+            let bindings_path = root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE);
+            let bindings_bytes =
+                std::fs::read(&bindings_path).expect("the bindings blob is still there");
+            let new_bindings_key = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(*rotated_group),
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let rebound = protocol::decode_device_binding_blob(
+                &new_bindings_key,
+                &ROT_ACCT,
+                2,
+                &bindings_bytes,
+            )
+            .expect("the re-sealed map opens under the NEW group key at the new epoch");
+            assert!(
+                protocol::decode_device_binding_blob(
+                    &new_bindings_key,
+                    &ROT_ACCT,
+                    1,
+                    &bindings_bytes,
+                )
+                .is_err(),
+                "and must NOT open at the retired epoch: the epoch is in the AAD"
+            );
+            let device_key = crate::plugins::device_binding::store::device_id_hex(&ROT_DEVICE_ID);
+            let tombstoned = rebound
+                .get(&device_key)
+                .expect("the row survived the removal");
+            assert!(
+                tombstoned.tombstone,
+                "the removed member's device must be tombstoned: their row is what every \
+                 other member's device list would otherwise keep naming them from"
+            );
+            assert!(
+                protocol::verify_device_binding_removal(
+                    &owner.public_half(),
+                    &ROT_DEVICE_ID,
+                    tombstoned,
+                ),
+                "the removal tombstone carries the OWNER's hybrid signature over the \
+                 removed person's fingerprint, which is the only signer the read side \
+                 accepts for a row that is not the caller's own"
+            );
+            assert!(
+                !protocol::live_device_bindings(&rebound).contains_key(&device_key),
+                "and a tombstone is a merge input rather than a row a device list renders"
+            );
+
             // The running session moved to the new tiers.
             assert_eq!(state.active_vault_id().await, Some(id));
+        });
+    }
+
+    /// The other half of step (5d), and the one nothing else in this file reaches: a
+    /// rotation on a device that holds NO `vault.device-bindings` file.
+    ///
+    /// `group_rotation_reclaim_sync_ids` retires the family's group-derived sync-id
+    /// unconditionally, so the re-seal has to be unconditional too. Skipping it left
+    /// the server deleting the retired-epoch blob with nothing staged at the new id,
+    /// and every peer still holding a copy sealed at the retired epoch was then stuck:
+    /// its bytes no longer open (the AAD binds `group_key_epoch`), so
+    /// `read_verified_bindings_bytes` answers `None` for them, so its sync phase
+    /// computes itself clean and never replaces the file, and that device's
+    /// attribution stayed blank permanently. The assertion is the staged write, not
+    /// the absence of an error: an empty map at the NEW epoch is what makes the two
+    /// halves land together.
+    #[cfg(any(test, feature = "test-support"))]
+    #[test]
+    fn group_rotation_with_no_local_names_or_bindings_blob_still_reseals_empty_ones() {
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::StdVaultIo;
+
+        block_on(async {
+            let owner = rot_pair(0x10);
+            let member = rot_pair(0x20);
+            let base = ScopedTempDir::new("group-rotation-no-bindings").expect("tempdir");
+            let (_id, root, _old_items, _old_group, state) =
+                seed_ntv6_group_vault(base.path(), &owner, &member).await;
+            let host = crate::host::test_host::TestHost::new(base.path());
+
+            // The state this test exists for: this device never claimed itself, holds no
+            // bindings file at all, and holds no names file either. Both are the ordinary
+            // state of a member who has not yet synced those two families down, and both
+            // steps (5c and 5d) retire a sync-id unconditionally, so both owe an empty
+            // re-seal on a device that has nothing to re-seal.
+            let bindings_path = root.join(crate::plugins::device_binding::DEVICE_BINDINGS_FILE);
+            std::fs::remove_file(&bindings_path).expect("the seeded bindings blob is removed");
+            let names_path = root.join(crate::plugins::member_names::MEMBER_NAMES_FILE);
+            std::fs::remove_file(&names_path).expect("the seeded names blob is removed");
+
+            rotate_group_from_host(
+                &host,
+                &StdVaultIo,
+                &state,
+                &owner,
+                &rot_hex(member.fingerprint()),
+            )
+            .await
+            .expect("rotation commits");
+
+            let bytes = std::fs::read(&bindings_path)
+                .expect("a blob is staged at the new epoch even when none was held");
+            let new_group = protocol::unlock_group_key_ntv6(
+                &protocol::parse_vault_meta_ntv6(
+                    &std::fs::read(root.join("vault.meta")).expect("meta"),
+                )
+                .expect("parse NTV6"),
+                &protocol::OwnerKey::new(ROT_ROOT),
+            )
+            .expect("group reopens");
+            let new_key = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(*new_group),
+                protocol::GroupRole::DeviceBindingKey,
+            );
+            let map = protocol::decode_device_binding_blob(&new_key, &ROT_ACCT, 2, &bytes)
+                .expect("the staged blob opens under the NEW group key at the new epoch");
+            assert!(
+                map.is_empty(),
+                "an absent file and an empty map are the same thing to every reader, so the \
+                 staged map carries no rows and resurrects nothing"
+            );
+
+            // The member-names family carries the same two halves and the same latent
+            // shape, so it is asserted here rather than in a second copy of this test.
+            let names_bytes = std::fs::read(&names_path)
+                .expect("a names blob is staged at the new epoch even when none was held");
+            let new_names_key = protocol::derive_group_subkey_v0_2(
+                &protocol::GroupKey::new(*new_group),
+                protocol::GroupRole::MemberNamesKey,
+            );
+            let names =
+                protocol::decode_member_names_blob(&new_names_key, &ROT_ACCT, 2, &names_bytes)
+                    .expect("the staged names blob opens under the NEW group key at the new epoch");
+            assert!(names.is_empty());
         });
     }
 
@@ -1555,6 +2172,30 @@ mod tests {
             let tmp = ScopedTempDir::new("rotation-rebase").expect("tempdir");
             let io = StdVaultIo;
             let old_group = [0x5Au8; 32];
+
+            // `vault.member-names` (myne-md/myne#851) and `vault.device-bindings`
+            // (`MYU5`, myne-md/myne#852) are both in this set. Pinned by NAME rather
+            // than by count, because the failure this guards is a family whose id is
+            // retired without its blob being re-sealed, and a count would still pass
+            // if an unrelated role were swapped in for it.
+            for (role, family) in [
+                (protocol::GroupRole::MemberNamesSyncId, "vault.member-names"),
+                (
+                    protocol::GroupRole::DeviceBindingSyncId,
+                    "vault.device-bindings",
+                ),
+            ] {
+                let sub =
+                    protocol::derive_group_subkey_v0_2(&protocol::GroupKey::new(old_group), role);
+                let mut id = [0u8; 16];
+                id.copy_from_slice(&sub[..16]);
+                assert!(
+                    group_rotation_reclaim_sync_ids(&old_group)
+                        .contains(&crate::plugins::sync::to_hex(&id)),
+                    "the retired epoch's `{family}` id must be reclaimed, or the removed \
+                     member keeps reading the family under the group key they still hold"
+                );
+            }
 
             let old_sub = protocol::derive_group_subkey_v0_2(
                 &protocol::GroupKey::new(old_group),
