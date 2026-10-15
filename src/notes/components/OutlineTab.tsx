@@ -28,9 +28,9 @@ import { useActiveHeading } from "../views/activeHeadingSignal";
 import { computeOutlineMeta } from "../outlineTree";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 interface OutlineEntry {
   level: number;
@@ -217,7 +217,7 @@ export function OutlineTab() {
                     )}
                     aria-expanded={!isCollapsed}
                     onClick={() => toggle(i)}
-                    {...hoverSurface()}
+                    {...interactiveSurface()}
                     style={{
                       flexShrink: 0,
                       display: "flex",
@@ -245,7 +245,7 @@ export function OutlineTab() {
                   data-active={isActive ? "true" : undefined}
                   onClick={() => requestRevealHeading(h.text)}
                   title={h.text}
-                  {...hoverSurface()}
+                  {...interactiveSurface()}
                   style={{
                     flex: 1,
                     minWidth: 0,

@@ -135,7 +135,7 @@ const CSS = `
   to   { opacity: 1; }
 }
 .cm-awareness-caret {
-  animation: myne-awareness-fade-in 220ms ease-out;
+  animation: myne-awareness-fade-in var(--duration-base) var(--ease-standard);
 }
 @media (prefers-reduced-motion: reduce) {
   .cm-awareness-caret { animation: none; }
@@ -568,7 +568,7 @@ const CSS = `
   transform: scaleY(0.12);
   border-radius: var(--radius-pill);
   background-color: var(--accent, #2c4a7a);
-  transition: transform 90ms var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 .cm-voice-rec-warning {
   font-size: 12px;
@@ -660,6 +660,15 @@ const CSS = `
 .cm-attachment-audio-transcript-bar {
   transform-origin: bottom;
   animation: cm-attachment-transcript-pulse 1s ease-in-out infinite;
+  /* The per-bar stagger, from the canon rather than from a number typed into the
+     caller. The two stagger tokens 0632 added are exactly this shape, and the
+     caller only declares the index: the delay is computed here so the loop keeps
+     getComputedStyle() out of it, and the cap is the token's rather than a second
+     number. */
+  animation-delay: min(
+    calc(var(--stagger-index, 0) * var(--stagger-step)),
+    var(--stagger-max)
+  );
 }
 `;
 

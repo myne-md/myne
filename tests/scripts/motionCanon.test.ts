@@ -87,31 +87,118 @@ describe("rule 2: an infinite animation outside the allowlist", () => {
 });
 
 describe("rule 1: ease-in as an entering curve", () => {
-  it("flags ease-in but not ease-in-out", () => {
-    fixture(style('transition: "opacity 200ms ease-in"'));
-    expect(run().out).toContain(FIXTURE_NAME);
+  it("tells ease-in apart from ease-in-out rather than merging them", () => {
+    // `ease-in` is this rule's defect. `ease-in-out` is legitimate for a looping
+    // indicator that returns to where it started, and on a transition it is still
+    // an UNNAMED curve, which rule 6 reports. The pair is here so the two are
+    // told apart; the fixtures are tokenised so each rule is isolated.
+    fixture(style('transition: "opacity var(--duration-fast) ease-in"'));
+    const withEaseIn = run().out;
+    expect(withEaseIn).toContain(FIXTURE_NAME);
+    expect(withEaseIn).toContain("[ease-in]");
 
-    fixture(style('transition: "opacity 200ms ease-in-out"'));
-    expect(run().out).not.toContain(FIXTURE_NAME);
+    fixture(style('transition: "opacity var(--duration-fast) ease-in-out"'));
+    const withEaseInOut = run().out;
+    expect(withEaseInOut).not.toContain("[ease-in]");
+    expect(withEaseInOut).toContain("[literal-easing]");
   });
 });
 
 describe("rule 3: a raw duration over the 300ms ceiling", () => {
-  it("flags 620ms and passes 200ms", () => {
-    fixture(style('transition: "opacity 620ms ease-out"'));
-    expect(run().out).toContain(FIXTURE_NAME);
+  it("flags a literal above the ceiling and leaves the named breaker alone", () => {
+    fixture(style('transition: "opacity 620ms var(--ease-standard)"'));
+    const out = run().out;
+    expect(out).toContain(FIXTURE_NAME);
+    expect(out).toContain("[duration]");
 
-    fixture(style('transition: "opacity 200ms ease-out"'));
+    // `--duration-slower` IS the ceiling-breaker, and being a token is what makes
+    // reaching for it a visible act rather than an inline number.
+    fixture(style('transition: "opacity var(--duration-slower) var(--ease-standard)"'));
     expect(run().out).not.toContain(FIXTURE_NAME);
   });
 });
 
 describe("rule 4: transitioning a layout property", () => {
   it("flags width and passes transform", () => {
-    fixture(style('transition: "width 200ms ease-out"'));
-    expect(run().out).toContain(FIXTURE_NAME);
+    fixture(style('transition: "width var(--duration-base) var(--ease-out)"'));
+    const out = run().out;
+    expect(out).toContain(FIXTURE_NAME);
+    expect(out).toContain("[layout-property]");
 
-    fixture(style('transition: "transform 200ms ease-out"'));
+    fixture(style('transition: "transform var(--duration-base) var(--ease-out)"'));
+    expect(run().out).not.toContain(FIXTURE_NAME);
+  });
+
+  it("also reads an IMPERATIVE assignment, which the first version never saw", () => {
+    // `el.style.transition = "height …"` is how a FLIP is written and is exactly
+    // the shape this rule hunts. Matching only a declaration left the one
+    // imperative site in the tree invisible to it (mobile's settings sheet).
+    fixture(
+      "export function T(el: HTMLElement) {\n" +
+        '  el.style.transition = "height 200ms ease-out";\n' +
+        "}\n",
+    );
+    expect(run().out).toContain(FIXTURE_NAME);
+    expect(run().out).toContain("layout-property");
+  });
+});
+
+describe("rule 6: a raw duration, curve or easing keyword", () => {
+  it("flags a duration literal in a declaration, below the rule 3 ceiling", () => {
+    fixture(style('transition: "opacity 100ms var(--ease-standard)"'));
+    const out = run().out;
+    expect(out).toContain(FIXTURE_NAME);
+    expect(out).toContain("100ms");
+  });
+
+  it("flags a copied curve", () => {
+    fixture(style('transition: "opacity var(--duration-fast) cubic-bezier(0.2, 0, 0, 1)"'));
+    expect(run().out).toContain("literal-curve");
+  });
+
+  it("flags a bare easing keyword, but leaves ease-in to rule 1", () => {
+    fixture(style('transition: "opacity var(--duration-fast) ease"'));
+    expect(run().out).toContain("literal-easing");
+
+    // One defect, one message: `ease-in` is rule 1's, and reporting it twice
+    // sends the reader to two places to fix one line.
+    fixture(style('transition: "opacity var(--duration-fast) ease-in"'));
+    expect(run().out).not.toContain("literal-easing");
+  });
+
+  it("flags a literal in an imperative assignment too", () => {
+    fixture(
+      "export function T(el: HTMLElement) {\n" +
+        '  el.style.transition = "opacity 140ms var(--ease-standard)";\n' +
+        "}\n",
+    );
+    expect(run().out).toContain("140ms");
+  });
+
+  it("flags a literal behind the CSSProperties[\"transition\"] annotation form", () => {
+    // The third shape the tree actually writes, and the one injection found: the
+    // first version of this rule matched a declaration and a `style.` assignment
+    // only, so `HOVER_TRANSITION: CSSProperties["transition"] = "…"` was invisible.
+    fixture(
+      'export const T: CSSProperties["transition"] = "opacity 140ms var(--ease-standard)";\n',
+    );
+    expect(run().out).toContain("140ms");
+  });
+
+  it("passes a fully tokenised declaration", () => {
+    fixture(style('transition: "opacity var(--duration-base) var(--ease-standard)"'));
+    expect(run().out).not.toContain(FIXTURE_NAME);
+  });
+
+  it("passes a looping animation's own period, which the allowlist admits by name", () => {
+    // A loop's period is not the interaction scale and is routinely longer than
+    // any transition token; the allowlist is what admits it, with its reason.
+    fixture(style('animation: "myne-spinner-rotate 0.9s linear infinite"'));
+    expect(run().out).not.toContain(FIXTURE_NAME);
+  });
+
+  it("passes a var() fallback, which is a stated value rather than an unstated one", () => {
+    fixture(style('transition: "opacity var(--duration-fast, 0.1s) var(--ease-standard)"'));
     expect(run().out).not.toContain(FIXTURE_NAME);
   });
 });
