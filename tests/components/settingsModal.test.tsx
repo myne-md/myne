@@ -4,15 +4,18 @@
 // Covers the open/closed gate, tab routing (click + ArrowUp/ArrowDown cycle),
 // Esc / backdrop / × dismissal, and the in-flight gating contract: when the
 // AccountPanel raises `onInFlightChange(true)`, Esc / backdrop / × all become
-// no-ops. The panel children exercised here (account, privacy, editor,
-// appearance, storage, about, ai, network) are stubbed to trivial markers so the test
+// no-ops. The panel children exercised here (account, vault, privacy, editor,
+// appearance, storage, about, ai, network, cli) are stubbed to trivial markers so the test
 // targets the shell's routing + dismissal logic, not the panels.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-// Capture the AccountPanel's onInFlightChange so a test can flip in-flight.
-let accountInFlight: ((busy: boolean) => void) | undefined;
+// Capture the Vault panel's onInFlightChange so a test can flip in-flight.
+// The Argon2id-bound commands (change password, delete vault) live there now,
+// not in Account: the split left the account-level panel with no in-flight IPC
+// at all.
+let vaultInFlight: ((busy: boolean) => void) | undefined;
 // Same, for the AI panel's child-dialog signal (the provider consent).
 let aiDialogOpen: ((open: boolean) => void) | undefined;
 
@@ -29,9 +32,12 @@ vi.mock("../../src/hooks/usePrefs", () => ({
 }));
 
 vi.mock("../../src/components/settings/AccountPanel", () => ({
-  AccountPanel: (props: { onInFlightChange?: (b: boolean) => void }) => {
-    accountInFlight = props.onInFlightChange;
-    return <div data-testid="panel.account">account</div>;
+  AccountPanel: () => <div data-testid="panel.account">account</div>,
+}));
+vi.mock("../../src/components/settings/VaultPanel", () => ({
+  VaultPanel: (props: { onInFlightChange?: (b: boolean) => void }) => {
+    vaultInFlight = props.onInFlightChange;
+    return <div data-testid="panel.vault">vault</div>;
   },
 }));
 vi.mock("../../src/components/settings/PrivacyPanel", () => ({
@@ -82,11 +88,14 @@ vi.mock("../../src/components/settings/AiPanel", () => ({
 vi.mock("../../src/components/settings/NetworkPanel", () => ({
   NetworkPanel: () => <div data-testid="panel.network">network</div>,
 }));
+vi.mock("../../src/components/settings/CliPanel", () => ({
+  CliPanel: () => <div data-testid="panel.cli">cli</div>,
+}));
 
 import { SettingsModal } from "../../src/components/SettingsModal";
 
 beforeEach(() => {
-  accountInFlight = undefined;
+  vaultInFlight = undefined;
   aiDialogOpen = undefined;
   developerMode = false;
 });
@@ -155,9 +164,10 @@ describe("SettingsModal — tab routing", () => {
 
   it("ArrowDown cycles to the next panel; ArrowUp wraps to the last (Developer mode off)", () => {
     renderModal();
-    // account → privacy
+    // account → vault: the vault panel was split out of Account and sits
+    // directly after it in the rail.
     fireEvent.keyDown(window, { key: "ArrowDown" });
-    expect(screen.getByTestId("panel.privacy")).toBeTruthy();
+    expect(screen.getByTestId("panel.vault")).toBeTruthy();
     // ArrowUp from account would wrap; reset to account first by clicking.
     fireEvent.click(screen.getByTestId("settings.tab-account"));
     fireEvent.keyDown(window, { key: "ArrowUp" });
@@ -171,14 +181,15 @@ describe("SettingsModal — tab routing", () => {
 });
 
 describe("SettingsModal — Developer group gating (MYND-593)", () => {
-  it("mode off: no Developer group, and neither of its tabs", () => {
+  it("mode off: no Developer group, and none of its tabs", () => {
     renderModal();
     expect(screen.queryByTestId("settings.developer-group")).toBeNull();
     expect(screen.queryByTestId("settings.tab-ai")).toBeNull();
     expect(screen.queryByTestId("settings.tab-network")).toBeNull();
+    expect(screen.queryByTestId("settings.tab-cli")).toBeNull();
   });
 
-  it("mode on: Developer group and both its tabs appear, and are reachable", () => {
+  it("mode on: Developer group and all three of its tabs appear, and are reachable", () => {
     developerMode = true;
     renderModal();
     expect(screen.getByTestId("settings.developer-group")).toBeTruthy();
@@ -186,11 +197,14 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     expect(screen.getByTestId("panel.ai")).toBeTruthy();
     fireEvent.click(screen.getByTestId("settings.tab-network"));
     expect(screen.getByTestId("panel.network")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("settings.tab-cli"));
+    expect(screen.getByTestId("panel.cli")).toBeTruthy();
   });
 
   it("the group divider renders exactly once, at the core→developer boundary", () => {
-    // With two members (MYND-650) "once" is an assertion rather than a
-    // tautology: `opensDeveloper` must fire on the first developer panel only.
+    // With three members (MYND-650, and the CLI panel of `decisions/ui/0678`)
+    // "once" is an assertion rather than a tautology: `opensDeveloper` must fire
+    // on the first developer panel only.
     developerMode = true;
     renderModal();
     expect(screen.getAllByTestId("settings.developer-group")).toHaveLength(1);
@@ -200,9 +214,9 @@ describe("SettingsModal — Developer group gating (MYND-593)", () => {
     developerMode = true;
     renderModal();
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    expect(screen.getByTestId("panel.network")).toBeTruthy();
+    expect(screen.getByTestId("panel.cli")).toBeTruthy();
     expect(
-      screen.getByTestId("settings.tab-network").getAttribute("aria-selected"),
+      screen.getByTestId("settings.tab-cli").getAttribute("aria-selected"),
     ).toBe("true");
   });
 });
@@ -236,10 +250,12 @@ describe("SettingsModal — dismissal", () => {
 describe("SettingsModal — in-flight gating", () => {
   it("Esc / backdrop / × all no-op while a child is in flight", () => {
     const { props } = renderModal();
-    // The AccountPanel raises the in-flight signal during change-password.
-    expect(accountInFlight).toBeDefined();
+    // The Vault panel raises the in-flight signal during change-password and
+    // delete-vault; it only mounts once its tab is selected.
+    fireEvent.click(screen.getByTestId("settings.tab-vault"));
+    expect(vaultInFlight).toBeDefined();
     // Flip in-flight on.
-    act(() => accountInFlight!(true));
+    act(() => vaultInFlight!(true));
 
     fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.click(screen.getByTestId("settings.modal"));
@@ -247,14 +263,15 @@ describe("SettingsModal — in-flight gating", () => {
     expect(props.onClose).not.toHaveBeenCalled();
 
     // Once it clears, dismissal works again.
-    act(() => accountInFlight!(false));
+    act(() => vaultInFlight!(false));
     fireEvent.click(screen.getByTestId("settings.close"));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   it("the × button is disabled while in flight", () => {
     renderModal();
-    act(() => accountInFlight!(true));
+    fireEvent.click(screen.getByTestId("settings.tab-vault"));
+    act(() => vaultInFlight!(true));
     expect(
       (screen.getByTestId("settings.close") as HTMLButtonElement).disabled,
     ).toBe(true);

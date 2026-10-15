@@ -2772,7 +2772,7 @@
       "version": "Έκδοση",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Παράμετροι Argon2id",
       "changePasswordButton": "Αλλαγή κωδικού πρόσβασης",
       "changePasswordError": {

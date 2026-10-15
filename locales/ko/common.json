@@ -2772,7 +2772,7 @@
       "version": "버전",
       "dev": "개발"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id 매개변수",
       "changePasswordButton": "비밀번호 변경",
       "changePasswordError": {

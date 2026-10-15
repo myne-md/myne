@@ -2758,7 +2758,7 @@
       "version": "वर्शन",
       "dev": "डेव"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "पासवर्ड बदलें",
       "changePasswordError": {
         "invalidCredentialOrVault": "मौजूदा पासवर्ड ग़लत है, या वॉल्ट फ़ाइल खराब है।",

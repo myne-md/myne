@@ -281,6 +281,14 @@ export interface EditorPanelProps {
    * no toast surface.
    */
   onShowToast?: (message: string) => void;
+  /**
+   * The pending settings-search target (MYND-536), passed straight through to
+   * `PeriodicNotesSettings`. It needs it because that block renders ONE period
+   * at a time, so a search hit on a period that is not selected would resolve to
+   * no anchor at all and the shell's jump would degrade to a bare panel switch.
+   * Read `PeriodicNotesSettings.tsx`'s header before changing this path.
+   */
+  focusAnchorId?: string;
 }
 
 const CHIP_SETTING_CONTROL_STYLE: CSSProperties = {
@@ -366,7 +374,7 @@ function TaskChipIconOnlySetting(): ReactNode {
   );
 }
 
-export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
+export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {}) {
   const { t } = useTranslation();
   // Task reminders (MYND-618) read their pref here and echo the toggle locally:
   // `usePrefs` reads once on mount, so the panel - not the hook - is what keeps
@@ -472,12 +480,14 @@ export function EditorPanel({ onShowToast }: EditorPanelProps = {}) {
       </SettingsSection>
 
       {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /
-          title format / template, one section per period. Rendered at PANEL
-          level rather than inside Writing above: `SettingsSection` draws a rule
-          to the panel edge, so nesting three of them made the Reminder rows
-          that followed sit under the Monthly divider and read as monthly
-          settings. */}
-      <PeriodicNotesSettings />
+          title format / template, ONE period at a time behind a switcher.
+          Rendered at PANEL level rather than inside Writing above: `SettingsSection`
+          draws a rule to the panel edge, so nesting it inside another section
+          made the Reminder rows that followed sit under its divider and read as
+          its settings. `focusAnchorId` is the settings-search target, which the
+          switcher needs in order to open the right period before the shell
+          looks for the anchor. */}
+      <PeriodicNotesSettings focusAnchorId={focusAnchorId} />
 
       <SettingsSection
         title={t("settings.editor.sections.features")}

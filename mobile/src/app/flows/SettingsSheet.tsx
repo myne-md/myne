@@ -1906,10 +1906,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     try {
       if (HAS_TAURI) await setVaultLabel(label.length > 0 ? label : null);
       setDraft((d) => ({ ...d, label: label.length > 0 ? label : null }));
-      setToast(t("settings.account.renamedToast"));
+      setToast(t("settings.vault.renamedToast"));
       setPanel("account");
     } catch {
-      setToast(t("settings.account.renameError"));
+      setToast(t("settings.vault.renameError"));
     }
   }
 
@@ -2011,15 +2011,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     const nw = newPw;
     const cf = confirmPw;
     if (nw.length < 12) {
-      setPwError(t("settings.account.changePasswordError.weakNewPassword"));
+      setPwError(t("settings.vault.changePasswordError.weakNewPassword"));
       return;
     }
     if (nw !== cf) {
-      setPwError(t("settings.account.newPasswordMismatch"));
+      setPwError(t("settings.vault.newPasswordMismatch"));
       return;
     }
     if (nw === cur) {
-      setPwError(t("settings.account.samePassword"));
+      setPwError(t("settings.vault.samePassword"));
       return;
     }
     setPwBusy(true);
@@ -2027,7 +2027,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) await changePassword(cur, nw);
       wipeRef.current();
       setPwBusy(false);
-      setToast(t("settings.account.passwordChangedToast"));
+      setToast(t("settings.vault.passwordChangedToast"));
       setPanel("account");
     } catch (raw) {
       const e = raw as VaultChangePasswordError;
@@ -2039,13 +2039,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           setPwError("Wrong current password or vault file is corrupted.");
           break;
         case "WeakNewPassword":
-          setPwError(t("settings.account.changePasswordError.weakNewPassword"));
+          setPwError(t("settings.vault.changePasswordError.weakNewPassword"));
           break;
         case "SamePasswordRejected":
-          setPwError(t("settings.account.samePassword"));
+          setPwError(t("settings.vault.samePassword"));
           break;
         case "InvalidVaultMeta":
-          setPwError(t("settings.account.vaultUnreadable"));
+          setPwError(t("settings.vault.vaultUnreadable"));
           break;
         case "IoError":
           setPwError(ioBanner(e.detail.io_error_kind));
@@ -2057,7 +2057,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           onLock();
           return;
         default:
-          setPwError(t("settings.account.genericChangeError"));
+          setPwError(t("settings.vault.genericChangeError"));
       }
       setPwBusy(false);
     }
@@ -2203,7 +2203,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               {t("commands.actions.lockVault.label")}
             </button>
 
-            <SectionLabel>{t("settings.account.dangerZoneHeading")}</SectionLabel>
+            <SectionLabel>{t("settings.vault.dangerZoneHeading")}</SectionLabel>
             <button
               onClick={() => setPanel("delete-vault")}
               style={{
@@ -2255,10 +2255,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 with instant read-back, unlike the rename below it, which needs a
                 field, a keyboard and an explicit save. Same control as desktop's
                 Account panel, so the two settings screens stay diff-able. */}
-            <FieldLabel mt={18}>{t("settings.account.vaultIconLabel")}</FieldLabel>
+            <FieldLabel mt={18}>{t("settings.vault.vaultIconLabel")}</FieldLabel>
             <div
               role="radiogroup"
-              aria-label={t("settings.account.vaultIconLabel")}
+              aria-label={t("settings.vault.vaultIconLabel")}
               data-testid="settings.icon-picker"
               style={ICON_GRID_STYLE}
             >
@@ -2266,7 +2266,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 type="button"
                 role="radio"
                 aria-checked={eff.icon === null}
-                aria-label={t("settings.account.vaultIconDefault")}
+                aria-label={t("settings.vault.vaultIconDefault")}
                 data-testid="settings.icon-option"
                 data-icon-name="default"
                 onClick={() => selectIcon(null)}
@@ -2757,10 +2757,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <FieldLabel mt={4}>{t("settings.panelTitle.vaultName")}</FieldLabel>
             <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={vaultDisplayLabel(null)} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              {t("settings.account.renameHelper")}
+              {t("settings.vault.renameHelper")}
             </div>
             <div style={{ marginTop: 18 }}>
-              <Button onClick={submitRename}>{t("settings.account.vaultLabelSave")}</Button>
+              <Button onClick={submitRename}>{t("settings.vault.vaultLabelSave")}</Button>
             </div>
           </div>
         )}
@@ -2861,20 +2861,20 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <FieldLabel mt={pwError ? 10 : 4}>{t("settings.changePassword.currentLabel")}</FieldLabel>
             <SheetInput type="password" value={currentPw} onChange={setCurrentPw} autoFocus placeholder={t("settings.changePassword.currentLabel")} />
             <FieldLabel mt={16}>{t("settings.changePassword.newLabel")}</FieldLabel>
-            <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.account.newPasswordPlaceholder")} />
+            <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.vault.newPasswordPlaceholder")} />
             {newPw.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <StrengthMeter level={strengthLevel(newPw.length)} />
               </div>
             )}
             <FieldLabel mt={16}>{t("settings.changePassword.confirmLabel")}</FieldLabel>
-            <SheetInput type="password" value={confirmPw} onChange={setConfirmPw} placeholder={t("settings.account.reenterNewPassword")} />
+            <SheetInput type="password" value={confirmPw} onChange={setConfirmPw} placeholder={t("settings.vault.reenterNewPassword")} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              {t("settings.account.changePasswordFootnote")}
+              {t("settings.vault.changePasswordFootnote")}
             </div>
             <div style={{ marginTop: 18 }}>
               <Button onClick={submitChangePassword} disabled={pwBusy}>
-                {pwBusy ? t("settings.account.changing") : t("settings.changePassword.title")}
+                {pwBusy ? t("settings.vault.changing") : t("settings.changePassword.title")}
               </Button>
             </div>
           </div>

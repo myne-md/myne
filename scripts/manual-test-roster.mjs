@@ -1305,6 +1305,7 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/cli_bridge/socket.rs",
       "src-tauri/src/cli_bridge/mod.rs",
       "src-tauri/src/cli_bridge/path_shim.rs",
+      "src/components/settings/CliPanel.tsx",
       "src/components/settings/CliAccessSettings.tsx",
       "src/lib/cli-access.ts",
       "cli/src/status.rs",
@@ -1322,21 +1323,21 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On macOS, install the shipped bundle, unlock a vault, turn on Settings → Privacy → Terminal access behind Developer mode, then run `myne list` in Terminal and confirm it returns notes. Lock the vault and run it again: confirm the message says the vault is locked. Unlock, turn the toggle off, and run it a third time: confirm the message says terminal access is disabled in Settings. The three outcomes must read differently from each other.",
+        see: "On macOS, install the shipped bundle, unlock a vault, turn on Developer mode and then Settings → CLI → Terminal access, then run `myne list` in Terminal and confirm it returns notes. Lock the vault and run it again: confirm the message says the vault is locked. Unlock, turn the toggle off, and run it a third time: confirm the message says terminal access is disabled in Settings. The three outcomes must read differently from each other.",
         whyNotAutomated: "The six scenarios covering this run on Linux only (tauri-driver support is Linux-only by decision), and the socket path is resolved through dirs::data_dir(), which is ~/Library/Application Support on macOS versus ~/.local/share on Linux. That is a different resolution than any test has exercised.",
         clients: ["cli", "desktop-macos"],
         estimateMin: 12,
         tier: "standard",
       },
       {
-        see: "Install the real macOS bundle on a stock user account, open a fresh Terminal and type `myne --help`. Record whether it resolves. Then open Settings → Privacy → Terminal access and confirm the $PATH hint with its `export PATH=…` line appears exactly when the command did NOT resolve. Add the line to the shell profile, open a NEW terminal, and confirm `myne list` now answers against the unlocked app.",
+        see: "Install the real macOS bundle on a stock user account, open a fresh Terminal and type `myne --help`. Record whether it resolves. Then turn on Developer mode and open Settings → CLI → Terminal access, and confirm the $PATH hint with its `export PATH=…` line appears exactly when the command did NOT resolve. Add the line to the shell profile, open a NEW terminal, and confirm `myne list` now answers against the unlocked app.",
         whyNotAutomated: "cli-thin-client.e2e.ts spawns the sidecar by absolute path inside a Linux container; whether the shim directory is on a real user's $PATH is a per-OS, per-shell packaging fact: macOS commonly leaves ~/.local/bin off $PATH and Linux commonly does not, and CI builds with --no-bundle so no installed bundle exists in any lane.",
         clients: ["desktop-macos", "cli"],
         estimateMin: 8,
         tier: "standard",
       },
       {
-        see: "Install the Windows build, turn on Developer mode and open Settings → Privacy. Confirm the Terminal access block is either absent or states plainly that terminal access is unavailable on Windows. It must NOT present a toggle that appears to open a door, since the named-pipe bind is a documented unimplemented seam. Type `myne` in a new PowerShell and a new cmd window and record what happens.",
+        see: "Install the Windows build, turn on Developer mode and open Settings → CLI. Confirm the Terminal access row is either absent or states plainly that terminal access is unavailable on Windows. It must NOT present a toggle that appears to open a door, since the named-pipe bind is a documented unimplemented seam. Type `myne` in a new PowerShell and a new cmd window and record what happens.",
         whyNotAutomated: "Nothing runs on Windows at all, and the defect is a control that looks functional while binding nothing. Every code-side check passes it, because windows_pipe_name is a real tested pure function while the bind half does not exist.",
         clients: ["desktop-windows", "cli"],
         estimateMin: 6,
@@ -4882,7 +4883,7 @@ export const ROSTER = Object.freeze([
     title: "Vault label, icon and hiding vault names on the lock screen",
     paths: [
       "src/components/settings/PrivacyPanel.tsx",
-      "src/components/settings/AccountPanel.tsx",
+      "src/components/settings/VaultPanel.tsx",
       "src/lib/vault-label.ts",
       "src/lib/prefs.ts",
       "src/notes/folderIcons.ts",
@@ -5382,7 +5383,6 @@ export const ROSTER = Object.freeze([
       "src/components/settings/AccountPanel.tsx",
       "src/components/SettingsModal.tsx",
       "src/components/settings/ConnectedExtensions.tsx",
-      "src/lib/vault-delete.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
@@ -5394,7 +5394,31 @@ export const ROSTER = Object.freeze([
       "e2e/keyboard-nav-working.e2e.ts",
     ],
     manual: [],
-    exemptionReason: "All three candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The danger-zone copy is a straight capability branch (AccountPanel.tsx, `capabilities.has(\"localOnlyVault\") ? … : …`) and ConnectedExtensions is capability-gated, so which key each build renders is a literal assertion on the mobile flow-logic tier and in e2e-web; and a part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking.",
+    exemptionReason: "Everything this panel renders is a machine-checkable claim. ConnectedExtensions is capability-gated and its list/revoke calls are asserted with mocks plus the clipper-install scenario, and the account grouping the panel renders is the same device-local record `e2e/account-grouping.e2e.ts` and the picker's manual item already cover (myne-md/myne#554 ruled the candidate items automatable). The vault-scoped controls this entry used to carry moved to `settings.panel.vault`.",
+  },
+  {
+    // The panel split out of Account: the vault's own label, icon, change
+    // password and danger zone. Machines judge these (see the exemptionReason),
+    // so it carries no manual item; the entry exists because the panel is a
+    // surface a release plan schedules against and the guard fails on a file in
+    // the denominator that no entry claims.
+    id: "settings.panel.vault",
+    title: "Vault panel",
+    paths: [
+      "src/components/settings/VaultPanel.tsx",
+      "src/lib/vault-delete.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+    automatedBy: [
+      "e2e/change-password.e2e.ts",
+      "e2e/vault-delete-targeting.e2e.ts",
+      "e2e/state-machine.e2e.ts",
+      "e2e/prefs.e2e.ts",
+      "e2e/keyboard-nav-working.e2e.ts",
+      "e2e-web/vault-delete.e2e.ts",
+    ],
+    manual: [],
+    exemptionReason: "Every control here is asserted by a scenario on this entry's automatedBy list, including the danger-zone copy branch and the web client's sign-out variant, and the part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking (myne-md/myne#554).",
   },
   {
     id: "settings.panel.ai",

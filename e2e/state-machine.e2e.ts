@@ -310,8 +310,8 @@ describeE2E("post-delete routing (Settings → Account delete)", () => {
   const PASSWORD_C = "e2e-delete-routing-c-pw";
 
   async function deleteOpenVaultFromSettings(session: Session): Promise<void> {
-    // Settings → Account → Danger zone → typed-DELETE gate → Submit.
-    await openSettings(session, "account");
+    // Settings → Vault → Danger zone → typed-DELETE gate → Submit.
+    await openSettings(session, "vault");
     await (await session.byTestId("settings.delete-vault-cta")).click();
     const confirmInput = await session.byTestId("delete-vault.confirm-input", {
       timeoutMs: 10_000,

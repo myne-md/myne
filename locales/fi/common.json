@@ -2772,7 +2772,7 @@
       "version": "Versio",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id-parametrit",
       "changePasswordButton": "Vaihda salasana",
       "changePasswordError": {

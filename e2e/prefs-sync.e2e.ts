@@ -45,11 +45,11 @@ describePrefsSync("prefs sync (MYND-478)", () => {
     try {
       const { a, b, teardown } = await setupTwoSyncedDevices(srv);
       try {
-        // --- A: rename the vault through the REAL Settings → Account UI
+        // --- A: rename the vault through the REAL Settings → Vault UI
         // (exercises the production setter → central clock-stamping path).
-        // The setup left the modal on the Sync tab — select Account explicitly. ---
+        // The setup left the modal on the Sync tab — select Vault explicitly. ---
         await openSettings(a.session);
-        await (await a.session.byTestId("settings.tab-account")).click();
+        await (await a.session.byTestId("settings.tab-vault")).click();
         const labelInput = await a.session.byTestId("settings.label-input");
         await labelInput.replaceText(RENAMED);
         await (await a.session.byTestId("settings.label-save")).click();

@@ -2772,7 +2772,7 @@
       "version": "Versie",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id-parameters",
       "changePasswordButton": "Wachtwoord wijzigen",
       "changePasswordError": {

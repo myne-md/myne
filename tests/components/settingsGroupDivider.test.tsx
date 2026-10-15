@@ -66,11 +66,18 @@ vi.mock("../../src/components/settings/AiPanel", () => ({
 vi.mock("../../src/components/settings/NetworkPanel", () => ({
   NetworkPanel: () => <div data-testid="panel.network">network</div>,
 }));
+vi.mock("../../src/components/settings/CliPanel", () => ({
+  CliPanel: () => <div data-testid="panel.cli">cli</div>,
+}));
 
 const { SettingsModal } = await import("../../src/components/SettingsModal");
 
-/** The two panels that live in the Developer group. */
-const DEVELOPER_TABS = ["settings.tab-ai", "settings.tab-network"] as const;
+/** The three panels that live in the Developer group. */
+const DEVELOPER_TABS = [
+  "settings.tab-ai",
+  "settings.tab-network",
+  "settings.tab-cli",
+] as const;
 const GROUP_HEADER = "settings.developer-group";
 
 function mount() {
@@ -101,7 +108,7 @@ function railSequence(): Array<{ kind: "header" | "tab"; id: string }> {
 
 beforeEach(() => {
   developerMode = false;
-  present = new Set(["localAi", "torRouting"]);
+  present = new Set(["localAi", "torRouting", "cliAccess"]);
 });
 
 afterEach(cleanup);
@@ -136,9 +143,9 @@ describe("the Developer divider is derived from what survived the filter", () =>
   });
 
   it("renders no divider on a build where EVERY developer panel is capability-absent", () => {
-    // The web build: `localAi` and `torRouting` are both absent, so Developer
-    // mode being on leaves the group empty. A declared divider would render a
-    // heading over nothing here, and no desktop walk could ever see it.
+    // The web build: `localAi`, `torRouting` and `cliAccess` are all absent, so
+    // Developer mode being on leaves the group empty. A declared divider would
+    // render a heading over nothing here, and no desktop walk could ever see it.
     developerMode = true;
     present = new Set();
     mount();
@@ -161,15 +168,17 @@ describe("the Developer divider is derived from what survived the filter", () =>
     expect(screen.getAllByTestId(GROUP_HEADER).length).toBe(1);
     expect(screen.getByTestId("settings.tab-ai")).toBeTruthy();
     expect(screen.queryByTestId("settings.tab-network")).toBeNull();
+    expect(screen.queryByTestId("settings.tab-cli")).toBeNull();
   });
 });
 
 describe("the rail invariant: no heading without members", () => {
   const CASES: ReadonlyArray<[label: string, dev: boolean, caps: string[]]> = [
-    ["developer off, everything present", false, ["localAi", "torRouting"]],
-    ["developer on, everything present", true, ["localAi", "torRouting"]],
+    ["developer off, everything present", false, ["localAi", "torRouting", "cliAccess"]],
+    ["developer on, everything present", true, ["localAi", "torRouting", "cliAccess"]],
     ["developer on, ai only", true, ["localAi"]],
     ["developer on, tor only", true, ["torRouting"]],
+    ["developer on, cli only", true, ["cliAccess"]],
     ["developer on, nothing present", true, []],
     ["developer off, nothing present", false, []],
   ];

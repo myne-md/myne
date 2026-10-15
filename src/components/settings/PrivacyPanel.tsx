@@ -15,7 +15,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { mutationFrom } from "../../lib/prefs";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
@@ -36,7 +35,6 @@ import { has } from "../../platform/capabilities";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
-import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import { MemberPasswordSettings } from "./MemberPasswordSettings";
 import { RecoveryDrillRow } from "./RecoveryDrillRow";
@@ -380,14 +378,7 @@ interface PrivacyPanelProps {
 
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { t } = useTranslation();
-  const {
-    prefs,
-    toggleScreenCapture,
-    setAutoLock,
-    setCliEnabled,
-    setCliExcludedFolders,
-    setCliRateLimitDisabled,
-  } = usePrefs(onShowToast);
+  const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
 
   // The device-local override (myne-md/myne#482). Owned by the panel rather
   // than by its row, because the per-vault switch above has to know when it is
@@ -520,44 +511,14 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           `myne-core`'s and the web dispatcher routes it), and it is not behind
           Developer mode because a first-time user is exactly who it is for. */}
       <RecoveryDrillRow />
-      {/* CLI terminal access (cli-thin-client task 12, MYND-490). Omitted where
-          `cliAccess` is absent rather than greyed out: a browser tab cannot host
-          a terminal's Unix socket, and the sidecar it would talk to is a file
-          inside a desktop bundle (`decisions.md` 2026-07-26 "Web capability
-          set" makes omission normative).
-
-          Behind Developer mode as well (#181): the block opens the unlocked
-          vault to an EXTERNAL terminal process over the local command socket —
-          a separate trust boundary, and Myne does not vouch for what walks
-          through it. That is the Developer group's whole membership test, so
-          this belongs behind the same deliberate door as AI and Tor even
-          though it keeps its home in Privacy. The gate HIDES, it does not
-          disable: turning Developer mode back off leaves an enabled socket
-          serving, exactly as it leaves `ai_enabled` set — the off switch for
-          the feature is its own control. */}
-      {prefs.developer_mode && has("cliAccess") && (
-        <CliAccessSettings
-          enabled={prefs.cli_enabled}
-          excludedFolders={prefs.cli_excluded_folders}
-          rateLimitDisabled={prefs.cli_rate_limit_disabled}
-          onSetEnabled={(next) => {
-            void setCliEnabled(next);
-          }}
-          onSetExcludedFolders={(folders, seededFrom) => {
-            // Diffed against what this panel last saw, not against the current
-            // cache. Same reasoning as AiPanel: an exclusion a peer added while
-            // the user was editing is in the cache and not in the editor's
-            // list, and diffing against the cache would call that a removal
-            // (myne-md/myne#613). The CLI exclusion list is an egress control,
-            // so the fail-open direction is the terminal reading a folder the
-            // user marked hidden.
-            void setCliExcludedFolders(mutationFrom(seededFrom, folders), folders);
-          }}
-          onSetRateLimitDisabled={(next) => {
-            void setCliRateLimitDisabled(next);
-          }}
-        />
-      )}
+      {/* The CLI block used to render here, gated inline on
+          `prefs.developer_mode && has("cliAccess")`. It is its own
+          developer-group panel now (`CliPanel`, `decisions/ui/0678`), which
+          carries the same two gates in the rail filter. Nothing about who can
+          reach those rows changed: they were invisible without Developer mode
+          before, and they are invisible without it now — what moved is the
+          panel a user reaches for a terminal setting in, and Privacy stops
+          being the home a growing CLI surface lands in by gravity. */}
     </div>
   );
 }

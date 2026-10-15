@@ -2758,7 +2758,7 @@
       "version": "نسخه",
       "dev": "توسعه"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "تغییر گذرواژه",
       "changePasswordError": {
         "invalidCredentialOrVault": "گذرواژهٔ فعلی نادرست است یا فایل خزانه آسیب دیده است.",

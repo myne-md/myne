@@ -2772,7 +2772,7 @@
       "version": "Versi",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Parameter Argon2id",
       "changePasswordButton": "Ubah kata sandi",
       "changePasswordError": {

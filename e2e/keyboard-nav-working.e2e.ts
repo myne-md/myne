@@ -106,7 +106,7 @@ describeE2E("KN-6 change-password form Tab order is current → new → confirm 
         await unlockToEditor(app.session, fixture.password);
         await dismissImporterOffer(app.session);
 
-        await openSettings(app.session, "account");
+        await openSettings(app.session, "vault");
         await (await app.session.byTestId("settings.change-password-cta")).click();
         const current = await app.session.byTestId("change-password.current", {
           timeoutMs: 10_000,

@@ -2758,7 +2758,7 @@
       "version": "ورژن",
       "dev": "ڈیو"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "پاس ورڈ تبدیل کریں",
       "changePasswordError": {
         "invalidCredentialOrVault": "موجودہ پاس ورڈ غلط ہے یا والٹ فائل خراب ہے۔",

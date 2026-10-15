@@ -3028,6 +3028,24 @@
       "dev": "Dev"
     },
     "account": {
+      "nameLabel": "Account name",
+      "nameHelper": "A name for this group of vaults on this device. The vault picker uses it as the group's heading. It stays on this device and is never stored inside a vault, so it does not sync and another device may group and name the same vaults differently.",
+      "namePlaceholder": "Add a name…",
+      "nameSave": "Save",
+      "nameSaving": "Saving…",
+      "vaultsLabel": "Vaults in this account",
+      "vaultsHelper": "The vaults this device groups under the name above. Grouping is a per-device organisational choice, so it is not part of any vault's content and does not travel with it.",
+      "vaultsCount": "{{count}} vaults",
+      "currentVault": "This vault",
+      "unknownVault": "Another vault on this device",
+      "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
+      "unresolvedHelper": "Working out which vault is open…",
+      "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",
+      "groupingHidden": "Account names are unavailable while vault names are hidden. Turn that option off in Privacy to manage this account.",
+      "groupingUnreadable": "This device's account grouping could not be read. Nothing was changed.",
+      "groupingError": "Could not read the account grouping on this device. Nothing was changed."
+    },
+    "vault": {
       "changePasswordButton": "Change password",
       "changePasswordError": {
         "invalidCredentialOrVault": "Wrong current password or vault file is corrupted.",
@@ -3260,6 +3278,8 @@
       "sectionDaily": "Daily notes",
       "sectionWeekly": "Weekly notes",
       "sectionMonthly": "Monthly notes",
+      "sectionPeriodic": "Periodic notes",
+      "periodSwitcherAriaLabel": "Periodic note type",
       "periodFolderLabel": "Folder",
       "periodFolderHelper": "Where new {{period}} notes are filed. Defaults to {{default}}. The folder is kept even when empty.",
       "periodFormatLabel": "Title format",
@@ -3763,6 +3783,7 @@
         "account": "Account",
         "ai": "AI",
         "appearance": "Appearance",
+        "cli": "CLI",
         "editor": "Editor",
         "files": "Files",
         "transcription": "Transcription",
@@ -3770,7 +3791,8 @@
         "network": "Network",
         "privacy": "Privacy",
         "storage": "Storage",
-        "sync": "Sync"
+        "sync": "Sync",
+        "vault": "Vault"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"
@@ -3900,6 +3922,8 @@
       "empty": "No settings match “{{query}}”",
       "resultsLabel": "Search results",
       "keywords": {
+        "accountName": "account name group grouping rename label device local",
+        "accountVaults": "account vaults grouped which vaults belong group list",
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
         "aiMeetingPrompt": "meeting summary prompt instruction custom transcript action items decisions",

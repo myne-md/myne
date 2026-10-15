@@ -2758,7 +2758,7 @@
       "version": "ਵਰਜ਼ਨ",
       "dev": "ਡਿਵ"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "ਪਾਸਵਰਡ ਬਦਲੋ",
       "changePasswordError": {
         "invalidCredentialOrVault": "ਮੌਜੂਦਾ ਪਾਸਵਰਡ ਗ਼ਲਤ ਹੈ ਜਾਂ ਵਾਲਟ ਫ਼ਾਈਲ ਖ਼ਰਾਬ ਹੈ।",
