@@ -58,7 +58,8 @@
       // imports at all — so a watch meeting drained on mobile produces the SAME
       // note shape the desktop meeting session produces. A hand-copy is how the
       // two clients would silently disagree about the embed/transcript layout.
-      "@myne/meeting-note": ["../src/notes/meetingNote.ts"]
+      "@myne/meeting-note": ["../src/notes/meetingNote.ts"],
+      "@myne/note-mentions": ["../src/notes/ai/noteMentions.ts"]
     }
   },
   "include": ["src"]

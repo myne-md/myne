@@ -103,6 +103,22 @@ pub struct MemoryListRow {
     pub entry: MemoryEntryRow,
 }
 
+/// The list command's response (myne-md/myne#867): the roster plus the cap it
+/// is bounded by.
+///
+/// **The cap travels WITH the rows, and this is what stopped it being a second
+/// copy.** The surface has to show `N / cap` and say when the list needs
+/// pruning, and a cap written into the client is a second statement of
+/// `MAX_MEMORY_ENTRIES` that nothing keeps in step: a build whose cap moved
+/// would print a counter over the wrong denominator, and the number it printed
+/// would look exactly as authoritative as this one. It is one number, and it is
+/// the number the write path below already enforces.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct MemoryListView {
+    pub rows: Vec<MemoryListRow>,
+    pub cap: usize,
+}
+
 /// The catalog map: memory id (hex) → row. `BTreeMap` for byte-deterministic
 /// serialization (id-sorted), the `ThemesMap` discipline.
 pub type MemoryCatalogMap = BTreeMap<String, MemoryEntryRow>;
@@ -2979,13 +2995,17 @@ use tauri::{AppHandle, Runtime, State};
 pub async fn memory_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
-) -> Result<Vec<MemoryListRow>, MemoryReadError> {
-    memory_list_from_host(
+) -> Result<MemoryListView, MemoryReadError> {
+    let rows = memory_list_from_host(
         &TauriHost::new(app),
         &crate::vault_io::StdVaultIo,
         state.inner(),
     )
-    .await
+    .await?;
+    Ok(MemoryListView {
+        rows,
+        cap: MAX_MEMORY_ENTRIES,
+    })
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]

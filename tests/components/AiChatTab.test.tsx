@@ -16,6 +16,29 @@ import {
   within,
 } from "@testing-library/react";
 
+// **Both hooks the mention wiring reads** (myne-md/myne#867), partial in the
+// style the neighbouring mocks use so the module's other exports stay real:
+// other components in this graph import them.
+//
+// A mention needs a note set and somewhere a press lands, and neither is
+// mountable here: `useWorkspace` throws outside its provider, and
+// `useResolverNotes` reads the sidebar cache. Both are the surface's inputs
+// rather than its behaviour, so they are the two things worth stubbing.
+const { openNewTabInFocused } = vi.hoisted(() => ({
+  openNewTabInFocused: vi.fn(),
+}));
+vi.mock("../../src/notes/workspaceContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/workspaceContext")>()),
+  useWorkspace: () => ({ openNewTabInFocused, openInFocused: vi.fn() }),
+}));
+/** The vault's note set, as `useResolverNotes` reports it. Mutable so a test can
+ *  put a note in it without mounting a vault. */
+let resolverNoteSet: ResolverNote[] = [];
+vi.mock("../../src/notes/resolverNotes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/resolverNotes")>()),
+  useResolverNotes: () => resolverNoteSet,
+}));
+
 let aiEnabled = true;
 let aiProvider: string | null = null;
 vi.mock("../../src/hooks/usePrefs", () => ({
@@ -99,7 +122,11 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { AI_CHAT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
+import type { ResolverNote } from "../../src/notes/resolveWikilink";
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
+import { CHIP_KEY } from "../../src/notes/ai/restingCause";
+import type { ProviderErrorCause } from "../../src/lib/engine-error";
+
 import { ChatComposer } from "../../src/notes/components/ChatComposer";
 import {
   appendChatToken,
@@ -130,6 +157,11 @@ beforeEach(() => {
   surfaceState = { kind: "available" };
   retrievalState = { embedding: { kind: "available" }, indexReady: true };
   __resetChatForTest();
+  // The mention wiring's two inputs (myne-md/myne#867): no notes, and a fresh
+  // spy, so a test that forgets to set them cannot pass on the previous one's
+  // leftovers.
+  resolverNoteSet = [];
+  openNewTabInFocused.mockClear();
   clearAgent();
   agentLastRun.mockReset().mockResolvedValue(null);
   agentUndo.mockReset().mockResolvedValue({ reverted: 0, failed: [], notesCreatedNotReverted: 0 });
@@ -219,6 +251,49 @@ describe("AiChatTab", () => {
       expect(turns[0].getAttribute("data-role")).toBe("user");
       expect(turns[1].getAttribute("data-role")).toBe("assistant");
       expect(turns[1].textContent).toContain("You wrote about ownership.");
+    });
+
+    it("opens a note the answer names, in a new tab", () => {
+      // myne-md/myne#867, the reported case. The mention renders as a link and
+      // the press goes through the workspace's own new-tab call: neither the
+      // renderer nor this surface navigates by itself, so "open in a new tab"
+      // is decided in one place.
+      resolverNoteSet = [
+        {
+          noteUuid: "n-pixel",
+          title: "Pixel 10 Graphene OS",
+          folder: "Personal/Things I have/",
+        },
+      ];
+      const token = sendChatMessage("where did I note that?");
+      appendChatToken(token, "Under Personal/Things I have/Pixel 10 Graphene OS.");
+      finalizeChatTurn(token);
+      render(<AiChatTab />);
+      const link = screen.getByTestId("ai.mention-link");
+      expect(link.textContent).toBe("Personal/Things I have/Pixel 10 Graphene OS");
+      fireEvent.click(link);
+      expect(openNewTabInFocused).toHaveBeenCalledWith("n-pixel");
+    });
+
+    it("leaves a name the vault does not hold as plain text", () => {
+      // The other half of the same claim: with no note set there is nothing to
+      // link, and the sentence renders exactly as it did before the change.
+      const token = sendChatMessage("q");
+      appendChatToken(token, "Under Personal/Things I have/Pixel 10 Graphene OS.");
+      finalizeChatTurn(token);
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.mention-link")).toBeNull();
+      // The sentence is still there, whole, as prose. `getAllByTestId`: every
+      // turn carries the same testid, which is what the surface's own scenarios
+      // reach for.
+      const rendered = screen
+        .getAllByTestId("ai.turn-text")
+        .map((el) => el.textContent ?? "");
+      expect(
+        rendered.some((text) =>
+          text.includes("Personal/Things I have/Pixel 10 Graphene OS"),
+        ),
+      ).toBe(true);
     });
 
     it("shows the streaming caret on an in-flight assistant turn", () => {
@@ -532,18 +607,56 @@ describe("AiChatTab resting cause", () => {
     expect(body().textContent).toContain(bodyKey);
   }
 
-  it("says no provider when nothing is set up", () => {
+  it("names a missing model as a missing model, not as a missing provider", () => {
+    // `NoModel` is the cause the report emits when the local arm is active with
+    // no file, and the cause `remote_refusal` reports when a provider is named
+    // with no model chosen. It was absent from the taxonomy, so it fell into the
+    // surface's four-arm bucket and rendered "No provider" on a vault whose
+    // provider was named (myne-md/myne#867).
     surfaceState = { kind: "unavailable", cause: "no_model" };
     render(<AiChatTab />);
     expectsFault(
-      "editor.chrome.rightPanel.aiChat.statusNoModel",
-      "editor.chrome.rightPanel.aiChat.noModelHint",
+      "editor.chrome.rightPanel.aiChat.statusNoModelChosen",
+      "settings.ai.providerError.noModel",
     );
-    expect(chip().getAttribute("data-ai-cause")).toBe("no-provider");
+    expect(chip().getAttribute("data-ai-cause")).toBe("no_model");
     // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
     // reads both off one node, and splitting them would make that scenario
     // silently read `null` rather than fail.
-    expect(body().getAttribute("data-ai-cause")).toBe("no-provider");
+    expect(body().getAttribute("data-ai-cause")).toBe("no_model");
+  });
+
+  it("names consent the user has not given, instead of saying no provider", () => {
+    // **The reported defect.** A provider named, a model chosen, consent not yet
+    // recorded from this device: the header said "No provider" about a vault
+    // whose provider was named, and named an action the user had already taken.
+    surfaceState = { kind: "unavailable", cause: "consent_missing" };
+    render(<AiChatTab />);
+    expectsFault(
+      "editor.chrome.rightPanel.aiChat.statusConsentMissing",
+      "settings.ai.providerError.consentMissing",
+    );
+    expect(chip().getAttribute("data-ai-cause")).toBe("consent_missing");
+  });
+
+  it("tells a missing key from a rejected one", () => {
+    // Two causes, two fixes, and the transcript showed one sentence for both
+    // until myne-md/myne#466. Asserted here rather than through `expectsFault`,
+    // which requires the sentence to quote the chip's label, and "Key rejected"
+    // is not a phrase the provider's own sentence uses.
+    for (const [cause, label, sentence] of [
+      ["no_credential", "statusNoCredential", "noCredential"],
+      ["unauthorized", "statusKeyRejected", "unauthorized"],
+    ] as const) {
+      surfaceState = { kind: "unavailable", cause };
+      const { unmount } = render(<AiChatTab />);
+      expect(chip().getAttribute("data-ai-cause")).toBe(cause);
+      expect(chip().textContent).toBe(
+        `editor.chrome.rightPanel.aiChat.${label}`,
+      );
+      expect(body().textContent).toContain(`settings.ai.providerError.${sentence}`);
+      unmount();
+    }
   });
 
   it("says not answering when the configured backend is unreachable", () => {
@@ -551,7 +664,7 @@ describe("AiChatTab resting cause", () => {
     render(<AiChatTab />);
     expectsFault(
       "editor.chrome.rightPanel.aiChat.statusUnreachable",
-      "editor.chrome.rightPanel.aiChat.unreachableHint",
+      "settings.ai.providerError.unreachable",
     );
     expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
     // The cause rides on the SAME element as the testid: `e2e/ai-degradation`
@@ -579,7 +692,7 @@ describe("AiChatTab resting cause", () => {
     const bodies = new Set<string>();
     for (const state of [
       { kind: "unavailable", cause: "no_model" },
-      { kind: "unavailable", cause: "unreachable" },
+      { kind: "unavailable", cause: "consent_missing" },
       { kind: "absent" },
     ]) {
       surfaceState = state;
@@ -595,11 +708,31 @@ describe("AiChatTab resting cause", () => {
     expect(bodies.size).toBe(3);
   });
 
-  it("treats timeout and refused as not answering too", () => {
-    for (const cause of ["timeout", "refused"]) {
+  it("reports the host's own cause for EVERY cause, rather than a bucket", () => {
+    // The property the bucket broke, asserted over the whole set rather than
+    // over a handful of examples, because the failure mode was a DEFAULT arm:
+    // any cause the four buckets did not name rendered "No provider".
+    // `CHIP_KEY` is a total `Record` over the union, so its keys ARE the set.
+    for (const cause of Object.keys(CHIP_KEY) as ProviderErrorCause[]) {
       surfaceState = { kind: "unavailable", cause };
       const { unmount } = render(<AiChatTab />);
-      expect(chip().getAttribute("data-ai-cause")).toBe("unreachable");
+      expect(chip().getAttribute("data-ai-cause")).toBe(cause);
+      expect(chip().textContent).toBe(CHIP_KEY[cause]);
+      unmount();
+    }
+  });
+
+  it("shares one label across the causes that are one fact, and keeps their ids", () => {
+    // Three transport failures are one thing to a reader, so they share the
+    // label. Their IDS stay distinct, because a scenario that cannot tell them
+    // apart cannot assert which one it faulted.
+    for (const cause of ["timeout", "refused", "unreachable"]) {
+      surfaceState = { kind: "unavailable", cause };
+      const { unmount } = render(<AiChatTab />);
+      expect(chip().getAttribute("data-ai-cause")).toBe(cause);
+      expect(chip().textContent).toBe(
+        "editor.chrome.rightPanel.aiChat.statusUnreachable",
+      );
       unmount();
     }
   });

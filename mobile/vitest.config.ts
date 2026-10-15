@@ -105,6 +105,10 @@ export default defineConfig({
       { find: /^@myne\/engine-error$/, replacement: sib("../src/lib/engine-error.ts") },
       { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
       { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
+      // Mirror of vite.config.ts (myne-md/myne#867): the note-mention matcher,
+      // which `mobile/src/components/MentionText.tsx` imports. The mirror is
+      // kept complete rather than only where today's specs happen to reach it.
+      { find: /^@myne\/note-mentions$/, replacement: sib("../src/notes/ai/noteMentions.ts") },
     ],
   },
   test: {

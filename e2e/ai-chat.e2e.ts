@@ -68,6 +68,19 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
+        // **A note the fixture engine's reply names** (myne-md/myne#867), seeded
+        // FIRST so the note below stays the one the editor is on.
+        //
+        // The mention link only exists where an answer names a note the vault
+        // holds, and the stub's finished summary is the FIXED string `stub run`
+        // So the vault has to hold a note by that name for the answer to name
+        // one. The scenario is therefore coupled to that string on purpose: if
+        // the stub's summary is reworded, this fails by name rather than
+        // quietly asserting that no mention ever appears.
+        await createNote(s, "stub run");
+        await typeIntoEditor(s, "Notes about the fixture engine.");
+        await waitForSaved(s);
+
         await createNote(s, "ac1notealfa7k2m9qx4w8e5rj0aa");
         await typeIntoEditor(s, "The mitochondria is the powerhouse of the cell.");
         await waitForSaved(s);
@@ -123,6 +136,31 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         );
         // No error state on the happy path.
         expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
+
+        // ── The note mention opens the note (myne-md/myne#867) ────────────
+        // The answer's text is `stub run`, the vault holds a note by that
+        // name, so the name is a link rather than prose, and pressing it
+        // opens THAT note. Asserted on the assistant turn, which is where the
+        // desktop puts a mention: a user's own words stay plain text
+        // (`ConversationSurface` renders them as `pre-wrap` on purpose), so a
+        // link there would be a second, different surface.
+        const mentions = await s.findElements('[data-testid="ai.mention-link"]');
+        expect(mentions.length).toBeGreaterThan(0);
+        expect((await mentions[0]!.textContent()).trim()).toBe("stub run");
+        await mentions[0]!.click();
+        // `openMention` is `ws.openNewTabInFocused`, so the note becomes the
+        // ACTIVE tab, the one signal that says the press reached the
+        // workspace rather than only the link's own styling.
+        await s.waitUntil(
+          async () => {
+            for (const tab of await s.byTestIdAll("editor.tab")) {
+              if ((await tab.attribute("data-active")) !== "true") continue;
+              if ((await tab.textContent()).includes("stub run")) return true;
+            }
+            return null;
+          },
+          { label: "the mentioned note to become the active tab", timeoutMs: 10_000 },
+        );
 
         // Follow-up: a second message appends another exchange (multi-turn).
         const composer2 = await s.byTestId("ai.composer-input");

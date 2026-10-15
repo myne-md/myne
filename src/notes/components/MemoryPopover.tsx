@@ -6,10 +6,21 @@
 //
 // Mounted in the chat header, tab-local boolean like the history modal, so
 // every opening re-fetches the roster rather than showing a stale list.
+//
+// **It hangs off `AnchoredPanel`, and that is the fix for how it used to be
+// drawn** (myne-md/myne#867). It was a hand-written `position: absolute` box
+// with `right: 0` inside the button's own `position: relative` wrapper, and the
+// chat panel is narrower than the box: the card grew leftward past the panel's
+// left edge and the panel's `overflow` cut its text off, so a title read as
+// "remembers" and a sentence as "ered yet.". No test could see it, because the
+// panel and every word in it were in the DOM the whole time. `AnchoredPanel` is
+// the primitive whose own header records exactly this failure class; it portals
+// the box to the body, where no ancestor's overflow can reach it.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, RefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
 import { Button } from "../../components/primitives/Button";
 import {
   memoryDelete,
@@ -18,34 +29,37 @@ import {
   type MemoryListRow,
 } from "../../lib/memory";
 
-const OVERLAY_STYLE: CSSProperties = {
-  position: "absolute",
-  // The popover is anchored to the memory button (a `position: relative`
-  // wrapper in the chat header), so it opens DOWNWARD from the header into the
-  // chat area. The old `bottom: 100%` opened upward, which worked only because
-  // the popover used to live near the composer at the bottom of the tab.
-  top: "100%",
-  right: 0,
-  marginTop: "var(--space-1)",
-  zIndex: 30,
+/**
+ * The panel's own chrome. Placement, the portal, the width clamp, the height
+ * cap and dismissal all belong to `AnchoredPanel`; what is left here is what
+ * this surface looks like. The height is NOT stated because the primitive
+ * derives it from the room the anchor has, and a second number here would read
+ * as the cap while being overridden by that one, the trap
+ * `tests/styles/componentLayer.test.ts` records for the dropdown menus.
+ */
+const PANEL_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
   width: 300,
-  // The right panel narrows below 300px on small viewports: without this cap
-  // the overlay spills past the viewport edge and its own Close button stops
-  // being hit-testable (myne-md/myne#697 review). The cap keeps every control
-  // inside the clickable area.
-  maxWidth: "calc(100vw - 24px)",
-  // Viewport-capped: a short window still fits the whole overlay, and the
-  // roster scrolls inside while the Close row stays pinned (see SCROLL_STYLE
-  // / FOOTER_STYLE below).
-  maxHeight: "min(320px, calc(100vh - 96px))",
   background: "var(--paper)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
   boxShadow: "var(--shadow-2)",
   padding: "var(--space-2)",
+};
+
+/** The dialog inside the panel: the keyboard focus target, and the flex column
+ *  that lets the roster scroll while the footer stays put. */
+const DIALOG_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-1)",
+  flex: 1,
+  minHeight: 0,
+  // A dialog focused on open is a `tabIndex={-1}` target, and the global
+  // `:focus-visible` ring on a container reads as a border around the card.
+  outline: "none",
 };
 
 const SCROLL_STYLE: CSSProperties = {
@@ -94,6 +108,9 @@ const SMALL_BUTTON_STYLE: CSSProperties = {
 };
 
 export function MemoryPopover(props: {
+  /** The memory button's wrapper. `AnchoredPanel` measures it and places the
+   *  card beside it, in the body rather than inside the chat panel. */
+  anchorRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onOpenSettings: () => void;
   onShowToast: (message: string) => void;
@@ -102,6 +119,9 @@ export function MemoryPopover(props: {
   const [rows, setRows] = useState<MemoryListRow[] | null>(null);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [loadFailed, setLoadFailed] = useState(false);
+  // The host's cap (myne-md/myne#867), so the popover counts against the same
+  // denominator the write path enforces.
+  const [cap, setCap] = useState<number | null>(null);
   // Per-entry read failures, by id: a corrupt entry renders as unreadable,
   // never as a blank row (report-don't-empty applies per row, not just to
   // the roster: a blank row with a working Delete is indistinguishable from
@@ -110,16 +130,16 @@ export function MemoryPopover(props: {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Focus management, the MemorySheet twin's posture: focus the dialog on
-  // open, return focus to the memory button on close, Escape closes.
+  // open, return focus to the memory button on close.
+  //
+  // **Escape is NOT handled here**, and that is a removal rather than an
+  // omission: `AnchoredPanel` owns every dismissal it can receive (outside
+  // press, Escape, reflow), and a second listener on the same key closed the
+  // card twice for one press.
   useEffect(() => {
     const previouslyFocused = document.activeElement;
     dialogRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") props.onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
     // Mount/unmount only: onClose identity must not re-run the teardown.
@@ -128,8 +148,10 @@ export function MemoryPopover(props: {
 
   const reload = useCallback(async () => {
     try {
-      const list = await memoryList();
+      const view = await memoryList();
+      const list = view.rows;
       setRows(list);
+      setCap(view.cap);
       const next: Record<string, string> = {};
       const failed = new Set<string>();
       for (const row of list) {
@@ -155,17 +177,26 @@ export function MemoryPopover(props: {
   }, [reload]);
 
   return (
-    <div
-      style={{ position: "relative" }}
-      data-testid="ai.memory-popover-anchor"
+    <AnchoredPanel
+      open
+      onClose={props.onClose}
+      anchorRef={props.anchorRef}
+      minWidth={300}
+      align="end"
+      style={PANEL_STYLE}
     >
+      {/* **The testid stays on the DIALOG, not on the panel** (myne-md/myne#867).
+          `role="dialog"`, the accessible name and the focus target all live
+          here, and the E2E that waits on `ai.memory-popover` is asserting that a
+          dialog is up; splitting the id from the role would leave it asserting
+          that a box is up. */}
       <div
         ref={dialogRef}
         role="dialog"
         aria-label={t("editor.chrome.rightPanel.aiChat.memoryPopoverTitle")}
         tabIndex={-1}
-        style={{ ...OVERLAY_STYLE }}
         data-testid="ai.memory-popover"
+        style={DIALOG_STYLE}
       >
         <div style={SCROLL_STYLE}>
           <div
@@ -177,6 +208,29 @@ export function MemoryPopover(props: {
           >
             {t("editor.chrome.rightPanel.aiChat.memoryPopoverTitle")}
           </div>
+          {/* The same readout the settings panel carries, at the same place in
+              the reading order: how full this is, and at the cap what to do
+              about it (myne-md/myne#867). */}
+          {rows !== null && rows.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-1)",
+                fontSize: "var(--text-xs)",
+                color: "var(--fg-3)",
+              }}
+            >
+              <span data-testid="ai.memory-popover-count">
+                {t("settings.memory.count", { used: rows.length, cap: cap ?? rows.length })}
+              </span>
+              {cap !== null && rows.length >= cap ? (
+                <p data-testid="ai.memory-popover-at-cap" style={TEXT_STYLE}>
+                  {t("settings.memory.atCap")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {loadFailed ? (
             <div>
               <p data-testid="ai.memory-popover-load-failed" style={TEXT_STYLE}>
@@ -249,6 +303,6 @@ export function MemoryPopover(props: {
           </Button>
         </div>
       </div>
-    </div>
+    </AnchoredPanel>
   );
 }

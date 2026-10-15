@@ -37,6 +37,13 @@ import {
   LABEL_STYLE,
 } from "./panel-styles";
 
+/**
+ * **The roster is a bounded, scrolling region** (myne-md/myne#867). Up to
+ * `MAX_MEMORY_ENTRIES` rows (100) each carrying up to 2000 characters, in a
+ * settings panel that is itself a scroll container: unbounded, the list pushed
+ * the personality editor and the clear-all control off the end of the panel, so
+ * the controls a full list makes you need were the ones it hid.
+ */
 const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -44,6 +51,18 @@ const LIST_STYLE: CSSProperties = {
   margin: 0,
   padding: 0,
   listStyle: "none",
+  maxHeight: 360,
+  overflowY: "auto",
+};
+
+/** The `N / cap` readout and, at the cap, the sentence that says what to do
+ *  about it. Two elements because they are two facts, and the second only
+ *  exists in one state. */
+const COUNT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  margin: "var(--space-1) 0 0",
 };
 
 const ROW_STYLE: CSSProperties = {
@@ -226,6 +245,8 @@ function MemoryRow(props: {
 export function MemorySection(props: { onShowToast: (message: string) => void; aiEnabled: boolean }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<MemoryListRow[] | null>(null);
+  // The host's cap, not a constant here: see `MemoryListView`.
+  const [cap, setCap] = useState<number | null>(null);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [personalityDraft, setPersonalityDraft] = useState("");
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -236,8 +257,10 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
 
   const reload = useCallback(async () => {
     try {
-      const list = await memoryList();
+      const view = await memoryList();
+      const list = view.rows;
       setRows(list);
+      setCap(view.cap);
       const nextTexts: Record<string, string> = {};
       const failed = new Set<string>();
       for (const row of list) {
@@ -310,7 +333,15 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
 
   return (
     <div style={BLOCK_STYLE} data-testid="settings.memory-section">
-      <h3 style={{ ...LABEL_STYLE, fontSize: "var(--text-md)", margin: "var(--space-3) 0 0" }}>
+      {/* `data-setting-anchor` here because the settings-search registry carries
+          an `ai.memory` entry whose `id` IS the anchor a hit scrolls to, and it
+          had none: search found "memory", navigated to the panel and scrolled
+          to nothing (myne-md/myne#867). The personality block below already
+          rendered its anchor through `ControlBlock`. */}
+      <h3
+        data-setting-anchor="ai.memory"
+        style={{ ...LABEL_STYLE, fontSize: "var(--text-md)", margin: "var(--space-3) 0 0" }}
+      >
         {t("settings.memory.heading")}
       </h3>
       <p style={HELPER_STYLE}>{t("settings.memory.helper")}</p>
@@ -332,7 +363,27 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
           testId="settings.memory.empty"
         />
       ) : (
-        <ul style={LIST_STYLE} data-testid="settings.memory.list">
+        <>
+          {/* **What a limit owes the person it limits** (myne-md/myne#867): the
+              count, and at the cap the one action that unblocks it. The write
+              refusal itself belongs to the path that writes (the agent's
+              `remember`, which is not this surface), so saying it HERE is what
+              turns a limit into a job the user can do in advance rather than a
+              dead end discovered mid-run. */}
+          <div style={COUNT_STYLE}>
+            <span data-testid="settings.memory.count" style={HELPER_STYLE}>
+              {t("settings.memory.count", { used: rows.length, cap: cap ?? rows.length })}
+            </span>
+            {cap !== null && rows.length >= cap ? (
+              <span
+                data-testid="settings.memory.at-cap"
+                style={{ ...HELPER_STYLE, color: "var(--fg-1)" }}
+              >
+                {t("settings.memory.atCap")}
+              </span>
+            ) : null}
+          </div>
+          <ul style={LIST_STYLE} data-testid="settings.memory.list">
           {rows.map((row) => (
             <MemoryRow
               key={row.id}
@@ -345,7 +396,8 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
               onShowToast={props.onShowToast}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>

@@ -24,6 +24,7 @@ import {
   providerErrorKey,
   type ProviderErrorCause,
 } from "../../src/lib/engine-error";
+import { CHIP_KEY } from "../../src/notes/ai/restingCause";
 
 const CATALOG = JSON.parse(
   readFileSync(
@@ -55,6 +56,7 @@ const ALL: ProviderErrorCause[] = [
   "local_model_missing",
   "not_ready",
   "empty_grant",
+  "no_model",
   "failed",
 ];
 
@@ -82,6 +84,11 @@ describe("provider failure causes", () => {
       // emptied, before any model call. Reachable and previously collapsed
       // into the generic failure, which named no control and no fix.
       ["EmptyGrant", "empty_grant", "empty_grant"],
+      // myne-md/myne#867. The cause that made the chat header say "No provider"
+      // on a vault whose provider was named: the report emits it, this table
+      // had never heard of it, and the surface's bucket rendered the
+      // fall-through.
+      ["NoModel", "no_model", "no_model"],
     ];
     for (const [variant, tag, expected] of pairs) {
       expect(normalizeProviderError(variant)).toBe(expected);
@@ -112,6 +119,16 @@ describe("provider failure causes", () => {
   it("gives every cause a key that exists in the catalog", () => {
     for (const cause of ALL) {
       const key = providerErrorKey(cause);
+      expect(lookup(key), `missing catalog entry for ${key}`).toBeTruthy();
+    }
+  });
+
+  it("gives every chip label a key that exists in the catalog", () => {
+    // The chip's keys are RETURNED as strings for a caller to translate
+    // (`restingCause.ts`), so `scripts/check-i18n.mjs` is blind to them by
+    // construction, the same gap `providerErrorKey` has, and the same binding.
+    // A missing one renders the raw key inside a status pill.
+    for (const key of Object.values(CHIP_KEY)) {
       expect(lookup(key), `missing catalog entry for ${key}`).toBeTruthy();
     }
   });

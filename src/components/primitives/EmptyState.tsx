@@ -1,138 +1,57 @@
-// `<EmptyState>` — the app's one zero state (myne-md/myne#776, epic #772).
+// The desktop's `<EmptyState>`: a thin wrapper over the shared component
+// (myne-md/myne#867).
 //
-// ── The failure it closes ──────────────────────────────────────────────────
-// Three different situations rendered identically: a first-run empty vault, a
-// panel filtered to nothing, and a load error. The middle one is the reason
-// this exists. A user who had narrowed a list to zero results saw exactly what
-// a user with no notes at all saw — a bare sentence, no echo of what they had
-// searched for, and nothing to press. That is a dead end produced by treating
-// "there is nothing" and "you have hidden everything" as the same fact.
+// **The component moved to `@myne/client-core`; this file is what keeps its
+// callers unchanged.** Eighteen call sites import `{ EmptyState }` from this
+// path, and the phone had no zero state at all while the stylesheet behind this
+// one (`myne-empty`, in `client-core/src/components.css`) was already shared by
+// every client. So the component joined its stylesheet and this file stayed
+// behind as the desktop's own spelling of it.
 //
-// So the variant is not styling. `firstRun` offers the action that creates the
-// first thing; `filtered` echoes the query back and offers a way OUT of the
-// filter; `error` says why and offers a retry; `loading` defers to the
-// skeleton/progress convention rather than flashing a spinner.
-//
-// ── Size ───────────────────────────────────────────────────────────────────
-// One component at three sizes, not three components. A sidebar section, a
-// right-rail tab and a full centre pane want the same words with different
-// amounts of room, and three components is three places for the words to drift.
-//
-// ── The wash ───────────────────────────────────────────────────────────────
-// A soft, blurred accent gradient behind the content, drawn in CSS
-// (`.myne-empty__wash`). Static: no animation, no canvas, no loop, so it needs
-// no motion-canon exemption and costs nothing while it sits on screen.
-//
-// It replaced the `01` binary field (`docs/decisions/ui/0643`). The field read
-// as developer and privacy iconography — "encryption as theme", arriving as
-// texture — on surfaces a general user meets every day, which is exactly the
-// look `PRODUCT.md`'s anti-references refuse. The wash takes its colour from
-// `--accent`, so every palette, custom themes included, gets its own.
-//
-// ON by default for every variant and size; a caller that sits on a surface
-// already carrying colour passes `field={false}`.
+// The one thing it adds back is the desktop's `icon` API. The shared component
+// takes a glyph NODE rather than a name, because each client owns its own icon
+// registry and importing either one would drag that client's whole icon surface
+// into the other. The desktop's `Icon` and its `IconName` live here, so the
+// name-to-node translation is the half that belongs on this side, and no call
+// site had to learn about it.
 
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
+
 import { Icon } from "./Icon";
 import type { IconName } from "../../lib/icons";
+import {
+  EmptyState as SharedEmptyState,
+  type EmptyStateVariant,
+} from "@myne/client-core/emptyState";
 
-export type EmptyStateVariant = "firstRun" | "filtered" | "error" | "loading";
+export type { EmptyStateVariant };
+
+/** The glyph's size per state size, kept here rather than in the shared
+ *  component: it is a desktop-visual decision made about the desktop's icons. */
+const GLYPH_SIZE = { sm: 16, lg: 26, md: 20 } as const;
 
 interface EmptyStateProps {
   variant: EmptyStateVariant;
   /** The glyph in the tile. Pick one that names the ABSENT thing, not a mood. */
   icon: IconName;
-  /** One line. Sentence case, no trailing period on a fragment. */
   title: string;
-  /**
-   * Two to four lines explaining what this surface is for and how to leave the
-   * state. This is where the filtered variant earns its keep — "no results"
-   * alone is the dead end.
-   */
   body?: ReactNode;
-  /**
-   * The query echoed back, for `filtered`. Rendered monospace and bidi-isolated
-   * because it is user text quoted into a sentence.
-   */
   query?: string;
-  /** The primary action. A `filtered` state's should CLEAR the filter. */
   action?: ReactNode;
-  /** A secondary action beside it (a shortcut hint, a docs link). */
   secondaryAction?: ReactNode;
   size?: "sm" | "md" | "lg";
-  /**
-   * Draw the accent wash behind the content. On by default; pass `false` where
-   * the surface behind the state already carries colour of its own, or where a
-   * second wash beside another one would compete (the agent tab's rail).
-   */
   field?: boolean;
-  /**
-   * Become the surface instead of sitting on it — no border, no fill, and grow
-   * to the height the parent offers. For a state that owns the whole of a modal
-   * body or a pane, where a card with empty space under it reads as a layout
-   * bug rather than as a card.
-   */
   fill?: boolean;
   testId?: string;
-  /**
-   * Passed through to the root. For the `data-*` a caller needs ON the element
-   * its own tests reach for — the AI panel's degraded state carries
-   * `data-ai-cause` beside its testid, and an E2E that reads both from one
-   * element cannot be given two.
-   */
-  rest?: HTMLAttributes<HTMLDivElement>;
+  rest?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-export function EmptyState({
-  variant,
-  icon,
-  title,
-  body,
-  query,
-  action,
-  secondaryAction,
-  size = "md",
-  field = true,
-  fill = false,
-  testId,
-  rest,
-}: EmptyStateProps) {
+export function EmptyState({ icon, size = "md", ...rest }: EmptyStateProps) {
   return (
-    <div
+    <SharedEmptyState
       {...rest}
-      className="myne-empty"
-      data-variant={variant}
-      data-size={size}
-      data-fill={fill ? "true" : undefined}
-      data-testid={testId}
-    >
-      {field && (
-        // Decoration only: every word the user needs is in the body below.
-        <span className="myne-empty__wash" aria-hidden="true" />
-      )}
-      <div className="myne-empty__body">
-        <span className="myne-empty__glyph" aria-hidden="true">
-          <Icon name={icon} size={size === "sm" ? 16 : size === "lg" ? 26 : 20} />
-        </span>
-        <p className="myne-empty__title">{title}</p>
-        {body !== undefined && (
-          <p className="myne-empty__body-text">
-            {body}
-            {query !== undefined && query !== "" && (
-              <>
-                {" "}
-                <span className="myne-empty__query">{query}</span>
-              </>
-            )}
-          </p>
-        )}
-        {(action !== undefined || secondaryAction !== undefined) && (
-          <div className="myne-empty__actions">
-            {action}
-            {secondaryAction}
-          </div>
-        )}
-      </div>
-    </div>
+      size={size}
+      glyph={<Icon name={icon} size={GLYPH_SIZE[size]} />}
+    />
   );
 }

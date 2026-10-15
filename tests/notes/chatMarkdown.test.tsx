@@ -14,9 +14,11 @@
 // no path from a reply to markup in the DOM, by construction rather than by
 // sanitisation — and "by construction" is a claim a test can hold.
 
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { ChatMarkdown } from "../../src/notes/ai/ChatMarkdown";
+import { buildMentionTargets } from "../../src/notes/ai/noteMentions";
+import type { ResolverNote } from "../../src/notes/resolveWikilink";
 
 afterEach(cleanup);
 
@@ -124,5 +126,70 @@ describe("it degrades rather than failing", () => {
     // A streamed answer is rendered mid-token on every frame, so half a bold
     // marker is not an edge case — it is every second frame of every reply.
     expect(md("**unterminated").textContent).toContain("**unterminated");
+  });
+});
+
+
+// myne-md/myne#867. A model that says "your note is under X" is naming a note,
+// and until this the name was exactly as clickable as the word "your". The
+// boundary rules (what may NOT link) live in `noteMentions.test.ts`, where they
+// need no DOM; what is here is the wiring between the matcher and the rendered
+// bubble, in the two shapes the model actually writes.
+describe("note mentions", () => {
+  const NOTES: ResolverNote[] = [
+    {
+      noteUuid: "n-pixel",
+      title: "Pixel 10 Graphene OS",
+      folder: "Personal/Things I have/",
+    },
+  ];
+  const targets = buildMentionTargets(NOTES);
+
+  function withMentions(text: string) {
+    const onOpenNote = vi.fn();
+    const { container } = render(
+      <ChatMarkdown
+        text={text}
+        testId="md"
+        mentionTargets={targets}
+        onOpenNote={onOpenNote}
+      />,
+    );
+    return {
+      el: container.querySelector('[data-testid="md"]') as HTMLElement,
+      onOpenNote,
+    };
+  }
+
+  it("links a mention the model wrote in BOLD, which is how it writes one", () => {
+    const { el, onOpenNote } = withMentions(
+      "Notunuz **Personal/Things I have/Pixel 10 Graphene OS** başlığı altında duruyor.",
+    );
+    const link = el.querySelector('[data-testid="ai.mention-link"]') as HTMLElement;
+    expect(link.textContent).toBe("Personal/Things I have/Pixel 10 Graphene OS");
+    fireEvent.click(link);
+    expect(onOpenNote).toHaveBeenCalledWith("n-pixel");
+  });
+
+  it("links a wikilink whose target the vault holds, and shows the author's label", () => {
+    const { el, onOpenNote } = withMentions("see [[Pixel 10 Graphene OS|that note]]");
+    const link = el.querySelector('[data-testid="ai.mention-link"]') as HTMLElement;
+    expect(link.textContent).toBe("that note");
+    fireEvent.click(link);
+    expect(onOpenNote).toHaveBeenCalledWith("n-pixel");
+  });
+
+  it("leaves a wikilink the vault does not hold as its plain label", () => {
+    const { el } = withMentions("see [[Some Other Note]]");
+    expect(el.querySelector('[data-testid="ai.mention-link"]')).toBeNull();
+    expect(el.textContent).toContain("Some Other Note");
+  });
+
+  it("with no note set, renders the sentence exactly as it did before", () => {
+    // The pre-change contract, and the one every other caller still gets: no
+    // note set means no link, not a broken one.
+    const el = md("Under Personal/Things I have/Pixel 10 Graphene OS.");
+    expect(el.querySelector('[data-testid="ai.mention-link"]')).toBeNull();
+    expect(el.textContent).toBe("Under Personal/Things I have/Pixel 10 Graphene OS.");
   });
 });

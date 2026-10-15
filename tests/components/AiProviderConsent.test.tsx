@@ -322,6 +322,44 @@ describe("the provider key controls", () => {
     expect(field.type).toBe("password");
   });
 
+  it("does NOT store anything when the field merely loses focus", async () => {
+    // **The reported defect.** The field committed on blur, so pasting a key and
+    // tabbing away stored it: a write the user never confirmed, on the one
+    // control whose value they can neither see nor correct from here
+    // (myne-md/myne#867).
+    aiProvider = "openrouter";
+    consentFor = "openrouter";
+    render(<AiPanel />);
+    const field = await screen.findByTestId("ai.provider-key-input");
+    fireEvent.change(field, { target: { value: "sk-typed" } });
+    fireEvent.blur(field);
+    fireEvent.focusOut(field);
+    expect(setAiProviderKey).not.toHaveBeenCalled();
+    // …and what was typed is still there, because nothing was committed.
+    expect((field as HTMLInputElement).value).toBe("sk-typed");
+  });
+
+  it("cannot confirm an empty field, which would erase the stored key", async () => {
+    // An empty commit writes the empty string, and the host reads that as "no
+    // key": pressing confirm on an untouched field would DELETE the credential
+    // while looking like it saved one.
+    aiProvider = "openrouter";
+    consentFor = "openrouter";
+    aiProviderHasKey.mockResolvedValue(true);
+    render(<AiPanel />);
+    await screen.findByTestId("ai.provider-key-input");
+    expect(
+      screen.getByTestId("ai.provider-key-save").hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.change(screen.getByTestId("ai.provider-key-input"), {
+      target: { value: "   " },
+    });
+    // Whitespace is not a key either: the commit trims before it decides.
+    expect(
+      screen.getByTestId("ai.provider-key-save").hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
   it("rotating the key does NOT touch consent", async () => {
     aiProvider = "openrouter";
     consentFor = "openrouter";
@@ -329,7 +367,7 @@ describe("the provider key controls", () => {
     render(<AiPanel />);
     const field = await screen.findByTestId("ai.provider-key-input");
     fireEvent.change(field, { target: { value: "sk-new" } });
-    fireEvent.blur(field);
+    fireEvent.click(screen.getByTestId("ai.provider-key-save"));
     await waitFor(() => expect(setAiProviderKey).toHaveBeenCalledWith("sk-new"));
     // The recipient has not changed, so re-asking would train people to click
     // through the screen.
@@ -345,8 +383,22 @@ describe("the provider key controls", () => {
       "ai.provider-key-input",
     )) as HTMLInputElement;
     fireEvent.change(field, { target: { value: "sk-secret" } });
-    fireEvent.blur(field);
+    fireEvent.click(screen.getByTestId("ai.provider-key-save"));
     await waitFor(() => expect(field.value).toBe(""));
+  });
+
+  it("removes the stored key from the icon beside the field, and writes nothing else", async () => {
+    aiProvider = "openrouter";
+    consentFor = "openrouter";
+    aiProviderHasKey.mockResolvedValue(true);
+    render(<AiPanel />);
+    const field = await screen.findByTestId("ai.provider-key-input");
+    // A half-typed replacement sits in the field. The clear must not commit it:
+    // the buffer is destroyed after a clear for exactly this reason.
+    fireEvent.change(field, { target: { value: "sk-half-typed" } });
+    fireEvent.click(screen.getByTestId("ai.provider-key-revoke"));
+    await waitFor(() => expect(setAiProviderKey).toHaveBeenCalledWith(null));
+    expect(setAiProviderKey).not.toHaveBeenCalledWith("sk-half-typed");
   });
 
   it("clearing the provider revokes the key, in one action", async () => {

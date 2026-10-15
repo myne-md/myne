@@ -292,21 +292,32 @@ pub(super) fn capability_report_from(
     // every AI scenario driving a surface stuck in its empty state. `auto_tag`
     // below is the row that already asked the engine, and the row that already
     // worked.
-    let generation = match state.engine_for(RequestClass::UserInitiated) {
-        Err(cause) => FeatureStatus::blocked(cause),
-        // A locally side-loaded GGUF is required only by the in-process arm. A
-        // remote provider or a loopback runtime BRINGS ITS OWN model, which is
-        // the entire point of naming one — reporting `NoModel` there told a user
-        // whose generation demonstrably works that the feature is unavailable.
-        Ok(engine)
-            if !generation_model
-                && !engine.carries_own_models()
-                && state.class_for(RequestClass::UserInitiated)
-                    == Ok(super::state::BackendClass::InProcessLocal) =>
-        {
-            FeatureStatus::blocked(EngineError::NoModel)
-        }
-        Ok(_) => FeatureStatus::ok(),
+    // A NAMED provider whose remote arm is not answering says WHY, before the
+    // local arm is consulted at all (myne-md/myne#867). Without this branch the
+    // four ways a named provider can be unusable (the beta off, no key, no
+    // consent, no model chosen) all fell through to `NoModel` below, and the
+    // chat header rendered every one of them as "No provider" on a vault whose
+    // provider was named. The gate already computes the right `EngineError`;
+    // `LocalInferenceState::remote_refusal` is what stopped discarding it.
+    let generation = match state.remote_refusal() {
+        Some(cause) => FeatureStatus::blocked(cause),
+        None => match state.engine_for(RequestClass::UserInitiated) {
+            Err(cause) => FeatureStatus::blocked(cause),
+            // A locally side-loaded GGUF is required only by the in-process arm.
+            // A remote provider or a loopback runtime BRINGS ITS OWN model,
+            // which is the entire point of naming one. Reporting `NoModel`
+            // there told a user whose generation demonstrably works that the
+            // feature is unavailable.
+            Ok(engine)
+                if !generation_model
+                    && !engine.carries_own_models()
+                    && state.class_for(RequestClass::UserInitiated)
+                        == Ok(super::state::BackendClass::InProcessLocal) =>
+            {
+                FeatureStatus::blocked(EngineError::NoModel)
+            }
+            Ok(_) => FeatureStatus::ok(),
+        },
     };
     let embedding = match state.embedding_engine() {
         Err(cause) => FeatureStatus::blocked(cause),

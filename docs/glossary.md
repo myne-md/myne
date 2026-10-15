@@ -2081,6 +2081,12 @@ The note a [conversation](#conversation) is about, when it is about one: an opti
 
 Used in: `protocol.md` §9.23; `decisions/ai/0634`
 
+### **note mention** &nbsp; 📦 *Product*
+
+A note's name written inside an assistant answer, rendered as a link that opens that note in a new tab (myne-md/myne#867). It is recognised by an **exact** match against the strings that name a note the vault already holds: a vault-relative path, that path without its `.md`, or a bare title, all from the resolver's single `notePath` projection, so a mention and a displayed path cannot disagree about what a note is called. There is no fuzzy matching, deliberately: a text that only prefixes a real title (`Pixel 10` where the note is `Pixel 10 Graphene OS`) stays plain text, because a link that opens a note the model never named is worse than no link at all. A `[[wikilink]]` token whose target the vault holds renders through the same matcher, so a folder target (`[[Projects/]]`) and an unknown target stay plain labels. The click opens an in-vault note and does nothing else, and the renderer navigates nothing itself: the surface supplies the callback, and with none the text is rendered as it was before. Bounded in `threat-model.md` §7.
+
+Used in: `decisions/ai/0678`; `src/notes/ai/noteMentions.ts`
+
 ### **note-task** &nbsp; 📦 *Product*
 
 A whole note the user has declared a unit of work, marked by the value-strict `kind: task` frontmatter field (`spec/markdown-dialect.md` §3.6.1). Distinct from a [line-task](#line-task), which is a single `- [ ]` line inside any note: a note-task is the note itself.
@@ -2114,6 +2120,12 @@ Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7
 `downloads.myne.md`, Myne's own static artefact origin, which hosts the AI model weights the desktop client fetches on demand rather than bundling (myne-md/myne#805; `decisions/ai/0628`). Distinct from a [remote AI provider](#remote-ai-provider) and from a [local model runtime](#local-model-runtime): a fetch from this origin carries no note content and no credential, only a request for a named model file, so the only thing it can reveal is that this device chose to fetch a model. The trust anchor is a SHA-256 **compiled into the client binary**, never the origin's own `SHA256SUMS` or `index.json` (which are discovery and display only), so a tampered origin cannot serve bytes that agree with the check. The origin keeps no IP logs and no analytics (threat-model **TB14**). The non-LLM utility models (OCR, Whisper) stay bundled; only the LLM-shaped embeddings and tag weights are downloaded.
 
 Used in: `decisions/ai/0628`; `threat-model.md` §3 TB14, §7; `src-tauri/src/plugins/local_inference/download.rs`
+
+### **model catalogue** &nbsp; 📦 *Product*
+
+The list of model artefacts [Myne's own origin](#model-artefact-origin) can serve, whether or not each one is installed (myne-md/myne#867). It answers "what can I get"; the per-role assignment rows beside it answer "which file does this role use", and the two were blocks in the same group competing for one reading until the catalogue moved into a modal opened from an icon at the right of the Models heading. Fetching and installing stay separate acts: the catalogue only starts a download, and what a role then uses is recorded by the model-path store. A download is verified against a digest compiled into the client, so the origin is never the trust anchor.
+
+Used in: `decisions/ai/0628`, `decisions/ai/0678`; `src/components/settings/AiModelCatalogue.tsx`
 
 ### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

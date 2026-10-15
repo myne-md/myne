@@ -32,6 +32,8 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { EmptyState } from "../../components/primitives/EmptyState";
+import { restingBody, restingLabel, type RestingId } from "./restingCause";
+import type { MentionTarget } from "./noteMentions";
 import { IconButton } from "../../components/primitives/IconButton";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import { ScrollArea } from "../../components/primitives/ScrollArea";
@@ -112,44 +114,6 @@ function emptyRunLabel(end: AgentTurnEnd, t: TFn): string {
     case "cancelled":
     case "awaitingScope":
       return t("agent.review.noChanges");
-  }
-}
-
-/** The empty-transcript sentence for a degraded resting cause. A total switch
- *  rather than a lookup table, for the reason this file's helpers give:
- *  `scripts/check-i18n.mjs` verifies static `t("…")` call sites. The frame
- *  computes the cause; the surface, which owns the region, names it. */
-function degradedBodyKey(cause: string, t: TFn): string {
-  switch (cause) {
-    case "off":
-      return t("editor.chrome.rightPanel.aiChat.offHint");
-    case "no-provider":
-      return t("editor.chrome.rightPanel.aiChat.noModelHint");
-    case "unreachable":
-      return t("editor.chrome.rightPanel.aiChat.unreachableHint");
-    case "unavailable":
-      return t("editor.chrome.rightPanel.aiChat.unavailableHint");
-    default:
-      return t("editor.chrome.rightPanel.aiChat.noModelHint");
-  }
-}
-
-/** The NAME of a degraded resting cause — the fault, before the sentence that
- *  explains it. The header's status chip carried this alone, one glance away
- *  from the body text, so the transcript region said why without saying what.
- *  A total switch for the same reason `degradedBodyKey` is one. */
-function degradedTitleKey(cause: string, t: TFn): string {
-  switch (cause) {
-    case "off":
-      return t("editor.chrome.rightPanel.aiChat.statusOff");
-    case "no-provider":
-      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
-    case "unreachable":
-      return t("editor.chrome.rightPanel.aiChat.statusUnreachable");
-    case "unavailable":
-      return t("editor.chrome.rightPanel.aiChat.statusUnavailable");
-    default:
-      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
   }
 }
 
@@ -274,6 +238,8 @@ function AgentTurnView({
   onRequestRevert,
   revertBusy,
   undoReport,
+  mentionTargets,
+  onOpenNote,
 }: {
   turn: ChatTurn;
   /** The live run store, when THIS turn is the one an in-flight run renders
@@ -287,6 +253,8 @@ function AgentTurnView({
   onRequestRevert: (runId: string) => void;
   revertBusy: boolean;
   undoReport: AgentUndoResult | null;
+  mentionTargets?: readonly MentionTarget[];
+  onOpenNote?: (noteUuid: string) => void;
 }) {
   const working = live !== null;
   const s = turn.agentSummary;
@@ -413,6 +381,8 @@ function AgentTurnView({
           testId="ai.agent-answer"
           text={s.summary}
           style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", marginTop: "var(--space-1)" }}
+          {...(mentionTargets === undefined ? {} : { mentionTargets })}
+          {...(onOpenNote === undefined ? {} : { onOpenNote })}
         />
       ) : null}
       {s !== undefined ? (
@@ -479,10 +449,14 @@ const ChatTurnView = memo(function ChatTurnView({
   turn,
   onInsert,
   t,
+  mentionTargets,
+  onOpenNote,
 }: {
   turn: ChatTurn;
   onInsert?: (text: string) => void;
   t: TFn;
+  mentionTargets?: readonly MentionTarget[];
+  onOpenNote?: (noteUuid: string) => void;
 }) {
   const isUser = turn.role === "user";
   return (
@@ -533,7 +507,12 @@ const ChatTurnView = memo(function ChatTurnView({
         </div>
       ) : (
         <div style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)" }}>
-          <ChatMarkdown text={turn.text} testId="ai.turn-text" />
+          <ChatMarkdown
+            text={turn.text}
+            testId="ai.turn-text"
+            {...(mentionTargets === undefined ? {} : { mentionTargets })}
+            {...(onOpenNote === undefined ? {} : { onOpenNote })}
+          />
           {turn.streaming && (
             <span data-testid="ai.turn-streaming" aria-hidden="true">
               ▍
@@ -632,14 +611,27 @@ export interface ConversationSurfaceProps {
   /** Called once the surface has consumed `confirmRevertRunId`, so the frame
    *  can reset it to `null` and a second click on the fallback re-opens. */
   onConfirmRevertConsumed?: () => void;
-  /** The resting cause the frame computed (`off` / `no-provider` /
-   *  `unreachable` / `unavailable` / `ready`), carried down so the empty
-   *  transcript can name the state and expose `data-ai-cause`. The frame owns
-   *  the host reads that decide it; the surface owns the region that shows it. */
-  restingCause?: string;
+  /** The resting cause the frame computed, carried down so the empty transcript
+   *  can name the state and expose `data-ai-cause`. The frame owns the host
+   *  reads that decide it; the surface owns the region that shows it.
+   *
+   *  Typed as the id `restingCause.ts` owns rather than as a bare string, so the
+   *  name this surface renders and the name the header chip renders come from
+   *  ONE function (myne-md/myne#867): they were two switches that agreed by
+   *  hand, and a chip naming a fault the transcript explained differently is
+   *  what that shape costs. */
+  restingCause?: RestingId;
   /** Whether that cause is one of the degraded ones (no model / not answering /
    *  no local AI), so the surface can mark the empty transcript accordingly. */
   degraded?: boolean;
+  /**
+   * Strings that name a note, from `buildMentionTargets`, and where a press on
+   * one lands. Both are optional and travel together: absent means every name in
+   * the transcript stays plain text, which is what a caller with no note-set
+   * gets, and what every existing test and caller still gets.
+   */
+  mentionTargets?: readonly MentionTarget[];
+  onOpenNote?: (noteUuid: string) => void;
   /** Testid on the outer box, so each host can name its own surface. */
   testId?: string;
 }
@@ -670,6 +662,8 @@ export function ConversationSurface({
   onConfirmRevertConsumed,
   restingCause,
   degraded = false,
+  mentionTargets,
+  onOpenNote,
   testId,
 }: ConversationSurfaceProps) {
   const { t } = useTranslation();
@@ -847,6 +841,8 @@ export function ConversationSurface({
                 <AgentTurnView
                   key={turn.id}
                   turn={turn}
+                  {...(mentionTargets === undefined ? {} : { mentionTargets })}
+                  {...(onOpenNote === undefined ? {} : { onOpenNote })}
                   // The LIVE turn is the one the store's run belongs to and that
                   // has nothing frozen onto it yet: that is "running now" AND
                   // "paused on a question", which is why the condition is
@@ -876,7 +872,14 @@ export function ConversationSurface({
                   }
                 />
               ) : (
-                <ChatTurnView key={turn.id} turn={turn} onInsert={onInsert} t={t} />
+                <ChatTurnView
+                  key={turn.id}
+                  turn={turn}
+                  onInsert={onInsert}
+                  t={t}
+                  {...(mentionTargets === undefined ? {} : { mentionTargets })}
+                  {...(onOpenNote === undefined ? {} : { onOpenNote })}
+                />
               ),
             )}
           </div>
@@ -903,12 +906,12 @@ export function ConversationSurface({
             fill
             title={
               degraded
-                ? degradedTitleKey(restingCause ?? "no-provider", t)
+                ? restingLabel(restingCause ?? "not_ready", t)
                 : t("editor.chrome.rightPanel.aiChat.emptyTitle")
             }
             body={
               degraded
-                ? degradedBodyKey(restingCause ?? "no-provider", t)
+                ? restingBody(restingCause ?? "not_ready", t)
                 : t("editor.chrome.rightPanel.aiChat.empty")
             }
             testId={degraded ? "ai.status-no-model" : "ai.empty-transcript"}

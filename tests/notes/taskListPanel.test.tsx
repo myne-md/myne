@@ -332,3 +332,30 @@ describe("the four empty states", () => {
     }
   });
 });
+
+
+describe("a section heading paints no ground of its own (myne-md/myne#867)", () => {
+  // It filled with `--paper`, the LIGHTEST stop of the surface ramp, while the
+  // panel behind it sits on a darker one. A field earns that floor (an input
+  // reads as inset); a full-width opaque band does not, because it reads as a
+  // surface belonging to something else, which is why "No date" looked like a
+  // different panel spliced into the Tasks view. It was also the only element in
+  // that panel painting a surface of its own.
+  //
+  // jsdom applies no stylesheet, so a "computed ground per theme" comparison is
+  // not available and would be a test of jsdom rather than of the product. What
+  // IS checkable, and what makes the claim hold in all three themes by
+  // construction, is that the heading declares no fill at all: with none, the
+  // theme's own ground shows through behind it.
+  it("declares no background, and separates itself with a hairline", () => {
+    const { host, cleanup } = render(panel({ tasks: [task({ noteId: "e" })] }));
+    const heading = q(host, "tasks.section.none");
+    expect(heading).not.toBeNull();
+    expect(heading!.style.background).toBe("");
+    expect(heading!.style.backgroundColor).toBe("");
+    // The separation is not lost with the fill: a hairline is the canon's
+    // divider, and it is what the heading keeps.
+    expect(heading!.style.borderBottom).toContain("var(--line-1)");
+    cleanup();
+  });
+});

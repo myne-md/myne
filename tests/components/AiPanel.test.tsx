@@ -153,6 +153,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { AiPanel } from "../../src/components/settings/AiPanel";
+import { SETTINGS_SEARCH_INDEX } from "../../src/components/settings/search/settingsSearchIndex";
 import {
   AI_TRUST_INVARIANT,
   aiTrustHeadline,
@@ -275,11 +276,18 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     // as one flat list (myne-md/myne#848). The rule is the claim.
     render(<AiPanel />);
     const groups = screen.getAllByRole("heading", { level: 4 });
-    expect(groups.length).toBe(5);
+    // Four since myne-md/myne#867: the auto-tag switch and the meeting prompt
+    // used to have a heading each, and a heading per control is what made the
+    // panel read as five flat lists.
+    expect(groups.length).toBe(4);
     for (const group of groups) {
-      expect(group.style.borderTop, "a category with no rule above it").toContain(
-        "var(--line-1)",
-      );
+      // The Models heading is the one whose rule lives on a ROW, because that
+      // row also carries the catalogue button and the hairline has to reach
+      // past the heading to the control it introduces (myne-md/myne#867). The
+      // claim is unchanged: every group opens with a rule, not a bold label.
+      const rule =
+        group.style.borderTop || (group.parentElement?.style.borderTop ?? "");
+      expect(rule, "a category with no rule above it").toContain("var(--line-1)");
       expect(group.style.fontSize).toContain("var(--text-base)");
     }
   });
@@ -956,23 +964,24 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
   });
 });
 
-// myne-md/myne#848. The panel is grouped by INTENT, the excluded-folders box
-// gained a picker, and an installed model stopped offering a download.
+// myne-md/myne#848 grouped the panel by INTENT; myne-md/myne#867 took that from
+// five headings to four, because three of the five were a heading per control.
+// The excluded-folders box gained a picker, and an installed model stopped
+// offering a download.
 describe("AiPanel: grouped by intent", () => {
-  it("renders the five intent headings, in order", () => {
+  it("renders the four intent headings, in order", () => {
     render(<AiPanel />);
     const headings = screen
       .getAllByRole("heading", { level: 4 })
       .map((h) => h.textContent);
-    // The taxonomy the phase settled on. Asserted as a SEQUENCE because the
-    // order is the design: a user reads down the panel, and "Privacy and
-    // limits" after the model pickers is what makes it read as the controls
-    // beside the switch rather than four more things to configure.
+    // Asserted as a SEQUENCE because the order is the design: a user reads down
+    // the panel and meets "who answers" before "which file", and the auto-tag
+    // switch and the meeting prompt sit under Advanced rather than each under a
+    // heading of its own.
     expect(headings).toEqual([
-      "settings.ai.groupAutoTag",
-      "settings.ai.groupVoice",
-      "settings.ai.groupWriting",
-      "settings.ai.groupPrivacy",
+      "settings.ai.groupAnswering",
+      "settings.ai.groupModels",
+      "settings.ai.groupLimits",
       "settings.ai.groupAdvanced",
     ]);
   });
@@ -1024,12 +1033,15 @@ describe("AiPanel: the excluded-folders picker", () => {
   });
 });
 
-describe("AiPanel: an installed model", () => {
+describe("AiPanel: an installed model in the catalogue", () => {
+  // The artefact rows moved into the catalogue modal (myne-md/myne#867), so both
+  // tests here open it first. What they assert did not change.
   it("offers no download action, and states which file it is using", async () => {
     loadModelPath.mockImplementation((role?: string) =>
       Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
     );
     render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
     await waitFor(() =>
       expect(screen.queryByTestId("ai.model-provenance-embedding-e5-small")).not.toBeNull(),
     );
@@ -1055,6 +1067,7 @@ describe("AiPanel: an installed model", () => {
       Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
     );
     render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
     const button = await screen.findByTestId("ai.model-provenance-embedding-e5-small");
     expect(screen.queryByTestId("ai.model-provenance-panel-embedding-e5-small")).toBeNull();
     fireEvent.click(button);
@@ -1067,5 +1080,220 @@ describe("AiPanel: an installed model", () => {
       screen.getByTestId("ai.model-provenance-embedding-e5-small-reveal"),
     );
     expect(revealItemInDir).toHaveBeenCalledWith("/models/e5-small.onnx");
+  });
+});
+
+describe("AiPanel: the panel's grouping (myne-md/myne#867)", () => {
+  /** The panel's DOM order as tokens: every group heading, plus the controls
+   *  whose position the regrouping is about. Reading the RENDERED tree rather
+   *  than the source is the point: a panel whose JSX sits in the old sequence
+   *  and is composed into a new one has the same source order and a different
+   *  screen. */
+  function structureOrder(): string[] {
+    const panel = screen.getByTestId("settings.ai-panel");
+    const wanted = new Set([
+      "ai.enable-toggle",
+      "ai.trust-banner",
+      "ai.endpoint-section",
+      "ai.provider-section",
+      "ai.models-section",
+      "ai.catalogue-button",
+      "ai.excluded-folders",
+      "ai.auto-tag-toggle",
+      "ai.meeting-prompt",
+      "ai.history-budget-input",
+    ]);
+    const out: string[] = [];
+    for (const el of panel.querySelectorAll("h4, [data-testid]")) {
+      if (el.tagName === "H4") {
+        out.push(`heading:${el.textContent}`);
+        continue;
+      }
+      const id = el.getAttribute("data-testid") ?? "";
+      if (wanted.has(id)) out.push(id);
+    }
+    return out;
+  }
+
+  const headings = (order: string[]) => order.filter((t) => t.startsWith("heading:"));
+
+  it("puts the master switch and the trust card above every group heading", () => {
+    render(<AiPanel />);
+    expect(structureOrder().slice(0, 2)).toEqual(["ai.enable-toggle", "ai.trust-banner"]);
+  });
+
+  it("files each block under the group that asks its question", () => {
+    render(<AiPanel />);
+    const order = structureOrder();
+    const at = (token: string) => order.indexOf(token);
+    // Answering holds both ways of pointing Myne at something that answers.
+    for (const token of ["ai.endpoint-section", "ai.provider-section"]) {
+      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupAnswering"));
+      expect(at(token)).toBeLessThan(at("heading:settings.ai.groupModels"));
+    }
+    // Models owns the assignment rows and the catalogue, and it comes AFTER
+    // Answering rather than before it.
+    for (const token of ["ai.models-section", "ai.catalogue-button"]) {
+      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupModels"));
+      expect(at(token)).toBeLessThan(at("heading:settings.ai.groupLimits"));
+    }
+    // The excluded-folders editor is a LIMIT, not a group of its own.
+    expect(at("ai.excluded-folders")).toBeGreaterThan(at("heading:settings.ai.groupLimits"));
+    expect(at("ai.excluded-folders")).toBeLessThan(at("heading:settings.ai.groupAdvanced"));
+    // The two controls that used to own a heading each now sit under Advanced,
+    // which is what takes five headings down to four.
+    for (const token of [
+      "ai.auto-tag-toggle",
+      "ai.meeting-prompt",
+      "ai.history-budget-input",
+    ]) {
+      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupAdvanced"));
+    }
+  });
+
+  it("renders every AI entry's search target, so no hit scrolls to nothing", () => {
+    // A registry `id` IS the `data-setting-anchor` a search hit scrolls to and
+    // flashes, with `testid` as the fallback. Nothing else checks that: the
+    // drift guard reads panel SOURCE text and only for registered `testid`s, so
+    // an entry whose anchor never renders passes it (myne-md/myne#867 closed
+    // exactly one of those, `ai.memory`).
+    render(<AiPanel />);
+    const panel = screen.getByTestId("settings.ai-panel");
+    const missing: string[] = [];
+    for (const entry of SETTINGS_SEARCH_INDEX) {
+      if (entry.panelId !== "ai") continue;
+      const anchored = panel.querySelector(`[data-setting-anchor="${entry.id}"]`);
+      const byTestid =
+        entry.testid === undefined
+          ? null
+          : panel.querySelector(`[data-testid="${entry.testid}"]`);
+      if (anchored === null && byTestid === null) missing.push(entry.id);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("retires the headings whose contents moved", () => {
+    render(<AiPanel />);
+    const found = headings(structureOrder());
+    for (const retired of ["groupAutoTag", "groupVoice", "groupWriting", "groupPrivacy"]) {
+      expect(found).not.toContain(`heading:settings.ai.${retired}`);
+    }
+  });
+});
+
+describe("AiPanel: the model catalogue (myne-md/myne#867)", () => {
+  it("opens from the icon beside the Models heading, and carries no inline section", () => {
+    render(<AiPanel />);
+    // The panel's own download section is gone: fetching a model and assigning
+    // one used to be two blocks answering the same question.
+    expect(screen.queryByTestId("ai.downloads-section")).toBeNull();
+    expect(screen.queryByTestId("ai.catalogue")).toBeNull();
+    const button = screen.getByTestId("ai.catalogue-button");
+    fireEvent.click(button);
+    expect(screen.getByTestId("ai.catalogue")).toBeTruthy();
+  });
+
+  it("lists every artefact, installed or not, with the action its state enables", async () => {
+    loadModelPath.mockImplementation((role?: string) =>
+      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+    );
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
+    // Installed: Remove and no Download. A Download button beside an installed
+    // model reads as "this is not installed" on the row saying that it is.
+    await waitFor(() =>
+      expect(screen.queryByTestId("ai.remove-button-embedding-e5-small")).not.toBeNull(),
+    );
+    expect(screen.queryByTestId("ai.download-button-embedding-e5-small")).toBeNull();
+    // Not installed, and still listed. A catalogue that shows only what you
+    // already have cannot answer "what can I get", which is what it is for.
+    expect(screen.getByTestId("ai.download-row-tag")).toBeTruthy();
+    expect(screen.getByTestId("ai.download-button-tag")).toBeTruthy();
+    expect(screen.getByTestId("ai.download-state-tag").textContent).toBe(
+      "settings.ai.downloadNotInstalled",
+    );
+    expect(screen.getByTestId("ai.download-state-embedding-e5-small").textContent).toBe(
+      "settings.ai.downloadInstalled",
+    );
+  });
+
+  it("keeps the catalogue's testid contract distinct from the assignment rows", () => {
+    // Two surfaces now render a model row, and a shared testid would let one
+    // stand in for the other in every scenario that reaches either.
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
+    for (const artifact of ["embedding-e5-small", "tag"]) {
+      expect(screen.getByTestId(`ai.download-row-${artifact}`)).toBeTruthy();
+      expect(screen.getByTestId(`ai.download-state-${artifact}`)).toBeTruthy();
+    }
+    // The panel's assignment rows keep their own ids.
+    expect(screen.getByTestId("ai.model-select")).toBeTruthy();
+  });
+});
+
+describe("AiPanel: the assignment rows (myne-md/myne#867)", () => {
+  it("gives every role a row, tag included", () => {
+    // The tag role is a real `ModelRole` with a real side-loadable file, and it
+    // was the ONE role with no row: reachable only by downloading it, which is
+    // what made the block read as if a model were missing from it.
+    render(<AiPanel />);
+    // Listed rather than built from a role suffix: the generation row carries
+    // the original bare testids (`ai.model-select`, `ai.model-choose`) because
+    // scenarios already reach them, while its recommend link is named like the
+    // other three. Deriving the ids would hide that, which is the kind of
+    // tidying that silently breaks a scenario.
+    for (const id of [
+      "ai.model-select",
+      "ai.model-choose",
+      "ai.model-recommend-generation",
+      "ai.model-select-embedding",
+      "ai.model-choose-embedding",
+      "ai.model-recommend-embedding",
+      "ai.model-select-transcription",
+      "ai.model-choose-transcription",
+      "ai.model-recommend-transcription",
+      "ai.model-select-tag",
+      "ai.model-choose-tag",
+      "ai.model-recommend-tag",
+    ]) {
+      expect(screen.getByTestId(id)).toBeTruthy();
+    }
+  });
+
+  it("assigns the tag file the same way as any other role", async () => {
+    openFileDialog.mockResolvedValueOnce("/models/qwen-tag.gguf");
+    render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.model-choose-tag"));
+    await waitFor(() =>
+      expect(saveModelPath).toHaveBeenCalledWith("tag", "/models/qwen-tag.gguf"),
+    );
+  });
+
+  it("still refuses a file inside the vault tree, and says so", async () => {
+    // The host answers `InsideVaultTree` and returns no path. The row keeps what
+    // the user picked so the control is not left blank, and the surface says
+    // what happened rather than looking like a save: a model copied into the
+    // vault would be synced, and the refusal is the whole point of SYNC-1.
+    saveModelPath.mockRejectedValueOnce(new Error("InsideVaultTree"));
+    openFileDialog.mockResolvedValueOnce("/vault/notes/model.gguf");
+    const onShowToast = vi.fn();
+    render(<AiPanel onShowToast={onShowToast} />);
+    fireEvent.click(screen.getByTestId("ai.model-choose-tag"));
+    await waitFor(() =>
+      expect(onShowToast).toHaveBeenCalledWith("settings.ai.modelSaveFailed"),
+    );
+  });
+
+  it("keeps the tag file's name off the full path, like every other role", async () => {
+    // A path is a paragraph on a real machine; the name is the half a user
+    // recognises, and the folder button beside it holds the rest (myne-md/myne#848).
+    loadModelPath.mockImplementation((role?: string) =>
+      Promise.resolve(
+        role === "tag" ? "/Users/me/Library/Application Support/md.myne.desktop/models/qwen-tag.gguf" : null,
+      ),
+    );
+    render(<AiPanel />);
+    const shown = await screen.findByTestId("ai.model-select-tag");
+    expect(shown.textContent).toBe("qwen-tag.gguf");
   });
 });

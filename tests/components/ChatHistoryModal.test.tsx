@@ -99,15 +99,46 @@ describe("conversation list", () => {
 
   it("shows the empty state when there is nothing persisted", async () => {
     renderOpen();
-    expect(await screen.findByTestId("ai.history-empty")).toBeDefined();
+    const empty = await screen.findByTestId("ai.history-empty");
     expect(screen.queryByTestId("ai.conversation-list")).toBeNull();
+    // **It is the app's one zero state, not a bare sentence** (myne-md/myne#867).
+    // Asserted through the variant and the class rather than through the words:
+    // a hand-written `<p>` with the same sentence would pass a text assertion
+    // and fail the thing this change is about.
+    expect(empty.getAttribute("data-variant")).toBe("firstRun");
+    expect(empty.className).toContain("myne-empty");
+    // …and the copy is the HUB's key, because the hub lists the same
+    // conversations over the same store and the two used to word the state
+    // differently. This file mocks i18n, so `t` echoes the key: asserting it
+    // here is asserting the sharing itself, which a bare sentence could not do.
+    expect(empty.textContent).toContain("agent.hub.emptyTitle");
   });
 
   it("shows an error instead of a list when the fetch fails", async () => {
     mockChatsList.mockRejectedValue(new Error("torn"));
     renderOpen();
-    expect(await screen.findByTestId("ai.history-error")).toBeDefined();
+    const failed = await screen.findByTestId("ai.history-error");
     expect(screen.queryByTestId("ai.conversation-list")).toBeNull();
+    expect(failed.getAttribute("data-variant")).toBe("error");
+    // A failed read is a state with a way out, not a dead end: the retry is the
+    // reason the `error` variant exists rather than a red sentence.
+    mockChatsList.mockResolvedValue([]);
+    fireEvent.click(screen.getByTestId("ai.history-retry"));
+    await vi.waitFor(() => expect(mockChatsList).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("ai.history-empty")).toBeTruthy();
+  });
+
+  it("shows the loading variant while the list is in flight", async () => {
+    let release: (rows: unknown[]) => void = () => {};
+    mockChatsList.mockImplementation(
+      () => new Promise((resolve) => { release = resolve as (rows: unknown[]) => void; }),
+    );
+    renderOpen();
+    const loading = await screen.findByTestId("ai.history-loading");
+    expect(loading.getAttribute("data-variant")).toBe("loading");
+    expect(screen.queryByTestId("ai.history-empty")).toBeNull();
+    release([]);
+    expect(await screen.findByTestId("ai.history-empty")).toBeTruthy();
   });
 });
 

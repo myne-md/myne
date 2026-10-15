@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
 import { copyText } from "@myne/clipboard";
 import { showToast } from "../../components/ToastHost";
+import { buildMentionTargets } from "@myne/note-mentions";
 import { writeText as clipboardWriteText } from "../../lib/clipboardTransport";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
@@ -906,6 +907,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           folderIndex: false,
         })),
     [notes, noteFlags, bodies],
+  );
+  // The note names a chat answer may turn into a link (myne-md/myne#867).
+  // Built from `resolverNotes` rather than from `liveNotes`, and that is the
+  // desktop's own choice: an ARCHIVED note is hidden from the list but is still
+  // a note a model can name, so a link to it must work. The matcher's three
+  // boundary rules are the shared ones (`@myne/note-mentions`), because the
+  // failure they prevent is opening a note nobody named.
+  const mentionTargets = useMemo(
+    () => buildMentionTargets(resolverNotes),
+    [resolverNotes],
   );
   // #46: `isTrashedNote` excludes TOMBSTONES (`deleted:`). Without that clause
   // "Delete permanently" was a visible no-op - the tombstone it writes left the
@@ -3295,6 +3306,12 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // flow keeps no second copy of the note table.
             titleOf={(id) => deriveTitleSnippet(bodies.get(id) ?? "").title}
             bodyOf={(id) => bodies.get(id) ?? null}
+            // A note named in an answer opens on press, the desktop's rule.
+            // The flow resolves nothing itself: the names arrive already
+            // projected, and the press is the screen's own `openNote`, so a
+            // mention lands wherever any other "open this note" lands.
+            mentionTargets={mentionTargets}
+            onOpenNote={(id) => void openNote(id)}
             // An applied edit rewrote notes behind this screen, so they are
             // re-read one at a time rather than through `refreshAll`, which
             // re-decrypts the whole vault.
