@@ -32,6 +32,20 @@
 //      turns a smooth animation on the maintainer's laptop into a stuttering
 //      one on a five-year-old phone, and nothing else in the tree measures it.
 //
+//   5. A self-rescheduling `requestAnimationFrame` loop. Rule 2 catches the CSS
+//      `animation: … infinite`; the same thing written in JavaScript is how the
+//      most expensive animations here are actually driven.
+//
+//   6. **A raw duration, curve or easing keyword.** The rule that makes the
+//      vocabulary hold, and the one that was missing: rule 3 catches only what is
+//      above the 300ms ceiling, so everything below it was invisible to every gate
+//      in this tree. That is how the tree accumulated 90ms, 100ms and 140ms
+//      transitions, a whole foreign curve family in `mobile/src`, and bare `ease`
+//      in the shared `editor/` package that ships to all three clients
+//      (myne-md/myne#732). It reads a declaration, an imperative
+//      `el.style.transition = …` and the `CSSProperties["transition"] = …`
+//      annotation form, because all three appear in this tree.
+//
 // Scope is the shared-tree roster (`scripts/lib/shared-roots.mjs`), imported
 // rather than copied — a private copy is how `check-prefs-nonce.mjs` came to
 // print `ok` over a whole client it had never read.
@@ -41,8 +55,10 @@
 // asserts this file names it, and the declaration READER has fixtures there of
 // its own, because the two ways it has gone silently blind (an inline style's
 // quoted value, a value starting on the line AFTER the colon) were both found
-// by injection rather than by running it. A guard that has never failed is
-// untested.
+// by injection rather than by running it. The second direction matters as much
+// as the first: rule 6's arrival changed what three older fixtures meant, and
+// they were re-pointed at tokens rather than loosened, so each still proves its
+// OWN rule fires. A guard that has never failed is untested.
 //
 // Run by hand:   node scripts/check-motion-canon.mjs
 // Wired into:    lefthook `pre-commit`, CI `pnpm-build`.
@@ -249,6 +265,15 @@ const LAYOUT_EXEMPT = new Map([
       "Fires once per collapse toggle. Covers both the outer width animation and the " +
       "inner pane's matching one, which must stay in lockstep or the divider detaches " +
       "from the edge mid-travel.",
+  ],
+  [
+    "mobile/src/app/flows/SettingsSheet.tsx:height",
+    "The settings sheet's panel swap. Two panels have different heights and the sheet is " +
+      "a fixed-height surface, so the flip has to change the box to keep the footer in " +
+      "place; a `scaleY` would stretch the panel's text and its scrollbar along with it. " +
+      "Written imperatively (`el.style.transition`), which is why this entry only became " +
+      "necessary when rule 4 learned to read an assignment as well as a declaration. " +
+      "Fires once per panel change, not per frame.",
   ],
 ]);
 
@@ -609,7 +634,14 @@ for (const root of present) {
     }
 
     // -- Rule 4: transitioning a layout property ----------------------------
-    for (const m of src.matchAll(/\btransition(?:-property)?\s*:/g)) {
+    // The window also reads an ASSIGNMENT. `el.style.transition = "height …"` is
+    // how a FLIP is written and is exactly the shape this rule hunts, but the
+    // first version matched only a `transition:` declaration, so the one
+    // imperative site in the tree was invisible to it. Closing that is what
+    // surfaced `SettingsSheet.tsx`, whose exemption says why it is legitimate.
+    for (const m of src.matchAll(
+      /\btransition(?:-property)?\s*:|\.style\s*\.\s*transition(?:Property)?\s*=|\[\s*["']transition(?:Property)?["']\s*\]\s*=/g,
+    )) {
       const decl = declValue(src, m.index + m[0].length, isCss);
       for (const prop of LAYOUT_PROPS) {
         const re = new RegExp(`(^|[\\s,"'\`])${prop}(\\s|,|$)`);
@@ -627,6 +659,96 @@ for (const root of present) {
             "off the main thread. Where the surrounding rows genuinely must move and " +
             "there is no transform equivalent, record it in LAYOUT_EXEMPT with the reason.",
           line: lineOf(src, m.index),
+        });
+      }
+    }
+
+    // -- Rule 6: a raw duration, curve or easing keyword --------------------
+    // The rule that makes the vocabulary hold. Everything below the 300ms
+    // ceiling was invisible to every gate in this tree, which is how it
+    // accumulated 90ms, 100ms and 140ms transitions, a whole foreign curve family
+    // in `mobile/src`, and bare `ease` in the shared `editor/` package that ships
+    // to all three clients. Rule 3 catches only the over-ceiling case, so the
+    // common shape was the ungated one.
+    //
+    // Scoped deliberately, in three ways:
+    //   - `noReduced`, so a `prefers-reduced-motion` block's SLOW-DOWNS (1600ms,
+    //     2.4s) are not flagged. They are the canon being kept.
+    //   - Token references are stripped before the search, so only what carries a
+    //     literal is reported, and `var(--x, 200ms)` is a stated fallback.
+    //   - An allowlisted infinite animation is skipped: a LOOP's period is not the
+    //     interaction scale (it is routinely longer than any transition token) and
+    //     its symmetric curve is part of the definition the allowlist admitted by
+    //     name. `ease-in` is left to rule 1 so one defect gets one message.
+    for (const m of noReduced.matchAll(
+      /\b(?:transition|animation)(?:-duration|-timing-function)?\s*:|\.style\s*\.\s*(?:transition|animation)(?:Duration|TimingFunction)?\s*=|\[\s*["'](?:transition|animation)(?:Duration|TimingFunction)?["']\s*\]\s*=/g,
+    )) {
+      const decl = declValue(noReduced, m.index + m[0].length);
+      // A FEATURE QUERY is not a declaration: `@supports (transition-timing-
+      // function: linear(0, 1))` guards the `--ease-spring` upgrade and would
+      // otherwise read as a curve literal.
+      const lineStart = noReduced.lastIndexOf("\n", m.index) + 1;
+      if (/@(?:supports|media|container)\b/.test(noReduced.slice(lineStart, m.index))) continue;
+      if ([...INFINITE_ALLOWLIST.keys()].some((n) => decl.includes(n))) continue;
+      if ([...flaggedInfinite].some((n) => decl.includes(n))) continue;
+      // A reasoned over-ceiling exemption excuses its whole declaration, so rule 3
+      // and rule 6 do not both report the same line.
+      const durationExempt = [...DURATION_EXEMPT.keys()].find(
+        (k) => k.startsWith(`${rel}:`) && decl.includes(k.slice(rel.length + 1)),
+      );
+      if (durationExempt !== undefined) {
+        usedDurationExempt.add(durationExempt);
+        continue;
+      }
+      const bare = decl.replace(/var\([^)]*\)/g, " ");
+
+      const duration = /\b\d+(?:\.\d+)?m?s\b/.exec(bare);
+      if (duration !== null) {
+        // Above the ceiling is rule 3's, and it says something more specific
+        // (which token to reach for). One defect, one message.
+        const ms = duration[0].endsWith("ms")
+          ? Number.parseFloat(duration[0])
+          : Number.parseFloat(duration[0]) * 1000;
+        if (ms > 300) continue;
+        findings.push({
+          rel,
+          rule: "literal-duration",
+          detail:
+            `\`${duration[0]}\` is a duration written out rather than named. A literal ` +
+            "cannot be retuned centrally and cannot be found by anyone looking for it. " +
+            "Use `var(--duration-instant|fast|base|slow)` for the restrained tier, or " +
+            "`var(--duration-slower)` for the one named ceiling-breaker; the scale is " +
+            "declared in `client-core/src/tokens.css`.",
+          line: lineOf(noReduced, m.index),
+        });
+        continue;
+      }
+
+      if (/cubic-bezier\(|linear\(|steps\(/.test(bare)) {
+        findings.push({
+          rel,
+          rule: "literal-curve",
+          detail:
+            "A curve written out rather than named. Use `var(--ease-standard)` for an " +
+            "entrance or a standard transition, `var(--ease-out)` for an exit, or " +
+            "`var(--ease-emphasized)` on the expressive tier. A copied curve is usually " +
+            "`--ease-standard` typed out by hand, which no reader looking for the token " +
+            "will ever find.",
+          line: lineOf(noReduced, m.index),
+        });
+        continue;
+      }
+
+      const keyword = /\b(?:linear|ease-in-out|ease-out|ease|step-start|step-end)\b(?!-)/.exec(bare);
+      if (keyword !== null) {
+        findings.push({
+          rel,
+          rule: "literal-easing",
+          detail:
+            `\`${keyword[0]}\` is a bare easing keyword, and written as \`ease\` it is the ` +
+            "CSS-initial ease-in-out. Name the curve: `var(--ease-standard)` or " +
+            "`var(--ease-out)`.",
+          line: lineOf(noReduced, m.index),
         });
       }
     }

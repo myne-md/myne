@@ -18,6 +18,7 @@
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
+import { NEUTRAL_PRESS_BG, usePressSurface } from "../../components/primitives/pressSurface";
 import {
   IMPORT_SOURCES,
   availableSourceOrder,
@@ -46,7 +47,7 @@ const CARD_BASE: CSSProperties = {
   textAlign: "start",
   cursor: "pointer",
   width: "100%",
-  transition: "border-color 120ms ease, background 120ms ease",
+  transition: "border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard)",
 };
 
 const NAME: CSSProperties = {
@@ -81,6 +82,9 @@ export interface ImportSourcePickerProps {
 export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState<ImportSourceId | null>(null);
+  // One hook for the whole grid: the rows share a single hover state, so the
+  // pressed row is identified by the same key rather than by a second variable.
+  const { isPressed, handlersFor } = usePressSurface();
 
   return (
     <>
@@ -102,6 +106,7 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
           {availableSourceOrder().map((id) => {
             const spec = IMPORT_SOURCES[id];
             const active = hovered === id;
+            const pressed = isPressed(id);
             return (
               <button
                 type="button"
@@ -110,12 +115,17 @@ export function ImportSourcePicker({ onPick, onCancel }: ImportSourcePickerProps
                 style={{
                   ...CARD_BASE,
                   borderColor: active ? "var(--fg-3)" : "var(--line-1)",
-                  background: active ? "var(--paper-2)" : "var(--bg-2)",
+                  background: pressed
+                    ? NEUTRAL_PRESS_BG
+                    : active
+                      ? "var(--paper-2)"
+                      : "var(--bg-2)",
                 }}
                 onMouseEnter={() => setHovered(id)}
                 onMouseLeave={() => setHovered((h) => (h === id ? null : h))}
                 onFocus={() => setHovered(id)}
                 onBlur={() => setHovered((h) => (h === id ? null : h))}
+                {...handlersFor(id)}
                 onClick={() => onPick(id)}
                 data-testid="import.source-row"
                 data-source={id}

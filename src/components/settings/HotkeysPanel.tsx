@@ -28,9 +28,9 @@ import {
 } from "../../commands/bindableCatalog";
 import { PANEL_ROOT_STYLE, HELPER_STYLE } from "./panel-styles";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../primitives/hoverSurface";
+import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitives/interactiveSurface";
 import { reservedChord } from "../../platform/keyboard";
 
 const DEFAULTS = catalogDefaults();
@@ -180,6 +180,27 @@ const GROUP_LABEL_KEY: Record<BindGroup, string> = {
   "Editor formatting": "settings.hotkeys.group.editorFormatting",
 };
 
+/** The remove-binding ×: hover deepens the fill and turns the glyph danger, and a
+ *  press confirms the click. The fill half is `interactiveSurface`, which owns the
+ *  press step; the colour change chains onto the handlers it returns rather than
+ *  spreading around them, because a spread carrying event props placed after a
+ *  hand-written handler silently replaces it (`src/AGENTS.md`). Removing a binding
+ *  is destructive, which is why the × goes red over a hover rectangle. */
+function removeBindingSurface(): InteractiveSurfaceHandlers {
+  const surface = interactiveSurface({ hoverBg: "var(--bg-3)" });
+  return {
+    ...surface,
+    onMouseEnter: (e) => {
+      surface.onMouseEnter?.(e);
+      e.currentTarget.style.color = "var(--danger)";
+    },
+    onMouseLeave: (e) => {
+      surface.onMouseLeave?.(e);
+      e.currentTarget.style.color = "var(--fg-3)";
+    },
+  };
+}
+
 export function HotkeysPanel() {
   const { t } = useTranslation();
   const { prefs, setKeymapBinding } = usePrefs();
@@ -314,17 +335,17 @@ export function HotkeysPanel() {
       {confirmResetAll ? (
         <span style={WARN_STYLE} data-testid="hotkeys.reset-all-confirm">
           {t("settings.hotkeys.resetAllConfirm")}{" "}
-          <button style={ICON_BTN_STYLE} {...hoverSurface()} data-testid="hotkeys.reset-all-yes" onClick={resetAll}>
+          <button style={ICON_BTN_STYLE} {...interactiveSurface()} data-testid="hotkeys.reset-all-yes" onClick={resetAll}>
             {t("settings.hotkeys.resetAllYes")}
           </button>
-          <button style={ICON_BTN_STYLE} {...hoverSurface()} onClick={() => setConfirmResetAll(false)}>
+          <button style={ICON_BTN_STYLE} {...interactiveSurface()} onClick={() => setConfirmResetAll(false)}>
             {t("settings.hotkeys.cancel")}
           </button>
         </span>
       ) : (
         <button
           style={RESET_ALL_STYLE}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           data-testid="hotkeys.reset-all"
           onClick={() => setConfirmResetAll(true)}
         >
@@ -413,18 +434,7 @@ export function HotkeysPanel() {
                               chord: formatChord(chord),
                             })}
                             data-testid="hotkeys.remove-binding"
-                            // Inline hover — a stylesheet `:hover` loses to this
-                            // element's own inline background/color. Removing a
-                            // binding is destructive: the × goes red over a hover
-                            // rectangle.
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "var(--bg-3)";
-                              e.currentTarget.style.color = "var(--danger)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                              e.currentTarget.style.color = "var(--fg-3)";
-                            }}
+                            {...removeBindingSurface()}
                             onClick={() => removeChord(cmd, chord)}
                           >
                             ×
@@ -451,7 +461,7 @@ export function HotkeysPanel() {
                         <>
                           <button
                             style={ICON_BTN_STYLE}
-                            {...hoverSurface()}
+                            {...interactiveSurface()}
                             data-testid="hotkeys.add-binding"
                             aria-label={t("settings.hotkeys.addBindingAria", {
                               command: cmd.label,
@@ -466,7 +476,7 @@ export function HotkeysPanel() {
                           {overridden && (
                             <button
                               style={ICON_BTN_STYLE}
-                              {...hoverSurface()}
+                              {...interactiveSurface()}
                               data-testid="hotkeys.reset"
                               aria-label={t("settings.hotkeys.restoreDefaultAria", {
                                 command: cmd.label,
