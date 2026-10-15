@@ -22,6 +22,8 @@
 #     clipper only talks to instance A
 #
 # Usage: pnpm dev:two   (or: bash scripts/dev-two-desktop.sh)
+# Reset: pnpm dev:two:reset   (wipes both instances' data + the sync store; run
+#        it only while this script is NOT running)
 #
 # It ALSO builds and starts a LOCAL myne-server on http://127.0.0.1:8787 (override
 # with MYNE_DEV_SYNC_PORT) and seeds that endpoint + the beta-terms acceptance
