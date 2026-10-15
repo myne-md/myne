@@ -2631,6 +2631,20 @@ async fn sync_memory_entry_phase(
         }
         let take_remote = !local_dirty || remote_wins;
         if take_remote {
+            // The `memories/` directory is created by a LOCAL write
+            // (`memory::commands::write_entry_in_dir`), so a device that has
+            // never authored a memory of its own (a phone that only pulls) does
+            // not have it, and `atomic_write` requires its parent to exist.
+            // Without this the adopt arm fails `NotFound`, the caller skips the
+            // entry for the cycle, and it fails again every cycle: the catalog
+            // (a vault-root singleton) syncs, so the roster lists rows whose
+            // bodies never land. This closes that cause; a `create_dir_all`
+            // failure of its own (a read-only vault, a permission denial) lands
+            // in the same swallow-with-a-warning skip. The chats conversation
+            // phase does the same step for `chats/` (myne-md/myne#883).
+            io.create_dir_all(&memories_dir(vault_root))
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
             io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
@@ -13728,10 +13742,20 @@ mod tests {
         }
 
         // Absent entry file + verified remote: adopted verbatim.
+        //
+        // The fixture deliberately does NOT pre-create `memories/`: an absent
+        // local file is exactly the shape of a device that has never authored a
+        // memory of its own, which is the device this arm exists for. A fixture
+        // that creates the directory first makes the phase's own
+        // `create_dir_all` unreachable and the test passes over the production
+        // failure (myne-md/myne#883).
         #[test]
         fn absent_entry_adopts_verified_remote() {
             let dir = scratch("absent-entry");
-            std::fs::create_dir_all(dir.join("memories")).unwrap();
+            assert!(
+                !dir.join("memories").exists(),
+                "the fixture must start without the directory the phase owes"
+            );
             let remote_bytes = seal_entry(&ENTRY, "likes tea");
             let t = FakeTransport::new();
             let rec = serve(&t, &ENTRY, &remote_bytes, 2);
