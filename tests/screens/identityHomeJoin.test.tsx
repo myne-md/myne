@@ -106,6 +106,21 @@ async function openJoinForm(): Promise<void> {
   await screen.findByTestId("identity-home.join-form");
 }
 
+/** Leave the phrase step for the password step. The wizard is two steps now
+ *  (myne-md/myne#871) and only the current one's Continue exists on screen, so
+ *  this one testid addresses either step. */
+function continueJoin(): void {
+  fireEvent.click(screen.getByTestId("identity-home.join-continue"));
+}
+
+/** Walk the join wizard to its password step. */
+async function openJoinPasswordStep(): Promise<void> {
+  await openJoinForm();
+  fillJoinPhrase();
+  continueJoin();
+  await screen.findByTestId("identity-home.join.password-input");
+}
+
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personAcceptInvite.mockReset().mockResolvedValue({});
@@ -149,10 +164,10 @@ describe("IdentityHome second-device join", () => {
     renderHome();
     await openJoinForm();
 
-    // Positive half first: the form really is on screen with its own phrase grid.
+    // Positive half first: step 1 is on screen with its own phrase grid, and it
+    // does not yet ask for the password.
     expect(screen.getByTestId("identity-home.join-phrase-grid")).toBeTruthy();
-    expect(screen.getByTestId("identity-home.join.password-input")).toBeTruthy();
-    expect(screen.getByTestId("identity-home.join-password-note")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.join.password-input")).toBeNull();
 
     // The negative half. No owner-code field and no fingerprint step: the owner this
     // device verifies against comes from its own pinned profile record, and a field
@@ -165,20 +180,32 @@ describe("IdentityHome second-device join", () => {
     // …and structurally, so a field arriving under a DIFFERENT testid convention is
     // caught too: this form collects no free text at all. The accept form's one
     // textarea IS the out-of-band owner code, so a textarea here is that field renamed.
-    const form = screen.getByTestId("identity-home.join-form");
-    expect(form.querySelectorAll("textarea")).toHaveLength(0);
-    expect(
-      Array.from(form.querySelectorAll("[data-testid]")).filter((el) =>
-        (el.getAttribute("data-testid") ?? "").includes("owner"),
-      ),
-    ).toHaveLength(0);
+    // Asserted on BOTH steps, because the wizard renders one of them at a time and a
+    // field could arrive on either.
+    const noFreeText = (root: HTMLElement): void => {
+      expect(root.querySelectorAll("textarea")).toHaveLength(0);
+      expect(
+        Array.from(root.querySelectorAll("[data-testid]")).filter((el) =>
+          (el.getAttribute("data-testid") ?? "").includes("owner"),
+        ),
+      ).toHaveLength(0);
+    };
+    noFreeText(screen.getByTestId("identity-home.join-form"));
+
+    fillJoinPhrase();
+    continueJoin();
+
+    await screen.findByTestId("identity-home.join.password-input");
+    expect(screen.getByTestId("identity-home.join-password-note")).toBeTruthy();
+    // The phrase step is gone, not merely scrolled away.
+    expect(screen.queryByTestId("identity-home.join-phrase-grid")).toBeNull();
+    noFreeText(screen.getByTestId("identity-home.join-form"));
   });
 
   it("passes the invite, the account hash, the phrase and the password to the command", async () => {
     personListInvites.mockResolvedValue([CLAIMED]);
     renderHome();
-    await openJoinForm();
-    fillJoinPhrase();
+    await openJoinPasswordStep();
     fireEvent.change(screen.getByTestId("identity-home.join.password-input"), {
       target: { value: PASSWORD },
     });
@@ -203,8 +230,7 @@ describe("IdentityHome second-device join", () => {
   it("cannot join without a password meeting the floor", async () => {
     personListInvites.mockResolvedValue([CLAIMED]);
     renderHome();
-    await openJoinForm();
-    fillJoinPhrase();
+    await openJoinPasswordStep();
 
     const submit = () => screen.getByTestId("identity-home.join.submit") as HTMLButtonElement;
     expect(submit().disabled).toBe(true);
@@ -228,8 +254,7 @@ describe("IdentityHome second-device join", () => {
     const onAccepted = vi.fn();
     personListInvites.mockResolvedValue([CLAIMED]);
     renderHome(onAccepted);
-    await openJoinForm();
-    fillJoinPhrase();
+    await openJoinPasswordStep();
     fireEvent.change(screen.getByTestId("identity-home.join.password-input"), {
       target: { value: PASSWORD },
     });
@@ -247,8 +272,7 @@ describe("IdentityHome second-device join", () => {
     personListInvites.mockResolvedValue([CLAIMED]);
     personJoinVault.mockRejectedValue({ kind: "BadRequest" });
     renderHome();
-    await openJoinForm();
-    fillJoinPhrase();
+    await openJoinPasswordStep();
     fireEvent.change(screen.getByTestId("identity-home.join.password-input"), {
       target: { value: PASSWORD },
     });
