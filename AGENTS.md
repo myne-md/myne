@@ -157,6 +157,7 @@ pnpm tauri build        # production desktop bundle
 pnpm sidecar            # build + stage BOTH externalBin sidecars — `myne` (CLI) and `myne-tor` (arti) — debug
 pnpm sidecar:release    # same, release profile — both tauri lifecycle hooks run these
 
+pnpm web:local          # ONE command: web dev client on :1421 + a local sync server (scripts/dev-web.sh)
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
 pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
 pnpm web:preview        # serve the built web bundle
@@ -209,6 +210,8 @@ and recorded in the guard's header. myne-md/myne#548.
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
 JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vitest.config.ts` — standalone, it does not extend `vite.config.ts` — specs under `tests/**/*.test.{ts,tsx}`). The other lanes have configs of their own: `vitest.e2e.config.ts` (desktop E2E), `vitest.web-e2e.config.ts` (web E2E), `vitest.capture.config.ts` (user-guide screenshots). `tsc` via `pnpm build` is the typecheck; for Rust use `cargo test`. (Note: `tests/` is outside `tsc`'s `include: ["src"]`, so Vitest is the only check that exercises test files.)
+
+Two jsdom facts worth knowing before designing a test around them, both measured rather than assumed (myne-md/myne#732, 2026-10-15). jsdom keeps `color-mix(...)` and `var(...)` VERBATIM in `style.background`, so a token-derived colour can be asserted as the string the code set rather than as a resolved rgb. And jsdom provides `PointerEvent`, so a press or hover test can render a real element and dispatch real pointer events instead of calling handlers by hand. Both were probed with a five-line script before the spec was written, which is the cheap version of finding out that the whole approach was vacuous.
 
 ## What lives where
 
@@ -333,6 +336,8 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 
 **Verifying a guard means breaking it, not running it.** Every guard above claims to catch something, and a guard that has never failed is a guard nobody has tested. Three consecutive reviews of one feature found a check that passed while the thing it checked was wrong — a matrix compared in one direction while the success line claimed two, a roster compared against a second copy of itself, a filter named in a test title and never exercised. In each case the check had just been *fixed*, and the fix was "verified" by the check passing afterwards, which proves nothing. **Inject the exact defect the guard now claims to catch, watch it name that defect, then restore.** It costs a minute and it is the only evidence that means anything.
 
+**And an anti-drift assertion has to be scoped to the artifact it names.** The failure this catches is one step past the paragraph above, and injection is the only thing that finds it: a test written to hold two copies of a value together, over a file that contains that value TWICE, cannot fail on the drift it exists for. `expect(css).toContain(NEUTRAL_PRESS_BG)` was green while the button's own copy was edited, because an unrelated rule further down the sheet still carried the old string. The fix is to slice the sheet to the rule's own section and assert the value appears there exactly once, and the way to know it is the fix is to inject the drift and watch the test go red: myne-md/myne#732's 2026-10-15 review found this by injection, in the change whose stated thesis was removing one-value-two-places.
+
 **An `#[ignore]` that names a defect is a deferral, and a deferral with no issue is a note.**
 `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md` states
 the convention: when a verification pass establishes a security defect whose fix is not available in
@@ -403,6 +408,17 @@ revert-and-run that STILL passes is the finding, not a formality to tick.
 - **`Cargo.lock` is single-shared at workspace root** (TB9 audit anchor). Do not split into per-crate locks.
 - **Vite `strictPort: 1420`** — `pnpm dev` fails fast if port taken; this is intentional (Tauri expects exact port).
 - **Vite `clearScreen: false`** — keep it; otherwise Rust errors get hidden during `pnpm tauri dev`.
+- **`web/vite.config.ts` is in no `tsconfig`, so `tsc` never sees it.** `tsconfig.node.json` includes
+  only the ROOT `vite.config.ts`, and `web/tsconfig.json` includes `["src", "../src"]`, so an edit to
+  the web build config that does not typecheck is caught by nothing: `tsc -p web/tsconfig.json`
+  neither includes nor builds it, and Vite loads it through esbuild, which transpiles without
+  checking. An `@ts-expect-error` in that file is therefore inert in both directions.
+  `tests/web/dev-deployment.test.ts` is the only thing holding its dev deployment facts.
+- **A Vite dev server binds `localhost`, which on macOS resolves to `[::1]` alone, so a port probe on
+  `127.0.0.1` reports CLOSED for a server that is up.** `scripts/dev-web.sh` probes its own client on
+  `localhost`, and the Go sync server on `127.0.0.1` because that one really is bound there. The
+  failure this produces is a check that silently never fires, which reads exactly like a check that
+  passed (myne-md/myne#873).
 - **AGENTS.md HTML comments are stripped** before injection. Block comments (`<!-- ... -->`) outside code blocks vanish silently. Use code blocks if you need a literal comment.
 - **`String.replace`'s replacement STRING expands `$1`, `$&`, `` $` `` and `$$` — which defeats a quote sanitizer placed before it.** A theme value of `$1 onload=…` filtered clean of `["'<>]` still expanded to the captured group, whose own quote closed the attribute it was being interpolated into and landed a live event handler. `$` cannot be filtered (a legitimate CSS value may contain one), so the fix is a replacer **function**, to which no `$` sequence means anything. Any `replace(re, `…${untrusted}…`)` has this shape; `myne-themes/tools/render-preview.mjs` carries the worked example.
 - **`git add -N` to widen a diff leaves a zero-byte index entry behind, and deleting the file does not clear it.** Intent-to-add is how you get new files into `git diff HEAD` so a review or a guard can see them, and it is the right tool for that. What it also does is stage an empty blob (`e69de29`) for each path. Delete or rename such a file afterwards and the entry survives in the index while `git status` shows only ` D`, so a plain `git commit` lands an empty file named after work that moved elsewhere, and `git diff HEAD` shows neither the path nor the problem. The mirror-image failure costs more: a file created AFTER the `add -N` is untracked, so it is absent from that same diff, and a commit lands the imports that reference it without the module itself, with `pre-commit`'s `tsc` green because it reads the working copy rather than the index. Both shapes landed together on one branch. `git ls-files --stage | grep e69de29` finds the first, `git status --porcelain | grep '^??'` the second, and both are worth a look before any commit that followed an `add -N`.

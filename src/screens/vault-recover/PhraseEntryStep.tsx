@@ -141,7 +141,7 @@ const CELL_WRAP_BASE: CSSProperties = {
   paddingInlineEnd: 8,
   height: 32,
   cursor: "text",
-  transition: "border-color 80ms linear",
+  transition: "border-color var(--duration-instant) var(--ease-standard)",
 };
 
 function cellWrapStyle(focused: boolean): CSSProperties {

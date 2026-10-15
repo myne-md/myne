@@ -25,9 +25,9 @@ import { backlinks, forward } from "../vaultIndices";
 import { useResolverNotes } from "../resolverNotes";
 import { SECTION_HEADING_STYLE, SIDEBAR_CARD_STYLE } from "./sharedStyles";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 export function BacklinksTab() {
   const { t } = useTranslation();
@@ -97,7 +97,7 @@ export function BacklinksTab() {
               data-testid="editor.backlink-row"
               data-source-id={row.sourceUuid}
               onClick={() => void ctx.open(row.sourceUuid)}
-              {...hoverSurface({ restBg: "var(--bg-1)" })}
+              {...interactiveSurface({ restBg: "var(--bg-1)" })}
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
@@ -146,7 +146,7 @@ export function BacklinksTab() {
               data-testid="editor.outgoing-link-row"
               data-target-id={row.targetUuid}
               onClick={() => void ctx.open(row.targetUuid)}
-              {...hoverSurface({ restBg: "var(--bg-1)" })}
+              {...interactiveSurface({ restBg: "var(--bg-1)" })}
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>

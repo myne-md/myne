@@ -49,16 +49,18 @@ export function MemberNameGate({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
 
-  // `onDone` is usually an inline arrow, so it is read through a ref and the check
-  // below runs exactly once per mount. Without the ref the effect would re-run on
-  // every parent render, and the `checked` latch covers a development double-mount.
+  // `onDone` is usually an inline arrow, so it is read through a ref and the probe
+  // below runs once per mount. The `checked` latch goes AFTER the await, never
+  // before it: a StrictMode dev mount cleans the first run up mid-flight, so a
+  // latch set on entry makes the second run return early while the first bails on
+  // its own `cancelled`, and `setChecking(false)` never runs. The bug is
+  // invisible in a release build, which never double-mounts (myne-md/myne#871).
   const done = useRef(onDone);
   done.current = onDone;
   const checked = useRef(false);
 
   useEffect(() => {
     if (checked.current) return;
-    checked.current = true;
     let cancelled = false;
     void (async () => {
       let named = false;
@@ -71,6 +73,7 @@ export function MemberNameGate({ onDone }: { onDone: () => void }) {
         named = false;
       }
       if (cancelled) return;
+      checked.current = true;
       if (named) {
         done.current();
         return;

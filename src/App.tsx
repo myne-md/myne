@@ -165,7 +165,10 @@ function App() {
   // already holds a person account, show the identity home instead of Welcome.
   // Probe-only state; a failed probe leaves `false` (the pre-B2B Welcome path).
   const [personEnrolled, setPersonEnrolled] = useState(false);
-  const [personIdHex, setPersonIdHex] = useState<string | null>(null);
+  // `person_id_hex` is read off the same probe and deliberately NOT kept: the
+  // identity home used to print it above the invite code, which is an unlabeled
+  // 32-byte blob a user can neither read nor act on (myne-md/myne#869). The
+  // public material that IS actionable is `identity_code`.
   const [identityCode, setIdentityCode] = useState<string | null>(null);
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
@@ -234,7 +237,6 @@ function App() {
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
       setPersonEnrolled(person.enrolled);
-      setPersonIdHex(person.person_id_hex);
       setIdentityCode(person.identity_code);
       setPersonIdentityState({
         ready: person.identity_unlocked,
@@ -744,7 +746,6 @@ function App() {
         if (personEnrolled) {
           return (
             <IdentityHome
-              personIdHex={personIdHex}
               identityCode={identityCode}
               onCreateVault={() => dispatch({ type: "create-vault.start" })}
               onAccepted={() => void reprobe()}

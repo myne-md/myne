@@ -3,7 +3,6 @@
     "accountMismatch": "このブラウザにはすでに別のアカウントの保管庫があります。そちらを開くか、先にサインアウトしてこのブラウザ内のコピーを消去してください。",
     "changeAccount": "別のアカウント番号を使用",
     "continue": "続ける",
-    "failed": "そのアカウントを開けませんでした。アカウント番号とパスワードを確認して、もう一度お試しください。",
     "hint": "このアカウントのマスターパスワードを入力してください。Myneが保管庫を取得し、このブラウザをこのアカウントのデバイスとして設定します。",
     "noEndpoint": "このMyneには同期サーバーが設定されていないため、保管庫に接続できません。運用している方にお問い合わせください。",
     "passwordLabel": "マスターパスワード",
@@ -30,9 +29,8 @@
   },
   "agent": {
     "composer": {
-      "placeholder": "これらのノートの変更をAIに依頼",
+      "placeholder": "AIに依頼…",
       "scopeLabel": "作業対象",
-      "scopeChange": "変更",
       "scopeOpenNote": "このノート",
       "scopeCount_one": "{{count}}件のノート",
       "scopeCount_other": "{{count}}件のノート",
@@ -46,10 +44,16 @@
       "unchecked": "編集チェックを完了できなかったため、現在エージェントは利用できません。モデルまたはプロバイダーに接続できるか確認してから、もう一度お試しください。",
       "unsupported": "このモデルは正確な編集を安定して行えないため、エージェントは利用できません。より大きなモデルかプロバイダーを選択してください。",
       "unsupportedDetail": "{{attempts}}回のチェック中{{passes}}回合格しました。必要なのは{{required}}回です。",
-      "checking": "モデルを確認しています…",
-      "checkingAt": "モデルを確認しています…（{{attempt}}/{{of}}）",
+      "checking": "確認中",
       "unsupportedProvisional": "この合格基準はまだ複数のモデルで測定されていないため、本来より厳しすぎたり緩すぎたりする可能性があります。",
-      "scopeNone": "開いているノートがないため、まだ作業する対象がありません"
+      "scopeNone": "開いているノートがないため、まだ作業する対象がありません",
+      "scopeAllVault": "すべてのノート",
+      "blockedScope": "エージェントが作業できる対象がまだありません: すべてのノートがAIから除外されているか、保管庫が空です。",
+      "preparing": "準備中…",
+      "blockedScopeSidebar": "ここで尋ねられる対象がまだありません: このノートのフォルダはAIから除外されています。",
+      "needsScope": "下からフォルダを選ぶかノートを開いて、エージェントが作業できる対象を用意してください。",
+      "scopeExcluded_other": "{{count}}件がAIから除外",
+      "scopeExcluded_one": "{{count}}件がAIから除外"
     },
     "progress": {
       "working": "処理中",
@@ -66,7 +70,8 @@
       "grantsUser_other": "あなたが設定した範囲{{count}}件",
       "grantsModel_one": "要求された{{count}}件",
       "grantsModel_other": "要求された{{count}}件",
-      "cancelledBackground": "Myne がバックグラウンドに移ったため、実行は取り消されました。何も書き込まれていません。準備ができたらもう一度お尋ねください。"
+      "cancelledBackground": "Myne がバックグラウンドに移ったため、実行は取り消されました。何も書き込まれていません。準備ができたらもう一度お尋ねください。",
+      "legFailed": "実行は完了する前に停止しました。"
     },
     "scope": {
       "title": "{{folder}}を含めますか？",
@@ -123,7 +128,9 @@
         "notProposed": "適用できませんでした: その変更はこの実行の提案に含まれていません。",
         "noteMoved": "適用できませんでした: その変更はノートを別のフォルダへ移動させます。",
         "appendEmpty": "適用できませんでした: 追加するものがありませんでした。",
-        "appendWouldWriteFrontmatter": "適用できませんでした: そのテキストはノートのプロパティブロックになってしまいます。"
+        "appendWouldWriteFrontmatter": "適用できませんでした: そのテキストはノートのプロパティブロックになってしまいます。",
+        "moveToSameFolder": "移動しませんでした: そのノートはすでにそのフォルダにあります。",
+        "moveIntoExcludedFolder": "移動しませんでした: そのフォルダはAIから除外されています。"
       },
       "applyFailed": "変更を適用できませんでした。",
       "undo": "この実行を元に戻す",
@@ -145,11 +152,39 @@
       "runSummaryOnDevice": "このデバイスの外には何も出ていません",
       "appendFlag": "末尾に追加",
       "diffCurrent": "現在のノート内",
-      "diffProposed": "この変更の後"
+      "diffProposed": "この変更の後",
+      "summaryShowAll": "要約全体を表示",
+      "summaryShorten": "要約を短くする",
+      "settingFolderFrom": "フォルダ: {{from}} が {{to}} になります",
+      "moveFlag": "別のフォルダへ移動します",
+      "settingFromValue": "{{from}} が {{to}} になります",
+      "settingFromUnset": "未設定、{{value}} になります",
+      "settingCleared": "{{from}} を削除します",
+      "settingAlreadyUnset": "未設定",
+      "settingFolder": "{{folder}} 内",
+      "applySetting": "単独で適用",
+      "refusedSetting": {
+        "needsOwnAct": "ここでは適用されません: 設定の変更は常に単独で承認されます。",
+        "notWritable": "適用できませんでした: その設定はエージェントが変更できるものではなくなりました。",
+        "invalidValue": "適用できませんでした: その値はこの設定では受け付けられません。",
+        "folderRemoved": "適用されませんでした: そのフォルダはあなたが削除したため、エージェントは復元しません。",
+        "notClearable": "クリアできませんでした: この設定に未設定の状態はありません。代わりに値を変更してください。",
+        "writeFailed": "適用できませんでした: 設定の書き込みに失敗しました。ほかの変更は適用されています。",
+        "runStopped": "適用されませんでした: 実行が停止したため、変更は試みられませんでした。",
+        "notProposed": "適用されませんでした: この実行はその変更を提案していないため、ホストは書き込みません。"
+      },
+      "undoReportFailed_other": "{{count}}件の変更を元に戻せませんでした。",
+      "undoReportSettings_other": "{{count}}件の設定を元に戻しました。",
+      "settingsHeading_other": "設定{{count}}件",
+      "settingsChanged_other": "{{count}}件の設定を変更しました。",
+      "refusedCount_other": "{{count}}件の変更を適用できませんでした",
+      "undoReportFailed_one": "{{count}}件の変更を元に戻せませんでした。",
+      "undoReportSettings_one": "{{count}}件の設定を元に戻しました。",
+      "settingsHeading_one": "設定{{count}}件",
+      "settingsChanged_one": "{{count}}件の設定を変更しました。",
+      "refusedCount_one": "{{count}}件の変更を適用できませんでした"
     },
     "undo": {
-      "offer_one": "前回の実行で{{count}}件のノートが変更されました。",
-      "offer_other": "前回の実行で{{count}}件のノートが変更されました。",
       "action": "この実行を元に戻す",
       "reverted_one": "{{count}}件のノートを復元しました。",
       "reverted_other": "{{count}}件のノートを復元しました。",
@@ -158,7 +193,50 @@
       "createdNotReverted_one": "この実行が作成した{{count}}件のノートはそのまま残されています。",
       "createdNotReverted_other": "この実行が作成した{{count}}件のノートはそのまま残されています。",
       "sessionOnly": "このワンタップの取り消しは、保管庫をロックするかアプリを閉じるまで有効です。その後はノートのバージョン履歴から一件ずつ復元してください。",
-      "sessionOnlyLink": "バージョン履歴を開く"
+      "revertedSettings_other": "{{count}}件の設定を元に戻しました。",
+      "revertedSettings_one": "{{count}}件の設定を元に戻しました。"
+    },
+    "hub": {
+      "title": "エージェント",
+      "loading": "会話を読み込んでいます…",
+      "modeLabel": "表示する会話",
+      "modeVault": "すべて",
+      "modeNote": "このノート",
+      "renamedAnnouncement": "{{name}}に名前を変更しました",
+      "deletedAnnouncement": "会話を削除しました",
+      "loadFailed": "会話を読み込めませんでした。",
+      "emptyTitle": "会話はまだありません",
+      "anchorLabel": "ノート上",
+      "anchorOpen": "{{name}}を開く",
+      "generateTitle": "タイトルを生成",
+      "generateTitleNeedsModel": "タイトルを生成（ローカルのテキストモデルが必要）",
+      "generateTitleExcluded": "タイトルを生成（このノートはAIから除外したフォルダにあります）",
+      "titleGenerating": "タイトルを生成しています…",
+      "titleGenerated": "タイトルを生成しました: {{name}}",
+      "titleFailed": "タイトルを生成できませんでした。",
+      "titleSaveFailed": "タイトルを保存できませんでした。",
+      "searchLabel": "会話を検索",
+      "searchPlaceholder": "会話を検索…",
+      "noMatchTitle": "一致なし",
+      "noMatchBody": "「{{query}}」に一致する会話はありません。検索を消去するとすべて表示されます。",
+      "emptyBody": "開始した会話がここに表示されます。",
+      "menu": "会話の操作",
+      "unread": "まだ読んでいない完了した結果",
+      "targetFolder": "フォルダについて",
+      "targetNote": "ノートについて",
+      "targetVault": "保管庫全体について",
+      "running": "この会話を処理中",
+      "newConversation": "新しい会話",
+      "historyLabel": "履歴"
+    },
+    "focus": {
+      "title": "ノート上のエージェント",
+      "openNote": "ノートを開く"
+    },
+    "footprint": {
+      "disclosure": "この実行にかかったもの",
+      "memory_other": "{{count}}件のメモリを保存しました",
+      "memory_one": "{{count}}件のメモリを保存しました"
     }
   },
   "ai": {
@@ -228,10 +306,10 @@
       "decrypting": "添付ファイルを復号中…",
       "clearSearchAriaLabel": "検索をクリア",
       "emptyClearSearch": "検索をクリア",
-      "emptyImportHint": "ファイルをインポートして保管庫に保存します。",
+      "emptyImportHint": "ノートに追加したファイルは保管庫に保存され、どこかへ送られる前にこのデバイス上で暗号化されます。まず1つインポートしてみてください。",
       "emptyLoadError": "添付ファイルのカタログを読み取れませんでした。",
       "emptyNoAttachments": "添付ファイルはまだありません。",
-      "emptyNoResultsTitle": "検索に一致する添付ファイルはありません。",
+      "emptyNoResultsTitle": "一致する添付ファイルはありません。",
       "filterAriaLabel": "種類で絞り込み",
       "gridView": "グリッド表示",
       "import": "インポート",
@@ -245,16 +323,14 @@
       "menuRename": "名前を変更",
       "menuTranscribe": "文字起こし",
       "menuViewTranscription": "文字起こしを表示",
-      "noMatch": "検索に一致する添付ファイルはありません。",
       "noUnusedNotice": "整理する未使用の添付ファイルはありません。",
-      "preview": "プレビュー",
       "previewAttachment": "添付ファイルをプレビュー",
       "searchAriaLabel": "ファイル名で添付ファイルを検索",
       "searchPlaceholder": "ファイル名で検索",
       "sort": {
         "createdAsc": "古い順",
         "createdDesc": "新しい順",
-        "nameAsc": "名前順（A–Z）",
+        "nameAsc": "名前 A→Z",
         "nameDesc": "名前 Z→A"
       },
       "sortAriaLabel": "添付ファイルを並べ替え",
@@ -276,7 +352,11 @@
       "usedInCount_one": "{{count}}件のノートで使用中",
       "usedInCount_other": "{{count}}件のノートで使用中",
       "usedInLoading": "…",
-      "previewNamed": "{{name}}をプレビュー"
+      "previewNamed": "{{name}}をプレビュー",
+      "emptyFilteredBody": "現在の種類フィルタに一致するものはありません。消去するとライブラリ全体が再び表示されます。",
+      "emptyFilteredBodyQuery": "ライブラリに一致するものはありません",
+      "emptyLoadErrorBody": "カタログは保管庫とともに暗号化されているため、これは通常、データが失われたのではなく読み取りが中断されたものです。もう一度お試しください。繰り返し失敗する場合でも、ノートとそのファイルは影響を受けていません。",
+      "emptyRetry": "もう一度お試しください"
     },
     "thumbnail": {
       "audioLabel": "オーディオ：{{filename}}",
@@ -349,7 +429,11 @@
       "preparing": "準備中…",
       "successToast": "バックアップを検証して保存しました。",
       "title": "保管庫をバックアップ",
-      "verifying": "{{total}}件中{{done}}件を検証中…"
+      "verifying": "{{total}}件中{{done}}件を検証中…",
+      "drillBody": "パスワードを失った場合、バックアップだけでは戻れません。",
+      "drillCta": "確認する",
+      "drillOnce": "表示は一度きりです。これを閉じると再び表示されません。",
+      "drillTitle": "復元フレーズも確認しましたか？"
     }
   },
   "clipper": {
@@ -551,17 +635,11 @@
       "restoreBackup": {
         "label": "バックアップからボールトを復元…"
       },
-      "toggleRealtimeSync": {
-        "label": "リアルタイム同期を切り替え"
-      },
       "revealVaultFolder": {
         "label": "ファイルマネージャーでボールトフォルダを表示"
       },
       "aiSummarizeNote": {
         "label": "ノートを要約"
-      },
-      "aiSuggestTags": {
-        "label": "タグを提案"
       },
       "aiRewriteSelection": {
         "label": "選択範囲を書き換え"
@@ -697,6 +775,18 @@
       },
       "showIsolatedGraph": {
         "label": "分離グラフを開く"
+      },
+      "aiOpenAgentVault": {
+        "label": "エージェント: 保管庫で開く"
+      },
+      "aiOpenAgentNote": {
+        "label": "エージェント: ノートで開く"
+      },
+      "meetingSummarize": {
+        "label": "AIで会議を要約…"
+      },
+      "openPalette": {
+        "label": "検索してコマンドを実行…"
       }
     },
     "hotkeys": {
@@ -783,7 +873,7 @@
         "exportFailed": "{{filename}}をエクスポートできませんでした。",
         "renamed": "{{name}}に名前を変更しました。",
         "renameFailed": "添付ファイルの名前を変更できませんでした。",
-        "saveDialogFailed": "保存ダイアログを開けませんでした。"
+        "saveDialogFailed": "このファイルの保存先を選択できませんでした。"
       },
       "compression": {
         "bulkNotice_one": "{{count}}件の画像を圧縮しました：{{from}} → {{to}}",
@@ -978,11 +1068,9 @@
             "tooLong": "この録音は文字起こしするには長すぎます。音声は添付されたままなので、再生はできます。",
             "vaultLocked": "文字起こしするには保管庫のロックを解除してください。"
           },
-          "disabledReason": "文字起こしするには 設定 → Developer → AI でAIを有効にしてください。",
           "failed": "文字起こしに失敗しました。もう一度お試しください。",
           "heading": "文字起こし",
           "insert": "文字起こしをノートに挿入",
-          "noModelHint": "設定 → Developer → AI で文字起こしモデルを選択してください。",
           "progress": "文字起こし中…",
           "stop": "停止"
         },
@@ -1043,7 +1131,6 @@
         "moveRight": "右に移動",
         "saveStatus": "保存状態",
         "settings": "設定",
-        "syncStatus": "同期ステータス",
         "tags": "タグ",
         "viewMode": "表示モード",
         "views": "ビュー",
@@ -1121,14 +1208,14 @@
             "proposed_one": "{{count}}件の変更を提案しました。",
             "proposed_other": "{{count}}件の変更を提案しました。",
             "memoryUpdated_one": "メモリを1件のエントリで更新しました。",
-            "memoryUpdated_other": "メモリを{{count}}件のエントリで更新しました。"
+            "memoryUpdated_other": "メモリを{{count}}件のエントリで更新しました。",
+            "honestyExpand": "ノート全体を表示",
+            "honestyCollapse": "ノートを短くする"
           },
           "askPlaceholder": "ノートについて質問する…",
           "askSubmit": "質問",
           "assistant": "アシスタント",
-          "citations": "出典",
-          "composerPlaceholder": "ノートにメッセージを送る…",
-          "empty": "AIの出力（要約、回答、提案）がここに表示されます。",
+          "empty": "要約や回答、提案は、あなたが求めるとここに表示されます。",
           "error": "AIリクエストを完了できませんでした。",
           "errorTurn": "アシスタントは回答できませんでした。",
           "gettingReadyHint": "AIのためにノートを準備しています。しばらくお待ちください。",
@@ -1138,7 +1225,7 @@
           "newChat": "新規チャット",
           "noModelHint": "AIプロバイダーが設定されていないため、チャット、要約、書き換え、セマンティック検索を実行するものがありません。設定 → 開発者 → AI で設定してください。",
           "unreachableHint": "設定したプロバイダーが応答していません。動作していることを確認してから、もう一度送信してください。",
-          "unavailableHint": "このMyneのビルドにはローカルAIが含まれていないため、ここでは何も実行できません。",
+          "unavailableHint": "このMyneのビルドはローカルAIなしでコンパイルされているため、ここでは何も実行できません。設定を変えてもそれは変わりません — AIを含むビルドが必要です。",
           "offHint": "ローカルAIはオフです。設定 → 開発者 → AI でオンにしてください。",
           "send": "送信",
           "statusGettingReady": "準備中…",
@@ -1160,8 +1247,6 @@
           "historyEmpty": "まだ会話がありません。新しいチャットはここに表示されます。",
           "historyError": "会話を読み込めませんでした。再試行してください。",
           "historyLoading": "読み込み中…",
-          "historyProposalAfter": "後",
-          "historyProposalBefore": "前",
           "historyProposalNewNote": "新しいノート",
           "historyRename": "名前を変更",
           "historyTitle": "チャット履歴",
@@ -1177,7 +1262,23 @@
           "memoryPopoverLoadFailed": "メモリを読み込めませんでした。変更はありません。",
           "memoryPopoverRetry": "再試行",
           "memoryPopoverSettings": "設定で管理",
-          "memoryPopoverClose": "閉じる"
+          "memoryPopoverClose": "閉じる",
+          "copied": "コピーしました",
+          "copyAnswer": "回答をコピー",
+          "copyFailed": "コピーできませんでした",
+          "copyYourMessage": "メッセージをコピー",
+          "emptyTitle": "ノートについて質問",
+          "noticeLeaves": "入力した言葉、各ターンが読み取るノート、その実行が読み取りうるすべてのノートのタイトル・識別子・フォルダパス（除外フォルダを除いた保管庫全体。範囲を狭めない場合）、そしてAIがあなたについて記憶していることは、応答している相手に送信されます。このデバイス上のほかのものは送信されません。",
+          "noticeReceiver": "応答しているのは {{provider}} で、Myneが運営しているものではありません。",
+          "noticeReceiverLocal": "応答しているのは、このデバイス上で動作しているプログラムです。マシンの外には何も出ませんが、そのプログラムはMyneの一部ではなく、Myneはそれがそれらをどう扱うかを把握できません。",
+          "noticeRevoke": "停止するには、設定でAIをオフにするか、そこで応答しているものを変更してください。プロバイダーのキーを取り消すと、そのプロバイダーは即座に停止します。",
+          "noticeSettingsCta": "AI設定を開く",
+          "viewDiff": "変更を表示",
+          "revertRun": "この実行を元に戻す",
+          "diffTitle": "提案された変更",
+          "revertConfirmTitle": "この実行を元に戻しますか？",
+          "revertConfirmBody": "この実行が変更したノートは実行前の状態に戻ります。この実行が作成したノートはそのまま残ります。",
+          "focusAgent": "エージェントタブで開く"
         },
         "allHidden": "すべてのタブが非表示です。右クリックで復元してください。",
         "outline": {
@@ -1191,7 +1292,8 @@
           "backlinks": "リンク",
           "outline": "アウトライン",
           "tasks": "タスク",
-          "unlinked": "未リンクのメンション"
+          "unlinked": "未リンクのメンション",
+          "whoIsHere": "誰がいるか"
         },
         "tabStripLabel": "右パネル"
       },
@@ -1228,6 +1330,14 @@
         "editor": "エディタ",
         "rightPanel": "右パネル",
         "sidebar": "ノートサイドバー"
+      },
+      "presence": {
+        "editing": "が編集中",
+        "empty": "ここにいるのはあなただけです",
+        "jumpTo": "{{name}} へ移動",
+        "unknown": "誰か",
+        "title_other": "現在{{count}}人",
+        "title_one": "現在{{count}}人"
       }
     },
     "noteActions": {
@@ -1349,7 +1459,8 @@
       "todoList": "To-Doリスト",
       "voiceNote": "ボイスノート",
       "wikiLink": "Wikiリンク",
-      "remind": "リマインダー"
+      "remind": "リマインダー",
+      "meeting": "会議セッション"
     },
     "spell": {
       "menu": {
@@ -1390,7 +1501,6 @@
         "priority": "優先度",
         "remind": "リマインダー"
       },
-      "timeLabel": "時刻（任意）",
       "invalidRemind": "Myneはこの日付を読み取れないため、リマインダーは通知されません。",
       "addTime": "時刻を追加",
       "clear": "クリア",
@@ -1667,6 +1777,47 @@
       "title": "このノートは他の場所で削除されました",
       "body": "他のウィンドウから削除されたか、別のデバイスから同期されました。このウィンドウの未保存の変更は別コピーとして保持されました。",
       "close": "ウィンドウを閉じる"
+    },
+    "meeting": {
+      "ai": {
+        "cancelled": "停止しました。ノートには何も追加されていません。",
+        "close": "閉じる",
+        "discard": "破棄",
+        "failed": "AIの処理に失敗しました。文字起こしは変更されていません。",
+        "generate": "生成",
+        "insert": "ノートに挿入",
+        "notice": "上の文字起こしからAIが生成したものです。誤りを含む可能性があり、記録は文字起こしです。",
+        "noAttribution": "文字起こしには誰が話したかが記録されていないため、アクションアイテムに担当者がありません。",
+        "noModel": "テキストを生成するAIモデルがインストールされていません。会議の要約にはモデルが必要です。設定 → AI でダウンロードしてください。",
+        "offer": "会議を保存しました。AIで要約しますか？",
+        "offerAction": "要約",
+        "openSettings": "AI設定を開く",
+        "pickIntro": "文字起こしから何を生成するか選択してください。",
+        "progress": "{{total}} 件中 {{done}} 件目",
+        "reviewIntro": "挿入する前に確認してください。文字起こしはそのまま残ります。",
+        "running": "生成中…",
+        "section": {
+          "actionItems": "アクションアイテム",
+          "decisions": "決定事項",
+          "openQuestions": "未解決の質問",
+          "summary": "要約"
+        },
+        "stop": "停止",
+        "title": "会議AI"
+      },
+      "barAria": "会議セッション",
+      "cancel": "キャンセル",
+      "chunksMissing": "会議の一部が転送されなかったため、ノートに欠落があります。届いた音声はそのまま残っています。",
+      "clipFailed": "会議の一部を保存できませんでした。残りはノートに残っています。",
+      "machineNotice": "これは会議の機械文字起こしであり、誤りを含む可能性があります。",
+      "noteTitle": "会議 {{date}}",
+      "noteWriteFailed": "会議のノートを書き込めませんでした。録音された音声は添付ファイルとして保管庫に残っています。",
+      "saving": "ノートを書き込んでいます…",
+      "stop": "停止",
+      "systemAudioUnavailable": "このデバイスはシステム音声をキャプチャできないため、他の参加者の声はノートに入りません。",
+      "tapSilent": "他の参加者の音声が入力されていません。システム設定、プライバシーとセキュリティ、画面収録とシステムオーディオ録音を確認してください。",
+      "transcriptHeading": "文字起こし",
+      "transcriptionFailed": "会議の一部を文字起こしできませんでした。音声はノートに残っています。"
     }
   },
   "export": {
@@ -1823,14 +1974,12 @@
       "close": "閉じる",
       "count_one": "ノート{{count}}件",
       "count_other": "{{count}}件のノート",
-      "countEmpty": "空",
       "delete": "削除",
       "deleteError": "そのノートを削除できませんでした。もう一度お試しください。",
       "emptyBody": "アーカイブしたノートとフォルダはサイドバーには表示されませんが、そのまま保管されています。必要になったら、ここから復元してください。",
       "emptyTitle": "アーカイブされたものはありません",
       "folderDeleteBody_one": "「{{name}}」とその中のノート{{count}}件",
       "folderDeleteBody_other": "「{{name}}」とその中のノート{{count}}件",
-      "emptyState": "アーカイブは空です。",
       "folderDeleteConfirm_one": "ノート{{count}}件をゴミ箱に移動しますか？",
       "folderDeleteConfirm_other": "ノート{{count}}件をゴミ箱に移動しますか？",
       "folderDeleteConfirmCta": "ゴミ箱に移動",
@@ -1931,7 +2080,10 @@
         "tag": "タグ"
       },
       "unrepresentable": "このフィルタは高度なエディタで作成されたため、ここでは編集できません。",
-      "unresolved": "未解決"
+      "unresolved": "未解決",
+      "conditionNegate": "条件: 一致するかしないか",
+      "conditionType": "条件: 一致させる対象",
+      "conditionValue": "条件: 一致させる値"
     },
     "folderManagement": {
       "illegalSegment": "フォルダ名には / \\ | # ^ [ ] を含めたり、スペースで始めたり終えたりすることはできません。",
@@ -1950,7 +2102,6 @@
     "folderRow": {
       "createFolderNote": "フォルダノートを作成",
       "empty": "空",
-      "folderNote": "フォルダノート",
       "openFolderNote": "フォルダノートを開く"
     },
     "graph": {
@@ -1970,8 +2121,6 @@
         "filterConditions_one": "条件{{count}}件",
         "filterConditions_other": "条件{{count}}件",
         "heading": "カラーグループ",
-        "moveDown": "ルールを下に移動",
-        "moveUp": "ルールを上に移動",
         "namePlaceholder": "無題のルール",
         "rowLabel": "{{name}}、グループ{{index}} / {{total}}。Alt+上下矢印で並べ替えます。",
         "editRuleButton": "編集",
@@ -1984,13 +2133,10 @@
       "depthToggleTitle": "近傍の深さを切り替え（1 ↔ 2ホップ）",
       "filterAll": "すべて",
       "filterAroundNote": "このノートの周辺",
-      "filterByTag": "タグで絞り込み",
       "filterIsolated": "孤立",
       "hop": "{{depth}}ホップ",
       "loading": "グラフを読み込み中…",
       "noNotes": "グラフ化できるノートがまだありません。",
-      "overCap": "この保管庫は大きいため、保管庫全体のグラフは上限が設けられています。タグで絞り込むか、孤立したノートを表示して探索してください。",
-      "refresh": "更新",
       "refreshTitle": "保管庫が変更されました：グラフを再構築",
       "settings": {
         "appearanceHeading": "外観",
@@ -2006,7 +2152,7 @@
         "nodeSizeStrength": "接続数でサイズを変える",
         "openTitle": "グラフ設定",
         "reset": "デフォルトに戻す",
-        "showArrows": "方向の矢印を表示",
+        "showArrows": "ホバー時に方向の矢印を表示",
         "title": "グラフ設定"
       },
       "canvasLabel": "{{count}}個のノートのナレッジグラフ",
@@ -2015,7 +2161,6 @@
       "listLinkCount_other": "{{count}}件のリンク",
       "listLinksFrom": "からのリンク: {{titles}}",
       "listLinksTo": "へのリンク: {{titles}}",
-      "relayout": "レイアウトを再配置",
       "relayoutTitle": "グラフを一から再配置",
       "showingCount_one": "{{count}}個のノートを表示中",
       "showingCount_other": "{{count}}個のノートを表示中",
@@ -2044,7 +2189,6 @@
         "flagDetail": "{{kind}}「{{segment}}」{{reason}}。",
         "flagKindFolder": "フォルダ",
         "flagKindTitle": "タイトル",
-        "folderPickerTitle": "Obsidian保管庫フォルダを選択",
         "hiddenIgnoredPrefix_one": "{{count}}件の設定 / 隠しアイテムを無視しました（例: ",
         "hiddenIgnoredPrefix_other": "{{count}}件の設定／隠しアイテムを無視しました（例：",
         "hiddenIgnoredSuffix": "、ドットファイル）。",
@@ -2161,8 +2305,8 @@
         "myne": {
           "label": "Myneの保管庫",
           "loses": "バージョン履歴、削除したノート、テンプレートはインポート元の保管庫に残ります。インポートしたどのノートも使っていない添付ファイルは引き継がれません。インポート元の保管庫は変更されず、同期している場合はそのまま同期が続きます。",
-          "pickerTitle": "インポート元の保管庫を選択",
-          "short": "このデバイスにあるほかの保管庫",
+          "pickerTitle": "インポート元の .myne-backup ファイルを選択",
+          "short": "エクスポートした .myne-backup ファイル",
           "survives": "ノート、フォルダ、タグ、インポートするノート同士のリンク、そしてそれらのノートが使っている添付ファイル。インポート元の保管庫の辞書に追加した単語も一緒に引き継がれます。"
         }
       },
@@ -2174,14 +2318,14 @@
         "errors": {
           "alreadyOpen": "その保管庫はすでに別のインポートで開かれています。先にそのインポートを完了するかキャンセルしてください。",
           "busy": "別の保管庫の操作が実行中です。完了するのを待ってから、もう一度お試しください。",
-          "credential": "そのパスワードまたは復元フレーズでは保管庫を開けませんでした。確認してもう一度お試しください。"
+          "credential": "そのパスワードまたは復元フレーズでは保管庫を開けませんでした。確認してもう一度お試しください。",
+          "backupInvalid": "そのファイルはMyneのバックアップとして読み取れませんでした。ファイルを確認してもう一度お試しください。"
         },
         "importLabel": "このインポートの名前",
         "importLabelHint": "インポートするノートが既存のノートと同じ名前で、インポートするもののどれかがそのノートにリンクしている場合、インポートされたほうの名前にこれが付きます。このインポートをもう一度実行するときに同じ名前のままにしておけば、二重に取り込まれることはありません。",
         "importLabelIllegal": "その名前は使用できません。ノート名には \\ / | # ^ [ ] を含めたり、スペースで始めたり終えたりすることはできません。",
         "loading": "ほかの保管庫を探しています…",
         "noOtherVaults": "このデバイスには、インポート元にできるほかの保管庫がありません。先にバックアップを復元すると、ここからインポートできる保管庫になります。",
-        "opening": "開いています…",
         "passwordLabel": "その保管庫のパスワード",
         "phraseLabel": "その保管庫の24語の復元フレーズ",
         "report": {
@@ -2202,18 +2346,19 @@
         "usePhrase": "代わりに復元フレーズを使用",
         "vaultLabel": "インポート元",
         "vaultPlaceholder": "保管庫を選択",
-        "wordAria": "24語中{{number}}語目"
+        "wordAria": "24語中{{number}}語目",
+        "backupLabel": "バックアップファイル",
+        "chooseBackup": "バックアップファイルを選択",
+        "noBackupChosen": "バックアップファイルが選択されていません"
       }
     },
     "list": {
       "addToFavorites": "お気に入りに追加",
-      "archive": "アーカイブ",
       "archiveBulkError": "ノートをアーカイブできませんでした。",
       "renameFailed": "その名前を保存できなかったため、ノートは元の名前のままです。",
       "archiveFolder": "フォルダをアーカイブ",
       "archiveNote": "アーカイブ",
       "archiveSingleError": "ノートをアーカイブできませんでした。",
-      "attachments": "添付ファイル",
       "bulkArchive": "{{count}}件のノートをアーカイブ",
       "bulkArchive_one": "ノート{{count}}件をアーカイブ",
       "bulkArchive_other": "ノート{{count}}件をアーカイブ",
@@ -2226,7 +2371,7 @@
       "bulkMove_other": "ノート{{count}}件を移動…",
       "caseMergeBody": "「{{name}}」という名前のフォルダがすでに存在します。これらは統合されます。別々に保つには、いずれかの名前を変更しますか？",
       "color": "色…",
-      "createFirstNote": "+ 最初のノートを作成",
+      "createFirstNote": "最初のノートを作成",
       "createFolderNote": "フォルダノートを作成",
       "customize": "カスタマイズ…",
       "delete": "削除",
@@ -2246,24 +2391,18 @@
       "newFolder": "新規フォルダ",
       "newFolderInPlaceholder": "{{path}}内に新規フォルダ",
       "newFolderPlaceholder": "新規フォルダ",
-      "newItem": "新規…",
       "newNote": "新規ノート",
-      "newNoteFromTemplate": "テンプレートから新規ノート…",
       "newNoteHere": "ここに新規ノート",
       "newNoteMenu": "新規ノート",
-      "newNoteShortcut": "新規ノート（⌘N）",
       "newSubfolder": "新規サブフォルダ",
       "newViewTitle": "新規ビュー",
       "noteMovedToTrash": "ノートをゴミ箱に移動しました",
       "notesHeading": "ノート",
       "notesMovedToTrash_one": "ノート{{count}}件をゴミ箱に移動しました",
       "notesMovedToTrash_other": "{{count}}件のノートをゴミ箱に移動しました",
-      "openArchive": "アーカイブを開く",
-      "openAttachments": "添付ファイルを開く",
       "openFolderNote": "フォルダノートを開く",
       "openInNewTab": "新しいタブで開く",
       "openToSide": "横に並べて開く",
-      "openTrash": "ゴミ箱を開く",
       "removeFolderNote": "フォルダノートを削除",
       "removeFromFavorites": "お気に入りから削除",
       "rename": "名前を変更",
@@ -2289,7 +2428,9 @@
       "moveFolderTo": "フォルダを移動…",
       "treeLabel": "ノートとフォルダ",
       "selectionAnnouncement": "{{title}}を選択しました",
-      "untitled": "無題"
+      "untitled": "無題",
+      "emptyBody": "ノートはプレーンなMarkdownで、どこかへ行く前にこのデバイス上で暗号化されます。作成して始めるか、上の検索行を押して任意のコマンドを実行してください。",
+      "search": "検索"
     },
     "newFromTemplate": {
       "back": "戻る",
@@ -2307,20 +2448,33 @@
       "untitledTemplate": "無題のテンプレート"
     },
     "newTab": {
-      "createNote": "新規ノートを作成",
+      "createNote": "新しいノート",
       "createDrawing": "新規ドローイング",
-      "noNotesMatch": "一致するノートはありません。",
       "noNotesYet": "ノートはまだありません。",
-      "recent": "最近",
-      "searchAriaLabel": "開くノートを検索",
-      "searchPlaceholder": "ノートを検索…",
-      "untitled": "無題"
+      "recent": "続きを再開",
+      "searchAriaLabel": "ノートとコマンドを検索",
+      "searchPlaceholder": "ノートとコマンドを検索…",
+      "untitled": "無題",
+      "createFromTemplate": "テンプレートから",
+      "kindCommand": "コマンド",
+      "kindNote": "ノート",
+      "noMatch": "一致するものがありません。",
+      "places": {
+        "agent": "エージェント",
+        "attachments": "添付ファイル",
+        "graph": "グラフ",
+        "tasks": "タスク",
+        "today": "今日"
+      },
+      "placesLabel": "移動先",
+      "results": "結果"
     },
     "pane": {
       "graphTab": "グラフ",
       "tasksTab": "タスク",
       "loading": "読み込み中…",
-      "untitledView": "無題のビュー"
+      "untitledView": "無題のビュー",
+      "agentTab": "エージェント"
     },
     "relativeTime": {
       "daysAgo": "{{d}}日前",
@@ -2401,7 +2555,9 @@
       "restoredStatus": "復元しました。直前のバージョンはスナップショットとして保存されています。",
       "selectPlaceholder": "スナップショットを選択すると、それ以降の変更内容をプレビューできます。",
       "title": "スナップショット",
-      "untitled": "無題"
+      "untitled": "無題",
+      "deviceFallback": "デバイス {{code}}",
+      "unknownAuthor": "不明なデバイス"
     },
     "tabStrip": {
       "closeNewTab": "新しいタブを閉じる",
@@ -2442,7 +2598,6 @@
       "close": "閉じる",
       "count_one": "ノート{{count}}件",
       "count_other": "{{count}}件のノート",
-      "countEmpty": "空",
       "delete": "削除",
       "deleteError": "そのノートを削除できませんでした。もう一度お試しください。",
       "empty": "ゴミ箱を空にする",
@@ -2454,7 +2609,6 @@
       "emptyPartialFailure_other": "{{count}}件のノートを削除できず、ゴミ箱に残っています。",
       "emptyBody": "削除したノートはここに入ります。ゴミ箱を空にするまで残り、いつでも復元できます。",
       "emptyTitle": "ゴミ箱は空です",
-      "emptyState": "ゴミ箱は空です。",
       "purgeConfirmCta": "完全に削除",
       "purgeConfirmTitle": "完全に削除しますか？",
       "restore": "復元",
@@ -2483,13 +2637,7 @@
         "setCoverImage": "カバー画像を設定",
         "untitled": "無題"
       },
-      "collapseViews": "ビューを折りたたむ",
       "empty": "ビューはまだありません。現在のノート一覧をビューとして保存できます。",
-      "expandViews": "ビューを展開",
-      "heading": "ビュー",
-      "host": {
-        "unsupported": "このビュータイプは今後のアップデートで対応予定です。"
-      },
       "list": {
         "empty": "このビューに一致するノートはありません",
         "noValue": "値なし"
@@ -2545,7 +2693,7 @@
       "viewTypeTable": "表"
     },
     "welcome": {
-      "body": "Myneへようこそ。ここはあなたが考え、書くためのプライベートな空間です。\n\nここに保存したものはすべて暗号化され、あなたのデバイスにとどまります。**パスワード**と**復元フレーズ**だけがその鍵なので、安全な場所に保管してください。両方とも失ってしまうと、私たちを含め誰もあなたのノートを取り戻すことはできません。\n\nこれはごく普通のノートなので、自由に使ってください。いつでも編集、名前変更、削除でき、アイデアが広がるたびに新しいノートを追加できます。\n\nお越しいただきありがとうございます。Myneについて詳しくは https://myne.md をご覧ください。\n",
+      "body": "Myneへようこそ。ここはあなたが考え、書くためのプライベートな空間です。\n\nここに保存したものはすべて暗号化され、あなたのデバイスにとどまります。**パスワード**と**復元フレーズ**だけがその鍵なので、安全な場所に保管してください。両方とも失ってしまうと、私たちを含め誰もあなたのノートを取り戻すことはできません。\n\n**ノート同士をリンクできます。** `[[` と入力すると、Myneがすでにあるノートを候補に出します。1つ選ぶとリンクになります。リンク先のノートには、そのリンクがどこから来たかが専用のバックリンクパネルに表示されるので、ノートの集まりをどちらの方向からもたどれます。\n\nこれはごく普通のノートなので、自由に使ってください。いつでも編集、名前変更、削除でき、アイデアが広がるたびに新しいノートを追加できます。\n\nMyneについて詳しくは https://myne.md をご覧ください。\n",
       "title": "Myneへようこそ"
     },
     "workspace": {
@@ -2563,7 +2711,7 @@
     "createForm": {
       "checkingStrength": "強度を確認中…",
       "confirmLabel": "マスターパスワードを確認",
-      "defaultEmptyCaption": "Argon2id（m=256 MiB、t=3、p=2）の入力として使用されます。覚えられるものを選んでください。リセットはできません。",
+      "defaultEmptyCaption": "覚えられるものを選んでください。リセットはできません。",
       "mismatch": "パスワードが一致しません。",
       "passwordLabel": "マスターパスワード",
       "suggestPassword": "パスワードを提案",
@@ -2710,7 +2858,7 @@
   },
   "restore": {
     "backLabel": "戻る",
-    "cancelLabel": "キャンセル",
+    "cancelLabel": "戻る",
     "collision": {
       "body": "このバックアップの保管庫はすでにこのデバイスに存在します。両方を保持すること（復元したコピーは保管庫一覧に別の保管庫として表示されます）も、今すぐ復元してから既存の保管庫をご自身で一覧から削除することもできます（削除にはDELETEの入力が必要で、復元した保管庫が開くことを確認してから行うのが適切です）。",
       "keepBoth": "両方を保持",
@@ -2770,10 +2918,23 @@
       "threatModelHelper": "公開されている脅威モデルのドキュメントをブラウザで開きます。",
       "threatModelLabel": "脅威モデル",
       "version": "バージョン",
-      "dev": "開発"
+      "dev": "開発",
+      "updateAutoCheckHelper": "Myneは、より新しいバージョンがあるかを確認するために、myne.mdから小さな署名済みファイルをダウンロードして知らせます。送信するのは現在のバージョンとプラットフォームだけで、ほかには何も送信しません。上のボタンで手動で確認することもできます。",
+      "updateAutoCheckLabel": "自動で更新を確認する",
+      "updateAvailable": "バージョン {{version}} が利用可能です。",
+      "updateChannelBeta": "ベータ",
+      "updateChannelLabel": "更新チャネル",
+      "updateChannelStable": "安定版",
+      "updateCheckButton": "更新を確認",
+      "updateChecking": "確認中…",
+      "updateFailed": "更新を確認できませんでした。後で再試行します。",
+      "updateHelper": "Myneは、インストールする前にすべての更新をオフラインのリリースキーで検証します。確認では downloads.myne.md に最新バージョンを問い合わせ、送信するのはバージョンとプラットフォーム（および、その配信元が記録しないIPアドレス）だけで、ノートやアカウントを送信することは決してありません。",
+      "updateIdle": "署名済みの更新。確認したときに downloads.myne.md から取得されます。",
+      "updateInstallButton": "再起動して更新",
+      "updateLabel": "更新",
+      "updateUpToDate": "最新バージョンです。"
     },
     "vault": {
-      "argon2idHeading": "Argon2idパラメータ",
       "changePasswordButton": "パスワードを変更",
       "changePasswordError": {
         "invalidCredentialOrVault": "現在のパスワードが間違っているか、保管庫ファイルが破損しています。",
@@ -2781,7 +2942,9 @@
         "joinFailure": "問題が発生しました。もう一度お試しください。",
         "samePasswordRejected": "新しいパスワードが現在のパスワードと同じです。",
         "serverAckPending": "新しいパスワードはこのデバイスでは有効ですが、Myneはそれを保存するためにサーバーへ接続できませんでした。接続できるまで、他のデバイスは引き続き以前のパスワードを要求します。それまでにこのブラウザ内のコピーが消去されると、この変更は失われます。自動的に再試行されます。",
-        "weakNewPassword": "新しいパスワードは12文字以上にしてください。"
+        "weakNewPassword": "新しいパスワードは12文字以上にしてください。",
+        "unexpected": "そのパスワード変更は完了しませんでした。もう一度お試しください。",
+        "vaultNotUnlocked": "この保管庫のパスワードを変更する前に、ロックを解除してください。"
       },
       "changePasswordHeading": "パスワードを変更",
       "changePasswordHelper": "同じ保管庫を保ったまま、マスターパスワードを変更します。復元フレーズは変わりません。",
@@ -2791,9 +2954,6 @@
       "localEraseHelper": "このブラウザにあるMyneの保管庫コピーを消去します。アカウントと、すでに同期済みのものはサーバーに残ります。",
       "localEraseButton": "サインアウトしてこのブラウザ内のコピーを消去…",
       "deleteVaultButton": "保管庫を削除…",
-      "memoryCost": "メモリコスト",
-      "parallelism": "並列度",
-      "timeCost": "時間コスト",
       "vaultLabelEyebrow": "保管庫ラベル",
       "vaultLabelHelper": "アプリ内の切り替え画面と、ロック解除前の起動時の保管庫選択画面に表示される、この保管庫の名前。保管庫内に暗号化して保存され、平文のままデバイスから出ることはありません。",
       "vaultLabelPlaceholder": "ラベルを追加…",
@@ -2812,7 +2972,8 @@
       "newPasswordPlaceholder": "12文字以上",
       "reenterNewPassword": "新しいパスワードを再入力",
       "changePasswordFootnote": "これによりクイックロック解除は無効になります。リカバリーフレーズは変わりません。",
-      "changing": "変更中…"
+      "changing": "変更中…",
+      "memberVaultNotice": "これは共有保管庫です。保管庫のパスワードはありません。パスワードまたはPINを追加するには、プライバシーの「共有保管庫のロック解除」を使用してください。"
     },
     "appearance": {
       "accentHelper": "アプリ全体で使うアクセントカラーを選びます。このデバイスのみに適用されます。",
@@ -2846,7 +3007,11 @@
       "showEditTimesSubtitle": "各ノートの下にタイムスタンプ",
       "graphSettingsLabel": "グラフの外観",
       "graphSettingsHelper": "ノードの色、ラベル、サイズ、レイアウトの力はグラフの中で設定します。グラフを開いて、隅にある歯車を使ってください。設定はデバイスごとに保持されるため、ここでの変更がスマートフォンに引き継がれることはありません。",
-      "openGraph": "グラフを開く"
+      "openGraph": "グラフを開く",
+      "barCustomize": {
+        "label": "下部バー",
+        "helper": "下部バーに表示するインジケーターを選択します。すべて非表示にするとバー自体が削除され、そのスペースが空きます。バー上の項目をドラッグまたは右クリックすると並べ替えられます。"
+      }
     },
     "archive": {
       "helper": "ノートをアーカイブに移動して、メインの一覧から外しておけるようにします。これをオフにすると、アーカイブ済みのノートがすべて元のフォルダに戻り、アーカイブ済みのフォルダもすべてアーカイブ解除され、アーカイブの操作は非表示になります。この設定は保管庫全体に、すべてのデバイスで適用されます。",
@@ -2963,7 +3128,7 @@
       "confirm": "確定",
       "delete": "削除",
       "deleteError": "そのテーマを削除できませんでした。もう一度お試しください。",
-      "empty": "カスタムテーマはまだありません。テーマファイルをインポートして始めてください。",
+      "empty": "テーマファイルをインポートするか、ギャラリーから探してください。",
       "error": {
         "aColorFallback": "色",
         "invalidFile": "無効なテーマファイルです。",
@@ -2983,10 +3148,9 @@
       "importButton": "テーマをインポート…",
       "importError": "そのファイルは有効なテーマではありません。リファレンスを開いて形式を確認してください。",
       "label": "カスタムテーマ",
-      "openFolderButton": "テーマフォルダを開く",
-      "openFolderError": "テーマフォルダを開けませんでした。",
       "readError": "カスタムテーマを読み取れませんでした。",
-      "readOnlyHelper": "カスタムテーマはお使いのコンピューターにインストールされます。あなたのテーマは、同期後にここへ自動的に表示されます。"
+      "readOnlyHelper": "カスタムテーマはお使いのコンピューターにインストールされます。あなたのテーマは、同期後にここへ自動的に表示されます。",
+      "emptyTitle": "カスタムテーマはまだありません"
     },
     "dailyNotes": {
       "blankTemplate": "空白（テンプレートなし）",
@@ -3017,15 +3181,8 @@
       "periodFolderAriaLabel": "{{period}}ノートのフォルダー",
       "periodFormatAriaLabel": "{{period}}ノートのタイトル書式",
       "periodTemplateAriaLabel": "{{period}}ノートのテンプレート",
-      "dateFormatHelper": "各デイリーノートのタイトル。YYYY、MM、DDに対応します。デフォルトは{{default}}です。",
-      "dateFormatLabel": "デイリーノートの日付形式",
-      "dateFormatSaveError": "日付形式を保存できませんでした。もう一度お試しください。",
-      "folderHelper": "新しいデイリーノートが保存される場所。デフォルトは{{default}}です。フォルダは空でも保持されます。",
-      "folderLabel": "デイリーノートのフォルダ",
-      "folderSaveError": "デイリーノートのフォルダを保存できませんでした。もう一度お試しください。",
-      "templateHelper": "各デイリーノートの起点にするテンプレートを選ぶか、空白のままにして日付をタイトルにした空のノートを作成します。",
-      "templateLabel": "デイリーノートのテンプレート",
-      "templateSaveError": "デイリーノートのテンプレートを保存できませんでした。もう一度お試しください。"
+      "sectionPeriodic": "定期ノート",
+      "periodSwitcherAriaLabel": "定期ノートの種類"
     },
     "deleteVault": {
       "cancel": "キャンセル",
@@ -3176,7 +3333,7 @@
     "ai": {
       "autoTagHelper": "入力の手が止まると、このデバイス上の小さなモデルがノートを読み、その先頭にタグを提案します。提案を受け入れるまで、何も追加されません。",
       "autoTagLabel": "タグを自動で提案",
-      "autoTagUnavailable": "このビルドにはタグ用のモデルが同梱されていないため、タグを提案できません。Myneがモデルをダウンロードすることはありません。同梱されたビルドでは、このスイッチが自動的にオンになります。",
+      "autoTagUnavailable": "タグ用のモデルがまだインストールされていません。設定 → AI で一度ダウンロードすると、インストール後にこのスイッチは自動でオンになります。",
       "consent": {
         "accept": "ノートを{{provider}}に送信する",
         "cancel": "キャンセル",
@@ -3193,7 +3350,7 @@
       "disclosureToggle": "これはどのように機能しますか？",
       "enableHelper": "あなたが用意したモデルを実行します。どこで実行されるか、そしてノートがこのデバイスの外に出るかどうかは、下で指定するプロバイダーによって決まります。実験的機能で、デフォルトはオフです。",
       "enableLabel": "ローカルAIを有効化",
-      "excludedHelper": "これらのフォルダ内のノートは、AIによって読み取られたりインデックス化されたりすることはありません。1行につき1つのフォルダパス。",
+      "excludedHelper": "これらのフォルダ内のノートは、AIが読み取ることもインデックス化することもありません。空の場合はAIがすべてを見られることを意味します。これはコマンドラインクライアントが適用するのと同じリストです。1行につき1つのフォルダパス。",
       "excludedLabel": "除外するフォルダ",
       "excludedPlaceholder": "Private/\nJournal/",
       "endpointHelper": "このコンピュータですでにモデルランタイムを動かしている場合は、モデルファイルを選ぶ代わりに、Myneをそこへ向けられます。空のままにすると、上のファイルが使われます。",
@@ -3235,7 +3392,7 @@
       "modelNone": "ファイルが選択されていません",
       "modelSaveFailed": "モデルのパスを保存できませんでした（ボールトの外にある必要があります）。",
       "modelTranscriptionLabel": "音声認識モデル（文字起こし）",
-      "modelsHelper": "Myneはモデルをダウンロードしません。それはネットワーク経由でデータを送信することを意味するからです。ブラウザでリンクを開いて入手し、ダウンロードしたファイルをここで選択してください。ここで選択したモデルはこのデバイス上で実行されます。代わりにプロバイダーを指定している場合は、そのプロバイダーが回答します。",
+      "modelsHelper": "ここでモデルをダウンロードするか、リンクを開いてブラウザで入手し、ダウンロードしたファイルを選択してください。モデルはこのデバイス上で動作します。代わりにプロバイダーを指定している場合は、そのプロバイダーが応答します。",
       "providerHelper": "ここでモデルを実行する代わりに、Myneは指定したサービスにリクエストを送信できます。その際、ノートはこのデバイスの外に出ます。デフォルトは「なし」で、どのサービスにも一切接続しないことを意味します。",
       "providerKeyAdd": "APIキーを貼り付け",
       "providerKeyLabel": "APIキー",
@@ -3273,7 +3430,35 @@
       "mobileApproveLabel": "この端末からの送信を許可",
       "mobileApproveHelper": "提供者とそのキーは別の端末から届いたものです。何が送られるかをお読みになり、ここで許可されるまで、この端末からは何も送信されません。",
       "historyBudgetHelper": "各リクエストが直近の会話をどれだけ含めるか、文字数で指定します。空欄で既定値になります。大きい値ほど AI は長い会話を追えますが、その分多くを送信します。この端末にないプロバイダーでは、実行の各ステップでより多くのテキストが端末の外に出ることになります。",
-      "historyBudgetLabel": "リクエストごとに送る会話"
+      "historyBudgetLabel": "リクエストごとに送る会話",
+      "meetingPromptHelper": "会議AIの処理が文字起こしをセクションに変換するときに使う指示です。組み込みの既定値を使う場合は空のままにします。既定の出力形式を置き換えるため、設定する場合は希望するセクションを自分で指定してください。",
+      "meetingPromptLabel": "会議要約のプロンプト",
+      "meetingPromptReset": "既定に戻す",
+      "groupAutoTag": "自動タグ",
+      "groupVoice": "音声と会議",
+      "groupWriting": "執筆とチャット",
+      "groupPrivacy": "プライバシーと制限",
+      "groupAdvanced": "詳細設定",
+      "excludedPickLabel": "除外するフォルダを追加",
+      "excludedPickPlaceholder": "フォルダを選択…",
+      "modelShowInFolder": "フォルダ内に表示",
+      "modelShowLocation": "{{name}} の場所を表示",
+      "downloadsLabel": "モデルをダウンロード",
+      "downloadsHelper": "Myne自身の配信元からモデルを取得します。使用前にアプリに組み込まれたフィンガープリントと照合されるため、改ざんされたダウンロードは拒否されます。クリックしない限り何も取得されません。",
+      "downloadEmbeddingSize": "多言語モデル、約449MB。",
+      "downloadTagLabel": "タグモデル: タグの自動提案",
+      "downloadTagSize": "小さなローカルモデル、約337MB。",
+      "downloadInstalled": "インストール済み",
+      "downloadNotInstalled": "未インストール",
+      "downloadReinstall": "ダウンロード",
+      "downloadInstall": "ダウンロード",
+      "modelRemove": "削除",
+      "downloading": "ダウンロード中…",
+      "downloadingPercent": "ダウンロード中… {{percent}}%",
+      "downloadCancel": "キャンセル",
+      "downloadFailed": "ダウンロードが完了しませんでした。",
+      "downloadFailedChecksum": "ダウンロードがフィンガープリントと一致しなかったため、拒否されました。もう一度お試しください。",
+      "sideloadDisclosure": "開発者モードでは、自分で入手したモデルファイルをMyneに指定することもできます。ほかからダウンロードしたファイルはMyneによる確認を受けないため、信頼できるものだけを使用してください。"
     },
     "network": {
       "disabledCue": "同期はTor経由ではなくなりました。新しい接続は同期サーバーに直接つながります。",
@@ -3289,13 +3474,13 @@
       "postureInactive": "同期は同期サーバーに直接つながります",
       "postureUnavailable": "Torを利用できません：同期は一時停止しています",
       "postureUnavailableDetail": "直接送信されているものはありません。この設定をオフにしてからもう一度オンにすると、Torクライアントの起動を試みます。Torなしで同期する場合はオフのままにしてください。",
-      "residualExit": "Tor回線の最後のリレー（出口ノード）には、あなたがどの同期サーバーに接続しているかが見えます。同期している内容を読むことはできません。内容はエンドツーエンドで暗号化されたままです。",
+      "residualExit": "Tor回路の最後のリレーである出口ノードには、あなたがどの同期サーバーに接続しているかが見えます。デスクトップでこれがオンの場合は、どのAIプロバイダーに到達するかも見えます。同期する内容を読むことはできません。内容はエンドツーエンドで暗号化されたままです。",
       "residualMetadata": "同期サーバーには、いつ同期したか、いくつのブロブをどれだけの大きさで送信したか、デバイスが何台あるかが引き続き見えます。Torはそれを変えません。",
       "residualPayment": "ホスト型の同期に料金を支払っている場合、その支払いとアカウントは引き続きあなたに結び付けられます。Torが変えるのは接続元であって、請求の記録ではありません。",
-      "residualScope": "Torを通るのは、Myne自身の同期通信だけです。このデバイス上の他の通信は通りません。",
+      "residualScope": "デスクトップでは、同期通信とリモートAIプロバイダーへのリクエストが対象になります。モバイルにはまだTor経由のルーティングがないため、そのプロバイダーへのリクエストは直接送信されます。このデバイス上のほかの通信はTorを通りません。",
       "residualsToggle": "これで隠せないもの",
-      "torHelper": "同期サーバーからあなたのIPアドレスと所在地を隠し、どのサーバーと同期しているかをあなたのネットワークとインターネット接続事業者から隠します。このデバイスがTorに接続していること自体は見えます。Myneに対して匿名になるわけではなく、何をいつ同期したかをサーバーから隠すものでもありません。",
-      "torLabel": "同期をTor経由にする"
+      "torHelper": "同期サーバーからあなたのIPアドレスと所在地を隠し、どのサーバーと同期しているか（デスクトップではどのAIプロバイダーに到達するかも）をあなたのネットワークとインターネット接続事業者から隠します。このデバイスがTorに接続していること自体は見えます。Myneに対して匿名になるわけではなく、何をいつ同期したかをサーバーから隠すものでもありません。",
+      "torLabel": "同期とデスクトップのAIをTor経由にする"
     },
     "prefs": {
       "saveError": "設定を保存できませんでした。もう一度お試しください。",
@@ -3328,8 +3513,6 @@
       "hideVaultNamesErrorRead": "現在の設定を読み取れませんでした。スイッチを切り替えて設定し直してください。",
       "hideVaultNamesErrorSave": "設定を保存できなかったため、変更されていません。オンにしようとしていた場合、保存されていた名前の一部はすでに破棄されている可能性があります。完了するにはもう一度オンにしてください。",
       "hideVaultNamesErrorErase": "保存された名前の1つを破棄できなかったため、実際には行われていない消去を行ったと表示しないよう、設定はオフのままにしました。もう一度お試しください。",
-      "realtimeSyncHelper": "他のデバイスからの変更は、内容を含まないシグナルによって数秒以内に届きます — サーバーが中継するのは「何かが変更された」ということだけで、その内容は決して中継しません。ボールトのロックが解除されている間、アプリはいずれにせよ定期的にサーバーを確認するため、これによって意味のある可視性が加わることはありません。設定する項目はありません。",
-      "realtimeSyncLabel": "リアルタイム同期",
       "screenCaptureHelperOff": "保護はロック解除前には常に適用されます。ロック解除後はこの設定に従います。",
       "screenCaptureHelperOn": "Windows 10（2020年5月更新）以降で有効です。macOSとLinuxにはこのためのシステムAPIがないため、そこではキャプチャを防げません。",
       "screenCaptureLabel": "画面キャプチャ保護",
@@ -3347,7 +3530,14 @@
       "screenCaptureOverrideLabel": "このデバイスで画面キャプチャを許可",
       "screenCaptureOverrideUnknown": "このデバイスの画面キャプチャ設定を読み取れなかったため、この設定は適用されていません。設定を開き直してもう一度お試しください。",
       "screenCaptureSuperseded": "このデバイスではオフです。下の「このデバイスで画面キャプチャを許可」を確認してください。この設定は保持されており、そちらをオフにすると再び適用されます。",
-      "screenCaptureSupersededByFlag": "Myneが --disable-screen-capture-protection を付けて起動されたため、このセッションではオフです。この設定は保持されており、次にそれを付けずにMyneを開いたときに再び適用されます。"
+      "screenCaptureSupersededByFlag": "Myneが --disable-screen-capture-protection を付けて起動されたため、このセッションではオフです。この設定は保持されており、次にそれを付けずにMyneを開いたときに再び適用されます。",
+      "recoveryDrillCheck": "フレーズを確認",
+      "recoveryDrillChecking": "確認中…",
+      "recoveryDrillError": "今は確認を実行できませんでした。何も変更されていません。しばらくしてからもう一度お試しください。",
+      "recoveryDrillHelper": "書き留めた24語を入力してください。Myneはそれらが今もこの保管庫を開けるかを確認し、それ以外のことは伝えません。入力した語がここに表示されることはありません。",
+      "recoveryDrillLabel": "復元フレーズを確認",
+      "recoveryDrillPassed": "これらの語でこの保管庫を開けます。見つけた場所にそのまま保管してください。",
+      "recoveryDrillPlaceholder": "24語を順番に、スペースで区切って入力"
     },
     "quickUnlock": {
       "errorBusy": "別の保管庫の操作が進行中です。しばらくしてからもう一度お試しください。",
@@ -3390,7 +3580,9 @@
       "pinPlaceholder6": "6桁以上",
       "confirmPin": "PINを確認",
       "reenterPin": "PINを再入力",
-      "setupButton": "クイックロック解除を設定"
+      "setupButton": "クイックロック解除を設定",
+      "errorBiometricAuthFailed": "Touch IDを設定できませんでした。システム設定で指紋が登録されていることを確認するか、代わりにPINを使用してください。",
+      "biometricAuthFailed": "{{method}} を設定できませんでした。デバイスの設定で有効になっていることを確認するか、代わりにPINを使用してください。"
     },
     "shell": {
       "closeLabel": "設定を閉じる",
@@ -3410,7 +3602,9 @@
         "network": "ネットワーク",
         "privacy": "プライバシー",
         "storage": "ストレージ",
-        "sync": "同期"
+        "sync": "同期",
+        "cli": "CLI",
+        "vault": "保管庫"
       },
       "passwordUpdatedToast": "パスワードを更新しました",
       "title": "設定"
@@ -3539,10 +3733,6 @@
       "ariaLabel": "設定を検索",
       "empty": "「{{query}}」に一致する設定はありません。",
       "resultsLabel": "検索結果",
-      "extra": {
-        "lastActiveNoteTitle": "続きから再開",
-        "lastActiveNoteDesc": "開いていたノートを同期して、別のデバイスで続きから作業できるようにします。"
-      },
       "keywords": {
         "aiAutoTag": "自動タグ タグ 提案 ラベル ai auto tag tags suggest suggestions labels",
         "aiEndpoint": "エンドポイント アドレス ローカル ランタイム モデル サーバー ポート ループバック ollama endpoint address local runtime model server port loopback",
@@ -3575,7 +3765,6 @@
         "import": "インポート 取り込み 移行 ノート obsidian notion evernote enex html csv import migrate migration bring",
         "language": "言語 表示言語 ロケール 翻訳 インターフェース language locale interface translation ui",
         "legal": "法的情報 プライバシーポリシー 利用規約 インプレッサム GDPR 個人情報保護 捜査機関 通報 データ保護 legal privacy policy terms impressum gdpr dsgvo law enforcement abuse report data protection",
-        "lastActiveNote": "続きから 最後のノート 再開 同期 開く continue where you left off last note resume sync open",
         "license": "ライセンス オープンソース 法務 agpl license open source legal",
         "lineNumbers": "行番号 番号 余白 エディタ 表示 line numbers gutter editor display",
         "vimMode": "vim ノーマル 挿入 ビジュアル 置換 モーダル編集 キーボード modal editing normal insert visual keyboard",
@@ -3584,7 +3773,6 @@
         "torRouting": "tor ルーティング onion プロキシ ネットワーク ipアドレス 所在地 隠す 同期 匿名性 routing proxy network ip address location hide sync anonymity",
         "quickUnlock": "クイックロック解除 ロック解除 pin 生体認証 指紋 顔認証 touch id quick unlock biometric face",
         "reminders": "リマインダー 通知 お知らせ アラート タスク 期限 事前にスケジュール 登録 日数 何日前 reminders notify notification alert task due remind horizon registration ahead days",
-        "realtimeSync": "リアルタイム同期 同期 リアルタイム 接続 ライブ real time sync live connection presence polling",
         "screenCapture": "画面キャプチャ スクリーンショット 画面録画 保護 ブロック プライバシー screen capture protection screenshot recording block",
         "showEditTimes": "編集時刻 タイムスタンプ 更新日時 日付 表示 show edit times timestamps modified dates notes",
         "spell": "スペルチェック つづり 辞書 自動修正 spell check spelling dictionary autocorrect",
@@ -3616,8 +3804,18 @@
         "aiMemory": "メモリ 覚えている事実 アシスタント 学ぶ 個性 音声設定",
         "ribbon": "左リボン レール ピン留め ピン コマンド コマンド 並べ替え ピン解除 ツールバー ショートカット",
         "folderNotes": "フォルダ ノート インデックス folder_index ランディングページ ダブルクリック フォルダリンク プロジェクト オフ 無効",
-        "syncMembers": "メンバー、共有、招待、チーム、コラボレーション、ボールト"
-      }
+        "syncMembers": "メンバー、共有、招待、チーム、コラボレーション、ボールト",
+        "accountName": "アカウント名 アカウント 名前 グループ グループ化 名前変更 ラベル デバイス ローカル account name group grouping rename label device local",
+        "accountVaults": "アカウント 保管庫 グループ化 所属 一覧 account vaults grouped belong group list",
+        "aiMeetingPrompt": "会議 要約 プロンプト 指示 カスタム 文字起こし アクションアイテム 決定事項 meeting summary prompt instruction custom transcript action items decisions",
+        "update": "更新 アップグレード 更新確認 新しいバージョン リリース ダウンロード update upgrade check release download",
+        "plainFile": "プレーンファイル エディタ markdown ローカル ディスク 保管庫の外 平文 その場で開く plain file editor local disk plaintext open in place",
+        "memberPassword": "共有保管庫 パスワード メンバー ロック解除 参加 フレーズ shared vault password member unlock join phrase",
+        "recoveryDrill": "復元フレーズ 確認 検証 テスト 24語 シード バックアップ パスワードを忘れた recovery phrase check verify drill seed backup",
+        "bar": "下部バー ステータスバー インジケーター カスタマイズ 並べ替え 非表示 表示 ツールバー bottom bar status bar indicators customize reorder hide show",
+        "syncDeviceBindings": "デバイス クレーム メンバー 署名 帰属 所有者 devices claimed by members attribution signed belongs"
+      },
+      "emptyBody": "短い単語か、パネル名を試してください。"
     },
     "dateTime": {
       "dateLabel": "日付形式",
@@ -3641,7 +3839,7 @@
     },
     "ribbonCustomize": {
       "add": "追加",
-      "empty": "リボンにはまだコマンドがありません。追加でピン留めしてください。",
+      "empty": "「追加」でコマンドをリボンにピン留めできます。",
       "errorSave": "リボン設定を保存できませんでした。",
       "helper": "左リボンのコマンドを順に表示。ドラッグで並べ替え、コマンド一覧から追加、×で削除。レールは現在の状態で利用できないコマンドを隠します。",
       "label": "左リボン",
@@ -3651,12 +3849,13 @@
       "searchPlaceholder": "コマンドを検索…",
       "searchResultsLabel": "一致するコマンド",
       "showHelper": "このデバイスで左リボンを表示。",
-      "showLabel": "左リボンを表示"
+      "showLabel": "左リボンを表示",
+      "emptyTitle": "まだ何もピン留めされていません"
     },
     "memory": {
       "heading": "アシスタントが覚えていること",
       "helper": "AIがあなたと作業して学んだ事実です。AI自身が書き込みます（実行ごとに最大1件）。すべて表示でき、修正できます。エントリは他のデバイスに同期され、暗号化されたままです。",
-      "empty": "まだ何も覚えていません。実行中にアシスタントが学ぶとエントリがここに表示されます。",
+      "empty": "実行中にアシスタントが何かを学ぶと、エントリがここに表示されます。",
       "editLabel": "編集",
       "deleteLabel": "削除",
       "save": "保存",
@@ -3679,7 +3878,54 @@
       "personalitySavedToast": "音声設定を更新しました。",
       "personalitySaveFailed": "音声設定を保存できませんでした。",
       "loadFailed": "メモリまたは音声設定を読み込めませんでした。変更はありません。",
-      "retryLabel": "再試行"
+      "retryLabel": "再試行",
+      "emptyTitle": "まだ何も覚えていません"
+    },
+    "account": {
+      "nameLabel": "アカウント名",
+      "nameHelper": "このデバイス上でこの保管庫のグループに付ける名前です。保管庫の選択画面でグループの見出しとして使われます。このデバイスにとどまり、保管庫の中に保存されることはないため同期されず、別のデバイスでは同じ保管庫を別の名前でグルーピングすることがあります。",
+      "namePlaceholder": "名前を追加…",
+      "nameSave": "保存",
+      "nameSaving": "保存中…",
+      "vaultsLabel": "このアカウントの保管庫",
+      "vaultsHelper": "上の名前でこのデバイスがグループ化している保管庫です。グループ化はデバイスごとの整理上の選択であり、どの保管庫の内容にも属さず、保管庫とともに移動することもありません。",
+      "vaultsCount": "{{count}} 個の保管庫",
+      "currentVault": "この保管庫",
+      "unknownVault": "このデバイス上の別の保管庫",
+      "standaloneHelper": "この保管庫はこのデバイス上でアカウントにグループ化されていないため、独立しています。グループ化はデバイスごとで、別のデバイスではいずれかに含まれて表示されることがあります。",
+      "unresolvedHelper": "開いている保管庫を特定しています…",
+      "devicesNote": "デバイス、共有保管庫のメンバー、あなたのアイデンティティは同期で管理します。",
+      "groupingHidden": "保管庫名を非表示にしている間は、アカウント名を利用できません。このアカウントを管理するには、プライバシーでそのオプションをオフにしてください。",
+      "groupingUnreadable": "このデバイスのアカウントのグループ化を読み取れませんでした。何も変更されていません。",
+      "groupingError": "このデバイスのアカウントのグループ化を読み取れませんでした。何も変更されていません。"
+    },
+    "plainFile": {
+      "errorSaveSetting": "プレーンファイルの設定を保存できませんでした。",
+      "helper": "ディスク上にすでにある .md ファイルを、保管庫に追加せずにその場で開いて編集します。これらのファイルは平文です: Myneは暗号化せず、変更は同期もバックアップもされません。既定ではオンです。ここでオフにできます。",
+      "label": "プレーンファイルエディタ",
+      "openFilesRemain": "未保存の変更があるファイルがまだ開いています。それらを解決してから、もう一度これをオフにしてください。"
+    },
+    "memberPassword": {
+      "reminder": "このデバイスにはまだ高速ロック解除がないため、この保管庫は毎回復元フレーズを求めます。",
+      "reminderDismiss": "今はしない",
+      "title": "共有保管庫のロック解除",
+      "helperConfigured": "この共有保管庫は、このデバイスに保存された {{method}} で開きます。",
+      "helperNotConfigured": "毎回復元フレーズを入力し直さなくて済むよう、パスワードまたはPINを設定してください。",
+      "set": "設定",
+      "change": "変更",
+      "remove": "削除",
+      "label": "保管庫のパスワード",
+      "methodPassword": "パスワード",
+      "methodPin": "PIN",
+      "methodBiometric": "デバイスの生体認証",
+      "usePin": "PINを使用",
+      "useBiometric": "Touch IDを使用",
+      "pinLabel": "保管庫のPIN",
+      "pinPlaceholder": "PIN、{{count}}桁以上",
+      "setupHelper": "{{count}}文字以上。このデバイスにのみ保存されます。復元フレーズはどのデバイスでも引き続きこの保管庫を開けます。",
+      "pinSetupHelper": "{{count}}桁以上。このデバイスにのみ保存されます。復元フレーズはどのデバイスでも引き続きこの保管庫を開けます。",
+      "errorTooShort": "{{count}}文字／桁以上にしてください。",
+      "errorGeneric": "認証情報を設定できませんでした。もう一度お試しください。"
     }
   },
   "storageLost": {
@@ -3745,14 +3991,15 @@
       "compareTheirs": "競合するコピー",
       "compareTitle": "「{{title}}」を比較",
       "discard": "破棄",
-      "empty": "競合はありません。デバイス間で同期がとれています。",
+      "empty": "デバイスは同期されています。",
       "groupTitle_one": "{{original}}の競合するコピー{{count}}件",
       "groupTitle_other": "「{{original}}」の競合するコピー{{count}}件",
       "keepAsSeparate": "別々に保持",
       "tookTheirsToast": "ローカルバージョンをゴミ箱に移動しました。",
       "tookTheirsUndo": "元に戻す",
       "untitled": "無題（{{hex}}）",
-      "useThisVersion": "このバージョンを使用"
+      "useThisVersion": "このバージョンを使用",
+      "emptyTitle": "競合はありません"
     },
     "deviceJoinQr": {
       "accountLabel": "アカウント番号",
@@ -3770,7 +4017,7 @@
       "awaitingApproval_one": "承認待ちのデバイス{{count}}台",
       "awaitingApproval_other": "承認待ちのデバイス{{count}}件",
       "loading": "読み込み中…",
-      "noDevices": "同期されているデバイスはまだありません。",
+      "noDevices": "ほかのデバイスはまだありません。",
       "notEnrolled": "このデバイスはまだ接続されていません。追加したばかりの場合は、別のデバイスからの承認をお待ちください。そうでない場合は、上の「デバイスを追加」フォームから追加してください。",
       "platform": {
         "android": "Androidスマートフォン",
@@ -3800,7 +4047,7 @@
       "reasonDeviceLimit": "アカウントがデバイス数の上限に達しています",
       "reasonAwaitingApproval": "このデバイスはまだ承認待ちです",
       "reasonNotConfigured": "同期サーバーが設定されていません",
-      "transportHint": "サーバーが移転したか証明書が変更された場合は、上の「同期サーバー」でサーバーURLを再入力して、改めて信頼してください。",
+      "transportHint": "サーバーが移転した場合は、上の「同期サーバー」で新しいアドレスを入力してください。そのHTTPS証明書が有効であることを確認してください。",
       "unreachable": "同期に接続できませんでした（{{error}}）。",
       "verifyBody": "今承認したデバイスに同じコードが表示されていることを確認してください。一致していれば、そのデバイスはあなたのアカウントにあります。一致しない場合は、そのデバイスを削除してください。",
       "verifyMatch": "一致します",
@@ -3810,19 +4057,28 @@
       "verifySyncing": "同期中…",
       "verifyTitle": "新しいデバイスを確認",
       "verifyAction": "コードを照合",
-      "yourDevices": "お使いのデバイス"
+      "yourDevices": "お使いのデバイス",
+      "noDevicesBody": "このアカウントに追加したデバイスが、最後に同期した日付とともにここに表示されます。",
+      "reasonTls": "サーバーのHTTPS証明書を検証できませんでした",
+      "tlsFailure": "同期サーバーのHTTPS証明書を検証できませんでした。",
+      "tlsFailureHint": "サーバーアドレス、証明書の有効性、CAの信頼を確認してください。サーバーが有効な証明書を提示すれば、Myneは再接続します。"
     },
     "endpoint": {
       "connect": "接続",
       "connected": "接続済み",
       "connectedLocal": "接続済み（ローカル、TLSなし）。",
-      "connectedPlatformTrust": "TLS経由で接続しました。このサーバーの証明書はお使いのブラウザが検証しました。",
+      "connectedPlatformTrust": "TLS経由で接続しました。証明書とサーバー名が検証されました。",
       "connecting": "接続中…",
       "fixedOrigin": "このクライアントは、デプロイ時に設定された1つのサーバーと同期します。ここから変更することはできません。このページはこの1つのアドレスとしか通信できません。",
       "fixedOriginNone": "このデプロイには同期サーバーが設定されていません。",
-      "pinPlatformTrust": "お使いのブラウザの証明書ストアによって検証されました。このクライアント自身で証明書をピン留めすることはできません。",
+      "pinPlatformTrust": "サーバー証明書は、このクライアントのトラストストアによって検証されました。",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "そのサーバーに接続できませんでした。URLと、サーバーが稼働しているかを確認してください。"
+      "unreachable": "そのサーバーに接続できませんでした。URLと、サーバーが稼働しているかを確認してください。",
+      "tlsHelp": "すべてのデバイスで同じサーバーURLを入力してください。セルフホストのサーバーには信頼されたHTTPS証明書が必要です。",
+      "tlsFailure": "サーバーのHTTPS証明書を検証できませんでした。サーバーアドレス、証明書、その有効性を確認してください。",
+      "inviteLabel": "招待コード（このサーバーが求める場合のみ）",
+      "invitePlaceholder": "サーバーの運用者から渡されたコード",
+      "changeInviteCode": "招待コードを変更"
     },
     "enroll": {
       "accountNumberLabel": "アカウント番号",
@@ -3838,7 +4094,9 @@
         "notConfigured": "このデバイスを追加する前に、設定で同期サーバーを指定してください。",
         "serverMismatch": "同期サーバーの身元が、このデバイスの想定と一致しませんでした。理由がわかるまで、認証情報を再入力しないでください。",
         "kdfTooLarge": "このデバイスには、その保管庫を開くのに十分なメモリがありません。保管庫の暗号化設定は、ここでこのアプリが使用できる量を超えるメモリを必要とします。代わりにデスクトップコンピュータで開いてください。",
-        "transport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
+        "transport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+        "inviteCodeInvalid": "その招待コードは受け付けられませんでした。確認してもう一度お試しください。",
+        "inviteCodeRequired": "このサーバーは招待コードがないと新しいアカウントを受け付けません。運用者から渡されたコードを入力してください。"
       },
       "mode": {
         "password": "パスワード",
@@ -3869,7 +4127,17 @@
       "verifyTitle": "このデバイスを確認",
       "waitingHint": "このウィンドウを開いたままにしてください。承認されると、他のデバイスと比較するための確認コードがここに表示されます。",
       "waitingTitle": "承認待ち",
-      "sasAbortFailed": "このデバイスの接続を解除できませんでした。まだそのサーバーに登録されているため、信頼できないものとして扱ってください。設定 → 同期 を開いてそこから削除してください。ノートは削除されていません。"
+      "sasAbortFailed": "このデバイスの接続を解除できませんでした。まだそのサーバーに登録されているため、信頼できないものとして扱ってください。設定 → 同期 を開いてそこから削除してください。ノートは削除されていません。",
+      "backToWaiting": "承認待ちに戻る",
+      "errorPhrase": "このデバイスを追加できませんでした。サーバーURL、アカウント番号、復元フレーズ、そしてサーバーに接続できるかを確認してください。",
+      "modePassword": "パスワード",
+      "modePhrase": "復元フレーズ",
+      "noDeviceBody": "このデバイスを承認できる別のデバイスがありませんか？代わりに復元フレーズで確認できます。",
+      "phraseEscapeBody": "復元フレーズはこのアカウントの完全な鍵であるため、別のデバイスからの承認なしでこのデバイスを確認できます。先ほど使用したパスワードはそのまま使えます。",
+      "phraseTitle": "復元フレーズで確認",
+      "phraseWarning": "復元フレーズはこのアカウントの完全な鍵であるため、別のデバイスからの承認なしでこのデバイスが追加されます。承認できる別のデバイスがない場合にのみ使用してください。次に新しいパスワードを設定します。",
+      "usePhrase": "復元フレーズを使用",
+      "back": "戻る"
     },
     "panel": {
       "addDevice": {
@@ -3910,6 +4178,14 @@
       "usage": {
         "helper": "このアカウントがサーバーに保存している暗号化データの量と、サインインしているデバイスの数です。",
         "label": "ストレージとデバイス"
+      },
+      "identity": {
+        "label": "アイデンティティ",
+        "helper": "アイデンティティがあると、他の人があなたを保管庫に招待でき、1つのアイデンティティで複数の保管庫を所有できます。",
+        "cta": "アイデンティティを追加",
+        "codeLabel": "あなたのアイデンティティコード",
+        "lockedHelper": "このデバイスはアイデンティティを保持しています。このセッションではロックされています。同期と招待に署名するには、復元フレーズでロックを解除してください。",
+        "unlockedHelper": "このデバイスはアイデンティティを保持しており、このセッションではロックが解除されています。"
       }
     },
     "reconcile": {
@@ -3939,7 +4215,10 @@
       "off": "同期オフ",
       "synced": "同期済み",
       "syncing": "同期中…",
-      "syncNow": "今すぐ同期"
+      "syncNow": "今すぐ同期",
+      "errorIdentityLocked": "同期するにはアイデンティティのロックを解除してください",
+      "errorTls": "同期サーバーのHTTPS接続を検証できませんでした",
+      "unlockIdentityCta": "アイデンティティのロックを解除"
     },
     "usage": {
       "devices": "デバイス",
@@ -3968,7 +4247,7 @@
       "keepDevice": "保持する",
       "notEnrolledHelp": "このデバイスはまだ同期していません。前の画面から追加すると、デバイスが表示されます。",
       "unauthenticated": "このデバイスのアクセスは取り消されました。おそらく別のデバイスから削除されたためです。",
-      "transportError": "同期サーバーに接続できませんでした。サーバーが移動した、または証明書が変更された場合は、同期サーバー画面から再接続してください。",
+      "transportError": "同期サーバーに接続できませんでした。サーバーアドレスとそのHTTPS証明書を確認してください。",
       "retiredSelf": "このデバイスは別のデバイスから削除されました。",
       "resetAndAddAgain": "リセットして再追加",
       "noDevices": "デバイスはまだありません。",
@@ -3996,11 +4275,10 @@
       "loading": "メンバーを読み込み中…",
       "error": "ボールトの名簿を読み取れませんでした。",
       "hint": "このボールトのメンバー。各自が自分のアイデンティティと資格情報で参加します。",
-      "empty": "まだメンバーがいません。誰かを招待するのが次のステップです。",
+      "empty": "誰かを招待してこの保管庫を共有しましょう。相手は自分のアイデンティティで参加します。",
       "rotated": "鍵をローテーションしました",
       "keyChanged": "鍵が変わりました。所有者と確認してください。",
       "relinkConfirmed": "所有者が再リンクを確認しました",
-      "epoch": "グループ鍵エポック {{epoch}}",
       "ownerBadge": "所有者",
       "memberBadge": "メンバー",
       "invite": "メンバーを招待",
@@ -4024,12 +4302,69 @@
       "sasHint": "このフィンガープリントを招待する相手に読み上げるか、相手に読み上げてもらいます。続行前に双方で一致している必要があります。",
       "sasConfirm": "チャネル外でこのフィンガープリントを相手と確認しました",
       "inviteCodeInvalid": "有効なメンバーアイデンティティコードではありません。",
-      "kemLabel": "ML-KEM公開鍵",
-      "edLabel": "Ed25519公開鍵",
-      "mldsaLabel": "ML-DSA公開鍵",
       "untitledVault": "無題のボールト",
       "inviteFailed": "招待を作成できませんでした。",
-      "removeFailed": "メンバーを削除できませんでした。"
+      "removeFailed": "メンバーを削除できませんでした。",
+      "youBadge": "あなた",
+      "nameUnverified": "名前は未検証",
+      "nameLabel": "表示名",
+      "nameEdit": "名前を変更",
+      "nameSave": "保存",
+      "nameClear": "クリア",
+      "nameCancel": "キャンセル",
+      "nameErrorEmpty": "名前を入力するか、クリアで自分の名前を削除してください。",
+      "nameErrorTooLong": "その名前は長すぎます。",
+      "nameErrorUnreadable": "このデバイスで名前の保存領域を読み取れませんでした。何も保存されていません。",
+      "nameErrorUnshared": "名前はこの保管庫が共有されてから設定できます。",
+      "nameErrorLocked": "名前を変更するには保管庫のロックを解除してください。",
+      "nameErrorGeneric": "名前を保存できませんでした。もう一度お試しください。",
+      "nameInvite": "まだ表示名がありません。他のメンバーにはあなたのフィンガープリントが表示されます。",
+      "nameInviteCta": "名前を設定",
+      "nameInviteDismiss": "今はしない",
+      "noInvitations": "まだ招待は送信されていません。",
+      "identityHeading": "あなたのアイデンティティ",
+      "membersHeading": "メンバー",
+      "emptyTitle": "メンバーはまだいません",
+      "personUnlockOpen": "ロック解除",
+      "unsharedNotice": "この保管庫はまだ共有されていません。共有は元に戻せず、誰かを初めて招待したときに行われます。",
+      "shareConfirmTitle": "この保管庫を共有しますか？",
+      "shareConfirmBody": "誰かを招待すると、この保管庫は共有保管庫になります。グループ鍵を持ち、招待した人はそれで内容を開きます。この変更は元に戻せず、単一ユーザーの保管庫に戻す方法はありません。続けると招待する相手を選べます。",
+      "shareConfirmCta": "共有して招待",
+      "shareFailed": "この保管庫の共有を開始できませんでした。",
+      "identityForgetCta": "このデバイスでこのアイデンティティを忘れる",
+      "identityForgetCheckbox": "このアイデンティティがこのデバイスから削除されることを理解しました。",
+      "identityForgetConfirm": "アイデンティティを忘れる",
+      "identityForgetCancel": "保持する",
+      "identityForgetWarning": "これはこのデバイスからのみアイデンティティを削除します。サーバー上のアカウント、およびそれが所有または参加している保管庫はそのまま残り、別のデバイスで24語のフレーズを使ってアイデンティティを復元できます。このデバイスでの招待と名簿の操作には、再びロック解除が必要になります。",
+      "identityForgetError": "アイデンティティを忘れられませんでした。もう一度お試しください。"
+    },
+    "deviceBindings": {
+      "title": "デバイスとメンバー",
+      "heading": "クレーム済みのデバイス",
+      "hint": "この保管庫で自分自身をクレームした各デバイスと、その主張に自らの署名を付けたメンバーです。クレームは所有の証明ではありません: どのメンバーがその表明に署名したかを示すだけで、そのデバイスがその人のものであることを示すものではありません。",
+      "loading": "デバイスを読み込んでいます…",
+      "emptyTitle": "まだクレームされたデバイスはありません",
+      "empty": "この共有保管庫で自分自身をクレームすると、デバイスがここに表示されます。",
+      "claimedBy": "{{name}} がクレーム",
+      "unverified": "未検証",
+      "unverifiedHint": "これらのデバイスIDは保管庫にありますが、それらに関する主張を裏付けるものがありません: 署名が検証できなかったか、メンバー一覧にない誰かを指しています。そばに示せるメンバーがいないため、IDとして表示されます。",
+      "claimHint": "このデバイスには、この保管庫における検証済みのクレームがありません。改めてクレームするとあなたのアイデンティティのもとで登録され、検証できなかったクレームの修復にもなります。",
+      "claim": "このデバイスをクレーム",
+      "claiming": "クレーム中…",
+      "unshared": "この保管庫はまだ共有されていないため、デバイスを帰属させるメンバーがいません。共有は元に戻せず、誰かを初めて招待したときに行われます。",
+      "errorLocked": "デバイスを読み取るには保管庫のロックを解除してください。",
+      "errorUnshared": "この保管庫は共有されていないため、デバイスの紐付けはありません。",
+      "errorNoDeviceId": "このデバイスはアカウントに追加されていないため、自分自身をクレームするためのデバイスIDがありません。",
+      "errorConflict": "同じバージョンの2つの異なるクレームを区別できなかったため、何も変更されていません。置き換えるには、このデバイスを改めてクレームしてください。",
+      "errorUnreadable": "このデバイスでデバイス一覧を読み取れませんでした。何も変更されていません。",
+      "errorGeneric": "この保管庫のデバイスを読み取れませんでした。もう一度お試しください。"
+    },
+    "nameGate": {
+      "title": "表示名を選択",
+      "body": "この保管庫の他のメンバーがメンバー一覧で見るあなたの表示です。フィンガープリントがその横に残り、名前は後から変更できます。",
+      "label": "表示名",
+      "checking": "名前を確認しています…",
+      "save": "続ける"
     }
   },
   "tasks": {
@@ -4057,7 +4392,6 @@
       "search": "「{{query}}」に一致するタスクはありません。"
     },
     "filter": {
-      "all": "すべて",
       "overdue": "期限切れ",
       "today": "今日",
       "upcoming": "今後"
@@ -4080,10 +4414,6 @@
       "notCompleted": "タスク、未完了",
       "tooLongToWrite": "このタスクの行は長すぎて、ここからは編集できません。ノートを開いて編集してください。",
       "untitled": "無題のタスク"
-    },
-    "scope": {
-      "allFolders": "すべてのフォルダ",
-      "label": "絞り込み"
     },
     "title": "タスク",
     "axis": {
@@ -4140,13 +4470,6 @@
       "allNotes": "すべてのノート",
       "anyPriority": "すべての優先度",
       "anyTag": "すべてのタグ",
-      "dueLabel": "期限日でフィルタ",
-      "folderLabel": "フォルダでフィルタ",
-      "noteLabel": "ノートでフィルタ",
-      "priorityLabel": "優先度でフィルタ",
-      "sortLabel": "セクション内の並べ替え",
-      "statusLabel": "完了状態でフィルタ",
-      "tagLabel": "タグでフィルタ",
       "untitled": "無題"
     },
     "search": {
@@ -4156,7 +4479,6 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "テンプレートを閉じる",
       "deleteRowLabel": "テンプレート{{name}}を削除（ゴミ箱に移動）",
       "editTemplateLabel": "テンプレート{{name}}を編集",
       "emptyBody": "テンプレートを作成すると、ノートのひな形を再利用できます：会議ノート、デイリーログ、読書ノートなど。新しいノートを作るときに選択できます。",
@@ -4167,7 +4489,10 @@
       "newTemplateName": "無題のテンプレート",
       "removeFromTemplates": "テンプレートから外す",
       "removeRowLabel": "{{name}}をテンプレートから外す（ノートは残ります）",
-      "title": "ノートテンプレート"
+      "title": "ノートテンプレート",
+      "nameLabel": "テンプレート名",
+      "create": "作成",
+      "createFailed": "テンプレートを作成できませんでした。もう一度お試しください。"
     },
     "emptyBefore": "テンプレートはまだありません。",
     "newAction": "新規",
@@ -4225,8 +4550,9 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "PINでロック解除",
       "unlockWithTouchId": "Touch IDでロック解除",
-      "usePasswordBelow": "または下記のパスワードを使用",
-      "wrongCredential": "正しくありません。残り{{remaining}}回試行できます。"
+      "wrongCredential": "正しくありません。残り{{remaining}}回試行できます。",
+      "showPin": "PINを表示",
+      "hidePin": "PINを非表示"
     },
     "recoveryInterruptedBanner": "復元フローが中断されました。先に新しいパスワードを設定してください。",
     "recoveryInterruptedBody": "先に新しいパスワードを設定してから、保管庫を再封印してください。",
@@ -4240,7 +4566,7 @@
       "lockedDuringChange": "パスワードの変更をキャンセルしました：保管庫がロックされました。",
       "metaChangedExternally": "保管庫が別のセッションで変更されました。もう一度ロックを解除してください。"
     },
-    "title": "保管庫のロックを解除します。",
+    "title": "保管庫のロックを解除",
     "vaultUnreadable": "ボールトファイルを読み取れません。バックアップから復元してください。",
     "unlockFailedGeneric": "ロック解除できませんでした。もう一度お試しください。",
     "biometricTooManyAttempts": "{{biometric}}の試行回数が多すぎます。パスワードを使用してください。",
@@ -4271,7 +4597,18 @@
     "memberHint": "このボールトはあなたと共有されています。自分のリカバリーフレーズで解除してください。",
     "memberPhraseLabel": "リカバリーフレーズ",
     "memberSubmit": "解除",
-    "memberError": "そのフレーズではこの共有ボールトを開けませんでした。"
+    "memberError": "そのフレーズではこの共有ボールトを開けませんでした。",
+    "memberPasswordHint": "この保管庫はあなたと共有されています。このデバイスで設定したパスワードでロックを解除してください。",
+    "memberPasswordLabel": "保管庫のパスワード",
+    "memberPasswordError": "そのパスワードではこの共有保管庫を開けませんでした。",
+    "memberUsePhrase": "代わりに復元フレーズを使用",
+    "memberUseFast": "代わりに高速ロック解除を使用",
+    "memberPinHint": "この保管庫はあなたと共有されています。このデバイスで設定したPINでロックを解除してください。",
+    "memberPinLabel": "保管庫のPIN",
+    "memberPinPlaceholder": "保管庫のPIN（{{count}}桁以上）",
+    "memberBiometricHint": "この保管庫はあなたと共有されています。デバイスの生体認証で確認してロックを解除してください。",
+    "memberBiometricSubmit": "生体認証でロック解除",
+    "titleNamed": "{{vault}} のロックを解除"
   },
   "vault": {
     "ioBanner": {
@@ -4281,28 +4618,10 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "ackLabel": "後で見つけられる場所にアカウント番号を保存しました。",
-      "back": "戻る",
-      "commit": "保管庫を作成",
-      "committing": "保存中…",
-      "copied": "コピーしました",
-      "copy": "コピー",
-      "copyFailed": "コピーできませんでした。代わりに「ファイルとして保存」をお使いください。",
-      "downloadStarted": "ブラウザのダウンロードに送りました。届いたか確認してください。ファイルの保存先を決めるのはブラウザで、Myneには届いたかどうかを知る手段がありません。",
-      "eyebrow": "ステップ4 / 4：アカウント番号",
-      "heading": "アカウント番号を保存してください。",
-      "intro": "これはあなたの所持人払いトークンです。現金のように扱ってください。",
-      "saveAsFile": "ファイルとして保存",
-      "saveFailed": "ファイルを保存できませんでした。代わりに番号をコピーするか、書き留めてください。",
-      "savedToFile": "保存しました。プレーンテキストのファイルなので、あなただけが読める場所に保管してください。",
-      "shownOnceBody": "今すぐ保存してください。Myneがこれを復元することはできません。後で同期の登録をするときに必要です。",
-      "shownOnceEmphasis": "これは一度だけ表示されます。"
-    },
     "briefing": {
       "back": "戻る",
       "continue": "保管庫の作成に進む",
-      "eyebrow": "保管庫を作成する前に",
+      "eyebrow": "新しい保管庫",
       "heading": "保管庫を作成する前に",
       "intro": "Myneはあなたのノートを暗号化し、あなただけが開けるようにします。そこから導かれる3つの点があります。読んでから先に進んでください。",
       "statements": {
@@ -4326,12 +4645,13 @@
     },
     "confirm": {
       "back": "戻る",
-      "continue": "続行",
-      "eyebrow": "ステップ3 / 4：フレーズの確認",
-      "heading": "フレーズの中から4つの単語を入力してください。",
-      "intro": "保存できているかを確認するため、特定の位置の単語をお尋ねします。",
+      "heading": "復元フレーズを確認",
+      "intro": "保存できているかを確認するため、この4つの位置の単語を入力してください。",
       "mismatch": "{{pos}}番目の単語と一致しません。",
-      "wordAtPosition": "{{pos}}番目の単語"
+      "wordAtPosition": "{{pos}}番目の単語",
+      "commit": "保管庫を作成",
+      "committing": "保存中…",
+      "eyebrowLabel": "フレーズを確認"
     },
     "encrypting": {
       "caption": "少し時間がかかります。",
@@ -4435,45 +4755,69 @@
     },
     "password": {
       "back": "戻る",
-      "eyebrow": "ステップ1 / 4：マスターパスワード",
-      "heading": "保管庫を作成",
+      "heading": "マスターパスワードを選択",
       "helperLead": "Myneはパスワードや復元フレーズを保存しません。",
-      "submit": "復元フレーズを生成"
+      "submit": "復元フレーズを生成",
+      "eyebrowLabel": "マスターパスワード"
     },
     "phrase": {
-      "back": "戻る",
       "clipboardNotCleared": "このブラウザではMyneが後からクリップボードを消去できないため、その24語は他のものをコピーするまで残り続けます。パスワードマネージャーに貼り付けてから、何か別のものをコピーしてください。",
-      "continue": "保存しました、フレーズを確認",
       "copied": "コピーしました。アプリが動作し続けている限り、先に進んでもMyneが30秒後にクリップボードを消去します。",
       "copiedNoAutoClear": "コピーしました。ここではMyneがクリップボードを消去できないため、他のものをコピーするまで単語は残り続けます。",
       "copy": "コピー",
       "extensionNotice": "このサイトにアクセスできるブラウザ拡張機能は、このページの内容を読み取れます。このプロファイルのすべての拡張機能を信頼できるか確信が持てない場合は、この手順にはデスクトップアプリか、まっさらなブラウザプロファイルを使用してください。",
       "copyFailed": "コピーできませんでした。代わりに「ファイルとして保存」を使用してください。",
       "downloadStarted": "ブラウザのダウンロードに送りました。届いたか確認してください。ファイルの保存先を決めるのはブラウザで、Myneには届いたかどうかを知る手段がありません。",
-      "eyebrow": "ステップ2 / 4：復元フレーズ",
-      "heading": "この24個の単語を書き留めてください。",
-      "intro": "このフレーズとパスワードを組み合わせることが、保管庫を復元する唯一の方法です。オフラインで保管してください：紙、パスワードマネージャー、ハードウェアウォレットなど。現金のように扱ってください。",
       "reveal": "フレーズを表示",
       "saveAsFile": "ファイルとして保存",
       "saveFailed": "ファイルを保存できませんでした。代わりに単語をコピーするか、書き留めてください。",
       "savedToFile": "保存しました。プレーンテキストのファイルなので、あなただけが読める場所に保管してください。"
     },
     "ready": {
-      "backedUp": "バックアップ済み ✓",
+      "backedUp": "バックアップ済み",
       "backingUp": "バックアップ中…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "バックアップが完了しませんでした。ファイルは残されていません。設定 → ストレージからいつでもバックアップできます。",
       "backupFilterName": "Myneバックアップ",
-      "backUpNow": "今すぐこの保管庫をバックアップ",
-      "body": "Myneは保管庫をアプリケーションデータフォルダに書き込みました。マスターパスワードと復元フレーズが唯一の戻る手段です。どちらも安全な場所に保存されていることを確認してください。",
+      "backUpNow": "今すぐバックアップ",
+      "body": "ノートは暗号化されてこのデバイスに保存されます。パスワードと復元キットは安全な場所に保管してください。それらだけが戻る手段です。",
       "decrypting": "復号中…",
-      "done": "完了",
-      "heading": "保管庫の準備ができました。",
+      "done": "保管庫を開く",
+      "heading": "保管庫の準備ができました",
       "showFolder": "保管庫フォルダを表示"
     },
     "sessionLost": {
       "startOver": "最初からやり直す"
-    }
+    },
+    "kit": {
+      "accountFor": "アカウント番号 — 別のデバイスを追加するときに使用",
+      "back": "戻る",
+      "continue": "保存しました、フレーズを確認",
+      "copied": "キットはクリップボードにあります。アプリが動作し続けている限り、先に進んでもMyneは30秒後にクリップボードを消去します。",
+      "copiedNoAutoClear": "コピーしました。ここではMyneがクリップボードを消去できないため、別のものをコピーするまでキットは残ります。",
+      "copy": "コピー",
+      "copyFailed": "コピーできませんでした。代わりに「復元キットを保存」を使用してください。",
+      "documentTitle": "Myne 復元キット",
+      "downloadStarted": "ブラウザのダウンロードに送信しました。キットが届いたか確認してください: ファイルの保存先はブラウザが決めるため、Myneは届いたかどうかを確認できません。",
+      "eyebrowLabel": "復元キット",
+      "heading": "復元キットを保存",
+      "intro": "これから保存するファイルはまさにこの内容です。表示は一度きりです。",
+      "phraseFor": "復元フレーズ — パスワードを忘れた場合に使用",
+      "save": "復元キットを保存",
+      "saveFailed": "ファイルを保存できませんでした。代わりにキットをコピーするか、両方の部分を書き留めてください。",
+      "savedToFile": "保存しました。両方の秘密を保持するプレーンテキストファイルなので、自分だけが読める場所に保管してください。",
+      "whyEnglish": "これらの語はどの言語でも英語です。BIP-39標準の一部であるため、どのMyneクライアントでも、別のクライアントが書いたフレーズを読み取れます。翻訳しないでください: 翻訳された語は単語リストにないため、フレーズが機能しなくなります。"
+    },
+    "name": {
+      "back": "戻る",
+      "continue": "続ける",
+      "eyebrowLabel": "保管庫に名前を付ける",
+      "heading": "この保管庫を何と呼びますか？",
+      "helper": "名前は保管庫とともに暗号化して保存されます。このデバイスでは、ロックを解除する前に起動時の保管庫選択画面に表示されるため、その画面を見られる人は誰でも読めます。設定で保管庫名を非表示にすると、これを止められます。名前は後から変更できます。",
+      "intro": "この名前はロック画面と保管庫一覧に表示されます。",
+      "placeholder": "個人用"
+    },
+    "stepIndicator": "ステップ {{n}} / {{total}} · {{label}}"
   },
   "vaultPicker": {
     "createAnother": "別の保管庫を作成",
@@ -4495,7 +4839,10 @@
     "renameCancel": "キャンセル",
     "renamePlaceholder": "アカウント名",
     "renameSave": "名前を変更",
-    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。"
+    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。",
+    "createShort": "新しい保管庫",
+    "joinShort": "デバイスを追加",
+    "restoreShort": "バックアップを復元"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4561,9 +4908,6 @@
   },
   "welcome": {
     "createCta": "新しい保管庫を作成",
-    "headlineLine1": "暗号化されたMarkdownノート。",
-    "headlineLine2": "登録時にメール不要。",
-    "joinCta": "このデバイスをアカウントに追加",
     "repairResidue": {
       "cancel": "キャンセル",
       "cleaningUp": "クリーンアップ中…",
@@ -4583,8 +4927,6 @@
       "partialBody_other": "{{count}}件のファイルが別のアプリ（ウイルス対策、ファイル同期、検索インデックス作成など）によってロックされている可能性があります。アプリを閉じて少し待ってからもう一度試すか、保管庫フォルダを手動で削除してください。",
       "partialTitle": "一部のファイルを削除できませんでした"
     },
-    "restoreCta": "バックアップから復元",
-    "subtitle": "ノートはデバイスを離れる前に、このデバイス上で暗号化されます。サーバーには暗号文のみが保存されます。",
     "repairCleanedUp_one": "残っていたファイル{{count}}件をクリーンアップしました。",
     "repairCleanedUp_other": "残っていたファイル{{count}}件をクリーンアップしました。",
     "repairFailed": "クリーンアップを完了できませんでした。もう一度お試しください。",
@@ -4594,9 +4936,22 @@
     "lede": "Markdown。このデバイスから出る前に、このデバイス上で暗号化されます。アカウントのメールアドレスは不要。あなたの言葉を一言でも読めるサーバーはありません。",
     "residueBanner": "中断された削除から残ったファイルがあります（{{n}}）。ボールトを作成する前にクリーンアップしてください。",
     "cleanUpFiles": "残ったファイルをクリーンアップ",
-    "create": "ボールトを作成",
     "connect": "自分のアカウントに接続",
-    "identityCta": "アイデンティティのみ作成"
+    "startIdentity": "アイデンティティを作成",
+    "startLocal": "代わりにローカル保管庫を作成",
+    "tagline": "暗号化されたMarkdownノート。サインアップにメールアドレスは不要です。",
+    "identityTitle": "アイデンティティを作成",
+    "identityBody": "すべての保管庫に1つのアイデンティティ。他の人があなたを招待できるようになります。同期サーバーが必要です。",
+    "localTitle": "ローカル保管庫を作成",
+    "localBody": "このデバイス上の暗号化された保管庫。同期やアイデンティティは後から追加できます。",
+    "restoreTitle": "バックアップから復元",
+    "restoreBody": "以前に保存した .myne-backup ファイルを開きます。",
+    "joinTitle": "このデバイスをアカウントに追加",
+    "joinBody": "別のデバイスにすでにある保管庫を使用します。",
+    "createAction": "作成",
+    "restoreAction": "復元",
+    "joinAction": "デバイスを追加",
+    "version": "バージョン {{version}} · プレアルファ"
   },
   "wikiGraph": {
     "emptyTitle": "リンクはまだありません",
@@ -4701,7 +5056,6 @@
     "approvalHint": "すでにアカウントを持っているデバイスからこのデバイスを承認すると、ノートが表示されます。",
     "connectingSubtitle": "アカウントを取得し、このデバイスでボールトのロックを解除しています。",
     "qr": {
-      "cancel": "キャンセル",
       "confirmAccount": "アカウント",
       "confirmServer": "サーバー",
       "confirmTitle": "このデバイスを追加しますか？",
@@ -4719,7 +5073,6 @@
     "beginGeneric": "ボールトの作成を開始できませんでした。もう一度お試しください。",
     "wordNumber": "単語 #{{position}}",
     "commitError": "ボールトを保存できませんでした。もう一度お試しください。",
-    "copyPhrase": "コピー",
     "phraseCopied": "コピーしました。このデバイス内にとどまり、30秒後にシステムが破棄します。",
     "phraseCopyFailed": "コピーできませんでした。代わりに「ファイルに保存」を使用してください。",
     "savedToFile": "{{label}}に保存しました",
@@ -4733,8 +5086,6 @@
     "confirmPasswordLabel": "パスワードを確認",
     "passwordHelper": "保存も送信もされません。このデバイス上であなたの鍵を暗号化します。",
     "encryptingSubtitle": "Argon2idであなたの鍵を導出しています。これには数秒かかり、中断できません。",
-    "phraseTitle": "リカバリーフレーズ",
-    "phraseIntro": "24語を順番どおりに。紙に書き留めて、安全な場所に保管してください。",
     "showSecondHalf": "13〜24番目の単語を表示",
     "saveToFile": "ファイルに保存",
     "writtenThemDown": "書き留めました",
@@ -4742,9 +5093,6 @@
     "typebackLead": "今保存したリカバリーフレーズから、次の4つの単語を入力してください。",
     "wordMismatch": "{{pos}}番目の単語と一致しません",
     "backToPhrase": "フレーズに戻る",
-    "accountTitle": "アカウント番号",
-    "accountLead": "これをリカバリーフレーズと一緒に保存してください。新しいデバイスでボールトを復元する際に必要になります。",
-    "accountSavedAck": "アカウント番号を保存しました。",
     "commit": "確定",
     "committingTitle": "ボールトを保存しています…",
     "committingSubtitle": "暗号化されたボールトをこのデバイスに書き込んでいます。",
@@ -4784,7 +5132,6 @@
       "backup": "暗号化バックアップの作成と復元は、任意の場所にバックアップファイルを書き込めるMyneのデスクトップアプリで行います。ここでのノートはサーバーから取得されるため、このブラウザは同期によって自身を復元します。",
       "creation": "このブラウザにはすでにアカウントがあります。別のアカウントを作成するには、Myneのデスクトップアプリを開くか、別のブラウザプロファイルを使用してください。",
       "multiVault": "このブラウザが保持できるアカウントは1つです。別のアカウントを使うには、Myneのデスクトップアプリか別のブラウザプロファイルで開いてください。",
-      "phraseRecovery": "フレーズによる復元はMyneのデスクトップアプリで行います。復元フレーズは、決してWebページに入力すべきではありません。",
       "title": "ブラウザでは利用できません"
     },
     "unsupported": {
@@ -4818,16 +5165,33 @@
     "savedForNextLaunch": "保存しました。このセッションは --disable-screen-capture-protection を付けて起動されているため、保護はオフのままです。次にそれを付けずにMyneを開いたときに保護が戻ります。"
   },
   "identitySetup": {
-    "createCta": "アイデンティティを作成",
     "doneCta": "完了",
-    "error": "アイデンティティを設定できませんでした。同期サーバーが構成されていることを確認して再試行してください。",
+    "error": "アイデンティティを設定できませんでした。もう一度お試しください。",
     "intro": "アイデンティティを使うと、ボールトを持つ前に招待を自分宛にできます。ボールトは作らず、ノートも保存しません。",
     "pending": "このデバイスはアカウント上の他のデバイスの承認を待っています。",
     "phraseWarning": "この24語を紙に書き写し、安全に保管してください。表示はこれが最初で最後です。このアイデンティティの復元はこの語だけが使えます。",
     "recoverCta": "アイデンティティを復元",
-    "recoverIntro": "すでにアイデンティティをお持ちですか？24語のリカバリーフレーズを入力してください。",
+    "recoverIntro": "アイデンティティの復元フレーズ",
     "recovered": "アイデンティティを復元しました。",
-    "title": "アイデンティティのみ"
+    "title": "アイデンティティを作成",
+    "errorAlreadyHeld": "このデバイスはすでにアイデンティティを保持しています。復元フレーズで復元するか、忘れて新しいものを作成してください。",
+    "errorNotConfigured": "アイデンティティを設定できませんでした。同期サーバーが設定されていることを確認して、もう一度お試しください。",
+    "forgetCancel": "保持する",
+    "forgetConfirm": "忘れて新規作成",
+    "forgetCta": "このアイデンティティを忘れて新しいものを作成",
+    "forgetWarning": "これはこのデバイスに保持されているアイデンティティを消去します。その24語の復元フレーズを書き留めていない場合、それは失われます: そのフレーズで復元するまで、このデバイスはそれが所有または参加している保管庫へのアクセスを失います。確信がある場合のみ続けてください。",
+    "heldIntro": "このデバイスはすでにアイデンティティを保持しています。下でその24語のフレーズを使って復元してください。",
+    "typeBackLead": "保存したことを確認するため、上のフレーズからこの4語を入力してください。",
+    "typeBackMismatch": "{{pos}}語目と一致しません。",
+    "typeBackWordAtPosition": "{{pos}}語目",
+    "newTitle": "新しいアイデンティティ",
+    "createAction": "作成",
+    "recoverTitle": "すでに持っています",
+    "recoverHint": "このデバイスで、その24語の復元フレーズを使って復元してください。",
+    "recoverAction": "復元",
+    "back": "戻る",
+    "changeServer": "同期サーバーを変更または確認",
+    "errorTlsFailure": "サーバーのHTTPS証明書を検証できませんでした。サーバーアドレスとその証明書を確認してください。"
   },
   "personIdentityCode": {
     "copy": "ID コードをコピー",
@@ -4853,6 +5217,169 @@
     "acceptInvalid": "有効な所有者アイデンティティコードではありません。",
     "shareCodeHeading": "あなたの招待コード",
     "shareCodeHint": "招待してくれる誰かとこのコードを共有してください。公開情報（アイデンティティIDと公開鍵）のみを含み、フレーズは含みません。",
-    "title": "あなたのアイデンティティ"
+    "title": "あなたのアイデンティティ",
+    "acceptPasswordNote": "このデバイス用のパスワードを選択してください。保管庫の所有者のパスワードとも、あなたの復元フレーズとも別のものです: このデバイスでこの保管庫のロックを解除するもので、復元フレーズは引き続きどこへでも持ち運べる復帰手段です。",
+    "acceptErrorBadRequest": "招待を検証できませんでした。保管庫の所有者のアイデンティティコードを貼り付け（招待時に共有されます）、双方でフィンガープリントを照合してください。",
+    "acceptErrorNotFound": "この招待はもう利用できません。すでに使用されたか、取り消された可能性があります。所有者に新しい招待を送ってもらってください。",
+    "acceptErrorNotEnrolled": "このデバイスは、この招待の宛先のアイデンティティではありません。招待が送られたアイデンティティを開いてから、承諾してください。",
+    "acceptErrorTransport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+    "acceptErrorUnauthenticated": "このデバイスではあなたのアイデンティティにサインインしていません。アイデンティティのロックを解除して、もう一度お試しください。",
+    "claimedHeading": "すでに承諾した招待",
+    "claimedHint": "復元フレーズでこのデバイスに追加します。その後、保管庫の所有者があなたを保管庫から削除している場合、ここに追加することはできません。",
+    "join": "このデバイスに追加",
+    "joinHint": "この保管庫はすでにあなたのアイデンティティと共有されています。このデバイスにインストールするには、復元フレーズを入力してください。",
+    "joinPhraseLabel": "あなたの復元フレーズ",
+    "joinPasswordNote": "このデバイス用のパスワードを選択してください。保管庫の所有者のパスワードとは別のものです: ここでこの保管庫のロックを解除するもので、復元フレーズは引き続きどこへでも持ち運べる復帰手段です。",
+    "joinSubmit": "追加してロック解除",
+    "joinError": "このデバイスに保管庫を追加できませんでした。",
+    "joinErrorAlreadyHeld": "このデバイスはすでにこの保管庫を保持しているため、追加するものはありません。ここにある既存の保管庫を開いてください。",
+    "joinErrorBadRequest": "このデバイスは、この保管庫がどの所有者のものかを確認できなかったため、保管庫を追加しませんでした。この保管庫にここで初めてサインインする場合は、すでにそれを持っているデバイスで一度開いてから、もう一度お試しください。",
+    "joinErrorNotEnrolled": "この復元フレーズは、この保管庫が共有されたアイデンティティのものではありません。招待されたアイデンティティのフレーズを入力したか確認してください。",
+    "joinErrorNotConfigured": "このデバイスでは同期が設定されていません。同期サーバーを設定してから、もう一度お試しください。",
+    "joinErrorUnauthenticated": "このデバイスではあなたのアイデンティティにサインインしていません。アイデンティティのロックを解除して、もう一度お試しください。",
+    "joinErrorTransport": "同期サーバーに接続できなかったか、この保管庫がまだそこに公開されていません。接続を確認してもう一度お試しください。",
+    "forgetCancel": "保持する",
+    "forgetCheckbox": "このアイデンティティがこのデバイスから削除されることを理解しました。",
+    "forgetConfirm": "アイデンティティを忘れる",
+    "forgetCta": "このデバイスでこのアイデンティティを忘れる",
+    "forgetError": "アイデンティティを忘れられませんでした。もう一度お試しください。",
+    "forgetWarning": "これはこのデバイスからのみアイデンティティを削除します。サーバー上のアカウント、およびそれが所有または参加している保管庫はそのまま残り、別のデバイスで24語のフレーズを使ってアイデンティティを復元できます。そのフレーズを保存していない場合、このデバイスでは復元できません。"
+  },
+  "aiOnboarding": {
+    "title": "AIを設定",
+    "intro": "Myneはノートを意味で検索し、タグを提案し、ノートについて対話できます。どれも必須ではなく、後から設定でオンにできます。",
+    "enableLabel": "AI機能をオンにする",
+    "semantic": {
+      "title": "セマンティック検索",
+      "body": "多言語の埋め込みモデル（約449MB）をダウンロードすると、言葉だけでなく意味で検索できます。"
+    },
+    "tag": {
+      "title": "自動タグ付け",
+      "body": "タグ用モデル（約337MB）をダウンロードすると、書いている間にMyneがタグを提案できます。"
+    },
+    "chat": {
+      "title": "チャット",
+      "body": "ダウンロードはありません。チャットは、あなたがすでに自分で動かしているモデル、または指定したプロバイダーに対して実行され、同意の手順があります。",
+      "setup": "プロバイダーを設定"
+    },
+    "download": "ダウンロード",
+    "downloading": "ダウンロード中…",
+    "cancel": "キャンセル",
+    "complete": "準備完了",
+    "retry": "再試行",
+    "skip": "スキップ",
+    "done": "完了"
+  },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "編集を続ける",
+      "message": "開いているファイルの中に、ディスクに書き込めなかった未保存の変更がまだあります。今閉じるとそれらは破棄されます。",
+      "okLabel": "破棄して閉じる",
+      "title": "Myneを閉じますか？"
+    },
+    "closeTab": "{{name}} を閉じる",
+    "conflict": {
+      "body": "編集中にこのファイルがディスク上で変更されました。Myneは何も書き込んでいません。",
+      "copy": "コピーを保存…",
+      "copyFailed": "コピーを保存できませんでした。元のファイルは変更されていません。",
+      "overwrite": "自分の変更で上書き",
+      "reload": "ディスクから再読み込み"
+    },
+    "deeplink": {
+      "body": "これはどの保管庫の外にあるため、Myneは暗号化しません。",
+      "cancel": "キャンセル",
+      "confirm": "開く",
+      "failed": "ファイルを開けませんでした。移動または変更された可能性があります。",
+      "title": "このローカルファイルを開きますか？"
+    },
+    "empty": "開いているファイルはありません。",
+    "import": "保管庫にインポート",
+    "importFailed": "ファイルをインポートできませんでした。何も変更されていません。",
+    "importLocked": "保管庫がロックされています。ロックを解除してから、もう一度お試しください。",
+    "importNeedsVault": "このデバイスにはまだ保管庫がありません。作成してから、もう一度お試しください。",
+    "marker": "ローカルファイル。暗号化されておらず、どの保管庫にも属していません。",
+    "open": "ローカルファイルを開く",
+    "openFailed": "そのファイルを開けませんでした。",
+    "openRefusedTooLarge": "そのファイルは大きすぎるため、ここでは開けません。",
+    "openRefusedType": "ここで開けるのは .md と .markdown ファイルだけです。",
+    "retry": "もう一度保存を試す",
+    "saveError": "ファイルを保存できませんでした。編集内容はまだ残っています。",
+    "tabs": "開いているローカルファイル",
+    "unsaved": "未保存の変更"
+  },
+  "update": {
+    "banner": {
+      "available": "Myne {{version}} が利用可能です。",
+      "failed": "更新をインストールできませんでした。もう一度お試しください。",
+      "installing": "更新をダウンロードしています…",
+      "later": "後で",
+      "restart": "再起動して更新"
+    }
+  },
+  "firstRun": {
+    "server": {
+      "heading": "同期サーバーを選択",
+      "chooseHeading": "ノートをどこに同期しますか？",
+      "chooseIntro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。Myne Syncサービスを使うか、このデバイスを自分で運用するサーバーに向けてください。どちらの場合も、ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
+      "myneSyncHint": "Myneが運営するサーバーです。HTTPS証明書は自動で確認されます。",
+      "intro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
+      "notConfigured": "上のサーバーアドレスを入力し、接続を押して続けてください。",
+      "back": "戻る",
+      "continue": "続ける",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "自分のサーバー",
+      "selfHostedHint": "自分で運用する同期サーバーです。次の画面でアドレスを入力します。",
+      "connectAction": "接続",
+      "setUpAction": "設定"
+    }
+  },
+  "identityFlow": {
+    "title": "アイデンティティを作成",
+    "lead": "アイデンティティがあると、他の人があなたを保管庫に招待でき、1つのアイデンティティで多くの保管庫を所有できます。暗号化されたノートを保持し、あなたに届くために同期サーバーが必要です。",
+    "start": "アイデンティティを作成",
+    "skip": "今はしない、このデバイスのみを使用",
+    "back": "戻る",
+    "serverUnreachable": "そのサーバーに接続できませんでした。アドレスを確認してもう一度お試しください。",
+    "createFailed": "アイデンティティを作成できませんでした。同期サーバーを確認してもう一度お試しください。",
+    "server": {
+      "title": "同期サーバーを選択",
+      "lead": "ノートはこのデバイスを離れる前に暗号化されます。サーバーが保存するのは暗号文だけです。",
+      "urlLabel": "サーバーアドレス",
+      "useMyneSync": "Myne Syncを使用",
+      "selfHostedHint": "または、自分で運用するサーバーのアドレスを入力してください。",
+      "connect": "接続",
+      "connecting": "接続中…"
+    },
+    "held": {
+      "title": "このデバイスにはすでにアイデンティティがあります",
+      "lead": "このデバイスはすでにアイデンティティを保持しています。忘れると、24語のフレーズで復元するまで、このデバイスはそれが所有または参加している保管庫へのアクセスを失います。そのフレーズを保存していない場合、復元することはできません。",
+      "forget": "忘れて最初からやり直す"
+    },
+    "create": {
+      "title": "アイデンティティを作成",
+      "lead": "あなたのアイデンティティを1つ作成します。保管庫は作成せず、ノートも保存しません。",
+      "cta": "アイデンティティを作成",
+      "working": "作成中…"
+    },
+    "phrase": {
+      "title": "アイデンティティのフレーズを保存",
+      "warning": "この24語を書き留めて安全に保管してください。表示はこれが唯一の機会であり、このアイデンティティを復元する唯一の方法です。これは保管庫の復元フレーズとは別のフレーズです。",
+      "reveal": "表示",
+      "typebackLead": "保存したことを確認するため、上のフレーズからこの4語を入力してください。",
+      "wordNumber": "{{position}}語目",
+      "wordMismatch": "{{pos}}語目と一致しません。",
+      "continue": "続ける"
+    },
+    "home": {
+      "title": "あなたのアイデンティティ",
+      "lead": "他の人があなたを保管庫に招待できます。招待されるために保管庫を所有する必要はありません。",
+      "codeLabel": "あなたのアイデンティティコード",
+      "invitesHeading": "招待",
+      "noInvites": "まだ招待はありません。",
+      "inviteHint": "保管庫の選択画面からこの招待を開くと、アイデンティティのフレーズで参加できます。",
+      "forgetHeading": "このデバイス",
+      "forget": "このデバイスでこのアイデンティティを忘れる",
+      "forgetCheckbox": "このアイデンティティがこのデバイスから削除されることを理解しました。サーバー上のアカウントは残り、フレーズで復元できます。"
+    }
   }
 }

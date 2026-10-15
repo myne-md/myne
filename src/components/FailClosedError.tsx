@@ -29,10 +29,10 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
-  ctaHover,
+  ctaInteraction,
   ctaStyle,
 } from "./primitives/CenteredCard";
-import { hoverSurface } from "./primitives/hoverSurface";
+import { interactiveSurface } from "./primitives/interactiveSurface";
 import type { IoFailureKind } from "../lib/stage";
 
 export type FailClosedReason =
@@ -136,10 +136,10 @@ const SECONDARY_CTA_STYLE: CSSProperties = {
 };
 
 /** The secondary's own hover — the canon surface deepen, not the accent ramp.
- *  `ctaHover` would restore `--accent` on pointer-leave and repaint a
+ *  `ctaInteraction` would restore `--accent` on pointer-leave and repaint a
  *  transparent button solid blue. */
 const secondaryHover = () =>
-  hoverSurface({ restBg: "transparent", hoverBg: "var(--bg-3)" });
+  interactiveSurface({ restBg: "transparent", hoverBg: "var(--bg-3)" });
 
 export function FailClosedError({
   reason,
@@ -190,7 +190,7 @@ export function FailClosedError({
             type="button"
             onClick={restoreDoor}
             style={CTA_STYLE}
-            {...ctaHover(false)}
+            {...ctaInteraction(false)}
             data-testid="fail-closed.restore-cta"
           >
             {t("failClosed.restoreFromBackup")}
@@ -200,7 +200,7 @@ export function FailClosedError({
           type="button"
           onClick={onCtaClick}
           style={restoreDoor !== undefined ? SECONDARY_CTA_STYLE : CTA_STYLE}
-          {...(restoreDoor !== undefined ? secondaryHover() : ctaHover(false))}
+          {...(restoreDoor !== undefined ? secondaryHover() : ctaInteraction(false))}
           data-testid="fail-closed.cta"
         >
           {ctaLabelKey ? t(ctaLabelKey) : copy.cta}
