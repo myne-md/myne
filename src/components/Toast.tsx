@@ -3,10 +3,10 @@
 // Every surface that used to render its own positioned toast still writes
 // `<Toast message={…} onDone={…} variant=… action=… />` exactly as before — but
 // this no longer draws anything. It pushes the message into the toast store, so
-// the single <Toaster> (mounted once in Editor) renders it in the shared
-// collapsed stack. That is what makes every toast — React-surface or the
-// editor's imperative one — look and stack alike, without touching a single
-// call site.
+// the single <Toaster> (mounted once in App, above the stage switch, since
+// myne-md/myne#390) renders it in the shared collapsed stack. That is what makes
+// every toast — React-surface or the editor's imperative one — look and stack
+// alike, without touching a single call site.
 //
 // The store owns auto-dismiss, the slide in/out, pause-on-hover and the ×; this
 // component only mirrors the owner's `message` state into and out of the store.

@@ -24,6 +24,7 @@ import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import packageJson from "../package.json";
+import { ISOLATION_HEADERS, normaliseSyncOrigin } from "./csp";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const desktopSeam = path.join(repoRoot, "src", "platform");
@@ -465,10 +466,87 @@ function emitCssDataImages(): Plugin {
   };
 }
 
+// ── dev-only: the two deployment facts the app refuses to boot without ───────
+//
+// `pnpm web:dev` serves the same app the container does, and until this existed it
+// served it into an environment the app REFUSES. No COOP/COEP means
+// `crossOriginIsolated` is false and `SharedArrayBuffer` is undefined, so
+// `web/src/environment-gate.ts` stops at boot naming both headers; and there is no
+// `/config.json` for the sync origin, which only the container writes
+// (`web/container/generate-headers.mjs`). The app was never broken in dev. The
+// deployment was missing, and nothing said so.
+//
+// So the dev server reproduces those two facts, and the origin is not a second
+// opinion about what is valid: it goes through `normaliseSyncOrigin`, the validator
+// the container's header generator uses, so a dev client cannot be pointed at an
+// origin production would refuse.
+//
+// What is deliberately NOT reproduced is the Content-Security-Policy. Vite's dev
+// client is an inline module script and `script-src 'self'` refuses it, so a dev
+// server sending the production policy would not serve a working dev client. That
+// asymmetry is exactly why `e2e-web/AGENTS.md` loads `web/dist` through
+// `e2e-web/support/server.ts` instead of a dev server, and why no security claim is
+// ever verified here.
+//
+// `vite preview` is kept out of this too, and NOT by being left alone: Vite falls back
+// to `server.headers` for the preview server, so the pair would reach it and leave a
+// half-reproduced deployment behind, isolation on and CSP absent. The `preview.headers`
+// override below is what holds that line.
+const DEV_SYNC_ORIGIN_DEFAULT = "http://127.0.0.1:8787";
+
+function devDeploymentPlugin(): Plugin {
+  let resolved: string | null = null;
+
+  /**
+   * Resolved LAZILY, from a serve-only hook, and never at module scope. This file
+   * is also loaded by `pnpm web:build`, and a malformed `MYNE_DEV_SYNC_ORIGIN`
+   * sitting in a developer's shell must not break a production build.
+   */
+  const syncOrigin = (): string =>
+    (resolved ??= normaliseSyncOrigin(
+      // @ts-expect-error process is a nodejs global, as in the root vite.config.ts
+      process.env.MYNE_DEV_SYNC_ORIGIN ?? DEV_SYNC_ORIGIN_DEFAULT,
+    ));
+
+  return {
+    name: "myne:dev-deployment",
+    // Never during a build: the bundle has to stay the byte-identical artefact the
+    // container ships (`docs/self-host-web.md`).
+    apply: "serve",
+    configureServer(server) {
+      // Called for its throw: a malformed origin must stop the dev server with the
+      // validator's own message at STARTUP, rather than answer a config.json the
+      // client cannot reach anything with.
+      syncOrigin();
+
+      // `/config.json` is answered from memory rather than placed in `public/`,
+      // which is the SHARED desktop+web directory: a file there would land in
+      // `web/dist` and in the desktop bundle, and a sync origin is a deployment fact
+      // rather than a build input.
+      server.middlewares.use((req, res, next) => {
+        if ((req.url ?? "").split("?")[0] !== "/config.json") {
+          next();
+          return;
+        }
+        res.setHeader("Content-Type", "application/json");
+        // Matches the container, which serves it `no-store`: re-pointing the origin
+        // must not survive in a browser cache.
+        res.setHeader("Cache-Control", "no-store");
+        res.end(JSON.stringify({ sync_origin: syncOrigin() }));
+      });
+    },
+  };
+}
+
 export default defineConfig({
   root: path.join(repoRoot, "web"),
   publicDir: path.join(repoRoot, "public"),
-  plugins: [platformSeamSubstitution(), emitCssDataImages(), react()],
+  plugins: [
+    platformSeamSubstitution(),
+    emitCssDataImages(),
+    devDeploymentPlugin(),
+    react(),
+  ],
 
   // Same compile-time version injection as the desktop config; `src/` reads
   // `__APP_VERSION__` unconditionally, so omitting it here would break the
@@ -494,9 +572,11 @@ export default defineConfig({
     // Pinning the literal the image already produces converts "works because
     // git is absent" into "works because nothing reads it".
     //
-    // The tempting alternative is to feed this from `MYNE_BUILD_COMMIT`, which
-    // `web-docker-build` already passes as a `--build-arg`. That is the deadlock
-    // above, arriving on the first deploy after the change.
+    // The tempting alternative is to feed this from `MYNE_BUILD_COMMIT`, which the
+    // by-hand build passes as a `--build-arg`
+    // (`myne-ops/runbooks/web-client-deploy.md`), as `web-docker-build` did before it
+    // left the pipeline (myne-md/myne#584). That is the deadlock above, arriving on
+    // the first deploy after the change.
     //
     // The desktop config keeps `buildCommit()` and is right to: a desktop build
     // ships inside an installer whose identity the version string names, gated
@@ -527,7 +607,26 @@ export default defineConfig({
     // The shared tree lives above this root; without it the dev server refuses
     // to serve `../src/**`.
     fs: { allow: [repoRoot] },
+    // Cross-origin isolation, and the whole reason `pnpm web:dev` used to show the
+    // environment refusal screen. The pair is what `web/src/environment-gate.ts`
+    // probes at boot, and it is IMPORTED from `web/csp.ts` rather than written out
+    // here, so a dev server can never verify an isolation posture the container does
+    // not send. Dev only by definition, since `server.*` is not part of a build, so
+    // nothing about the shipped bundle moves.
+    headers: { ...ISOLATION_HEADERS },
   },
+
+  // `vite preview` must stay exactly as it was, and this override is why.
+  //
+  // Vite falls back to `server.headers` for the preview server (`headers: preview?.headers
+  // ?? server.headers`), so the pair above would otherwise leak into `pnpm web:preview`
+  // and make it send cross-origin isolation while still sending no CSP and no
+  // `/config.json`. That is a half-reproduced deployment, and it is precisely the
+  // "lane looser than production" shape `e2e-web/AGENTS.md` rejects the preview server
+  // for, in a sentence this file would otherwise have falsified. An explicit empty
+  // object is non-nullish, so it wins over the fallback, and preview sends what it has
+  // always sent.
+  preview: { headers: {} },
 
   // Same reason as the desktop config: never hide a build error behind a
   // cleared screen.

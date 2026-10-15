@@ -38,7 +38,12 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const REPO = new URL("..", import.meta.url).pathname;
-const TREES = ["e2e"];
+// `e2e-web` is the browser lane (MYND-574). It sat outside this walk, which is
+// how e35c8a7b's removal of the sidebar `+` menu left `notes.new-menu` clicks in
+// two `e2e-web/` files for ~2.7 weeks: the guard written to catch exactly that
+// never read the tree they were in. Both lanes reach user-facing controls, so
+// both are in scope.
+const TREES = ["e2e", "e2e-web"];
 
 // `--scan <dir>`: walk THIS directory instead of the repo, so the guard's own
 // test can drive it over a throwaway tree (myne-md/myne#242, found while
@@ -145,9 +150,20 @@ for (const tree of TREES) {
       // The helper's own definition names them as a parameter, not a literal.
       if (line.includes(HELPER)) return;
       for (const id of MENU_ONLY_EFFECTIVE) {
-        // `byTestId("x")` / `byTestIdAll("x")` / `testIdSelector("x")` — the
-        // three ways a scenario reaches for an element by testid.
-        const re = new RegExp(`(byTestId|byTestIdAll|testIdSelector)\\(\\s*"${id.replace(".", "\\.")}"`);
+        // TWO idioms, because the two lanes reach elements differently.
+        //   · `byTestId("x")` / `byTestIdAll("x")` / `testIdSelector("x")` — the
+        //     desktop lane's three ways.
+        //   · `document.querySelector('[data-testid="x"]')` — the browser lane's
+        //     scripted click, used where the driver cannot click directly. The
+        //     escaped quotes are part of the source, hence the optional `\`.
+        // Matching only the first is half of how `notes.new-menu` survived: the
+        // web lane's reaches were invisible to this regex even after the tree
+        // was in scope.
+        const sel = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(
+          `(byTestId|byTestIdAll|testIdSelector)\\(\\s*["']${sel}["']` +
+            `|data-testid=(?:\\\\?["'])${sel}(?:\\\\?["'])`,
+        );
         if (re.test(line)) {
           violations.push({ file: rel, line: i + 1, id });
         }

@@ -565,7 +565,7 @@ const V = {
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
   "src/hooks/useUpdateAvailable.ts": [
     "adapted",
-    "Desktop self-update. Gated on the `selfUpdate` capability, which is absent on web, so the check never runs there and no banner mounts. The `plugin:update|*` commands are `Unsupported` on web (`web/wasm/src/capability.rs`), reached only through the platform seam.",
+    "Desktop self-update. Gated on the `selfUpdate` capability, which is absent on web, so the check never runs there and no notice mounts: the flow this hook now owns is mounted by `App.tsx` and gated on the editor stage, and the notice it drives renders nothing without an offer. The `plugin:update|*` commands are `Unsupported` on web (`web/wasm/src/capability.rs`), reached only through the platform seam.",
   ],
   "src/hooks/useTorState.ts": [
     "adapted",

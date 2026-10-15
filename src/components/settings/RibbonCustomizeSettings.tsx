@@ -14,7 +14,8 @@ import { Input } from "../primitives/Input";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import { ERROR_STYLE } from "./panel-styles";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { prefsRead, setRibbonItems, setRibbonVisible } from "../../lib/prefs";
 import { resolveRibbonItems, ribbonEligibleIds } from "../../notes/ribbonItems";
 import { CUSTOMIZE_LIST_STYLE, CustomizeRow, useDragReorder } from "./CustomizeList";
@@ -254,7 +255,7 @@ export function RibbonCustomizeSettings() {
                     role="option"
                     aria-selected={false}
                     onClick={() => add(id)}
-                    {...hoverSurface()}
+                    {...interactiveSurface()}
                     style={CHOICE_STYLE}
                     data-testid="settings.ribbon-customize.choice"
                     data-item-id={id}
@@ -303,7 +304,7 @@ export function RibbonCustomizeSettings() {
                   type="button"
                   aria-label={t("settings.ribbonCustomize.remove", { name: action.label })}
                   onClick={() => remove(id)}
-                  {...hoverSurface()}
+                  {...interactiveSurface()}
                   style={ICON_BUTTON_STYLE}
                   data-testid="settings.ribbon-customize.remove"
                   data-item-id={id}

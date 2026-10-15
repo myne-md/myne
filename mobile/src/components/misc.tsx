@@ -108,6 +108,12 @@ export function Fab({ icon = "plus", style }: { icon?: IconName; style?: CSSProp
  * *outside* the card) runs the exit animation then calls `onClose`. To animate
  * the exit for an in-sheet button too (Done/Cancel), use the render-prop form:
  * `<Sheet onClose={fn}>{(close) => …onClick={close}…}</Sheet>`.
+ *
+ * `SHEET_MS` below is the duration this description means, in milliseconds, for
+ * the two JS timers that schedule `onClose` after the exit animation. It exists
+ * ONLY because `setTimeout` needs a number: every CSS transition in this file
+ * reads `var(--duration-slow)` itself, so there is one declared value and this is
+ * a timer that must match it, not a second copy of the motion scale.
  */
 const SHEET_MS = 260;
 
@@ -200,7 +206,7 @@ export function Sheet({
           inset: 0,
           background: "rgba(0,0,0,0.45)",
           opacity: shown ? Math.max(0, 1 - dragY / 400) : 0,
-          transition: dragging ? "none" : `opacity ${SHEET_MS}ms ease`,
+          transition: dragging ? "none" : "opacity var(--duration-slow) var(--ease-standard)",
         }}
       />
       <div
@@ -219,7 +225,7 @@ export function Sheet({
           padding: padded ? "10px 18px 20px" : "10px 0 20px",
           boxShadow: "var(--shadow-3)",
           transform: shown ? `translateY(${dragY}px)` : "translateY(calc(100% + 24px))",
-          transition: dragging ? "none" : `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+          transition: dragging ? "none" : "transform var(--duration-slow) var(--ease-emphasized)",
           willChange: "transform",
           ...style,
         }}
@@ -290,7 +296,7 @@ export function SidePanel({
           inset: 0,
           background: "rgba(0,0,0,0.45)",
           opacity: shown ? 1 : 0,
-          transition: `opacity ${SHEET_MS}ms ease`,
+          transition: "opacity var(--duration-slow) var(--ease-standard)",
         }}
       />
       <div
@@ -313,7 +319,7 @@ export function SidePanel({
           // The drawer hides toward its own (inline-end) edge: off to the right
           // under LTR, off to the left under RTL where inline-end is the left.
           transform: shown ? "translateX(0)" : `translateX(${isRtl() ? "-100%" : "100%"})`,
-          transition: `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+          transition: "transform var(--duration-slow) var(--ease-emphasized)",
           willChange: "transform",
         }}
       >

@@ -129,9 +129,11 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         // action, and this dialog is one of the two that perform the
         // cryptographic erase of `docs/decisions/storage/0105`: no undo, and
         // nothing outside a `.myne-backup` gets the note back. Its jsdom tests
-        // are not evidence for the shipping WebView, which `docs/decisions/ui/
-        // 0564` records measuring: `requestAnimationFrame` never fired there and
-        // left Enter inert for a full 45 s budget, three attempts over.
+        // are not evidence for the shipping WebView, and myne-md/myne#683 is the
+        // reason to believe that rather than assert it: the guard those tests
+        // exercised was refusing the harness's press at 14 ms of dialog age,
+        // under load, with every jsdom-level check green. `docs/decisions/ui/
+        // 0685` records the measurement and what replaced the guard.
         //
         // It also exercises guard 4 end to end. The palette selects its row on an
         // Enter KEYDOWN, so the dialog mounts with that key still down and

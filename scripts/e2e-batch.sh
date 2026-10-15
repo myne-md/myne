@@ -69,9 +69,10 @@ RUN_FLAGS=(
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
 # Host-side append, NOT inside the single-quoted literal above: that string is
-# passed through to the container's bash, where `$E2E_CARGO_JOBS` is unset and
-# would expand to nothing. See scripts/lib/e2e-docker.sh.
-E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS"
+# passed through to the container's bash, where `$E2E_CARGO_JOBS` and
+# `$E2E_CARGO_CODEGEN_UNITS` are unset and would expand to nothing. See
+# scripts/lib/e2e-docker.sh.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS"
 
 # **Forward the quarantine gate, or a quarantined spec SELF-SKIPS and this
 # script reports SKIP for a run you believed verified something.** That is not
