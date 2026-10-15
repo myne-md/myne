@@ -8,7 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CenteredCard, ctaHover, ctaStyle } from "../primitives/CenteredCard";
+import { CenteredCard, ctaInteraction, ctaStyle } from "../primitives/CenteredCard";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
@@ -209,7 +209,7 @@ export function MemberVaultUnlockCard({
           data-testid="unlock.member-submit"
           disabled={busy || !canSubmit}
           style={ctaStyle(busy || !canSubmit)}
-          {...ctaHover(busy || !canSubmit)}
+          {...ctaInteraction(busy || !canSubmit)}
         >
           {surface === "biometric" ? t("unlock.memberBiometricSubmit") : t("unlock.memberSubmit")}
         </button>

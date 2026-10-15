@@ -12,9 +12,9 @@ import { ControlBlock } from "./ControlBlock";
 import { ERROR_STYLE } from "./panel-styles";
 import { Icon } from "../primitives/Icon";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
 import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
 import {
@@ -281,7 +281,7 @@ export function ToolbarCustomizeSettings() {
                       aria-label={t("settings.toolbarCustomize.moveUp")}
                       disabled={isFirst}
                       onClick={() => move(id, -1)}
-                      {...hoverSurface({ disabled: isFirst })}
+                      {...interactiveSurface({ disabled: isFirst })}
                       style={isFirst ? ARROW_DISABLED_STYLE : ARROW_STYLE}
                       data-testid="settings.toolbar-customize.move-up"
                       data-item-id={id}
@@ -293,7 +293,7 @@ export function ToolbarCustomizeSettings() {
                       aria-label={t("settings.toolbarCustomize.moveDown")}
                       disabled={isLast}
                       onClick={() => move(id, 1)}
-                      {...hoverSurface({ disabled: isLast })}
+                      {...interactiveSurface({ disabled: isLast })}
                       style={isLast ? ARROW_DISABLED_STYLE : ARROW_STYLE}
                       data-testid="settings.toolbar-customize.move-down"
                       data-item-id={id}

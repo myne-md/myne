@@ -8,7 +8,8 @@
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 
 const STYLE: CSSProperties = {
   display: "flex",
@@ -55,7 +56,7 @@ export function IntegrityAlertBanner({ present, onDismiss }: IntegrityAlertBanne
           aria-label={t("common.dismiss")}
           onClick={onDismiss}
           style={DISMISS_STYLE}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           data-testid="sync.integrity-alert-dismiss"
         >
           ×

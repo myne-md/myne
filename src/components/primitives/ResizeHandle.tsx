@@ -159,7 +159,7 @@ export function ResizeHandle({
     width: barWidth,
     background: barColor,
     borderRadius: "var(--radius-1)",
-    transition: "background 120ms cubic-bezier(0.2, 0, 0, 1), width 120ms cubic-bezier(0.2, 0, 0, 1)",
+    transition: "background var(--duration-fast) var(--ease-standard), width var(--duration-fast) var(--ease-standard)",
   };
 
   return (

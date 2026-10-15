@@ -190,7 +190,10 @@ export function createTranscriptSection(opts: {
       // instead. The default for any new animation stays suppressed — this is
       // an opt-in, and a decorative one must not take it.
       bar.setAttribute("data-motion", "essential");
-      bar.style.animationDelay = `${i * 90}ms`;
+      // The stagger index only. `animation-delay` is computed in CSS from
+      // `--stagger-step` / `--stagger-max`, so the canon's stagger tokens are the
+      // single source and this loop stays free of `getComputedStyle`.
+      bar.style.setProperty("--stagger-index", String(i));
       meter.appendChild(bar);
     }
     progress.appendChild(meter);

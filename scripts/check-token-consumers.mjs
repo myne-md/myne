@@ -94,8 +94,6 @@ export function consumedTokens(files, read = (p) => readFileSync(p, "utf8")) {
  * rather than calling it dead.
  */
 export const THEME_ONLY = Object.freeze({
-  "--duration-slow":
-    "the long end of the timing scale, declared for a theme that wants a slower feel; no shipped rule reaches it",
   "--duration-slower":
     "the longest step, same reason; the shipped UI tops out at --duration-base",
 });

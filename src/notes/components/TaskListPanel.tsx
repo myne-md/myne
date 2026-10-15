@@ -27,6 +27,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { TaskRow, type TaskRowData, type TaskRowScope } from "@myne/editor/host/notes/TaskRow";
 import { Icon } from "../../components/primitives/Icon";
+import { usePressSurface } from "../../components/primitives/pressSurface";
+import type { InteractiveSurfaceHandlers } from "../../components/primitives/interactiveSurface";
 import { taskDescription } from "../../dialect/taskFieldWriter";
 import {
   DEFAULT_TASK_VIEW,
@@ -81,13 +83,28 @@ function toRowData(task: VaultTask, depth: number): TaskRowData {
   };
 }
 
-/** Inline styles cannot express `:hover`, so each interactive row owns a flag. */
-function useHover(): [
-  boolean,
-  { onMouseEnter: () => void; onMouseLeave: () => void },
-] {
+/** Inline styles cannot express `:hover` or press, so each interactive row owns
+ *  its flags and folds them into the fill it computes. The press half comes from
+ *  `usePressSurface`, which owns the press step and its value; this helper only
+ *  names the pair for a row and merges the two handler sets. */
+function useHover(): {
+  hover: boolean;
+  pressed: boolean;
+  pressBg: string;
+  handlers: InteractiveSurfaceHandlers;
+} {
   const [hover, setHover] = useState(false);
-  return [hover, { onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false) }];
+  const { pressed, pressBg, handlers: pressHandlers } = usePressSurface();
+  return {
+    hover,
+    pressed,
+    pressBg,
+    handlers: {
+      ...pressHandlers,
+      onMouseEnter: () => setHover(true),
+      onMouseLeave: () => setHover(false),
+    },
+  };
 }
 
 const PANEL_STYLE: CSSProperties = {
@@ -456,11 +473,11 @@ function FilterChip({
   testId: string;
   onRemove: () => void;
 }): ReactElement {
-  const [hover, handlers] = useHover();
+  const { hover, pressed, pressBg, handlers } = useHover();
   return (
     <button
       type="button"
-      style={hover ? CHIP_HOVER_STYLE : CHIP_STYLE}
+      style={pressed ? { ...CHIP_STYLE, background: pressBg } : hover ? CHIP_HOVER_STYLE : CHIP_STYLE}
       data-testid={testId}
       {...handlers}
       onClick={onRemove}
@@ -499,18 +516,20 @@ function BuilderLeftRow({
   onReset: () => void;
   testId: string;
 }): ReactElement {
-  const [hover, handlers] = useHover();
-  const [resetHover, resetHandlers] = useHover();
+  const { hover, pressed, pressBg, handlers } = useHover();
+  const { hover: resetHover, handlers: resetHandlers } = useHover();
   return (
     <div style={BUILDER_LEFT_ROW_STYLE}>
       <button
         type="button"
         style={
-          active
-            ? BUILDER_LEFT_ITEM_ACTIVE_STYLE
-            : hover
-              ? BUILDER_LEFT_ITEM_HOVER_STYLE
-              : BUILDER_LEFT_ITEM_STYLE
+          pressed
+            ? { ...BUILDER_LEFT_ITEM_STYLE, background: pressBg }
+            : active
+              ? BUILDER_LEFT_ITEM_ACTIVE_STYLE
+              : hover
+                ? BUILDER_LEFT_ITEM_HOVER_STYLE
+                : BUILDER_LEFT_ITEM_STYLE
         }
         {...handlers}
         aria-expanded={active}
@@ -551,11 +570,11 @@ function BuilderValueRow({
   onSelect: () => void;
   testId: string;
 }): ReactElement {
-  const [hover, handlers] = useHover();
+  const { hover, pressed, pressBg, handlers } = useHover();
   return (
     <button
       type="button"
-      style={active ? BUILDER_VALUE_ACTIVE_STYLE : hover ? BUILDER_VALUE_HOVER_STYLE : BUILDER_VALUE_STYLE}
+        style={pressed ? { ...BUILDER_VALUE_STYLE, background: pressBg } : active ? BUILDER_VALUE_ACTIVE_STYLE : hover ? BUILDER_VALUE_HOVER_STYLE : BUILDER_VALUE_STYLE}
       {...handlers}
       aria-checked={active}
       role="menuitemradio"
@@ -620,7 +639,7 @@ function TaskFilterBuilder({
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const [clearHover, clearHandlers] = useHover();
+  const { hover: clearHover, handlers: clearHandlers } = useHover();
   const setView = (patch: Partial<TaskView>): void => onViewChange({ ...view, ...patch });
 
   const axisLabel: Record<BuilderSection, string> = {
@@ -872,8 +891,8 @@ export function TaskListPanel({
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [builderOpen, setBuilderOpen] = useState(false);
-  const [filtersHover, filtersHandlers] = useHover();
-  const [clearHover, clearHandlers] = useHover();
+  const { hover: filtersHover, handlers: filtersHandlers } = useHover();
+  const { hover: clearHover, handlers: clearHandlers } = useHover();
   const filtersButtonRef = useRef<HTMLButtonElement>(null);
   // Escape close returns focus to the button that opened the builder
   // (myne-md/myne#656 review); the backdrop path is a mouse close and moves

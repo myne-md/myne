@@ -94,7 +94,7 @@ export function CommandPalette({
       <div
         role="presentation"
         onClick={requestClose}
-        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }}
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity var(--duration-base) var(--ease-standard)" }}
       />
       <div
         ref={paletteRef}
@@ -116,7 +116,7 @@ export function CommandPalette({
           transformOrigin: "top center",
           opacity: shown ? 1 : 0,
           transform: shown ? "translateY(0) scale(1)" : "translateY(-14px) scale(0.98)",
-          transition: "transform 240ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease",
+          transition: "transform var(--duration-slow) var(--ease-emphasized), opacity var(--duration-base) var(--ease-standard)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderBottom: "1px solid var(--line-1)", flex: "none" }}>
