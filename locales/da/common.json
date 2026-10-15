@@ -3,7 +3,6 @@
     "accountMismatch": "Denne browser indeholder allerede en boks fra en anden konto. Åbn den, eller log ud og slet denne browsers kopi først.",
     "changeAccount": "Brug et andet kontonummer",
     "continue": "Fortsæt",
-    "failed": "Kunne ikke åbne den konto. Tjek kontonummeret og adgangskoden, og prøv igen.",
     "hint": "Indtast hovedadgangskoden til denne konto. Myne henter din boks og registrerer denne browser som en enhed på den.",
     "noEndpoint": "Denne kopi af Myne har ingen synkroniseringsserver konfigureret og kan derfor ikke nå din boks. Kontakt dem, der driver den.",
     "passwordLabel": "Hovedadgangskode",
@@ -32,7 +31,6 @@
     "composer": {
       "placeholder": "Bed AI'en om at ændre disse noter",
       "scopeLabel": "Arbejder på",
-      "scopeChange": "Skift",
       "scopeOpenNote": "Denne note",
       "scopeCount_one": "{{count}} note",
       "scopeCount_other": "{{count}} noter",
@@ -47,9 +45,15 @@
       "unsupported": "Denne model kan ikke pålideligt lave præcise ændringer, så agenten er utilgængelig. Vælg en større model eller en udbyder.",
       "unsupportedDetail": "Den bestod {{passes}} af {{attempts}} tjek; der kræves {{required}}.",
       "checking": "Tjekker modellen…",
-      "checkingAt": "Tjekker modellen… ({{attempt}}/{{of}})",
       "unsupportedProvisional": "Den beståelsesgrænse er endnu ikke målt på tværs af modeller, så den kan være strengere eller mere lempelig, end den bør være.",
-      "scopeNone": "ingen note åben, så der er endnu ikke noget at arbejde med"
+      "scopeNone": "ingen note åben, så der er endnu ikke noget at arbejde med",
+      "scopeAllVault": "Alle noter",
+      "blockedScope": "Der er endnu intet for agenten at arbejde på: hver note er udelukket fra AI, eller boksen er tom.",
+      "preparing": "Gør klar…",
+      "blockedScopeSidebar": "Der er endnu intet at spørge om her: denne notes mappe er udelukket fra AI.",
+      "needsScope": "Vælg en mappe nedenfor, eller åbn en note, så agenten har noget at arbejde på.",
+      "scopeExcluded_one": "{{count}} udelukket fra AI",
+      "scopeExcluded_other": "{{count}} udelukket fra AI"
     },
     "progress": {
       "working": "Arbejder",
@@ -66,7 +70,8 @@
       "grantsUser_other": "{{count}} omfang, du har angivet",
       "grantsModel_one": "{{count}} den bad om",
       "grantsModel_other": "{{count}} omfang, den bad om",
-      "cancelledBackground": "Kørslen blev annulleret, fordi Myne gik i baggrunden. Der blev ikke skrevet noget. Spørg igen, når du er klar."
+      "cancelledBackground": "Kørslen blev annulleret, fordi Myne gik i baggrunden. Der blev ikke skrevet noget. Spørg igen, når du er klar.",
+      "legFailed": "Kørslen stoppede, før den blev færdig."
     },
     "scope": {
       "title": "Inkludér {{folder}}?",
@@ -123,7 +128,9 @@
         "notProposed": "Kunne ikke anvendes: den ændring er ikke en del af denne kørsels forslag.",
         "noteMoved": "Kunne ikke anvendes: den ændring ville flytte noten til en anden mappe.",
         "appendEmpty": "Kunne ikke anvendes: der var intet at tilføje.",
-        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok."
+        "appendWouldWriteFrontmatter": "Kunne ikke anvendes: den tekst ville være blevet notens egenskabsblok.",
+        "moveToSameFolder": "Ikke flyttet: noten er allerede i den mappe.",
+        "moveIntoExcludedFolder": "Ikke flyttet: den mappe er udelukket fra AI."
       },
       "applyFailed": "Ændringerne kunne ikke anvendes.",
       "undo": "Fortryd denne kørsel",
@@ -145,11 +152,39 @@
       "runSummaryOnDevice": "intet forlod denne enhed",
       "appendFlag": "tilføjes til slutningen",
       "diffCurrent": "I noten nu",
-      "diffProposed": "Efter denne ændring"
+      "diffProposed": "Efter denne ændring",
+      "summaryShowAll": "Vis hele resuméet",
+      "summaryShorten": "Forkort resuméet",
+      "settingFolderFrom": "mappe: {{from}} bliver {{to}}",
+      "moveFlag": "flytter til en anden mappe",
+      "settingFromValue": "{{from}} bliver {{to}}",
+      "settingFromUnset": "ikke angivet, bliver {{value}}",
+      "settingCleared": "{{from}} fjernes",
+      "settingAlreadyUnset": "ikke angivet",
+      "settingFolder": "i {{folder}}",
+      "applySetting": "Anvend separat",
+      "refusedSetting": {
+        "needsOwnAct": "Ikke anvendt her: en ændring af en indstilling godkendes altid separat.",
+        "notWritable": "Kunne ikke anvendes: den indstilling er ikke længere en, agenten må ændre.",
+        "invalidValue": "Kunne ikke anvendes: den værdi accepteres ikke for denne indstilling.",
+        "folderRemoved": "Ikke anvendt: du slettede den mappe, og agenten genskaber den ikke.",
+        "notClearable": "Kunne ikke ryddes: denne indstilling har ingen ikke-angivet-tilstand. Ændr den til en værdi i stedet.",
+        "writeFailed": "Kunne ikke anvendes: skrivningen af indstillingen mislykkedes. De øvrige ændringer blev stadig anvendt.",
+        "runStopped": "Ikke anvendt: kørslen blev stoppet, så der blev ikke forsøgt nogen ændring.",
+        "notProposed": "Ikke anvendt: denne kørsel foreslog aldrig den ændring, så værten skriver den ikke."
+      },
+      "undoReportFailed_one": "{{count}} ændring kunne ikke føres tilbage.",
+      "undoReportFailed_other": "{{count}} ændringer kunne ikke føres tilbage.",
+      "undoReportSettings_one": "{{count}} indstilling ført tilbage.",
+      "undoReportSettings_other": "{{count}} indstillinger ført tilbage.",
+      "settingsHeading_one": "{{count}} indstilling",
+      "settingsHeading_other": "{{count}} indstillinger",
+      "settingsChanged_one": "{{count}} indstilling ændret.",
+      "settingsChanged_other": "{{count}} indstillinger ændret.",
+      "refusedCount_one": "{{count}} ændring kunne ikke anvendes",
+      "refusedCount_other": "{{count}} ændringer kunne ikke anvendes"
     },
     "undo": {
-      "offer_one": "Den seneste kørsel ændrede {{count}} note.",
-      "offer_other": "Den seneste kørsel ændrede {{count}} noter.",
       "action": "Fortryd kørslen",
       "reverted_one": "{{count}} note gendannet.",
       "reverted_other": "{{count}} noter gendannet.",
@@ -158,7 +193,50 @@
       "createdNotReverted_one": "{{count}} note, som kørslen oprettede, blev efterladt.",
       "createdNotReverted_other": "{{count}} noter, som kørslen oprettede, blev efterladt.",
       "sessionOnly": "Denne fortryd-med-ét-tryk gælder, indtil du låser boksen eller lukker appen. Derefter gendanner du noter én ad gangen fra en notes versionshistorik.",
-      "sessionOnlyLink": "Åbn versionshistorik"
+      "revertedSettings_one": "{{count}} indstilling ført tilbage.",
+      "revertedSettings_other": "{{count}} indstillinger ført tilbage."
+    },
+    "hub": {
+      "title": "Agent",
+      "loading": "Indlæser samtaler…",
+      "modeLabel": "Hvilke samtaler",
+      "modeVault": "Alle",
+      "modeNote": "Denne note",
+      "renamedAnnouncement": "Omdøbt til {{name}}",
+      "deletedAnnouncement": "Samtale slettet",
+      "loadFailed": "Dine samtaler kunne ikke indlæses lige nu.",
+      "emptyTitle": "Ingen samtaler endnu",
+      "anchorLabel": "På en note",
+      "anchorOpen": "Åbn {{name}}",
+      "generateTitle": "Generér titel",
+      "generateTitleNeedsModel": "Generér titel, kræver en lokal tekstmodel",
+      "generateTitleExcluded": "Generér titel, denne note er i en mappe, du har udelukket fra AI",
+      "titleGenerating": "Genererer en titel…",
+      "titleGenerated": "Titel genereret: {{name}}",
+      "titleFailed": "Kunne ikke generere en titel.",
+      "titleSaveFailed": "Titlen kunne ikke gemmes.",
+      "searchLabel": "Søg i samtaler",
+      "searchPlaceholder": "Søg i samtaler…",
+      "noMatchTitle": "Ingen resultater",
+      "noMatchBody": "Ingen samtale matcher “{{query}}”. Ryd søgningen for at se dem alle.",
+      "emptyBody": "Samtaler, du starter, vises her.",
+      "menu": "Samtalehandlinger",
+      "unread": "Et færdigt resultat, du endnu ikke har læst",
+      "targetFolder": "Om en mappe",
+      "targetNote": "Om en note",
+      "targetVault": "Om hele boksen",
+      "running": "Arbejder på denne samtale",
+      "newConversation": "Ny samtale",
+      "historyLabel": "Historik"
+    },
+    "focus": {
+      "title": "Agent på note",
+      "openNote": "Åbn note"
+    },
+    "footprint": {
+      "disclosure": "Hvad denne kørsel kostede",
+      "memory_one": "{{count}} hukommelse gemt",
+      "memory_other": "{{count}} hukommelser gemt"
     }
   },
   "ai": {
@@ -245,9 +323,7 @@
       "menuRename": "Omdøb",
       "menuTranscribe": "Transskribér",
       "menuViewTranscription": "Vis transskription",
-      "noMatch": "Ingen vedhæftede filer matcher din søgning.",
       "noUnusedNotice": "Ingen ubrugte vedhæftede filer at rydde op i.",
-      "preview": "Forhåndsvis",
       "previewAttachment": "Forhåndsvis vedhæftet fil",
       "searchAriaLabel": "Søg i vedhæftede filer efter filnavn",
       "searchPlaceholder": "Søg efter filnavn",
@@ -276,7 +352,11 @@
       "usedInCount_one": "Bruges i {{count}} note",
       "usedInCount_other": "Bruges i {{count}} noter",
       "usedInLoading": "…",
-      "previewNamed": "Forhåndsvis {{name}}"
+      "previewNamed": "Forhåndsvis {{name}}",
+      "emptyFilteredBody": "Intet her matcher det aktuelle typefilter. Ryd det for at se hele biblioteket igen.",
+      "emptyFilteredBodyQuery": "Intet i biblioteket matcher",
+      "emptyLoadErrorBody": "Kataloget er krypteret med din boks, så det er som regel en læsning, der blev afbrudt, snarere end tabte data. Prøv igen; hvis det bliver ved med at fejle, er dine noter og deres filer ikke påvirket.",
+      "emptyRetry": "Prøv igen"
     },
     "thumbnail": {
       "audioLabel": "Lyd: {{filename}}",
@@ -349,7 +429,11 @@
       "preparing": "Forbereder…",
       "successToast": "Sikkerhedskopi verificeret og gemt.",
       "title": "Sikkerhedskopiér boks",
-      "verifying": "Verificerer {{done}} af {{total}}…"
+      "verifying": "Verificerer {{done}} af {{total}}…",
+      "drillBody": "En sikkerhedskopi alene giver dig ikke adgang igen, hvis du mister din adgangskode.",
+      "drillCta": "Tjek den",
+      "drillOnce": "Vises én gang. Når du lukker dette, kommer det ikke igen.",
+      "drillTitle": "Har du også tjekket din gendannelsessætning?"
     }
   },
   "clipper": {
@@ -551,17 +635,11 @@
       "restoreBackup": {
         "label": "Gendan boks fra sikkerhedskopi…"
       },
-      "toggleRealtimeSync": {
-        "label": "Slå realtidssynkronisering til/fra"
-      },
       "revealVaultFolder": {
         "label": "Vis boksmappen i filhåndteringen"
       },
       "aiSummarizeNote": {
         "label": "Opsummér note"
-      },
-      "aiSuggestTags": {
-        "label": "Foreslå tags"
       },
       "aiRewriteSelection": {
         "label": "Omskriv markering"
@@ -697,6 +775,18 @@
       },
       "showIsolatedGraph": {
         "label": "Åbn isoleret graf"
+      },
+      "aiOpenAgentVault": {
+        "label": "Agent: åbn på boks"
+      },
+      "aiOpenAgentNote": {
+        "label": "Agent: åbn på note"
+      },
+      "meetingSummarize": {
+        "label": "Opsummer møde med AI…"
+      },
+      "openPalette": {
+        "label": "Søg og kør en kommando…"
       }
     },
     "hotkeys": {
@@ -978,11 +1068,9 @@
             "tooLong": "Denne optagelse er for lang til at blive transskriberet. Lyden forbliver vedhæftet, så du kan stadig afspille den.",
             "vaultLocked": "Lås din boks op for at transskribere."
           },
-          "disabledReason": "Aktivér AI under Indstillinger → Developer → AI for at transskribere.",
           "failed": "Transskription mislykkedes. Prøv igen.",
           "heading": "Transskription",
           "insert": "Indsæt transskription i noten",
-          "noModelHint": "Vælg en transskriptionsmodel under Indstillinger → Developer → AI.",
           "progress": "Transskriberer…",
           "stop": "Stop"
         },
@@ -1043,7 +1131,6 @@
         "moveRight": "Flyt til højre",
         "saveStatus": "Gemmestatus",
         "settings": "Indstillinger",
-        "syncStatus": "Synkroniseringsstatus",
         "tags": "Tags",
         "viewMode": "Visningstilstand",
         "views": "Visninger",
@@ -1121,13 +1208,13 @@
             "proposed_one": "Foreslog {{count}} ændring.",
             "proposed_other": "Foreslog {{count}} ændringer.",
             "memoryUpdated_one": "Hukommelse opdateret med én post.",
-            "memoryUpdated_other": "Hukommelse opdateret med {{count}} poster."
+            "memoryUpdated_other": "Hukommelse opdateret med {{count}} poster.",
+            "honestyExpand": "Vis hele noten",
+            "honestyCollapse": "Forkort noten"
           },
           "askPlaceholder": "Stil et spørgsmål om dine noter…",
           "askSubmit": "Spørg",
           "assistant": "Assistent",
-          "citations": "Kilder",
-          "composerPlaceholder": "Skriv til dine noter…",
           "empty": "AI-output (opsummeringer, svar og forslag) vises her.",
           "error": "AI-anmodningen kunne ikke fuldføres.",
           "errorTurn": "Assistenten kunne ikke svare.",
@@ -1160,8 +1247,6 @@
           "historyEmpty": "Endnu ingen samtaler. Nye chats vises her.",
           "historyError": "Kunne ikke indlæse samtaler. Prøv igen.",
           "historyLoading": "Indlæser…",
-          "historyProposalAfter": "Efter",
-          "historyProposalBefore": "Før",
           "historyProposalNewNote": "Ny note",
           "historyRename": "Omdøb",
           "historyTitle": "Chathistorik",
@@ -1177,7 +1262,23 @@
           "memoryPopoverLoadFailed": "Kunne ikke indlæse minder. Intet blev ændret.",
           "memoryPopoverRetry": "Prøv igen",
           "memoryPopoverSettings": "Administrer i Indstillinger",
-          "memoryPopoverClose": "Luk"
+          "memoryPopoverClose": "Luk",
+          "copied": "Kopieret",
+          "copyAnswer": "Kopiér svaret",
+          "copyFailed": "Kunne ikke kopiere",
+          "copyYourMessage": "Kopiér din besked",
+          "emptyTitle": "Spørg om dine noter",
+          "noticeLeaves": "De ord, du skriver, de noter et trin læser, titlerne, identifikatorerne og mappestierne for hver note, kørslen må læse (hele boksen minus dine udelukkede mapper, medmindre du indsnævrer den), og det, AI'en husker om dig, sendes til det, der svarer. Intet andet på denne enhed sendes.",
+          "noticeReceiver": "Det er, der svarer: {{provider}}, som Myne ikke driver.",
+          "noticeReceiverLocal": "Det er, der svarer: et program, der kører på denne enhed. Intet forlader maskinen, men det program er ikke en del af Myne, og Myne kan ikke se, hvad det gør med dem.",
+          "noticeRevoke": "For at stoppe det skal du slå AI fra i Indstillinger eller ændre, hvad der svarer der. Tilbagekalder du en udbydernøgle, stopper den udbyder med det samme.",
+          "noticeSettingsCta": "Åbn AI-indstillinger",
+          "viewDiff": "Se ændringer",
+          "revertRun": "Fortryd denne kørsel",
+          "diffTitle": "Foreslåede ændringer",
+          "revertConfirmTitle": "Fortryd denne kørsel?",
+          "revertConfirmBody": "Noter, som denne kørsel ændrede, vender tilbage til, som de var før. Noter, den oprettede, forbliver, hvor de er.",
+          "focusAgent": "Åbn i agent-fanen"
         },
         "allHidden": "Alle faner er skjult. Højreklik for at gendanne.",
         "outline": {
@@ -1191,7 +1292,8 @@
           "backlinks": "Links",
           "outline": "Disposition",
           "tasks": "Opgaver",
-          "unlinked": "Ulinkede omtaler"
+          "unlinked": "Ulinkede omtaler",
+          "whoIsHere": "Hvem er her"
         },
         "tabStripLabel": "Højre panel"
       },
@@ -1228,6 +1330,14 @@
         "editor": "Redigeringsprogram",
         "rightPanel": "Højre panel",
         "sidebar": "Notesider"
+      },
+      "presence": {
+        "editing": "redigerer",
+        "empty": "Du er den eneste her",
+        "jumpTo": "Hop til {{name}}",
+        "unknown": "Nogen",
+        "title_one": "{{count}} her nu",
+        "title_other": "{{count}} her nu"
       }
     },
     "noteActions": {
@@ -1349,7 +1459,8 @@
       "todoList": "Opgaveliste",
       "voiceNote": "Talenote",
       "wikiLink": "Wikilink",
-      "remind": "Påmindelse"
+      "remind": "Påmindelse",
+      "meeting": "Mødesession"
     },
     "spell": {
       "menu": {
@@ -1390,7 +1501,6 @@
         "priority": "Prioritet",
         "remind": "Påmindelse"
       },
-      "timeLabel": "Klokkeslæt (valgfrit)",
       "invalidRemind": "Myne kan ikke læse denne dato, så du får ingen påmindelse.",
       "addTime": "Tilføj tid",
       "clear": "Ryd",
@@ -1667,6 +1777,47 @@
       "title": "Denne note blev slettet et andet sted",
       "body": "Den blev slettet fra et andet vindue eller synkroniseret fra en anden enhed. Alle usavede ændringer i dette vindue blev bevaret som en kopi.",
       "close": "Luk vindue"
+    },
+    "meeting": {
+      "ai": {
+        "cancelled": "Stoppet. Der blev ikke tilføjet noget til noten.",
+        "close": "Luk",
+        "discard": "Kassér",
+        "failed": "AI-gennemløbet mislykkedes. Transskriptionen er uændret.",
+        "generate": "Generér",
+        "insert": "Indsæt i note",
+        "notice": "AI-genereret ud fra transskriptionen ovenfor. Det kan være forkert; transskriptionen er det egentlige.",
+        "noAttribution": "Transskriptionen siger ikke, hvem der talte, så handlingspunkter har ingen ejere.",
+        "noModel": "Der er ikke installeret nogen AI-model til at generere tekst. Møderesuméet kræver en; download den i Indstillinger, AI.",
+        "offer": "Møde gemt. Opsummer det med AI?",
+        "offerAction": "Opsummer",
+        "openSettings": "Åbn AI-indstillinger",
+        "pickIntro": "Vælg, hvad der skal genereres ud fra transskriptionen.",
+        "progress": "Del {{done}} af {{total}}",
+        "reviewIntro": "Gennemgå, før du indsætter. Transskriptionen forbliver, som den er.",
+        "running": "Genererer…",
+        "section": {
+          "actionItems": "Handlingspunkter",
+          "decisions": "Beslutninger",
+          "openQuestions": "Åbne spørgsmål",
+          "summary": "Resumé"
+        },
+        "stop": "Stop",
+        "title": "Møde-AI"
+      },
+      "barAria": "Mødesession",
+      "cancel": "Annuller",
+      "chunksMissing": "En del af mødet blev ikke overført, så noten har et hul. Den lyd, der nåede frem, er stadig der.",
+      "clipFailed": "En del af mødet kunne ikke gemmes. Resten er stadig i noten.",
+      "machineNotice": "Dette er en maskintransskription af mødet og kan indeholde fejl.",
+      "noteTitle": "Møde {{date}}",
+      "noteWriteFailed": "Mødets note kunne ikke skrives. Den optagede lyd er stadig i din boks som vedhæftede filer.",
+      "saving": "Skriver noten…",
+      "stop": "Stop",
+      "systemAudioUnavailable": "Denne enhed kan ikke optage systemlyd, så de øvrige deltagere kommer ikke med i noten.",
+      "tapSilent": "De øvrige deltageres lyd kommer ikke igennem. Tjek Systemindstillinger, Anonymitet og sikkerhed, Skærm- og systemlydoptagelse.",
+      "transcriptHeading": "Transskription",
+      "transcriptionFailed": "En del af mødet kunne ikke transskriberes. Lyden er stadig i noten."
     }
   },
   "export": {
@@ -1823,14 +1974,12 @@
       "close": "Luk",
       "count_one": "{{count}} note",
       "count_other": "{{count}} noter",
-      "countEmpty": "Tom",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette den note. Prøv igen.",
       "emptyBody": "Arkiverede noter og mapper er skjult i sidepanelet, men de bevares. Gendan dem her, når du får brug for dem.",
       "emptyTitle": "Intet arkiveret",
       "folderDeleteBody_one": "“{{name}}” og dens {{count}} note",
       "folderDeleteBody_other": "“{{name}}” og dens {{count}} noter",
-      "emptyState": "Arkivet er tomt.",
       "folderDeleteConfirm_one": "Flyt {{count}} note til papirkurven?",
       "folderDeleteConfirm_other": "Flyt {{count}} noter til papirkurven?",
       "folderDeleteConfirmCta": "Flyt til papirkurv",
@@ -1931,7 +2080,10 @@
         "tag": "Tag"
       },
       "unrepresentable": "Dette filter blev lavet med en avanceret editor og kan ikke redigeres her.",
-      "unresolved": "uafklaret"
+      "unresolved": "uafklaret",
+      "conditionNegate": "Betingelse: er eller er ikke",
+      "conditionType": "Betingelse: hvad der skal matche",
+      "conditionValue": "Betingelse: værdien der skal matche"
     },
     "folderManagement": {
       "illegalSegment": "Et mappenavn kan ikke indeholde / \\ | # ^ [ ] eller begynde/slutte med et mellemrum.",
@@ -1950,7 +2102,6 @@
     "folderRow": {
       "createFolderNote": "Opret en mappenote",
       "empty": "tom",
-      "folderNote": "mappenote",
       "openFolderNote": "Åbn mappenote"
     },
     "graph": {
@@ -1970,8 +2121,6 @@
         "filterConditions_one": "{{count}} betingelse",
         "filterConditions_other": "{{count}} betingelser",
         "heading": "Farvegrupper",
-        "moveDown": "Flyt regel ned",
-        "moveUp": "Flyt regel op",
         "namePlaceholder": "Regel uden titel",
         "rowLabel": "{{name}}, gruppe {{index}} af {{total}}. Alt plus op- eller nedpilen omorganiserer den.",
         "editRuleButton": "Rediger",
@@ -1984,13 +2133,10 @@
       "depthToggleTitle": "Skift nabolagsdybde (1 ↔ 2 spring)",
       "filterAll": "Alle",
       "filterAroundNote": "Omkring denne note",
-      "filterByTag": "Filtrér efter tag",
       "filterIsolated": "Isolerede",
       "hop": "{{depth}} spring",
       "loading": "Indlæser graf…",
       "noNotes": "Ingen noter at vise i grafen endnu.",
-      "overCap": "Denne boks er stor — grafen over hele boksen er begrænset. Filtrér efter et tag, eller vis isolerede noter for at udforske.",
-      "refresh": "Opdatér",
       "refreshTitle": "Boksen blev ændret: genopbyg grafen",
       "settings": {
         "appearanceHeading": "Udseende",
@@ -2015,7 +2161,6 @@
       "listLinkCount_other": "{{count}} links",
       "listLinksFrom": "Linket fra: {{titles}}",
       "listLinksTo": "Linker til: {{titles}}",
-      "relayout": "Genopbyg layout",
       "relayoutTitle": "Læg grafen op igen fra bunden",
       "showingCount_one": "Viser {{count}} note",
       "showingCount_other": "Viser {{count}} noter",
@@ -2044,7 +2189,6 @@
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Mappe",
         "flagKindTitle": "Titel",
-        "folderPickerTitle": "Vælg din Obsidian-boksmappe",
         "hiddenIgnoredPrefix_one": "{{count}} konfigurations-/skjult element ignoreret (fx ",
         "hiddenIgnoredPrefix_other": "{{count}} konfigurations-/skjulte elementer ignoreret (fx ",
         "hiddenIgnoredSuffix": ", dotfiler).",
@@ -2179,12 +2323,12 @@
         "importLabel": "Navngiv denne import",
         "importLabelHint": "Hvis en note, du importerer, har samme navn som en, du allerede har, og noget, du importerer, linker til den, omdøbes den importerede med dette. Behold det samme navn, hvis du kører denne import igen, så bliver intet hentet ind to gange.",
         "importLabelIllegal": "Det navn kan ikke bruges: et notenavn må ikke indeholde \\ / | # ^ [ ], eller begynde eller slutte med et mellemrum.",
-        "opening": "Åbner…",
         "unnamedVault": "Boks {{n}}",
         "errors": {
           "credential": "Den adgangskode eller gendannelsessætning åbnede ikke boksen. Tjek den, og prøv igen.",
           "busy": "En anden handling på boksen er i gang. Vent, til den er færdig, og prøv igen.",
-          "alreadyOpen": "Den boks er allerede åben for en import. Afslut eller annullér den import først."
+          "alreadyOpen": "Den boks er allerede åben for en import. Afslut eller annullér den import først.",
+          "backupInvalid": "Den fil kunne ikke læses som en Myne-sikkerhedskopi. Tjek filen, og prøv igen."
         },
         "done": {
           "sourceUnchanged": "Den boks, du importerede fra, er ikke blevet ændret. Hvis du synkroniserer den, bliver den ved med at synkronisere.",
@@ -2202,18 +2346,19 @@
           "dictionaryWordsAdded": "Ord fra ordbogen taget med",
           "dictionaryUnreadable": "Kildeboksens ordbog kunne ikke læses, så ingen ord blev taget med.",
           "linksLeftUnresolved": "Links, der ikke kunne omdirigeres til noget"
-        }
+        },
+        "backupLabel": "Sikkerhedskopifil",
+        "chooseBackup": "Vælg sikkerhedskopifil",
+        "noBackupChosen": "Ingen sikkerhedskopifil valgt"
       }
     },
     "list": {
       "addToFavorites": "Tilføj til favoritter",
-      "archive": "Arkivér",
       "archiveBulkError": "Kunne ikke arkivere noterne.",
       "renameFailed": "Kunne ikke gemme det navn, så noten beholdt sit gamle.",
       "archiveFolder": "Arkivér mappe",
       "archiveNote": "Arkivér",
       "archiveSingleError": "Kunne ikke arkivere noten.",
-      "attachments": "Vedhæftede filer",
       "bulkArchive": "Arkivér {{count}} noter",
       "bulkArchive_one": "Arkivér {{count}} note",
       "bulkArchive_other": "Arkivér {{count}} noter",
@@ -2246,24 +2391,18 @@
       "newFolder": "Ny mappe",
       "newFolderInPlaceholder": "Ny mappe i {{path}}",
       "newFolderPlaceholder": "Ny mappe",
-      "newItem": "Ny…",
       "newNote": "Ny note",
-      "newNoteFromTemplate": "Ny note fra skabelon…",
       "newNoteHere": "Ny note her",
       "newNoteMenu": "Ny note",
-      "newNoteShortcut": "Ny note (⌘N)",
       "newSubfolder": "Ny undermappe",
       "newViewTitle": "Ny visning",
       "noteMovedToTrash": "Note flyttet til papirkurven",
       "notesHeading": "Noter",
       "notesMovedToTrash_one": "{{count}} note flyttet til papirkurven",
       "notesMovedToTrash_other": "{{count}} noter flyttet til papirkurven",
-      "openArchive": "Åbn arkivet",
-      "openAttachments": "Åbn vedhæftede filer",
       "openFolderNote": "Åbn mappenote",
       "openInNewTab": "Åbn i nyt faneblad",
       "openToSide": "Åbn ved siden af",
-      "openTrash": "Åbn papirkurven",
       "removeFolderNote": "Fjern mappenote",
       "removeFromFavorites": "Fjern fra favoritter",
       "rename": "Omdøb",
@@ -2289,7 +2428,9 @@
       "moveFolderTo": "Flyt mappe til…",
       "treeLabel": "Noter og mapper",
       "selectionAnnouncement": "Valgt {{title}}",
-      "untitled": "Uden navn"
+      "untitled": "Uden navn",
+      "emptyBody": "Noter er almindelig markdown, krypteret på denne enhed, før de forlader den. Opret en for at komme i gang, eller tryk på søgerækken ovenfor for at køre en kommando.",
+      "search": "Søg"
     },
     "newFromTemplate": {
       "back": "Tilbage",
@@ -2309,18 +2450,31 @@
     "newTab": {
       "createNote": "Opret en ny note",
       "createDrawing": "Ny tegning",
-      "noNotesMatch": "Ingen noter matcher.",
       "noNotesYet": "Ingen noter endnu.",
       "recent": "Seneste",
       "searchAriaLabel": "Søg i noter, der skal åbnes",
       "searchPlaceholder": "Søg i noter…",
-      "untitled": "Uden titel"
+      "untitled": "Uden titel",
+      "createFromTemplate": "Fra skabelon",
+      "kindCommand": "Kommando",
+      "kindNote": "Note",
+      "noMatch": "Intet matcher.",
+      "places": {
+        "agent": "Agent",
+        "attachments": "Vedhæftede filer",
+        "graph": "Graf",
+        "tasks": "Opgaver",
+        "today": "I dag"
+      },
+      "placesLabel": "Gå til",
+      "results": "Resultater"
     },
     "pane": {
       "graphTab": "Graf",
       "tasksTab": "Opgaver",
       "loading": "Indlæser…",
-      "untitledView": "Visning uden titel"
+      "untitledView": "Visning uden titel",
+      "agentTab": "Agent"
     },
     "relativeTime": {
       "daysAgo": "for {{d}} dage siden",
@@ -2401,7 +2555,9 @@
       "restoredStatus": "Gendannet. Den version, du havde, er gemt som et øjebliksbillede.",
       "selectPlaceholder": "Vælg et øjebliksbillede for at se, hvad der er ændret siden da.",
       "title": "Øjebliksbilleder",
-      "untitled": "Uden titel"
+      "untitled": "Uden titel",
+      "deviceFallback": "Enhed {{code}}",
+      "unknownAuthor": "Ukendt enhed"
     },
     "tabStrip": {
       "closeNewTab": "Luk nyt faneblad",
@@ -2442,7 +2598,6 @@
       "close": "Luk",
       "count_one": "{{count}} note",
       "count_other": "{{count}} noter",
-      "countEmpty": "Tom",
       "delete": "Slet",
       "deleteError": "Kunne ikke slette den note. Prøv igen.",
       "empty": "Tøm papirkurv",
@@ -2454,7 +2609,6 @@
       "emptyPartialFailure_other": "{{count}} noter kunne ikke slettes og bliver i papirkurven.",
       "emptyBody": "Noter, du sletter, havner her. De bliver liggende, indtil du tømmer papirkurven. Du kan gendanne enhver af dem når som helst.",
       "emptyTitle": "Papirkurven er tom",
-      "emptyState": "Papirkurven er tom.",
       "purgeConfirmCta": "Slet permanent",
       "purgeConfirmTitle": "Slet permanent?",
       "restore": "Gendan",
@@ -2483,13 +2637,7 @@
         "setCoverImage": "Vælg forsidebillede",
         "untitled": "Uden titel"
       },
-      "collapseViews": "Skjul visninger",
       "empty": "Ingen visninger endnu. Gem den aktuelle noteliste som en visning.",
-      "expandViews": "Udvid visninger",
-      "heading": "Visninger",
-      "host": {
-        "unsupported": "Denne visningstype kommer i en senere opdatering."
-      },
       "list": {
         "empty": "Ingen noter matcher denne visning",
         "noValue": "Ingen værdi"
@@ -2770,10 +2918,23 @@
       "threatModelHelper": "Åbn det offentlige trusselsmodel-dokument i din browser.",
       "threatModelLabel": "Trusselsmodel",
       "version": "Version",
-      "dev": "Dev"
+      "dev": "Dev",
+      "updateAutoCheckHelper": "Myne downloader en lille signeret fil fra myne.md for at se, om der findes en nyere version, og fortæller dig det. Den sender din nuværende version og platform og intet andet. Du kan stadig tjekke manuelt med knappen ovenfor.",
+      "updateAutoCheckLabel": "Tjek automatisk for opdateringer",
+      "updateAvailable": "Version {{version}} er tilgængelig.",
+      "updateChannelBeta": "Beta",
+      "updateChannelLabel": "Opdateringskanal",
+      "updateChannelStable": "Stabil",
+      "updateCheckButton": "Tjek for opdateringer",
+      "updateChecking": "Tjekker…",
+      "updateFailed": "Kunne ikke tjekke for opdateringer. Der gøres et nyt forsøg senere.",
+      "updateHelper": "Myne verificerer hver opdatering mod en offline-udgivelsesnøgle, før den installeres. Tjekket spørger downloads.myne.md om den nyeste version og sender kun din version og platform (og din IP, som det ophav ikke logger); aldrig dine noter eller din konto.",
+      "updateIdle": "Signerede opdateringer, hentet fra downloads.myne.md, når du tjekker.",
+      "updateInstallButton": "Genstart for at opdatere",
+      "updateLabel": "Opdateringer",
+      "updateUpToDate": "Du har den nyeste version."
     },
     "vault": {
-      "argon2idHeading": "Argon2id-parametre",
       "changePasswordButton": "Skift adgangskode",
       "changePasswordError": {
         "invalidCredentialOrVault": "Forkert nuværende adgangskode, eller boks-filen er beskadiget.",
@@ -2781,7 +2942,9 @@
         "joinFailure": "Noget gik galt, prøv igen.",
         "samePasswordRejected": "Den nye adgangskode er den samme som den nuværende.",
         "serverAckPending": "Din nye adgangskode virker på denne enhed, men Myne kunne ikke nå serveren for at gemme den. Indtil det lykkes, forventer dine andre enheder stadig den gamle adgangskode, og hvis denne browsers kopi ryddes inden da, går ændringen tabt. Der forsøges automatisk igen.",
-        "weakNewPassword": "Den nye adgangskode skal være mindst 12 tegn."
+        "weakNewPassword": "Den nye adgangskode skal være mindst 12 tegn.",
+        "unexpected": "Den adgangskodeændring gik ikke igennem. Prøv igen.",
+        "vaultNotUnlocked": "Lås denne boks op, før du ændrer dens adgangskode."
       },
       "changePasswordHeading": "Skift adgangskode",
       "changePasswordHelper": "Skift din hovedadgangskode, men behold den samme boks. Gendannelsessætningen forbliver den samme.",
@@ -2791,9 +2954,6 @@
       "localEraseHelper": "Slet Mynes kopi af din boks fra denne browser. Din konto og alt, der allerede er synkroniseret, bliver på serveren.",
       "localEraseButton": "Log ud og slet denne browsers kopi…",
       "deleteVaultButton": "Slet boks…",
-      "memoryCost": "Hukommelsesomkostning",
-      "parallelism": "Parallelitet",
-      "timeCost": "Tidsomkostning",
       "vaultLabelEyebrow": "BOKSMÆRKAT",
       "vaultLabelHelper": "Et navn på denne boks, der vises i boksskifteren inde i appen og i boksvælgeren ved opstart, før du låser op. Gemmes krypteret inde i boksen; forlader aldrig din enhed i klartekst.",
       "vaultLabelPlaceholder": "Tilføj et mærkat…",
@@ -2812,7 +2972,8 @@
       "newPasswordPlaceholder": "Mindst 12 tegn",
       "reenterNewPassword": "Indtast ny adgangskode igen",
       "changePasswordFootnote": "Dette ugyldiggør hurtig oplåsning. Din gendannelsessætning er uændret.",
-      "changing": "Ændrer…"
+      "changing": "Ændrer…",
+      "memberVaultNotice": "Dette er en delt boks. Den har ingen boksadgangskode. Brug Delt boks-opklaring under Anonymitet for at tilføje en adgangskode eller PIN."
     },
     "appearance": {
       "accentHelper": "Vælg den accentfarve, der bruges i hele appen. Kun på denne enhed.",
@@ -2846,7 +3007,11 @@
       "showEditTimesSubtitle": "Tidsstempler under hver note",
       "graphSettingsLabel": "Grafens udseende",
       "graphSettingsHelper": "Knudefarver, etiketter, størrelser og layoutkræfter indstilles inde i grafen selv. Åbn den, og brug tandhjulet i dens hjørne. De gemmes pr. enhed, så en ændring her følger ikke med til din telefon.",
-      "openGraph": "Åbn graf"
+      "openGraph": "Åbn graf",
+      "barCustomize": {
+        "label": "Bundlinje",
+        "helper": "Vælg, hvilke indikatorer bundlinjen viser. Skjuler du alle, fjernes linjen selv, og pladsen frigøres. Træk i et element på linjen, eller højreklik på det, for at ændre rækkefølgen."
+      }
     },
     "archive": {
       "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, alle arkiverede mapper tages ud af arkivet, og arkivknapperne skjules. Det gælder hele boksen, på alle enheder.",
@@ -2983,10 +3148,9 @@
       "importButton": "Importér tema…",
       "importError": "Den fil er ikke et gyldigt tema. Åbn referencen for at se formatet.",
       "label": "Brugerdefinerede temaer",
-      "openFolderButton": "Åbn temamappe",
-      "openFolderError": "Kunne ikke åbne temamappen.",
       "readError": "Kunne ikke læse dine brugerdefinerede temaer.",
-      "readOnlyHelper": "Brugerdefinerede temaer installeres på din computer. Dine egne dukker op her af sig selv efter en synkronisering."
+      "readOnlyHelper": "Brugerdefinerede temaer installeres på din computer. Dine egne dukker op her af sig selv efter en synkronisering.",
+      "emptyTitle": "Ingen brugerdefinerede temaer endnu"
     },
     "dailyNotes": {
       "blankTemplate": "Tom (ingen skabelon)",
@@ -3017,15 +3181,8 @@
       "periodFolderAriaLabel": "Mappe til {{period}} noter",
       "periodFormatAriaLabel": "Titelformat til {{period}} noter",
       "periodTemplateAriaLabel": "Skabelon til {{period}} noter",
-      "dateFormatHelper": "Titlen på hver daglig note. Understøtter ÅÅÅÅ, MM, DD. Standard er {{default}}.",
-      "dateFormatLabel": "Datoformat for daglige noter",
-      "dateFormatSaveError": "Kunne ikke gemme datoformatet. Prøv igen.",
-      "folderHelper": "Hvor nye daglige noter placeres. Standard er {{default}}. Mappen beholdes, også når den er tom.",
-      "folderLabel": "Mappe til daglige noter",
-      "folderSaveError": "Kunne ikke gemme den daglige mappe. Prøv igen.",
-      "templateHelper": "Vælg en skabelon, som hver daglig note skal starte fra, eller lad være tom for en tom note med datoen som titel.",
-      "templateLabel": "Skabelon til daglige noter",
-      "templateSaveError": "Kunne ikke gemme den daglige skabelon. Prøv igen."
+      "sectionPeriodic": "Periodiske noter",
+      "periodSwitcherAriaLabel": "Type periodisk note"
     },
     "deleteVault": {
       "cancel": "Annullér",
@@ -3273,7 +3430,35 @@
       "mobileApproveLabel": "Godkend afsendelse på denne telefon",
       "mobileApproveHelper": "Udbyderen og dens nøgle kom fra en anden enhed. Der sendes intet fra denne telefon, før du læser, hvad der sendes, og godkender det her.",
       "historyBudgetHelper": "Hvor meget af den seneste samtale hver forespørgsel bærer, i tegn. Lad feltet stå tomt for standardværdien. Et større tal lader AI'en følge længere samtaler og sender mere af dem: hos en udbyder, der ikke er på denne enhed, betyder det mere af din tekst, der forlader den, ved hvert trin i en kørsel.",
-      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel"
+      "historyBudgetLabel": "Samtale der sendes med hver forespørgsel",
+      "meetingPromptHelper": "Den instruktion, møde-AI-gennemløbet bruger til at omdanne en transskription til afsnit. Lad den stå tom for at bruge standarden. Den erstatter standardformatet for output, så hvis du angiver den, skal du selv bede om de afsnit, du vil have.",
+      "meetingPromptLabel": "Prompt til møderesumé",
+      "meetingPromptReset": "Nulstil til standard",
+      "groupAutoTag": "Auto-tag",
+      "groupVoice": "Stemme og møder",
+      "groupWriting": "Skrivning og chat",
+      "groupPrivacy": "Anonymitet og grænser",
+      "groupAdvanced": "Avanceret",
+      "excludedPickLabel": "Tilføj en mappe, der skal udelades",
+      "excludedPickPlaceholder": "Vælg en mappe…",
+      "modelShowInFolder": "Vis i mappe",
+      "modelShowLocation": "Vis placeringen af {{name}}",
+      "downloadsLabel": "Download modeller",
+      "downloadsHelper": "Hent en model fra Mynes eget ophav. Den tjekkes mod et fingeraftryk, der er indbygget i appen, før den bruges, så en manipuleret download afvises. Der hentes intet, medmindre du klikker.",
+      "downloadEmbeddingSize": "Flersproget model, ca. 449 MB.",
+      "downloadTagLabel": "Tag-model: automatiske tag-forslag",
+      "downloadTagSize": "Lille lokal model, ca. 337 MB.",
+      "downloadInstalled": "Installeret",
+      "downloadNotInstalled": "Ikke installeret",
+      "downloadReinstall": "Download",
+      "downloadInstall": "Download",
+      "modelRemove": "Fjern",
+      "downloading": "Downloader…",
+      "downloadingPercent": "Downloader… {{percent}}%",
+      "downloadCancel": "Annuller",
+      "downloadFailed": "Downloadet blev ikke færdigt.",
+      "downloadFailedChecksum": "Downloadet matchede ikke sit fingeraftryk og blev afvist. Prøv igen.",
+      "sideloadDisclosure": "Udviklertilstand lader dig også pege Myne mod en modelfil, du selv har skaffet. En fil, du downloader fra et andet sted, tjekkes ikke af Myne, så brug kun en, du har tillid til."
     },
     "network": {
       "disabledCue": "Synkronisering sendes ikke længere gennem Tor. Nye forbindelser går direkte til synkroniseringsserveren.",
@@ -3328,8 +3513,6 @@
       "hideVaultNamesErrorRead": "Kunne ikke læse den nuværende indstilling. Slå kontakten om for at sætte den igen.",
       "hideVaultNamesErrorSave": "Kunne ikke gemme indstillingen, så den er uændret. Hvis du var ved at slå den til, kan nogle gemte navne allerede være destrueret; slå den til igen for at gøre det færdigt.",
       "hideVaultNamesErrorErase": "Et gemt navn kunne ikke destrueres, så indstillingen blev efterladt slået fra i stedet for at påstå en sletning, der ikke skete. Prøv igen.",
-      "realtimeSyncHelper": "Ændringer fra andre enheder ankommer inden for sekunder via et indholdsløst signal — serveren videresender kun “noget blev ændret”, aldrig hvad. Mens din boks er låst op, tjekker appen alligevel serveren regelmæssigt, så dette giver ingen nævneværdig synlighed; der er intet at konfigurere.",
-      "realtimeSyncLabel": "Realtidssynkronisering",
       "screenCaptureHelperOff": "Beskyttelsen gælder altid før oplåsning. Efter oplåsning følger den denne indstilling.",
       "screenCaptureHelperOn": "Virker på Windows 10 (May 2020 Update) og nyere. macOS og Linux har ikke noget system-API til dette, så der kan indstillingen ikke blokere optagelse.",
       "screenCaptureLabel": "Beskyttelse mod skærmoptagelse",
@@ -3347,7 +3530,14 @@
       "screenCaptureOverrideHelper": "Slår beskyttelse mod skærmoptagelse fra på denne enhed alene — både før du låser en boks op og efter. Slå denne indstilling til, hvis et skærmforstørrelsesprogram, et fjernskrivebordsprogram eller en, der hjælper dig på afstand, ser et sort vindue. Den synkroniseres ikke.",
       "screenCaptureOverrideUnknown": "Denne enheds indstilling for skærmoptagelse kunne ikke læses, så denne indstilling anvendes ikke. Åbn Indstillinger igen for at prøve på ny.",
       "screenCaptureSuperseded": "Slået fra på denne enhed. Se “Tillad skærmoptagelse på denne enhed” nedenfor. Denne indstilling bevares og gælder igen, når du slår den mulighed fra.",
-      "screenCaptureSupersededByFlag": "Slået fra i denne session, fordi Myne blev startet med --disable-screen-capture-protection. Denne indstilling bevares og gælder igen, næste gang du åbner Myne uden det."
+      "screenCaptureSupersededByFlag": "Slået fra i denne session, fordi Myne blev startet med --disable-screen-capture-protection. Denne indstilling bevares og gælder igen, næste gang du åbner Myne uden det.",
+      "recoveryDrillCheck": "Tjek sætning",
+      "recoveryDrillChecking": "Tjekker…",
+      "recoveryDrillError": "Kunne ikke køre tjekket lige nu. Intet blev ændret. Prøv igen om et øjeblik.",
+      "recoveryDrillHelper": "Skriv de 24 ord, du skrev ned. Myne tjekker, om de stadig åbner denne boks, og fortæller dig intet andet — ordene vises aldrig her.",
+      "recoveryDrillLabel": "Tjek din gendannelsessætning",
+      "recoveryDrillPassed": "Disse ord åbner denne boks. Opbevar dem, hvor du fandt dem.",
+      "recoveryDrillPlaceholder": "De 24 ord, i rækkefølge, adskilt af mellemrum"
     },
     "quickUnlock": {
       "errorBusy": "En anden handling på boksen er i gang. Prøv igen om et øjeblik.",
@@ -3390,7 +3580,9 @@
       "pinPlaceholder6": "Mindst 6 cifre",
       "confirmPin": "Bekræft PIN",
       "reenterPin": "Indtast PIN igen",
-      "setupButton": "Konfigurer hurtig oplåsning"
+      "setupButton": "Konfigurer hurtig oplåsning",
+      "errorBiometricAuthFailed": "Touch ID kunne ikke opsættes. Sørg for, at et fingeraftryk er registreret i Systemindstillinger, eller brug en PIN i stedet.",
+      "biometricAuthFailed": "{{method}} kunne ikke opsættes. Sørg for, at det er aktiveret i dine enhedsindstillinger, eller brug en PIN i stedet."
     },
     "shell": {
       "closeLabel": "Luk indstillinger",
@@ -3410,7 +3602,9 @@
         "network": "Netværk",
         "privacy": "Privatliv",
         "storage": "Opbevaring",
-        "sync": "Synkronisering"
+        "sync": "Synkronisering",
+        "cli": "CLI",
+        "vault": "Boks"
       },
       "passwordUpdatedToast": "Adgangskode opdateret",
       "title": "Indstillinger"
@@ -3539,10 +3733,6 @@
       "ariaLabel": "Søg i indstillinger",
       "empty": "Ingen indstillinger matcher “{{query}}”.",
       "resultsLabel": "Søgeresultater",
-      "extra": {
-        "lastActiveNoteTitle": "Fortsæt, hvor du slap",
-        "lastActiveNoteDesc": "Synkronisér, hvilken note du havde åben, så du kan tage den op igen på en anden enhed."
-      },
       "keywords": {
         "aiAutoTag": "automatiske tags tag foreslå forslag mærkater ai auto tag",
         "aiEndpoint": "ollama endpoint adresse lokalt modelmiljø model server port loopback runtime",
@@ -3575,7 +3765,6 @@
         "import": "import importer noter obsidian notion evernote enex html csv migrering hent",
         "language": "sprog lokalitet grænseflade oversættelse ui language",
         "legal": "juridisk privatlivspolitik vilkår impressum gdpr dsgvo myndigheder misbrug anmeld databeskyttelse legal",
-        "lastActiveNote": "fortsæt hvor du slap sidste note genoptag synkronisering åbn",
         "license": "licens agpl open source juridisk licenser",
         "lineNumbers": "linjenumre linjenummer margen editor vis line numbers",
         "vimMode": "vim modal redigering normal insert visual tastatur tilstand",
@@ -3584,7 +3773,6 @@
         "torRouting": "tor routing onion proxy netværk ip-adresse placering skjul synkronisering anonymitet",
         "quickUnlock": "hurtig oplåsning pin touch id biometrisk ansigt lås op",
         "reminders": "påmindelser notifikation besked alarm opgave forfald påmind horisont registrering forud dage reminders",
-        "realtimeSync": "realtid realtidssynkronisering synkronisering live forbindelse polling sync",
         "screenCapture": "skærmoptagelse skærmbillede beskyttelse optagelse bloker privatliv screenshot",
         "showEditTimes": "vis redigeringstidspunkter tidsstempler ændret datoer noter timestamps",
         "spell": "stavekontrol stavning ordbog autokorrektur spell check",
@@ -3616,8 +3804,18 @@
         "aiMemory": "hukommelse huskede fakta assistent lærer personlighed stemmepræferencer",
         "ribbon": "venstre bånd skinne fastgør pin kommando kommandoer tilpas omorganisér frigør værktøjslinje genveje",
         "folderNotes": "mappe note indeks folder_index landingsside dobbeltklik mappelink projekter fra slå fra deaktiver",
-        "syncMembers": "medlemmer, del, inviter, team, samarbejde, bog"
-      }
+        "syncMembers": "medlemmer, del, inviter, team, samarbejde, bog",
+        "accountName": "kontonavn konto gruppe gruppering omdøb mærkat enhed lokal",
+        "accountVaults": "konto bokse grupperet hvilke bokse tilhører gruppe liste",
+        "aiMeetingPrompt": "møde resumé prompt instruktion brugerdefineret transskription handlingspunkter beslutninger",
+        "update": "opdatering opgrader tjek for opdateringer ny version udgivelse download",
+        "plainFile": "almindelig fil editor markdown lokal disk uden for boks klartekst åbn på stedet",
+        "memberPassword": "delt boks adgangskode medlem lås op tilslut sætning",
+        "recoveryDrill": "gendannelsessætning tjek verificer øvelse test 24 ord seed sikkerhedskopi mistet adgangskode",
+        "bar": "bundlinje statuslinje indikatorer tilpas omorganiser skjul vis værktøjslinje",
+        "syncDeviceBindings": "enheder gjort krav på af medlemmer tilskrivning hvem signerede hvilken enhed tilhører"
+      },
+      "emptyBody": "Prøv et kortere ord, eller navnet på et panel."
     },
     "dateTime": {
       "dateLabel": "Datoformat",
@@ -3651,7 +3849,8 @@
       "searchPlaceholder": "Søg efter kommandoer…",
       "searchResultsLabel": "Matchende kommandoer",
       "showHelper": "Vis det venstre bånd på denne enhed.",
-      "showLabel": "Vis venstre bånd"
+      "showLabel": "Vis venstre bånd",
+      "emptyTitle": "Intet fastgjort endnu"
     },
     "memory": {
       "heading": "Hvad assistenten husker",
@@ -3679,7 +3878,54 @@
       "personalitySavedToast": "Stemmepræferencer opdateret.",
       "personalitySaveFailed": "Stemmepræferencerne kunne ikke gemmes.",
       "loadFailed": "Kunne ikke indlæse minder eller stemmepræferencer. Intet blev ændret.",
-      "retryLabel": "Prøv igen"
+      "retryLabel": "Prøv igen",
+      "emptyTitle": "Intet husket endnu"
+    },
+    "account": {
+      "nameLabel": "Kontonavn",
+      "nameHelper": "Et navn til denne gruppe af bokse på denne enhed. Boks vælgeren bruger det som gruppens overskrift. Det bliver på denne enhed og gemmes aldrig inde i en boks, så det synkroniseres ikke, og en anden enhed kan gruppere og navngive de samme bokse anderledes.",
+      "namePlaceholder": "Tilføj et navn…",
+      "nameSave": "Gem",
+      "nameSaving": "Gemmer…",
+      "vaultsLabel": "Bokse i denne konto",
+      "vaultsHelper": "De bokse, som denne enhed grupperer under navnet ovenfor. Gruppering er et organisationsvalg pr. enhed, så det er ikke en del af nogen boks' indhold og følger ikke med den.",
+      "vaultsCount": "{{count}} bokse",
+      "currentVault": "Denne boks",
+      "unknownVault": "En anden boks på denne enhed",
+      "standaloneHelper": "Denne boks er ikke grupperet under en konto på denne enhed, så den står alene. Gruppering er pr. enhed: en anden enhed kan vise den inde i en.",
+      "unresolvedHelper": "Finder ud af, hvilken boks der er åben…",
+      "devicesNote": "Enheder, medlemmer af delte bokse og din identitet administreres i Synkronisering.",
+      "groupingHidden": "Kontonavne er utilgængelige, mens boksnavne er skjult. Slå den indstilling fra under Anonymitet for at administrere denne konto.",
+      "groupingUnreadable": "Denne enheds kontogruppering kunne ikke læses. Intet blev ændret.",
+      "groupingError": "Kunne ikke læse kontogrupperingen på denne enhed. Intet blev ændret."
+    },
+    "plainFile": {
+      "errorSaveSetting": "Kunne ikke gemme indstillingen for almindelige filer.",
+      "helper": "Åbn og redigér de .md-filer, du allerede har på disken, på stedet, uden at føje dem til en boks. Disse filer er klartekst: Myne krypterer dem ikke, og ændringer i dem synkroniseres eller sikkerhedskopieres ikke. Slået til som standard; slå det fra her.",
+      "label": "Editor til almindelige filer",
+      "openFilesRemain": "Filer med ikke-gemte ændringer er stadig åbne. Løs dem, og slå det derefter fra igen."
+    },
+    "memberPassword": {
+      "reminder": "Du har endnu ingen hurtig oplåsning på denne enhed, så denne boks beder om din gendannelsessætning hver gang.",
+      "reminderDismiss": "Ikke nu",
+      "title": "Oplåsning af delt boks",
+      "helperConfigured": "Denne delte boks åbnes med {{method}}, der er gemt på denne enhed.",
+      "helperNotConfigured": "Angiv en adgangskode eller PIN, så du ikke skal skrive din gendannelsessætning hver gang.",
+      "set": "Angiv",
+      "change": "Ændr",
+      "remove": "Fjern",
+      "label": "Boksadgangskode",
+      "methodPassword": "en adgangskode",
+      "methodPin": "en PIN",
+      "methodBiometric": "din enheds biometri",
+      "usePin": "Brug en PIN",
+      "useBiometric": "Brug Touch ID",
+      "pinLabel": "Boks-PIN",
+      "pinPlaceholder": "PIN, mindst {{count}} cifre",
+      "setupHelper": "Mindst {{count}} tegn. Gemmes kun på denne enhed; din gendannelsessætning åbner stadig boksen overalt.",
+      "pinSetupHelper": "Mindst {{count}} cifre. Gemmes kun på denne enhed; din gendannelsessætning åbner stadig boksen overalt.",
+      "errorTooShort": "Brug mindst {{count}} tegn/cifre.",
+      "errorGeneric": "Kunne ikke angive legitimationsoplysningen. Prøv igen."
     }
   },
   "storageLost": {
@@ -3752,7 +3998,8 @@
       "tookTheirsToast": "Lokal version flyttet til papirkurven.",
       "tookTheirsUndo": "Fortryd",
       "untitled": "Uden titel ({{hex}})",
-      "useThisVersion": "Brug denne version"
+      "useThisVersion": "Brug denne version",
+      "emptyTitle": "Ingen konflikter"
     },
     "deviceJoinQr": {
       "accountLabel": "Kontonummer",
@@ -3810,7 +4057,11 @@
       "verifySyncing": "Synkroniserer…",
       "verifyTitle": "Verificér den nye enhed",
       "verifyAction": "Sammenlign kode",
-      "yourDevices": "Dine enheder"
+      "yourDevices": "Dine enheder",
+      "noDevicesBody": "Enheder, du føjer til denne konto, vises her, med datoen for hver enheds seneste synkronisering.",
+      "reasonTls": "serverens HTTPS-certifikat kunne ikke verificeres",
+      "tlsFailure": "Synkroniseringsserverens HTTPS-certifikat kunne ikke verificeres.",
+      "tlsFailureHint": "Tjek serveradressen, certifikatets gyldighed og CA-tillid. Myne opretter forbindelse igen, når serveren fremviser et gyldigt certifikat."
     },
     "endpoint": {
       "connect": "Forbind",
@@ -3822,7 +4073,12 @@
       "fixedOriginNone": "Der er ikke konfigureret nogen synkroniseringsserver for denne udrulning.",
       "pinPlatformTrust": "Verificeret via din browsers certifikatlager. Denne klient kan ikke selv fastgøre et certifikat.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Kunne ikke nå den server. Tjek URL'en, og at den kører."
+      "unreachable": "Kunne ikke nå den server. Tjek URL'en, og at den kører.",
+      "tlsHelp": "Indtast den samme server-URL på hver enhed. En selvhostet server kræver et betroet HTTPS-certifikat.",
+      "tlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen, certifikatet og dets gyldighed.",
+      "inviteLabel": "Invitationskode (kun hvis denne server beder om en)",
+      "invitePlaceholder": "Den kode, serverens operatør gav dig",
+      "changeInviteCode": "Ændr invitationskode"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -3838,7 +4094,9 @@
         "notConfigured": "Angiv en synkroniseringsserver i indstillinger, før du tilføjer denne enhed.",
         "serverMismatch": "Synkroniseringsserverens identitet stemte ikke overens med det, denne enhed forventede. Indtast ikke dine legitimationsoplysninger igen, før du ved hvorfor.",
         "kdfTooLarge": "Denne enhed har ikke nok hukommelse til at åbne den boks. Dens krypteringsindstillinger kræver mere hukommelse, end denne app kan bruge her. Åbn den på en desktopcomputer i stedet.",
-        "transport": "Kunne ikke nå synkroniseringsserveren. Tjek din forbindelse, og prøv igen."
+        "transport": "Kunne ikke nå synkroniseringsserveren. Tjek din forbindelse, og prøv igen.",
+        "inviteCodeInvalid": "Den invitationskode blev ikke accepteret. Tjek den, og prøv igen.",
+        "inviteCodeRequired": "Denne server accepterer kun nye konti med en invitationskode. Indtast den kode, dens operatør gav dig."
       },
       "mode": {
         "password": "Adgangskode",
@@ -3869,7 +4127,17 @@
       "verifyTitle": "Verificér denne enhed",
       "waitingHint": "Hold dette vindue åbent. Når enheden er godkendt, vises en verifikationskode her, som du kan sammenligne med din anden enhed.",
       "waitingTitle": "Venter på godkendelse",
-      "sasAbortFailed": "Kunne ikke afbryde forbindelsen for denne enhed. Den er stadig tilmeldt hos den server, så betragt den som ikke-betroet: åbn Indstillinger → Synkronisering, og fjern den der. Dine noter blev ikke slettet."
+      "sasAbortFailed": "Kunne ikke afbryde forbindelsen for denne enhed. Den er stadig tilmeldt hos den server, så betragt den som ikke-betroet: åbn Indstillinger → Synkronisering, og fjern den der. Dine noter blev ikke slettet.",
+      "backToWaiting": "Tilbage til ventetilstand",
+      "errorPhrase": "Kunne ikke føje denne enhed til. Tjek server-URL'en, kontonummeret og gendannelsessætningen, og at serveren kan nås.",
+      "modePassword": "Min adgangskode",
+      "modePhrase": "Min gendannelsessætning",
+      "noDeviceBody": "Ingen anden enhed til at godkende denne? Du kan i stedet bekræfte med din gendannelsessætning.",
+      "phraseEscapeBody": "Din gendannelsessætning er den fulde nøgle til denne konto, så den bekræfter denne enhed uden godkendelse fra en anden enhed. Du beholder den adgangskode, du lige brugte.",
+      "phraseTitle": "Bekræft med din gendannelsessætning",
+      "phraseWarning": "Din gendannelsessætning er den fulde nøgle til denne konto, så denne enhed føjes til uden godkendelse fra en anden enhed. Brug den kun, hvis du ikke har nogen anden enhed at godkende fra. Du angiver en ny adgangskode bagefter.",
+      "usePhrase": "Brug min gendannelsessætning",
+      "back": "Tilbage"
     },
     "panel": {
       "addDevice": {
@@ -3910,6 +4178,14 @@
       "usage": {
         "helper": "Hvor mange krypterede data denne konto gemmer på serveren, og hvor mange enheder der er logget ind.",
         "label": "Lagerplads og enheder"
+      },
+      "identity": {
+        "label": "Identitet",
+        "helper": "En identitet gør det muligt for folk at invitere dig til en boks, og lader én identitet eje flere bokse.",
+        "cta": "Tilføj en identitet",
+        "codeLabel": "Din identitetskode",
+        "lockedHelper": "Denne enhed har en identitet. Den er låst for denne session; lås den op med din gendannelsessætning for at signere synkronisering og invitationer.",
+        "unlockedHelper": "Denne enhed har en identitet, låst op for denne session."
       }
     },
     "reconcile": {
@@ -3939,7 +4215,10 @@
       "off": "Synkronisering fra",
       "synced": "Synkroniseret",
       "syncing": "Synkroniserer…",
-      "syncNow": "Synkronisér nu"
+      "syncNow": "Synkronisér nu",
+      "errorIdentityLocked": "Lås din identitet op for at synkronisere",
+      "errorTls": "Kunne ikke verificere synkroniseringsserverens HTTPS-forbindelse",
+      "unlockIdentityCta": "Lås identitet op"
     },
     "usage": {
       "devices": "Enheder",
@@ -4000,7 +4279,6 @@
       "rotated": "Nøgle roteret",
       "keyChanged": "Nøgle ændret. Verificer med ejeren.",
       "relinkConfirmed": "Genlink bekræftet af ejer",
-      "epoch": "Gruppenøgle-epoch {{epoch}}",
       "ownerBadge": "Ejer",
       "memberBadge": "Medlem",
       "invite": "Inviter medlem",
@@ -4024,12 +4302,69 @@
       "sasHint": "Læs dette fingeraftryk op til den person, du inviterer, eller lad dem læse det for dig. Det skal matche på begge sider, før du fortsætter.",
       "sasConfirm": "Jeg bekræftede dette fingeraftryk med personen uden for kanalen",
       "inviteCodeInvalid": "Det er ikke en gyldig medlemsidentitetskode.",
-      "kemLabel": "ML-KEM offentlig nøgle",
-      "edLabel": "Ed25519 offentlig nøgle",
-      "mldsaLabel": "ML-DSA offentlig nøgle",
       "untitledVault": "Bog uden navn",
       "inviteFailed": "Invitationen kunne ikke oprettes.",
-      "removeFailed": "Medlemmet kunne ikke fjernes."
+      "removeFailed": "Medlemmet kunne ikke fjernes.",
+      "youBadge": "Dig",
+      "nameUnverified": "Navn ikke verificeret",
+      "nameLabel": "Dit visningsnavn",
+      "nameEdit": "Omdøb",
+      "nameSave": "Gem",
+      "nameClear": "Ryd",
+      "nameCancel": "Annuller",
+      "nameErrorEmpty": "Indtast et navn, eller brug Ryd til at fjerne dit.",
+      "nameErrorTooLong": "Det navn er for langt.",
+      "nameErrorUnreadable": "Navnelageret kunne ikke læses på denne enhed. Intet blev gemt.",
+      "nameErrorUnshared": "Navne kan angives, når denne boks er delt.",
+      "nameErrorLocked": "Lås boksen op for at ændre dit navn.",
+      "nameErrorGeneric": "Kunne ikke gemme dit navn. Prøv igen.",
+      "nameInvite": "Du har endnu ikke noget visningsnavn. De øvrige medlemmer ser dit fingeraftryk.",
+      "nameInviteCta": "Angiv et navn",
+      "nameInviteDismiss": "Ikke nu",
+      "noInvitations": "Ingen invitationer sendt endnu.",
+      "identityHeading": "Din identitet",
+      "membersHeading": "Medlemmer",
+      "emptyTitle": "Ingen medlemmer endnu",
+      "personUnlockOpen": "Lås op",
+      "unsharedNotice": "Denne boks er ikke delt endnu. Deling er permanent og sker første gang, du inviterer nogen.",
+      "shareConfirmTitle": "Del denne boks?",
+      "shareConfirmBody": "Når du inviterer nogen, bliver denne boks en delt en: den får en gruppenøgle, og de personer, du inviterer, åbner dens indhold med den. Denne ændring er permanent, og der er ingen vej tilbage til en enkelbrugerboks. Fortsæt for at vælge, hvem du vil invitere.",
+      "shareConfirmCta": "Del og inviter",
+      "shareFailed": "Kunne ikke begynde at dele denne boks.",
+      "identityForgetCta": "Glem denne identitet på denne enhed",
+      "identityForgetCheckbox": "Jeg forstår, at denne identitet fjernes fra denne enhed.",
+      "identityForgetConfirm": "Glem identitet",
+      "identityForgetCancel": "Behold den",
+      "identityForgetWarning": "Dette fjerner kun identiteten fra denne enhed. Serverkontoen og enhver boks, den ejer eller har tilsluttet sig, er urørt, og du kan gendanne identiteten med dens 24-ords sætning på en anden enhed. Invitationer og listehandlinger på denne enhed vil kræve, at den låses op igen.",
+      "identityForgetError": "Kunne ikke glemme identiteten. Prøv igen."
+    },
+    "deviceBindings": {
+      "title": "Enheder og medlemmer",
+      "heading": "Enheder med krav",
+      "hint": "Hver enhed, der har gjort krav på sig selv i denne boks, sammen med det medlem, hvis egen signatur gør krav på den. Et krav er ikke bevis på ejerskab: det siger, hvilket medlem der har signeret erklæringen, ikke at enheden tilhører dem.",
+      "loading": "Indlæser enheder…",
+      "emptyTitle": "Ingen enheder med krav endnu",
+      "empty": "En enhed vises her, når den gør krav på sig selv i denne delte boks.",
+      "claimedBy": "gjort krav på af {{name}}",
+      "unverified": "Ikke verificeret",
+      "unverifiedHint": "Disse enheds-id'er findes i boksen, men intet bakker et krav om dem op: signaturen gik ikke igennem, eller den nævner en person, som medlemslisten ikke har. De vises som id'er, fordi der ikke er noget medlem at nævne ved siden af dem.",
+      "claimHint": "Denne enhed har ikke noget verificeret krav på sig selv i denne boks. Gør du krav på den igen, registreres den under din identitet, og det er også reparationen for et krav, der ikke gik igennem.",
+      "claim": "Gør krav på denne enhed",
+      "claiming": "Gør krav…",
+      "unshared": "Denne boks er ikke delt endnu, så der er intet medlem at tilskrive en enhed til. Deling er permanent og sker første gang, du inviterer nogen.",
+      "errorLocked": "Lås boksen op for at læse dens enheder.",
+      "errorUnshared": "Denne boks er ikke delt, så den har ingen enhedstilknytninger.",
+      "errorNoDeviceId": "Denne enhed er ikke føjet til din konto, så den har ingen enhedsidentitet at gøre krav på sig selv under.",
+      "errorConflict": "To forskellige krav med samme version kunne ikke skelnes, så intet blev ændret. Gør krav på denne enhed igen for at erstatte dem.",
+      "errorUnreadable": "Enhedslisten kunne ikke læses på denne enhed. Intet blev ændret.",
+      "errorGeneric": "Kunne ikke læse denne boks' enheder. Prøv igen."
+    },
+    "nameGate": {
+      "title": "Vælg et visningsnavn",
+      "body": "Sådan vil de øvrige medlemmer af denne boks se dig på medlemslisten. Dit fingeraftryk står ved siden af, og du kan ændre navnet senere.",
+      "label": "Dit visningsnavn",
+      "checking": "Tjekker dit navn…",
+      "save": "Fortsæt"
     }
   },
   "tasks": {
@@ -4057,7 +4392,6 @@
       "search": "Ingen opgaver matcher “{{query}}”."
     },
     "filter": {
-      "all": "Alle",
       "overdue": "Overskredet",
       "today": "I dag",
       "upcoming": "Kommende"
@@ -4080,10 +4414,6 @@
       "notCompleted": "Opgave, ikke fuldført",
       "tooLongToWrite": "Denne opgaves linje er for lang til at redigere herfra. Åbn dens note i stedet.",
       "untitled": "Opgave uden titel"
-    },
-    "scope": {
-      "allFolders": "Alle mapper",
-      "label": "Afgræns efter"
     },
     "title": "Opgaver",
     "axis": {
@@ -4140,13 +4470,6 @@
       "allNotes": "Alle noter",
       "anyPriority": "Enhver prioritet",
       "anyTag": "Ethvert tag",
-      "dueLabel": "Filtrer efter forfaldsdato",
-      "folderLabel": "Filtrer efter mappe",
-      "noteLabel": "Filtrer efter note",
-      "priorityLabel": "Filtrer efter prioritet",
-      "sortLabel": "Sortér inden for sektioner",
-      "statusLabel": "Filtrer efter fuldførelse",
-      "tagLabel": "Filtrer efter tag",
       "untitled": "Uden navn"
     },
     "search": {
@@ -4156,7 +4479,6 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "Luk skabeloner",
       "deleteRowLabel": "Slet skabelon {{name}} (flyt til papirkurven)",
       "editTemplateLabel": "Redigér skabelon {{name}}",
       "emptyBody": "Opret en skabelon for at genbruge et noteskelet: en mødenote, en daglig log, en læsenote. Vælg en, når du opretter en ny note.",
@@ -4167,7 +4489,10 @@
       "newTemplateName": "Skabelon uden titel",
       "removeFromTemplates": "Fjern fra skabeloner",
       "removeRowLabel": "Fjern {{name}} fra skabeloner (beholder noten)",
-      "title": "Noteskabeloner"
+      "title": "Noteskabeloner",
+      "nameLabel": "Skabelonnavn",
+      "create": "Opret",
+      "createFailed": "Kunne ikke oprette skabelonen. Prøv igen."
     },
     "emptyBefore": "Ingen skabeloner endnu. Tryk på ",
     "newAction": "Ny",
@@ -4225,8 +4550,9 @@
       "pinPlaceholder": "PIN-kode",
       "unlockWithPin": "Lås op med PIN-kode",
       "unlockWithTouchId": "Lås op med Touch ID",
-      "usePasswordBelow": "eller brug din adgangskode nedenfor",
-      "wrongCredential": "Forkert. {{remaining}} forsøg tilbage."
+      "wrongCredential": "Forkert. {{remaining}} forsøg tilbage.",
+      "showPin": "Vis PIN",
+      "hidePin": "Skjul PIN"
     },
     "recoveryInterruptedBanner": "Gendannelsesforløbet blev afbrudt. Angiv en ny adgangskode først.",
     "recoveryInterruptedBody": "Angiv en ny adgangskode først, og forsegl så din boks igen.",
@@ -4271,7 +4597,18 @@
     "memberHint": "Denne bog deles med dig. Lås den op med din egen genfrasetægningsfrase.",
     "memberPhraseLabel": "Genfrasetægningsfrase",
     "memberSubmit": "Lås op",
-    "memberError": "Den frase åbnede ikke denne delte bog."
+    "memberError": "Den frase åbnede ikke denne delte bog.",
+    "memberPasswordHint": "Denne boks er delt med dig. Lås den op med den adgangskode, du angav på denne enhed.",
+    "memberPasswordLabel": "Boksadgangskode",
+    "memberPasswordError": "Den adgangskode åbnede ikke denne delte boks.",
+    "memberUsePhrase": "Brug gendannelsessætningen i stedet",
+    "memberUseFast": "Brug hurtig oplåsning i stedet",
+    "memberPinHint": "Denne boks er delt med dig. Lås den op med den PIN, du angav på denne enhed.",
+    "memberPinLabel": "Boks-PIN",
+    "memberPinPlaceholder": "Boks-PIN (mindst {{count}} cifre)",
+    "memberBiometricHint": "Denne boks er delt med dig. Bekræft med din enheds biometri for at låse op.",
+    "memberBiometricSubmit": "Lås op med biometri",
+    "titleNamed": "Lås {{vault}} op"
   },
   "vault": {
     "ioBanner": {
@@ -4281,24 +4618,6 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "ackLabel": "Jeg har gemt mit kontonummer et sted, hvor jeg kan finde det senere.",
-      "back": "Tilbage",
-      "commit": "Opret boks",
-      "committing": "Gemmer…",
-      "copied": "Kopieret",
-      "copy": "Kopiér",
-      "copyFailed": "Kunne ikke kopiere. Brug “Gem som fil” i stedet.",
-      "downloadStarted": "Sendt til din browsers downloads. Tjek, at den er nået frem: det er din browser, der bestemmer, hvor filen havner, og Myne kan ikke se, om den gjorde det.",
-      "eyebrow": "Trin 4 af 4: kontonummer",
-      "heading": "Gem dit kontonummer.",
-      "intro": "Dette er din ihændehaver-nøgle. Behandl den som kontanter.",
-      "saveAsFile": "Gem som fil",
-      "saveFailed": "Kunne ikke gemme filen. Kopiér nummeret i stedet, eller skriv det ned.",
-      "savedToFile": "Gemt. Det er en almindelig tekstfil, så opbevar den et sted, kun du kan læse.",
-      "shownOnceBody": "Gem det nu. Myne kan ikke gendanne det for dig. Det kræves for at registrere dig til synkronisering senere.",
-      "shownOnceEmphasis": "Dette vises kun én gang."
-    },
     "briefing": {
       "back": "Tilbage",
       "continue": "Fortsæt til oprettelse af boks",
@@ -4326,12 +4645,13 @@
     },
     "confirm": {
       "back": "Tilbage",
-      "continue": "Fortsæt",
-      "eyebrow": "Trin 3 af 4: bekræft sætning",
       "heading": "Skriv fire ord fra din sætning igen.",
       "intro": "Vi spørger om bestemte positioner for at bekræfte, at du har gemt den.",
       "mismatch": "Matcher ikke ord nr. {{pos}}.",
-      "wordAtPosition": "Ord på position {{pos}}"
+      "wordAtPosition": "Ord på position {{pos}}",
+      "commit": "Opret boks",
+      "committing": "Gemmer…",
+      "eyebrowLabel": "Bekræft sætning"
     },
     "encrypting": {
       "caption": "Dette tager et øjeblik.",
@@ -4435,24 +4755,19 @@
     },
     "password": {
       "back": "Tilbage",
-      "eyebrow": "Trin 1 af 4: hovedadgangskode",
       "heading": "Opret boks",
       "helperLead": "Myne gemmer ikke din adgangskode eller gendannelsessætning.",
-      "submit": "Generér gendannelsessætning"
+      "submit": "Generér gendannelsessætning",
+      "eyebrowLabel": "Hovedadgangskode"
     },
     "phrase": {
-      "back": "Tilbage",
       "clipboardNotCleared": "Din browser lader ikke Myne rydde din udklipsholder bagefter, så de 24 ord bliver liggende der, indtil du kopierer noget andet. Indsæt dem i din adgangskodemanager, og kopiér så noget andet.",
-      "continue": "Jeg har gemt dette, bekræft sætning",
       "copied": "Kopieret. Myne rydder udklipsholderen efter 30 sekunder, også selvom du går videre, så længe appen kører.",
       "copiedNoAutoClear": "Kopieret. Myne kan ikke rydde din udklipsholder her, så ordene bliver liggende på den, indtil du kopierer noget andet.",
       "copy": "Kopiér",
       "extensionNotice": "Browserudvidelser med adgang til dette websted kan læse, hvad der står på denne side. Er du ikke sikker på hver eneste udvidelse i denne profil, så brug desktop-appen eller en ren browserprofil til dette trin.",
       "copyFailed": "Kunne ikke kopiere. Brug “Gem som fil” i stedet.",
       "downloadStarted": "Sendt til din browsers downloads. Tjek, at den er nået frem: det er din browser, der bestemmer, hvor filen havner, og Myne kan ikke se, om den gjorde det.",
-      "eyebrow": "Trin 2 af 4: gendannelsessætning",
-      "heading": "Skriv disse 24 ord ned.",
-      "intro": "Denne sætning er sammen med din adgangskode den eneste måde at gendanne din boks på. Opbevar den offline: på papir, i en adgangskodemanager eller en hardware-wallet. Behandl den som kontanter.",
       "reveal": "Vis sætning",
       "saveAsFile": "Gem som fil",
       "saveFailed": "Kunne ikke gemme filen. Kopiér ordene i stedet, eller skriv dem ned.",
@@ -4473,7 +4788,36 @@
     },
     "sessionLost": {
       "startOver": "Start forfra"
-    }
+    },
+    "kit": {
+      "accountFor": "Kontonummer — når du tilføjer en anden enhed",
+      "back": "Tilbage",
+      "continue": "Jeg har gemt dette, bekræft sætning",
+      "copied": "Sættet ligger i din udklipsholder. Myne rydder den om 30 sekunder, selv om du går videre, så længe appen kører.",
+      "copiedNoAutoClear": "Kopieret. Myne kan ikke rydde din udklipsholder her, så sættet bliver liggende, indtil du kopierer noget andet.",
+      "copy": "Kopiér",
+      "copyFailed": "Kunne ikke kopiere. Brug “Gem gendannelsessæt” i stedet.",
+      "documentTitle": "Mynes gendannelsessæt",
+      "downloadStarted": "Sendt til din browsers downloads. Tjek, at sættet nåede frem: din browser bestemmer, hvor filen ender, og Myne kan ikke se, om den gjorde.",
+      "eyebrowLabel": "Gendannelsessæt",
+      "heading": "Gem dit gendannelsessæt",
+      "intro": "Filen, du er ved at gemme, er præcis dette. Det vises én gang.",
+      "phraseFor": "Gendannelsessætning — hvis du glemmer din adgangskode",
+      "save": "Gem gendannelsessæt",
+      "saveFailed": "Kunne ikke gemme filen. Kopiér sættet i stedet, eller skriv begge dele ned.",
+      "savedToFile": "Gemt. Det er en almindelig tekstfil med begge hemmeligheder, så opbevar den et sted, hvor kun du kan læse den.",
+      "whyEnglish": "Ordene er engelske på alle sprog. De er en del af BIP-39-standarden, så enhver Myne-klient kan læse en sætning skrevet af enhver anden. Oversæt dem ikke: oversatte ord findes ikke på ordlisten, og sætningen ville holde op med at virke."
+    },
+    "name": {
+      "back": "Tilbage",
+      "continue": "Fortsæt",
+      "eyebrowLabel": "Navngiv din boks",
+      "heading": "Hvad skal vi kalde denne boks?",
+      "helper": "Navnet gemmes krypteret sammen med boksen. På denne enhed vises det i boks vælgeren ved opstart, før du låser op, så alle, der kan se den skærm, kan læse det; skjul boksnavne i Indstillinger for at slå det fra. Du kan ændre det senere.",
+      "intro": "Du ser dette navn på låseskærmen og i din boksliste.",
+      "placeholder": "Personlig"
+    },
+    "stepIndicator": "Trin {{n}} af {{total}} · {{label}}"
   },
   "vaultPicker": {
     "createAnother": "Opret en anden boks",
@@ -4495,7 +4839,10 @@
     "renameCancel": "Annuller",
     "renamePlaceholder": "Kontonavn",
     "renameSave": "Omdøb",
-    "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret."
+    "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret.",
+    "createShort": "Ny boks",
+    "joinShort": "Tilføj enhed",
+    "restoreShort": "Gendan sikkerhedskopi"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4561,9 +4908,6 @@
   },
   "welcome": {
     "createCta": "Opret ny boks",
-    "headlineLine1": "Krypterede markdown-noter.",
-    "headlineLine2": "Ingen e-mail ved tilmelding.",
-    "joinCta": "Tilføj denne enhed til en konto",
     "repairResidue": {
       "cancel": "Annullér",
       "cleaningUp": "Rydder op…",
@@ -4583,8 +4927,6 @@
       "partialBody_other": "{{count}} filer kan være låst af en anden app (antivirus, filsynkronisering eller søgeindeksering). Luk appen og prøv igen om et øjeblik, eller fjern boksmappen manuelt.",
       "partialTitle": "Nogle filer kunne ikke fjernes"
     },
-    "restoreCta": "Gendan fra sikkerhedskopi",
-    "subtitle": "Dine noter krypteres på denne enhed, før de forlader den. Serveren gemmer kun chiffertekst.",
     "repairCleanedUp_one": "Ryddede {{count}} resterende fil op.",
     "repairCleanedUp_other": "Ryddede {{count}} resterende filer op.",
     "repairFailed": "Kunne ikke fuldføre oprydningen. Prøv igen.",
@@ -4594,9 +4936,22 @@
     "lede": "Markdown, krypteret på denne enhed, før den overhovedet forlader den. Ingen konto-e-mail. Ingen servere, der kan læse et eneste ord.",
     "residueBanner": "Resterende filer fra en afbrudt sletning ({{n}}). Ryd dem op, før du opretter en boks.",
     "cleanUpFiles": "Ryd resterende filer op",
-    "create": "Opret en boks",
     "connect": "Forbind til min konto",
-    "identityCta": "Opret kun en identitet"
+    "startIdentity": "Opret en identitet",
+    "startLocal": "Opret en lokal boks i stedet",
+    "tagline": "Krypterede markdown-noter. Ingen e-mail ved oprettelse.",
+    "identityTitle": "Opret en identitet",
+    "identityBody": "Én identitet til alle dine bokse, så folk kan invitere dig. Kræver en synkroniseringsserver.",
+    "localTitle": "Opret en lokal boks",
+    "localBody": "En krypteret boks på denne enhed. Tilføj synkronisering eller en identitet senere.",
+    "restoreTitle": "Gendan fra sikkerhedskopi",
+    "restoreBody": "Åbn en .myne-backup-fil, du gemte tidligere.",
+    "joinTitle": "Føj denne enhed til en konto",
+    "joinBody": "Brug en boks, du allerede har på en anden enhed.",
+    "createAction": "Opret",
+    "restoreAction": "Gendan",
+    "joinAction": "Tilføj enhed",
+    "version": "Version {{version}} · pre-alpha"
   },
   "wikiGraph": {
     "emptyTitle": "Ingen links endnu",
@@ -4701,7 +5056,6 @@
     "approvalHint": "Dine noter vises, når du godkender denne enhed fra en enhed, der allerede har din konto.",
     "connectingSubtitle": "Henter din konto og låser din boks op på denne enhed.",
     "qr": {
-      "cancel": "Annullér",
       "confirmAccount": "Konto",
       "confirmServer": "Server",
       "confirmTitle": "Tilføj denne enhed?",
@@ -4719,7 +5073,6 @@
     "beginGeneric": "Kunne ikke starte oprettelse af boks. Prøv igen.",
     "wordNumber": "ORD #{{position}}",
     "commitError": "Kunne ikke gemme din boks. Prøv igen.",
-    "copyPhrase": "Kopiér",
     "phraseCopied": "Kopieret. Den bliver på denne enhed, og systemet fjerner den efter 30 sekunder.",
     "phraseCopyFailed": "Kunne ikke kopiere. Brug “Gem til fil” i stedet.",
     "savedToFile": "Gemt til {{label}}",
@@ -4733,8 +5086,6 @@
     "confirmPasswordLabel": "Bekræft adgangskode",
     "passwordHelper": "Aldrig gemt, aldrig sendt. Den krypterer dine nøgler på denne enhed.",
     "encryptingSubtitle": "Udleder din nøgle med Argon2id. Dette tager et par sekunder og kan ikke afbrydes.",
-    "phraseTitle": "Din gendannelsessætning",
-    "phraseIntro": "Fireogtyve ord, i rækkefølge. Skriv dem ned på papir, og opbevar dem et sikkert sted.",
     "showSecondHalf": "Vis ord 13-24",
     "saveToFile": "Gem til fil",
     "writtenThemDown": "Jeg har skrevet dem ned",
@@ -4742,9 +5093,6 @@
     "typebackLead": "Indtast disse fire ord fra den gendannelsessætning, du netop gemte.",
     "wordMismatch": "Stemmer ikke med ord #{{pos}}",
     "backToPhrase": "Tilbage til sætning",
-    "accountTitle": "Dit kontonummer",
-    "accountLead": "Gem dette sammen med din gendannelsessætning. Du får brug for det til at gendanne din boks på en ny enhed.",
-    "accountSavedAck": "Jeg har gemt mit kontonummer.",
     "commit": "Gennemfør",
     "committingTitle": "Gemmer din boks…",
     "committingSubtitle": "Skriver den krypterede boks til denne enhed.",
@@ -4784,7 +5132,6 @@
       "backup": "Krypterede sikkerhedskopier laves og gendannes i Mynes desktop-app, som kan skrive sikkerhedskopifilen, hvor du vælger. Dine noter her kommer fra serveren, så denne browser gendanner sig selv ved at synkronisere.",
       "creation": "Denne browser rummer allerede en konto. Vil du oprette en til, så åbn Mynes desktop-app eller brug en anden browserprofil.",
       "multiVault": "Denne browser rummer én konto. Vil du bruge en anden, så åbn den i Mynes desktop-app eller i en anden browserprofil.",
-      "phraseRecovery": "Gendannelse med sætning foregår i Mynes desktop-app. Din gendannelsessætning bør aldrig skrives ind på en webside.",
       "title": "Ikke tilgængelig i browseren"
     },
     "unsupported": {
@@ -4818,7 +5165,6 @@
     "saveFailed": "Det kunne ikke gemmes, så intet blev ændret. Prøv igen, eller start Myne med --disable-screen-capture-protection."
   },
   "identitySetup": {
-    "createCta": "Opret en identitet",
     "doneCta": "Færdig",
     "error": "Identiteten kunne ikke oprettes. Tjek, at en synkroniseringsserver er konfigureret, og prøv igen.",
     "intro": "En identitet lader folk adressere en invitation til dig, før du ejer nogen bog. Den opretter ingen bog og gemmer ingen noter.",
@@ -4827,7 +5173,25 @@
     "recoverCta": "Gendan en identitet",
     "recoverIntro": "Har du allerede en identitet? Indtast dens 24-ords genfrasetægningsfrase.",
     "recovered": "Identitet gendannet.",
-    "title": "Kun identitet"
+    "title": "Kun identitet",
+    "errorAlreadyHeld": "Denne enhed har allerede en identitet. Gendan den med dens gendannelsessætning, eller glem den, og opret en ny.",
+    "errorNotConfigured": "Kunne ikke opsætte identiteten. Tjek, at der er konfigureret en synkroniseringsserver, og prøv igen.",
+    "forgetCancel": "Behold den",
+    "forgetConfirm": "Glem, og opret ny",
+    "forgetCta": "Glem denne identitet, og opret en ny",
+    "forgetWarning": "Dette sletter den identitet, der findes på denne enhed. Har du ikke skrevet dens 24-ords gendannelsessætning ned, er den væk: denne enhed mister adgangen til enhver boks, den ejer eller har tilsluttet sig, indtil du gendanner den med den sætning. Fortsæt kun, hvis du er sikker.",
+    "heldIntro": "Denne enhed har allerede en identitet. Gendan den med dens 24-ords sætning nedenfor.",
+    "typeBackLead": "For at bekræfte, at du har gemt den, skal du skrive disse fire ord fra sætningen ovenfor.",
+    "typeBackMismatch": "Det matcher ikke ord nr. {{pos}}.",
+    "typeBackWordAtPosition": "Ord nr. {{pos}}",
+    "newTitle": "En ny identitet",
+    "createAction": "Opret",
+    "recoverTitle": "Jeg har allerede en",
+    "recoverHint": "Gendan den på denne enhed med dens 24-ords gendannelsessætning.",
+    "recoverAction": "Gendan",
+    "back": "Tilbage",
+    "changeServer": "Ændr eller verificer synkroniseringsserver",
+    "errorTlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen og dens certifikat."
   },
   "personIdentityCode": {
     "copy": "Kopiér identitetskode",
@@ -4853,6 +5217,169 @@
     "acceptInvalid": "Det er ikke en gyldig ejeridentitetskode.",
     "shareCodeHeading": "Din invitationskode",
     "shareCodeHint": "Del denne kode med hvem end der inviterer dig. Den indeholder kun offentlige oplysninger (din identitets-id og offentlige nøgler), aldrig din frase.",
-    "title": "Din identitet"
+    "title": "Din identitet",
+    "acceptPasswordNote": "Vælg en adgangskode til denne enhed. Den er adskilt fra boksens ejers adgangskode og fra din gendannelsessætning: den låser denne boks op på denne enhed, og din sætning forbliver den portable vej tilbage.",
+    "acceptErrorBadRequest": "Invitationen kunne ikke verificeres. Indsæt boksens ejers identitetskode (de deler den, når de inviterer dig), og sammenlign fingeraftrykket på begge sider.",
+    "acceptErrorNotFound": "Denne invitation er ikke længere tilgængelig. Den er måske allerede blevet brugt eller trukket tilbage. Bed ejeren om at sende en ny invitation.",
+    "acceptErrorNotEnrolled": "Denne enhed er ikke den identitet, som invitationen var rettet til. Åbn den identitet, invitationen blev sendt til, og accepter derefter.",
+    "acceptErrorTransport": "Kunne ikke nå synkroniseringsserveren. Tjek din forbindelse, og prøv igen.",
+    "acceptErrorUnauthenticated": "Din identitet er ikke logget ind på denne enhed. Lås din identitet op, og prøv igen.",
+    "claimedHeading": "Invitationer, du allerede har gjort krav på",
+    "claimedHint": "Føj en til denne enhed med din gendannelsessætning. Hvis boksens ejer sidenhen har fjernet dig fra boksen, kan den ikke føjes til her.",
+    "join": "Føj til denne enhed",
+    "joinHint": "Denne boks er allerede delt med din identitet. Indtast din gendannelsessætning for at installere den på denne enhed.",
+    "joinPhraseLabel": "Din gendannelsessætning",
+    "joinPasswordNote": "Vælg en adgangskode til denne enhed. Den er adskilt fra boksens ejers adgangskode: den låser denne boks op her, og din gendannelsessætning forbliver den portable vej tilbage.",
+    "joinSubmit": "Føj til, og lås op",
+    "joinError": "Boksen kunne ikke føjes til denne enhed.",
+    "joinErrorAlreadyHeld": "Denne enhed har allerede denne boks, så der er intet at føje til. Åbn den boks, du allerede har her.",
+    "joinErrorBadRequest": "Denne enhed kunne ikke bekræfte, hvilken ejer denne boks tilhører, så den føjede ikke boksen til. Hvis det er første gang, du logger ind på denne boks her, så åbn den én gang på en enhed, der allerede har den, og prøv igen.",
+    "joinErrorNotEnrolled": "Denne gendannelsessætning er ikke den identitet, som denne boks blev delt med. Tjek, at du indtastede sætningen for den identitet, der blev inviteret.",
+    "joinErrorNotConfigured": "Synkronisering er ikke opsat på denne enhed. Angiv din synkroniseringsserver, og prøv igen.",
+    "joinErrorUnauthenticated": "Din identitet er ikke logget ind på denne enhed. Lås din identitet op, og prøv igen.",
+    "joinErrorTransport": "Kunne ikke nå synkroniseringsserveren, eller også er denne boks ikke offentliggjort der endnu. Tjek din forbindelse, og prøv igen.",
+    "forgetCancel": "Behold den",
+    "forgetCheckbox": "Jeg forstår, at denne identitet fjernes fra denne enhed.",
+    "forgetConfirm": "Glem identitet",
+    "forgetCta": "Glem denne identitet på denne enhed",
+    "forgetError": "Kunne ikke glemme identiteten. Prøv igen.",
+    "forgetWarning": "Dette fjerner kun identiteten fra denne enhed. Serverkontoen og enhver boks, den ejer eller har tilsluttet sig, er urørt, og du kan gendanne identiteten med dens 24-ords sætning på en anden enhed. Har du ikke gemt den sætning, kan denne enhed ikke gendanne den."
+  },
+  "aiOnboarding": {
+    "title": "Opsæt AI",
+    "intro": "Myne kan søge i dine noter efter betydning, foreslå tags og chatte om dem. Intet af det er påkrævet, og du kan slå det til senere fra Indstillinger.",
+    "enableLabel": "Slå AI-funktioner til",
+    "semantic": {
+      "title": "Semantisk søgning",
+      "body": "Download en flersproget embedding-model (ca. 449 MB), så du kan søge efter betydning, ikke kun efter ord."
+    },
+    "tag": {
+      "title": "Auto-tagging",
+      "body": "Download tag-modellen (ca. 337 MB), så Myne kan foreslå tags, mens du skriver."
+    },
+    "chat": {
+      "title": "Chat",
+      "body": "Ingen download. Chat kører mod en model, du selv kører i forvejen, eller en udbyder, du angiver, med et samtykketrin.",
+      "setup": "Opsæt en udbyder"
+    },
+    "download": "Download",
+    "downloading": "Downloader…",
+    "cancel": "Annuller",
+    "complete": "Klar",
+    "retry": "Prøv igen",
+    "skip": "Spring over",
+    "done": "Færdig"
+  },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "Fortsæt med at redigere",
+      "message": "Nogle åbne filer har stadig ikke-gemte ændringer, som ikke kunne skrives til disken. Lukker du nu, kasseres de.",
+      "okLabel": "Kassér og luk",
+      "title": "Luk Myne?"
+    },
+    "closeTab": "Luk {{name}}",
+    "conflict": {
+      "body": "Denne fil blev ændret på disken, mens du redigerede. Myne har ikke skrevet noget.",
+      "copy": "Gem en kopi…",
+      "copyFailed": "Kopien kunne ikke gemmes. Den oprindelige fil er uændret.",
+      "overwrite": "Overskriv med mine ændringer",
+      "reload": "Genindlæs fra disken"
+    },
+    "deeplink": {
+      "body": "Den ligger uden for enhver boks, så Myne krypterer den ikke.",
+      "cancel": "Annuller",
+      "confirm": "Åbn",
+      "failed": "Filen kunne ikke åbnes. Den er måske flyttet eller ændret.",
+      "title": "Åbn denne lokale fil?"
+    },
+    "empty": "Ingen fil er åben.",
+    "import": "Importér til boks",
+    "importFailed": "Filen kunne ikke importeres. Intet blev ændret.",
+    "importLocked": "Boksen er låst. Lås den op, og prøv igen.",
+    "importNeedsVault": "Der er endnu ingen boks på denne enhed. Opret en, og prøv igen.",
+    "marker": "Lokal fil. Ikke krypteret og ikke en del af nogen boks.",
+    "open": "Åbn en lokal fil",
+    "openFailed": "Den fil kunne ikke åbnes.",
+    "openRefusedTooLarge": "Den fil er for stor til at åbne her.",
+    "openRefusedType": "Kun .md- og .markdown-filer åbnes her.",
+    "retry": "Prøv at gemme igen",
+    "saveError": "Filen kunne ikke gemmes. Dine ændringer er stadig her.",
+    "tabs": "Åbne lokale filer",
+    "unsaved": "Ikke-gemte ændringer"
+  },
+  "update": {
+    "banner": {
+      "available": "Myne {{version}} er tilgængelig.",
+      "failed": "Kunne ikke installere opdateringen. Prøv igen.",
+      "installing": "Downloader opdateringen…",
+      "later": "Senere",
+      "restart": "Genstart for at opdatere"
+    }
+  },
+  "firstRun": {
+    "server": {
+      "heading": "Vælg en synkroniseringsserver",
+      "chooseHeading": "Hvor skal dine noter synkroniseres?",
+      "chooseIntro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Brug Myne Sync-tjenesten, eller peg denne enhed mod en server, du selv driver. Uanset hvad forbliver dine noter krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
+      "myneSyncHint": "Den Myne-drevne server. Dens HTTPS-certifikat tjekkes automatisk.",
+      "intro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Dine noter forbliver krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
+      "notConfigured": "Indtast en serveradresse ovenfor, og tryk på Opret forbindelse for at fortsætte.",
+      "back": "Tilbage",
+      "continue": "Fortsæt",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "Din egen server",
+      "selfHostedHint": "En synkroniseringsserver, du selv driver. Du indtaster dens adresse på næste skærm.",
+      "connectAction": "Opret forbindelse",
+      "setUpAction": "Opsæt"
+    }
+  },
+  "identityFlow": {
+    "title": "Opret en identitet",
+    "lead": "En identitet gør det muligt for folk at invitere dig til en boks, og lader én identitet eje mange bokse. Den kræver en synkroniseringsserver til at opbevare dine krypterede noter og nå dig.",
+    "start": "Opret en identitet",
+    "skip": "Ikke nu, brug kun denne enhed",
+    "back": "Tilbage",
+    "serverUnreachable": "Kunne ikke nå den server. Tjek adressen, og prøv igen.",
+    "createFailed": "Kunne ikke oprette identiteten. Tjek synkroniseringsserveren, og prøv igen.",
+    "server": {
+      "title": "Vælg en synkroniseringsserver",
+      "lead": "Dine noter forbliver krypteret på denne enhed, før de forlader den. Serveren gemmer kun ciphertext.",
+      "urlLabel": "Serveradresse",
+      "useMyneSync": "Brug Myne Sync",
+      "selfHostedHint": "Eller indtast adressen på en server, du selv driver.",
+      "connect": "Opret forbindelse",
+      "connecting": "Opretter forbindelse…"
+    },
+    "held": {
+      "title": "Der findes allerede en identitet på denne enhed",
+      "lead": "Denne enhed har allerede en identitet. Glemmer du den, mister denne enhed adgangen til enhver boks, den ejer eller har tilsluttet sig, indtil du gendanner den med dens 24-ords sætning. Har du ikke gemt den sætning, kan den ikke gendannes.",
+      "forget": "Glem den, og start forfra"
+    },
+    "create": {
+      "title": "Opret din identitet",
+      "lead": "Dette opretter én identitet til dig. Det opretter ingen boks og gemmer ingen noter.",
+      "cta": "Opret identitet",
+      "working": "Opretter…"
+    },
+    "phrase": {
+      "title": "Gem din identitetssætning",
+      "warning": "Skriv disse 24 ord ned, og opbevar dem sikkert. Det er den eneste gang, de vises; de er den eneste måde at gendanne denne identitet. Det er en anden sætning end enhver boks-gendannelsessætning.",
+      "reveal": "Vis",
+      "typebackLead": "For at bekræfte, at du har gemt den, skal du skrive disse fire ord fra sætningen ovenfor.",
+      "wordNumber": "Ord nr. {{position}}",
+      "wordMismatch": "Det matcher ikke ord nr. {{pos}}.",
+      "continue": "Fortsæt"
+    },
+    "home": {
+      "title": "Din identitet",
+      "lead": "Folk kan invitere dig til en boks. Du behøver ikke eje en boks for at blive inviteret.",
+      "codeLabel": "Din identitetskode",
+      "invitesHeading": "Invitationer",
+      "noInvites": "Ingen invitationer endnu.",
+      "inviteHint": "Åbn denne invitation fra boks vælgeren for at tilslutte dig med din identitetssætning.",
+      "forgetHeading": "Denne enhed",
+      "forget": "Glem denne identitet på denne enhed",
+      "forgetCheckbox": "Jeg forstår, at denne identitet fjernes fra denne enhed. Serverkontoen består, og sætningen gendanner den."
+    }
   }
 }

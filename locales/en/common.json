@@ -3,7 +3,6 @@
     "accountMismatch": "This browser already holds a different account's vault. Open that one, or sign out and erase this browser's copy first.",
     "changeAccount": "Use a different account number",
     "continue": "Continue",
-    "failed": "Couldn't open that account. Check the account number and password, then try again.",
     "hint": "Enter the master password for this account. Myne will fetch your vault and set this browser up as a device on it.",
     "noEndpoint": "This copy of Myne has no sync server configured, so it can't reach your vault. Contact whoever runs it.",
     "passwordLabel": "Master password",
@@ -59,13 +58,11 @@
       "targetNote": "About a note",
       "targetVault": "About the whole vault",
       "running": "Working on this conversation",
-      "emptyNeedsNote": "A run works on notes you choose, so a conversation starts from one. Open a note, then come back — or use the AI panel beside it.",
       "newConversation": "New conversation",
       "historyLabel": "History"
     },
     "focus": {
       "title": "Agent on note",
-      "backToHub": "All conversations",
       "openNote": "Open note"
     },
     "footprint": {
@@ -76,10 +73,8 @@
     "composer": {
       "placeholder": "Ask the AI…",
       "scopeLabel": "Working on",
-      "scopeChange": "Change",
       "scopeOpenNote": "This note",
       "scopeAllVault": "All notes",
-      "scopeChoose": "Choose a folder",
       "blockedScope": "Nothing for the agent to work on yet: every note is excluded from AI, or the vault is empty.",
       "checking": "Checking",
       "preparing": "Getting ready…",
@@ -232,8 +227,6 @@
       }
     },
     "undo": {
-      "offer_one": "The last run changed {{count}} note.",
-      "offer_other": "The last run changed {{count}} notes.",
       "action": "Undo the run",
       "reverted_one": "{{count}} note restored.",
       "reverted_other": "{{count}} notes restored.",
@@ -359,9 +352,7 @@
       "menuRename": "Rename",
       "menuTranscribe": "Transcribe",
       "menuViewTranscription": "View transcription",
-      "noMatch": "No attachments match your search.",
       "noUnusedNotice": "No unused attachments to clean.",
-      "preview": "Preview",
       "previewAttachment": "Preview attachment",
       "previewNamed": "Preview {{name}}",
       "searchAriaLabel": "Search attachments by filename",
@@ -2136,7 +2127,6 @@
     "folderRow": {
       "createFolderNote": "Create a folder note",
       "empty": "empty",
-      "folderNote": "folder note",
       "openFolderNote": "Open folder note"
     },
     "graph": {
@@ -2163,15 +2153,12 @@
         "filterConditions_one": "{{count}} condition",
         "filterConditions_other": "{{count}} conditions",
         "heading": "Color groups",
-        "moveDown": "Move rule down",
-        "moveUp": "Move rule up",
         "namePlaceholder": "Untitled rule",
         "newRuleTitle": "New color group"
       },
       "depthToggleTitle": "Toggle neighborhood depth (1 ↔ 2 hops)",
       "filterAll": "All",
       "filterAroundNote": "Around this note",
-      "filterByTag": "Filter by tag",
       "filterIsolated": "Isolated",
       "filterSelectAriaLabel": "Filter the graph",
       "hop": "{{depth}} hop",
@@ -2181,9 +2168,7 @@
       "listLinksTo": "Links to: {{titles}}",
       "loading": "Loading graph…",
       "noNotes": "No notes to graph yet.",
-      "refresh": "Refresh",
       "refreshTitle": "The vault changed: rebuild the graph",
-      "relayout": "Re-layout",
       "relayoutTitle": "Lay the graph out again from scratch",
       "settings": {
         "appearanceHeading": "Appearance",
@@ -2239,7 +2224,6 @@
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Folder",
         "flagKindTitle": "Title",
-        "folderPickerTitle": "Choose your Obsidian vault folder",
         "hiddenIgnoredPrefix_one": "{{count}} config / hidden item ignored (e.g. ",
         "hiddenIgnoredPrefix_other": "{{count}} config / hidden items ignored (e.g. ",
         "hiddenIgnoredSuffix": ", dotfiles).",
@@ -2330,7 +2314,6 @@
         "importLabel": "Name this import",
         "importLabelHint": "If a note you import has the same name as one you already have, and something you import links to it, the imported one is renamed with this. Keep the same name if you run this import again and nothing will be brought in twice.",
         "importLabelIllegal": "That name cannot be used: a note name may not contain \\ / | # ^ [ ] or start/end with a space.",
-        "opening": "Opening…",
         "unnamedVault": "Vault {{n}}",
         "errors": {
           "credential": "That password or recovery phrase did not open the vault. Check it and try again.",
@@ -2403,12 +2386,10 @@
     },
     "list": {
       "addToFavorites": "Add to favorites",
-      "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
       "archiveFolder": "Archive folder",
       "archiveNote": "Archive",
       "archiveSingleError": "Couldn't archive the note.",
-      "attachments": "Attachments",
       "bulkArchive": "Archive {{count}} notes",
       "bulkArchive_one": "Archive {{count}} note",
       "bulkArchive_other": "Archive {{count}} notes",
@@ -2449,24 +2430,18 @@
       "newFolder": "New folder",
       "newFolderInPlaceholder": "New folder in {{path}}",
       "newFolderPlaceholder": "New folder",
-      "newItem": "New…",
       "newNote": "New note",
-      "newNoteFromTemplate": "New note from template…",
       "newNoteHere": "New note here",
       "newNoteMenu": "New note",
-      "newNoteShortcut": "New note (⌘N)",
       "newSubfolder": "New subfolder",
       "newViewTitle": "New view",
       "noteMovedToTrash": "Note moved to Trash",
       "notesHeading": "Notes",
       "notesMovedToTrash_one": "{{count}} note moved to Trash",
       "notesMovedToTrash_other": "{{count}} notes moved to Trash",
-      "openArchive": "Open the archive",
-      "openAttachments": "Open attachments",
       "openFolderNote": "Open folder note",
       "openInNewTab": "Open in new tab",
       "openToSide": "Open to the side",
-      "openTrash": "Open the trash",
       "removeFolderNote": "Remove folder note",
       "removeFromFavorites": "Remove from favorites",
       "rename": "Rename",
@@ -2694,13 +2669,7 @@
         "setCoverImage": "Set cover image",
         "untitled": "Untitled"
       },
-      "collapseViews": "Collapse views",
       "empty": "No views yet. Save the current note list as a view.",
-      "expandViews": "Expand views",
-      "heading": "Views",
-      "host": {
-        "unsupported": "This view type arrives in a later update."
-      },
       "list": {
         "empty": "No notes match this view",
         "noValue": "No value"
@@ -4183,9 +4152,6 @@
       "pinPlatformTrust": "Server certificate verified by this client’s trust store.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server. Check the URL and that it’s running.",
-      "copyFingerprint": "Copy fingerprint",
-      "fingerprintCopied": "Fingerprint copied.",
-      "fingerprintCopyFailed": "Couldn't copy the fingerprint. Select it and copy it by hand.",
       "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
       "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
       "inviteLabel": "Invite code (only if this server asks for one)",
@@ -4384,7 +4350,6 @@
       "rotated": "Key rotated",
       "keyChanged": "Key changed. Verify with the owner.",
       "relinkConfirmed": "Relink confirmed by owner",
-      "epoch": "Group key epoch {{epoch}}",
       "ownerBadge": "Owner",
       "memberBadge": "Member",
       "youBadge": "You",
@@ -4414,7 +4379,6 @@
       "invitationPending": "Not accepted yet",
       "invitationsFailed": "Could not load your invitations.",
       "title": "Vault members",
-      "personHint": "Unlock it with your identity's recovery phrase to invite or manage members.",
       "identityHeading": "Your identity",
       "membersHeading": "Members",
       "personUnlock": "Unlock member identity",
@@ -4428,16 +4392,11 @@
       "sasHint": "Read this fingerprint to the person you are inviting, or have them read it to you. It must match on both sides before you continue.",
       "sasConfirm": "I confirmed this fingerprint with the person out of band",
       "inviteCodeInvalid": "That is not a valid member identity code.",
-      "kemLabel": "ML-KEM public key",
-      "edLabel": "Ed25519 public key",
-      "mldsaLabel": "ML-DSA public key",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
       "removeFailed": "The member could not be removed.",
       "emptyTitle": "No members yet",
-      "personLockedTitle": "Member identity locked",
       "personUnlockOpen": "Unlock",
-      "personUnlockCancel": "Cancel",
       "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
       "shareConfirmTitle": "Share this vault?",
       "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
@@ -4521,7 +4480,6 @@
       "upcoming": "Upcoming"
     },
     "filter": {
-      "all": "All",
       "overdue": "Overdue",
       "today": "Today",
       "upcoming": "Upcoming"
@@ -4564,13 +4522,6 @@
       "allNotes": "All notes",
       "anyPriority": "Any priority",
       "anyTag": "Any tag",
-      "dueLabel": "Filter by due date",
-      "folderLabel": "Filter by folder",
-      "noteLabel": "Filter by note",
-      "priorityLabel": "Filter by priority",
-      "sortLabel": "Sort within sections",
-      "statusLabel": "Filter by completion",
-      "tagLabel": "Filter by tag",
       "untitled": "Untitled"
     },
     "query": {
@@ -4591,10 +4542,6 @@
       "tooLongToWrite": "This task's line is too long to edit from here. Open its note instead.",
       "untitled": "Untitled task"
     },
-    "scope": {
-      "allFolders": "All folders",
-      "label": "Narrow by"
-    },
     "search": {
       "label": "Search tasks",
       "placeholder": "Search tasks…"
@@ -4603,7 +4550,6 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "Close templates",
       "deleteRowLabel": "Delete template {{name}} (move to Trash)",
       "editTemplateLabel": "Edit template {{name}}",
       "emptyBody": "Create a template to reuse a note skeleton: a meeting note, a daily log, a reading note. Pick one when you make a new note.",
@@ -4615,7 +4561,6 @@
       "nameLabel": "Template name",
       "create": "Create",
       "createFailed": "Couldn't create the template. Try again.",
-      "openFailed": "Couldn't open the template. Try again.",
       "removeFromTemplates": "Remove from templates",
       "removeRowLabel": "Remove {{name}} from templates (keeps the note)",
       "title": "Note templates"
@@ -4680,7 +4625,6 @@
     "memberPasswordLabel": "Vault password",
     "memberPasswordError": "That password did not open this shared vault.",
     "memberUsePhrase": "Use recovery phrase instead",
-    "memberUsePassword": "Use vault password instead",
     "memberUseFast": "Use fast unlock instead",
     "memberPinHint": "This vault is shared with you. Unlock it with the PIN you set on this device.",
     "memberPinLabel": "Vault PIN",
@@ -5053,9 +4997,6 @@
       "chooseHeading": "Where should your notes sync?",
       "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
-      "connecting": "Connecting…",
-      "hostedError": "Couldn't reach the Myne server. Check your connection and try again, or use your own server.",
-      "selfHosted": "Use my own server",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
@@ -5229,7 +5170,6 @@
     "lede": "Markdown, encrypted on this device before it ever leaves it. No account email. No servers that can read a word.",
     "residueBanner": "Leftover files from an interrupted delete ({{n}}). Clean them up before creating a vault.",
     "cleanUpFiles": "Clean up leftover files",
-    "create": "Create a vault",
     "connect": "Connect to my account",
     "tagline": "Encrypted markdown notes. No email at signup.",
     "identityTitle": "Create an identity",
@@ -5348,7 +5288,6 @@
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
     "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
     "qr": {
-      "cancel": "Cancel",
       "confirmAccount": "Account",
       "confirmServer": "Server",
       "confirmTitle": "Add this device?",
@@ -5366,7 +5305,6 @@
     "beginGeneric": "Couldn't start vault creation. Please try again.",
     "wordNumber": "WORD #{{position}}",
     "commitError": "Couldn't save your vault. Please try again.",
-    "copyPhrase": "Copy",
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
@@ -5380,8 +5318,6 @@
     "confirmPasswordLabel": "Confirm password",
     "passwordHelper": "Never stored, never transmitted. It encrypts your keys on this device.",
     "encryptingSubtitle": "Deriving your key with Argon2id. This takes a few seconds and can't be interrupted.",
-    "phraseTitle": "Your recovery phrase",
-    "phraseIntro": "Twenty-four words, in order. Write them on paper and store them somewhere safe.",
     "showSecondHalf": "Show words 13-24",
     "saveToFile": "Save to file",
     "writtenThemDown": "I've written them down",
@@ -5389,9 +5325,6 @@
     "typebackLead": "Enter these four words from the recovery phrase you just saved.",
     "wordMismatch": "Doesn't match word #{{pos}}",
     "backToPhrase": "Back to phrase",
-    "accountTitle": "Your account number",
-    "accountLead": "Save this alongside your recovery phrase. You'll need it to restore your vault on a new device.",
-    "accountSavedAck": "I have saved my account number.",
     "commit": "Commit",
     "committingTitle": "Saving your vault…",
     "committingSubtitle": "Writing the encrypted vault to this device.",
