@@ -2192,7 +2192,7 @@ function PopulatedList({
   // inheriting that rejection would make this action fail while a save is
   // failing elsewhere. So a DIRTY pane still races: the reload early-returns on
   // pending work, and the writers' read-patch-write can lose the field or mint a
-  // keep-both copy. That race is recorded in `decisions/editor/0680` rather than
+  // keep-both copy. That race is recorded in `decisions/editor/0684` rather than
   // claimed away here.
   const handleSetIndex = useCallback(
     async (id: NoteId) => {
