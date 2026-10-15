@@ -1622,15 +1622,30 @@ runner(
         },
       );
 
-      // ---- Frame: vault (label + icon + actions) ----
-      // The controls captured here moved out of the Account panel into the
-      // Vault panel. The frame name and the user-guide slug below are the
-      // WEBSITE's article names, so they are left alone by this change; the
-      // article text and the slug want their own update on `myne-website`.
+      // ---- Frame: account (the grouping: name, vaults, extensions) ----
+      // The Account panel is the account grouping (`decisions/ui/0679`): the
+      // account name, the vaults it groups on this device, and the extension
+      // pairing block the connected-extensions frame below covers in detail.
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
+        "The Account settings panel showing the account name, the vaults grouped under it, and the browser-extension pairing controls.",
+        async () => {
+          await (await s.byTestId("settings.tab-account")).click();
+          await s.byTestId("settings.account-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: vault (label + icon + actions) ----
+      // The controls captured here moved out of the Account panel into the
+      // Vault panel, and the website now carries a `vault` article of its own,
+      // so the frame name and the slug below follow it.
+      await frame(
+        s,
+        "vault-panel",
+        "settings-and-privacy/vault",
         "The Vault settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
         async () => {
           await (await s.byTestId("settings.tab-vault")).click();
