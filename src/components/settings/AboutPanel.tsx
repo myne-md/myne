@@ -208,7 +208,7 @@ export function AboutPanel() {
   // (myne-md/myne#870): it flushes and installs without locking the vault, so it
   // has no confirm, no `updating` Stage and no failure surface. The notice's
   // confirm is the path that locks first, and unifying the two is a product
-  // decision recorded in `docs/decisions/ui/0680` rather than taken here.
+  // decision recorded in `docs/decisions/ui/0686` rather than taken here.
   const [installing, setInstalling] = useState(false);
   const runUpdateInstall = () => {
     setInstalling(true);
