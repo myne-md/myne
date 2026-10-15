@@ -124,6 +124,10 @@ const VERDICTS = {
     verdict: "ported",
     note: "The local store vanishing underneath a live session (task 22). Renders on BOTH clients — a desktop directory can be unmounted or deleted too — but its CTA differs by `localOnlyVault`: server-held ⇒ erase and re-download, local-only ⇒ lock and re-probe, because handing a desktop user an erase button on a storage fault would destroy the only copy.",
   },
+  "UpdatingScreen.tsx": {
+    verdict: "adapted",
+    note: "The self-update screen (myne-md/myne#870): it ships whole in the web bundle and is unreachable there, because its only inbound edge is the notice's confirm and the notice is gated on the `selfUpdate` capability, which the web descriptor does not carry. The documented difference is therefore reachability rather than behaviour, which is the same shape `AgentReview.tsx` records as `adapted`.",
+  },
   "DeviceRevoked.tsx": {
     verdict: "web-only",
     note: "Revocation treated as TERMINAL — lock, erase this browser's copy, explain (task 94). Reachable only where `localOnlyVault` is absent: on desktop the same server signal keeps parking at re-enrol, because erasing a user's own machine on a server signal would be a new and unasked-for destructive power.",

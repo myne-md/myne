@@ -728,3 +728,37 @@ a:focus-visible,
 .myne-toast--success { --toast-accent: var(--success); }
 .myne-toast--error   { --toast-accent: var(--danger); }
 .myne-toast--info    { --toast-accent: var(--info); }
+
+/* -- Update notice (myne-md/myne#870) ---------------------------------------
+   The notice arrives once per offered version, which is the rare-moment case
+   `docs/decisions/ui/0632` exists for, so it uses the expressive tier. Both
+   animations below are transform + opacity only, so neither triggers layout,
+   and both are decoration: the blanket reduced-motion rule at the top of this
+   sheet zeroes their durations, which is the correct answer rather than a loss
+   (`--duration-slower` is over the ceiling and is deliberately not used here). */
+@keyframes myne-update-notice-in {
+  from { opacity: 0; transform: translateY(0.5em); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.myne-update-notice {
+  animation: myne-update-notice-in var(--duration-slow) var(--ease-emphasized) both;
+}
+
+/* The version resolving, once, inside the updating screen. Each glyph is
+   staggered by `--stagger-step` times its index and CLAMPED at `--stagger-max`,
+   which matters: this build ships a beta channel, so `0.11.0-beta.1` is thirteen
+   glyphs and would otherwise start its last glyph 216ms in and finish past the
+   300ms ceiling the motion canon sets. The clamp lives in the inline
+   `min(calc(...))` at the call site, where `check-motion-canon.mjs` cannot see
+   it, so this comment is what stops it being deleted as unnecessary. */
+@keyframes myne-version-reveal-in {
+  from { opacity: 0; transform: translateY(0.15em); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.myne-version-reveal {
+  display: flex;
+  justify-content: center;
+}
+.myne-version-reveal span[aria-hidden="true"] {
+  animation: myne-version-reveal-in var(--duration-fast) var(--ease-out) both;
+}
