@@ -1,14 +1,17 @@
-// su1: desktop self-update surfaces (Settings → About + the banner).
+// su1: desktop self-update surfaces (Settings → About + the notice).
 // Vault-count precondition: 1.
 //
 // Asserts the update controls render on the PRODUCTION binary: the update
 // channel row, the "Check for updates" button and the status line, all gated on
-// the `selfUpdate` capability (present on desktop), and that the update banner
-// is ABSENT while no update has been found. It deliberately does not drive a
+// the `selfUpdate` capability (present on desktop), and that NO update notice is
+// on screen while the host has offered nothing. It deliberately does not drive a
 // real update: the check reaches `downloads.myne.md`, whose reachability from
 // the container is not guaranteed, so this pins the surfaces rather than the
-// network outcome. The signature-gated install is the gated manual roster item
-// (`app.self-update`).
+// network outcome, and the interactive flow (notice, confirm, the lock, the
+// updating screen) stays on the gated manual roster item (`app.self-update`) for
+// the same reason. The notice's own states are covered by the story catalogue
+// and by `tests/components/UpdateNotice.test.tsx`, where the platform answer is
+// a fixture rather than a network.
 //
 // KDF: weak generator fixtures (unlock reads params from vault.meta).
 //
@@ -23,7 +26,7 @@ import { seedVault, type SeededVault } from "./support/fixtures";
 import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
 
 describeE2E("su1 desktop self-update surfaces", () => {
-  it("renders the About update controls, and no banner before an update is found", async () => {
+  it("renders the About update controls, and no notice before an update is offered", async () => {
     let seeded: SeededVault;
     await scenario(
       "su1-self-update-surfaces",
@@ -33,8 +36,12 @@ describeE2E("su1 desktop self-update surfaces", () => {
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
 
-        // No update has been found yet, so the banner is absent.
-        expect(await s.byTestIdAll("update.banner")).toHaveLength(0);
+        // Nothing has been offered, so neither the notice nor the pill it
+        // reduces to is on screen. Both ids are asserted because they are two
+        // render paths, and a regression that mounts the pill alone would slip
+        // past a check for the card.
+        expect(await s.byTestIdAll("update.notice")).toHaveLength(0);
+        expect(await s.byTestIdAll("update.notice-pill")).toHaveLength(0);
 
         // The About panel carries the update controls (selfUpdate is present on
         // desktop). `byTestId` waits for each.
