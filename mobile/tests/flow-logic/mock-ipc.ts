@@ -1383,7 +1383,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         };
         const byUpdatedDesc = () => [...rows].sort((a, b) => b.updated_at - a.updated_at);
         return {
-          "plugin:memory|memory_list": () => byUpdatedDesc(),
+          // `{ rows, cap }` since myne-md/myne#867: the cap rides with the
+          // roster, so the sheet counts against the number the host enforces.
+          "plugin:memory|memory_list": () => ({ rows: byUpdatedDesc(), cap: 100 }),
           "plugin:memory|memory_read": (args: Record<string, unknown>) => {
             const text = texts[args["memoryIdHex"] as string];
             if (text === undefined) {

@@ -51,6 +51,14 @@ const V = {
     "adapted",
     "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty. Unchanged by the remote-provider controls (myne#415): they live inside this same panel, so they inherit the same rail filter and reach the browser no more than the rest of it does.",
   ],
+  "src/components/settings/AiModelCatalogue.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this modal is unreachable. Its host calls are the `local-inference` download bindings (that whole plugin is classified absent-on-web in `web/wasm/src/capability.rs`) plus the model-store reads, so there is nothing here that would need a web substitution even if it were reachable. Moved out of AiPanel.tsx by myne#867; the verdict is unchanged in kind, because it is reachable from exactly one place and that place is the panel.",
+  ],
+  "src/components/settings/ModelPathButton.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx and AiModelCatalogue.tsx, so it inherits the panel's rail filter exactly: where `localAi` is absent neither caller is mounted and this control is unreachable. Its only host call is `revealItemInDir` on the opener plugin, behind a button that is disabled without a resolved path, so there is nothing here that would need a web substitution even if it were reachable. Extracted from AiPanel.tsx by myne#867 to give the panel and the catalogue one copy.",
+  ],
   "src/components/settings/AiOnboardingSurface.tsx": [
     "adapted",
     "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0628). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",

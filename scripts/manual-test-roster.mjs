@@ -475,12 +475,19 @@ export const ROSTER = Object.freeze([
     title: "AI model download onboarding",
     paths: [
       "src/components/settings/AiOnboardingSurface.tsx",
+      "src/components/settings/AiModelCatalogue.tsx",
+      "src/components/settings/ModelPathButton.tsx",
       "src/lib/aiOnboardingSeen.ts",
       "src/lib/ai-model-download.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
       "e2e/ai-model-download.e2e.ts",
+      // The catalogue's own surface: reachable from the Models heading, both
+      // artefacts listed with their state, the tag role's row present, the
+      // Download button wired, and an installed model's Remove round trip
+      // (myne-md/myne#867).
+      "e2e/ai-model-surface.e2e.ts",
     ],
     manual: [
       {
@@ -491,8 +498,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "Download the embedding model on a real connection and watch it through to Ready, then cancel a second download mid-transfer and confirm no partial model is registered and Retry works. On a slow or flaky connection, confirm a failed transfer is named as a failure and offers Retry rather than a silent no-op. Then open Settings, Developer, AI and confirm the same model shows as Installed, that Remove returns it to Not installed and reclaims the disk space, and that a model you side-loaded yourself is only forgotten (your own file stays on disk).",
-        whyNotAutomated: "The E2E lane drives a local fixture origin that answers instantly, so the progress, cancel and flaky-connection states are exercised only against a fixture with no latency. A real transfer over a real network, and a real cancel at an arbitrary byte, are the conditions a human has to create. It also drives the download command and the first-run surface rather than the Settings management rows, and has no side-loaded file to prove the remove path only deletes the app's own copy.",
+        see: "Download the embedding model on a real connection and watch it through to Ready, then cancel a second download mid-transfer and confirm no partial model is registered and Retry works. On a slow or flaky connection, confirm a failed transfer is named as a failure and offers Retry rather than a silent no-op. Then open Settings, Developer, AI, press the download icon at the right of the Models heading, and confirm the catalogue lists every model Myne's own origin serves whether or not it is installed: the downloaded one shows as Installed with its file name beside it, Remove returns it to Not installed and reclaims the disk space, and a model you side-loaded yourself is only forgotten (your own file stays on disk).",
+        whyNotAutomated: "The E2E lane drives a local fixture origin that answers instantly, so the progress, cancel and flaky-connection states are exercised only against a fixture with no latency. A real transfer over a real network, and a real cancel at an arbitrary byte, are the conditions a human has to create. What the lane DOES now cover is the management row's own surface (`e2e/ai-model-surface.e2e.ts`): the catalogue is opened from the Models heading, both artefacts are listed with their state, the Download button's wiring is proven by the request the pinned origin receives, and Remove clears the stored path. What is still a human's is the last clause: a file you side-loaded yourself, and that Remove forgets the selection without touching your file.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 8,
         tier: "standard",
@@ -4555,14 +4562,14 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "For each of the three roles, press the pick control and use the real OS file dialog to choose a downloaded model file, including one on an external volume and one in a location the OS guards (macOS Downloads on a freshly installed app, Windows C:\\Program Files). Confirm the chosen path replaces \"None\", that cancelling the dialog leaves the previous value untouched, and that a path inside Myne's own vault directory is refused with a message that does NOT echo the path back.",
+        see: "For each of the FOUR roles (text, search, speech-to-text and tag), press the pick control and use the real OS file dialog to choose a downloaded model file, including one on an external volume and one in a location the OS guards (macOS Downloads on a freshly installed app, Windows C:\\Program Files). Confirm the chosen path replaces \"None\", that cancelling the dialog leaves the previous value untouched, and that a path inside Myne's own vault directory is refused with a message that does NOT echo the path back.",
         whyNotAutomated: "Every native dialog in the suite is bypassed with page-seat IPC or answered by intercepting one IPC URL, and macOS TCC prompts for Downloads/Desktop and Windows ACL denials have no equivalent on the Linux runner.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 12,
         tier: "standard",
       },
       {
-        see: "Press the recommended-model link for each of the three roles on macOS and on Windows. Confirm the user's own browser opens at the model page rather than the app's own WebView navigating away.",
+        see: "Press the recommended-model link for each of the FOUR roles (text, search, speech-to-text and tag) on macOS and on Windows. Confirm the user's own browser opens at the model page rather than the app's own WebView navigating away.",
         whyNotAutomated: "The link is an OS handoff through the opener plugin to whatever LSOpenURLs or ShellExecute resolves; no scenario observes a second process launching, and neither of those platforms has a lane. (The no-handler-installed failure path IS drivable on the browser-less runner and is recorded as debt.)",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 8,

@@ -23,6 +23,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -104,8 +105,42 @@ export function AnchoredPanel({
       ...placeMenu(r, window.innerHeight, { cap: 280 }),
       left,
       minWidth: width,
+      // A hard ceiling as well as a clamp: whatever the content does, the panel
+      // cannot be wider than the window it has to live in.
+      maxWidth: window.innerWidth - EDGE * 2,
     });
   }, [open, anchorRef, minWidth, align]);
+
+  // **The second pass, and it is here because the first cannot know the width.**
+  // (myne-md/myne#867.) `left` above is clamped against `max(minWidth,
+  // anchor.width)`, which is the ANCHOR's box. The panel's own box can be wider
+  // than that (it is the content that decides), and when it is, the panel
+  // overhangs the window edge the clamp was measured against, which is how a
+  // model's location panel rendered partly off screen. So once the panel exists,
+  // measure IT and pull it back.
+  //
+  // Runs after every render rather than on a dependency list, because "how wide
+  // is this panel" has no dependency that can be named: a font loading, a
+  // wrapped line or a longer path all change it. It costs one measurement, and
+  // `setCoords` returns `prev` unchanged when the number does not move, so
+  // React bails out of the re-render and there is no loop.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = panelRef.current;
+    if (el === null) return;
+    const width = el.getBoundingClientRect().width;
+    // 0 in jsdom, and 0 for any box that has not been laid out yet: there is
+    // nothing to clamp against, and clamping to it would park the panel at the
+    // left edge.
+    if (width === 0) return;
+    setCoords((prev) => {
+      if (prev === null) return prev;
+      const left = typeof prev.left === "number" ? prev.left : EDGE;
+      const overhang = left + width - (window.innerWidth - EDGE);
+      if (overhang <= 0) return prev;
+      return { ...prev, left: Math.max(EDGE, left - overhang) };
+    });
+  });
 
   // Dismissal. A fixed panel would otherwise drift away from its anchor on
   // scroll, so scroll CLOSES it rather than repositioning it: these panels hold

@@ -61,6 +61,7 @@ import {
   agentStart,
   agentUndo,
 } from "../../lib/agent-run";
+import type { MentionTarget } from "@myne/note-mentions";
 import { chatsList, chatsRead } from "../../lib/chats";
 import {
   flushPendingTranscript,
@@ -80,6 +81,7 @@ import { usePrefs } from "../../lib/use-prefs";
 // This client's own nonce, passed into the shared undo hook below.
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { Button } from "../../components/Button";
+import { MentionText } from "../../components/MentionText";
 import { Icon } from "../../components/Icon";
 import { ScreenScroll } from "../../components/layout";
 import { Sheet } from "../../components/misc";
@@ -252,6 +254,8 @@ export function AiChatFlow({
   titleOf,
   bodyOf,
   onNotesWritten,
+  mentionTargets,
+  onOpenNote,
 }: {
   grant: ScopeGrant | null;
   /** Resolve a note's title, for the review list. The proposal carries ids. */
@@ -259,6 +263,12 @@ export function AiChatFlow({
   /** Read a note's current body, for the review's diff. */
   bodyOf: (noteId: string) => string | null;
   onNotesWritten?: (noteIds: string[]) => void;
+  /** Strings that name a note, longest first, from the shared matcher. Passed
+   *  in rather than derived here, so the flow keeps no second copy of the note
+   *  table (the same rule `titleOf`/`bodyOf` above follow). */
+  mentionTargets?: readonly MentionTarget[];
+  /** Open a note a turn named. The screen owns this; the flow only reports. */
+  onOpenNote?: (noteId: string) => void;
 }) {
   const { t } = useTranslation();
   const agent = useAgent();
@@ -712,6 +722,13 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
                 style={turn.role === "user" ? BUBBLE_USER : BUBBLE_ASSISTANT}
               >
                 {turn.role === "user" ? (
+                  // **The user's own words stay plain text**, which is the
+                  // desktop's deliberate split: only the model's answer goes
+                  // through a renderer that can linkify (`ConversationSurface`
+                  // renders a user turn as `pre-wrap` text). A mention the
+                  // person just typed is one they already know, and rendering it
+                  // as a link would be a second, different surface to keep in
+                  // step for no reading gain.
                   <p style={{ ...BODY_TEXT, margin: 0 }}>{turn.text}</p>
                 ) : (
                   <>
@@ -756,9 +773,19 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
                         ) : null}
                       </div>
                     ) : null}
-                    <p style={{ ...BODY_TEXT, margin: 0 }}>
-                      {s !== undefined && s.summary.length > 0 ? s.summary : turn.text}
-                    </p>
+                    <MentionText
+                      // The FINISH SUMMARY when the run produced one, because
+                      // that is the sentence a reader acts on, and a model that
+                      // names a note it just wrote names it there.
+                      text={
+                        s !== undefined && s.summary.length > 0
+                          ? s.summary
+                          : turn.text
+                      }
+                      targets={mentionTargets}
+                      onOpenNote={onOpenNote}
+                      style={{ ...BODY_TEXT, margin: 0 }}
+                    />
                     {undoReport !== null ? (
                       <p data-testid="ai.undo-result" style={MUTED}>
                         {undoResultText(undoReport, t)}
@@ -832,7 +859,12 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
               it. */}
           {summary.length > 0 && (
             <div data-testid="ai.agent-answer" style={BUBBLE_ASSISTANT}>
-              <p style={{ ...BODY_TEXT, margin: 0 }}>{summary}</p>
+              <MentionText
+                text={summary}
+                targets={mentionTargets}
+                onOpenNote={onOpenNote}
+                style={{ ...BODY_TEXT, margin: 0 }}
+              />
             </div>
           )}
 

@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
+import { EmptyState } from "../../components/primitives/EmptyState";
 import { ModalShell } from "../../components/primitives/ModalShell";
 import {
   chatsDelete,
@@ -165,20 +166,59 @@ export function ChatHistoryModal({ open, onClose }: ChatHistoryModalProps): Reac
       title={t("editor.chrome.rightPanel.aiChat.historyTitle")}
       labelId="ai-history-title"
     >
+      {/* **The three states are the app's one zero state, and the COPY is the
+          agent hub's** (myne-md/myne#867). They used to be three hand-written
+          `<p>`s, which is how the same three facts came to be worded twice:
+          this modal said "No conversations yet. New chats appear here." while
+          the hub's rail, listing conversations over the same store, said "No
+          conversations yet" / "Conversations you start appear here.". Two
+          surfaces, one fact, one set of words: the hub already had the better
+          copy, so it owns it here. The `aiChat.history*` trio stays in the
+          catalog because the PHONE's history sheet still renders it, and moving
+          that client onto the same copy is task 13's; retiring the keys now
+          would break the phone's next build.
+
+          The variants are not styling: `firstRun` is "you have none", `loading`
+          is "not yet", `error` is "we could not read them" and offers the
+          retry. The testids are unchanged, so every scenario that reaches them
+          still does. */}
       {error ? (
-        <p data-testid="ai.history-error" style={ERROR_STYLE}>
-          {t("editor.chrome.rightPanel.aiChat.historyError")}
-        </p>
+        <EmptyState
+          variant="error"
+          icon="circle-alert"
+          size="sm"
+          title={t("agent.hub.loadFailed")}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="ai.history-retry"
+              onClick={() => void refresh()}
+            >
+              {t("editor.chrome.rightPanel.aiChat.historyRetry")}
+            </Button>
+          }
+          testId="ai.history-error"
+        />
       ) : null}
       {rows === null && !error ? (
-        <p data-testid="ai.history-loading" style={META_STYLE}>
-          {t("editor.chrome.rightPanel.aiChat.historyLoading")}
-        </p>
+        <EmptyState
+          variant="loading"
+          icon="loader-circle"
+          size="sm"
+          title={t("agent.hub.loading")}
+          testId="ai.history-loading"
+        />
       ) : null}
       {rows !== null && rows.length === 0 ? (
-        <p data-testid="ai.history-empty" style={META_STYLE}>
-          {t("editor.chrome.rightPanel.aiChat.historyEmpty")}
-        </p>
+        <EmptyState
+          variant="firstRun"
+          icon="message-square"
+          size="sm"
+          title={t("agent.hub.emptyTitle")}
+          body={t("agent.hub.emptyBody")}
+          testId="ai.history-empty"
+        />
       ) : null}
       {rows !== null && rows.length > 0 ? (
         <div

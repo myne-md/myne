@@ -45,7 +45,7 @@ function sheet(props: Partial<Parameters<typeof MemorySheet>[0]> = {}) {
 }
 
 beforeEach(() => {
-  mockMemoryList.mockReset().mockResolvedValue(ROWS);
+  mockMemoryList.mockReset().mockResolvedValue({ rows: ROWS, cap: 100 });
   mockMemoryRead.mockReset().mockResolvedValue("entry text");
   mockMemoryDelete.mockReset().mockResolvedValue(undefined);
 });

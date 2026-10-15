@@ -107,6 +107,8 @@ export function MemorySheet({
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<MemoryListRow[] | null>(null);
+  // The host's cap (myne-md/myne#867), never a constant here.
+  const [cap, setCap] = useState<number | null>(null);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -128,8 +130,10 @@ export function MemorySheet({
 
   async function refresh(): Promise<void> {
     try {
-      const list = [...(await memoryList())].sort((a, b) => b.updated_at - a.updated_at);
+      const view = await memoryList();
+      const list = [...view.rows].sort((a, b) => b.updated_at - a.updated_at);
       setRows(list);
+      setCap(view.cap);
       setTexts(await readTexts(list));
     } catch {
       setError(true);
@@ -140,9 +144,11 @@ export function MemorySheet({
     let cancelled = false;
     void (async () => {
       try {
-        const list = [...(await memoryList())].sort((a, b) => b.updated_at - a.updated_at);
+        const view = await memoryList();
+        const list = [...view.rows].sort((a, b) => b.updated_at - a.updated_at);
         if (cancelled) return;
         setRows(list);
+        setCap(view.cap);
         const nextTexts: Record<string, string> = {};
         const failed = new Set<string>();
         for (const row of list) {
@@ -234,6 +240,21 @@ export function MemorySheet({
             <p data-testid="ai.memory-error" style={ERROR_TEXT}>
               {t("settings.memory.deleteFailed")}
             </p>
+          ) : null}
+          {/* The count, and at the cap the action that unblocks it
+              (myne-md/myne#867). The sheet is where a phone manages entries,
+              so it is where a full list has to say so. */}
+          {rows !== null && rows.length > 0 ? (
+            <>
+              <p data-testid="ai.memory-count" style={META}>
+                {t("settings.memory.count", { used: rows.length, cap: cap ?? rows.length })}
+              </p>
+              {cap !== null && rows.length >= cap ? (
+                <p data-testid="ai.memory-at-cap" style={META}>
+                  {t("settings.memory.atCap")}
+                </p>
+              ) : null}
+            </>
           ) : null}
           {rows !== null && rows.length === 0 ? (
             <p data-testid="ai.memory-empty" style={META}>

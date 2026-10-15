@@ -43,6 +43,13 @@ const HELPER: CSSProperties = {
   color: "var(--fg-2)",
 };
 
+/**
+ * **A bounded, scrolling roster** (myne-md/myne#867). Up to 100 entries of up
+ * to 2000 characters each, inside a sheet that scrolls as a whole: unbounded,
+ * the list buries the personality editor and the clear-all control under it,
+ * which are exactly the controls a full list makes you need. A phone has less
+ * room than a settings panel, so the bound is tighter here.
+ */
 const LIST: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -50,6 +57,8 @@ const LIST: CSSProperties = {
   margin: "var(--space-3) 0 0",
   padding: 0,
   listStyle: "none",
+  maxHeight: 280,
+  overflowY: "auto",
 };
 
 const ROW: CSSProperties = {
@@ -257,12 +266,16 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
 
   const [loadFailed, setLoadFailed] = useState(false);
+  // The host's cap (myne-md/myne#867), never a constant here.
+  const [cap, setCap] = useState<number | null>(null);
   const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set());
 
   const reload = useCallback(async () => {
     try {
-      const list = await memoryList();
+      const view = await memoryList();
+      const list = view.rows;
       setRows(list);
+      setCap(view.cap);
       const nextTexts: Record<string, string> = {};
       const failed = new Set<string>();
       for (const row of list) {
@@ -341,7 +354,19 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
           {t("settings.memory.empty")}
         </p>
       ) : (
-        <ul style={LIST} data-testid="settings.memory.list">
+        <>
+          {/* The count, and at the cap the one action that unblocks it: the
+              phone writes no memory itself, so the sentence has to live where
+              the entries are managed (myne-md/myne#867). */}
+          <p data-testid="settings.memory.count" style={HELPER}>
+            {t("settings.memory.count", { used: rows.length, cap: cap ?? rows.length })}
+          </p>
+          {cap !== null && rows.length >= cap ? (
+            <p data-testid="settings.memory.at-cap" style={{ ...HELPER, color: "var(--fg-1)" }}>
+              {t("settings.memory.atCap")}
+            </p>
+          ) : null}
+          <ul style={LIST} data-testid="settings.memory.list">
           {rows.map((row) => (
             <MemoryRow
               key={row.id}
@@ -353,7 +378,8 @@ export function MemorySection(props: { onToast: (message: string) => void }) {
               onToast={props.onToast}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {confirmingClear ? (

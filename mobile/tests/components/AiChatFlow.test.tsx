@@ -15,9 +15,10 @@
 
 import i18n from "@myne/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { clearAgent, clearAgentForLock, currentRunEpoch, getAgent, setUndoable } from "@myne/agent-store";
+import { buildMentionTargets } from "@myne/note-mentions";
 import type { AgentRunView, RunProgress } from "@myne/agent-protocol";
 // The COMPLETE binding mock, from one place. A per-file mock breaks whenever a
 // different task wires a new call into a surface this file mounts, and the spec
@@ -105,8 +106,8 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function mount() {
-  render(<AiChatFlow grant={{ kind: "folder", value: "" }} />);
+function mount(over: Partial<React.ComponentProps<typeof AiChatFlow>> = {}) {
+  render(<AiChatFlow grant={{ kind: "folder", value: "" }} {...over} />);
 }
 
 function type(text: string) {
@@ -156,6 +157,40 @@ describe("AiChatFlow", () => {
       expect.any(Function),
       expect.any(Function),
     );
+  });
+
+  it("links a note the answer names, and opens it on press (myne-md/myne#867)", async () => {
+    // The defect: a model that answered "it is under Personal/Things I have/
+    // Pixel 10 Graphene OS" left that name as flat text, so the one thing the
+    // reader wanted next, the note, was as pressable as any other word. The
+    // matcher is shared with desktop and tested there; what this pins is the
+    // WIRING, because a shared matcher that no surface calls is a feature that
+    // ships inert.
+    const onOpenNote = vi.fn();
+    agentStart.mockResolvedValue(
+      finished("It is under Personal/Things I have/Pixel 10 Graphene OS."),
+    );
+    mount({
+      mentionTargets: buildMentionTargets([
+        { noteUuid: "n1", title: "Pixel 10 Graphene OS", folder: "Personal/Things I have/" },
+      ]),
+      onOpenNote,
+    });
+    type("where did that note go?");
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    await waitFor(() => expect(screen.getByTestId("ai.agent-answer")).toBeTruthy());
+    // Scoped to the live answer: the same text also lands in the settled turn
+    // below it, so a whole-screen lookup finds it twice, which is this
+    // surface's existing shape, not something this change introduced.
+    const link = within(screen.getByTestId("ai.agent-answer")).getByTestId(
+      "ai.mention-link",
+    );
+    expect(link.textContent).toBe("Personal/Things I have/Pixel 10 Graphene OS");
+    // The press reports the NOTE, and the screen opens it: the flow resolves
+    // nothing itself.
+    fireEvent.click(link);
+    expect(onOpenNote).toHaveBeenCalledWith("n1");
   });
 
   it("advances the three cost figures DURING the run, not only after it", async () => {

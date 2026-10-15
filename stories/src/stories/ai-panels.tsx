@@ -249,9 +249,17 @@ export const AI_STORIES: StoryDescriptor[] = [
     tags: ["components", "aichattab", "default"],
     fixture: AI_FIXTURE,
     render: () => (
-      <div style={{ width: 320, height: 800, display: "flex", background: "var(--bg-1)" }}>
-        <AiChatTab openNoteId="n1" folders={[]} />
-      </div>
+      // **Both providers, not decoration** (myne-md/myne#867): the tab now reads
+      // the vault's note set for mention linking, and the workspace for where a
+      // press lands. Without them the story throws rather than rendering, which
+      // is what the smoke lane caught.
+      <SidebarStateProvider>
+        <WorkspaceProvider>
+          <div style={{ width: 320, height: 800, display: "flex", background: "var(--bg-1)" }}>
+            <AiChatTab openNoteId="n1" folders={[]} />
+          </div>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
     ),
   },
   {

@@ -983,14 +983,19 @@ function AiPanel({
 
   return (
     <div style={PANEL_STACK}>
-      {/* **The same intent vocabulary as the desktop panel** (myne-md/myne#848),
-          over what this device actually has. The phone has no model files, no
-          auto-tag switch, no meeting prompt and no history budget, those are
-          the surfaces the desktop's five groups are built around, so grouping
-          here is two headings rather than five, and inventing empty ones for
-          parity would be a heading over nothing. What carries across is the
-          WORDING: a user who read the desktop panel recognises these. */}
-      <SectionLabel>{t("settings.ai.groupPrivacy")}</SectionLabel>
+      {/* **The desktop's WORDING over what this device actually has**
+          (myne-md/myne#848, re-pointed by myne-md/myne#867). The phone has no
+          model files, no auto-tag switch, no meeting prompt and no history
+          budget, so grouping here is ONE heading where the desktop has four,
+          and inventing empty ones for parity would be a heading over nothing.
+          What carries across is the wording, and that is now exact: the heading
+          below is the desktop's `Answering`, because it holds the same thing
+          (the provider, its key and the model to ask for).
+
+          **The enable row has no heading**, which is also the desktop's shape
+          since myne-md/myne#867: whether AI runs at all is the panel's first
+          question, and a heading over a single switch is a label for a list of
+          one. */}
       <Group>
         <ToggleRow
           first
@@ -1008,7 +1013,7 @@ function AiPanel({
           normative for a capability a platform lacks. */}
       {prefs.ai_enabled && (
         <>
-          <SectionLabel>{t("settings.ai.groupWriting")}</SectionLabel>
+          <SectionLabel>{t("settings.ai.groupAnswering")}</SectionLabel>
           <SectionLabel>{t("settings.ai.providerLabel")}</SectionLabel>
           <Group>
             <ToggleRow
@@ -1030,7 +1035,13 @@ function AiPanel({
           {provider !== null && (
             <>
               <SectionLabel>{t("settings.ai.providerKeyLabel")}</SectionLabel>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--space-2)",
+                }}
+              >
                 <SheetInput
                   type="password"
                   mono

@@ -22,8 +22,10 @@ import {
   useDragReorder,
 } from "@app/components/settings/CustomizeList";
 import { AccountPanel } from "@app/components/settings/AccountPanel";
+import { AiModelCatalogue } from "@app/components/settings/AiModelCatalogue";
 import { AiOnboardingSurface } from "@app/components/settings/AiOnboardingSurface";
 import { AiPanel } from "@app/components/settings/AiPanel";
+import { ModelPathButton } from "@app/components/settings/ModelPathButton";
 import { AiProviderConsent } from "@app/components/settings/AiProviderConsent";
 import { AppearancePanel } from "@app/components/settings/AppearancePanel";
 import { ArchiveSettings } from "@app/components/settings/ArchiveSettings";
@@ -110,6 +112,22 @@ const PREFS_FIXTURE: Fixture = {
   },
 };
 
+
+/** The catalogue with one artefact installed and one not, which is the state it
+ *  exists for: a list that answers "is this installed" and "what else can I get"
+ *  in one place. `PREFS_FIXTURE` first, because a hand-rolled partial answers
+ *  every other pref as `undefined` and the surface throws where the real host
+ *  would not. */
+const CATALOGUE_FIXTURE: Fixture = {
+  description: "the model catalogue, one artefact installed",
+  handlers: {
+    ...PREFS_FIXTURE.handlers,
+    "plugin:local-inference|get_model_path": (args: Record<string, unknown>) =>
+      args.role === "embedding"
+        ? "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors"
+        : null,
+  },
+};
 
 /** Same vault, with sync answering a real (non-enrolled) state. */
 const SYNC_FIXTURE: Fixture = {
@@ -242,6 +260,52 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           onClose={action("onClose")}
           downloads={false}
           onOpenProviderSetup={action("onOpenProviderSetup")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/aimodelcatalogue/default",
+    group: "settings",
+    surface: "AiModelCatalogue",
+    state: "default",
+    description:
+      "The model catalogue: every artefact Myne's own origin can serve, whether or not it is installed, each with its size and the one action its state enables. Opened from the icon at the right of the Models heading, which is what stops fetching a model and assigning one from being two blocks in a row.",
+    tags: ["settings", "ai", "models", "catalogue", "download", "modal"],
+    fixture: CATALOGUE_FIXTURE,
+    render: () => (
+      <AiModelCatalogue
+        open
+        onClose={action("onClose")}
+        modelPaths={{
+          generation: null,
+          embedding:
+            "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors",
+          transcription: null,
+          tag: null,
+        }}
+        aiEnabled
+        onChanged={action("onChanged")}
+        onShowToast={action("onShowToast")}
+      />
+    ),
+  },
+  {
+    id: "settings/modelpathbutton/default",
+    group: "settings",
+    surface: "ModelPathButton",
+    state: "default",
+    description:
+      "The location control every model row carries: a folder button whose accessible name is the FILE, which is the half a user recognises, and whose press opens the whole path with the one action that path enables. A full path printed inline ran past the panel's edge, which is why this is a button at all.",
+    tags: ["settings", "ai", "models", "path", "location"],
+    render: () => (
+      <Frame>
+        <ModelPathButton
+          path="/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors"
+          label="Search model: semantic search & Q&A"
+          revealLabel="Show in folder"
+          testId="story.model-path"
+          panelTestId="story.model-path-panel"
         />
       </Frame>
     ),

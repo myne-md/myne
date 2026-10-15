@@ -560,7 +560,18 @@
   box-shadow: none;
 }
 
+/* The scrolling half of the searchable menu.
+   `overflow-y: auto` alone is NOT enough, and the missing declaration is the
+   defect this comment exists for (myne-md/myne#867): a flex item's default
+   `min-height` is `auto`, which resolves to its CONTENT height, so the list
+   never shrank below all of its options. The menu is a fixed-height flex column
+   with `overflow-y: hidden`, so it clipped the remainder and the user was left
+   with a folder list that would not scroll. Removal is silent and looks like a
+   deliberate design: the options are all in the DOM, reachable by a keyboard
+   walk, and invisible to the pointer. `tests/styles/componentLayer.test.ts`
+   holds both declarations. */
 .myne-select-list {
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-1) 0;
 }

@@ -48,6 +48,10 @@ const ROWS = [
   row({ id: "b", title: "Newer", updated_at: 300 }),
 ];
 
+/** A row anchored to a note, which is the shape the truncation was reported
+ *  on: the anchor chip has to share the line with the title and the time. */
+const ANCHORED = [row({ id: "a", title: "Older", updated_at: 100, note_id: "n1" })];
+
 function sheet(props: Partial<Parameters<typeof AiHistorySheet>[0]> = {}) {
   const onOpen = vi.fn();
   const onNew = vi.fn();
@@ -173,5 +177,47 @@ describe("AiHistorySheet", () => {
     await screen.findAllByTestId("ai.conversation-row");
     fireEvent.click(screen.getByTestId("ai.history-new-chat"));
     expect(onNew).toHaveBeenCalled();
+  });
+});
+
+
+describe("the anchor chip is text, not a swatch (myne-md/myne#867)", () => {
+  it("uses the pill, so the label is not cut off at 40px", async () => {
+    // The row read "On a" where it meant "On a note": `myne-chiplet` is the
+    // fixed 40x28 COLOUR SWATCH with `overflow: hidden`, so a text label inside
+    // it is clipped. `myne-pill` is sized by its text; the desktop hub was moved
+    // to it when this was first found, and the phone kept the swatch.
+    mockChatsList.mockResolvedValue(ANCHORED);
+    sheet();
+    const anchor = await screen.findByTestId("ai.conversation-anchor");
+    expect(anchor.className).toContain("myne-pill");
+    expect(anchor.className).not.toContain("myne-chiplet");
+    // …and it is the label the copy says it is, not a fragment.
+    expect(anchor.textContent).toBe(await i18n.t("agent.hub.anchorLabel"));
+  });
+});
+
+describe("the sheet's three states use the hub's copy (myne-md/myne#867)", () => {
+  it("echoes the query and offers the way out when a search matches nothing", async () => {
+    mockChatsList.mockResolvedValue(ANCHORED);
+    sheet();
+    const search = await screen.findByTestId("ai.history-search");
+    fireEvent.change(search, { target: { value: "zzz-no-such-conversation" } });
+    const noMatch = await screen.findByTestId("ai.history-no-match");
+    // The BODY, which this sheet used to drop: it is the sentence that names the
+    // fix, and it takes the query.
+    expect(noMatch.textContent).toContain("zzz-no-such-conversation");
+    fireEvent.click(screen.getByTestId("ai.history-clear-search"));
+    expect(await screen.findByTestId("ai.conversation-row")).toBeTruthy();
+  });
+
+  it("says what the hub says when there is nothing persisted", async () => {
+    mockChatsList.mockResolvedValue([]);
+    sheet();
+    const empty = await screen.findByTestId("ai.history-empty");
+    // The root of the shared zero state, so it carries the title AND the body.
+    expect(empty.textContent).toContain(await i18n.t("agent.hub.emptyTitle"));
+    expect(empty.textContent).toContain(await i18n.t("agent.hub.emptyBody"));
+    expect(empty.className).toContain("myne-empty");
   });
 });

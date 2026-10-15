@@ -1,26 +1,34 @@
 // Settings → AI panel (local-ai epic, ai-ux-surface MYND-408, task 4).
 //
-// The opt-in surface for the experimental, LOCAL-ONLY AI features: an
-// `ai_enabled` toggle (SYNC-12), the threat-model-bounded trust affordance
-// (SYNC-16 — the load-bearing headline + a "How does this work?" disclosure), a
-// per-role side-load model picker (SYNC-1 — the user brings their own files;
-// Myne NEVER downloads them), an `auto_tag_enabled` sub-toggle (MYND-651), and
-// an `ai_excluded_folders` editor (SYNC-14, same set encoding as
-// deliberate_folders).
+// The opt-in surface for AI on this client: the `ai_enabled` master toggle
+// (SYNC-12) and the threat-model-bounded trust affordance (SYNC-16, the
+// load-bearing headline plus a "How does this work?" disclosure), followed by
+// four groups in the order their questions are asked. `Answering` holds the
+// local runtime address and the remote provider with its key and model.
+// `Models` holds the per-role assignment rows (SYNC-1, the user brings their own
+// files) with the catalogue modal opened from its own heading (myne-md/myne#805,
+// myne-md/myne#867) and the side-load disclosure. `Limits` holds the
+// `ai_excluded_folders` editor
+// (SYNC-14, the same set encoding as deliberate_folders). `Advanced` holds the
+// `auto_tag_enabled` sub-toggle (MYND-651), the meeting prompt, the chat history
+// budget and the memory surface.
 //
-// Model acquisition (SYNC-1/2): Myne never fetches a model — that half is
-// unchanged and is a standing commitment. The reasoning behind it is not: the
-// old "Myne has no network egress path by construction" is superseded
-// (`decisions.md` 2026-08-09 — a user-named provider may open one, and
-// 2026-08-04 already showed the gate never proved that claim anyway). The
-// commitment now rests on there being no fetch path in Myne's own code, not on
-// the process being unable to reach the network. The "Recommended
-// models" links open in the user's OWN browser via the opener plugin (an OS
-// handoff, not a Myne fetch — the same affordance the About panel uses for the
-// threat-model doc); the user downloads there and side-loads the files with the
-// pickers. Three roles: a Qwen2-family GGUF for generation (summaries / chat /
-// writing), an all-MiniLM-L6-v2 embedding model for semantic search / Q&A, and
-// a Whisper GGUF for speech-to-text transcription (MYND-270).
+// **The master toggle and the trust card sit ABOVE the first heading, with no
+// heading of their own** (myne-md/myne#867). Whether AI runs at all is the
+// panel's first question, and it used to be the fourth thing a reader met, with
+// the provider and its key filed under a writing heading.
+//
+// Model acquisition is two paths now, and the distinction matters. A **download**
+// is Myne fetching an artefact from its own origin on an explicit click, verified
+// against a digest compiled into the binary (myne-md/myne#805), so it is no
+// longer true that Myne never fetches a model. A **side-load** is the user
+// bringing their own file, which the "Recommended models" links support by
+// opening in the user's OWN browser via the opener plugin (an OS handoff, not a
+// Myne fetch, the same affordance the About panel uses for the threat-model
+// doc). Four roles: a Qwen2-family GGUF for generation (summaries / chat /
+// writing), an all-MiniLM-L6-v2 embedding model for semantic search / Q&A, a
+// Whisper GGUF for speech-to-text transcription (MYND-270), and a small Qwen2
+// GGUF for tag suggestions.
 //
 // Honesty discipline: the trust copy renders the `load-bearing-copy.ts`
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
@@ -37,7 +45,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
-import { openUrl, revealItemInDir } from "../../platform/opener";
+import { openUrl } from "../../platform/opener";
 
 import type {
   EndpointRejection,
@@ -78,7 +86,6 @@ import { Input } from "../primitives/Input";
 import { Icon } from "../primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import { IconButton } from "../primitives/IconButton";
-import { AnchoredPanel } from "../primitives/AnchoredPanel";
 import { Button } from "../primitives/Button";
 import { Select } from "../primitives/Select";
 import { SearchableSelect } from "../primitives/SearchableSelect";
@@ -89,15 +96,11 @@ import {
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
 import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
-import { removeModel, type DownloadArtifactId } from "../../lib/ai-model-download";
-import {
-  cancelModelDownloadFor,
-  startModelDownload,
-  useModelDownload,
-} from "../../lib/ai-download-store";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { MemorySection } from "./MemorySection";
+import { AiModelCatalogue } from "./AiModelCatalogue";
+import { ModelPathButton, fileNameOf } from "./ModelPathButton";
 import {
   BLOCK_STYLE,
   CONTROL_SLOT_STYLE,
@@ -114,7 +117,6 @@ const TITLE_STYLE: CSSProperties = {
   fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
   color: "var(--fg-1)",
 };
-
 
 /** The intent headings: **a rule and a title, not a bold label**
  *  (myne-md/myne#848).
@@ -138,6 +140,32 @@ const GROUP_HEADING_STYLE: CSSProperties = {
   fontSize: "var(--text-base)",
   fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
   color: "var(--fg-1)",
+};
+
+/** The heading's half of the shape above, without the rule: for the one group
+ *  whose rule belongs to a ROW rather than to its heading. */
+const GROUP_HEADING_TEXT_STYLE: CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
+
+/** **The Models heading is the one that carries a control** (myne-md/myne#867):
+ *  the catalogue button sits at its right. The hairline therefore belongs to a
+ *  row, so it reaches past the heading to the button; a rule on the heading
+ *  alone would stop short of the control it introduces. The button is a SIBLING
+ *  of the `h4` rather than a child, because a button inside a heading is
+ *  announced as part of the heading's own text. */
+const GROUP_HEADING_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-2)",
+  paddingTop: "var(--space-4)",
+  borderTop: "1px solid var(--line-1)",
 };
 const LINK_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -297,85 +325,6 @@ function folderLines(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-/** The last segment of a path, for a control that has room for one word rather
- *  than a full location. Both separators: a stored path is whatever the host
- *  returned, and the Windows shape reaches this panel on Windows. */
-function fileNameOf(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-/**
- * **A model file's location is a folder, not a paragraph** (myne-md/myne#848).
- *
- * Both model rows used to print the full path inline. On this machine that is
- * `/Users/<name>/Library/Application Support/md.myne.desktop/models/…`, longer
- * than the panel, so it either ran past the edge or squeezed the label beside it
- * into one word per line, and the panel read as broken. A path is also the least
- * useful thing to print: the part a user recognises is the file name, and the
- * part they need when they act on it is the folder.
- *
- * So the location is a button. It is DISABLED when there is no file (nothing to
- * reveal), its accessible name and tooltip carry the file name, short, which is
- * what a tooltip is for, and pressing it opens the full path with the one
- * action that path enables: show it in the folder.
- */
-function ModelPathButton(props: {
-  path: string | null;
-  /** The row's role, for the accessible name: "Show the location of …". */
-  label: string;
-  revealLabel: string;
-  testId: string;
-  panelTestId: string;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLSpanElement | null>(null);
-  const path = props.path;
-  const name = path === null ? props.label : fileNameOf(path);
-  return (
-    <>
-      <span ref={anchorRef} style={{ display: "inline-flex" }}>
-        <IconButton
-          icon="folder"
-          iconSize={14}
-          label={t("settings.ai.modelShowLocation", { name })}
-          tooltip
-          disabled={path === null}
-          expanded={open}
-          testId={props.testId}
-          onClick={() => setOpen((o) => !o)}
-        />
-      </span>
-      <AnchoredPanel
-        open={open && path !== null}
-        onClose={() => setOpen(false)}
-        anchorRef={anchorRef}
-        minWidth={300}
-        align="end"
-        style={PATH_PANEL_STYLE}
-        testId={props.panelTestId}
-      >
-        <span data-testid={`${props.panelTestId}-path`} style={PATH_TEXT_STYLE}>
-          {path}
-        </span>
-        <Button
-          variant="secondary"
-          data-testid={`${props.testId}-reveal`}
-          onClick={() => {
-            // Reveal failure is swallowed: the path is on screen and the user
-            // can copy it, which is the fallback the action was offering.
-            void revealItemInDir(path ?? "").catch(() => {});
-            setOpen(false);
-          }}
-        >
-          {props.revealLabel}
-        </Button>
-      </AnchoredPanel>
-    </>
-  );
-}
-
 /**
  * **What is answering, as a glyph** (myne-md/myne#848).
  *
@@ -439,26 +388,6 @@ const TRUST_LINE_STYLE: CSSProperties = {
   ...LABEL_STYLE,
   lineHeight: 1.5,
   margin: 0,
-};
-
-/** The path disclosure's own box: monospace, wrapping, selectable. A path is
- *  text to copy as often as it is a thing to click. */
-const PATH_PANEL_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  padding: "var(--space-2)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-};
-
-const PATH_TEXT_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-2)",
-  overflowWrap: "anywhere",
-  userSelect: "text",
 };
 
 /** A single model role's block: heading → recommended-model browser link + the
@@ -533,220 +462,6 @@ function ModelRoleBlock(props: {
         </div>
       </div>
     </div>
-  );
-}
-
-/** One downloadable model the desktop can fetch on demand (myne-md/myne#805).
- *  `artifact` is a compiled-in id; the UI never constructs a URL or a digest.
- *  Shown only when the host resolves a stored path for the role (downloaded or
- *  side-loaded), so the same row answers "is it installed" and "fetch it again". */
-function DownloadedModelRow(props: {
-  artifact: DownloadArtifactId;
-  /** The model-store role this artefact registers (for remove). */
-  role: string;
-  label: string;
-  sizeText: string;
-  path: string | null;
-  aiEnabled: boolean;
-  onChanged: () => void;
-  onShowToast?: (message: string) => void;
-}) {
-  const { t } = useTranslation();
-  // The download lives in the module-scope store, so it survives this row
-  // unmounting when the user switches Settings panels (myne-md/myne#814).
-  const download = useModelDownload(props.artifact);
-  const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState(false);
-
-  const downloading = download.status === "downloading";
-  const busy = downloading || removing;
-  const percent =
-    download.total > 0
-      ? Math.min(100, Math.round((download.downloaded / download.total) * 100))
-      : 0;
-
-  // Surface a terminal failure once: inline copy plus a toast, one cause to one
-  // message (the checksum branch names itself).
-  const announcedRef = useRef(false);
-  useEffect(() => {
-    if (download.status !== "failed") {
-      announcedRef.current = false;
-      return;
-    }
-    if (announcedRef.current) return;
-    announcedRef.current = true;
-    const message =
-      download.cause === "checksum"
-        ? t("settings.ai.downloadFailedChecksum")
-        : t("settings.ai.downloadFailed");
-    setError(message);
-    props.onShowToast?.(message);
-    // `props.onShowToast` and `t` are stable enough for this one-shot; the
-    // `announcedRef` guard makes a re-run idempotent.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [download.status, download.cause]);
-
-  // A completed download (this mount or a background one) reloads the stored
-  // path so the row flips to "Installed".
-  const completedRef = useRef(false);
-  useEffect(() => {
-    if (download.status === "complete" && !completedRef.current) {
-      completedRef.current = true;
-      props.onChanged();
-    }
-    if (download.status !== "complete") completedRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [download.status]);
-
-  const remove = async () => {
-    setRemoving(true);
-    setError(null);
-    try {
-      await removeModel(props.role);
-      props.onChanged();
-    } catch {
-      setError(t("settings.ai.downloadFailed"));
-    } finally {
-      setRemoving(false);
-    }
-  };
-
-  return (
-    <SettingRow
-      anchorId={`ai.download.${props.artifact}`}
-      label={props.label}
-      helper={props.sizeText}
-      testId={`ai.download-row-${props.artifact}`}
-      error={error}
-      control={(helperId) =>
-        downloading ? (
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--space-2)",
-              alignItems: "center",
-            }}
-          >
-            <div
-              data-testid={`ai.download-progress-${props.artifact}`}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              style={{
-                width: 120,
-                height: 6,
-                background: "var(--paper-3)",
-                borderRadius: "var(--radius-2)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  background: "var(--accent)",
-                  transformOrigin: "left",
-                  // A determinate fill animated with `transform: scaleX`, not
-                  // `width`: scaling runs on the compositor, while a `width`
-                  // transition lays out and paints every frame
-                  // (`scripts/check-motion-canon.mjs`).
-                  transform: `scaleX(${percent / 100})`,
-                  transition: "transform var(--duration-fast) var(--ease-standard)",
-                }}
-              />
-            </div>
-            <span
-              data-testid={`ai.download-percent-${props.artifact}`}
-              aria-describedby={helperId}
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-2)",
-                fontFamily: "var(--font-mono)",
-                minWidth: "4ch",
-              }}
-            >
-              {t("settings.ai.downloadingPercent", { percent })}
-            </span>
-            <Button
-              variant="ghost"
-              onClick={() => cancelModelDownloadFor(props.artifact)}
-              data-testid={`ai.download-cancel-${props.artifact}`}
-            >
-              {t("settings.ai.downloadCancel")}
-            </Button>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--space-2)",
-              alignItems: "center",
-            }}
-          >
-            <span
-              data-testid={`ai.download-state-${props.artifact}`}
-              style={{
-                fontSize: "var(--text-sm)",
-                color: props.path ? "var(--accent)" : "var(--fg-3)",
-                fontFamily: "var(--font-mono)",
-              }}
-              aria-describedby={helperId}
-            >
-              {props.path
-                ? t("settings.ai.downloadInstalled")
-                : t("settings.ai.downloadNotInstalled")}
-            </span>
-            {/* **Which FILE this row is using** (myne-md/myne#848). Two rows
-                that both said "Installed" were two unexplained rows: a model
-                fetched by the app and one chosen from a file picker are
-                different promises about where the bytes came from, and the one
-                fact that is always true and always knowable is the path. The
-                path is the provenance; a mechanism ("downloaded", "side-loaded")
-                would be a claim the panel cannot make from `loadModelPath`
-                alone, and the download store resets with the session.
-
-                **It is a folder button, not a printed path.** Printing it here
-                ran the line past the panel's edge on this machine, over the
-                label above it. The button's name and tooltip carry the file,
-                which is the short, recognisable half, and pressing it shows the
-                whole location with the one action the location enables. */}
-            <ModelPathButton
-              path={props.path}
-              label={props.label}
-              revealLabel={t("settings.ai.modelShowInFolder")}
-              testId={`ai.model-provenance-${props.artifact}`}
-              panelTestId={`ai.model-provenance-panel-${props.artifact}`}
-            />
-            {/* **No download action once the model is here** (myne-md/myne#848).
-                A "Download" button beside every installed model reads as "this is
-                not installed" on the very row whose job is to say that it is. A
-                re-download stays reachable the honest way: remove it first,
-                which is one click away and says what it does. */}
-            {props.path === null ? (
-              <Button
-                variant="secondary"
-                disabled={!props.aiEnabled || busy}
-                onClick={() => void startModelDownload(props.artifact)}
-                data-testid={`ai.download-button-${props.artifact}`}
-              >
-                {t("settings.ai.downloadInstall")}
-              </Button>
-            ) : null}
-            {props.path && (
-              <Button
-                variant="ghost"
-                disabled={!props.aiEnabled || busy}
-                onClick={() => void remove()}
-                data-testid={`ai.remove-button-${props.artifact}`}
-              >
-                {t("settings.ai.modelRemove")}
-              </Button>
-            )}
-          </div>
-        )
-      }
-    />
   );
 }
 
@@ -860,14 +575,19 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // consent is not already recorded routes HERE first; nothing is stored until
   // the dialog is accepted.
   const [pendingProvider, setPendingProvider] = useState<string | null>(null);
+  // The model catalogue modal (myne-md/myne#867). Tab-local like the rest of
+  // this panel's dialogs, and mounted only while open, so its rows re-read the
+  // stored paths on every opening and an install that landed while it was shut
+  // is seen straight away.
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   // Tell the Settings shell a modal of ours is up (see `onDialogOpenChange`).
   // The cleanup is load-bearing: the shell's flag outlives this panel, so
   // unmounting with the dialog open — Settings closed by its own × — would
   // leave Esc gated for every later session.
   useEffect(() => {
-    onDialogOpenChange?.(pendingProvider !== null);
+    onDialogOpenChange?.(pendingProvider !== null || catalogueOpen);
     return () => onDialogOpenChange?.(false);
-  }, [pendingProvider, onDialogOpenChange]);
+  }, [pendingProvider, catalogueOpen, onDialogOpenChange]);
   // The provider's own catalogue, and the three states it can be in. `null` is
   // "not asked yet" and is NOT the same as `[]` ("asked, and the provider
   // published none") — collapsing them would tell the user a provider has no
@@ -1266,207 +986,98 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     <div data-testid="settings.ai-panel" style={PANEL_ROOT_STYLE}>
       <h3 style={TITLE_STYLE}>{t("settings.ai.title")}</h3>
 
-      {/* **Auto-tag**: grouped by INTENT (myne-md/myne#848): a setting
-          belongs under the question the user arrived with, not under the feature
-          that implements it. */}
-      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupAutoTag")}</h4>
-
-      {/* Auto-tag (MYND-651): the tag pass runs on a BUNDLED model, so it
-          carries no model picker and no download; its own group, because "tag my
-          notes as I write" is a thing a user came for. Disabled (not hidden) while the
-          beta is off, matching every other dependent control in this panel; the
-          host re-reads both flags before it loads a model, so this surface is
-          discovery, not enforcement.
-
-          It is ALSO disabled when the build ships no tag model, with the reason
-          spelled out — the disabled-control discipline in `src/AGENTS.md`: a
-          real label, no "coming soon" copy, and it enables itself on the build
-          that lands the weights. Without it the switch persists `true` against
-          a host that answers `not_ready` forever and a band that never appears,
-          which is a control that lies by omission. */}
+      {/* Opt-in toggle. */}
       <SettingRow
-        anchorId="ai.auto-tag"
-        label={t("settings.ai.autoTagLabel")}
-        helper={t("settings.ai.autoTagHelper")}
+        anchorId="ai.enable"
+        label={t("settings.ai.enableLabel")}
+        helper={t("settings.ai.enableHelper")}
         control={(helperId) => (
           <Switch
-            checked={autoTag}
-            disabled={!aiEnabled || tagModel === false}
-            onChange={(next) => void setAutoTagEnabled(next)}
-            ariaLabel={t("settings.ai.autoTagLabel")}
+            checked={aiEnabled}
+            onChange={(next) => void setAiEnabled(next)}
+            ariaLabel={t("settings.ai.enableLabel")}
             ariaDescribedBy={helperId}
-            testId="ai.auto-tag-toggle"
+            testId="ai.enable-toggle"
           />
         )}
-      >
-        {tagModel === false && (
-          <p data-testid="ai.auto-tag-unavailable" style={{ ...HELPER_STYLE, color: "var(--fg-2)" }}>
-            {t("settings.ai.autoTagUnavailable")}
-          </p>
-        )}
-      </SettingRow>
-
-      {/* **Voice and meetings**: grouped by INTENT (myne-md/myne#848): a setting
-          belongs under the question the user arrived with, not under the feature
-          that implements it. */}
-      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupVoice")}</h4>
-
-      {/* Meeting AI prompt (meeting-ai): the user's replacement for the meeting
-          AI pass's reduce instruction. Empty means the built-in default. */}
-      <ControlBlock
-        label={t("settings.ai.meetingPromptLabel")}
-        helper={t("settings.ai.meetingPromptHelper")}
-        testId="ai.meeting-prompt"
-        anchorId="ai.meeting-prompt"
-        control={
-          <>
-            <textarea
-              value={meetingPromptDraft}
-              onChange={(e) => setMeetingPromptDraft(e.target.value)}
-              onBlur={() => {
-                const trimmed = meetingPromptDraft.trim();
-                void setMeetingAiPrompt(trimmed === "" ? null : meetingPromptDraft);
-              }}
-              disabled={!aiEnabled}
-              aria-label={t("settings.ai.meetingPromptLabel")}
-              data-testid="ai.meeting-prompt-input"
-              // **`MULTILINE_STYLE`, which exists for exactly this**
-              // (myne-md/myne#848). An unstyled `<textarea>` falls back to the
-              // WebView's own white field, so this one was a white box on a dark
-              // panel, the only control in the panel that did not come from the
-              // tokens.
-              style={MULTILINE_STYLE}
-              rows={4}
-            />
-            <Button
-              variant="secondary"
-              disabled={!aiEnabled}
-              onClick={() => {
-                setMeetingPromptDraft("");
-                void setMeetingAiPrompt(null);
-              }}
-              data-testid="ai.meeting-prompt-reset"
-            >
-              {t("settings.ai.meetingPromptReset")}
-            </Button>
-          </>
-        }
       />
 
-      {/* **Writing and chat**: grouped by INTENT (myne-md/myne#848): a setting
-          belongs under the question the user arrived with, not under the feature
-          that implements it. */}
-      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupWriting")}</h4>
-
-      {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
-          links open in the user's browser; the pickers take the downloaded
-          files. Three roles: text (GGUF) + search/embedding (safetensors) +
-          speech-to-text (Whisper GGUF). */}
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="ai.models"
-        data-setting-row="true"
-        data-testid="ai.models-section"
-      >
-        <label style={LABEL_STYLE}>{t("settings.ai.modelsLabel")}</label>
-        <p style={HELPER_STYLE}>{t("settings.ai.modelsHelper")}</p>
-
-        <ModelRoleBlock
-          roleLabel={t("settings.ai.modelGenerationLabel")}
-          filesText={t("settings.ai.recommendedFilesGeneration")}
-          recommendName={RECOMMENDED_MODEL.generation.name}
-          onOpenRecommend={() => openRecommend("generation")}
-          path={modelPaths.generation}
-          noneLabel={t("settings.ai.modelNone")}
-          chooseLabel={t("settings.ai.modelChoose")}
-          onChoose={() => void chooseModel("generation")}
-          disabled={!aiEnabled}
-          testIdRecommend="ai.model-recommend-generation"
-          testIdSelect="ai.model-select"
-          testIdChoose="ai.model-choose"
-        />
-
-        <ModelRoleBlock
-          roleLabel={t("settings.ai.modelEmbeddingLabel")}
-          filesText={t("settings.ai.recommendedFilesEmbedding")}
-          recommendName={RECOMMENDED_MODEL.embedding.name}
-          onOpenRecommend={() => openRecommend("embedding")}
-          path={modelPaths.embedding}
-          noneLabel={t("settings.ai.modelNone")}
-          chooseLabel={t("settings.ai.modelChoose")}
-          onChoose={() => void chooseModel("embedding")}
-          disabled={!aiEnabled}
-          testIdRecommend="ai.model-recommend-embedding"
-          testIdSelect="ai.model-select-embedding"
-          testIdChoose="ai.model-choose-embedding"
-        />
-
-        {/* Speech-to-text (voice-to-text MYND-552, SYNC-V3): the ASR / Whisper
-            role — side-load only, disabled when AI is off, distinct testids. */}
-        <ModelRoleBlock
-          roleLabel={t("settings.ai.modelTranscriptionLabel")}
-          filesText={t("settings.ai.recommendedFilesTranscription")}
-          recommendName={RECOMMENDED_MODEL.transcription.name}
-          onOpenRecommend={() => openRecommend("transcription")}
-          path={modelPaths.transcription}
-          noneLabel={t("settings.ai.modelNone")}
-          chooseLabel={t("settings.ai.modelChoose")}
-          onChoose={() => void chooseModel("transcription")}
-          disabled={!aiEnabled}
-          testIdRecommend="ai.model-recommend-transcription"
-          testIdSelect="ai.model-select-transcription"
-          testIdChoose="ai.model-choose-transcription"
-        />
+      {/* Trust affordance, load-bearing copy, rendered verbatim (SYNC-16 /
+          SYNC-7). One INVARIANT sentence, always shown, plus one STATE
+          sentence selected by which backend is answering: a provider IS a
+          server, so the old flat "runs entirely on your device" claim is false
+          the moment one is named (`decisions.md` 2026-08-09). */}
+      <div style={TRUST_BANNER_STYLE} data-testid="ai.trust-banner">
+        {/* Decorative: the headline beside it says the same thing in words, and
+            a screen reader announcing a glyph would only repeat it. */}
+        <span
+          aria-hidden="true"
+          data-testid="ai.trust-glyph"
+          // Both, because they answer different questions: `data-state` is
+          // which state the panel derived, `data-icon` is which glyph it chose
+          // for it. Asserting only the first would pass on a mapping that
+          // painted one glyph for all three (myne-md/myne#848).
+          data-state={trustState.kind}
+          data-icon={trustGlyph(trustState.kind).icon}
+          style={{
+            ...TRUST_GLYPH_STYLE,
+            background: trustGlyph(trustState.kind).bg,
+            color: trustGlyph(trustState.kind).fg,
+          }}
+        >
+          <Icon name={trustGlyph(trustState.kind).icon} size={16} />
+        </span>
+        <div style={TRUST_BODY_STYLE}>
+        <p data-testid="ai.trust-invariant" style={TRUST_LINE_STYLE}>
+          {AI_TRUST_INVARIANT}
+        </p>
+        <p data-testid="ai.trust-headline" style={TRUST_LINE_STYLE}>
+          {aiTrustHeadline(trustState)}
+        </p>
+        <button
+          type="button"
+          className="myne-text-link"
+          data-testid="ai.trust-disclosure-toggle"
+          aria-expanded={disclosureOpen}
+          onClick={() => setDisclosureOpen((o) => !o)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            marginTop: "var(--space-1)",
+            color: "var(--fg-2)",
+            font: "inherit",
+            fontSize: "var(--text-sm)",
+            cursor: "pointer",
+            alignSelf: "flex-start",
+          }}
+        >
+          {t("settings.ai.disclosureToggle")}
+        </button>
+        {disclosureOpen && (
+          <p data-testid="ai.trust-disclosure" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
+            {aiTrustDisclosure(trustState)}
+          </p>
+        )}
+        {/* What is answering RIGHT NOW (#191 task 5, SYNC-13). A read-only
+            caption, deliberately NOT a `SettingRow`: a caption adds no setting,
+            and a setting would owe a `settingsSearchIndex.ts` entry plus a
+            control the user could operate, which SYNC-19 removed from scope.
+            It sits in the trust block because it is the same question that
+            block answers, one level more concrete. */}
+        <p data-testid="ai.active-provider" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
+          {activeProviderName === undefined
+            ? t("settings.ai.providerNothingAnswering")
+            : t("settings.ai.providerActive", { name: activeProviderName })}
+        </p>
+        </div>
       </div>
 
-      {/* Downloadable models (myne-md/myne#805, `decisions/ai/0628`).
-          The AI-shaped weights are no longer bundled: a user who skipped
-          onboarding enables AI and fetches them here, and the same rows answer
-          "is it installed" from the device-local model store. No file name and
-          no quantisation label is shown, only the feature and its size. */}
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="ai.downloads"
-        data-setting-row="true"
-        data-testid="ai.downloads-section"
-      >
-        <label style={LABEL_STYLE}>{t("settings.ai.downloadsLabel")}</label>
-        <p style={HELPER_STYLE}>{t("settings.ai.downloadsHelper")}</p>
-        <DownloadedModelRow
-          artifact="embedding-e5-small"
-          role="embedding"
-          label={t("settings.ai.modelEmbeddingLabel")}
-          sizeText={t("settings.ai.downloadEmbeddingSize")}
-          path={modelPaths.embedding}
-          aiEnabled={aiEnabled}
-          onChanged={reloadModelPaths}
-          onShowToast={onShowToast}
-        />
-        <DownloadedModelRow
-          artifact="tag"
-          role="tag"
-          label={t("settings.ai.downloadTagLabel")}
-          sizeText={t("settings.ai.downloadTagSize")}
-          path={modelPaths.tag}
-          aiEnabled={aiEnabled}
-          onChanged={reloadModelPaths}
-          onShowToast={onShowToast}
-        />
-      </div>
-
-      {/* Side-load disclosure (myne-md/myne#805). Developer mode lets a user
-          point Myne at a model they sourced themselves; the disclosure states
-          that plainly, because a side-loaded model is the untrusted-input case
-          `threat-model.md` §7 now carries. */}
-      <div
-        style={BLOCK_STYLE}
-        data-setting-anchor="ai.sideload"
-        data-setting-row="true"
-        data-testid="ai.sideload-disclosure"
-      >
-        <p style={HELPER_STYLE}>{t("settings.ai.sideloadDisclosure")}</p>
-      </div>
-
+      {/* **Answering**: who or what answers, and what it is allowed to send.
+          This is the panel's second question, after whether AI is on at all, and
+          the reason the provider and its key are no longer filed under a
+          writing heading. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupAnswering")}</h4>
       {/* Local model runtime (ai-ollama-local task 8, SYNC-17/SYNC-18).
 
           The alternative to side-loading a file: point Myne at a runtime the
@@ -1474,11 +1085,11 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           deliberate and should not be "tidied" away:
 
           1. The field ships EMPTY. The conventional address is placeholder text
-             only — a stored default would be Myne naming an endpoint the user
+             only: a stored default would be Myne naming an endpoint the user
              did not (`decisions.md` 2026-08-09 default-state invariant).
           2. The disclosure is GENERIC. It says the runtime is a separate
              program with its own network behaviour, and NOT what that program
-             fetches or when — a version-specific claim would rot into a false
+             fetches or when: a version-specific claim would rot into a false
              statement Myne made about someone else's software.
           3. A refusal names the RULE, never the input. The user's URL is not
              echoed back into the DOM and no path appears.
@@ -1590,8 +1201,8 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       </div>
 
       {/* Remote provider (ai-remote-providers myne#415 task 14, SYNC-13/18).
-          Below the models section because it is the alternative to them, and
-          in the panel's shipped conventions rather than a new visual language.
+          The alternative to a local runtime, and in the panel's shipped
+          conventions rather than a new visual language.
 
           Four things here are deliberate:
           1. `none` is the DEFAULT and the unreachable state, not a disabled
@@ -1646,48 +1257,77 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             >
               {t("settings.ai.providerKeyLabel")}
             </label>
-            <div style={{ marginTop: "var(--space-1)" }}>
-              <Input
-                id="ai-provider-key"
-                data-testid="ai.provider-key-input"
-                mono
-                type="password"
-                spellCheck={false}
-                autoComplete="off"
-                disabled={!aiEnabled}
-                value={keyDraft}
-                placeholder={
-                  hasKey
-                    ? t("settings.ai.providerKeyReplace")
-                    : t("settings.ai.providerKeyAdd")
-                }
-                onChange={(e) => setKeyDraft(e.target.value)}
-                onBlur={() => void commitKey()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void commitKey();
+            {/* **Saving a credential is an act, not a side effect of moving
+                on** (myne-md/myne#867). The field used to commit on BLUR, so
+                pasting a key and tabbing away stored it, a write the user
+                never confirmed, on the one control in this panel whose value
+                they can neither see nor correct from here. The confirm is a
+                control beside the field, and it is DISABLED while the field is
+                empty, because an empty confirm writes an empty string and the
+                host reads that as "no key": pressing it would erase the stored
+                credential rather than save one.
+
+                Enter still commits. It is the same act with the keyboard, and
+                the E2E lane already drives it that way. */}
+            <div
+              style={{
+                ...TOGGLE_ROW_STYLE,
+                marginTop: "var(--space-1)",
+                gap: "var(--space-2)",
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <Input
+                  id="ai-provider-key"
+                  data-testid="ai.provider-key-input"
+                  mono
+                  type="password"
+                  spellCheck={false}
+                  autoComplete="off"
+                  disabled={!aiEnabled}
+                  value={keyDraft}
+                  placeholder={
+                    hasKey
+                      ? t("settings.ai.providerKeyReplace")
+                      : t("settings.ai.providerKeyAdd")
                   }
-                }}
+                  onChange={(e) => setKeyDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void commitKey();
+                    }
+                  }}
+                />
+              </div>
+              <IconButton
+                icon="circle-check"
+                label={t("settings.ai.providerKeySave")}
+                tooltip
+                disabled={!aiEnabled || keyDraft.trim().length === 0}
+                testId="ai.provider-key-save"
+                onClick={() => void commitKey()}
               />
+              {/* The clear is an ICON beside the field rather than a sentence
+                  under it, for the same reason the confirm is: both act on the
+                  ONE value in that field, and a link further down the panel
+                  reads as a different subject (myne-md/myne#867). */}
+              {hasKey ? (
+                <IconButton
+                  icon="trash-2"
+                  label={t("settings.ai.providerKeyRevoke")}
+                  tooltip
+                  disabled={!aiEnabled}
+                  testId="ai.provider-key-revoke"
+                  onClick={() => void revokeKey()}
+                />
+              ) : null}
             </div>
             <p data-testid="ai.provider-key-state" style={HELPER_STYLE}>
               {hasKey
                 ? t("settings.ai.providerKeyStored")
                 : t("settings.ai.providerKeyNone")}
             </p>
-            {hasKey && (
-              <button
-                type="button"
-                data-testid="ai.provider-key-revoke"
-                disabled={!aiEnabled}
-                onClick={() => void revokeKey()}
-                className="myne-text-link"
-                style={LINK_STYLE}
-              >
-                {t("settings.ai.providerKeyRevoke")}
-              </button>
-            )}
 
             {/* The model chooser (SYNC-24). Gated on a stored key because
                 there is nothing to ask the provider WITH before then — a
@@ -1807,98 +1447,133 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         )}
       </div>
 
-      {/* **Privacy and limits**: grouped by INTENT (myne-md/myne#848): a setting
-          belongs under the question the user arrived with, not under the feature
-          that implements it. */}
-      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupPrivacy")}</h4>
-
-      {/* Opt-in toggle. */}
-      <SettingRow
-        anchorId="ai.enable"
-        label={t("settings.ai.enableLabel")}
-        helper={t("settings.ai.enableHelper")}
-        control={(helperId) => (
-          <Switch
-            checked={aiEnabled}
-            onChange={(next) => void setAiEnabled(next)}
-            ariaLabel={t("settings.ai.enableLabel")}
-            ariaDescribedBy={helperId}
-            testId="ai.enable-toggle"
+      {/* **Models**: what runs, and where each role's file comes from. The
+          assignment rows live here; the download catalogue is a modal opened
+          from the heading's own icon, so fetching a model and assigning one no
+          longer compete for the same space. */}
+      <div style={GROUP_HEADING_ROW_STYLE}>
+        <h4 style={GROUP_HEADING_TEXT_STYLE}>{t("settings.ai.groupModels")}</h4>
+        {/* The anchor travels with the control the entry is about: search finds
+            "download models" and lands on the button that opens the catalogue,
+            not on a section that no longer exists (myne-md/myne#867). */}
+        <span data-setting-anchor="ai.downloads" style={{ display: "inline-flex" }}>
+          <IconButton
+            icon="download"
+            label={t("settings.ai.catalogueOpen")}
+            tooltip
+            expanded={catalogueOpen}
+            testId="ai.catalogue-button"
+            onClick={() => setCatalogueOpen(true)}
           />
-        )}
-      />
-
-      {/* Trust affordance, load-bearing copy, rendered verbatim (SYNC-16 /
-          SYNC-7). One INVARIANT sentence, always shown, plus one STATE
-          sentence selected by which backend is answering: a provider IS a
-          server, so the old flat "runs entirely on your device" claim is false
-          the moment one is named (`decisions.md` 2026-08-09). */}
-      <div style={TRUST_BANNER_STYLE} data-testid="ai.trust-banner">
-        {/* Decorative: the headline beside it says the same thing in words, and
-            a screen reader announcing a glyph would only repeat it. */}
-        <span
-          aria-hidden="true"
-          data-testid="ai.trust-glyph"
-          // Both, because they answer different questions: `data-state` is
-          // which state the panel derived, `data-icon` is which glyph it chose
-          // for it. Asserting only the first would pass on a mapping that
-          // painted one glyph for all three (myne-md/myne#848).
-          data-state={trustState.kind}
-          data-icon={trustGlyph(trustState.kind).icon}
-          style={{
-            ...TRUST_GLYPH_STYLE,
-            background: trustGlyph(trustState.kind).bg,
-            color: trustGlyph(trustState.kind).fg,
-          }}
-        >
-          <Icon name={trustGlyph(trustState.kind).icon} size={16} />
         </span>
-        <div style={TRUST_BODY_STYLE}>
-        <p data-testid="ai.trust-invariant" style={TRUST_LINE_STYLE}>
-          {AI_TRUST_INVARIANT}
-        </p>
-        <p data-testid="ai.trust-headline" style={TRUST_LINE_STYLE}>
-          {aiTrustHeadline(trustState)}
-        </p>
-        <button
-          type="button"
-          className="myne-text-link"
-          data-testid="ai.trust-disclosure-toggle"
-          aria-expanded={disclosureOpen}
-          onClick={() => setDisclosureOpen((o) => !o)}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            marginTop: "var(--space-1)",
-            color: "var(--fg-2)",
-            font: "inherit",
-            fontSize: "var(--text-sm)",
-            cursor: "pointer",
-            alignSelf: "flex-start",
-          }}
-        >
-          {t("settings.ai.disclosureToggle")}
-        </button>
-        {disclosureOpen && (
-          <p data-testid="ai.trust-disclosure" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
-            {aiTrustDisclosure(trustState)}
-          </p>
-        )}
-        {/* What is answering RIGHT NOW (#191 task 5, SYNC-13). A read-only
-            caption, deliberately NOT a `SettingRow`: a caption adds no setting,
-            and a setting would owe a `settingsSearchIndex.ts` entry plus a
-            control the user could operate, which SYNC-19 removed from scope.
-            It sits in the trust block because it is the same question that
-            block answers, one level more concrete. */}
-        <p data-testid="ai.active-provider" style={{ ...HELPER_STYLE, lineHeight: 1.5 }}>
-          {activeProviderName === undefined
-            ? t("settings.ai.providerNothingAnswering")
-            : t("settings.ai.providerActive", { name: activeProviderName })}
-        </p>
-        </div>
+      </div>
+      {/* Models: one assignment row per role, four of them. Recommended links
+          open in the user's browser; the pickers take the files the user
+          already has. Fetching one from Myne's own origin is the button beside
+          this heading, which opens the catalogue (myne-md/myne#867): the two
+          used to be blocks in a row, and they answer different questions.
+          Roles: text (GGUF) + search/embedding (safetensors) + speech-to-text
+          (Whisper GGUF) + tag (GGUF). */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.models"
+        data-setting-row="true"
+        data-testid="ai.models-section"
+      >
+        <label style={LABEL_STYLE}>{t("settings.ai.modelsLabel")}</label>
+        <p style={HELPER_STYLE}>{t("settings.ai.modelsHelper")}</p>
+
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.modelGenerationLabel")}
+          filesText={t("settings.ai.recommendedFilesGeneration")}
+          recommendName={RECOMMENDED_MODEL.generation.name}
+          onOpenRecommend={() => openRecommend("generation")}
+          path={modelPaths.generation}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("generation")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-generation"
+          testIdSelect="ai.model-select"
+          testIdChoose="ai.model-choose"
+        />
+
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.modelEmbeddingLabel")}
+          filesText={t("settings.ai.recommendedFilesEmbedding")}
+          recommendName={RECOMMENDED_MODEL.embedding.name}
+          onOpenRecommend={() => openRecommend("embedding")}
+          path={modelPaths.embedding}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("embedding")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-embedding"
+          testIdSelect="ai.model-select-embedding"
+          testIdChoose="ai.model-choose-embedding"
+        />
+
+        {/* Speech-to-text (voice-to-text MYND-552, SYNC-V3): the ASR / Whisper
+            role (side-load only, disabled when AI is off, distinct testids). */}
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.modelTranscriptionLabel")}
+          filesText={t("settings.ai.recommendedFilesTranscription")}
+          recommendName={RECOMMENDED_MODEL.transcription.name}
+          onOpenRecommend={() => openRecommend("transcription")}
+          path={modelPaths.transcription}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("transcription")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-transcription"
+          testIdSelect="ai.model-select-transcription"
+          testIdChoose="ai.model-choose-transcription"
+        />
+
+        {/* Tag (myne-md/myne#867). The tag role is a real `ModelRole` with a real
+            side-loadable file, and it was the ONE role with no assignment row:
+            it could only be reached by downloading it. That asymmetry is what
+            made the block read as if a model were missing from it, so the row
+            arrives here and the download is one click away in the catalogue,
+            the same as every other role. */}
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.downloadTagLabel")}
+          // The SAME file requirement as the generation row, and therefore the
+          // same key: both roles take a Qwen2 GGUF beside a tokenizer.json.
+          // A second key holding the identical sentence is exactly the
+          // duplication `scripts/check-i18n-duplicates.mjs` refuses, and
+          // "record the sharing with a reason" would be paperwork for a fact
+          // that is already true by construction.
+          filesText={t("settings.ai.recommendedFilesGeneration")}
+          recommendName={RECOMMENDED_MODEL.tag.name}
+          onOpenRecommend={() => openRecommend("tag")}
+          path={modelPaths.tag}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("tag")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-tag"
+          testIdSelect="ai.model-select-tag"
+          testIdChoose="ai.model-choose-tag"
+        />
       </div>
 
+      {/* Side-load disclosure (myne-md/myne#805). Developer mode lets a user
+          point Myne at a model they sourced themselves; the disclosure states
+          that plainly, because a side-loaded model is the untrusted-input case
+          `threat-model.md` §7 now carries. */}
+      <div
+        style={BLOCK_STYLE}
+        data-setting-anchor="ai.sideload"
+        data-setting-row="true"
+        data-testid="ai.sideload-disclosure"
+      >
+        <p style={HELPER_STYLE}>{t("settings.ai.sideloadDisclosure")}</p>
+      </div>
+
+      {/* **Limits**: what the AI may not see, and the bounds on what an answer
+          may cost. */}
+      <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupLimits")}</h4>
       {/* Excluded folders — same canonical set encoding as deliberate_folders. */}
       <div
         style={BLOCK_STYLE}
@@ -1936,10 +1611,88 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <p style={HELPER_STYLE}>{t("settings.ai.excludedHelper")}</p>
       </div>
 
-      {/* **Advanced**: grouped by INTENT (myne-md/myne#848): a setting
-          belongs under the question the user arrived with, not under the feature
-          that implements it. */}
+      {/* **Advanced**: the knobs a user reaches for once the rest works. The
+          auto-tag switch and the meeting prompt live here rather than under
+          headings of their own: each is one control, and a heading per control
+          is what made this panel read as five flat lists (myne-md/myne#848). */}
       <h4 style={GROUP_HEADING_STYLE}>{t("settings.ai.groupAdvanced")}</h4>
+      {/* Auto-tag (MYND-651). It is a role like the other three, with a file
+          you can point at and a catalogue entry you can fetch, and since
+          myne-md/myne#867 it has an assignment row of its own instead of being
+          reachable only by downloading it. Disabled (not hidden) while the beta
+          is off, matching every other dependent control in this panel; the host
+          re-reads both flags before it loads a model, so this surface is
+          discovery, not enforcement.
+
+          It is ALSO disabled when the build ships no tag model, with the reason
+          spelled out, the disabled-control discipline in `src/AGENTS.md`: a
+          real label, no "coming soon" copy, and it enables itself on the build
+          that lands the weights. Without it the switch persists `true` against
+          a host that answers `not_ready` forever and a band that never appears,
+          which is a control that lies by omission. */}
+      <SettingRow
+        anchorId="ai.auto-tag"
+        label={t("settings.ai.autoTagLabel")}
+        helper={t("settings.ai.autoTagHelper")}
+        control={(helperId) => (
+          <Switch
+            checked={autoTag}
+            disabled={!aiEnabled || tagModel === false}
+            onChange={(next) => void setAutoTagEnabled(next)}
+            ariaLabel={t("settings.ai.autoTagLabel")}
+            ariaDescribedBy={helperId}
+            testId="ai.auto-tag-toggle"
+          />
+        )}
+      >
+        {tagModel === false && (
+          <p data-testid="ai.auto-tag-unavailable" style={{ ...HELPER_STYLE, color: "var(--fg-2)" }}>
+            {t("settings.ai.autoTagUnavailable")}
+          </p>
+        )}
+      </SettingRow>
+
+      {/* Meeting AI prompt (meeting-ai): the user's replacement for the meeting
+          AI pass's reduce instruction. Empty means the built-in default. */}
+      <ControlBlock
+        label={t("settings.ai.meetingPromptLabel")}
+        helper={t("settings.ai.meetingPromptHelper")}
+        testId="ai.meeting-prompt"
+        anchorId="ai.meeting-prompt"
+        control={
+          <>
+            <textarea
+              value={meetingPromptDraft}
+              onChange={(e) => setMeetingPromptDraft(e.target.value)}
+              onBlur={() => {
+                const trimmed = meetingPromptDraft.trim();
+                void setMeetingAiPrompt(trimmed === "" ? null : meetingPromptDraft);
+              }}
+              disabled={!aiEnabled}
+              aria-label={t("settings.ai.meetingPromptLabel")}
+              data-testid="ai.meeting-prompt-input"
+              // **`MULTILINE_STYLE`, which exists for exactly this**
+              // (myne-md/myne#848). An unstyled `<textarea>` falls back to the
+              // WebView's own white field, so this one was a white box on a dark
+              // panel, the only control in the panel that did not come from the
+              // tokens.
+              style={MULTILINE_STYLE}
+              rows={4}
+            />
+            <Button
+              variant="secondary"
+              disabled={!aiEnabled}
+              onClick={() => {
+                setMeetingPromptDraft("");
+                void setMeetingAiPrompt(null);
+              }}
+              data-testid="ai.meeting-prompt-reset"
+            >
+              {t("settings.ai.meetingPromptReset")}
+            </Button>
+          </>
+        }
+      />
 
       {/* How much of the visible conversation an agent run is seeded with
           (myne-md/myne#617).
@@ -2027,6 +1780,16 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         <MemorySection onShowToast={onShowToast ?? (() => {})} aiEnabled={aiEnabled} />
       ) : null}
 
+      {catalogueOpen ? (
+        <AiModelCatalogue
+          open
+          onClose={() => setCatalogueOpen(false)}
+          modelPaths={modelPaths}
+          aiEnabled={aiEnabled}
+          onChanged={reloadModelPaths}
+          {...(onShowToast === undefined ? {} : { onShowToast })}
+        />
+      ) : null}
     </div>
   );
 }
