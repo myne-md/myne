@@ -19,6 +19,7 @@ import type { FolderNode } from "../folderTree";
 import { labelColorVar } from "../decorations";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
+import { NEUTRAL_PRESS_BG, usePressSurface } from "../../components/primitives/pressSurface";
 import { dragZone, insertionLineStyle } from "./reorderDnd";
 
 const INDENT_PER_LEVEL = 18;
@@ -335,6 +336,7 @@ export function FolderRow({
 }: FolderRowProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
+  const { pressed, handlers } = usePressSurface();
   const inputRef = useRef<HTMLInputElement>(null);
   const paddingLeft = BASE_PADDING_LEFT + depth * INDENT_PER_LEVEL;
   const expanded = !collapsed && !empty;
@@ -360,9 +362,11 @@ export function FolderRow({
 
   const background = dropTarget
     ? "var(--accent-soft)"
-    : hovering
-      ? "var(--bg-3)"
-      : "transparent";
+    : pressed
+      ? NEUTRAL_PRESS_BG
+      : hovering
+        ? "var(--bg-3)"
+        : "transparent";
 
   return (
     <div
@@ -374,6 +378,7 @@ export function FolderRow({
         boxShadow: dropTarget ? "inset 0 0 0 1px var(--accent)" : undefined,
       }}
       draggable={!renaming}
+      {...handlers}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       onClick={() => {

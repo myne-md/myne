@@ -17,9 +17,15 @@
 // `NewNoteFromTemplateModal`). NOT retrofitted onto `SettingsModal` /
 // `CommandPalette`: those carry extra keyboard behavior (in-flight dismissal
 // gating, arrow-key rail nav) that doesn't fit a generic unconditional-dismiss
-// shell — forcing them in would couple unrelated concerns. If a future modal
-// needs gated dismissal, add an optional `canDismiss?: () => boolean` here
-// rather than re-hand-rolling the shell.
+// shell. Forcing them in would couple unrelated concerns.
+//
+// `canDismiss` is the gated-dismissal seam this header used to propose
+// (myne-md/myne#869): while it answers false, Esc and backdrop clicks are
+// ignored and the close × is not rendered. The identity ceremony needs it.
+// Esc or a stray backdrop click on the phrase step skipped the type-back
+// challenge entirely, and the shape is a caller-supplied PREDICATE rather
+// than an `inert` boolean so the gate is live state: the escape hatch returns
+// the moment the caller's own condition clears, with no second prop to sync.
 
 import {
   useCallback,
@@ -56,6 +62,13 @@ interface ModalShellProps {
    */
   testId?: string;
   /**
+   * Optional gate on the three dismissal routes (Esc, backdrop click, ×).
+   * While it answers `false` the modal cannot be dismissed: both key and
+   * click are ignored and the close button is not rendered. Omit for the
+   * ordinary unconditional-dismiss shell.
+   */
+  canDismiss?: () => boolean;
+  /**
    * Stacking level for the backdrop. Defaults to the shared modal level, which
    * is correct for anything the user opened themselves — those are opened one
    * at a time, by an owner that closes the previous one first.
@@ -85,25 +98,31 @@ export function ModalShell({
   closeLabel = "Close",
   zIndex,
   testId,
+  canDismiss,
   children,
 }: ModalShellProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // A gated modal swallows Escape rather than closing: the caller is
+        // mid-ceremony and its own predicate decides when the door reopens.
+        if (canDismiss !== undefined && !canDismiss()) return;
         e.preventDefault();
         onClose();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, canDismiss]);
 
   const handleBackdropClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) onClose();
+      if (e.target !== e.currentTarget) return;
+      if (canDismiss !== undefined && !canDismiss()) return;
+      onClose();
     },
-    [onClose],
+    [onClose, canDismiss],
   );
 
   // Trap + restore focus while open so `aria-modal="true"` is truthful (MYND-93).
@@ -119,6 +138,10 @@ export function ModalShell({
   useFocusTrap(modalRef, { enabled: open });
 
   if (!open) return null;
+
+  // Evaluated once per render, after the early return: the × is a route out
+  // exactly like Esc and the backdrop, so it disappears under the same gate.
+  const dismissBlocked = canDismiss !== undefined && !canDismiss();
 
   // Only the CALLER-SUPPLIED geometry stays inline; the card's own chrome and
   // its entry animation live in `components.css` under `.myne-modal-card`.
@@ -154,18 +177,20 @@ export function ModalShell({
           <h2 id={labelId} className="myne-modal-title">
             {title}
           </h2>
-          <button
-            type="button"
-            aria-label={closeLabel}
-            // Namespaced from the caller's `testId` so a shared primitive does
-            // not publish one global name for every modal's close button; the
-            // bare `modal-close` remains the default for callers without one.
-            data-testid={testId === undefined ? "modal-close" : `${testId}-close`}
-            onClick={onClose}
-            className="myne-modal-close"
-          >
-            <Icon name="x" size={16} />
-          </button>
+          {dismissBlocked ? null : (
+            <button
+              type="button"
+              aria-label={closeLabel}
+              // Namespaced from the caller's `testId` so a shared primitive does
+              // not publish one global name for every modal's close button; the
+              // bare `modal-close` remains the default for callers without one.
+              data-testid={testId === undefined ? "modal-close" : `${testId}-close`}
+              onClick={onClose}
+              className="myne-modal-close"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
         <div className="myne-modal-body">{children}</div>
       </div>

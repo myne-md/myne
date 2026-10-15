@@ -15,7 +15,8 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { useSyncStatus, type SyncStatus } from "../../hooks/useSyncStatus";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { Button } from "../primitives/Button";
 
 const ROOT_STYLE: CSSProperties = {
@@ -177,7 +178,7 @@ export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorPro
         <button
           type="button"
           style={{ ...BUTTON_STYLE, opacity: busy ? 0.6 : 1 }}
-          {...hoverSurface({
+          {...interactiveSurface({
             restBg: "var(--bg-2)",
             hoverBg: "var(--paper-3)",
             disabled: busy,

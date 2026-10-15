@@ -341,12 +341,16 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       await second.session.byTestId("identity-home.join-form");
 
       // The same phrase, a fresh device-local password. Neither is the owner's.
+      // The join is two steps now (myne-md/myne#871) and only the current step's
+      // Continue exists, so one testid walks the gate.
       await typePhrase(
         second.session,
         "identity-home.join-phrase",
         "identity-home.join-phrase-cell",
         MEMBER_PHRASE,
       );
+      await (await second.session.byTestId("identity-home.join-continue")).click();
+      await second.session.byTestId("identity-home.join.password-input");
       await (await second.session.byTestId("identity-home.join.password-input")).replaceText(
         MEMBER_PASSWORD,
       );
@@ -355,12 +359,15 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       );
       // The proof that no owner code is needed is BEHAVIOURAL and this click is it: the
       // form's own required fields are the phrase grid and the two password fields
-      // (`IdentityHome.tsx`, `EnrollPhraseCredential` + `PasswordCreateForm`, whose
+      // (`InviteWizard.tsx`, `EnrollPhraseCredential` + `PasswordCreateForm`, whose
       // `disabled` reads only `joinPhraseCells`), so a completed submit with no code
       // field anywhere on the form is the join having verified the group package
       // against the owner PINNED in the person's own sealed profile
       // (`decisions/protocol/0675`). An absence assertion over a field that was never
       // in the markup would only be restating the source.
+      // The phrase step is gone from the DOM at this point (the wizard renders one
+      // step at a time), which is what the component test pins; what this scenario
+      // adds is that the real IPC path completes with no owner code anywhere.
       await (await second.session.byTestId("identity-home.join.submit")).click();
 
       // The editor, and NOT a name step: this person already has a name for this vault,

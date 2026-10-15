@@ -55,10 +55,25 @@ type Step =
   | "server"
   | "create"
   | "phrase"
+  // The type-back challenge gets a step of its own (myne-md/myne#869), the
+  // `kit`/`typeback` split `CreateVaultFlow` has had since it shipped: the
+  // phrase step shows the words and nothing else, and this step asks for four
+  // of them back. On one screen the challenge read as a footnote to the grid.
+  | "typeback"
   | "home"
-  | "accept"
-  | "join"
+  | "accept-owner"
+  | "accept-phrase"
+  | "accept-password"
+  | "join-phrase"
+  | "join-password"
   | "name";
+
+/** The accept wizard's steps, in order. A step-changing control names the step
+ *  it moves to, so the three screens cannot disagree about the sequence. */
+type AcceptStep = "accept-owner" | "accept-phrase" | "accept-password";
+
+/** The join wizard's two steps, same shape. */
+type JoinStep = "join-phrase" | "join-password";
 
 /** Recovery-phrase width. Frozen by BIP-39 at 24 words (256 bits) and by
  *  `PHRASE_CELL_COUNT` on the desktop's `EnrollPhraseCredential`; the client
@@ -164,6 +179,57 @@ function AckRow({
 
 /** Secondary ink for a hint line under a field or section. */
 const HINT_STYLE = { fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)", color: "var(--fg-3)" } as const;
+
+/**
+ * The invite wizards' step counter (myne-md/myne#871): a row of `total`
+ * segments filled up to `n`, over the same sentence the desktop wizard renders
+ * (`identityHome.stepIndicator`). Module scope, because it holds no state and
+ * both wizards mount it on every step; `testId` names the wrapper so a spec can
+ * assert which step is on screen and the fill state of each segment.
+ *
+ * A private copy rather than the desktop's `StepProgress`
+ * (`src/screens/vault-creation/step-shell.tsx`), which this change extracted for
+ * the desktop wizard. That one belongs to the desktop vault-creation shell, and a
+ * phone flow importing a desktop screen's internals would couple the two clients
+ * through a module neither owns; what the pair shares is the shape (a row of
+ * token-coloured segments), not code, and the sentence above IS shared because
+ * both read one catalog key. Hoisting the primitive into a package all three
+ * clients can consume is a design-system change, not this fix.
+ */
+function StepProgress({
+  testId,
+  n,
+  total,
+  label,
+}: {
+  testId: string;
+  n: number;
+  total: number;
+  label: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div data-testid={testId} style={{ marginTop: "var(--space-4)" }}>
+      <div aria-hidden="true" style={{ display: "flex", gap: "var(--space-1)" }}>
+        {Array.from({ length: total }, (_, index) => (
+          <span
+            key={index}
+            data-filled={index < n ? "true" : "false"}
+            style={{
+              flex: 1,
+              height: 3,
+              borderRadius: "var(--radius-pill)",
+              background: index < n ? "var(--accent)" : "var(--line-2)",
+            }}
+          />
+        ))}
+      </div>
+      <div style={{ ...HINT_STYLE, marginTop: "var(--space-2)" }}>
+        {t("identityHome.stepIndicator", { n, total, label })}
+      </div>
+    </div>
+  );
+}
 
 /** The inline mismatch line under a wrong type-back word. Tokens, so the
  *  token-adoption ratchet sees no new literal. */
@@ -577,8 +643,24 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     clearAcceptSecrets();
     setAcceptInvite(invite);
     setError(null);
-    setStep("accept");
+    setStep("accept-owner");
   }, [clearAcceptSecrets]);
+
+  /** Leave the accept wizard for the home, dropping what it collected. The
+   *  header chevron on step 1 and the footer cancel both land here. */
+  const leaveAccept = useCallback(() => {
+    clearAcceptSecrets();
+    setAcceptInvite(null);
+    setError(null);
+    setStep("home");
+  }, [clearAcceptSecrets]);
+
+  /** Move between the accept wizard's steps, clearing the banner as we go: an
+   *  error about a step the user has left is stale the moment they leave it. */
+  const goAcceptStep = useCallback((next: AcceptStep) => {
+    setError(null);
+    setStep(next);
+  }, []);
 
   /** The join step's counterpart. Same rule, same reason: the phrase and the
    *  device password are re-collected per invite rather than left over from the
@@ -604,8 +686,22 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   const openJoin = useCallback((invite: InviteSummary) => {
     clearJoinSecrets();
     setJoinInvite(invite);
-    setStep("join");
+    setStep("join-phrase");
   }, [clearJoinSecrets]);
+
+  /** Leave the join wizard for the home. The header chevron on step 1 and the
+   *  footer cancel both land here. */
+  const leaveJoin = useCallback(() => {
+    clearJoinSecrets();
+    setJoinInvite(null);
+    setStep("home");
+  }, [clearJoinSecrets]);
+
+  /** Move between the join wizard's steps, clearing its own banner as we go. */
+  const goJoinStep = useCallback((next: JoinStep) => {
+    setJoinError(null);
+    setStep(next);
+  }, []);
 
   /**
    * Read the fingerprint out of the owner's identity code, so the user can
@@ -677,17 +773,24 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // Every gate in one place, so the submit button and the handler cannot
   // disagree about whether the form is complete. The backend re-checks the floor
   // and the phrase; this is the affordance, not the gate.
+  //
+  // Split per step (myne-md/myne#871): each step's Continue is gated on what
+  // THAT step collects, and the final `acceptReady` stays the submit gate so
+  // the full check is what guards the call.
+  const acceptOwnerReady = ownerFingerprint !== null && confirmed;
+  const acceptPhraseReady = acceptWords.every((word) => word.length > 0);
   const acceptReady =
-    confirmed &&
-    acceptWords.every((word) => word.length > 0) &&
+    acceptOwnerReady &&
+    acceptPhraseReady &&
     [...password].length >= MIN_PASSWORD_LEN &&
     password === confirmPassword;
 
   /** The join's gate: the same phrase completeness and the same device-password
    *  floor, and deliberately NO confirmation step. There is no owner code on this
    *  form to confirm, because there is none to collect. */
+  const joinPhraseReady = joinWords.every((word) => word.length > 0);
   const joinReady =
-    joinWords.every((word) => word.length > 0) &&
+    joinPhraseReady &&
     [...joinPassword].length >= MIN_PASSWORD_LEN &&
     joinPassword === joinConfirmPassword;
 
@@ -799,7 +902,6 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
    */
   useEffect(() => {
     if (step !== "name" || nameChecked.current) return;
-    nameChecked.current = true;
     let cancelled = false;
     setNameChecking(true);
     void (async () => {
@@ -811,6 +913,19 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         named = false;
       }
       if (cancelled) return;
+      // The latch goes HERE, after the await and after the cancellation guard, to
+      // match the desktop gate (`src/components/sync/MemberNameGate.tsx`) exactly
+      // (myne-md/myne#871). Latched before the await, the second run a StrictMode
+      // double-invoke performs bails on it while the first run's cleanup has
+      // already marked that one cancelled, and the roster answer is then discarded
+      // by neither branch, so the step would render "Checking your name…" forever.
+      // That hang is NOT reachable on this client as it stands, and saying so is
+      // the honest form of the claim: the flow mounts at the gate step, and
+      // StrictMode double-invokes effects at MOUNT, so this effect's one run
+      // happens long after the double-invoke. It is fixed because the ordering is
+      // the defect the desktop carried and the twin should not be the one place a
+      // future mount change reopens it.
+      nameChecked.current = true;
       setNameChecking(false);
       if (named) accepted.current();
     })();
@@ -962,9 +1077,6 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
 
   const renderPhrase = () => {
     const phrase = (result?.phrase ?? "").split(" ");
-    // The gate: the challenge must be answered, and the phrase revealed (the
-    // challenge is unanswerable without it).
-    const { matches: corrects, allCorrect } = phraseTypeBackMatches(phrase, challenge, answers);
     return (
       <Screen>
         <FlowHeader label={t("identityFlow.phrase.title")} />
@@ -980,8 +1092,40 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
               </Button>
             )}
           </div>
+        </ScreenScroll>
+        <FooterBar>
+          {/* Revealed is the only gate here (myne-md/myne#869): the challenge
+              moved to its own step, and until the words are on screen there is
+              nothing to type back from. No back arrow and no dismissal either.
+              The phrase is shown once and the ceremony holds until the type-back
+              proves it was saved, which is the same block the desktop dialog
+              enforces through `ModalShell.canDismiss`. */}
+          <Button
+            onClick={() => setStep("typeback")}
+            disabled={!revealed}
+            data-testid="identity-flow.phrase-continue"
+          >
+            {t("identityFlow.phrase.continue")}
+          </Button>
+        </FooterBar>
+      </Screen>
+    );
+  };
+
+  const renderTypeback = () => {
+    const phrase = (result?.phrase ?? "").split(" ");
+    // The gate: all four words right. `revealed` is not re-checked because the
+    // phrase is not on this screen, and back-returning to the phrase step keeps
+    // `revealed` as it was, so the way to re-read the words is Back, not a
+    // second reveal.
+    const { matches: corrects, allCorrect } = phraseTypeBackMatches(phrase, challenge, answers);
+    return (
+      <Screen>
+        <FlowHeader label={t("identityFlow.typeback.title")} onBack={() => setStep("phrase")} />
+        <ScreenScroll style={{ padding: "18px 22px 0" }}>
+          <Title>{t("identityFlow.typeback.title")}</Title>
+          <Lead>{t("identityFlow.phrase.typebackLead")}</Lead>
           <div style={{ marginTop: "var(--space-4)" }}>
-            <FieldLabel>{t("identityFlow.phrase.typebackLead")}</FieldLabel>
             {challenge.map((pos, i) => (
               <div key={pos} style={{ marginTop: "var(--space-3)" }}>
                 <FieldLabel>
@@ -1009,8 +1153,8 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         <FooterBar>
           <Button
             onClick={finishPhrase}
-            disabled={!revealed || !allCorrect}
-            data-testid="identity-flow.phrase-continue"
+            disabled={!allCorrect}
+            data-testid="identity-flow.typeback-continue"
           >
             {t("identityFlow.phrase.continue")}
           </Button>
@@ -1199,66 +1343,94 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         <FlowHeader
           label={t("identityHome.accept")}
           onBack={() => {
-            clearAcceptSecrets();
-            setAcceptInvite(null);
-            setError(null);
-            setStep("home");
+            // Step 1's chevron is the wizard's exit; a later step's goes back one.
+            if (step === "accept-owner") leaveAccept();
+            else if (step === "accept-phrase") goAcceptStep("accept-owner");
+            else goAcceptStep("accept-phrase");
           }}
         />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
-          <Title>{t("identityHome.accept")}</Title>
-          <div data-testid="identity-flow.accept-hint" style={HINT_STYLE}>
-            {t("identityHome.acceptHint")}
-          </div>
-
-          <div style={{ marginTop: "var(--space-5)" }}>
-            <FieldLabel>{t("identityHome.acceptOwnerCodeLabel")}</FieldLabel>
-            <textarea
-              data-testid="identity-flow.accept-owner-code"
-              aria-label={t("identityHome.acceptOwnerCodeLabel")}
-              value={ownerCode}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
-                setOwnerCode(e.target.value);
-                setOwnerFingerprint(null);
-                setConfirmed(false);
-                setError(null);
-              }}
-              rows={3}
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              dir="ltr"
-              style={OWNER_CODE_STYLE}
-            />
-          </div>
-
-          {ownerFingerprint === null ? (
-            <div style={{ marginTop: "var(--space-3)" }}>
-              <Button
-                variant="secondary"
-                full={false}
-                data-testid="identity-flow.accept-inspect"
-                disabled={inspecting || ownerCode.trim() === ""}
-                onClick={() => void inspectOwner()}
-              >
-                {t("identityHome.acceptInspect")}
-              </Button>
-            </div>
-          ) : (
-            <div data-testid="identity-flow.accept-sas">
-              <div data-testid="identity-flow.accept-sas-hint" style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}>
-                {t("identityHome.acceptSasHint")}
+          {step === "accept-owner" ? (
+            <>
+              <StepProgress
+                testId="identity-flow.accept-step"
+                n={1}
+                total={3}
+                label={t("identityHome.stepVerifyOwner")}
+              />
+              <Title>{t("identityHome.acceptHeading")}</Title>
+              <div data-testid="identity-flow.accept-hint" style={HINT_STYLE}>
+                {t("identityHome.acceptHint")}
               </div>
-              <div style={{ marginTop: "var(--space-3)" }}>
-                <MonoBox value={ownerFingerprint} testId="identity-flow.accept-owner-fingerprint" />
+
+              <div style={{ marginTop: "var(--space-5)" }}>
+                <FieldLabel>{t("identityHome.acceptOwnerCodeLabel")}</FieldLabel>
+                <textarea
+                  data-testid="identity-flow.accept-owner-code"
+                  aria-label={t("identityHome.acceptOwnerCodeLabel")}
+                  value={ownerCode}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
+                    setOwnerCode(e.target.value);
+                    setOwnerFingerprint(null);
+                    setConfirmed(false);
+                    setError(null);
+                  }}
+                  rows={3}
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  spellCheck={false}
+                  dir="ltr"
+                  style={OWNER_CODE_STYLE}
+                />
               </div>
-              <AckRow
-                checked={confirmed}
-                onToggle={() => setConfirmed((v) => !v)}
-                testId="identity-flow.accept-confirm"
-              >
-                {t("identityHome.acceptConfirm")}
-              </AckRow>
+
+              {ownerFingerprint === null ? (
+                <div style={{ marginTop: "var(--space-3)" }}>
+                  <Button
+                    variant="secondary"
+                    full={false}
+                    data-testid="identity-flow.accept-inspect"
+                    disabled={inspecting || ownerCode.trim() === ""}
+                    onClick={() => void inspectOwner()}
+                  >
+                    {t("identityHome.acceptInspect")}
+                  </Button>
+                </div>
+              ) : (
+                <div data-testid="identity-flow.accept-sas">
+                  <div data-testid="identity-flow.accept-sas-hint" style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}>
+                    {t("identityHome.acceptSasHint")}
+                  </div>
+                  <div style={{ marginTop: "var(--space-3)" }}>
+                    <MonoBox value={ownerFingerprint} testId="identity-flow.accept-owner-fingerprint" />
+                  </div>
+                  <AckRow
+                    checked={confirmed}
+                    onToggle={() => setConfirmed((v) => !v)}
+                    testId="identity-flow.accept-confirm"
+                  >
+                    {t("identityHome.acceptConfirm")}
+                  </AckRow>
+                </div>
+              )}
+
+              {/* The inspect failure belongs to THIS step, so its banner does too. */}
+              {error ? (
+                <Banner kind="danger" testID="identity-flow.accept-error" style={{ marginTop: "var(--space-4)" }}>
+                  {error}
+                </Banner>
+              ) : null}
+            </>
+          ) : step === "accept-phrase" ? (
+            <>
+              <StepProgress
+                testId="identity-flow.accept-step"
+                n={2}
+                total={3}
+                label={t("identityHome.stepRecoveryPhrase")}
+              />
+              <Title>{t("identityHome.phraseHeading")}</Title>
+              <div style={HINT_STYLE}>{t("identityHome.acceptPhraseHint")}</div>
 
               <div id={phraseLabelId} data-testid="identity-flow.accept-phrase-label" style={{ marginTop: "var(--space-4)" }}>
                 <FieldLabel>{t("identityHome.acceptPhraseLabel")}</FieldLabel>
@@ -1281,7 +1453,16 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
                   />
                 ))}
               </div>
-
+            </>
+          ) : (
+            <>
+              <StepProgress
+                testId="identity-flow.accept-step"
+                n={3}
+                total={3}
+                label={t("identityHome.stepDevicePassword")}
+              />
+              <Title>{t("identityHome.passwordHeading")}</Title>
               <div
                 data-testid="identity-flow.accept-password-note"
                 style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}
@@ -1317,36 +1498,72 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
                   {t("password.createForm.mismatch")}
                 </div>
               ) : null}
-            </div>
-          )}
 
-          {error ? (
-            <Banner kind="danger" testID="identity-flow.accept-error" style={{ marginTop: "var(--space-4)" }}>
-              {error}
-            </Banner>
-          ) : null}
+              {/* The submit refusal belongs to THIS step, so its banner does too. */}
+              {error ? (
+                <Banner kind="danger" testID="identity-flow.accept-error" style={{ marginTop: "var(--space-4)" }}>
+                  {error}
+                </Banner>
+              ) : null}
+            </>
+          )}
         </ScreenScroll>
         <FooterBar>
-          <Button
-            variant="secondary"
-            full={false}
-            onClick={() => {
-              clearAcceptSecrets();
-              setAcceptInvite(null);
-              setError(null);
-              setStep("home");
-            }}
-            data-testid="identity-flow.accept-cancel"
-          >
-            {t("identityFlow.back")}
-          </Button>
-          <Button
-            onClick={() => void accept()}
-            disabled={!ready}
-            data-testid="identity-flow.accept.submit"
-          >
-            {t("identityHome.acceptSubmit")}
-          </Button>
+          {step === "accept-owner" ? (
+            <>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={leaveAccept}
+                data-testid="identity-flow.accept-cancel"
+              >
+                {t("identityFlow.back")}
+              </Button>
+              <Button
+                onClick={() => goAcceptStep("accept-phrase")}
+                disabled={!acceptOwnerReady}
+                data-testid="identity-flow.accept-continue"
+              >
+                {t("common.continue")}
+              </Button>
+            </>
+          ) : step === "accept-phrase" ? (
+            <>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={() => goAcceptStep("accept-owner")}
+                data-testid="identity-flow.accept-step-back"
+              >
+                {t("common.back")}
+              </Button>
+              <Button
+                onClick={() => goAcceptStep("accept-password")}
+                disabled={!acceptPhraseReady}
+                data-testid="identity-flow.accept-continue"
+              >
+                {t("common.continue")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={() => goAcceptStep("accept-phrase")}
+                data-testid="identity-flow.accept-step-back"
+              >
+                {t("common.back")}
+              </Button>
+              <Button
+                onClick={() => void accept()}
+                disabled={!ready}
+                data-testid="identity-flow.accept.submit"
+              >
+                {t("identityHome.acceptSubmit")}
+              </Button>
+            </>
+          )}
         </FooterBar>
         {busy && <BlockingOverlay title={t("identityHome.acceptSubmit")} />}
       </Screen>
@@ -1376,105 +1593,143 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         <FlowHeader
           label={t("identityHome.join")}
           onBack={() => {
-            clearJoinSecrets();
-            setJoinInvite(null);
-            setStep("home");
+            // Step 1's chevron is the wizard's exit; step 2's goes back one.
+            if (step === "join-phrase") leaveJoin();
+            else goJoinStep("join-phrase");
           }}
         />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
-          <Title>{t("identityHome.join")}</Title>
-          <div data-testid="identity-flow.join-hint" style={HINT_STYLE}>
-            {t("identityHome.joinHint")}
-          </div>
-
-          <div
-            id={joinPhraseLabelId}
-            data-testid="identity-flow.join-phrase-label"
-            style={{ marginTop: "var(--space-5)" }}
-          >
-            <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
-          </div>
-          <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
-          <div role="group" aria-labelledby={joinPhraseLabelId} style={PHRASE_GRID_STYLE}>
-            {joinWords.map((word, i) => (
-              <PhraseCell
-                key={i}
-                index={i}
-                word={word}
-                testId={
-                  i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`
-                }
-                label={t("sync.enroll.wordAria", { number: i + 1 })}
-                onChange={setJoinWord}
-                onPaste={(index, event) =>
-                  pasteWords(setJoinWords, () => setJoinError(null), index, event)
-                }
+          {step === "join-phrase" ? (
+            <>
+              <StepProgress
+                testId="identity-flow.join-step"
+                n={1}
+                total={2}
+                label={t("identityHome.stepRecoveryPhrase")}
               />
-            ))}
-          </div>
+              <Title>{t("identityHome.phraseHeading")}</Title>
+              <div data-testid="identity-flow.join-hint" style={HINT_STYLE}>
+                {t("identityHome.joinHint")}
+              </div>
 
-          <div
-            data-testid="identity-flow.join-password-note"
-            style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}
-          >
-            {t("identityHome.joinPasswordNote")}
-          </div>
-          <div data-testid="identity-flow.join.password-label" style={{ marginTop: "var(--space-3)" }}>
-            <FieldLabel>{t("password.createForm.passwordLabel")}</FieldLabel>
-          </div>
-          <DevicePasswordField
-            value={joinPassword}
-            onChange={(v) => {
-              setJoinPassword(v);
-              setJoinError(null);
-            }}
-            testId="identity-flow.join.password-input"
-            label={t("password.createForm.passwordLabel")}
-          />
-          <div data-testid="identity-flow.join.confirm-label" style={{ marginTop: "var(--space-3)" }}>
-            <FieldLabel>{t("password.createForm.confirmLabel")}</FieldLabel>
-          </div>
-          <DevicePasswordField
-            value={joinConfirmPassword}
-            onChange={(v) => {
-              setJoinConfirmPassword(v);
-              setJoinError(null);
-            }}
-            testId="identity-flow.join.confirm-input"
-            label={t("password.createForm.confirmLabel")}
-          />
-          {joinConfirmPassword !== "" && joinPassword !== joinConfirmPassword ? (
-            <div style={MISMATCH_STYLE} data-testid="identity-flow.join.password-mismatch">
-              {t("password.createForm.mismatch")}
-            </div>
-          ) : null}
+              <div
+                id={joinPhraseLabelId}
+                data-testid="identity-flow.join-phrase-label"
+                style={{ marginTop: "var(--space-4)" }}
+              >
+                <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
+              </div>
+              <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
+              <div role="group" aria-labelledby={joinPhraseLabelId} style={PHRASE_GRID_STYLE}>
+                {joinWords.map((word, i) => (
+                  <PhraseCell
+                    key={i}
+                    index={i}
+                    word={word}
+                    testId={
+                      i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`
+                    }
+                    label={t("sync.enroll.wordAria", { number: i + 1 })}
+                    onChange={setJoinWord}
+                    onPaste={(index, event) =>
+                      pasteWords(setJoinWords, () => setJoinError(null), index, event)
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <StepProgress
+                testId="identity-flow.join-step"
+                n={2}
+                total={2}
+                label={t("identityHome.stepDevicePassword")}
+              />
+              <Title>{t("identityHome.passwordHeading")}</Title>
+              <div
+                data-testid="identity-flow.join-password-note"
+                style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}
+              >
+                {t("identityHome.joinPasswordNote")}
+              </div>
+              <div data-testid="identity-flow.join.password-label" style={{ marginTop: "var(--space-3)" }}>
+                <FieldLabel>{t("password.createForm.passwordLabel")}</FieldLabel>
+              </div>
+              <DevicePasswordField
+                value={joinPassword}
+                onChange={(v) => {
+                  setJoinPassword(v);
+                  setJoinError(null);
+                }}
+                testId="identity-flow.join.password-input"
+                label={t("password.createForm.passwordLabel")}
+              />
+              <div data-testid="identity-flow.join.confirm-label" style={{ marginTop: "var(--space-3)" }}>
+                <FieldLabel>{t("password.createForm.confirmLabel")}</FieldLabel>
+              </div>
+              <DevicePasswordField
+                value={joinConfirmPassword}
+                onChange={(v) => {
+                  setJoinConfirmPassword(v);
+                  setJoinError(null);
+                }}
+                testId="identity-flow.join.confirm-input"
+                label={t("password.createForm.confirmLabel")}
+              />
+              {joinConfirmPassword !== "" && joinPassword !== joinConfirmPassword ? (
+                <div style={MISMATCH_STYLE} data-testid="identity-flow.join.password-mismatch">
+                  {t("password.createForm.mismatch")}
+                </div>
+              ) : null}
 
-          {joinError ? (
-            <Banner kind="danger" testID="identity-flow.join-error" style={{ marginTop: "var(--space-4)" }}>
-              {joinError}
-            </Banner>
-          ) : null}
+              {/* The submit refusal belongs to THIS step, so its banner does too. */}
+              {joinError ? (
+                <Banner kind="danger" testID="identity-flow.join-error" style={{ marginTop: "var(--space-4)" }}>
+                  {joinError}
+                </Banner>
+              ) : null}
+            </>
+          )}
         </ScreenScroll>
         <FooterBar>
-          <Button
-            variant="secondary"
-            full={false}
-            onClick={() => {
-              clearJoinSecrets();
-              setJoinInvite(null);
-              setStep("home");
-            }}
-            data-testid="identity-flow.join-cancel"
-          >
-            {t("identityFlow.back")}
-          </Button>
-          <Button
-            onClick={() => void join()}
-            disabled={!ready}
-            data-testid="identity-flow.join.submit"
-          >
-            {t("identityHome.joinSubmit")}
-          </Button>
+          {step === "join-phrase" ? (
+            <>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={leaveJoin}
+                data-testid="identity-flow.join-cancel"
+              >
+                {t("identityFlow.back")}
+              </Button>
+              <Button
+                onClick={() => goJoinStep("join-password")}
+                disabled={!joinPhraseReady}
+                data-testid="identity-flow.join-continue"
+              >
+                {t("common.continue")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={() => goJoinStep("join-phrase")}
+                data-testid="identity-flow.join-step-back"
+              >
+                {t("common.back")}
+              </Button>
+              <Button
+                onClick={() => void join()}
+                disabled={!ready}
+                data-testid="identity-flow.join.submit"
+              >
+                {t("identityHome.joinSubmit")}
+              </Button>
+            </>
+          )}
         </FooterBar>
         {joining && <BlockingOverlay title={t("identityHome.joinSubmit")} />}
       </Screen>
@@ -1549,9 +1804,11 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       {step === "server" && renderServer()}
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}
+      {step === "typeback" && renderTypeback()}
       {step === "home" && renderHome()}
-      {step === "accept" && renderAccept()}
-      {step === "join" && renderJoin()}
+      {(step === "accept-owner" || step === "accept-phrase" || step === "accept-password") &&
+        renderAccept()}
+      {(step === "join-phrase" || step === "join-password") && renderJoin()}
       {step === "name" && renderName()}
     </Screen>
   );

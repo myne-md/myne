@@ -1,4 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
@@ -1771,7 +1772,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     el.style.transition = "none";
     el.style.height = `${from}px`;
     void el.offsetHeight; // force reflow so the next height change transitions
-    el.style.transition = "height 280ms cubic-bezier(0.22, 0.61, 0.36, 1)";
+    el.style.transition = "height var(--duration-slow) var(--ease-emphasized)";
     el.style.height = `${target}px`;
     // Once settled, drop back to auto so intra-panel content changes aren't
     // clipped (a taller panel stays capped + scrolls, so leave it explicit).
@@ -1789,7 +1790,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           { opacity: 0, transform: `translateX(${enter}px)` },
           { opacity: 1, transform: "translateX(0)" },
         ],
-        { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+        { duration: motionDurationMs("--duration-base"), easing: motionEasing("--ease-emphasized") },
       );
     }
   }, [panel]);

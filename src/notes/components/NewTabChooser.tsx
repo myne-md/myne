@@ -30,9 +30,9 @@ import type { CommandAction } from "../../commands/registry";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useRecentCommandRuns } from "../../lib/commandRecency";
 import type { IconName } from "../../lib/icons";
@@ -364,7 +364,7 @@ export function NewTabChooser({
               type="button"
               onClick={() => runCommand(p.id)}
               data-testid={`notes.newTab.place.${p.id}`}
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={PLACE}
             >
               <span
@@ -398,7 +398,7 @@ export function NewTabChooser({
               data-testid={
                 row.kind === "note" ? "notes.newTab.note-row" : "notes.newTab.command-row"
               }
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={ROW}
             >
               <span style={ROW_ICON}>
