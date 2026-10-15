@@ -135,7 +135,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "NewTabChooser": { file: "src/notes/components/NewTabChooser.tsx", line: 220 },
   "NoteActionsMenu": { file: "src/notes/components/NoteActionsMenu.tsx", line: 133 },
   "NoteExportModal": { file: "src/components/export/NoteExportModal.tsx", line: 135 },
-  "NoteList": { file: "src/notes/components/NoteList.tsx", line: 782 },
+  "NoteList": { file: "src/notes/components/NoteList.tsx", line: 783 },
   "NotePdfExportNotice": { file: "src/components/export/NotePdfExportNotice.tsx", line: 58 },
   "NoteRow": { file: "src/notes/components/NoteRow.tsx", line: 382 },
   "OutlineTab": { file: "src/notes/components/OutlineTab.tsx", line: 91 },

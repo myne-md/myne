@@ -27,6 +27,7 @@ import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { SidebarSearchRow } from "./SidebarSearchRow";
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
+import { settleFrontmatterWrite } from "../settleFrontmatterWrite";
 import { noteRead } from "../readNote";
 import {
   liveCache,
@@ -2177,16 +2178,28 @@ function PopulatedList({
     [handleOpenIndexNote, handleCreateFolderNote, folderNotesEnabled],
   );
 
-  // Designate / undesignate a note as its folder's index, then refresh its
-  // record so the derived tree + badge update. The flag flip writes through the
-  // dedicated `folderNote` orchestrators (no `updated:` bump); `refreshOne`
-  // re-reads the slice so `folderIndex` settles into the cache.
+  // Designate / undesignate a note as its folder's index, then settle the write.
+  // The flag flip writes through the dedicated `folderNote` orchestrators (no
+  // `updated:` bump) straight to disk, and `refreshOne` alone re-reads only the
+  // sidebar slice: an open note's pane keeps the pre-write bytes and its next
+  // autosave writes them back, reverting the field the user just set.
+  // `settleFrontmatterWrite` is the recipe for that half (its own header names
+  // this failure) and it reloads the pane and refreshes the record together.
+  //
+  // It is the CLEAN-pane half only, deliberately. The other half is the flush
+  // before the write, and `flushBeforeFrontmatterWrite.ts` lists `folderNote`
+  // among the five writers that do NOT flush, each needing its own answer:
+  // inheriting that rejection would make this action fail while a save is
+  // failing elsewhere. So a DIRTY pane still races: the reload early-returns on
+  // pending work, and the writers' read-patch-write can lose the field or mint a
+  // keep-both copy. That race is recorded in `decisions/editor/0684` rather than
+  // claimed away here.
   const handleSetIndex = useCallback(
     async (id: NoteId) => {
       setMenu(null);
       try {
         await setFolderIndex(id);
-        await ctx.refreshOne(id);
+        await settleFrontmatterWrite(ctx, id);
       } catch (err) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
@@ -2201,7 +2214,11 @@ function PopulatedList({
       setMenu(null);
       try {
         await unsetFolderIndex(id);
-        await ctx.refreshOne(id);
+        // Same settle as the designate above, and it is the half that matters
+        // here: the undesignate DELETES the field, so a pane left holding the
+        // pre-write frontmatter would write `folder_index: true` back on its
+        // next autosave and resurrect a designation the user just removed.
+        await settleFrontmatterWrite(ctx, id);
       } catch (err) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
