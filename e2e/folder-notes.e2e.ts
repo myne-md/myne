@@ -25,13 +25,14 @@
 // Vault-count precondition: 1 per scenario (weak KDF generator fixture — legal:
 // unlock reads params from vault.meta).
 //
-// VERIFICATION STATUS: verified green 3x consecutive in the container on
-// 2026-09-05 (myne-md/myne#661; OrbStack on macOS via
-// `./scripts/e2e-buildrun.sh folder-notes folder-notes folder-notes`,
-// MYNE_E2E_RETRIES=0), covering fn1/fn2 (feature enabled first) and the new fn3
-// off-switch scenario. The suite is Linux/tauri-driver only, so `pnpm test:e2e`
-// self-skips on a bare macOS host; run ISOLATED per the full-suite-contamination
-// note.
+// VERIFICATION STATUS: fn1/fn2/fn3 verified green 3x consecutive in the
+// container on 2026-10-15 with `MYNE_E2E_RETRIES=0` and
+// `./scripts/e2e-buildrun.sh folder-notes folder-notes folder-notes` (Docker on
+// macOS; each run ~19 s). That run includes the two read-only managed-row
+// assertions fn1 gained for myne-md/myne#872, which the earlier 2026-09-05
+// verification (myne-md/myne#661) predates. The suite is Linux/tauri-driver
+// only, so `pnpm test:e2e` self-skips on a bare macOS host; run ISOLATED per the
+// full-suite-contamination note.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
@@ -260,6 +261,29 @@ describeE2E("fn1 folder index: designate → hidden → double-click open → li
         );
         expect((await editorText(s)).includes("othertailm7w5qp")).toBe(false);
 
+        // ── The index note's own `folder_index` row renders READ-ONLY
+        // (myne-md/myne#872). The row must be on screen (the line is in the
+        // file) and must offer nothing that can write it: this panel is body
+        // autosave, and the field belongs to the designate/undesignate
+        // actions. It used to render as a checkbox whose single click wrote
+        // `folder_index: false`, a value no Myne action produces. The selector
+        // is key-scoped because this note also carries read-only `folder:` and
+        // `updated:` rows. ──
+        const indexRowSelector = testIdSelector(
+          "editor.frontmatter-managed-row",
+          { "data-managed-key": "folder_index" },
+        );
+        await s.waitForElement(indexRowSelector);
+        const managedRowControls = await s.execute<number>(
+          `const row = document.querySelector('[data-testid="editor.frontmatter-managed-row"][data-managed-key="folder_index"]');
+           return row ? row.querySelectorAll('input, button, textarea, select').length : -1;`,
+        );
+        if (managedRowControls !== 0) {
+          throw new Error(
+            `the managed folder_index row must offer no control, found ${managedRowControls}`,
+          );
+        }
+
         // ── A folder-target wikilink resolves (chip NOT broken) even though the
         // index note is no longer a visible sidebar row. ──
         await typeIntoEditor(s, " "); // settle the cursor + prove the key pipeline
@@ -280,6 +304,13 @@ describeE2E("fn1 folder index: designate → hidden → double-click open → li
         // ── Undesignate from the FOLDER menu; the note re-appears as a row. ──
         await contextMenuPick(s, await s.byTestId("notes.folder-row"), "folder.remove-index");
         await s.waitForElement(testIdSelector("notes.row", { "data-note-id": indexNoteId }));
+        // The undesignate action DELETES `folder_index:`, and that read-only row
+        // goes with it: the widget tracks the row's own line rather than holding
+        // a stale one (myne-md/myne#872). This is also the direction a user
+        // cannot reach from the panel, and the reason the field must not have a
+        // second writer. Key-scoped: the note's `folder:` and `updated:` rows are
+        // read-only too and legitimately remain. ──
+        await s.waitForGone(indexRowSelector);
       },
     );
   });

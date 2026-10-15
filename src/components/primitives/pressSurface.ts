@@ -31,7 +31,7 @@ import type { PointerEvent } from "react";
  * The neutral press step: one step past the hover ramp, toward the foreground.
  *
  * Deliberately NOT a token, and deliberately not `--line-1`, which
- * `docs/design/README.md` names and `docs/decisions/ui/0681` records the reason
+ * `docs/design/README.md` names and `docs/decisions/ui/0683` records the reason
  * for: `--line-1` is a hairline border, and the step measured in it is 9/255 on
  * light and dark but 18/255 on amoled, so the same rule lands twice as hard on
  * one theme. This mix holds roughly 17/255 in all three.

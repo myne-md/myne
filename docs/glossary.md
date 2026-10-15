@@ -2369,9 +2369,9 @@ Used in: `docs/decisions/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#
 
 ### **identity ceremony** &nbsp; 📦 *Product*
 
-The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0680`). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the identity is already registered server-side by the time the phrase renders, and the phrase is shown once, so Esc, a backdrop click and the close control are all withheld until the four words match. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
+The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0682`). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the identity is already registered server-side by the time the phrase renders, and the phrase is shown once, so Esc, a backdrop click and the close control are all withheld until the four words match. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
 
-Used in: `src/components/IdentitySetupDialog.tsx`, `mobile/src/app/flows/IdentityFlow.tsx`, `decisions/ui/0680`
+Used in: `src/components/IdentitySetupDialog.tsx`, `mobile/src/app/flows/IdentityFlow.tsx`, `decisions/ui/0682`
 
 ### **identity-first first run** &nbsp; 📦 *Product*
 
