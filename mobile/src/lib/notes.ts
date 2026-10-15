@@ -20,7 +20,7 @@
 import { invoke } from "../platform/core";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { mutateDeliberateFolders } from "./prefs";
-import { patchDeletedField } from "../dialect/surgery";
+import { patchDeletedField, patchTitleField } from "../dialect/surgery";
 import type { NoteCreateError } from "../types/note-create-error";
 import type { NoteReadError } from "../types/note-read-error";
 import type { NoteUpdateError } from "../types/note-update-error";
@@ -195,4 +195,27 @@ export async function deleteNoteRouted(noteId: string): Promise<void> {
  */
 export async function noteList(): Promise<string[]> {
   return await invoke<string[]>("plugin:notes|note_list");
+}
+
+/**
+ * Create a note whose `title:` frontmatter is stamped from `name`, at `folder`
+ * (`null` = the vault root).
+ *
+ * `note_create` takes plaintext, so a generated note's title has to be written
+ * into the body before the call, and `noteCreate` then registers the folder.
+ * That tail was hand-copied into every generator (the meeting drain and the
+ * saved audio transcript, myne-md/myne#886 review), which is one place for the
+ * two to drift apart; it lives here beside the note primitives instead.
+ *
+ * `daily.ts`'s `createNoteFromBody` is deliberately NOT a caller: it also
+ * patches the `folder:` field into the body and stamps `updated:`, which is the
+ * period-note convention rather than this one.
+ */
+export async function createTitledNote(
+  body: string,
+  name: string,
+  folder: string | null = null,
+): Promise<string> {
+  const bytes = patchTitleField(new TextEncoder().encode(body), name);
+  return await noteCreate(new TextDecoder().decode(bytes), folder);
 }

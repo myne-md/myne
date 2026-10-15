@@ -13,7 +13,7 @@ import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
 import { usePrefs } from "../../lib/use-prefs";
-import { startTranscription, type TranscribeError } from "../../lib/transcribe";
+import { TranscriptSheet } from "./TranscriptSheet";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { renderPdfFirstPage } from "@myne/editor/attachments/pdf-render";
 import { tappable } from "../a11y/tappable";
@@ -43,6 +43,7 @@ export function AttachmentsSheet({
   onClose,
   onInsert,
   onInsertText,
+  onSavedNote,
   variant = "sheet",
 }: {
   onClose: () => void;
@@ -55,6 +56,10 @@ export function AttachmentsSheet({
    *  (MYND-563). Distinct from `onInsert`, which embeds an attachment reference.
    *  Omitted for the top-level Files library, where there is no open note. */
   onInsertText?: (text: string) => void;
+  /** When provided, a transcript saved as a note is handed back so the caller
+   *  can open it. Present in both entry contexts: saving a transcript is an
+   *  action the Files tab offers too, where no note is open. */
+  onSavedNote?: (noteId: string) => void;
   /** `"sheet"` = floating modal (in-editor insert picker). `"page"` = full
    *  bottom-tab page (the top-level Files library). */
   variant?: "sheet" | "page";
@@ -74,6 +79,8 @@ export function AttachmentsSheet({
   // Direct upload from the sheet/page (no longer paperclip-only).
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // The audio attachment whose transcript sheet is open, or null (myne-md/myne#886).
+  const [transcriptFor, setTranscriptFor] = useState<CatalogEntry | null>(null);
 
   async function reviewUnused() {
     setError(null);
@@ -272,7 +279,22 @@ export function AttachmentsSheet({
             {t("attachments.emptyState")}
           </div>
         ) : (
-          entries.map((e) => (
+          entries.map((e) => {
+            // The row's activation depends on what the file IS: an image/PDF
+            // opens the shared lightbox, an audio attachment opens its transcript
+            // sheet (myne-md/myne#886: the row is the entry point, replacing the
+            // permanent per-row Transcribe button), and video is inert (it plays
+            // in its tile). An audio row stays tappable even with speech-to-text
+            // off: the setting hides the Transcribe ACTION, and reading a
+            // transcript that already exists needs no engine (the sheet decides
+            // which of the two it is showing, after probing the cache).
+            const rowActivate =
+              isAudio(e.content_type)
+                ? () => setTranscriptFor(e)
+                : previewKind(e.content_type)
+                  ? () => openPreview(e)
+                  : undefined;
+            return (
             <div key={e.id} style={{ borderTop: "1px solid var(--line-1)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px" }}>
               <div
@@ -286,11 +308,21 @@ export function AttachmentsSheet({
                 // helper's comment warns about in reverse: the tile's contents
                 // are an `<img alt="">` or a glyph, so there IS no text to take
                 // a name from.
+                // Conditionally a control (myne#728, task 16), and only when the
+                // lightbox can actually show the file: audio and video carry
+                // their own transport inside the tile, and a generic file has no
+                // preview at all, so neither may announce itself as one (a
+                // "Preview invoice.zip" button that does nothing is worse than
+                // no button). `tappable` returns null when `onActivate` is
+                // absent, so the div stays a plain box.
+                //
+                // Labelled, unlike every row below, and this is the case the
+                // helper's comment warns about in reverse: the tile's contents
+                // are an `<img alt="">` or a glyph, so there IS no text to take
+                // a name from.
                 {...(tappable({
                   onActivate:
-                    isAudio(e.content_type) || isVideo(e.content_type)
-                      ? undefined
-                      : () => openPreview(e),
+                    previewKind(e.content_type) === null ? undefined : () => openPreview(e),
                   label: t("attachments.library.previewNamed", { name: e.filename }),
                 }) ?? {})}
                 style={{ width: 44, height: 44, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", cursor: previewKind(e.content_type) ? "pointer" : "default" }}
@@ -319,8 +351,10 @@ export function AttachmentsSheet({
                   />
                 ) : (
                   <div
-                {...tappable({ onActivate: () => openPreview(e) })}
-                style={{ cursor: previewKind(e.content_type) ? "pointer" : "default" }}
+                {...(tappable({ onActivate: rowActivate }) ?? {})}
+                data-testid="files.row-open"
+                data-attachment-id={e.id}
+                style={{ cursor: rowActivate ? "pointer" : "default" }}
               >
                     <div style={{ fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.filename}</div>
                     <div style={{ fontSize: 12, color: "var(--fg-3)" }}>{formatBytes(e.size)}</div>
@@ -335,16 +369,28 @@ export function AttachmentsSheet({
                 </div>
               )}
             </div>
-            {isAudio(e.content_type) && prefs.transcription_enabled && (
-              <TranscribeRow id={e.id} onInsertText={onInsertText} />
-            )}
             </div>
-          ))
+            );
+          })
         )}
     </>
   );
 
   const title = cleanup ? t("attachments.library.cleanUnused") : variant === "page" ? t("settings.shell.panels.files") : t("attachments.library.title");
+
+  // The transcript reader is mounted in BOTH entry contexts (the full-screen
+  // Files page and the in-editor insert sheet). Its own Sheet floats above this
+  // one, so it is rendered here once rather than duplicated per branch.
+  const transcriptSheet = transcriptFor !== null && (
+    <TranscriptSheet
+      attachmentId={transcriptFor.id}
+      filename={transcriptFor.filename}
+      transcriptionEnabled={prefs.transcription_enabled}
+      onInsertText={onInsertText}
+      onSavedNote={onSavedNote}
+      onClose={() => setTranscriptFor(null)}
+    />
+  );
 
   if (variant === "page") {
     return (
@@ -363,11 +409,13 @@ export function AttachmentsSheet({
           {cleanupPanel}
         </div>
         <div style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: "12px 20px 0" }}>{listInner}</div>
+        {transcriptSheet}
       </>
     );
   }
 
   return (
+    <>
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {uploadInput}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flex: "none" }}>
@@ -379,6 +427,8 @@ export function AttachmentsSheet({
       {cleanupPanel}
       <div style={{ marginTop: 12, overflowY: "auto", flex: 1, minHeight: 0 }}>{listInner}</div>
     </Sheet>
+    {transcriptSheet}
+    </>
   );
 }
 
@@ -509,84 +559,6 @@ function VideoTile({ id, filename }: { id: string; filename: string }) {
         </span>
       )}
     </button>
-  );
-}
-
-/** Inline transcription control under an audio row (MYND-563). Idle shows a
- *  "Transcribe" button; running streams each segment into a live preview; done
- *  shows the read-only transcript (`textContent`-only — never HTML) + an
- *  "Insert transcript into note" action when an `onInsertText` sink is provided.
- *  The transcript is AS3-Sensitive plaintext — rendered, never logged. */
-function TranscribeRow({ id, onInsertText }: { id: string; onInsertText?: (text: string) => void }) {
-  const { t } = useTranslation();
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [text, setText] = useState("");
-  const [errKind, setErrKind] = useState<TranscribeError["kind"] | null>(null);
-
-  const run = () => {
-    setState("running");
-    setText("");
-    setErrKind(null);
-    const { done } = startTranscription(id, (seg) => setText((prev) => prev + seg));
-    done
-      .then((full) => {
-        setText(full);
-        setState("done");
-      })
-      .catch((e: TranscribeError) => {
-        setErrKind(e.kind);
-        setState("error");
-      });
-  };
-
-  return (
-    <div style={{ padding: "0 4px 12px 56px" }} data-testid="files.transcribe-row" data-attachment-id={id}>
-      {state === "idle" && (
-        <button type="button" onClick={run} data-testid="files.transcribe-start" style={actionBtn("var(--accent)")}>
-          {t("attachments.library.menuTranscribe")}
-        </button>
-      )}
-      {state === "running" && (
-        <div style={{ fontSize: 13, color: "var(--fg-2)" }}>
-          <div style={{ color: "var(--fg-3)", marginBottom: 4 }}>{t("attachments.library.transcribeStarted")}</div>
-          {text && <div style={{ whiteSpace: "pre-wrap" }}>{text}</div>}
-        </div>
-      )}
-      {state === "done" && (
-        <div data-testid="files.transcribe-done">
-          <div style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-3)", marginBottom: 4 }}>
-            {t("editor.attachment.widget.transcribe.heading")}
-          </div>
-          <div style={{ fontSize: 14, color: "var(--fg-1)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{text}</div>
-          {onInsertText && (
-            <button
-              type="button"
-              onClick={() => onInsertText(text)}
-              data-testid="files.transcribe-insert"
-              style={{ ...actionBtn("var(--accent)"), marginTop: 6 }}
-            >
-              {t("editor.attachment.widget.transcribe.insert")}
-            </button>
-          )}
-        </div>
-      )}
-      {state === "error" && (
-        <div style={{ fontSize: 13, color: "var(--danger)" }} data-testid="files.transcribe-error">
-          {errKind === "not_ready"
-            ? t("attachments.library.transcribeNoModel")
-            : errKind === "too_long"
-              ? t("editor.attachment.widget.transcribe.cause.tooLong")
-              : t("attachments.library.transcribeFailed")}{" "}
-          {/* No retry for "too_long": the same clip is refused every time, so
-              offering the button would be advice that cannot work (myne#485). */}
-          {errKind !== "too_long" && (
-            <button type="button" onClick={run} style={actionBtn("var(--accent)")}>
-              {t("attachments.library.menuTranscribe")}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -87,7 +87,7 @@
   "web/src/VaultOpenElsewhere.tsx": 1,
   "mobile/src/app/flows/AiHistorySheet.tsx": 1,
   "mobile/src/app/flows/AiScopeSheet.tsx": 1,
-  "mobile/src/app/flows/AttachmentsSheet.tsx": 51,
+  "mobile/src/app/flows/AttachmentsSheet.tsx": 44,
   "mobile/src/app/flows/CreateVaultFlow.tsx": 56,
   "mobile/src/app/flows/EditorFlow.tsx": 89,
   "mobile/src/app/flows/JoinFlow.tsx": 38,

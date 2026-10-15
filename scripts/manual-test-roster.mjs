@@ -368,9 +368,12 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/transcribe.ts",
       "mobile/src-tauri/src/plugins/local_inference/",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
+      "mobile/src/app/flows/TranscriptSheet.tsx",
     ],
     clients: ["ios", "android"],
-    automatedBy: [],
+    automatedBy: [
+      "mobile/tests/flow-logic/voice/transcribe.flow.ts",
+    ],
     manual: [
       {
         see: "On the OLDEST iPhone model you support and on a mid-range Android phone, transcribe a 60-second recorded clip. Record wall-clock time, the battery percentage before and after, and whether the phone becomes noticeably hot. Confirm the app stays responsive (you can scroll the note) throughout and that segments appear progressively rather than all at once at the end.",
