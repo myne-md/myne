@@ -1,0 +1,292 @@
+// @vitest-environment jsdom
+//
+// The install flow's ORDER, which is the load-bearing part of
+// `src/hooks/useUpdateAvailable.ts` (myne-md/myne#870).
+//
+// Four steps run on a confirmed update and only one order is correct: flush the
+// open panes, lock the vault, enter the updating stage, install. The flush is the
+// only step that needs the keys, and the stage is what unmounts the panes the
+// flush writes through, so a reorder is silent in every other test in this tree:
+// it typechecks, the happy path still "works", and the failure it causes is a
+// note whose last keystrokes were lost.
+//
+// The lock-failure arm is here for the same reason. It must NOT install (the
+// confirmation promised a locked vault) and it must NOT stay in the confirm (the
+// user would believe nothing happened).
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+
+// `vi.hoisted` because the mock factories below are hoisted above every top
+// level `const`: without it the factories close over bindings that do not exist
+// yet and vitest refuses the module.
+const h = vi.hoisted(() => {
+  const state = {
+    /** Every side effect, in the order it was reached. */
+    calls: [] as string[],
+    installShouldReject: false,
+    lockShouldReject: false,
+    flushShouldReject: false,
+    /** True when the caller must refuse the stage transition. */
+    stageShouldRefuse: false,
+  };
+  return {
+    state,
+    flushOpenPanes: vi.fn(() => {
+      state.calls.push("flush");
+      return state.flushShouldReject
+        ? Promise.reject(new Error("no"))
+        : Promise.resolve();
+    }),
+    lockVault: vi.fn(() => {
+      state.calls.push("lock");
+      return state.lockShouldReject
+        ? Promise.reject(new Error("no"))
+        : Promise.resolve();
+    }),
+    updateInstall: vi.fn(() => {
+      state.calls.push("install");
+      return state.installShouldReject
+        ? Promise.reject(new Error("no"))
+        : Promise.resolve();
+    }),
+    updateCheck: vi.fn(() => {
+      state.calls.push("check");
+      return Promise.resolve({
+        kind: "available" as const,
+        version: "0.10.1",
+        notes: "Fixes a crash on launch.",
+      });
+    }),
+    getAutoCheck: vi.fn(() => Promise.resolve(true)),
+  };
+});
+
+vi.mock("../../src/platform/capabilities", () => ({ has: () => true }));
+vi.mock("../../src/platform/update", () => ({
+  getAutoCheck: h.getAutoCheck,
+  updateCheck: h.updateCheck,
+  updateInstall: h.updateInstall,
+}));
+vi.mock("../../src/lib/vault-unlock", () => ({ lockVault: h.lockVault }));
+vi.mock("../../src/notes/renameFlushHook", () => ({
+  renameFlushHooks: () => ({ flushOpenPanes: h.flushOpenPanes }),
+}));
+
+import { useUpdateAvailable } from "../../src/hooks/useUpdateAvailable";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  h.state.calls = [];
+  h.state.installShouldReject = false;
+  h.state.lockShouldReject = false;
+  // Every arm reset, not just the ones an earlier test happened to set: the
+  // flush arm leaked into the two tests after it when this line was missing.
+  h.state.flushShouldReject = false;
+  h.state.stageShouldRefuse = false;
+  vi.clearAllMocks();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+/** Mount the hook and let the automatic check fire. */
+async function mountChecked(options: { enabled?: boolean } = {}) {
+  const onLocked = vi.fn(() => {
+    h.state.calls.push("stage");
+    // The caller reports whether the app actually moved into the updating stage.
+    return !h.state.stageShouldRefuse;
+  });
+  const enabled = options.enabled ?? true;
+  const hook = renderHook(
+    ({ on }: { on: boolean }) =>
+      useUpdateAvailable({ enabled: on, onLocked }),
+    { initialProps: { on: enabled } },
+  );
+  if (enabled) {
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+    // A second drain for the promise chain the timer started: `act` flushes the
+    // microtask queue, and the check is three hops deep.
+    await act(async () => {});
+  }
+  return { hook, onLocked };
+}
+
+/**
+ * Promote every pending microtask. `waitFor` is unusable in this file: it polls
+ * on real timers, and this suite runs on fake ones, so the two deadlock until the
+ * five-second timeout. Several turns, because a confirm is a chain of awaits
+ * (flush, then lock, then the install's own catch) and one turn only reaches the
+ * first link.
+ */
+async function settle() {
+  for (let turn = 0; turn < 5; turn += 1) {
+    await act(async () => {});
+  }
+}
+
+describe("the automatic check", () => {
+  it("offers what the host reported, and does not check at all while disabled", async () => {
+    const { hook } = await mountChecked({ enabled: false });
+    expect(hook.result.current.view).toBeNull();
+    expect(h.getAutoCheck).not.toHaveBeenCalled();
+
+    hook.rerender({ on: true });
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+    await settle();
+    expect(hook.result.current.view).toBe("offer");
+    expect(hook.result.current.version).toBe("0.10.1");
+    expect(hook.result.current.notes).toBe("Fixes a crash on launch.");
+  });
+
+  it("reduces the offer to the pill after a moment, but never a confirm the user opened", async () => {
+    const { hook } = await mountChecked();
+    expect(hook.result.current.view).toBe("offer");
+
+    act(() => vi.advanceTimersByTime(8_000));
+    expect(hook.result.current.view).toBe("pill");
+
+    // Reopened, then expanded into the confirm: a decision in progress is not
+    // something the collapse timer may take away mid-read.
+    act(() => hook.result.current.reopen());
+    act(() => hook.result.current.request());
+    expect(hook.result.current.view).toBe("confirm");
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(hook.result.current.view).toBe("confirm");
+
+    act(() => hook.result.current.cancel());
+    expect(hook.result.current.view).toBe("offer");
+  });
+
+  it("keeps a dismissed offer dismissed for the session", async () => {
+    const { hook } = await mountChecked();
+    act(() => hook.result.current.later());
+    expect(hook.result.current.view).toBeNull();
+
+    // The daily re-check must not resurrect it, which a second `view` write from
+    // the check would do.
+    await act(async () => {
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+    });
+    await settle();
+    expect(hook.result.current.view).toBeNull();
+  });
+});
+
+describe("the confirmed install", () => {
+  it("flushes, locks, enters the stage and installs, in that order", async () => {
+    const { hook, onLocked } = await mountChecked();
+    // Drop the check's own entry: this test is about the flow's order, and the
+    // check legitimately happens before it.
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+
+    // The stage callback appends "stage" itself, so this one assertion is the
+    // whole order rather than four separate ones that could each pass alone.
+    expect(h.state.calls).toEqual(["flush", "lock", "stage", "install"]);
+    expect(onLocked).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.phase).toBe("working");
+  });
+
+  it("does not install when the vault cannot be locked, and reports which step refused", async () => {
+    h.state.lockShouldReject = true;
+    const { hook, onLocked } = await mountChecked();
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+
+    expect(h.updateInstall).not.toHaveBeenCalled();
+    expect(onLocked).not.toHaveBeenCalled();
+    expect(h.state.calls).toEqual(["flush", "lock"]);
+    // The stage never moved, so the notice is still on screen and it is the
+    // surface that has to carry the refusal. `phase` stays idle because the
+    // updating screen is unreachable without a lock.
+    expect(hook.result.current.blocked).toBe("lock");
+    expect(hook.result.current.phase).toBe("idle");
+  });
+
+  it("stops before the lock when a pane would not save, because the lock destroys the buffer", async () => {
+    h.state.flushShouldReject = true;
+    const { hook, onLocked } = await mountChecked();
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+
+    // The order is the whole point of this arm: locking after a rejected flush
+    // unmounts the panes holding the edits that did not reach disk.
+    expect(h.state.calls).toEqual(["flush"]);
+    expect(h.lockVault).not.toHaveBeenCalled();
+    expect(h.updateInstall).not.toHaveBeenCalled();
+    expect(onLocked).not.toHaveBeenCalled();
+    expect(hook.result.current.blocked).toBe("flush");
+    expect(hook.result.current.phase).toBe("idle");
+  });
+
+  it("does not install when the app has already left the editor stage", async () => {
+    h.state.stageShouldRefuse = true;
+    const { hook } = await mountChecked();
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+
+    // The refused transition means there is no updating screen to report a
+    // failure on, so the install must not start at all.
+    expect(h.state.calls).toEqual(["flush", "lock", "stage"]);
+    expect(h.updateInstall).not.toHaveBeenCalled();
+    expect(hook.result.current.blocked).toBe("stage");
+    expect(hook.result.current.phase).toBe("idle");
+  });
+
+  it("ignores a second press while the first is still in flight", async () => {
+    const { hook } = await mountChecked();
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+      hook.result.current.confirm();
+    });
+    await settle();
+
+    // Two chains would run two installers against one bundle, which is worse
+    // than a failed install.
+    expect(h.state.calls).toEqual(["flush", "lock", "stage", "install"]);
+  });
+
+  it("reaches the failed phase when the install fails, and retries without re-locking", async () => {
+    h.state.installShouldReject = true;
+    const { hook, onLocked } = await mountChecked();
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+    expect(hook.result.current.phase).toBe("failed");
+
+    h.state.installShouldReject = false;
+    h.state.calls = [];
+    await act(async () => {
+      hook.result.current.retry();
+    });
+    await settle();
+
+    // The retry must not flush or lock again: the panes are gone and the vault
+    // is already locked by this point.
+    expect(h.state.calls).toEqual(["install"]);
+    expect(hook.result.current.phase).toBe("working");
+    expect(onLocked).toHaveBeenCalledTimes(1);
+  });
+});
