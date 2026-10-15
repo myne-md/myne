@@ -348,6 +348,19 @@ export interface MockConfig {
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
   transcribe?: { text: string } | { error: "not_ready" | "too_long" | "failed" };
+  /** What `plugin:local-inference|read_transcript` answers (myne-md/myne#886):
+   *  the already-cached transcript the reader opens on, or `null` for none (the
+   *  default). A cached value puts the sheet straight into its `done` state,
+   *  which is the "read before running" path desktop calls View transcription. */
+  readTranscript?: string | null;
+  /** Segments the mock pushes through the `onSegment` channel before it
+   *  resolves (myne-md/myne#886). The real engine emits one per phrase, so this
+   *  is what lets a spec observe the running preview and the phrase-joined final
+   *  text rather than only the resolved string. */
+  transcribeSegments?: string[];
+  /** Hold the transcribe resolution for this long. The mock is otherwise
+   *  instantaneous, which makes the running state unobservable. */
+  transcribeDelayMs?: number;
   /** Whether the device-local `myne.aiOnboardingSeen` flag is set before boot.
    *  Defaults to `true`, so the first-run `AiOnboardingSheet` stays closed and
    *  its full-viewport scrim cannot swallow the clicks of every editor-mounted
@@ -1429,7 +1442,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // not-ready / failed UI branches are exercised. The streaming `onSegment`
       // channel is ignored here — the TranscribeRow renders from the resolved
       // `done` promise, so a canned final transcript is enough for flow logic.
-      "plugin:local-inference|transcribe": () => {
+      "plugin:local-inference|transcribe": async (args) => {
         const c = config.transcribe;
         if (c && "error" in c) {
           // The real `EngineError` variant names, not the normalized kinds: the
@@ -1443,9 +1456,24 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
                 : "TranscriptionFailed";
           throw { kind };
         }
+        // Stream first, then hold, then resolve — the order the real run takes,
+        // so the running state is observable when `transcribeDelayMs` is set.
+        const channel = args?.onSegment as { onmessage?: (s: string) => void } | undefined;
+        for (const seg of config.transcribeSegments ?? []) channel?.onmessage?.(seg);
+        if (config.transcribeDelayMs !== undefined) {
+          await new Promise((resolve) => setTimeout(resolve, config.transcribeDelayMs));
+        }
         return c && "text" in c ? c.text : "the quick brown fox";
       },
-      "plugin:local-inference|read_transcript": () => null,
+      "plugin:local-inference|read_transcript": () => config.readTranscript ?? null,
+      // Clipboard (myne-md/myne#886): the copy action goes through the native
+      // sensitive-pasteboard seam. Recorded rather than merely resolved so a spec
+      // can assert WHAT was copied, which is the whole point of the action.
+      "plugin:sensitive-clipboard|write_text": (args) => {
+        const w = window as unknown as { __clipboardWrites?: string[] };
+        (w.__clipboardWrites ??= []).push(String(args.value ?? ""));
+        return null;
+      },
       // ── Quick-unlock surface (per-test configurable) ──
       "plugin:quick-unlock|quick_unlock_status": () => quickUnlock,
       "plugin:quick-unlock|quick_unlock_setup_biometric": () => {

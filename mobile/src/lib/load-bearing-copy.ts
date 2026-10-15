@@ -156,6 +156,11 @@ export {
   BETA_TERMS_DATA_LOSS,
   BETA_TERMS_WHAT_HAPPENS_NEXT,
   BETA_TERMS_WHAT_WE_CAN_SEE,
+  // Transcript fallibility (voice-to-text MYND-552). The mobile transcript sheet
+  // renders it beside the text, exactly as desktop's `TranscriptionModal` does;
+  // in `@myne/copy` since myne-md/myne#886 so both clients show the same
+  // sentence byte-for-byte rather than by promise.
+  AI_TRANSCRIPT_HONESTY_NOTE,
 } from "@myne/copy";
 // Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
 // clip lands at the vault ROOT (SYNC-15) and the user keeps working — the

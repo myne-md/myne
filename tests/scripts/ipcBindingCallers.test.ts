@@ -83,6 +83,28 @@ await agentStart(task);`,
     expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
   });
 
+  it("does not accept a COMMENT mention as a caller", () => {
+    // myne-md/myne#886: the import strip left this hole one line away. A caller
+    // file that names the binding in a doc comment and never calls it counted as
+    // a caller, so replacing the real call with a no-op kept the guard green and
+    // the exemption deletion was resting on a comment. A comment is weaker
+    // evidence than an import, which the case above already rejects.
+    const { dead } = deadBindings({
+      bindings: new Map([["src/lib/agent-run.ts", BINDING]]),
+      callers: new Map([
+        ["src/lib/agent-run.ts", BINDING],
+        [
+          "src/notes/agent/Composer.tsx",
+          `import { agentCapability, agentStart } from "../../lib/agent-run";
+// On open it probes the cache (agentCapability), then runs.
+/* agentCapability is what this WOULD call. */
+await agentStart(task);`,
+        ],
+      ]),
+    });
+    expect(dead).toEqual(["src/lib/agent-run.ts:agentCapability"]);
+  });
+
   it("does not accept a RE-EXPORT as a caller", () => {
     const { dead } = deadBindings({
       bindings: new Map([["src/lib/agent-run.ts", BINDING]]),
