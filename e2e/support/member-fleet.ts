@@ -115,8 +115,8 @@ export async function createMemberIdentity(member: AppSession): Promise<string> 
   await (await member.session.byTestId("identity-setup.recover-cta")).click();
   // The recover arm echoes no phrase and generated nothing to prove possession of,
   // so the type-back challenge does not apply and the dialog goes straight to the
-  // fingerprint.
-  await member.session.byTestId("identity-setup.fingerprint", { timeoutMs: 90_000 });
+  // recovered result (`identitySetup.recovered`), whose only exit is Done.
+  await member.session.byTestId("identity-setup.close-cta", { timeoutMs: 90_000 });
   // Asserted, not assumed: a device awaiting approval holds no token, and the invite
   // listing a caller is about would then fail rather than show anything. The FIRST
   // device of a person account is approved, which is the arm a fresh server puts this

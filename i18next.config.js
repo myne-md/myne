@@ -49,8 +49,15 @@ export default defineConfig({
     // the default `common` namespace, so disable the `:` namespace separator.
     keySeparator: ".",
     nsSeparator: false,
-    // Stable ordering for catalogs edited by hand and in review.
-    sort: true,
+    // Do NOT sort. `sort: true` looked like "stable ordering for catalogs edited
+    // by hand", and it is the opposite: every run rewrites and re-orders all 32
+    // catalogs (~2500 changed lines in `en` alone for one new key), which buries
+    // the actual change, makes `git blame` on a string useless, and contradicts
+    // the repo's positional-insertion rule (`src/AGENTS.md`, `docs/dev/i18n.md`).
+    // With it off, extraction leaves existing order alone and appends a new key
+    // at the end. The result is an additions-only diff you then move next to its
+    // siblings by hand.
+    sort: false,
     // Never silently drop a key still present in a translation file — pruning a
     // removed-in-code key is a deliberate, by-hand edit.
     removeUnusedKeys: false,

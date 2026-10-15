@@ -116,13 +116,6 @@ const BODY_SMALL_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
-const PERSON_ID_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-  wordBreak: "break-all",
-};
-
 const COPY_ERROR_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-xs)",
@@ -196,7 +189,6 @@ const ACTIONS_ROW_STYLE: CSSProperties = {
 };
 
 interface IdentityHomeProps {
-  personIdHex: string | null;
   /** The out-of-band invite code. Public material remains available while the
    *  private identity is locked. */
   identityCode: string | null;
@@ -210,7 +202,6 @@ interface IdentityHomeProps {
 }
 
 export function IdentityHome({
-  personIdHex,
   identityCode,
   onCreateVault,
   onAccepted,
@@ -379,11 +370,11 @@ export function IdentityHome({
 
         <p style={CARD_BODY_STYLE}>{t("identityHome.subtitle")}</p>
 
-        {personIdHex ? (
-          <div data-testid="identity-home.person-id" style={PERSON_ID_STYLE}>
-            {personIdHex}
-          </div>
-        ) : null}
+        {/* The person-id hex line that used to sit here is gone (myne-md/myne#869):
+            an unlabeled 32-byte blob that no one can read or compare, directly
+            between the subtitle and the one piece of public material the user is
+            meant to hand out. The invite code below is that material, and it is
+            labelled. */}
 
         {/* The invite code an owner pastes to invite this person. Public
             material only (person id + public halves). */}

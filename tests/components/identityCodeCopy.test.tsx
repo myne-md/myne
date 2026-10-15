@@ -131,7 +131,6 @@ const surfaces = [
 
       render(
         <IdentityHome
-          personIdHex={"99".repeat(16)}
           identityCode={IDENTITY_CODE}
           onCreateVault={() => {}}
           onAccepted={() => {}}
@@ -265,7 +264,6 @@ describe("identity-code textareas are themed", () => {
         ]);
         render(
           <IdentityHome
-            personIdHex={"99".repeat(16)}
             identityCode={IDENTITY_CODE}
             onCreateVault={() => {}}
             onAccepted={() => {}}
@@ -304,7 +302,6 @@ describe("IdentityHome invite phrase", () => {
     const onAccepted = vi.fn();
     render(
       <IdentityHome
-        personIdHex={"99".repeat(16)}
         identityCode={IDENTITY_CODE}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
