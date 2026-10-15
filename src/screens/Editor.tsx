@@ -100,9 +100,9 @@ import { Button } from "../components/primitives/Button";
 import { PanelToggleGlyph } from "../components/primitives/PanelToggleGlyph";
 import { Tooltip } from "../components/primitives/Tooltip";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../components/primitives/hoverSurface";
+import { interactiveSurface } from "../components/primitives/interactiveSurface";
 import { SettingsModal, type PanelId } from "../components/SettingsModal";
 import { MeetingAiDialog } from "../components/meeting/MeetingAiDialog";
 import { offerMeetingAi } from "../components/meeting/meetingAiStore";
@@ -3183,7 +3183,7 @@ function TitleBarToggle({
       data-testid="editor.sidebar-toggle"
       data-side={side}
       data-collapsed={collapsed ? "true" : "false"}
-      {...hoverSurface({ disabled })}
+      {...interactiveSurface({ disabled })}
       style={{
         ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_TOGGLE_WIDTH,
@@ -3226,7 +3226,7 @@ function TitleBarNavButton({
       title={label}
       data-testid={`editor.nav-${direction}`}
       data-disabled={disabled ? "true" : "false"}
-      {...hoverSurface({ disabled })}
+      {...interactiveSurface({ disabled })}
       style={{
         ...TITLE_BAR_BUTTON_BASE,
         width: TITLE_BAR_NAV_WIDTH,
@@ -4884,7 +4884,7 @@ function RightSidebar({
               data-panel-tab-id={id}
               data-active={isActive ? "true" : undefined}
               data-dragging={draggedId === id ? "true" : undefined}
-              {...hoverSurface()}
+              {...interactiveSurface()}
               onClick={() => void setRightPanelActiveTab(id)}
               onDragStart={(e) => {
                 setDraggedId(id);
@@ -5234,9 +5234,11 @@ function SidebarPane({
         justifyContent: side === "right" ? "flex-end" : "flex-start",
         overflow: "hidden",
         minHeight: 0,
-        transition: resizing
-          ? "none"
-          : "width var(--duration-base) var(--ease-standard)",
+        // One line on purpose: the motion guard reads an unquoted value to the
+        // END OF ITS LINE, so a wrapped ternary made this `width` transition
+        // invisible to it (myne-md/myne#868). The exemption that covers it is
+        // in `scripts/check-motion-canon.mjs`, beside the mobile twin's.
+        transition: resizing ? "none" : "width var(--duration-base) var(--ease-standard)",
       }}
     >
       {/* Fixed-width inner wrapper: keeps the children at their open width so
@@ -5459,7 +5461,7 @@ function BottomBar({
           title={t("editor.chrome.bottomBar.viewModeTitle", {
             mode: t(VIEW_MODE_LABEL_KEY[viewMode]),
           })}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -5487,7 +5489,7 @@ function BottomBar({
             onClick={onShowTags}
             aria-label={t("editor.chrome.bottomBar.browseTags")}
             data-testid="editor.tags-cta"
-            {...hoverSurface()}
+            {...interactiveSurface()}
             style={{
               display: "flex",
               alignItems: "center",
@@ -5513,7 +5515,7 @@ function BottomBar({
             onClick={onShowViews}
             aria-label={t("editor.chrome.bottomBar.browseViews")}
             data-testid="editor.views-cta"
-            {...hoverSurface()}
+            {...interactiveSurface()}
             style={{
               display: "flex",
               alignItems: "center",
@@ -5541,7 +5543,7 @@ function BottomBar({
           onClick={onOpenSettings}
           aria-label={t("editor.chrome.bottomBar.openSettings")}
           data-testid="editor.settings-cta"
-          {...hoverSurface()}
+          {...interactiveSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -5565,7 +5567,7 @@ function BottomBar({
         onClick={handleLockClick}
         aria-label={t("editor.chrome.bottomBar.lockVault")}
         data-testid="editor.lock-cta"
-        {...hoverSurface()}
+        {...interactiveSurface()}
         style={{
           display: "flex",
           alignItems: "center",
@@ -5728,7 +5730,7 @@ function BottomBar({
               aria-label={t("editor.chrome.bottomBar.togglePreview")}
               aria-pressed={previewActive}
               data-testid="editor.preview-companion-toggle"
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -5866,7 +5868,7 @@ function WorkspaceSwitcherControl({
         title={t("editor.chrome.workspaceSwitcher.toggleTitle", {
           name: activeName,
         })}
-        {...hoverSurface()}
+        {...interactiveSurface()}
         style={{
           display: "flex",
           alignItems: "center",
@@ -5938,7 +5940,7 @@ function WorkspaceSwitcherControl({
                     if (!isActive) onSwitch(s.id);
                     setOpen(false);
                   }}
-                  {...hoverSurface({
+                  {...interactiveSurface({
                     restBg: isActive ? "var(--paper-2)" : "transparent",
                     hoverBg: isActive ? "var(--paper-2)" : "var(--bg-3)",
                   })}
@@ -5986,7 +5988,7 @@ function WorkspaceSwitcherControl({
                       setOpen(false);
                       onRename(s.id);
                     }}
-                    {...hoverSurface()}
+                    {...interactiveSurface()}
                     style={{
                       flexShrink: 0,
                       display: "flex",
@@ -6024,7 +6026,7 @@ function WorkspaceSwitcherControl({
                   setOpen(false);
                   onSaveAs();
                 }}
-                {...hoverSurface()}
+                {...interactiveSurface()}
                 style={{
                   display: "flex",
                   alignItems: "center",

@@ -104,7 +104,7 @@ textarea,
    reclaim editor width). The opacity transition is zeroed by the reduced-motion
    rule below, so reduced-motion users get an instant, non-animated toggle. */
 [data-editor-chrome] {
-  transition: opacity 200ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 [data-focus-active="true"] [data-editor-chrome] {
   opacity: 0;
@@ -118,7 +118,7 @@ textarea,
    it is invisible in normal mode and only marks the active line here). */
 [data-focus-dim="true"] .cm-line {
   opacity: 0.4;
-  transition: opacity 200ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 [data-focus-dim="true"] .cm-line.cm-activeLine {
   opacity: 1;
