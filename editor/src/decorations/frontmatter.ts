@@ -12,6 +12,18 @@
 // nested YAML (mappings, block scalars, anchors) still survives byte-stably in
 // the source without a widget affordance.
 //
+// ONE row class is not editable: a ROW whose own line is app state, which is a
+// Myne-managed canonical field (§3.6.1) carrying a value its reader recognises
+// (myne-md/myne#872). Such a row is still RENDERED (the line is in the file, and
+// the frontmatter block is replaced wholesale by this widget, so a hidden field
+// would be a byte the user can neither see nor reach) and it just carries no
+// input. A managed key whose value no reader recognises is the user's line, so
+// it stays an ordinary editable row, exactly like a dangling `cover:`. `title`
+// is promoted to the note-title field and `cover` keeps its own
+// banner-conditional rule; both are handled before this one. The predicate is
+// asked per row rather than per key, and why that is load-bearing is written at
+// `MANAGED_FIELD_READERS`.
+//
 // Block-level decoration: CodeMirror 6 requires `Decoration.replace`
 // with `block: true` to be provided through a `StateField`, not a
 // `ViewPlugin`. The state field re-derives its decoration set on every
@@ -33,7 +45,8 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
-import { formatYamlScalar } from "@myne/dialect";
+import { formatYamlScalar, TASK_KIND_VALUE } from "@myne/dialect";
+import { load as loadYaml } from "js-yaml";
 // The SINGLE type authority (markdown-dialect.md 3.6.4). Consumed, never
 // re-derived: its own header states siblings consume this typing and never
 // redefine it, and a second opinion here would be a second answer the query
@@ -47,7 +60,23 @@ import { readNoteId } from "../note-identity";
 import { catalogChanged, catalogField } from "../attachments/catalog";
 import { coverIsOnScreen } from "./cover-banner";
 import { foldSegment } from "@myne/dialect/folderPath";
-import { formatYamlStringScalar } from "@myne/dialect/surgery";
+// The per-field value-strict READERS, consumed rather than re-derived: they are
+// the authority on whether a managed field's value is Myne's own state or a
+// user's line that happens to carry the key (myne-md/myne#872).
+import {
+  formatYamlStringScalar,
+  readArchivedFromFmBody,
+  readConflictFromFmBody,
+  readDeletedFromFmBody,
+  readDoneFromFmBody,
+  readFolderFromFmBody,
+  readFolderIndexFromFmBody,
+  readKindFromFmBody,
+  readTemplateFromFmBody,
+  readTrashedFromFmBody,
+  readUpdatedFromFmBody,
+} from "@myne/dialect/surgery";
+import type { ManagedFrontmatterField } from "@myne/dialect/managedFields";
 import {
   planSequenceItemInsert,
   planSequenceItemRemove,
@@ -108,6 +137,169 @@ function displayYamlScalar(raw: string): string {
     return v.slice(1, -1).replace(/''/g, "'");
   }
   return v;
+}
+
+/** Testid for a read-only row the app owns (myne-md/myne#872). */
+export const MANAGED_ROW_TESTID = "editor.frontmatter-managed-row";
+
+/**
+ * Whether YAML resolves this raw scalar to a STRING, which is exactly the
+ * question the app's own frontmatter read asks: `src/notes/loadNoteBatch.ts`
+ * parses the body with js-yaml's default schema and keeps `folder:` only when
+ * `typeof parsed["folder"] === "string"`.
+ *
+ * The parser is called on the row's value portion rather than on the whole body,
+ * which is the one difference and it matters only for a value YAML would read as
+ * something other than a scalar at all (a mapping, a sequence); those answer
+ * "not a string" either way, which is what the app's own `typeof` check does.
+ * A value the parser refuses is not a string the app can read, so it answers
+ * false and the row stays the user's.
+ *
+ * This exists because the Myne type authority is deliberately NOT this reader:
+ * it resolves under CORE_SCHEMA so a date stays a string for the index
+ * (`propertyTyping.ts`), while `folder:`'s owner is the default-schema read.
+ * `js-yaml` is already a dependency of this package.
+ */
+function resolvesToYamlString(rawValue: string): boolean {
+  try {
+    return typeof loadYaml(rawValue) === "string";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The managed field whose value its own value-strict reader recognises is APP
+ * STATE, so its row is read-only (myne-md/myne#872).
+ *
+ * Keyed by the canonical field name and typed as a total record over
+ * `MANAGED_FRONTMATTER_FIELDS` minus the two this widget already treats
+ * specially, so adding a fourteenth managed field is a COMPILE error here
+ * rather than a row that silently stays editable. The readers are consumed, not
+ * re-derived: each one answers "is this value the app's" for its own field.
+ *
+ * The question is asked per ROW, over that row's own line, and never over the
+ * whole frontmatter body. The readers stop at the FIRST matching line while
+ * `parseSimpleProperties` emits one row per line, so a body-wide answer would
+ * make every row of a duplicated key agree: it would render a hand-written junk
+ * line read-only (stranding it behind a block-replace widget), and with the junk
+ * line FIRST it would leave the canonical line's row as an editable checkbox,
+ * which is the very writer this rule exists to remove.
+ *
+ * A reader that does not recognise the value means the value is not app state at
+ * all: a hand-edited or imported line, which the user must be able to see and
+ * fix, the same rule a dangling `cover:` already followed. The key must also be
+ * spelled canonically, since every reader is anchored and case-sensitive while
+ * `isManagedFrontmatterField` is deliberately case-insensitive for the
+ * IMPORTERS' question, so `Folder_Index:` is a user's line and stays editable.
+ * `title` is promoted to the note-title field and `cover` keeps its own
+ * conditional rule, which is why neither appears below.
+ */
+const MANAGED_FIELD_READERS: Record<
+  Exclude<ManagedFrontmatterField, "title" | "cover">,
+  (line: string, rawValue: string) => boolean
+> = {
+  updated: (line) => readUpdatedFromFmBody(line) !== null,
+  // `readFolderFromFmBody` answers for any non-empty scalar, but the APP's read
+  // is narrower: `loadNoteBatch` keeps `folder:` only when js-yaml hands back a
+  // string. The question is therefore asked of that same parser, on the raw
+  // scalar, rather than of the Myne type authority: the authority resolves under
+  // CORE_SCHEMA by design (§3.6.4, so dates stay strings), while the app reads
+  // with js-yaml's default schema, where a bare date or `~` is not a string. The
+  // two answers agree with the app instead of approximating it.
+  folder: (line, rawValue) =>
+    readFolderFromFmBody(line) !== null && resolvesToYamlString(rawValue),
+  trashed: (line) => readTrashedFromFmBody(line) !== null,
+  template: (line) => readTemplateFromFmBody(line),
+  folder_index: (line) => readFolderIndexFromFmBody(line),
+  archived: (line) => readArchivedFromFmBody(line) !== null,
+  done: (line) => readDoneFromFmBody(line) !== null,
+  deleted: (line) => readDeletedFromFmBody(line) !== null,
+  conflict: (line) => readConflictFromFmBody(line),
+  // Deliberately NOT read-only, and this is the one field where the answer is a
+  // judgement rather than a reader: `readConflictOfFromFmBody` accepts ANY
+  // non-empty scalar (it is not value-strict), so a reader-based `true` here
+  // would make a hand-written `conflict_of: note three` un-editable and
+  // un-removable, which the rule above forbids. The field is meaningful only
+  // alongside `conflict: true`, and that row IS read-only, so the pair is still
+  // guarded on the flag side. Making this read-only owes a value-strict reader
+  // in `dialect/src/surgery.ts` first, which is a wider change than this one.
+  conflict_of: () => false,
+  // Deliberately NOT read-only either, for a different reason: this is the one
+  // managed field with no action that CLEARS it. `patchKindField` has a single
+  // production caller (`drawingNote.ts`, which passes `drawing`), nothing writes
+  // `kind: task` at all, and no action anywhere passes `null`. A read-only row
+  // would therefore strand a `kind:` marker the user cannot remove from the
+  // panel and no action can remove either. It joins the rule the day a task
+  // marker action (write and clear) exists.
+  kind: () => false,
+};
+
+/**
+ * Whether the app OWNS the value this row shows, which decides whether the row
+ * is writable (myne-md/myne#872).
+ *
+ * Only a scalar row can be app state: no managed field's canonical value is a
+ * YAML sequence (§3.6.1), so a sequence-valued one is junk by shape and stays
+ * editable. Everything else is the reader's answer about the row's own line,
+ * with one co-check, `done:`, which the app only writes and only clears on a
+ * task note (see below).
+ */
+function managedFieldOwnsValue(
+  prop: PropertyRow,
+  rows: readonly PropertyRow[],
+): boolean {
+  if (prop.kind !== "scalar") return false;
+  // `done:` is read-only only on a note whose class marker makes it clearable.
+  // `patchNoteCompletion` refuses with `NotATaskNoteError` before it touches the
+  // field and `uncompleteNote` is the only path that deletes it, so a `done:`
+  // arrived at by hand (or from another build) on a note with no `kind: task`
+  // has no action that could ever remove it, and the block-replace widget leaves
+  // no other route to the line. Same reasoning as the `kind:` exemption below,
+  // one field over.
+  if (prop.key === "done" && !hasTaskClassMarker(rows)) return false;
+  // OWN-property only. The record is an object literal, so a plain index lookup
+  // answers for `Object.prototype` members too: a user's own frontmatter key
+  // named `constructor:` or `toString:` would find a real function that returns
+  // truthy, and their row would be drawn read-only under a note claiming Myne
+  // writes it, while `__proto__:` or `valueOf:` hands back a non-callable and
+  // the whole widget throws. Every one of those names is a legal frontmatter key
+  // (`PROPERTY_LINE_RE`), so this is reachable from an ordinary note. The
+  // importer's `isManagedFrontmatterField` cannot be the gate here: it is
+  // case-insensitive, which this rule deliberately is not.
+  // `Object.hasOwn` would read better and needs a lib this package does not
+  // target (ES2022), so the prototype method is called explicitly.
+  if (
+    !Object.prototype.hasOwnProperty.call(MANAGED_FIELD_READERS, prop.key)
+  ) {
+    return false;
+  }
+  const reader =
+    MANAGED_FIELD_READERS[
+      prop.key as keyof typeof MANAGED_FIELD_READERS
+    ];
+  // The row's own line, in the column-zero shape every reader is anchored on.
+  // `prop.value` keeps any trailing comment, which the readers strip themselves.
+  // It is also handed over raw, because js-yaml sees the raw scalar: a quoted
+  // `"123"` is a string to both readers while the decoded one is not.
+  return reader(`${prop.key}: ${prop.value}\n`, prop.value);
+}
+
+/**
+ * Whether these rows declare the note a note-task (`kind: task`), which is the
+ * gate the completion action itself uses (`src/notes/completeNoteCore.ts`).
+ *
+ * Read through the field's own value-strict reader, so a quoted or differently
+ * spelled marker answers as it does everywhere else.
+ */
+function hasTaskClassMarker(rows: readonly PropertyRow[]): boolean {
+  // The FIRST `kind:` row, not any of them: `readKindFromFmBody` is
+  // first-line-wins (its own doc says so), so `kind: chore` followed by
+  // `kind: task` is NOT a task note to the completion action, and a `.some`
+  // here would draw `done:` read-only on a note whose stamp nothing can clear.
+  const first = rows.find((row) => row.kind === "scalar" && row.key === "kind");
+  if (first === undefined || first.kind !== "scalar") return false;
+  return readKindFromFmBody(`kind: ${first.value}\n`) === TASK_KIND_VALUE;
 }
 
 class PropertiesWidget extends WidgetType {
@@ -182,6 +374,13 @@ class PropertiesWidget extends WidgetType {
       // it. Both a rejected value and a dangling one therefore fall through to
       // the ordinary text row, where the user can see and fix them.
       if (prop.key === "cover" && this.coverShown) continue;
+      // A Myne-managed field the app owns renders read-only (myne-md/myne#872).
+      // Placed before the kind dispatch, so a managed key carrying a
+      // hand-written sequence value never reaches the reader table.
+      if (managedFieldOwnsValue(prop, this.properties) && prop.kind === "scalar") {
+        list.appendChild(this.renderManagedRow(prop));
+        continue;
+      }
       list.appendChild(
         prop.kind === "sequence"
           ? this.renderSequenceRow(view, prop)
@@ -320,9 +519,18 @@ class PropertiesWidget extends WidgetType {
     return icon;
   }
 
-  /** The editable key input, shared by scalar and sequence rows. Commit /
-   *  Enter / Escape behaviour is identical — the value cell is what differs. */
-  private makeKeyInput(view: EditorView, key: string): HTMLInputElement {
+  /** The editable key input, shared by scalar and sequence rows. The commit
+   *  and the Enter / Escape behaviour are identical; the value cell is what
+   *  differs.
+   *
+   *  The commit is addressed by the row's OWN line offset, not by its key
+   *  (myne-md/myne#872): a body may carry the same key twice, and a key lookup
+   *  renames the first line no matter which row was edited. */
+  private makeKeyInput(
+    view: EditorView,
+    key: string,
+    lineFrom: number,
+  ): HTMLInputElement {
     const keyInput = document.createElement("input");
     keyInput.type = "text";
     keyInput.className = "cm-fm-properties-key";
@@ -330,7 +538,7 @@ class PropertiesWidget extends WidgetType {
     keyInput.spellcheck = false;
     keyInput.autocomplete = "off";
     keyInput.addEventListener("change", () => {
-      this.commitKey(view, key, keyInput.value);
+      this.commitKey(view, { key, lineFrom }, keyInput.value);
     });
     keyInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -363,7 +571,7 @@ class PropertiesWidget extends WidgetType {
     const typed = coerceSourceScalar(prop.value);
 
     row.appendChild(this.makeIcon(typed.type));
-    row.appendChild(this.makeKeyInput(view, prop.key));
+    row.appendChild(this.makeKeyInput(view, prop.key, prop.lineFrom));
 
     const valueInput = document.createElement("input");
     // A NATIVE date input silently refuses a value it cannot parse: the field
@@ -392,7 +600,7 @@ class PropertiesWidget extends WidgetType {
     valueInput.spellcheck = false;
     valueInput.autocomplete = "off";
     valueInput.addEventListener("change", () => {
-      this.commitValue(view, prop.key, valueInput.value);
+      this.commitValue(view, prop, valueInput.value);
     });
     valueInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -414,13 +622,71 @@ class PropertiesWidget extends WidgetType {
       box.checked = typed.value === "true";
       box.setAttribute("aria-label", prop.key);
       box.addEventListener("change", () => {
-        this.commitValue(view, prop.key, box.checked ? "true" : "false");
+        this.commitValue(view, prop, box.checked ? "true" : "false");
       });
       row.appendChild(box);
       return row;
     }
 
     row.appendChild(valueInput);
+
+    return row;
+  }
+
+  /**
+   * A row for a Myne-managed field whose value the app OWNS
+   * ({@link managedFieldOwnsValue}). Scalar only: a sequence-valued managed key
+   * is junk by shape and never gets here.
+   *
+   * Visible but not writable, and the two halves are separately load-bearing.
+   * Visible, because the line is in the file: hiding a managed field would put
+   * a byte in the note that appears nowhere in the interface, which is the
+   * plain-markdown portability commitment the `cover:` skip is careful about.
+   * Not writable, because the value this row shows is app state, and this panel
+   * writes through body autosave while the app's own action is what owns it
+   * (markdown-dialect.md §3.6.1 names a writer per field). One click on the
+   * checkbox this row used to be turned `folder_index: true` into
+   * `folder_index: false`, a value no Myne action produces and the undesignate
+   * path never writes, because it DELETES the field (myne-md/myne#872).
+   *
+   * The value is printed VERBATIM from the row's own value bytes, quotes and
+   * trailing comment included, because this row is the only representation of
+   * that line anywhere in the app. A display-normalised value would show
+   * something that matches neither the file nor what the reader saw.
+   *
+   * Static text rather than a `disabled` input: a disabled control still reads
+   * as "this is where you edit this, later", and the user has no way to learn
+   * where. The `role`/`aria-label` pair carries the same reason the `title`
+   * does, for the pointer-free case (touch and keyboard), since a tooltip needs
+   * hover.
+   */
+  private renderManagedRow(
+    prop: Extract<PropertyRow, { kind: "scalar" }>,
+  ): HTMLElement {
+    const managedNote = i18n.t("editor.frontmatter.managedField");
+    const row = document.createElement("div");
+    row.className = "cm-fm-properties-row";
+    row.dataset.managed = "true";
+    // Key-scoped, because a note carries several managed rows at once
+    // (`folder:` and `updated:` at least) and a caller that means "the
+    // folder_index row" has to be able to say so.
+    row.dataset.managedKey = prop.key;
+    row.setAttribute("data-testid", MANAGED_ROW_TESTID);
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", `${prop.key}: ${prop.value}. ${managedNote}`);
+    row.title = managedNote;
+
+    row.appendChild(this.makeIcon(coerceSourceScalar(prop.value).type));
+
+    const key = document.createElement("span");
+    key.className = "cm-fm-properties-key-static";
+    key.textContent = prop.key;
+    row.appendChild(key);
+
+    const value = document.createElement("span");
+    value.className = "cm-fm-properties-value-static";
+    value.textContent = prop.value;
+    row.appendChild(value);
 
     return row;
   }
@@ -435,7 +701,11 @@ class PropertiesWidget extends WidgetType {
     const row = document.createElement("div");
     row.className = "cm-fm-properties-row";
     row.appendChild(this.makeIcon());
-    row.appendChild(this.makeKeyInput(view, prop.key));
+    // A sequence row's key rename is row-scoped too (`prop.lineFrom`); its
+    // ITEM add/remove helpers stay key-addressed, which is stated at
+    // `commitAddItem`, because a document carrying the same key twice is
+    // ambiguous YAML for them either way.
+    row.appendChild(this.makeKeyInput(view, prop.key, prop.lineFrom));
 
     const cell = document.createElement("div");
     cell.className = "cm-fm-properties-tags";
@@ -515,6 +785,12 @@ class PropertiesWidget extends WidgetType {
    * a single leading `#` (a user may type `#tag`), and formats the item so it
    * reads back as the exact string it was typed as. No-op on empty / duplicate /
    * a frontmatter shape the writer refuses.
+   *
+   * Key-addressed, unlike {@link commitKey} and {@link commitValue}: the
+   * sequence planner resolves the key's own line, and a document carrying the
+   * same sequence key twice is ambiguous YAML for it either way. The managed
+   * fields this file draws read-only are all scalars, so the guarantee that
+   * change owes (`myne-md/myne#872`) is not reached through here.
    */
   private commitAddItem(
     view: EditorView,
@@ -583,9 +859,23 @@ class PropertiesWidget extends WidgetType {
     });
   }
 
-  private commitKey(view: EditorView, oldKey: string, nextKeyRaw: string): void {
+  /**
+   * Rename one row's key, addressed by the row's OWN line offset.
+   *
+   * `row` is the captured identity of the row that drew the input: its key and
+   * the offset its line started at. A key lookup cannot stand in for it, because
+   * a body may carry the same key twice and the lookup would rename the FIRST
+   * line whichever row the user typed in (myne-md/myne#872). The captured pair
+   * is re-checked against a fresh parse, so a widget whose document moved under
+   * it refuses the write instead of renaming a line it was never looking at.
+   */
+  private commitKey(
+    view: EditorView,
+    row: { key: string; lineFrom: number },
+    nextKeyRaw: string,
+  ): void {
     const nextKey = nextKeyRaw.trim();
-    if (nextKey === oldKey) return;
+    if (nextKey === row.key) return;
     // Reject empty / whitespace / non-simple keys — the
     // `parseSimpleProperties` regex (`^[a-zA-Z0-9_-]+$`) anchors what's
     // considered a valid simple-property key. Anything else stays on
@@ -596,31 +886,42 @@ class PropertiesWidget extends WidgetType {
     if (range === null) return;
     const doc = view.state.doc.toString();
     const props = parseSimpleProperties(doc, range);
-    const live = props.find((p) => p.key === oldKey);
-    if (live === undefined) return;
+    const live = props.find((p) => p.lineFrom === row.lineFrom);
+    if (live === undefined || live.key !== row.key) return;
     // Reject collision with another existing key — would produce
     // duplicate YAML keys, undefined parse behavior.
     if (props.some((p) => p !== live && p.key === nextKey)) return;
     view.dispatch({
       changes: {
         from: live.lineFrom,
-        to: live.lineFrom + oldKey.length,
+        to: live.lineFrom + row.key.length,
         insert: nextKey,
       },
       userEvent: "frontmatter.rename-key",
     });
   }
 
-  private commitValue(view: EditorView, key: string, next: string): void {
-    // Resolve the live value range against the current doc — the
-    // captured property snapshot may be stale if other edits ran since
-    // the widget was rendered. Re-parse from the cached frontmatter
-    // range, find the matching key, replace just the value bytes.
+  /**
+   * Write one row's value, addressed by the row's OWN byte range.
+   *
+   * Same reasoning as {@link commitKey}: the captured range is re-checked
+   * against a fresh parse by position, and the row's key and previous value must
+   * still be the ones that drew the control, so a stale widget refuses rather
+   * than writing a neighbouring line of the same key. That matters most for the
+   * rows this file now draws read-only: without it, the editable row of a
+   * duplicated managed key wrote the canonical line the rule exists to protect,
+   * which is the defect one layer down (myne-md/myne#872).
+   */
+  private commitValue(view: EditorView, prop: SimpleProperty, next: string): void {
     const range = cachedLocateFrontmatter(view.state.doc);
     if (range === null) return;
     const doc = view.state.doc.toString();
-    const live = parseSimpleProperties(doc, range).find((p) => p.key === key);
-    if (live === undefined) return;
+    const live = parseSimpleProperties(doc, range).find(
+      (p) => p.valueFrom === prop.valueFrom,
+    );
+    if (live === undefined || live.key !== prop.key || live.value !== prop.value) {
+      return;
+    }
     if (live.value === next) return;
     view.dispatch({
       changes: { from: live.valueFrom, to: live.valueTo, insert: next },
