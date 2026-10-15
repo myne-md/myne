@@ -5099,10 +5099,13 @@
       "title": "Save your identity phrase",
       "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
       "reveal": "Reveal",
-      "typebackLead": "To confirm you saved it, type these four words from the phrase above.",
+      "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
       "continue": "Continue"
+    },
+    "typeback": {
+      "title": "Confirm your phrase"
     },
     "home": {
       "title": "Your identity",
@@ -5128,8 +5131,11 @@
     "heldIntro": "This device already holds an identity. Recover it with its 24-word phrase below.",
     "intro": "An identity lets people address an invite to you before you own any vault. It creates no vault and stores no notes.",
     "pending": "This device is waiting for another device on the account to approve it.",
+    "phraseTitle": "Save your identity phrase",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
-    "typeBackLead": "To confirm you saved it, type these four words from the phrase above.",
+    "phraseContinue": "Continue",
+    "confirmTitle": "Confirm your phrase",
+    "typeBackLead": "Enter these four words from the identity phrase you just saved.",
     "typeBackMismatch": "That does not match word #{{pos}}.",
     "typeBackWordAtPosition": "Word #{{pos}}",
     "recoverCta": "Recover an identity",

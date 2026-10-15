@@ -451,12 +451,20 @@
     "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
   },
   {
-    "value": "To confirm you saved it, type these four words from the phrase above.",
+    "value": "Enter these four words from the identity phrase you just saved.",
     "keys": [
       "identityFlow.phrase.typebackLead",
       "identitySetup.typeBackLead"
     ],
     "reason": "The desktop identity-setup dialog and the mobile identity flow run the SAME phrase-typeback step, so the question a user must answer is one sentence. Rewording per client would let the two clients ask a different question about the same phrase."
+  },
+  {
+    "value": "Save your identity phrase",
+    "keys": [
+      "identityFlow.phrase.title",
+      "identitySetup.phraseTitle"
+    ],
+    "reason": "The phrase step of the identity ceremony is one screen on both clients (myne-md/myne#869 split it off the type-back step), so its title is the same title; two wordings would name the same step differently on the phone and on the desktop."
   },
   {
     "value": "That does not match word #{{pos}}.",

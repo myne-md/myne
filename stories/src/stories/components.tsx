@@ -1741,7 +1741,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "unlocked",
     render: () => (
       <IdentityHome
-        personIdHex={null}
         identityCode={null}
         onCreateVault={action("onCreateVault")}
         onAccepted={action("onAccepted")}
