@@ -52,7 +52,7 @@ export function FolderTreeRow({
       {...handlers}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", paddingInlineStart: indentPx, cursor: "pointer" }}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform 140ms ease" }}>
+      <svg width="12" height="12" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform var(--duration-fast) var(--ease-standard)" }}>
         <path d="M8 5l8 7-8 7" fill="none" stroke="var(--fg-3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {icon ? (

@@ -42,7 +42,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../platform/core";
-import { CenteredCard, ctaHover, ctaStyle } from "../components/primitives/CenteredCard";
+import { CenteredCard, ctaInteraction, ctaStyle } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 
@@ -179,7 +179,7 @@ export function AccountNumberEntry({ onValid, onCreateAccount }: AccountNumberEn
           type="submit"
           disabled={!submittable}
           style={ctaStyle(!submittable)}
-          {...ctaHover(!submittable)}
+          {...ctaInteraction(!submittable)}
         >
           <span>{checking ? t("accountEntry.checking") : t("accountEntry.continue")}</span>
         </button>

@@ -115,8 +115,8 @@ export async function createMemberIdentity(member: AppSession): Promise<string> 
   await (await member.session.byTestId("identity-setup.recover-cta")).click();
   // The recover arm echoes no phrase and generated nothing to prove possession of,
   // so the type-back challenge does not apply and the dialog goes straight to the
-  // fingerprint.
-  await member.session.byTestId("identity-setup.fingerprint", { timeoutMs: 90_000 });
+  // recovered result (`identitySetup.recovered`), whose only exit is Done.
+  await member.session.byTestId("identity-setup.close-cta", { timeoutMs: 90_000 });
   // Asserted, not assumed: a device awaiting approval holds no token, and the invite
   // listing a caller is about would then fail rather than show anything. The FIRST
   // device of a person account is approved, which is the arm a fresh server puts this
@@ -194,16 +194,16 @@ export async function sendInvite(owner: AppSession, memberCode: string): Promise
 }
 
 /**
- * Accept, through BOTH steps the accept owns: the device-local password and the
- * name gate.
+ * Accept, through the three wizard steps the accept owns (verify the owner, the
+ * recovery phrase, the device password) and then the name gate.
  *
  * This is the FIRST membership, so it is the only path that may write a name.
  * The store the name lands in is `decisions/protocol/0666` and the row is signed
  * per `0667`; the rule that ONLY this path writes one has no decision entry of its
- * own and is carried by `src/screens/IdentityHome.tsx`'s comment on the join state
- * ("the accept owes the name gate, the join must not touch a name at all"). A second
- * device joins through `joinMemberVault` instead and writes none, which is asserted
- * in `member-devices.e2e.ts` by the name gate's absence there.
+ * own and is carried by `src/components/sync/InviteWizard.tsx`'s comment on the
+ * join wizard ("the accept owes the name gate, the join must not touch a name at
+ * all"). A second device joins through `joinMemberVault` instead and writes none,
+ * which is asserted in `member-devices.e2e.ts` by the name gate's absence there.
  */
 export async function acceptInvite(
   member: AppSession,
@@ -219,14 +219,20 @@ export async function acceptInvite(
   await (await member.session.byTestId("identity-home.accept-inspect")).click();
   await member.session.byTestId("identity-home.accept-sas");
   // The out-of-band compare comes BEFORE the phrase is typed: it is the last point at
-  // which the invitee can still refuse, and submit is gated on it.
+  // which the invitee can still refuse, and the owner step is gated on it. The three
+  // collects are three screens now (myne-md/myne#871), and only the current step's
+  // Continue exists, so one testid walks both gates.
   await (await member.session.byTestId("identity-home.accept-confirm")).click();
+  await (await member.session.byTestId("identity-home.accept-continue")).click();
+  await member.session.byTestId("identity-home.accept-phrase-grid");
   await typePhrase(
     member.session,
     "identity-home.accept-phrase",
     "identity-home.accept-phrase-cell",
     MEMBER_PHRASE,
   );
+  await (await member.session.byTestId("identity-home.accept-continue")).click();
+  await member.session.byTestId("identity-home.accept.password-input");
   await (await member.session.byTestId("identity-home.accept.password-input")).replaceText(
     MEMBER_PASSWORD,
   );

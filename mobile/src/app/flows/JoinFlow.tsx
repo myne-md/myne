@@ -471,7 +471,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     return (
       <Screen style={{ alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
         <div data-testid="sync.join.pending" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ marginBottom: 22, animation: "myne-spinner-rotate 2.4s linear infinite" }}>
+          <svg className="myne-spinner" width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ marginBottom: 22 }}>
             <circle cx="28" cy="28" r="24" stroke="var(--line-1)" strokeWidth="2" />
             <path d="M28 4a24 24 0 0 1 24 24" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
           </svg>

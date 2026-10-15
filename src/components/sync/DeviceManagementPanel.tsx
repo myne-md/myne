@@ -29,7 +29,8 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { setDeviceName } from "../../lib/prefs";
 import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitives/interactiveSurface";
 import { Icon } from "../primitives/Icon";
 import { Tooltip } from "../primitives/Tooltip";
 import { EmptyState } from "../primitives/EmptyState";
@@ -102,7 +103,7 @@ const BTN: CSSProperties = {
  *  one step to `--paper-3`. Pass the same `disabled` the button carries so a
  *  dimmed control never lights up. */
 const btnHover = (disabled = false) =>
-  hoverSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
+  interactiveSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
 
 // "This device" reads as an accent-soft pill with accent text (E3b) — a quiet
 // self-marker, distinct from a plain outlined chip.
@@ -235,6 +236,30 @@ function deviceErrorReason(kind: string): string {
     default:
       return "sync.devices.reasonUnexpected";
   }
+}
+
+/** The per-device remove button: hover deepens the fill and turns the trash icon
+ *  danger, and a press confirms the click. The fill half is `interactiveSurface`;
+ *  the colour change chains onto its handlers rather than spreading around them.
+ *  `busy` disables the whole surface, which is what the hand-written version's
+ *  early return did. */
+function removeDeviceSurface(busy: boolean): InteractiveSurfaceHandlers {
+  const surface = interactiveSurface({
+    restBg: "var(--bg-2)",
+    hoverBg: "var(--paper-3)",
+    disabled: busy,
+  });
+  return {
+    ...surface,
+    onMouseEnter: (e) => {
+      surface.onMouseEnter?.(e);
+      e.currentTarget.style.color = "var(--danger)";
+    },
+    onMouseLeave: (e) => {
+      surface.onMouseLeave?.(e);
+      e.currentTarget.style.color = "var(--fg-2)";
+    },
+  };
 }
 
 export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
@@ -630,15 +655,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                       }}
                       disabled={busy}
                       aria-label={t("sync.devices.remove")}
-                      onMouseEnter={(e) => {
-                        if (busy) return;
-                        e.currentTarget.style.background = "var(--paper-3)";
-                        e.currentTarget.style.color = "var(--danger)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "var(--bg-2)";
-                        e.currentTarget.style.color = "var(--fg-2)";
-                      }}
+                      {...removeDeviceSurface(busy)}
                       onClick={() => setConfirmRemove(d.device_id_hex)}
                       data-testid="sync.remove-device"
                     >

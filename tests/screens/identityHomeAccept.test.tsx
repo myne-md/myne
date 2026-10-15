@@ -53,6 +53,13 @@ import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
 import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
 import { MIN_PASSWORD_LEN } from "../../src/components/PasswordInput";
 
+/** Leave the current accept step for the next one. The accept is three steps now
+ *  (myne-md/myne#871) and only the current step's Continue is on screen, so one
+ *  testid addresses all of them. */
+function continueAccept(): void {
+  fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
+}
+
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personLock.mockReset().mockResolvedValue(undefined);
@@ -68,10 +75,11 @@ afterEach(() => {
 });
 
 describe("IdentityHome accept path", () => {
+  const OWNER_CODE = `MYNE-PERSON-1:${"11".repeat(16)}:${"22".repeat(32)}:${"33".repeat(32)}:${"44".repeat(48)}`;
+
   it("offers a vault creation from the identity landing in one action", async () => {
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -88,7 +96,6 @@ describe("IdentityHome accept path", () => {
     ]);
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -97,10 +104,100 @@ describe("IdentityHome accept path", () => {
     );
     const open = await screen.findByTestId("identity-home.accept-open");
     fireEvent.click(open);
-    // The accept form opens with the owner-code field; the member then inspects
-    // the fingerprint and confirms before the phrase step.
-    expect(await screen.findByTestId("identity-home.accept-owner-code")).toBeTruthy();
+    // The accept opens on its OWNER step: the code, the fingerprint check and
+    // nothing else. The member phrase is a step of its own below.
+    expect(await screen.findByTestId("identity-home.accept-step")).toBeTruthy();
+    expect(screen.getByTestId("identity-home.accept-owner-code")).toBeTruthy();
     expect(screen.getByTestId("identity-home.accept-inspect")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.accept-phrase-grid")).toBeNull();
+  });
+
+  // The three-step skeleton itself (myne-md/myne#871): step 1 -> phrase ->
+  // password, and every step can be walked back to without losing what the
+  // earlier ones collected (which is why that state lives in the wizard and not
+  // in the step components).
+  it("walks owner -> phrase -> password, and back", async () => {
+    personListInvites.mockResolvedValue([
+      { invite_id_hex: "aa", vault_account_hash_hex: "bb", claimed: false },
+    ]);
+    inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
+    render(
+      <IdentityHome
+        identityCode="code"
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
+
+    // Step 1's Continue is gated on the out-of-band confirmation, not on the
+    // code merely being non-empty.
+    const firstContinue = () => screen.getByTestId("identity-home.accept-continue") as HTMLButtonElement;
+    expect(firstContinue().disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
+      target: { value: OWNER_CODE },
+    });
+    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
+    await screen.findByTestId("identity-home.accept-sas");
+    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
+    expect(firstContinue().disabled).toBe(false);
+
+    fireEvent.click(firstContinue());
+    expect(await screen.findByTestId("identity-home.accept-phrase-grid")).toBeTruthy();
+
+    // Back from the phrase returns to the owner step with its fingerprint still
+    // confirmed, so the walk is not a re-entry of the out-of-band material.
+    fireEvent.click(screen.getByTestId("identity-home.accept-back"));
+    expect(await screen.findByTestId("identity-home.accept-owner-code")).toBeTruthy();
+    expect(screen.getByTestId("identity-home.accept-owner-fingerprint").textContent).toBe(
+      "55".repeat(32),
+    );
+    fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
+
+    // The phrase step's Continue is gated on all 24 words.
+    const phraseContinue = () =>
+      screen.getByTestId("identity-home.accept-continue") as HTMLButtonElement;
+    expect(phraseContinue().disabled).toBe(true);
+    for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
+      fireEvent.change(
+        screen.getByTestId(
+          index === 0
+            ? "identity-home.accept-phrase"
+            : `identity-home.accept-phrase-cell-${index + 1}`,
+        ),
+        { target: { value: `word${index + 1}` } },
+      );
+    }
+    expect(phraseContinue().disabled).toBe(false);
+    fireEvent.click(phraseContinue());
+
+    // Step 3 is the password, and its Back goes to the phrase step rather than
+    // out of the wizard.
+    expect(await screen.findByTestId("identity-home.accept.password-input")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("identity-home.accept.secondary"));
+    expect(await screen.findByTestId("identity-home.accept-phrase-grid")).toBeTruthy();
+  });
+
+  // Cancel exits the takeover entirely; the invite row is still there to re-open
+  // (and the wizard's fields, including the phrase, went with the unmount).
+  it("cancels out of the accept wizard back to the invite list", async () => {
+    personListInvites.mockResolvedValue([
+      { invite_id_hex: "aa", vault_account_hash_hex: "bb", claimed: false },
+    ]);
+    render(
+      <IdentityHome
+        identityCode="code"
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
+    fireEvent.click(screen.getByTestId("identity-home.accept-cancel"));
+
+    expect(await screen.findByTestId("identity-home.invite-row")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.accept-form")).toBeNull();
   });
 
   // myne-md/myne#782: the identity can be forgotten from the home, gated on a
@@ -109,7 +206,6 @@ describe("IdentityHome accept path", () => {
     const onForgotten = vi.fn();
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -143,7 +239,6 @@ describe("IdentityHome invite refresh (myne-md/myne#794)", () => {
   const renderHome = () =>
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -244,7 +339,6 @@ describe("IdentityHome accept requires a device password", () => {
     inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -258,7 +352,11 @@ describe("IdentityHome accept requires a device password", () => {
     fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
     await screen.findByTestId("identity-home.accept-sas");
     fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
+    continueAccept();
+    await screen.findByTestId("identity-home.accept-phrase-grid");
     fillPhrase();
+    continueAccept();
+    await screen.findByTestId("identity-home.accept.password-input");
   }
 
   const submit = () =>
@@ -287,6 +385,41 @@ describe("IdentityHome accept requires a device password", () => {
     expect(submit().disabled).toBe(false);
   });
 
+  it("withholds the in-flight Back, so a late refusal keeps a banner to land on", async () => {
+    let fail!: () => void;
+    personAcceptInvite.mockImplementation(
+      () =>
+        new Promise<void>((_, reject) => {
+          fail = () => reject({ kind: "BadRequest" });
+        }),
+    );
+    await readyExceptPassword();
+    fireEvent.change(screen.getByTestId("identity-home.accept.password-input"), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.change(screen.getByTestId("identity-home.accept.confirm-input"), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.click(submit());
+
+    // In flight, and the submit is an Argon2id-bound call: there is no Back. A
+    // refusal that arrives late renders on THIS step's banner, and walking to the
+    // phrase step, which has none, would drop it silently.
+    await waitFor(() =>
+      expect(screen.queryByTestId("identity-home.accept.secondary")).toBeNull(),
+    );
+    expect(submit().disabled).toBe(true);
+
+    fail();
+    expect((await screen.findByTestId("identity-home.accept-error")).textContent).toBe(
+      "identityHome.acceptErrorBadRequest",
+    );
+    // …and the walk is offered again once the call has settled.
+    await waitFor(() =>
+      expect(screen.getByTestId("identity-home.accept.secondary")).toBeTruthy(),
+    );
+  });
+
   it("does not accept while the two password fields differ", async () => {
     await readyExceptPassword();
     const password = screen.getByTestId("identity-home.accept.password-input");
@@ -312,7 +445,6 @@ describe("IdentityHome accept requires a device password", () => {
     inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={onAccepted}
@@ -326,7 +458,11 @@ describe("IdentityHome accept requires a device password", () => {
     fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
     await screen.findByTestId("identity-home.accept-sas");
     fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
+    continueAccept();
+    await screen.findByTestId("identity-home.accept-phrase-grid");
     fillPhrase();
+    continueAccept();
+    await screen.findByTestId("identity-home.accept.password-input");
     fireEvent.change(screen.getByTestId("identity-home.accept.password-input"), {
       target: { value: PASSWORD },
     });
@@ -363,7 +499,6 @@ describe("IdentityHome accept reaches the name gate", () => {
     personAcceptInvite.mockResolvedValue({});
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={onAccepted}
@@ -377,6 +512,8 @@ describe("IdentityHome accept reaches the name gate", () => {
     fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
     await screen.findByTestId("identity-home.accept-sas");
     fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
+    continueAccept();
+    await screen.findByTestId("identity-home.accept-phrase-grid");
     for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {
       fireEvent.change(
         screen.getByTestId(
@@ -387,6 +524,8 @@ describe("IdentityHome accept reaches the name gate", () => {
         { target: { value: `word${index + 1}` } },
       );
     }
+    continueAccept();
+    await screen.findByTestId("identity-home.accept.password-input");
     fireEvent.change(screen.getByTestId("identity-home.accept.password-input"), {
       target: { value: PASSWORD },
     });
