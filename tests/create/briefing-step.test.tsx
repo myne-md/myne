@@ -17,7 +17,7 @@
 //       or double-showed the briefing would land here.)
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve()) }));
 vi.mock("../../src/lib/app-window", () => ({
@@ -75,7 +75,7 @@ describe("<BriefingStep> — acknowledgement gating", () => {
     expect(continueBtn().disabled).toBe(true);
   });
 
-  it("'Why?' is opt-in: hidden by default, expands inline, and re-collapses", () => {
+  it("'Why?' is opt-in: hidden by default, expands inline, and re-collapses", async () => {
     const { container } = render(<BriefingStep onBack={() => {}} onContinue={() => {}} />);
     expect(screen.queryAllByTestId("create.briefing-why-text")).toHaveLength(0);
 
@@ -86,15 +86,75 @@ describe("<BriefingStep> — acknowledgement gating", () => {
 
     fireEvent.click(why);
     expect(why.getAttribute("aria-expanded")).toBe("true");
+    // The chevron turns over in place rather than swapping glyphs, because a
+    // swap remounts the node and a remount cannot animate (myne-md/myne#868).
+    expect((why.querySelector("svg") as SVGElement).style.transform).toBe("rotate(180deg)");
     const text = container.querySelector(
       '[data-testid="create.briefing-why-text"][data-ack-id="phrase-backup"]',
-    );
+    ) as HTMLElement;
     // The normative fixed string is stated, plainly, once.
-    expect(text?.textContent).toContain(LOST_BOTH_SECRETS_SENTENCE);
+    expect(text.textContent).toContain(LOST_BOTH_SECRETS_SENTENCE);
+    // The entrance animates: the body mounts hidden and flips visible on the
+    // next frame, so the browser has a painted value to transition FROM.
+    const grid = text.parentElement?.parentElement as HTMLElement;
+    expect(grid.style.opacity).toBe("0");
+    await waitFor(() => expect(grid.style.opacity).toBe("1"));
+    // The curve follows the direction, which is the mechanism the issue fixes:
+    // `--ease-out` leads the entrance, `--ease-standard` the exit. A single
+    // curve for both ends turns one of them into an ease-in.
+    expect(grid.style.transition).toContain("var(--ease-out)");
+    expect((why.querySelector("svg") as SVGElement).style.transition).toContain(
+      "var(--ease-out)",
+    );
 
     fireEvent.click(why);
     expect(why.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryAllByTestId("create.briefing-why-text")).toHaveLength(0);
+    // The exit animates the same way in reverse: the body goes transparent
+    // first and only unmounts once the motion has settled. Pinning both halves
+    // keeps a regression to an instant hide, or to a node that never leaves,
+    // from passing here.
+    expect(grid.style.opacity).toBe("0");
+    expect(grid.style.transition).toContain("var(--ease-standard)");
+    expect(screen.queryAllByTestId("create.briefing-why-text")).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.queryAllByTestId("create.briefing-why-text")).toHaveLength(0),
+    );
+  });
+
+  it("resolves both ends instantly under prefers-reduced-motion", () => {
+    // The two reduced-motion arms are the half no unstubbed run measures: jsdom
+    // provides no `matchMedia`, so `reduce` is false everywhere else and
+    // emptying either branch would fail nothing. Stubbed the way
+    // `tests/notes/graphCanvasMount.test.tsx` does it.
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    );
+    try {
+      const { container } = render(<BriefingStep onBack={() => {}} onContinue={() => {}} />);
+      const why = container.querySelector(
+        '[data-testid="create.briefing-why"][data-ack-id="phrase-backup"]',
+      ) as HTMLButtonElement;
+
+      fireEvent.click(why);
+      // Open in the SAME commit, at its resting value: there is no hidden frame
+      // to flip from, which is the assertion the animated path cannot make.
+      const text = screen.getByTestId("create.briefing-why-text") as HTMLElement;
+      const grid = text.parentElement?.parentElement as HTMLElement;
+      expect(grid.style.opacity).toBe("1");
+
+      fireEvent.click(why);
+      // And gone in the same commit: the deferral is SKIPPED rather than
+      // shortened, so there is never a window holding a collapsed body.
+      expect(screen.queryAllByTestId("create.briefing-why-text")).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("Back fires onBack without requiring any acknowledgement", () => {

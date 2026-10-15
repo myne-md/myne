@@ -29,7 +29,8 @@ import { BINDABLE_COMMANDS } from "../../commands/bindableCatalog";
 import { effectiveChords } from "../../commands/keymap";
 import { usePrefs } from "../../hooks/usePrefs";
 import { ribbonCommands } from "../ribbonCommands";
-import { hoverSurface, HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -83,7 +84,7 @@ export function SidebarSearchRow() {
         type="button"
         data-testid="notes.sidebar-search"
         style={ROW_STYLE}
-        {...hoverSurface({ hoverBg: "var(--bg-3)" })}
+        {...interactiveSurface({ hoverBg: "var(--bg-3)" })}
         onClick={() => ribbonCommands.run?.("palette.open")}
       >
         <Icon name="search" size={14} />

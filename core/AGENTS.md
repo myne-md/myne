@@ -190,6 +190,22 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
 
 ## Gotchas
 
+- **A per-file sync adopt has no self-heal, so a write precondition is part of the sync path and not
+  only of the local one.** myne-md/myne#883: the agent-memory entry plane wrote `memories/<id>`
+  without creating `memories/`, and `atomic_write` requires its parent to exist, so on every device
+  that had never locally authored a memory the adopt failed `NotFound`, the caller swallowed it with
+  a warning and `continue`d, and the entry never landed while the catalog (a vault-root singleton)
+  synced fine. Three things generalise past the missing line. The symptom is asymmetric by
+  construction, a root singleton succeeding beside a subdirectory family failing, so it reads as
+  corrupt bodies rather than as a filesystem error. A fixture that PRE-creates what production lacks
+  hides the whole class, which is why the plane's own tests were green. And **the failure does not
+  heal**: the server serves a pull as `changeSeq > cursor`
+  (`myne-server/internal/store/fsstore.go`, `sync-protocol.md` §8.2), so once the cursor passes the
+  record a plain incremental pull never re-serves it, and the only ways back are a walk from 0 (the
+  `cursor_expired` 410 or a CAS retry) or a version bump from the device that holds the body.
+  Writing a new memory on the affected device does not heal the old rows, which is the first thing
+  anyone tries.
+
 - **A field added to a type that another site ENUMERATES BY HAND is invisible to every
   compiler, and `Proposal` cost two of them in one change** (myne-md/myne#850). The merge that
   accumulates a run's proposal across legs copied `edits`, `new_notes` and `summary` and dropped

@@ -37,9 +37,9 @@ import i18n from "../../i18n";
 import { labelColorVar } from "../decorations";
 import { Icon } from "../../components/primitives/Icon";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
 import { shouldDetachOnDrop } from "../detachDrop";
@@ -806,7 +806,7 @@ function Tab({
             e.stopPropagation();
             onClose(id);
           }}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -887,7 +887,7 @@ function NewTabChip({ onClose }: { onClose?: () => void }) {
           title={t("notes.tabStrip.closeNewTab")}
           data-testid="editor.new-tab-close"
           onClick={onClose}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           style={{
             display: "flex",
             alignItems: "center",
@@ -926,7 +926,7 @@ function StripButton({
       title={label}
       onClick={onClick}
       data-testid="editor.tab-strip-button"
-      {...hoverSurface()}
+      {...interactiveSurface()}
       style={{
         display: "flex",
         alignItems: "center",
@@ -1009,7 +1009,7 @@ function OverflowMenu({
                 role="menuitem"
                 title={text}
                 onClick={() => onPick(id)}
-                {...hoverSurface({
+                {...interactiveSurface({
                   restBg:
                     id === activeTab ? "var(--accent-soft)" : "transparent",
                   hoverBg:

@@ -32,13 +32,33 @@
 //      turns a smooth animation on the maintainer's laptop into a stuttering
 //      one on a five-year-old phone, and nothing else in the tree measures it.
 //
+//   5. A self-rescheduling `requestAnimationFrame` loop. Rule 2 catches the CSS
+//      `animation: … infinite`; the same thing written in JavaScript is how the
+//      most expensive animations here are actually driven.
+//
+//   6. **A raw duration, curve or easing keyword.** The rule that makes the
+//      vocabulary hold, and the one that was missing: rule 3 catches only what is
+//      above the 300ms ceiling, so everything below it was invisible to every gate
+//      in this tree. That is how the tree accumulated 90ms, 100ms and 140ms
+//      transitions, a whole foreign curve family in `mobile/src`, and bare `ease`
+//      in the shared `editor/` package that ships to all three clients
+//      (myne-md/myne#732). It reads a declaration, an imperative
+//      `el.style.transition = …` and the `CSSProperties["transition"] = …`
+//      annotation form, because all three appear in this tree.
+//
 // Scope is the shared-tree roster (`scripts/lib/shared-roots.mjs`), imported
 // rather than copied — a private copy is how `check-prefs-nonce.mjs` came to
 // print `ok` over a whole client it had never read.
 //
 // VERIFYING THIS GUARD MEANS BREAKING IT. Each rule's fixture lives in
 // `tests/scripts/motionCanon.test.ts`, which injects the exact defect and
-// asserts this file names it. A guard that has never failed is untested.
+// asserts this file names it, and the declaration READER has fixtures there of
+// its own, because the two ways it has gone silently blind (an inline style's
+// quoted value, a value starting on the line AFTER the colon) were both found
+// by injection rather than by running it. The second direction matters as much
+// as the first: rule 6's arrival changed what three older fixtures meant, and
+// they were re-pointed at tokens rather than loosened, so each still proves its
+// OWN rule fires. A guard that has never failed is untested.
 //
 // Run by hand:   node scripts/check-motion-canon.mjs
 // Wired into:    lefthook `pre-commit`, CI `pnpm-build`.
@@ -217,6 +237,27 @@ const LAYOUT_EXEMPT = new Map([
       "pointer-enter rather than continuously.",
   ],
   [
+    "client-core/src/components.css:width",
+    "The Segmented selection fill, which grows or shrinks between segments of " +
+      "different widths. Its `left` travel is already a `transform: translateX`, " +
+      "measured in the component; `width` is the one value a stylesheet cannot " +
+      "know, so a `scaleX` rewrite is not a stylesheet change: it moves a " +
+      "scale RATIO (and a base width to divide by) into the same measurement " +
+      "path myne-md/myne#727 had to fix for this exact primitive, whose thumb " +
+      "went zero-width in a pane that mounted hidden. Fires once per selection, " +
+      "not per frame.",
+  ],
+  [
+    "src/screens/Editor.tsx:width",
+    "The desktop sidebar collapse, the mobile twin of `EditorFlow.tsx:width` below " +
+      "and the same argument: the editor beside it must REFLOW into the reclaimed " +
+      "space, and a translated sidebar would slide over the editor instead of " +
+      "pushing it. Fires once per collapse toggle, and `resizing` turns the " +
+      "transition off entirely while the user is dragging the divider. It was " +
+      "invisible to this guard until myne-md/myne#868 put the value on one line, " +
+      "which is why the exemption lands with a formatting change.",
+  ],
+  [
     "mobile/src/app/flows/EditorFlow.tsx:width",
     "The sidebar collapse (248px <-> 0). This is the case a transform genuinely cannot " +
       "express: the editor beside it must REFLOW into the reclaimed space, and a " +
@@ -224,6 +265,15 @@ const LAYOUT_EXEMPT = new Map([
       "Fires once per collapse toggle. Covers both the outer width animation and the " +
       "inner pane's matching one, which must stay in lockstep or the divider detaches " +
       "from the edge mid-travel.",
+  ],
+  [
+    "mobile/src/app/flows/SettingsSheet.tsx:height",
+    "The settings sheet's panel swap. Two panels have different heights and the sheet is " +
+      "a fixed-height surface, so the flip has to change the box to keep the footer in " +
+      "place; a `scaleY` would stretch the panel's text and its scrollbar along with it. " +
+      "Written imperatively (`el.style.transition`), which is why this entry only became " +
+      "necessary when rule 4 learned to read an assignment as well as a declaration. " +
+      "Fires once per panel change, not per frame.",
   ],
 ]);
 
@@ -325,21 +375,47 @@ function maskReducedMotionBlocks(src) {
  * caught it; running the guard never would have, because a guard reading an
  * empty string finds nothing wrong with it.
  *
- * CSS:  `transition: opacity 200ms ease;`   -> ends at `;`, `}` or newline.
+ * The SAME empty-value hole had a second door, and this is the one that stayed
+ * open (myne-md/myne#868): skipping ` `/`\t` but not the newline meant
+ * `transition:\n    "…"`, the shape a formatter produces whenever the value is
+ * long enough to wrap, read as empty too. Rules 2, 3 and 4 were therefore blind
+ * to every wrapped declaration in the tree (13 sites under `.ts`/`.tsx` plus the
+ * CSS sheets). Both the quoted and the unquoted branch now skip ALL whitespace,
+ * newlines included, before the value.
+ *
+ * The unquoted branch stops at the declaration's own end, and where that end is
+ * depends on the syntax. The boundary is a judgement rather than a parse: in
+ * JS/TS a value on the next line is USUALLY the sibling property that follows
+ * it, while in a `.css` file it is a continuation of the SAME declaration, which
+ * there ends at `;` or `}`. So a JS/TS read stops at the newline and a `.css`
+ * read runs to the real terminator. Reading past that boundary charges this
+ * declaration for whatever the next line holds, a false positive rather than a
+ * miss, and `tests/scripts/motionCanon.test.ts` pins the boundary for that
+ * reason.
+ *
+ * One JS/TS shape stays out of reach, and it is the price of that boundary: an
+ * unquoted expression SPLIT ACROSS lines is read as its first line only, so rule
+ * 4 cannot see the property it names. `src/screens/Editor.tsx`'s sidebar
+ * collapse was written that way and its `width` transition was invisible until
+ * myne-md/myne#868; it now writes the expression on one line, which is the only
+ * reliable fix, because a regex cannot know where a JS expression ends.
+ *
+ * CSS:  `transition: opacity 200ms ease;`   -> ends at `;` or `}`.
  * JS:   `transition: "opacity 200ms ease",` -> ends at the matching quote, so a
  *       trailing `, nextProp: 400` cannot be swallowed and reported as part of
  *       this declaration.
  */
-function declValue(src, start) {
+function declValue(src, start, isCss = false) {
   let i = start;
-  while (i < src.length && (src[i] === " " || src[i] === "\t")) i++;
+  while (i < src.length && /\s/.test(src[i])) i++;
   const q = src[i];
   if (q === '"' || q === "'" || q === "`") {
     const end = src.indexOf(q, i + 1);
     return end === -1 ? "" : src.slice(i + 1, end);
   }
   let end = i;
-  while (end < src.length && !";}\n".includes(src[end])) end++;
+  const stops = isCss ? ";}" : ";}\n";
+  while (end < src.length && !stops.includes(src[end])) end++;
   return src.slice(i, end);
 }
 
@@ -418,6 +494,9 @@ for (const root of present) {
     const raw = readOrSkip(file);
     if (raw === null) continue;
     const src = scrub(raw);
+    // A `.css` value has no sibling property to swallow, so its unquoted read
+    // can run to the declaration's real terminator (see `declValue`).
+    const isCss = rel.endsWith(".css");
 
     // -- Rule 1: ease-in as a curve -----------------------------------------
     // `(?!-out)` is the whole subtlety: `ease-in-out` is a legitimate curve for
@@ -439,7 +518,7 @@ for (const root of present) {
     // token ORDER does not decide whether a loop is seen (see `animationNames`).
     const flaggedInfinite = new Set();
     for (const m of src.matchAll(/\banimation(?:-name)?\s*:/g)) {
-      const decl = declValue(src, m.index + m[0].length);
+      const decl = declValue(src, m.index + m[0].length, isCss);
       if (!/\binfinite\b/.test(decl)) continue;
       for (const name of animationNames(decl)) {
         seenInfinite.add(name);
@@ -480,7 +559,7 @@ for (const root of present) {
     for (const m of noReduced.matchAll(
       /\b(?:transition|animation)(?:-duration)?\s*:/g,
     )) {
-      const decl = declValue(noReduced, m.index + m[0].length);
+      const decl = declValue(noReduced, m.index + m[0].length, isCss);
       if ([...INFINITE_ALLOWLIST.keys()].some((n) => decl.includes(n))) continue;
       if ([...flaggedInfinite].some((n) => decl.includes(n))) continue;
       const exemptKey = [...DURATION_EXEMPT.keys()].find(
@@ -555,8 +634,15 @@ for (const root of present) {
     }
 
     // -- Rule 4: transitioning a layout property ----------------------------
-    for (const m of src.matchAll(/\btransition(?:-property)?\s*:/g)) {
-      const decl = declValue(src, m.index + m[0].length);
+    // The window also reads an ASSIGNMENT. `el.style.transition = "height …"` is
+    // how a FLIP is written and is exactly the shape this rule hunts, but the
+    // first version matched only a `transition:` declaration, so the one
+    // imperative site in the tree was invisible to it. Closing that is what
+    // surfaced `SettingsSheet.tsx`, whose exemption says why it is legitimate.
+    for (const m of src.matchAll(
+      /\btransition(?:-property)?\s*:|\.style\s*\.\s*transition(?:Property)?\s*=|\[\s*["']transition(?:Property)?["']\s*\]\s*=/g,
+    )) {
+      const decl = declValue(src, m.index + m[0].length, isCss);
       for (const prop of LAYOUT_PROPS) {
         const re = new RegExp(`(^|[\\s,"'\`])${prop}(\\s|,|$)`);
         if (!re.test(decl)) continue;
@@ -573,6 +659,96 @@ for (const root of present) {
             "off the main thread. Where the surrounding rows genuinely must move and " +
             "there is no transform equivalent, record it in LAYOUT_EXEMPT with the reason.",
           line: lineOf(src, m.index),
+        });
+      }
+    }
+
+    // -- Rule 6: a raw duration, curve or easing keyword --------------------
+    // The rule that makes the vocabulary hold. Everything below the 300ms
+    // ceiling was invisible to every gate in this tree, which is how it
+    // accumulated 90ms, 100ms and 140ms transitions, a whole foreign curve family
+    // in `mobile/src`, and bare `ease` in the shared `editor/` package that ships
+    // to all three clients. Rule 3 catches only the over-ceiling case, so the
+    // common shape was the ungated one.
+    //
+    // Scoped deliberately, in three ways:
+    //   - `noReduced`, so a `prefers-reduced-motion` block's SLOW-DOWNS (1600ms,
+    //     2.4s) are not flagged. They are the canon being kept.
+    //   - Token references are stripped before the search, so only what carries a
+    //     literal is reported, and `var(--x, 200ms)` is a stated fallback.
+    //   - An allowlisted infinite animation is skipped: a LOOP's period is not the
+    //     interaction scale (it is routinely longer than any transition token) and
+    //     its symmetric curve is part of the definition the allowlist admitted by
+    //     name. `ease-in` is left to rule 1 so one defect gets one message.
+    for (const m of noReduced.matchAll(
+      /\b(?:transition|animation)(?:-duration|-timing-function)?\s*:|\.style\s*\.\s*(?:transition|animation)(?:Duration|TimingFunction)?\s*=|\[\s*["'](?:transition|animation)(?:Duration|TimingFunction)?["']\s*\]\s*=/g,
+    )) {
+      const decl = declValue(noReduced, m.index + m[0].length);
+      // A FEATURE QUERY is not a declaration: `@supports (transition-timing-
+      // function: linear(0, 1))` guards the `--ease-spring` upgrade and would
+      // otherwise read as a curve literal.
+      const lineStart = noReduced.lastIndexOf("\n", m.index) + 1;
+      if (/@(?:supports|media|container)\b/.test(noReduced.slice(lineStart, m.index))) continue;
+      if ([...INFINITE_ALLOWLIST.keys()].some((n) => decl.includes(n))) continue;
+      if ([...flaggedInfinite].some((n) => decl.includes(n))) continue;
+      // A reasoned over-ceiling exemption excuses its whole declaration, so rule 3
+      // and rule 6 do not both report the same line.
+      const durationExempt = [...DURATION_EXEMPT.keys()].find(
+        (k) => k.startsWith(`${rel}:`) && decl.includes(k.slice(rel.length + 1)),
+      );
+      if (durationExempt !== undefined) {
+        usedDurationExempt.add(durationExempt);
+        continue;
+      }
+      const bare = decl.replace(/var\([^)]*\)/g, " ");
+
+      const duration = /\b\d+(?:\.\d+)?m?s\b/.exec(bare);
+      if (duration !== null) {
+        // Above the ceiling is rule 3's, and it says something more specific
+        // (which token to reach for). One defect, one message.
+        const ms = duration[0].endsWith("ms")
+          ? Number.parseFloat(duration[0])
+          : Number.parseFloat(duration[0]) * 1000;
+        if (ms > 300) continue;
+        findings.push({
+          rel,
+          rule: "literal-duration",
+          detail:
+            `\`${duration[0]}\` is a duration written out rather than named. A literal ` +
+            "cannot be retuned centrally and cannot be found by anyone looking for it. " +
+            "Use `var(--duration-instant|fast|base|slow)` for the restrained tier, or " +
+            "`var(--duration-slower)` for the one named ceiling-breaker; the scale is " +
+            "declared in `client-core/src/tokens.css`.",
+          line: lineOf(noReduced, m.index),
+        });
+        continue;
+      }
+
+      if (/cubic-bezier\(|linear\(|steps\(/.test(bare)) {
+        findings.push({
+          rel,
+          rule: "literal-curve",
+          detail:
+            "A curve written out rather than named. Use `var(--ease-standard)` for an " +
+            "entrance or a standard transition, `var(--ease-out)` for an exit, or " +
+            "`var(--ease-emphasized)` on the expressive tier. A copied curve is usually " +
+            "`--ease-standard` typed out by hand, which no reader looking for the token " +
+            "will ever find.",
+          line: lineOf(noReduced, m.index),
+        });
+        continue;
+      }
+
+      const keyword = /\b(?:linear|ease-in-out|ease-out|ease|step-start|step-end)\b(?!-)/.exec(bare);
+      if (keyword !== null) {
+        findings.push({
+          rel,
+          rule: "literal-easing",
+          detail:
+            `\`${keyword[0]}\` is a bare easing keyword, and written as \`ease\` it is the ` +
+            "CSS-initial ease-in-out. Name the curve: `var(--ease-standard)` or " +
+            "`var(--ease-out)`.",
+          line: lineOf(noReduced, m.index),
         });
       }
     }

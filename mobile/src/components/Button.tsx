@@ -3,14 +3,27 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 /**
- * Buttons — design-accurate geometry (h:52 primary/secondary, h:48 ghost,
- * r:6), colours from tokens so dark/amoled track automatically. UI-only:
- * `disabled` renders the 0.6-opacity state from the design but does nothing.
+ * Buttons.
+ *
+ * Appearance and every interactive state live in `@myne/client-core`'s
+ * `components.css` under `.myne-btn`, which `mobile/src/main.tsx` already loads
+ * and which the desktop `Button` renders through too. That means a press, a hover
+ * and a focus ring are one implementation across both clients and cannot drift
+ * apart, and it is where this button's press feedback came from: the file used to
+ * hand-write its own skins with no hover, no press and no transition at all.
+ *
+ * This file is the semantic shell. It picks a variant and applies the one thing
+ * that is a call-site decision, the full-width default.
+ *
+ * The touch GEOMETRY (52/48px, the larger type and gap) is mobile's own and lives
+ * in `mobile/src/styles/tokens.css` as an override rather than here, so what a
+ * button IS stays in the shared layer while how BIG it is stays in one stylesheet.
  */
 export function Button({
   variant = "primary",
   full = true,
   children,
+  className,
   style,
   ...rest
 }: {
@@ -18,36 +31,15 @@ export function Button({
   full?: boolean;
   children: ReactNode;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const base = {
-    height: variant === "ghost" ? 48 : 52,
-    width: full ? "100%" : undefined,
-    border: "none",
-    borderRadius: 6,
-    padding: "0 22px",
-    fontFamily: "var(--font-sans)",
-    fontSize: variant === "ghost" || variant === "secondary" ? 15 : 16,
-    fontWeight: 600,
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    opacity: rest.disabled ? 0.6 : 1,
-  } as const;
-
-  const skins = {
-    primary: { background: "var(--accent)", color: "var(--accent-on)" },
-    danger: { background: "var(--danger)", color: "#fff" },
-    secondary: {
-      background: "transparent",
-      color: "var(--fg-2)",
-      border: "1px solid var(--line-2)",
-    },
-    ghost: { background: "transparent", color: "var(--fg-1)", fontWeight: 500 as const },
-  }[variant];
-
   return (
-    <button {...rest} style={{ ...base, ...skins, ...style }}>
+    <button
+      {...rest}
+      data-variant={variant}
+      className={className === undefined ? "myne-btn" : `myne-btn ${className}`}
+      // After `...rest`, so a caller's `style` still wins over the default width
+      // the way it did before this component became a shell.
+      style={{ width: full ? "100%" : undefined, ...style }}
+    >
       {children}
     </button>
   );

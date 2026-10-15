@@ -22,9 +22,9 @@ import {
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 const ROW_ESTIMATED_HEIGHT = 48;
 
@@ -112,7 +112,7 @@ export function ListView({
         // A Tab stop, not a `-1` placeholder: see `makeViewRowHandlers`, whose
         // `key` entry is the other half (myne-md/myne#728).
         tabIndex={interactive ? 0 : undefined}
-        {...hoverSurface({ disabled: !interactive })}
+        {...interactiveSurface({ disabled: !interactive })}
         style={rowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
         onKeyDown={onOpenNote ? rows.key(row.noteId) : undefined}

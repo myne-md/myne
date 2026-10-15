@@ -23,7 +23,8 @@ import {
   deviceJoinQrErrorMessage,
 } from "../../lib/deviceJoinQr";
 import { svgToObjectUrl } from "../../lib/noteImageCard";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -203,7 +204,7 @@ export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {})
             cursor: canGenerate ? "pointer" : "default",
           }}
           disabled={!canGenerate}
-          {...hoverSurface({
+          {...interactiveSurface({
             restBg: "var(--bg-2)",
             hoverBg: "var(--paper-3)",
             disabled: !canGenerate,

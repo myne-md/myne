@@ -2367,6 +2367,12 @@ The addressable, recoverable person that Myne's first run is now rooted at (myne
 
 Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
 
+### **identity ceremony** &nbsp; 📦 *Product*
+
+The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0680`). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the identity is already registered server-side by the time the phrase renders, and the phrase is shown once, so Esc, a backdrop click and the close control are all withheld until the four words match. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
+
+Used in: `src/components/IdentitySetupDialog.tsx`, `mobile/src/app/flows/IdentityFlow.tsx`, `decisions/ui/0680`
+
 ### **identity-first first run** &nbsp; 📦 *Product*
 
 The zero-vault first-run shape on desktop and mobile in which the person identity is offered before a vault (`decisions/ui/0615`, myne-md/myne#768). It forks between creating an identity and starting with a local vault; the identity arm runs a sync-server step, creates the identity, and lands on the identity home from which a bound vault is created or a pending invite accepted. The identity step is skippable, and a skipped user owns an identity-less vault and can add an identity later from Settings. The web client has no identity-first first run, because identity setup is unsupported there and the browser first run stays at account bootstrap.
