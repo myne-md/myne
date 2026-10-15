@@ -59,13 +59,15 @@ function fm(...lines: readonly string[]): string {
 describe("the cover row in the Properties widget", () => {
   it("is hidden while the value is a valid cover", () => {
     const keys = renderedPropertyKeys(
-      fm("title: Roadmap", "folder: Projects/", `cover: "![[att:${ID}|photo.png]]"`),
+      fm("title: Roadmap", "status: draft", `cover: "![[att:${ID}|photo.png]]"`),
     );
     expect(keys).not.toContain("cover");
     // The control: `title` is promoted too, and its skip is the precedent.
     expect(keys).not.toContain("title");
-    // And an ordinary property is untouched by any of this.
-    expect(keys).toContain("folder");
+    // And an ordinary user property is untouched by any of this. (It used to be
+    // `folder:` here, which stopped being an ordinary row when an app-owned
+    // managed row became read-only: myne-md/myne#872.)
+    expect(keys).toContain("status");
   });
 
   it("is shown as an ordinary row when the value is not a valid cover", () => {

@@ -1502,6 +1502,7 @@
       "addListItem": "Add item…",
       "addListItemAriaLabel": "Add item to {{key}}",
       "addProperty": "+ Add property",
+      "managedField": "Myne writes this field",
       "propertiesLabel": "Properties",
       "removeListItemAriaLabel": "Remove {{item}}",
       "titleAriaLabel": "Note title",
