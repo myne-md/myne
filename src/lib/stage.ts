@@ -294,7 +294,20 @@ export type Stage =
        */
       name: "restore-backup";
       entry: "welcome" | "picker" | "corrupted" | "settings";
-    };
+    }
+  /**
+   * Desktop self-update in flight (myne-md/myne#870). The vault is locked by the
+   * time this stage is entered, which is why it is a stage and not an overlay:
+   * nothing under `editor` is mounted, so an overlay there would have unmounted
+   * with the trees it was drawn over.
+   *
+   * It carries no payload. The version being installed lives in the flow hook,
+   * not on the stage, because the stage's job is "which screen", and a
+   * successful install REPLACES the process rather than transitioning again.
+   * The only exit is the failure path, which is reprobe-based: the slot is
+   * Empty by then, so boot routing lands on `unlock` without a second action.
+   */
+  | { name: "updating" };
 
 /**
  * Action type sent to `transition`. Each action corresponds to a
@@ -510,7 +523,15 @@ export type Action =
    */
   | { type: "unlock.restore-backup" }
   /** editor → restore-backup (Settings → Storage entry; flow is pre-unlock-class). */
-  | { type: "editor.restore-backup" };
+  | { type: "editor.restore-backup" }
+  /**
+   * editor → updating. Dispatched by the notice's confirm, AFTER the caller has
+   * flushed the open panes and locked the vault, in that order: the flush is the
+   * only step that needs the keys, and the lock is what makes the confirmation
+   * copy true. Deliberately one action and no payload, so the reducer stays pure
+   * and the IPC ordering stays in the one place that can await it.
+   */
+  | { type: "editor.update-start" };
 
 /**
  * Pure transition function. Returns the next Stage given the previous
@@ -638,6 +659,11 @@ export function transition(prev: Stage, action: Action): Stage {
           // vault stays Unlocked (restore never touches the slot map) and
           // the reprobe exit routes by slot priority.
           return { name: "restore-backup", entry: "settings" };
+        case "editor.update-start":
+          // The notice's confirm (myne-md/myne#870). The caller has already
+          // flushed the open panes and locked the vault, so there is nothing
+          // left in this tree to tear down and no keys in the slot to keep.
+          return { name: "updating" };
         case "editor.create-vault":
           // "Create another vault" footer in the account-chip switcher
           // dropdown (MYND-205 task 5) → existing vault-creation flow. Same
@@ -720,6 +746,14 @@ export function transition(prev: Stage, action: Action): Stage {
       // No transition exits: the flow leaves via App.tsx's `reprobe()`
       // (MYND-219 / SYNC-16), so every (restore-backup × action) pair is
       // illegal by design.
+      return rejectIllegal(prev, action);
+    case "updating":
+      // No transition exits either (myne-md/myne#870), and for a stronger
+      // reason than `restore-backup`'s: a successful install replaces the
+      // running process, so there is no next stage to reach, and the failure
+      // path leaves via the same `reprobe()` once the vault is locked. "Try
+      // again" is not a transition, it is the flow hook re-entering its own
+      // working phase with the stage unchanged.
       return rejectIllegal(prev, action);
     case "account-entry":
       switch (action.type) {
@@ -1000,6 +1034,10 @@ const LEGAL: Record<string, Stage["name"]> = {
   // runs, which mobile has no analogue of (it re-addresses the load in place
   // from `editor`, its own one-row override).
   "unlock|unlock.join-success": "editor",
+  // The self-update flow (myne-md/myne#870). Desktop-only, and the only row
+  // here whose destination client cannot reach it at all: `selfUpdate` is
+  // absent on web and mobile, so nothing on either client can dispatch it.
+  "editor|editor.update-start": "updating",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
@@ -1051,6 +1089,9 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "recover", subStep: "password-reset" },
   { name: "recover", subStep: "delete-confirm" },
   { name: "picker" },
+  // The desktop self-update screen (myne-md/myne#870). Every (stage × action)
+  // pair is illegal from here, which this entry asserts.
+  { name: "updating" },
 ];
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
@@ -1082,6 +1123,11 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   // `editor` accepts it, and every other stage rejects it, which is what stops
   // the pre-#535 shape returning through a side door.
   { type: "editor.awaiting-approval" },
+  // The notice's confirm (myne-md/myne#870). Listed for the same both-halves
+  // reason as the row above: `editor` accepts it, `updating` and every other
+  // stage reject it, and an action the walk never sees is a legal pair nothing
+  // exercises.
+  { type: "editor.update-start" },
 ];
 
 /**

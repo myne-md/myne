@@ -120,7 +120,8 @@ import { dismissToast, toast } from "@app/components/toast/toastStore";
 import { TorStatusBanner } from "@app/components/sync/TorStatusBanner";
 import { TranscriptionModal } from "@app/components/attachments/TranscriptionModal";
 import { Unlock } from "@app/screens/Unlock";
-import { UpdateBanner } from "@app/components/UpdateBanner";
+import { UpdateNotice } from "@app/components/update/UpdateNotice";
+import { UpdatingScreen } from "@app/screens/UpdatingScreen";
 import { UsedInNotesPopover } from "@app/components/attachments/UsedInNotesPopover";
 import { VaultExportModal } from "@app/components/export/VaultExportModal";
 import { VaultPicker } from "@app/screens/VaultPicker";
@@ -158,6 +159,18 @@ const ATTACHMENT = {
   filename: "diagram.png",
   size: 204_800,
 };
+
+/**
+ * Synthetic release notes for the update-notice stories. The field is prose of
+ * unknown length (the host passes the updater manifest's own body through), so
+ * the sample is deliberately longer than one line: the notice clamps it, and a
+ * one-line fixture would hide whether the clamp works.
+ */
+const UPDATE_NOTES = [
+  "Attachments now sync in both directions, so a file added on a phone reaches every other device.",
+  "The task panel keeps its scroll position when you switch notes.",
+  "Fix: a note opened from a wikilink no longer steals the rename field on first render.",
+].join("\n");
 
 const COMMAND_CONTEXT = {
   stageName: "editor",
@@ -1208,18 +1221,128 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <SyncBanners />,
   },
   {
-    id: "components/updatebanner/default",
+    id: "components/updatenotice/offer",
     group: "components",
-    surface: "UpdateBanner",
-    state: "default",
-    description: "Update Banner, a default state.",
-    unreachable: {
-      what: "the desktop self-update banner",
-      why: "it appears only when the updater reports an available release, which the host does not answer here",
-    },
-    tags: ["components", "updatebanner", "default"],
+    surface: "UpdateNotice",
+    state: "offer",
+    description:
+      "The update notice offering a new version, with its release notes and the vault consequence stated before the press.",
+    tags: ["components", "updatenotice", "offer", "update"],
     fixture: "unlocked",
-    render: () => <UpdateBanner />,
+    render: () => (
+      <UpdateNotice
+        view="offer"
+        version="0.10.1"
+        notes={UPDATE_NOTES}
+        onRequestUpdate={action("onRequestUpdate")}
+        onConfirm={action("onConfirm")}
+        onCancel={action("onCancel")}
+        onLater={action("onLater")}
+        onReopen={action("onReopen")}
+      />
+    ),
+  },
+  {
+    id: "components/updatenotice/offer-no-notes",
+    group: "components",
+    surface: "UpdateNotice",
+    state: "offer-no-notes",
+    description:
+      "The same offer from a manifest that carries no release notes, which is the nullable half of the field.",
+    tags: ["components", "updatenotice", "offer", "update", "empty"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdateNotice
+        view="offer"
+        version="0.10.1"
+        notes={null}
+        onRequestUpdate={action("onRequestUpdate")}
+        onConfirm={action("onConfirm")}
+        onCancel={action("onCancel")}
+        onLater={action("onLater")}
+        onReopen={action("onReopen")}
+      />
+    ),
+  },
+  {
+    id: "components/updatenotice/confirm",
+    group: "components",
+    surface: "UpdateNotice",
+    state: "confirm",
+    description:
+      "The notice expanded into its confirm, naming the vault lock and the restart before anything starts.",
+    tags: ["components", "updatenotice", "confirm", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdateNotice
+        view="confirm"
+        version="0.10.1"
+        notes={UPDATE_NOTES}
+        onRequestUpdate={action("onRequestUpdate")}
+        onConfirm={action("onConfirm")}
+        onCancel={action("onCancel")}
+        onLater={action("onLater")}
+        onReopen={action("onReopen")}
+      />
+    ),
+  },
+  {
+    id: "components/updatenotice/pill",
+    group: "components",
+    surface: "UpdateNotice",
+    state: "pill",
+    description:
+      "The notice reduced to its pill, which is what it falls back to once it has announced itself and left the reading area.",
+    tags: ["components", "updatenotice", "pill", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdateNotice
+        view="pill"
+        version="0.10.1"
+        notes={UPDATE_NOTES}
+        onRequestUpdate={action("onRequestUpdate")}
+        onConfirm={action("onConfirm")}
+        onCancel={action("onCancel")}
+        onLater={action("onLater")}
+        onReopen={action("onReopen")}
+      />
+    ),
+  },
+  {
+    id: "components/updatingscreen/working",
+    group: "components",
+    surface: "UpdatingScreen",
+    state: "working",
+    description:
+      "The full-window updating surface mid install, with the version resolving once over the spinner.",
+    tags: ["components", "updatingscreen", "working", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdatingScreen
+        phase="working"
+        version="0.10.1"
+        onRetry={action("onRetry")}
+        onBackToUnlock={action("onBackToUnlock")}
+      />
+    ),
+  },
+  {
+    id: "components/updatingscreen/failed",
+    group: "components",
+    surface: "UpdatingScreen",
+    state: "failed",
+    description:
+      "The updating surface after a failed install, with the retry and the only honest way back, which is unlock.",
+    tags: ["components", "updatingscreen", "failed", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdatingScreen
+        phase="failed"
+        version="0.10.1"
+        onRetry={action("onRetry")}
+        onBackToUnlock={action("onBackToUnlock")}
+      />
+    ),
   },
   {
     id: "components/syncstatusindicator/default",

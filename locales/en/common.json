@@ -4013,12 +4013,34 @@
     "unsyncedOverflow_other": "…and {{count}} more."
   },
   "update": {
-    "banner": {
+    "notice": {
       "available": "Myne {{version}} is available.",
-      "failed": "Couldn't install the update. Try again.",
-      "installing": "Downloading the update…",
+      "consequence": "Updating locks your vault and restarts Myne. Your open notes are saved first.",
+      "flushFailed": "Myne could not save every open note, so the update did not start. Try again in a moment.",
+      "stageFailed": "Myne could not start the update because the app had already left the vault. Unlock it and try again.",
+      "lockFailed": "Myne could not lock your vault, so the update did not start.",
+      "primary": "Update and restart",
       "later": "Later",
-      "restart": "Restart to update"
+      "confirmTitle": "Update and restart Myne?",
+      "confirmBody": "Your vault will be locked and Myne will restart. Downloading and installing can take a few minutes on a slow connection.",
+      "confirmPrimary": "Lock vault and update",
+      "cancel": "Cancel",
+      "pill": "Update available"
+    },
+    "updating": {
+      "eyebrow": "Updating",
+      "heading": "Updating Myne",
+      "version": "Version {{version}}",
+      "caption": "Downloading and installing the new version.",
+      "hint": "Myne restarts on its own when this finishes. Leave the window open."
+    },
+    "failed": {
+      "eyebrow": "Update did not finish",
+      "heading": "The update did not finish",
+      "caption": "Myne {{version}} is still running and your notes are untouched.",
+      "hint": "Trying again starts the download over.",
+      "retry": "Try again",
+      "back": "Back to unlock"
     }
   },
   "sync": {
