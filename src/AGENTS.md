@@ -288,6 +288,7 @@ pnpm test               # Vitest — the only runner that exercises tests/ (outs
 pnpm test:e2e           # desktop E2E suite — Linux-only; on macOS use ./scripts/e2e-local.sh
 
 # the web lane compiles this same tree with the seam substituted
+pnpm web:local          # ONE command: web dev client on :1421 + a local sync server
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
 pnpm web:build          # typecheck web/ against src/ + production web bundle
 pnpm test:e2e:web       # browser E2E lane (e2e-web/)
