@@ -139,5 +139,6 @@
   "mobile/src/screens/sync/index.tsx": 3,
   "mobile/src/screens/system/index.tsx": 1,
   "mobile/src/screens/unlock/index.tsx": 1,
-  "mobile/src/screens/workspace/index.tsx": 4
+  "mobile/src/screens/workspace/index.tsx": 4,
+  "stories/src/stories/foundations.tsx": 2
 }

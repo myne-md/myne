@@ -62,7 +62,8 @@ import {
   ENROLL_PENDING_NOTICE,
 } from "../../lib/load-bearing-copy";
 import { refreshTorState } from "../../hooks/useTorState";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 
 interface JoinResult {
   /** The device_id this join registered (MYND-548) — used to name THIS device in
@@ -197,8 +198,8 @@ function btn(primary: boolean, disabled: boolean): CSSProperties {
  *  the button carries so a dimmed control stays inert. */
 function btnHover(primary: boolean, disabled: boolean) {
   return primary
-    ? hoverSurface({ restBg: "var(--accent)", hoverBg: "var(--accent-hover)", disabled })
-    : hoverSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
+    ? interactiveSurface({ restBg: "var(--accent)", hoverBg: "var(--accent-hover)", disabled })
+    : interactiveSurface({ restBg: "var(--bg-2)", hoverBg: "var(--paper-3)", disabled });
 }
 
 interface JoinDeviceModalProps {

@@ -7761,4 +7761,26 @@ export const ROSTER = Object.freeze([
     ],
     exemptionReason: "",
   },
+  {
+    id: "ui.press-feedback",
+    title: "Press feedback: the app answers a tap, and both platforms answer the same way",
+    paths: [
+      "src/components/primitives/pressSurface.ts",
+      "src/components/primitives/interactiveSurface.ts",
+      "client-core/src/motion.ts",
+      "mobile/src/components/Button.tsx",
+      "mobile/src/styles/tokens.css",
+    ],
+    clients: ["ios", "android"],
+    manual: [
+      {
+        see: "On a real iPhone and a real Android phone, open a screen with buttons and rows (the vault picker, a note list, the Settings sheet) and press one of each. Confirm the control visibly deepens the instant your finger goes down rather than when it comes back up, and that the step looks the same size on both phones. Confirm the platform's own tap flash does NOT appear on top of it: no grey rectangle over the control, no ripple ring. Then make a control inert (start a save in flight, or open a screen whose action is disabled) and confirm pressing it produces no step at all. Finally turn the OS Reduce Motion setting on one phone and repeat: the step must still appear, instantly, because what reduced motion suppresses is the animation rather than the answer.",
+        whyNotAutomated: "Two facts, each blocked by something different, and the first is the one this item exists for. Whether a control CONFIRMS a tap is a perceptual judgement carrying a stated pass condition above: the failure shape is a press with no answer, which reads as a slow app rather than as a missed tap, and no assertion encodes a person's read of that. The platform tap flash is an OS and WebView paint property: iOS WKWebView and Android System WebView each draw their own, neither is the engine any lane in this tree drives, and no lane builds for either platform at all. What IS asserted is the primitive and the class layer it shares its value with (tests/components/pressSurface.test.ts, whose assertions are proved by injection), and the desktop screen tree through the shared Vitest suite; MOBILE's own screen tree has no such assertion, so this item is the only place the handset half is observed rather than claimed.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
 ]);
