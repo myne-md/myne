@@ -6,7 +6,8 @@
 
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 
 const STYLE: CSSProperties = {
   display: "flex",
@@ -53,7 +54,7 @@ export function ReconcileBanner({ active, onDismiss }: ReconcileBannerProps) {
           aria-label={t("common.dismiss")}
           onClick={onDismiss}
           style={DISMISS_STYLE}
-          {...hoverSurface()}
+          {...interactiveSurface()}
           data-testid="sync.reconcile-banner-dismiss"
         >
           ×

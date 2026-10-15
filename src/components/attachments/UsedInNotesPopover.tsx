@@ -24,6 +24,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import type { NoteId } from "../../notes/sidebarState";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import type { TitleRecord } from "../../notes/loadNoteBatch";
 
 interface UsedInNotesPopoverProps {
@@ -58,6 +60,9 @@ const ITEM_STYLE: CSSProperties = {
   border: 0,
   cursor: "pointer",
   fontFamily: "var(--font-sans)",
+  // The menu row deepens on hover and on press through `interactiveSurface`, and
+  // without this the mutation lands as a single-frame jump rather than a settle.
+  transition: HOVER_TRANSITION,
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
   whiteSpace: "nowrap",
@@ -156,12 +161,7 @@ export function UsedInNotesPopover({
               data-testid="attachments.used-in-notes-row"
               data-note-id={id}
               style={ITEM_STYLE}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--paper-2)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
+              {...interactiveSurface({ hoverBg: "var(--paper-2)" })}
               onClick={() => {
                 onJump(id as NoteId);
                 onClose();

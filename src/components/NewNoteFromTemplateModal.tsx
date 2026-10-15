@@ -27,7 +27,8 @@ import type { TFunction } from "i18next";
 import { Icon } from "./primitives/Icon";
 import { Button } from "./primitives/Button";
 import { ModalShell } from "./primitives/ModalShell";
-import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { interactiveSurface } from "./primitives/interactiveSurface";
 import { listTemplates, type NoteId, type TitleRecord } from "../notes";
 
 interface NewNoteFromTemplateModalProps {
@@ -291,7 +292,7 @@ export function NewNoteFromTemplateModal({
                   type="button"
                   role="listitem"
                   style={ROW_STYLE}
-                  {...hoverSurface()}
+                  {...interactiveSurface()}
                   onClick={() => pickTemplate(rec)}
                   data-testid="new-from-template.row"
                 >

@@ -40,7 +40,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
-  ctaHover,
+  ctaInteraction,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { DEVICE_REVOKED_DISCLOSURE } from "../lib/load-bearing-copy";
@@ -108,7 +108,7 @@ export function DeviceRevoked({ onEraseLocalCopy, onDismiss }: DeviceRevokedProp
           type="button"
           onClick={onDismiss}
           style={CTA_STYLE}
-          {...ctaHover(false)}
+          {...ctaInteraction(false)}
           data-testid="device-revoked.cta"
         >
           {t("deviceRevoked.cta")}

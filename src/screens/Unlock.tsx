@@ -81,7 +81,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
-  ctaHover,
+  ctaInteraction,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { AuthHeading, AuthShell } from "./AuthShell";
@@ -726,7 +726,7 @@ export function Unlock({
           type="button"
           onClick={onResumeRecovery}
           style={ctaStyle(false)}
-          {...ctaHover(false)}
+          {...ctaInteraction(false)}
           data-testid="unlock.resume-cta"
         >
           <span>{t("unlock.continue")}</span>

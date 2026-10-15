@@ -36,7 +36,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
-import { hoverSurface, HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { HOVER_TRANSITION } from "./primitives/hoverSurface";
+import { interactiveSurface } from "./primitives/interactiveSurface";
 import { FolderGlyph } from "../notes/components/FolderGlyph";
 import { FOLDER_ICON_PATHS } from "../notes/folderIcons";
 import {
@@ -580,12 +581,7 @@ export function VaultSwitcher({
             setOpen(true);
           }
         }}
-        onMouseEnter={(e) => {
-          if (!open) e.currentTarget.style.background = "var(--paper-3)";
-        }}
-        onMouseLeave={(e) => {
-          if (!open) e.currentTarget.style.background = "transparent";
-        }}
+        {...interactiveSurface({ hoverBg: "var(--paper-3)", disabled: open })}
         aria-label={t("vaultSwitcher.switchVaultLabel")}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -751,7 +747,7 @@ export function VaultSwitcher({
               setOpen(false);
               onCreateAnother();
             }}
-            {...hoverSurface()}
+            {...interactiveSurface()}
             style={FOOTER_STYLE}
             data-testid="switcher.create-cta"
           >
@@ -767,7 +763,7 @@ export function VaultSwitcher({
                 setOpen(false);
                 onJoinDevice();
               }}
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={FOOTER_STYLE}
               data-testid="switcher.join-cta"
             >

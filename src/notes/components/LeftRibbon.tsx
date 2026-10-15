@@ -15,7 +15,8 @@ import { useCallback, useEffect, useMemo, useReducer, useState, type CSSProperti
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS } from "../../commands";
 import { Icon } from "../../components/primitives/Icon";
-import { hoverSurface, HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 import { setRibbonItems } from "../../lib/prefs";
 import { VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -270,7 +271,7 @@ export function LeftRibbon({
         const vis = ribbonCommands.visibility?.(id) ?? "show";
         const dimmed = vis === "disabled";
         const label = action.disabledHint !== undefined && dimmed ? action.disabledHint : action.label;
-        const hover = hoverSurface({ disabled: dimmed });
+        const hover = interactiveSurface({ disabled: dimmed });
         const showDrop = dropAt?.id === id;
         return (
           <div key={id} style={RAIL_ITEM_STYLE}>

@@ -31,9 +31,9 @@ import {
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 /** The column-header pseudo-item prepended to the group stream. */
 type ColHeaderItem = { kind: "colheader"; key: string };
@@ -177,7 +177,7 @@ export function TableView({
         // A Tab stop, not a `-1` placeholder: see `makeViewRowHandlers`, whose
         // `key` entry is the other half (myne-md/myne#728).
         tabIndex={interactive ? 0 : undefined}
-        {...hoverSurface({ restBg: "var(--paper)", disabled: !interactive })}
+        {...interactiveSurface({ restBg: "var(--paper)", disabled: !interactive })}
         style={dataRowStyle}
         onClick={onOpenNote ? rows.click(row.noteId) : undefined}
         onKeyDown={onOpenNote ? rows.key(row.noteId) : undefined}

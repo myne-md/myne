@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { isRtl } from "./util";
 
 /**
@@ -90,7 +91,7 @@ export function useSwipeBack(
       if (from > 0 && typeof el.animate === "function") {
         el.animate(
           [{ transform: `translateX(${sign * from}px)` }, { transform: "translateX(0)" }],
-          { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+          { duration: motionDurationMs("--duration-base"), easing: motionEasing("--ease-emphasized") },
         );
       }
     };
