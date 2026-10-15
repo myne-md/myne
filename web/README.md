@@ -43,11 +43,34 @@ web/
 
 ```bash
 ./scripts/build-wasm.sh   # wasm-bindgen glue into web/wasm/pkg/ — needed FIRST
+pnpm web:local    # ONE command: dev client on :1421 + a local sync server
 pnpm web:dev      # Vite dev server on :1421 (desktop dev keeps :1420)
 pnpm web:build    # typecheck + production bundle into web/dist/
 pnpm web:preview  # serve the built bundle
 pnpm test:e2e:web # the browser E2E lane (needs a WebDriver on :4544)
 ```
+
+`pnpm web:local` is the contributor's way in. It builds the wasm package if it is
+missing, starts `myne-server` on `127.0.0.1:8787` with its store under
+`.opencode/dev-sync-store*/` (a run that has to move off that port gets a store of its
+own, so two servers never write one directory), and serves the dev client pointed at
+that server through `/config.json`. Both halves are needed because this client cannot be
+opened any other way from this tree: it refuses to boot without cross-origin isolation, and
+it has no offline first run, so a sync server is not optional either. `pnpm web:dev`
+stays for the case where a server is already running, and serves the same headers and
+the same `/config.json` (`MYNE_DEV_SYNC_ORIGIN` overrides the origin it names).
+
+From a worktree it finds the sync server beside the **main** checkout rather than
+beside itself: companion repos are cloned into the main checkout and a worktree has
+none, so `git rev-parse --git-common-dir` is where the second look goes
+(`MYNE_SERVER_DIR` overrides both). The store still belongs to the checkout you are
+standing in, so two worktrees never share accounts.
+
+**What the dev server does not have is the Content-Security-Policy, and it cannot.**
+Vite's dev client is an inline module script, which `script-src 'self'` refuses, so a
+dev server sending the production policy would not serve a working dev client. No
+security claim about this client is checked in dev for that reason: the container and
+the `e2e-web` lane load the built bundle with the real `securityHeaders()`.
 
 `web/wasm/pkg/` is a derived artefact and gitignored, but `src/worker/worker.ts`
 imports it by path — so a clone that has never run `build-wasm.sh`, or one where
@@ -85,11 +108,13 @@ implementation — the wasm Worker, OPFS persistence, browser dialogs, downloads
 — and the target has its own CI lane. `web-build` typechecks and bundles, then
 runs the seam contract against this implementation plus the artefact greps, the
 bundle budget and the screen/surface/testid rosters; `e2e-web` drives the built
-bundle in a real browser. On `develop`, `web-docker-build` →
-`web-docker-deploy` → `web-smoke` build the `container/` image, refuse to deploy
-a bundle whose hash is not already published in
-[`docs/web-bundle-hashes.md`](../docs/web-bundle-hashes.md), and smoke the
-result over the public origin — the maintainer-run instance at `app.myne.md`.
+bundle in a real browser. Publishing is **by hand** and not in the pipeline
+(myne-md/myne#584): `web-container-check` builds the `container/` image to ask it
+questions, and the deploy that publishes `app.myne.md` is one procedure in the
+`myne-ops` runbook `web-client-deploy.md`, carrying its
+`check-bundle-record.mjs --has` precondition against
+[`docs/web-bundle-hashes.md`](../docs/web-bundle-hashes.md) and its post-deploy smoke.
+CI verifies and does not publish, so a green pipeline is not a release.
 
 **Durability is not the desktop's, and cannot be.** OPFS offers no crash-atomic
 rename — Safari does not implement `FileSystemFileHandle.move()` at all — so a

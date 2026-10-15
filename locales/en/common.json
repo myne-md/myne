@@ -3821,6 +3821,7 @@
       "optionSource": "Source"
     },
     "strength": {
+      "tooWeak": "Too weak",
       "weak": "Weak",
       "fair": "Fair",
       "good": "Good",
@@ -5040,10 +5041,13 @@
       "title": "Save your identity phrase",
       "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
       "reveal": "Reveal",
-      "typebackLead": "To confirm you saved it, type these four words from the phrase above.",
+      "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
       "continue": "Continue"
+    },
+    "typeback": {
+      "title": "Confirm your phrase"
     },
     "home": {
       "title": "Your identity",
@@ -5069,8 +5073,11 @@
     "heldIntro": "This device already holds an identity. Recover it with its 24-word phrase below.",
     "intro": "An identity lets people address an invite to you before you own any vault. It creates no vault and stores no notes.",
     "pending": "This device is waiting for another device on the account to approve it.",
+    "phraseTitle": "Save your identity phrase",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
-    "typeBackLead": "To confirm you saved it, type these four words from the phrase above.",
+    "phraseContinue": "Continue",
+    "confirmTitle": "Confirm your phrase",
+    "typeBackLead": "Enter these four words from the identity phrase you just saved.",
     "typeBackMismatch": "That does not match word #{{pos}}.",
     "typeBackWordAtPosition": "Word #{{pos}}",
     "recoverCta": "Recover an identity",
@@ -5098,7 +5105,14 @@
     "invitesLoading": "Checking for invitations…",
     "noInvites": "No invitations yet.",
     "subtitle": "You have an identity on this device, so people can invite you to a vault. You do not need to create one to be invited.",
+    "stepIndicator": "Step {{n}} of {{total}} · {{label}}",
+    "stepVerifyOwner": "Verify the owner",
+    "stepRecoveryPhrase": "Recovery phrase",
+    "stepDevicePassword": "Device password",
+    "phraseHeading": "Enter your recovery phrase",
+    "passwordHeading": "Password for this device",
     "accept": "Accept",
+    "acceptHeading": "Accept this invitation",
     "acceptHint": "Paste the owner’s identity code (they share it when they invite you).",
     "acceptOwnerCodeLabel": "Owner identity code",
     "acceptInspect": "Check fingerprint",
@@ -5106,6 +5120,7 @@
     "acceptConfirm": "I confirmed this fingerprint with the owner out of band",
     "acceptSubmit": "Accept and unlock",
     "acceptPhraseLabel": "Your recovery phrase",
+    "acceptPhraseHint": "Enter the 24 words of your recovery phrase. It is yours, not the vault owner’s.",
     "acceptPasswordNote": "Choose a password for this device. It is separate from the vault owner’s password and from your recovery phrase: it unlocks this vault on this device, and your phrase remains the portable way back in.",
     "acceptError": "The invite could not be accepted.",
     "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
