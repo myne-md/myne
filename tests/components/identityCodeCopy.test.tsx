@@ -320,7 +320,13 @@ describe("IdentityHome invite phrase", () => {
     fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
     await screen.findByTestId("identity-home.accept-sas");
     fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
+    // Two steps now (myne-md/myne#871): the fingerprint confirmation releases the
+    // owner step, the 24 cells release the phrase step.
+    fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
+    await screen.findByTestId("identity-home.accept-phrase-grid");
     fillIdentityPhrase();
+    fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
+    await screen.findByTestId("identity-home.accept.password-input");
     // The accept form now carries a REQUIRED device-local password (myne-md/myne#851
     // task 7), and its own submit is the accept button: the phrase alone no longer
     // enables it.

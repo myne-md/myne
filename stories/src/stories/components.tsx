@@ -62,6 +62,7 @@ import { FailClosedError } from "@app/components/FailClosedError";
 import { FirstRunServerStep } from "@app/components/sync/FirstRunServerStep";
 import { Icon } from "@app/components/primitives/Icon";
 import { IdentityHome } from "@app/screens/IdentityHome";
+import { AcceptInviteWizard, JoinVaultWizard } from "@app/components/sync/InviteWizard";
 import { IdentitySetupDialog } from "@app/components/IdentitySetupDialog";
 import { ImportPlainFileButton } from "@app/components/plain/ImportPlainFileButton";
 import { IntegrityAlertBanner } from "@app/components/sync/IntegrityAlertBanner";
@@ -1746,6 +1747,44 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onCreateVault={action("onCreateVault")}
         onAccepted={action("onAccepted")}
         onForgotten={action("onForgotten")}
+      />
+    ),
+  },
+  {
+    id: "components/invitewizard/accept",
+    group: "components",
+    surface: "InviteWizard",
+    state: "accept",
+    description:
+      "Step 1 of 3 of accepting an invitation (myne-md/myne#871): the owner's identity code, its fingerprint check, and the out-of-band confirmation that gates Continue. The member's own phrase and the device password are the two steps that follow, each on its own screen.",
+    tags: ["components", "invitewizard", "accept", "onboarding", "wizard"],
+    fixture: {
+      description: "an unclaimed invite addressed to this identity; nothing is submitted from this step",
+    },
+    render: () => (
+      <AcceptInviteWizard
+        invite={{ invite_id_hex: "aa", vault_account_hash_hex: "bb".repeat(32), claimed: false }}
+        onCancel={action("onCancel")}
+        onAccepted={action("onAccepted")}
+      />
+    ),
+  },
+  {
+    id: "components/invitewizard/join",
+    group: "components",
+    surface: "InviteWizard",
+    state: "join",
+    description:
+      "Step 1 of 2 of adding an already-shared vault to this device (myne-md/myne#871): the recovery phrase and nothing else. There is deliberately no owner-code field here, because the owner this device verifies against is the one its own per-(person, vault) profile already pins.",
+    tags: ["components", "invitewizard", "join", "onboarding", "wizard"],
+    fixture: {
+      description: "a claimed invite this identity can install with the phrase; nothing is submitted from this step",
+    },
+    render: () => (
+      <JoinVaultWizard
+        invite={{ invite_id_hex: "cc", vault_account_hash_hex: "dd".repeat(32), claimed: true }}
+        onCancel={action("onCancel")}
+        onAccepted={action("onAccepted")}
       />
     ),
   },

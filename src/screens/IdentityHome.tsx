@@ -15,14 +15,7 @@
 // rather than the bare column it shipped with, so the invite list scrolls
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type CSSProperties,
-  type ChangeEvent,
-  type ClipboardEvent,
-} from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
@@ -32,22 +25,15 @@ import {
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
-import { PasswordCreateForm } from "../components/PasswordCreateForm";
-import { MULTILINE_STYLE } from "../components/settings/panel-styles";
 import { MyneMark } from "../components/primitives/MyneMark";
-import {
-  personListInvites,
-  personAcceptInvite,
-  personJoinVault,
-  type InviteSummary,
-} from "../lib/personAccount";
+import { personListInvites, type InviteSummary } from "../lib/personAccount";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
-import { inspectInviteCode, personLock } from "../lib/invite";
+import { personLock } from "../lib/invite";
 import { copyText } from "../lib/clipboard";
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../components/sync/EnrollPhraseCredential";
+import { AcceptInviteWizard, JoinVaultWizard } from "../components/sync/InviteWizard";
 import { MemberNameGate } from "../components/sync/MemberNameGate";
 
 /** How often the pending-invite list re-polls while the identity home is
@@ -58,8 +44,8 @@ import { MemberNameGate } from "../components/sync/MemberNameGate";
 const INVITE_POLL_MS = 5000;
 
 /** Whether a freshly fetched invite list differs from the one on screen. Used to
- *  skip the state update when nothing changed, so a 5 s poll does not re-render
- *  the list (and disturb an open Accept form) for no reason. */
+ *  skip the state update when nothing changed, so the 5 s poll does not re-render
+ *  the list for no reason. */
 function sameInvites(previous: InviteSummary[] | null, next: InviteSummary[]): boolean {
   if (previous === null || previous.length !== next.length) return false;
   return previous.every(
@@ -173,27 +159,6 @@ const INVITE_HASH_STYLE: CSSProperties = {
   userSelect: "all",
 };
 
-const ACCEPT_FORM_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  paddingTop: "var(--space-2)",
-  borderTop: "1px solid var(--line-1)",
-};
-
-const FINGERPRINT_STYLE: CSSProperties = {
-  display: "block",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  padding: "var(--space-2) var(--space-3)",
-  wordBreak: "break-all",
-  userSelect: "all",
-};
-
 const CHECKBOX_LABEL_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -254,29 +219,22 @@ export function IdentityHome({
   const { t } = useTranslation();
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [accepting, setAccepting] = useState<string | null>(null);
-  // The join-on-this-device path (myne-md/myne#852 task 7). Deliberately a SECOND
-  // set of state rather than a mode flag on the accept above: the two forms differ
-  // in what they collect (the join collects no owner code) and in what follows them
-  // (the accept owes the name gate, the join must not touch a name at all).
-  const [joining, setJoining] = useState<string | null>(null);
-  const [joinPhraseCells, setJoinPhraseCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [ownerCode, setOwnerCode] = useState("");
-  const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  // Which invite each wizard is open for (myne-md/myne#871), or null for none.
+  // The screen owns only that choice: the wizard owns its own step, its own
+  // fields and its own secrets, so unmounting it (Cancel, or the accept
+  // succeeding) discards all of them with no cleanup to forget.
+  const [acceptingInvite, setAcceptingInvite] = useState<InviteSummary | null>(null);
+  // The join-on-this-device path (myne-md/myne#852 task 7) is deliberately its
+  // own wizard rather than a mode on the accept: the two differ in what they
+  // collect (the join collects no owner code) and in what follows them (the
+  // accept owes the name gate, the join must not touch a name at all).
+  const [joiningInvite, setJoiningInvite] = useState<InviteSummary | null>(null);
   // The required name step (myne-md/myne#851 task 8, stories 5 to 7). The accept
   // is COMMITTED by the time this opens, and `onAccepted` (which reprobes and lands
   // the member in the editor) is withheld until the gate completes: an accepted
   // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
-  const [acceptPhraseCells, setAcceptPhraseCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
-  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
   // Forget-this-identity-on-this-device (myne-md/myne#782). A short
   // acknowledgement gates the destructive button; the warning above it is the
@@ -379,6 +337,36 @@ export function IdentityHome({
     );
   }
 
+  // Both wizards replace the whole card rather than expanding inside it, the way
+  // the vault-creation steps own their screen. `key` on the invite id means
+  // switching invites (or reopening the same one after a Cancel) starts a fresh
+  // wizard rather than resuming one whose fields the previous invite's flow
+  // filled.
+  if (acceptingInvite) {
+    return (
+      <AcceptInviteWizard
+        key={acceptingInvite.invite_id_hex}
+        invite={acceptingInvite}
+        onCancel={() => setAcceptingInvite(null)}
+        onAccepted={() => {
+          setAcceptingInvite(null);
+          setNameGateOpen(true);
+        }}
+      />
+    );
+  }
+
+  if (joiningInvite) {
+    return (
+      <JoinVaultWizard
+        key={joiningInvite.invite_id_hex}
+        invite={joiningInvite}
+        onCancel={() => setJoiningInvite(null)}
+        onAccepted={onAccepted}
+      />
+    );
+  }
+
   return (
     <CenteredCard>
       <div data-testid="identity-home.root" style={{ display: "contents" }}>
@@ -472,159 +460,11 @@ export function IdentityHome({
                     <Button
                       type="button"
                       data-testid="identity-home.accept-open"
-                      onClick={() => {
-                        setAccepting(inv.invite_id_hex);
-                        setOwnerCode("");
-                        setOwnerFingerprint(null);
-                        setConfirmed(false);
-                        setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                        setAcceptError(null);
-                      }}
+                      onClick={() => setAcceptingInvite(inv)}
                     >
                       {t("identityHome.accept")}
                     </Button>
                   </div>
-                  {accepting === inv.invite_id_hex ? (
-                    <div data-testid="identity-home.accept-form" style={ACCEPT_FORM_STYLE}>
-                      <p style={BODY_SMALL_STYLE}>{t("identityHome.acceptHint")}</p>
-                      <textarea
-                        data-testid="identity-home.accept-owner-code"
-                        aria-label={t("identityHome.acceptOwnerCodeLabel")}
-                        value={ownerCode}
-                        onChange={(e) => {
-                          setOwnerCode(e.target.value);
-                          setOwnerFingerprint(null);
-                          setConfirmed(false);
-                          setAcceptError(null);
-                        }}
-                        rows={3}
-                        style={MULTILINE_STYLE}
-                      />
-                      {ownerFingerprint === null ? (
-                        <Button
-                          type="button"
-                          data-testid="identity-home.accept-inspect"
-                          disabled={ownerCode.trim() === ""}
-                          onClick={async () => {
-                            try {
-                              const view = await inspectInviteCode(ownerCode.trim());
-                              setOwnerFingerprint(view.fingerprint_hex);
-                            } catch {
-                              setAcceptError(t("identityHome.acceptInvalid"));
-                            }
-                          }}
-                        >
-                          {t("identityHome.acceptInspect")}
-                        </Button>
-                      ) : (
-                        <div data-testid="identity-home.accept-sas" style={BLOCK_STYLE}>
-                          <p style={BODY_SMALL_STYLE}>{t("identityHome.acceptSasHint")}</p>
-                          <code
-                            data-testid="identity-home.accept-owner-fingerprint"
-                            style={FINGERPRINT_STYLE}
-                          >
-                            {ownerFingerprint}
-                          </code>
-                          <label style={CHECKBOX_LABEL_STYLE}>
-                            <input
-                              type="checkbox"
-                              data-testid="identity-home.accept-confirm"
-                              checked={confirmed}
-                              onChange={(e) => setConfirmed(e.target.checked)}
-                              style={CHECKBOX_STYLE}
-                            />
-                            {t("identityHome.acceptConfirm")}
-                          </label>
-                          <EnrollPhraseCredential
-                            baseId="identity-home-accept"
-                            label={t("identityHome.acceptPhraseLabel")}
-                            cells={acceptPhraseCells}
-                            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
-                              setAcceptError(null);
-                              setAcceptPhraseCells((cells) =>
-                                cells.map((cell, cellIndex) =>
-                                  cellIndex === index
-                                    ? event.target.value.replace(/\s+/g, "")
-                                    : cell,
-                                ),
-                              );
-                            }}
-                            onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-                              const tokens = event.clipboardData
-                                .getData("text")
-                                .split(/\s+/)
-                                .filter((token) => token.length > 0);
-                              if (tokens.length < 2) return;
-                              event.preventDefault();
-                              setAcceptError(null);
-                              setAcceptPhraseCells((cells) => {
-                                const next = [...cells];
-                                for (
-                                  let i = 0;
-                                  i < tokens.length && index + i < PHRASE_CELL_COUNT;
-                                  i += 1
-                                ) {
-                                  next[index + i] = tokens[i];
-                                }
-                                return next;
-                              });
-                            }}
-                            gridTestId="identity-home.accept-phrase-grid"
-                            cellTestId={(index) =>
-                              index === 0
-                                ? "identity-home.accept-phrase"
-                                : `identity-home.accept-phrase-cell-${index + 1}`
-                            }
-                          />
-                          {/* The REQUIRED device-local credential (myne-md/myne#851
-                              task 7). This form's own submit IS the accept button,
-                              so the phrase, the out-of-band confirmation and a
-                              password meeting the project floor are all satisfied in
-                              one gesture, and an accepted vault always carries a
-                              credential this device can open it with. The copy says
-                              plainly that this is not the owner's password. */}
-                          <PasswordCreateForm
-                            testIdPrefix="identity-home.accept"
-                            submitLabel={t("identityHome.acceptSubmit")}
-                            disabled={
-                              !confirmed || !acceptPhraseCells.every((cell) => cell.length > 0)
-                            }
-                            autoFocus={false}
-                            helperCopy={
-                              <p
-                                data-testid="identity-home.accept-password-note"
-                                style={BODY_SMALL_STYLE}
-                              >
-                                {t("identityHome.acceptPasswordNote")}
-                              </p>
-                            }
-                            onSubmit={async (password) => {
-                              try {
-                                await personAcceptInvite(
-                                  inv.invite_id_hex,
-                                  ownerCode.trim(),
-                                  acceptPhraseCells.join(" "),
-                                  password,
-                                );
-                                setAcceptPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
-                                setNameGateOpen(true);
-                              } catch (error) {
-                                // Surface WHICH failure it was, not only "could
-                                // not be accepted": the kinds are a closed enum
-                                // and carry no secret (myne-md/myne#794).
-                                setAcceptError(t(acceptErrorKey(error)));
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
-                      {acceptError ? (
-                        <DestructiveBanner testId="identity-home.accept-error">
-                          {acceptError}
-                        </DestructiveBanner>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               ))}
               {claimed.length > 0 ? (
@@ -642,112 +482,11 @@ export function IdentityHome({
                         <Button
                           type="button"
                           data-testid="identity-home.join-open"
-                          onClick={() => {
-                            setJoining(inv.invite_id_hex);
-                            setJoinPhraseCells(
-                              Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-                            );
-                            setJoinError(null);
-                          }}
+                          onClick={() => setJoiningInvite(inv)}
                         >
                           {t("identityHome.join")}
                         </Button>
                       </div>
-                      {joining === inv.invite_id_hex ? (
-                        <div data-testid="identity-home.join-form" style={ACCEPT_FORM_STYLE}>
-                          <p style={BODY_SMALL_STYLE}>{t("identityHome.joinHint")}</p>
-                          {/* There is deliberately NO owner-code field here, and the
-                              absence is load-bearing rather than a simplification: the
-                              owner this device verifies the group package against is the
-                              one its own per-(person, vault) profile already pins
-                              (`decisions/protocol/0675`). A field would let whatever is
-                              pasted into it become the trust anchor, which is the one
-                              thing the pin exists to prevent. */}
-                          <EnrollPhraseCredential
-                            baseId="identity-home-join"
-                            label={t("identityHome.joinPhraseLabel")}
-                            cells={joinPhraseCells}
-                            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
-                              setJoinError(null);
-                              setJoinPhraseCells((cells) =>
-                                cells.map((cell, cellIndex) =>
-                                  cellIndex === index
-                                    ? event.target.value.replace(/\s+/g, "")
-                                    : cell,
-                                ),
-                              );
-                            }}
-                            onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-                              const tokens = event.clipboardData
-                                .getData("text")
-                                .split(/\s+/)
-                                .filter((token) => token.length > 0);
-                              if (tokens.length < 2) return;
-                              event.preventDefault();
-                              setJoinError(null);
-                              setJoinPhraseCells((cells) => {
-                                const next = [...cells];
-                                for (
-                                  let i = 0;
-                                  i < tokens.length && index + i < PHRASE_CELL_COUNT;
-                                  i += 1
-                                ) {
-                                  next[index + i] = tokens[i];
-                                }
-                                return next;
-                              });
-                            }}
-                            gridTestId="identity-home.join-phrase-grid"
-                            cellTestId={(index) =>
-                              index === 0
-                                ? "identity-home.join-phrase"
-                                : `identity-home.join-phrase-cell-${index + 1}`
-                            }
-                          />
-                          <PasswordCreateForm
-                            testIdPrefix="identity-home.join"
-                            submitLabel={t("identityHome.joinSubmit")}
-                            disabled={!joinPhraseCells.every((cell) => cell.length > 0)}
-                            autoFocus={false}
-                            helperCopy={
-                              <p
-                                data-testid="identity-home.join-password-note"
-                                style={BODY_SMALL_STYLE}
-                              >
-                                {t("identityHome.joinPasswordNote")}
-                              </p>
-                            }
-                            onSubmit={async (password) => {
-                              try {
-                                await personJoinVault(
-                                  inv.invite_id_hex,
-                                  inv.vault_account_hash_hex,
-                                  joinPhraseCells.join(" "),
-                                  password,
-                                );
-                                setJoinPhraseCells(
-                                  Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-                                );
-                                // Straight to the editor: a join installs a vault this
-                                // identity is ALREADY a member of, so there is no name to
-                                // set and no gate to pass. The accept above owes one
-                                // because it is what creates a member; this path must not
-                                // write a name, or a second device would silently re-name
-                                // a person its first device had already named
-                                // (myne-md/myne#852 task 7).
-                                onAccepted();
-                              } catch (error) {
-                                setJoinError(t(joinErrorKey(error)));
-                              }
-                            }}
-                          />
-                          {joinError ? (
-                            <DestructiveBanner testId="identity-home.join-error">
-                              {joinError}
-                            </DestructiveBanner>
-                          ) : null}
-                        </div>
-                      ) : null}
                     </div>
                   ))}
                 </div>

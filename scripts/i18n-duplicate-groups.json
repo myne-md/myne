@@ -411,6 +411,14 @@
     "reason": "Same slow-operation hint on the encrypting and decrypting footers; one hint, two flows."
   },
   {
+    "value": "Step {{n}} of {{total}} · {{label}}",
+    "keys": [
+      "identityHome.stepIndicator",
+      "vaultCreation.stepIndicator"
+    ],
+    "reason": "One step-counter sentence for every multi-step flow, so \"Step 2 of 3\" reads the same wherever it appears (myne-md/myne#871). The keys stay separate because the vocabularies are: vault creation's steps are enumerated in stepOrder.ts, these are the invite wizards', and the value is the sentence only rather than a shared component."
+  },
+  {
     "value": "No vaults could be loaded right now.",
     "keys": [
       "vaultPicker.noneLoaded",
