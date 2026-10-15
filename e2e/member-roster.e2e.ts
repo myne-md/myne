@@ -27,6 +27,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
+import { KEY, pressKey } from "./support/keyboard";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { httpsConfigSeed, syncConfigSeed } from "./support/multi-device";
 
@@ -231,15 +232,24 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           await (await app.session.byTestId("welcome.identity-cta")).click();
           await (await app.session.byTestId("identity-setup.create-cta")).click();
           await app.session.byTestId("identity-setup.phrase");
-          // The type-back below the grid gates Done (myne-md/myne#855): reveal the
-          // grid, read the words off it, and answer the four positions the challenge
-          // asks for. Without this the scenario can never leave the dialog, which is
-          // the point of the challenge.
+          // The ceremony is TWO steps since myne-md/myne#869: reveal the grid on
+          // the phrase step, read the words off it, Continue to the challenge, and
+          // answer the four positions it draws. Done is gated on all four, so
+          // without this the scenario can never leave the dialog.
           await (await app.session.byTestId("identity-setup.phrase-reveal")).click();
           const cells = await app.session.byTestIdAll("identity-setup.phrase-word");
           const words = (
             await Promise.all(cells.map(async (c) => (await c.text()).trim()))
           ).map((t) => t.replace(/^\d+/, "").trim());
+          await (await app.session.byTestId("identity-setup.phrase-continue")).click();
+          // The HARD BLOCK (#869): with the challenge unanswered, Esc must NOT
+          // dismiss the dialog: the phrase is shown once and the ceremony holds
+          // until the type-back proves it was saved. `canDismiss` answers false
+          // here, so the wait that follows is the assertion that it stayed open.
+          await pressKey(app.session, KEY.ESCAPE);
+          await app.session.byTestId("identity-setup.confirm-input");
+          // Elements go STALE on step remount, so the confirm handles are fetched
+          // AFTER the transition, not before it.
           for (const input of await app.session.byTestIdAll("identity-setup.confirm-input")) {
             const pos = Number(await input.attribute("data-index"));
             await input.sendKeys(words[pos - 1]);

@@ -156,4 +156,148 @@ test.describe("mobile create-vault onboarding", () => {
       ),
     ).toEqual([]);
   });
+
+  test("the briefing's Why? disclosure animates open and closed", async ({ page }) => {
+    // The mobile half of myne-md/myne#868; the desktop half is
+    // `tests/create/briefing-step.test.tsx`. Both pin the same four things: the
+    // body is absent at rest, the entrance mounts COLLAPSED and flips on the next
+    // frame, the exit keeps the node until the motion has settled, and the curve
+    // follows the direction.
+    //
+    // The click runs INSIDE `page.evaluate` and the read waits only on
+    // MICROTASKS. React commits a discrete event in a microtask, and the flip to
+    // `1fr` is a `requestAnimationFrame` callback, which cannot run until the
+    // current task's microtasks have drained. So the read lands after the commit
+    // and before the frame, which is what makes these states deterministic
+    // instead of a race against the 240ms deferral.
+    await installMockIpc(page, { freshDevice: true });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+
+    const why = page.getByTestId("create-vault.briefing-why").first();
+    const body = page.getByTestId("create-vault.briefing-why-text");
+    await expect(body).toHaveCount(0);
+    await expect(why).toHaveAttribute("aria-expanded", "false");
+
+    const opened = await page.evaluate(async () => {
+      const btn = document.querySelector(
+        '[data-testid="create-vault.briefing-why"]',
+      ) as HTMLButtonElement;
+      btn.click();
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      const text = document.querySelector(
+        '[data-testid="create-vault.briefing-why-text"]',
+      );
+      const grid = text?.parentElement?.parentElement as HTMLElement | null;
+      const svg = btn.querySelector("svg") as SVGElement | null;
+      return {
+        present: text !== null,
+        expanded: btn.getAttribute("aria-expanded"),
+        opacity: grid?.style.opacity ?? null,
+        transition: grid?.style.transition ?? null,
+        chevron: svg?.style.transform ?? null,
+        chevronTransition: svg?.style.transition ?? null,
+      };
+    });
+    // Mounted by the click and still at the COLLAPSED value: the flip to `1fr`
+    // is on the next frame, which is what gives the transition a painted value
+    // to start from. The chevron turns over in place rather than swapping glyphs;
+    // it follows `whyOpen`, which is already true in this commit.
+    expect(opened).toMatchObject({ present: true, expanded: "true", opacity: "0" });
+    // The curve is read off the SAME commit as the value that changes, so at
+    // this instant it is still the closing one: it becomes the entrance curve
+    // only when the flip lands, which is asserted below.
+    expect(opened.transition).toContain("var(--ease-standard)");
+    expect(opened.chevron).toBe("rotate(180deg)");
+    expect(opened.chevronTransition).toContain("var(--ease-out)");
+
+    // It reaches its resting state and stays there, on the ENTRANCE curve: the
+    // curve is read off the same commit as the value that changes, so it is the
+    // closing one until the flip lands.
+    await expect(body).toHaveCount(1);
+    await expect(body).toBeVisible();
+    const settled = await page.evaluate(() => {
+      const text = document.querySelector(
+        '[data-testid="create-vault.briefing-why-text"]',
+      );
+      const grid = text?.parentElement?.parentElement as HTMLElement | null;
+      return {
+        opacity: grid?.style.opacity ?? null,
+        transition: grid?.style.transition ?? null,
+      };
+    });
+    expect(settled).toMatchObject({ opacity: "1" });
+    expect(settled.transition).toContain("var(--ease-out)");
+
+    const closed = await page.evaluate(async () => {
+      const btn = document.querySelector(
+        '[data-testid="create-vault.briefing-why"]',
+      ) as HTMLButtonElement;
+      btn.click();
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      const text = document.querySelector(
+        '[data-testid="create-vault.briefing-why-text"]',
+      );
+      const grid = text?.parentElement?.parentElement as HTMLElement | null;
+      return {
+        present: text !== null,
+        expanded: btn.getAttribute("aria-expanded"),
+        opacity: grid?.style.opacity ?? null,
+        transition: grid?.style.transition ?? null,
+      };
+    });
+    // The node is STILL MOUNTED, transparent, on the closing curve: the collapse
+    // plays out and only then does the body leave.
+    expect(closed).toMatchObject({ present: true, expanded: "false", opacity: "0" });
+    expect(closed.transition).toContain("var(--ease-standard)");
+
+    // And it does leave, which is the DOM contract both tiers pin.
+    await expect(body).toHaveCount(0);
+  });
+
+  test("the Why? disclosure resolves instantly under reduced motion", async ({ page }) => {
+    // The mobile twin of the reduced-motion case in
+    // `tests/create/briefing-step.test.tsx`. On the phone this arm carries more
+    // than it does on desktop: the global `prefers-reduced-motion` rule zeroes
+    // the TRANSITION, but the unmount deferral is a timer, so without the skip
+    // a reduced-motion user would still hold a collapsed body for 240ms.
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installMockIpc(page, { freshDevice: true });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+
+    const body = page.getByTestId("create-vault.briefing-why-text");
+    await expect(body).toHaveCount(0);
+
+    const opened = await page.evaluate(async () => {
+      const btn = document.querySelector(
+        '[data-testid="create-vault.briefing-why"]',
+      ) as HTMLButtonElement;
+      btn.click();
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      const text = document.querySelector(
+        '[data-testid="create-vault.briefing-why-text"]',
+      );
+      const grid = text?.parentElement?.parentElement as HTMLElement | null;
+      return { present: text !== null, opacity: grid?.style.opacity ?? null };
+    });
+    // Visible in the commit the click produced: there is no hidden frame to flip
+    // from, which is the assertion the animated path cannot make.
+    expect(opened).toMatchObject({ present: true, opacity: "1" });
+
+    const closed = await page.evaluate(async () => {
+      const btn = document.querySelector(
+        '[data-testid="create-vault.briefing-why"]',
+      ) as HTMLButtonElement;
+      btn.click();
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      return document.querySelector('[data-testid="create-vault.briefing-why-text"]') !== null;
+    });
+    // Gone in the same commit: the deferral is SKIPPED rather than shortened.
+    expect(closed).toBe(false);
+  });
 });

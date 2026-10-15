@@ -17,12 +17,13 @@
 # where that trigger is owed, and `docs/dev/e2e.md` carries the procedure.
 #
 # ─── Why the RUN_E2E variable, and not a bare `event: manual` ────────────────
-# On this repo the manual event already means something else: `web-docker-build`
-# in `main.yml` is gated `event: manual` + `branch: develop`, and that is the
-# app.example.com deploy trigger (`design-notes/ops/0484`). A workflow gated on
-# the bare event would fire on every deploy, and with the agent's
-# `WOODPECKER_MAX_WORKFLOWS=2` it would park a long suite in front of a deploy
-# nobody asked to wait for. An unset RUN_E2E evaluates to the empty string, so
+# On this repo the manual event already means something else: `main.yml` is a
+# full pipeline gated `event: manual` + `branch: develop`, and a workflow gated
+# on the bare event would fire alongside it. With the agent's
+# `WOODPECKER_MAX_WORKFLOWS=2` it would park a long suite in front of a pipeline
+# nobody asked to wait for. (The `app.example.com` deploy this comment used to name
+# here left CI with `web-docker-build` in myne-md/myne#584: publishing is by hand
+# now, `design-notes/ops/0680`.) An unset RUN_E2E evaluates to the empty string, so
 # the default is "do not run" and `main.yml` carries the matching negation.
 #
 # ─── Why this workflow builds its own binaries ───────────────────────────────
@@ -116,7 +117,7 @@ steps:
   # `securityHeaders()` from `web/csp.ts`, not a copy).
   #
   # ONE step, build and run together. They were two while the build half was
-  # `main.yml`'s `web-build`, which is a real gate feeding `web-docker-build`.
+  # `main.yml`'s `web-build`, which is a real gate feeding `web-container-check`.
   # Here the build gates nothing on its own, so a second container that repeats
   # the pnpm install to hand the bundle across a stage boundary buys a status
   # line and costs a stage. The artefact gates (third-party origins, the
