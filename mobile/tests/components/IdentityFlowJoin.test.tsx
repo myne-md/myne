@@ -88,6 +88,11 @@ function localeValue(key: string): unknown {
 
 /** Every key the copy spec below asserts against, so the catalog claim is one list. */
 const JOIN_COPY_KEYS = [
+  "identityHome.stepIndicator",
+  "identityHome.stepRecoveryPhrase",
+  "identityHome.stepDevicePassword",
+  "identityHome.phraseHeading",
+  "identityHome.passwordHeading",
   "identityHome.claimedHeading",
   "identityHome.claimedHint",
   "identityHome.join",
@@ -194,6 +199,16 @@ function setJoinPassword(value: string, confirm = value): void {
   });
 }
 
+/** The join wizard's Continue, one testid across both steps (only one mounts). */
+function continueButton(): HTMLButtonElement {
+  return screen.getByTestId("identity-flow.join-continue") as HTMLButtonElement;
+}
+
+/** Step 1 → step 2 (the password). Gated on all 24 cells being filled. */
+function toJoinPasswordStep(): void {
+  fireEvent.click(continueButton());
+}
+
 function submit(): HTMLButtonElement {
   return screen.getByTestId("identity-flow.join.submit") as HTMLButtonElement;
 }
@@ -224,34 +239,46 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     expect(screen.getAllByTestId("identity-flow.join-open")).toHaveLength(1);
   });
 
-  it("asks for the recovery phrase and a device password, and for no owner code", async () => {
+  it("asks for the recovery phrase and a device password, and for no owner code on either step", async () => {
     renderFlow();
     await openJoin();
 
-    // Positive half first: the step really is on screen with its own phrase grid.
-    expect(joinCells()).toHaveLength(24);
-    expect(screen.getByTestId("identity-flow.join.password-input")).toBeTruthy();
-    expect(screen.getByTestId("identity-flow.join-password-note")).toBeTruthy();
+    // The negative half, asserted on BOTH wizard steps. No owner-code field, no
+    // fingerprint compare and nothing to confirm: the owner this device verifies
+    // against comes from its own pinned profile record, and a field here would let a
+    // pasted value replace that anchor.
+    const expectNoOwnerCode = (): void => {
+      expect(screen.queryByTestId("identity-flow.accept-owner-code")).toBeNull();
+      expect(screen.queryByTestId("identity-flow.accept-inspect")).toBeNull();
+      expect(screen.queryByTestId("identity-flow.accept-owner-fingerprint")).toBeNull();
+      expect(screen.queryByTestId("identity-flow.accept-confirm")).toBeNull();
+      // …and structurally, so a field arriving under a DIFFERENT testid convention is
+      // caught too: this step collects no free text at all. The accept step's one
+      // textarea IS the out-of-band owner code, so a textarea here is that field
+      // renamed.
+      expect(document.querySelectorAll("textarea")).toHaveLength(0);
+      expect(
+        Array.from(document.querySelectorAll("[data-testid]")).filter((el) =>
+          (el.getAttribute("data-testid") ?? "").includes("owner"),
+        ),
+      ).toHaveLength(0);
+    };
 
-    // The negative half. No owner-code field, no fingerprint compare and nothing to
-    // confirm: the owner this device verifies against comes from its own pinned
-    // profile record, and a field here would let a pasted value replace that anchor.
-    expect(screen.queryByTestId("identity-flow.accept-owner-code")).toBeNull();
-    expect(screen.queryByTestId("identity-flow.accept-inspect")).toBeNull();
-    expect(screen.queryByTestId("identity-flow.accept-owner-fingerprint")).toBeNull();
-    expect(screen.queryByTestId("identity-flow.accept-confirm")).toBeNull();
+    // Step 1: the phrase grid, and NO owner code.
+    expect(screen.getByTestId("identity-flow.join-step")).toBeTruthy();
+    expect(joinCells()).toHaveLength(24);
+    expect(screen.queryByTestId("identity-flow.join.password-input")).toBeNull();
+    expectNoOwnerCode();
     expect(inspectInviteCode).not.toHaveBeenCalled();
 
-    // …and structurally, so a field arriving under a DIFFERENT testid convention is
-    // caught too: this step collects no free text at all. The accept step's one
-    // textarea IS the out-of-band owner code, so a textarea here is that field
-    // renamed.
-    expect(document.querySelectorAll("textarea")).toHaveLength(0);
-    expect(
-      Array.from(document.querySelectorAll("[data-testid]")).filter((el) =>
-        (el.getAttribute("data-testid") ?? "").includes("owner"),
-      ),
-    ).toHaveLength(0);
+    // Step 2: the password form, and NO owner code.
+    typeJoinPhrase();
+    toJoinPasswordStep();
+    expect(screen.getByTestId("identity-flow.join.password-input")).toBeTruthy();
+    expect(screen.getByTestId("identity-flow.join-password-note")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.join-phrase")).toBeNull();
+    expectNoOwnerCode();
+    expect(inspectInviteCode).not.toHaveBeenCalled();
   });
 
   it("joins with the invite id, the account hash, the phrase and the password", async () => {
@@ -259,11 +286,15 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow(onAccepted);
     await openJoin();
 
-    // Nothing collected: blocked.
-    expect(submit().disabled).toBe(true);
+    // Nothing collected: step 1's gate is shut.
+    expect(continueButton().disabled).toBe(true);
 
     typeJoinPhrase();
-    // Phrase complete, no password: blocked. The credential is REQUIRED, not offered
+    // Phrase complete: the step opens.
+    expect(continueButton().disabled).toBe(false);
+    toJoinPasswordStep();
+
+    // No password: blocked. The credential is REQUIRED, not offered
     // (myne-md/myne#851 task 7), so a member vault is never materialized without one.
     expect(submit().disabled).toBe(true);
 
@@ -293,6 +324,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow();
     await openJoin();
     typeJoinPhrase();
+    toJoinPasswordStep();
 
     setJoinPassword("short-9");
     expect(submit().disabled).toBe(true);
@@ -318,6 +350,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow(onAccepted);
     await openJoin();
     typeJoinPhrase();
+    toJoinPasswordStep();
     setJoinPassword(PASSWORD);
     fireEvent.click(submit());
 
@@ -331,6 +364,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow(onAccepted);
     await openJoin();
     typeJoinPhrase();
+    toJoinPasswordStep();
     setJoinPassword(PASSWORD);
 
     personJoinVault.mockRejectedValueOnce({ kind: "BadRequest" });
@@ -342,8 +376,10 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // step never collected one.
     expect(banner.textContent).not.toBe("identityHome.acceptErrorBadRequest");
     expect(onAccepted).not.toHaveBeenCalled();
-    // Recoverable by retrying rather than by re-opening: the form is still there with
-    // the phrase the user typed.
+    // Recoverable by retrying rather than by re-opening: the form is still there, and
+    // one step back the phrase is still in its cells.
+    expect(screen.getByTestId("identity-flow.join.submit")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("identity-flow.join-step-back"));
     expect(screen.getByTestId("identity-flow.join-hint")).toBeTruthy();
     expect(joinCells().map((cell) => cell.value)).toEqual(PHRASE);
   });
@@ -352,6 +388,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow();
     await openJoin();
     typeJoinPhrase();
+    toJoinPasswordStep();
     setJoinPassword(PASSWORD);
 
     personJoinVault.mockRejectedValueOnce({ kind: "VaultAlreadyHeld" });
@@ -369,6 +406,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     renderFlow();
     await openJoin();
     typeJoinPhrase();
+    toJoinPasswordStep();
     setJoinPassword(PASSWORD);
 
     personJoinVault.mockRejectedValueOnce({ kind: "SomeKindAddedLater" });
@@ -422,8 +460,11 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     };
 
     await openAcceptFromHome();
+    fireEvent.click(screen.getByTestId("identity-flow.accept-continue"));
     expect(acceptCells()).toHaveLength(24);
     acceptCells().forEach((cell, i) => fireEvent.change(cell, { target: { value: PHRASE[i] } }));
+    // Exit the wizard the only way a later step can: back to step 1, then cancel.
+    fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
     fireEvent.click(screen.getByTestId("identity-flow.accept-cancel"));
 
     // The accept's phrase is not in the join's cells.
@@ -441,7 +482,38 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // to an owner this device has not verified.
     fireEvent.click(screen.getByTestId("identity-flow.join-cancel"));
     await openAcceptFromHome();
+    fireEvent.click(screen.getByTestId("identity-flow.accept-continue"));
     expect(acceptCells().map((cell) => cell.value)).toEqual(Array(24).fill(""));
+  });
+
+  it("walks the join steps in order, and Back preserves the phrase", async () => {
+    renderFlow();
+    await openJoin();
+
+    // Step 1: the phrase grid, with the password form NOT present.
+    expect(screen.getByTestId("identity-flow.join-step")).toBeTruthy();
+    expect(screen.getByTestId("identity-flow.join-phrase")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.join.password-input")).toBeNull();
+    // The fill state follows the step: one segment filled of two.
+    const segmentFill = (): (string | null)[] =>
+      Array.from(
+        screen.getByTestId("identity-flow.join-step").querySelectorAll("[data-filled]"),
+      ).map((el) => el.getAttribute("data-filled"));
+    expect(segmentFill()).toEqual(["true", "false"]);
+
+    typeJoinPhrase();
+    toJoinPasswordStep();
+
+    // Step 2: the password form, with the phrase grid NOT present.
+    expect(screen.getByTestId("identity-flow.join.password-input")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.join-phrase")).toBeNull();
+    expect(segmentFill()).toEqual(["true", "true"]);
+
+    // Back to step 1: the phrase the user typed is still in its cells.
+    fireEvent.click(screen.getByTestId("identity-flow.join-step-back"));
+    expect(joinCells().map((cell) => cell.value)).toEqual(PHRASE);
+    // …and the complete phrase kept Continue open.
+    expect(continueButton().disabled).toBe(false);
   });
 
   // The join grid pastes as the accept grid does. Both go through one shared
@@ -468,12 +540,22 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     );
     await openJoin();
 
+    // Step 1: the phrase grid.
+    expect(screen.getByTestId("identity-flow.join-step").textContent).toBe(
+      "identityHome.stepIndicator",
+    );
+    expect(screen.getByText("identityHome.phraseHeading")).toBeTruthy();
     expect(screen.getByTestId("identity-flow.join-hint").textContent).toBe(
       "identityHome.joinHint",
     );
     expect(screen.getByTestId("identity-flow.join-phrase-label").textContent).toBe(
       "identityHome.joinPhraseLabel",
     );
+
+    // Step 2: the password form.
+    typeJoinPhrase();
+    toJoinPasswordStep();
+    expect(screen.getByText("identityHome.passwordHeading")).toBeTruthy();
     expect(screen.getByTestId("identity-flow.join-password-note").textContent).toBe(
       "identityHome.joinPasswordNote",
     );
