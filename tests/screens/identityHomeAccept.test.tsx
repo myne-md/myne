@@ -71,7 +71,6 @@ describe("IdentityHome accept path", () => {
   it("offers a vault creation from the identity landing in one action", async () => {
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -88,7 +87,6 @@ describe("IdentityHome accept path", () => {
     ]);
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -109,7 +107,6 @@ describe("IdentityHome accept path", () => {
     const onForgotten = vi.fn();
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -143,7 +140,6 @@ describe("IdentityHome invite refresh (myne-md/myne#794)", () => {
   const renderHome = () =>
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -244,7 +240,6 @@ describe("IdentityHome accept requires a device password", () => {
     inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={() => {}}
@@ -312,7 +307,6 @@ describe("IdentityHome accept requires a device password", () => {
     inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={onAccepted}
@@ -363,7 +357,6 @@ describe("IdentityHome accept reaches the name gate", () => {
     personAcceptInvite.mockResolvedValue({});
     render(
       <IdentityHome
-        personIdHex="person"
         identityCode="code"
         onCreateVault={() => {}}
         onAccepted={onAccepted}

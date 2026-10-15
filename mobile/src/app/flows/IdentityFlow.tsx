@@ -55,6 +55,11 @@ type Step =
   | "server"
   | "create"
   | "phrase"
+  // The type-back challenge gets a step of its own (myne-md/myne#869), the
+  // `kit`/`typeback` split `CreateVaultFlow` has had since it shipped: the
+  // phrase step shows the words and nothing else, and this step asks for four
+  // of them back. On one screen the challenge read as a footnote to the grid.
+  | "typeback"
   | "home"
   | "accept"
   | "join"
@@ -962,9 +967,6 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
 
   const renderPhrase = () => {
     const phrase = (result?.phrase ?? "").split(" ");
-    // The gate: the challenge must be answered, and the phrase revealed (the
-    // challenge is unanswerable without it).
-    const { matches: corrects, allCorrect } = phraseTypeBackMatches(phrase, challenge, answers);
     return (
       <Screen>
         <FlowHeader label={t("identityFlow.phrase.title")} />
@@ -980,8 +982,40 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
               </Button>
             )}
           </div>
+        </ScreenScroll>
+        <FooterBar>
+          {/* Revealed is the only gate here (myne-md/myne#869): the challenge
+              moved to its own step, and until the words are on screen there is
+              nothing to type back from. No back arrow and no dismissal either.
+              The phrase is shown once and the ceremony holds until the type-back
+              proves it was saved, which is the same block the desktop dialog
+              enforces through `ModalShell.canDismiss`. */}
+          <Button
+            onClick={() => setStep("typeback")}
+            disabled={!revealed}
+            data-testid="identity-flow.phrase-continue"
+          >
+            {t("identityFlow.phrase.continue")}
+          </Button>
+        </FooterBar>
+      </Screen>
+    );
+  };
+
+  const renderTypeback = () => {
+    const phrase = (result?.phrase ?? "").split(" ");
+    // The gate: all four words right. `revealed` is not re-checked because the
+    // phrase is not on this screen, and back-returning to the phrase step keeps
+    // `revealed` as it was, so the way to re-read the words is Back, not a
+    // second reveal.
+    const { matches: corrects, allCorrect } = phraseTypeBackMatches(phrase, challenge, answers);
+    return (
+      <Screen>
+        <FlowHeader label={t("identityFlow.typeback.title")} onBack={() => setStep("phrase")} />
+        <ScreenScroll style={{ padding: "18px 22px 0" }}>
+          <Title>{t("identityFlow.typeback.title")}</Title>
+          <Lead>{t("identityFlow.phrase.typebackLead")}</Lead>
           <div style={{ marginTop: "var(--space-4)" }}>
-            <FieldLabel>{t("identityFlow.phrase.typebackLead")}</FieldLabel>
             {challenge.map((pos, i) => (
               <div key={pos} style={{ marginTop: "var(--space-3)" }}>
                 <FieldLabel>
@@ -1009,8 +1043,8 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         <FooterBar>
           <Button
             onClick={finishPhrase}
-            disabled={!revealed || !allCorrect}
-            data-testid="identity-flow.phrase-continue"
+            disabled={!allCorrect}
+            data-testid="identity-flow.typeback-continue"
           >
             {t("identityFlow.phrase.continue")}
           </Button>
@@ -1549,6 +1583,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       {step === "server" && renderServer()}
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}
+      {step === "typeback" && renderTypeback()}
       {step === "home" && renderHome()}
       {step === "accept" && renderAccept()}
       {step === "join" && renderJoin()}

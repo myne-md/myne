@@ -18,6 +18,19 @@
 // error blaming the sync server. This dialog reads the status up front and, when
 // an identity is held, offers Recover plus an explicit destructive forget
 // instead of a Create that is guaranteed to fail.
+//
+// The phrase ceremony is TWO steps, mirroring the vault flow's kit/typeback
+// split (myne-md/myne#869): the phrase gets a step of its own and the type-back
+// challenge the next one. Three things went with the old single screen. The
+// fingerprint hex that sat above Done is gone: an unlabeled 64-character blob
+// between the user and the button they were looking for. Done moved to the
+// confirm step only, so it can no longer be pressed while the grid and the
+// challenge are both on screen. And the dialog now REFUSES dismissal until the
+// four words match (`ModalShell.canDismiss`): Esc, a backdrop click and the ×
+// were all exits from the one screen whose phrase is shown once, and the
+// challenge could not gate a door it did not own. The account is already
+// registered by the time the phrase renders, so what the block protects is the
+// phrase on the screen, not the identity on the server.
 import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
@@ -117,6 +130,9 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   // already the demonstration.
   const [confirmPositions, setConfirmPositions] = useState<TypeBackPositions | null>(null);
   const [confirmInputs, setConfirmInputs] = useState<Record<number, string>>({});
+  // Which half of the ceremony is on screen (myne-md/myne#869). Reset by `run`
+  // and `close`, so every entry into the ceremony starts on the phrase.
+  const [step, setStep] = useState<"phrase" | "confirm">("phrase");
   const typeBack =
     result?.phrase && confirmPositions
       ? phraseTypeBackMatches(result.phrase.split(" "), confirmPositions, confirmInputs)
@@ -124,6 +140,13 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   // The Done CTA is the commit here, so the challenge gates it: a checkbox, or
   // nothing, is not evidence (section 7.1.3).
   const doneDisabled = typeBack !== null && !typeBack.allMatch;
+  // …and it gates DISMISSAL for the same reason (myne-md/myne#869). The phrase
+  // is shown once; an identity whose phrase was never written down cannot be
+  // recovered, so Esc, the backdrop and the × all have to stay shut until the
+  // four words prove it was saved. A recovered identity draws no positions, so
+  // `typeBack` is null there and the dialog dismisses as it always did: typing
+  // all 24 words was already the demonstration.
+  const ceremonyPending = result?.phrase != null && typeBack?.allMatch !== true;
 
   // Read the held-identity state whenever the dialog is opened, so a device
   // that already holds a sealed keypair (from an earlier session or another
@@ -157,6 +180,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
       setConfirmInputs({});
       setRecoveryCells(emptyRecoveryCells());
       setConfirmForget(false);
+      setStep("phrase");
     } catch (e) {
       const kind = errorKindOf(e);
       // A stale status probe: the backend still holds an identity. Reveal the
@@ -193,6 +217,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
     setResult(null);
     setConfirmPositions(null);
     setConfirmInputs({});
+    setStep("phrase");
     setError(null);
     setRecoveryCells(emptyRecoveryCells());
     setHeldCode(null);
@@ -218,10 +243,20 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
   return (
     <ModalShell
       open={open}
-      title={t("identitySetup.title")}
+      // Three titles, one per state the body can be in: the phrase step and the
+      // type-back step say what THIS screen is for, and the initial fork keeps
+      // the dialog's own name.
+      title={
+        result?.phrase
+          ? step === "confirm"
+            ? t("identitySetup.confirmTitle")
+            : t("identitySetup.phraseTitle")
+          : t("identitySetup.title")
+      }
       onClose={close}
       labelId="identity-setup-title"
       testId="identity-setup.root"
+      canDismiss={() => !ceremonyPending}
     >
       {/* The modal body carries no padding of its own (Settings fills it edge
           to edge), so a dialog that wants an inset supplies it. This one did
@@ -230,30 +265,33 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
       {result ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {result.phrase ? (
-            <>
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
-                {t("identitySetup.phraseWarning")}
-              </div>
-              {/* The phrase arrives as one space-joined string from the backend;
-                  split it for the shared reveal, which renders the numbered grid.
-                  Same protections as the vault phrase. The type-back below is the
-                  gate on Done (myne-md/myne#855; reverses the original
-                  `decisions/ui/0615` "no type-back" clause, recorded in
-                  `design-notes/ui/0665`). */}
-              <SecretPhraseReveal
-                phrase={result.phrase.split(" ")}
-                revealed={reveal.revealed}
-                onReveal={reveal.onReveal}
-                onHide={reveal.onHide}
-                testIdPrefix="identity-setup.phrase"
-                gridTestId="identity-setup.phrase"
-                saveFilename="myne-identity-phrase.txt"
-              />
-              {confirmPositions ? (
-                <>
-                  <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-                    {t("identitySetup.typeBackLead")}
-                  </div>
+            step === "phrase" ? (
+              // Step 1: the phrase. The string arrives space-joined from the
+              // backend; it is split for the shared reveal, which renders the
+              // numbered grid with the vault phrase's protections.
+              <>
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
+                  {t("identitySetup.phraseWarning")}
+                </div>
+                <SecretPhraseReveal
+                  phrase={result.phrase.split(" ")}
+                  revealed={reveal.revealed}
+                  onReveal={reveal.onReveal}
+                  onHide={reveal.onHide}
+                  testIdPrefix="identity-setup.phrase"
+                  gridTestId="identity-setup.phrase"
+                  saveFilename="myne-identity-phrase.txt"
+                />
+              </>
+            ) : (
+              // Step 2: the type-back (myne-md/myne#855; two-step split
+              // myne-md/myne#869). `decisions/ui/0665` records the challenge;
+              // the split moves it onto the screen that owns it.
+              <>
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)", lineHeight: 1.6 }}>
+                  {t("identitySetup.typeBackLead")}
+                </div>
+                {confirmPositions ? (
                   <PhraseTypeBack
                     phrase={result.phrase.split(" ")}
                     positions={confirmPositions}
@@ -265,21 +303,14 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
                     mismatchFor={(pos) => t("identitySetup.typeBackMismatch", { pos })}
                     testIdPrefix="identity-setup.confirm"
                   />
-                </>
-              ) : null}
-            </>
+                ) : null}
+              </>
+            )
           ) : (
             <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
               {t("identitySetup.recovered")}
             </div>
           )}
-
-          <div
-            data-testid="identity-setup.fingerprint"
-            style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--fg-3)", wordBreak: "break-all" }}
-          >
-            {result.fingerprint_hex}
-          </div>
 
           {!result.approved ? (
             <div data-testid="identity-setup.pending" style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
@@ -287,14 +318,43 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
             </div>
           ) : null}
 
-          <Button
-            variant="primary"
-            onClick={close}
-            disabled={doneDisabled}
-            data-testid="identity-setup.close-cta"
-          >
-            {t("identitySetup.doneCta")}
-          </Button>
+          {/* One actions row for all three bodies, because the CTA and the way
+              out are a function of the step: the phrase step's only way forward
+              is Continue (the phrase has to be seen first), the confirm step
+              carries Back plus the gated Done, and a recovered identity has
+              nothing to confirm and keeps Done alone. */}
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            {result.phrase && step === "confirm" ? (
+              <Button
+                variant="ghost"
+                icon="arrow-left"
+                onClick={() => setStep("phrase")}
+                data-testid="identity-setup.confirm-back"
+              >
+                {t("identitySetup.back")}
+              </Button>
+            ) : null}
+            <div style={{ flex: 1 }} />
+            {result.phrase && step === "phrase" ? (
+              <Button
+                variant="primary"
+                disabled={!reveal.revealed}
+                onClick={() => setStep("confirm")}
+                data-testid="identity-setup.phrase-continue"
+              >
+                {t("identitySetup.phraseContinue")}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={close}
+                disabled={doneDisabled}
+                data-testid="identity-setup.close-cta"
+              >
+                {t("identitySetup.doneCta")}
+              </Button>
+            )}
+          </div>
         </div>
       ) : (!hasEndpoint && !serverAcknowledged) || serverSelectionOpen ? (
         <FirstRunServerStep
