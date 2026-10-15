@@ -88,7 +88,7 @@
   "mobile/src/app/flows/AiChatFlow.tsx": 2,
   "mobile/src/app/flows/AiHistorySheet.tsx": 8,
   "mobile/src/app/flows/AiReviewFlow.tsx": 1,
-  "mobile/src/app/flows/AttachmentsSheet.tsx": 13,
+  "mobile/src/app/flows/AttachmentsSheet.tsx": 10,
   "mobile/src/app/flows/CreateVaultFlow.tsx": 7,
   "mobile/src/app/flows/EditorFlow.tsx": 21,
   "mobile/src/app/flows/JoinFlow.tsx": 5,
