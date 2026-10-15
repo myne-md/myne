@@ -17,7 +17,7 @@
 // Enter follows the focus ring, so the ring always names what Enter does.
 // Escape, the backdrop and Tab-to-Cancel are the ways out. myne-md/myne#683
 // replaced that effect's timing guard with a comparison on the key itself
-// (`docs/decisions/ui/0680`), which is why there is no arming window below.
+// (`docs/decisions/ui/0685`), which is why there is no arming window below.
 
 import {
   useCallback,
@@ -352,7 +352,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   // already placed focus on the confirm button unless a caller asked otherwise.
   //
   // `docs/decisions/ui/0564` records the reversal, including what it costs on
-  // the cryptographic-erase paths. `docs/decisions/ui/0680` records guard 2's
+  // the cryptographic-erase paths. `docs/decisions/ui/0685` records guard 2's
   // replacement and what the E2E container measured about it.
   const answerRef = useRef({ onCancel, onConfirm });
   useEffect(() => {
