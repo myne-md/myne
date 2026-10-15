@@ -15,24 +15,20 @@
 // myne-md/myne#628; `docs/decisions/ui/0564` is the record and the effect below
 // carries the reasoning. In one line: focus starts on the destructive button and
 // Enter follows the focus ring, so the ring always names what Enter does.
-// Escape, the backdrop and Tab-to-Cancel are the ways out.
+// Escape, the backdrop and Tab-to-Cancel are the ways out. myne-md/myne#683
+// replaced that effect's timing guard with a comparison on the key itself
+// (`docs/decisions/ui/0680`), which is why there is no arming window below.
 
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
-
-/**
- * One frame at 60 Hz, in milliseconds. The floor under the Enter guard's
- * "the dialog has been on screen long enough to have been read" test; see the
- * effect that uses it for why a paint alone is not enough of a signal.
- */
-const ARM_AFTER_MS = 16;
 
 // Shared modal backdrop envelope — also imported by `<TrashPanel>` so the two
 // trash-related modals don't re-declare the same fixed-inset dim layer.
@@ -242,7 +238,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   // focused <button>'s default activation is not fired reliably across WebViews
   // (WebKitGTK under the E2E harness), so relying on it alone drops the confirm.
   //
-  // THREE GUARDS, and each closes a way this dialog could confirm without having
+  // FOUR GUARDS, and each closes a way this dialog could confirm without having
   // been read. None is a nicety: two of its call sites perform the cryptographic
   // erase of `docs/decisions/storage/0105`, where there is no undo and no copy
   // outside a `.myne-backup`.
@@ -254,43 +250,76 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   //     and destroy the trash between two frames. At the merge base Enter was
   //     inert, so the same held key was harmless: making Enter act is what
   //     creates this, which is why the guard ships with it.
-  //  2. One frame of arming, and it covers ONLY an Enter already in flight when
-  //     the dialog appeared: a human cannot answer a dialog within the frame it
-  //     appeared in, so an Enter arriving in that frame is not an answer to it.
-  //     It is NOT the backstop for guard 1, and an earlier revision of this
-  //     comment said it was. The arithmetic refutes that: OS typematic delay
-  //     before the first auto-repeat is 250 ms to 660 ms on every platform this
-  //     ships to, by which time both the paint and the wall clock below have
-  //     armed the dialog, so a held Enter whose `repeat` flag was under-reported
-  //     would have walked straight through. Guard 4 is what actually closes
-  //     that, and it closes it without depending on a flag or on a clock.
-  //     **A paint OR the elapsed time, and the disjunction is the whole point.**
-  //     `requestAnimationFrame` is the better signal of the two, because it fires
-  //     when the dialog has actually been PAINTED, which is what "could have been
-  //     read" means. It is also a signal a WebView is free not to deliver, and
-  //     under WebKitGTK it measurably does not: an instrumented E2E run of `nc5`
-  //     captured `armed=false repeat=false contains=true
-  //     active=delete-confirm.confirm` on a dialog that was visible in the
-  //     screenshot taken from the same failure. The callback had not run, so Enter
-  //     was inert for the full 45 s budget, three attempts over. A gate that can
-  //     stay shut forever is not a gate, it is the #397 behaviour with extra
-  //     steps, so `ARM_AFTER_MS` of wall clock arms it whether or not the frame
-  //     callback ever arrives.
-  //     **Armed once at MOUNT, which is why the callbacks come through a ref.**
+  //  2. The key must be NEWER than the dialog, and that is a comparison rather
+  //     than a wait. Both readings come from one clock: the mount instant is a
+  //     synthetic event's `timeStamp`, which is the current high-resolution time,
+  //     and `e.timeStamp` is the same reading for a dispatched key. So an Enter
+  //     whose own timestamp predates the instant this dialog entered the document
+  //     is an Enter that was already in flight when the dialog appeared, and it is
+  //     not an answer to it. An Enter created after that instant is. Written
+  //     against a shared time origin between an event stamp and `performance.now()`
+  //     instead, the guard would be silently permissive on any engine where the two
+  //     disagree, which is jsdom, the pinned test environment, and is why the
+  //     comparison is anchored this way rather than measured-and-hoped.
+  //
+  //     It is NOT the backstop for guard 1: OS typematic delay before the first
+  //     auto-repeat is 250 ms to 660 ms on every platform this ships to, by which
+  //     time the dialog is far older than any key still in flight, so a held
+  //     Enter whose `repeat` flag was under-reported would pass. Guard 4 is what
+  //     actually closes that, and it closes it without depending on a flag or a
+  //     clock.
+  //     **The comparison is strict, and that is the deliberate direction.** A key
+  //     whose stamp falls in the same coarsened bucket as the mount (the clock can
+  //     be quantized to a millisecond or two) is admitted. `<=` would refuse a
+  //     press created in the mount's own bucket, which is a millisecond of the
+  //     #683 defect back, and the resolution is too coarse for "same bucket" to
+  //     mean "in flight". The in-flight keys that matter on the two erase paths
+  //     are refused by guard 4 instead, from the input rather than from a clock.
+  //     **This replaced a 16 ms wall clock, and the difference is not
+  //     cosmetic (myne-md/myne#683).** The window was measured from the moment
+  //     this effect RAN rather than from the moment the dialog APPEARED, and it
+  //     was a proxy for "in flight" that admits the opposite answer: it refuses
+  //     any press inside the window, whoever made it and however long the dialog
+  //     has really been up. Measured in the E2E container under load, with
+  //     `MYNE_E2E_RETRIES=0`, on the folder-delete dialog: the arming effect ran
+  //     1 ms after its own commit (`setupLag: [1, 1]`), the harness's press
+  //     arrived 10 to 14 ms after that (`sinceMount: 13.999999999999545`, a
+  //     dialog-relative 14), and the press was therefore refused
+  //     while `released=true repeat=false contains=true
+  //     active=delete-confirm.confirm` and the ring sat on the confirm button.
+  //     The SAME press 8 s later measured `sinceMount: 8137`, armed, and
+  //     confirmed. That is the whole of the report: a first press refused on a
+  //     dialog that looked ready, and a retry that "cures" it. `nc7` was 5 of 6
+  //     red under load and 0 of 4 red on an idle container, and the report's
+  //     "50 seconds or more" is the same window with the app running further
+  //     behind the driver, which is to say with the mount later relative to the
+  //     press that was already on its way.
+  //     It is NOT a remount and NOT a stopped clock, and both were measured
+  //     rather than reasoned away: a page-seat `MutationObserver` counted one
+  //     added node per dialog and one removed node per dismissal, and the
+  //     component's own mount counter read 2 across the two dialogs the scenario
+  //     opens, so the two effect setups were one per mount, not one mount
+  //     running twice. `performance.now()` advanced through 4000 samples at 1 to
+  //     3 ms granularity, and the press's own `timeStamp` tracked it to the
+  //     millisecond.
+  //     The `requestAnimationFrame` half of the old disjunction is gone with it.
+  //     It was the better signal in principle, but under a busy WebKitGTK it
+  //     measurably does not arrive: `rafs` was still 0 when the press landed, and
+  //     a frame took 36 ms to 222 ms, so it armed nothing it was asked to arm.
+  //     A gate that can stay shut is not a gate, which the earlier revision of
+  //     this comment had already learned; a gate that opens at an arbitrary
+  //     instant is the same defect wearing the opposite mask.
+  //     **Armed once per mount, which is why the callbacks come through a ref.**
   //     The obvious spelling, `[onCancel, onConfirm]` as the effect's deps,
   //     re-runs the whole effect whenever the PARENT hands down a new callback
   //     identity, and both of this modal's `NoteList` call sites do: the
   //     keyboard soft-trash's `onConfirm` closes over the very state that opened
   //     the dialog, so it is a new function on every render of a component whose
   //     sidebar re-renders on save settles, sync ticks and a relative-time
-  //     ticker. Each of those re-runs put the arming back to false, so the guard
-  //     stopped meaning "one frame since the dialog appeared" and started
-  //     meaning "one frame since the list last re-rendered", which is a gate
-  //     that can be shut when the user presses Enter. The same instrumented run
-  //     counted one effect setup per mount, so this was NOT what `nc5` was
-  //     failing on; it is a second way to reach the same inert Enter, found while
-  //     looking for the first, and it is what makes the wall clock above measure
-  //     from the dialog rather than from the list's last render.
+  //     ticker. Each of those re-runs would reset the mount instant, so the guard
+  //     would stop meaning "since the dialog appeared" and start meaning "since
+  //     the list last re-rendered", which is a gate that can be shut when the
+  //     user presses Enter.
   //  3. Containment. The listener is on `document`, so without this an Enter
   //     pressed in a dialog STACKED over this one confirms the one behind it.
   //     `ThemeInstallDialog` opens from an OS deep link, which can arrive over
@@ -307,34 +336,59 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   //     because the default is off and the caller passes the activating event's
   //     own answer (`detail === 0` on a React `onClick` is keyboard activation).
   //
+  // The listener below is a LAYOUT effect, which is the second half of
+  // myne-md/myne#683 and the reason this dialog can afford to drop the retry the
+  // E2E helper used to carry. A passive effect is free to run arbitrarily long
+  // after the commit that put the dialog on screen, so both of the things it
+  // supplies would be late: the mount instant guard 2 compares against, and the
+  // keyup listener guard 4 depends on. A key opener's keyup can then be
+  // dispatched before either exists, and guard 4 reads the opener's own release
+  // as "still held" and eats the user's first press. In a layout effect both are
+  // in place in the same synchronous commit that made the dialog visible, which
+  // is the only instant that can be compared against a key.
+  //
   // Containment is also what makes the confirm-on-unreadable fallback safe:
   // "unreadable" now means unreadable inside THIS dialog, where the trap has
   // already placed focus on the confirm button unless a caller asked otherwise.
   //
   // `docs/decisions/ui/0564` records the reversal, including what it costs on
-  // the cryptographic-erase paths.
+  // the cryptographic-erase paths. `docs/decisions/ui/0680` records guard 2's
+  // replacement and what the E2E container measured about it.
   const answerRef = useRef({ onCancel, onConfirm });
   useEffect(() => {
     answerRef.current = { onCancel, onConfirm };
   });
-  useEffect(() => {
-    const mountedAt = performance.now();
-    let painted = false;
-    const frame = requestAnimationFrame(() => {
-      painted = true;
-    });
+  useLayoutEffect(() => {
+    // The instant this dialog became part of the document, taken on the SAME clock the
+    // key carries. Guard 2 compares it against `e.timeStamp`, and two properties put both
+    // readings on one clock rather than assuming they agree: an event's `timeStamp` is
+    // initialized to the current high-resolution time when the event is CREATED, so this
+    // reading IS an event stamp and not a wall clock, and the High Resolution Time spec
+    // measures that against the document's time origin on every engine this ships to.
+    // Measured in the E2E container on WebKitGTK: this reading, `performance.now()` and a
+    // real driven keydown's own stamp all read 1316 in the same millisecond.
+    //
+    // An earlier version of this guard compared against `performance.now()`, which leans
+    // on those two clocks agreeing. Where they do not (jsdom, the pinned test
+    // environment, where an event stamp is epoch-based while `performance.now()` is
+    // origin-relative) that comparison is unconditionally false and the guard a silent
+    // no-op, which no test in that environment can see. The engines the container cannot
+    // reach (macOS, Windows, iOS, Android) are the manual-test roster's record, not an
+    // assumption made here.
+    const mountedAt = new Event("myne:delete-confirm-mount").timeStamp;
     // Guard 4 starts shut only when the caller says the dialog was opened by a
     // key, and the first Enter keyup opens it. A key that is being HELD emits
     // repeats and no keyup, so this cannot be satisfied by continuing to hold.
     let released = openedByKey !== true;
-    const isArmed = () => painted || performance.now() - mountedAt >= ARM_AFTER_MS;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
       if (dialogRef.current?.contains(document.activeElement) !== true) return;
-      // Swallowed even while disarmed: the point is that Enter does nothing
-      // here, not that it falls through to whatever is behind the dialog.
+      // Swallowed even when it is not an answer: the point is that Enter does
+      // nothing here, not that it falls through to whatever is behind the dialog.
       e.preventDefault();
-      if (e.repeat || !isArmed() || !released) return;
+      if (e.repeat || !released) return;
+      // Guard 2: the key must be newer than the dialog.
+      if (e.timeStamp < mountedAt) return;
       if (document.activeElement === cancelRef.current) answerRef.current.onCancel();
       else answerRef.current.onConfirm();
     };
@@ -344,7 +398,6 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     document.addEventListener("keydown", onKey);
     document.addEventListener("keyup", onKeyUp);
     return () => {
-      cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("keyup", onKeyUp);
     };

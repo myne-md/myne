@@ -7,7 +7,8 @@
 // So the key that normally activates a primary action did nothing, on a dialog
 // whose two buttons disagreed about which one was primary.
 //
-// `docs/decisions/ui/0541` records the reversal. The rule it settles on is that
+// `docs/decisions/ui/0564` records the reversal, and `docs/decisions/ui/0680`
+// records what #683 changed about it. The rule it settles on is that
 // **Enter follows the focus ring**: focus starts on the destructive button, so
 // the reflex press confirms, and a user who deliberately Tabs to Cancel gets an
 // Enter that cancels. #397's failure, a close indistinguishable from a
@@ -17,28 +18,51 @@
 // The Tab case is the one most worth a test: flipping the default alone would
 // have made Enter delete with the ring visibly on Cancel, which is a defect the
 // fix would have introduced.
+//
+// myne-md/myne#683 changed ONE guard's mechanism without changing what any of
+// them protect. Guard 2 used to be a 16 ms window measured from the effect that
+// armed it, so it refused any Enter inside that window whichever instant the
+// window happened to open in; it now compares the key event's own timestamp
+// against the moment the dialog entered the document. The consequence for these
+// tests is that `fireEvent`'s own (fresh) timestamp passes the guard, so each
+// refusal below is attributable to the guard its test is about, and the two
+// cases that matter are asserted directly: a key older than the dialog is
+// refused, and a key newer than it confirms with no frame or timer crossed.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { useRef } from "react";
 import { DeleteConfirmModal } from "../../src/notes/components/DeleteConfirmModal";
 import { useFocusTrap } from "../../src/hooks/useFocusTrap";
 
 afterEach(() => cleanup());
 
-/**
- * Let the dialog arm.
+/** The event clock's current reading, which is what a synthetic event is stamped with.
  *
- * Enter is ignored for one frame after mount, which is guard 2 in the component:
- * a human cannot answer a dialog within the frame it appeared in, so an Enter
- * arriving there is not an answer to it. Every test that means to press Enter
- * deliberately has to cross that frame first, and the two that do NOT call this
- * are the ones asserting the guard.
- */
-async function armed(): Promise<void> {
-  await act(async () => {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+ * Guard 2 compares a key's own `timeStamp` against the instant the dialog mounted, and
+ * that instant is an event stamp too (see the component), so both sides of the comparison
+ * are readings of THIS clock. The refusal direction needs a key that predates the mount,
+ * which no naturally-dispatched event in this test can carry, so that value is stated:
+ * one second before now is before this dialog existed, by a margin no clock skew covers.
+ * The permissive direction states its value for a related reason, one millisecond past
+ * now, so it asserts the ORDERING rather than whatever resolution this environment's
+ * clock happens to have. Measured here: this reading and `fireEvent`'s own stamp are both
+ * `Date.now()`-based (`1792079020813` against `performance.now()`'s `1783.55`), which is
+ * why the mount instant is not taken from `performance.now()`. (The plain `fireEvent`
+ * path is covered by the tests above, which want only "a fresh press confirms".) */
+function eventNow(): number {
+  return new Event("dc683:now").timeStamp;
+}
+
+/** Dispatch an Enter keydown carrying an explicit `timeStamp`. */
+function enterAt(timeStamp: number): void {
+  const ev = new KeyboardEvent("keydown", {
+    key: "Enter",
+    bubbles: true,
+    cancelable: true,
   });
+  Object.defineProperty(ev, "timeStamp", { value: timeStamp });
+  document.dispatchEvent(ev);
 }
 
 /** A second trapped dialog, the shape an OS deep link can open over this one. */
@@ -78,7 +102,6 @@ describe("DeleteConfirmModal keyboard contract", () => {
 
   it("Enter confirms from the default focus", async () => {
     const { onConfirm, onCancel } = mount();
-    await armed();
     fireEvent.keyDown(document, { key: "Enter" });
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();
@@ -86,14 +109,13 @@ describe("DeleteConfirmModal keyboard contract", () => {
 
   it("Enter CANCELS once the user has moved the ring to Cancel", async () => {
     const { getByTestId, onConfirm, onCancel } = mount();
-    await armed();
     getByTestId("delete-confirm.cancel").focus();
     fireEvent.keyDown(document, { key: "Enter" });
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  // The three guards, each asserted against the sequence it exists for. Two of
+  // The four guards, each asserted against the sequence it exists for. Two of
   // this modal's call sites are the cryptographic erase of decisions/storage
   // 0105, so each of these is a path from a keypress to an unrecoverable delete.
   describe("cannot confirm without having been read", () => {
@@ -102,18 +124,55 @@ describe("DeleteConfirmModal keyboard contract", () => {
       // press is dispatched before this listener exists; what reaches it is the
       // repeat, and every repeat after the first carries `repeat: true`.
       const { onConfirm, onCancel } = mount();
-      await armed();
       fireEvent.keyDown(document, { key: "Enter", repeat: true });
       expect(onConfirm).not.toHaveBeenCalled();
       expect(onCancel).not.toHaveBeenCalled();
     });
 
-    it("ignores an Enter that arrives in the frame the dialog appeared in", () => {
-      const { onConfirm, onCancel } = mount(); // deliberately not armed
-      fireEvent.keyDown(document, { key: "Enter" });
+    it("ignores an Enter whose own timestamp predates the dialog", () => {
+      // Guard 2's real subject: a key already in flight when the dialog appeared
+      // is not an answer to it. The key carries the instant it was created, and
+      // the mount instant is a reading of that same clock, so the test states a
+      // value one second before now: before this dialog existed by a margin no
+      // clock skew covers.
+      const { onConfirm, onCancel } = mount();
+      enterAt(eventNow() - 1_000);
       expect(onConfirm).not.toHaveBeenCalled();
       expect(onCancel).not.toHaveBeenCalled();
     });
+
+    it("confirms an Enter pressed after the dialog appeared, with no frame or timer crossed", () => {
+      // The myne-md/myne#683 regression, and the injection that pins the fix is
+      // reverting it. The guard used to be a 16 ms window measured from when the
+      // arming effect ran, so a press arriving immediately after mount was
+      // refused on a dialog whose ring was on the confirm button: `sinceMount`
+      // of 14 ms refused it, and the same press 8 s later confirmed. Nothing is
+      // waited for here, deliberately: a press created after the dialog appeared
+      // is an answer to it, whether or not a frame has been painted and whether
+      // or not any timer has fired. One millisecond past now states that
+      // ordering, rather than relying on two clocks disagreeing by an epoch.
+      const { onConfirm, onCancel } = mount();
+      enterAt(eventNow() + 1);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    // There is deliberately NO unit test here for the other half of #683, the
+    // registration moving from a passive effect to a commit-phase one. jsdom
+    // cannot hold the state that distinguishes them: every way of committing a
+    // mount (act, RTL's render, flushSync) also flushes the passive effects, so a
+    // keyup dispatched after any of them finds the listener either way, and the
+    // test this replaced passed against the defect when it was written.
+    //
+    // The guard-4 RULE is pinned below ("refuses a held Enter that opened the
+    // dialog"), so what is unexercised is the timing, not the rule. And no E2E
+    // scenario carries it either: `openedByKey === true` is reachable only
+    // through the palette's Enter keydown (`CommandPalette`'s row `runRow(row,
+    // true)`) or a keyboard-activated trash button, and `et1` and `nc5` do
+    // neither (et1 clicks the palette row, so the dialog mounts with
+    // `viaKey: false`, and nc5 opens from the Delete key and passes no
+    // `openedByKey`). Said out loud because an earlier version of this comment
+    // claimed those two scenarios covered it, which they do not.
 
     it("ignores an Enter pressed inside a dialog stacked over this one", async () => {
       // `ThemeInstallDialog` opens from an OS deep link, which can arrive over a
@@ -126,7 +185,6 @@ describe("DeleteConfirmModal keyboard contract", () => {
       // would pull focus straight back and the test would be asserting against a
       // state the app never reaches.
       const { onConfirm, onCancel } = mount();
-      await armed();
       const { getByTestId: getStacked } = render(<StackedDialog />);
       getStacked("stacked.button").focus();
       expect(document.activeElement).toBe(getStacked("stacked.button"));
@@ -142,36 +200,11 @@ describe("DeleteConfirmModal keyboard contract", () => {
       expect(onCancel).not.toHaveBeenCalled();
     });
 
-    it("arms on elapsed time when the frame callback never arrives", async () => {
-      // WebKitGTK under the E2E harness does not reliably deliver the
-      // `requestAnimationFrame` callback for a dialog that has just mounted. An
-      // instrumented run of `nc5` captured `armed=false repeat=false
-      // contains=true active=delete-confirm.confirm` on a dialog the same
-      // failure's screenshot shows on screen, so Enter stayed inert for the full
-      // 45 s budget three attempts over: a gate that can be shut forever is the
-      // #397 behaviour wearing a guard's name.
-      //
-      // Stubbing rAF to never call back IS that WebView, and the wall clock is
-      // what has to answer instead.
-      const raf = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
-      try {
-        const { onConfirm, onCancel } = mount();
-        await act(async () => {
-          await new Promise<void>((resolve) => setTimeout(resolve, 40));
-        });
-        fireEvent.keyDown(document, { key: "Enter" });
-        expect(onConfirm).toHaveBeenCalledTimes(1);
-        expect(onCancel).not.toHaveBeenCalled();
-      } finally {
-        raf.mockRestore();
-      }
-    });
-
     it("refuses a held Enter that opened the dialog, whatever `repeat` reports", async () => {
       // Guard 2 cannot do this and an earlier revision of the component claimed
       // it could. OS typematic delay before the first auto-repeat is 250 ms to
-      // 660 ms, so both the paint and the 16 ms clock have long armed the dialog
-      // by the time a held key's first repeat arrives. If the WebView reports
+      // 660 ms, so the dialog is far older than any key still in flight by the
+      // time a held key's first repeat arrives. If the WebView reports
       // `repeat: false` for that repeat, guard 1 admits it too.
       //
       // Guard 4 keys off the input instead of off a flag or a clock: a HELD key
@@ -180,7 +213,6 @@ describe("DeleteConfirmModal keyboard contract", () => {
       // press below carries `repeat: false` deliberately, which is the exact
       // case the other two guards cannot tell from a fresh press.
       const { onConfirm, onCancel } = mount({ openedByKey: true });
-      await armed();
       fireEvent.keyDown(document, { key: "Enter", repeat: false });
       expect(onConfirm).not.toHaveBeenCalled();
       expect(onCancel).not.toHaveBeenCalled();
@@ -197,26 +229,25 @@ describe("DeleteConfirmModal keyboard contract", () => {
       // would eat their first Enter, which is the #397 inertness this whole
       // entry set out to remove, narrowed to one dialog.
       const { onConfirm } = mount();
-      await armed();
       fireEvent.keyDown(document, { key: "Enter" });
       expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
     it("stays armed when the parent re-renders with fresh callbacks", async () => {
-      // The arming guard has to mean "one frame since the DIALOG appeared". The
-      // obvious spelling, `[onCancel, onConfirm]` as the listener effect's deps,
-      // makes it mean "one frame since the parent last re-rendered" instead,
-      // and `NoteList`'s keyboard soft-trash hands down an `onConfirm` that
-      // closes over the state opening the dialog, so it is a new identity on
-      // every render of a list that re-renders on save settles and sync ticks.
+      // The guard has to mean "since the DIALOG appeared". The obvious spelling,
+      // `[onCancel, onConfirm]` as the listener effect's deps, makes it mean
+      // "since the parent last re-rendered" instead, and `NoteList`'s keyboard
+      // soft-trash hands down an `onConfirm` that closes over the state opening
+      // the dialog, so it is a new identity on every render of a list that
+      // re-renders on save settles and sync ticks.
       //
-      // This is not a hypothetical. It shipped for one E2E run: `nc5` timed out
+      // This is not hypothetical: it was one of the two ways `nc5` was timed out
       // three times over with the focus ring visibly on the confirm button and
-      // Enter doing nothing, because the dialog was disarmed again after the
-      // frame that armed it. Re-rendering here WITHOUT crossing another frame is
-      // that state exactly.
+      // Enter doing nothing, found while hunting the other one (#683). A
+      // re-render that resets the mount instant puts the dialog's age back to
+      // zero, so the guard refuses a press on a dialog that has been up for
+      // seconds.
       const { onConfirm, onCancel, rerender } = mount();
-      await armed();
       rerender(
         <DeleteConfirmModal
           title="Delete this folder?"
@@ -239,7 +270,6 @@ describe("DeleteConfirmModal keyboard contract", () => {
       // keyboard soft-trash path means trashing whichever note was selected when
       // the dialog opened rather than the one the parent has since re-staged.
       const { onConfirm, rerender } = mount();
-      await armed();
       const later = vi.fn();
       rerender(
         <DeleteConfirmModal
@@ -288,7 +318,6 @@ describe("DeleteConfirmModal keyboard contract", () => {
 
     it("Enter cancels from there, and never confirms", async () => {
       const { onConfirm, onCancel } = mount({ initialFocus: "cancel" });
-      await armed();
       fireEvent.keyDown(document, { key: "Enter" });
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(onConfirm).not.toHaveBeenCalled();
