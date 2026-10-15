@@ -159,9 +159,15 @@ export type DeleteConfirmModalProps = {
    *
    * Default `false`, because for a pointer-opened dialog the first Enter is
    * always a deliberate new press and demanding a release would cost that press
-   * for nothing. Pass the activating event's own answer rather than a constant:
-   * a React `onClick` carries `detail === 0` exactly when the button was
-   * activated from the keyboard.
+   * for nothing.
+   *
+   * **Answer whether the key can still be DOWN, not merely whether a key did
+   * it.** `detail === 0` on a React `onClick` says the button was activated from
+   * the keyboard, and that is not the same question: a `<button>` activates on
+   * Enter's KEYDOWN and on Space's KEYUP, so a Space-activated click leaves no
+   * key held and passing `true` for it shuts this guard with nothing able to
+   * open it. `TrashPanel.purgeOpenedByHeldEnter` is the worked answer, and the
+   * palette's Enter keydown (`CommandPalette.runRow(row, true)`) is the other.
    *
    * Set at the two `TrashPanel` purge buttons and at the palette's empty-trash
    * action, which are the openers that fire on Enter KEYDOWN and the two paths
