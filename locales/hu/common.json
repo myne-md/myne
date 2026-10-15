@@ -2772,7 +2772,7 @@
       "version": "Verzió",
       "dev": "Fejlesztői"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id-paraméterek",
       "changePasswordButton": "Jelszó módosítása",
       "changePasswordError": {

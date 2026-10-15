@@ -2758,7 +2758,7 @@
       "version": "Toleo",
       "dev": "Usanidi"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "Badilisha nenosiri",
       "changePasswordError": {
         "invalidCredentialOrVault": "Nenosiri la sasa si sahihi au faili la kasha limeharibika.",

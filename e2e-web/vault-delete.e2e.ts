@@ -129,7 +129,7 @@ describeE2E("deleting the vault erases the OPFS container", () => {
           `hold on a browser that had never opened a vault. The fixture did not land.`,
       ).toBeGreaterThan(0);
 
-      await openSettingsTab(session, "settings.tab-account");
+      await openSettingsTab(session, "settings.tab-vault");
       await session.execute(
         "document.querySelector('[data-testid=\"settings.delete-vault-cta\"]').click();",
       );

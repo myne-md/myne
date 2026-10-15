@@ -128,7 +128,7 @@ async function pickerRowText(s: Session, vaultId: string): Promise<string> {
  * appear and then go is a real write-landed signal rather than a paint wait.
  */
 async function nameTheOpenVault(s: Session, name: string): Promise<void> {
-  await openSettings(s); // Account is the default panel.
+  await openSettings(s, "vault"); // The vault label lives in the Vault panel.
   const field = await s.byTestId("settings.label-input");
   await field.scrollIntoView();
   await field.replaceText(name);

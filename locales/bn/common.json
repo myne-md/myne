@@ -2758,7 +2758,7 @@
       "version": "সংস্করণ",
       "dev": "ডেভ"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "পাসওয়ার্ড বদলান",
       "changePasswordError": {
         "invalidCredentialOrVault": "বর্তমান পাসওয়ার্ড ভুল, নয়তো ভল্ট ফাইলটি ক্ষতিগ্রস্ত।",

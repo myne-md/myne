@@ -2772,7 +2772,7 @@
       "version": "Phiên bản",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Tham số Argon2id",
       "changePasswordButton": "Đổi mật khẩu",
       "changePasswordError": {

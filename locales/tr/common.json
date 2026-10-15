@@ -2772,7 +2772,7 @@
       "version": "Sürüm",
       "dev": "Geliştirme"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id parametreleri",
       "changePasswordButton": "Parola değiştir",
       "changePasswordError": {

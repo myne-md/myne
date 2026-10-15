@@ -2772,7 +2772,7 @@
       "version": "版本",
       "dev": "开发版"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Argon2id 参数",
       "changePasswordButton": "更改密码",
       "changePasswordError": {

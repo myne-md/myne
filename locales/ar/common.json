@@ -3170,7 +3170,7 @@
       "version": "الإصدار",
       "dev": "تطوير"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "تغيير كلمة المرور",
       "changePasswordError": {
         "invalidCredentialOrVault": "كلمة المرور الحالية خاطئة أو ملف الخزنة تالف.",

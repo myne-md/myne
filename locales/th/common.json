@@ -2758,7 +2758,7 @@
       "version": "เวอร์ชัน",
       "dev": "เดฟ"
     },
-    "account": {
+    "vault": {
       "changePasswordButton": "เปลี่ยนรหัสผ่าน",
       "changePasswordError": {
         "invalidCredentialOrVault": "รหัสผ่านปัจจุบันไม่ถูกต้อง หรือไฟล์ห้องนิรภัยเสียหาย",

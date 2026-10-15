@@ -2978,7 +2978,7 @@
       "version": "Версия",
       "dev": "Dev"
     },
-    "account": {
+    "vault": {
       "argon2idHeading": "Параметры Argon2id",
       "changePasswordButton": "Сменить пароль",
       "changePasswordError": {

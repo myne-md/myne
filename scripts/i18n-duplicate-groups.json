@@ -273,7 +273,7 @@
     "value": "Vault file is unreadable. Restore from a backup.",
     "keys": [
       "recover.vaultUnreadable",
-      "settings.account.vaultUnreadable",
+      "settings.vault.vaultUnreadable",
       "unlock.vaultUnreadable"
     ],
     "reason": "Same unreadable-vault error on recover, settings and unlock; one error, three call sites."
@@ -282,7 +282,7 @@
     "value": "Something went wrong. Please try again.",
     "keys": [
       "recover.genericError",
-      "settings.account.genericChangeError"
+      "settings.vault.genericChangeError"
     ],
     "reason": "Same generic failure on recover and account change; generic fallback, intentionally shared."
   },
@@ -297,7 +297,7 @@
   {
     "value": "New password must be at least 12 characters.",
     "keys": [
-      "settings.account.changePasswordError.weakNewPassword",
+      "settings.vault.changePasswordError.weakNewPassword",
       "vaultRecover.passwordReset.errors.weakPassword"
     ],
     "reason": "Same password-policy sentence in settings and vault recover; one policy, stated once."

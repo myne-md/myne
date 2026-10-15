@@ -1622,14 +1622,18 @@ runner(
         },
       );
 
-      // ---- Frame: account (label + icon + actions) ----
+      // ---- Frame: vault (label + icon + actions) ----
+      // The controls captured here moved out of the Account panel into the
+      // Vault panel. The frame name and the user-guide slug below are the
+      // WEBSITE's article names, so they are left alone by this change; the
+      // article text and the slug want their own update on `myne-website`.
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
-        "The Account settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
+        "The Vault settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-vault")).click();
           await s.byTestId("settings.icon-picker", { timeoutMs: 6000 });
           await settle(s, 400);
         },
@@ -1658,16 +1662,16 @@ runner(
         },
       );
 
-      // ---- Frame: change password (the Change password form, Account tab) ----
-      // AccountPanel: settings.change-password-cta reveals PasswordChangeForm
+      // ---- Frame: change password (the Change password form, Vault panel) ----
+      // VaultPanel: settings.change-password-cta reveals PasswordChangeForm
       // (change-password.submit). Cancel back to idle — never submit.
       await frame(
         s,
         "change-password",
         "settings-and-privacy/change-your-password",
-        "The Change password form in Account settings, with fields for the current password, the new password, and confirmation.",
+        "The Change password form in Vault settings, with fields for the current password, the new password, and confirmation.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-vault")).click();
           await (await s.byTestId("settings.change-password-cta")).click();
           await s.byTestId("change-password.submit", { timeoutMs: 6000 });
           await settle(s, 400);
@@ -1677,17 +1681,17 @@ runner(
         await (await s.byTestId("change-password.cancel")).click();
       });
 
-      // ---- Frame: delete a vault (the confirm form, Account tab) ----
-      // AccountPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
+      // ---- Frame: delete a vault (the confirm form, Vault panel) ----
+      // VaultPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
       // (delete-vault.confirm-input). Submit is gated on the typed phrase, so
       // capturing the empty form + cancelling never deletes anything.
       await frame(
         s,
         "delete-a-vault",
         "settings-and-privacy/delete-a-vault",
-        "The delete-vault confirmation form in Account settings, which requires typing a confirmation phrase before the vault is erased.",
+        "The delete-vault confirmation form in Vault settings, which requires typing a confirmation phrase before the vault is erased.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-vault")).click();
           await (await s.byTestId("settings.delete-vault-cta")).click();
           await s.byTestId("delete-vault.confirm-input", { timeoutMs: 6000 });
           await settle(s, 400);

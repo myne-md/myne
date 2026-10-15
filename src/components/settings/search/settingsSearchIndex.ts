@@ -161,39 +161,81 @@ export const WRITABILITY_WRITABLE: AgentWritability = { verdict: "writable" };
 // makes the additive `data-setting-anchor` pass in Task 4 a straight read-down.
 export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Account ────────────────────────────────────────────────────────────────
+  // The account-level panel. Its namespace is the account grouping: which
+  // vaults this device treats as one account, and what that group is called.
+  // Everything that acts on a vault's own container lives under `vault.*`
+  // below.
   {
-    id: "account.vault-label",
+    id: "account.name",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
+    testid: "settings.account-name-input",
+    titleKey: "settings.account.nameLabel",
+    descriptionKey: "settings.account.nameHelper",
+    keywordsKey: "settings.search.keywords.accountName",
+  },
+  {
+    id: "account.vaults",
+    agentWritability: WRITABILITY_NONE,
+    panelId: "account",
+    testid: "settings.account-vaults",
+    titleKey: "settings.account.vaultsLabel",
+    descriptionKey: "settings.account.vaultsHelper",
+    keywordsKey: "settings.search.keywords.accountVaults",
+  },
+  {
+    // Moved here from the Storage section: the control it names
+    // (`settings.clipper-install`, rendered by `ConnectedExtensions`) has lived
+    // in this panel since the 2026-06-21 decision moved it, so the entry was
+    // navigating to a panel that does not render it — the exact failure the
+    // registry's contract exists to prevent, and invisible because the testid
+    // it points at does exist, one panel away.
+    id: "account.extensions",
+    agentWritability: WRITABILITY_NONE,
+    capability: "clipper",
+    panelId: "account",
+    testid: "settings.clipper-install",
+    titleKey: "settings.clipperInstall.label",
+    descriptionKey: "settings.clipperInstall.helper",
+    keywordsKey: "settings.search.keywords.clipper",
+  },
+
+  // ── Vault ──────────────────────────────────────────────────────────────────
+  // Split out of Account: everything that acts on the sealed container itself.
+  // Same controls, same testids, same copy — a different home.
+  {
+    id: "vault.label",
+    agentWritability: WRITABILITY_NONE,
+    panelId: "vault",
     testid: "settings.label-input",
-    titleKey: "settings.account.vaultLabelEyebrow",
-    descriptionKey: "settings.account.vaultLabelHelper",
+    titleKey: "settings.vault.vaultLabelEyebrow",
+    descriptionKey: "settings.vault.vaultLabelHelper",
     keywordsKey: "settings.search.keywords.vaultLabel",
   },
   {
-    id: "account.vault-icon",
+    id: "vault.icon",
     agentWritability: WRITABILITY_NONE,
-    panelId: "account",
+    panelId: "vault",
     testid: "settings.icon-picker",
-    titleKey: "settings.account.vaultIconLabel",
+    titleKey: "settings.vault.vaultIconLabel",
     keywordsKey: "settings.search.keywords.vaultIcon",
   },
   {
-    id: "account.change-password",
+    id: "vault.change-password",
     agentWritability: WRITABILITY_NONE,
-    panelId: "account",
+    panelId: "vault",
     testid: "settings.change-password-cta",
-    titleKey: "settings.account.changePasswordHeading",
-    descriptionKey: "settings.account.changePasswordHelper",
+    titleKey: "settings.vault.changePasswordHeading",
+    descriptionKey: "settings.vault.changePasswordHelper",
     keywordsKey: "settings.search.keywords.changePassword",
   },
   {
-    id: "account.danger-zone",
+    id: "vault.danger-zone",
     agentWritability: WRITABILITY_NONE,
-    panelId: "account",
+    panelId: "vault",
     testid: "settings.delete-vault-cta",
-    titleKey: "settings.account.dangerZoneHeading",
-    descriptionKey: "settings.account.dangerZoneHelper",
+    titleKey: "settings.vault.dangerZoneHeading",
+    descriptionKey: "settings.vault.dangerZoneHelper",
     keywordsKey: "settings.search.keywords.dangerZone",
   },
 
@@ -310,40 +352,41 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.memberPassword.helperNotConfigured",
     keywordsKey: "settings.search.keywords.memberPassword",
   },
-  // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
-  // omitted where the capability is absent, so an ungated entry would navigate
-  // to an anchor that was never rendered. All three ALSO carry
-  // `developerGated` (#181) - PrivacyPanel now renders the block only while
-  // Developer mode is on, and the two gates are independent, so the entry
-  // needs both to stay in step with its control. The first developer-gated
-  // entries in a `core` panel: the flag has never meant "lives in the
-  // Developer rail group", only "hidden while the mode is off".
+  // CLI terminal access (MYND-490), in the CLI panel since
+  // `decisions/ui/0678`. All three carry `cliAccess`: the panel is absent
+  // where the capability is, so an ungated entry would navigate to an anchor
+  // that was never rendered. All three ALSO carry `developerGated` (#181) —
+  // the rail drops the whole developer group while the mode is off, and the
+  // search index has no view of the rail's groups, so dropping the flag here
+  // would offer a result that scrolls into a panel the rail is not showing.
+  // (The flag no longer means "hidden inside a core panel"; the vim toggle is
+  // the last entry of that shape.)
   {
-    id: "privacy.cli-access",
+    id: "cli.access",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
-    panelId: "privacy",
+    panelId: "cli",
     titleKey: "settings.cliAccess.label",
     descriptionKey: "settings.cliAccess.helperOff",
     keywordsKey: "settings.search.keywords.cliAccess",
   },
   {
-    id: "privacy.cli-excluded-folders",
+    id: "cli.excluded-folders",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
-    panelId: "privacy",
+    panelId: "cli",
     titleKey: "settings.cliAccess.excludedLabel",
     descriptionKey: "settings.cliAccess.excludedHelper",
     keywordsKey: "settings.search.keywords.cliExcludedFolders",
   },
   {
-    id: "privacy.cli-rate-limit",
+    id: "cli.rate-limit",
     agentWritability: WRITABILITY_CONTROL,
     capability: "cliAccess",
     developerGated: true,
-    panelId: "privacy",
+    panelId: "cli",
     titleKey: "settings.cliAccess.rateLimitLabel",
     descriptionKey: "settings.cliAccess.rateLimitHelper",
     keywordsKey: "settings.search.keywords.cliRateLimit",
@@ -874,17 +917,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.autoBackup.helper",
     keywordsKey: "settings.search.keywords.autoBackup",
   },
-  {
-    id: "storage.clipper",
-    agentWritability: WRITABILITY_NONE,
-    capability: "clipper",
-    panelId: "storage",
-    testid: "settings.clipper-install",
-    titleKey: "settings.clipperInstall.label",
-    descriptionKey: "settings.clipperInstall.helper",
-    keywordsKey: "settings.search.keywords.clipper",
-  },
-
   // ── About ──────────────────────────────────────────────────────────────────
   {
     id: "about.build-channel",

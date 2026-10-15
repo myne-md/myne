@@ -266,8 +266,8 @@ describeE2E("pf2 vault label + RAM cache round-trip (MYND-225)", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // Account panel (the modal's default tab) → label → Save.
-        await openSettings(s);
+        // Vault panel → label → Save.
+        await openSettings(s, "vault");
         const input = await s.byTestId("settings.label-input");
         await input.replaceText("Kasa-Bir");
         const save = await s.byTestId("settings.label-save");
@@ -314,8 +314,8 @@ describeE2E("pf6 vault icon + RAM cache round-trip (vault-icons)", () => {
           label: "chip starts on the wordmark",
         });
 
-        // Account panel (the modal's default tab) → icon picker → "book" glyph.
-        await openSettings(s);
+        // Vault panel → icon picker → "book" glyph.
+        await openSettings(s, "vault");
         const bookBtn = await s.waitForElement(
           testIdSelector("settings.icon-option", { "data-icon-name": "book" }),
         );
@@ -340,7 +340,7 @@ describeE2E("pf6 vault icon + RAM cache round-trip (vault-icons)", () => {
         });
 
         // Re-open Settings: the picker reads the persisted selection back.
-        await openSettings(s);
+        await openSettings(s, "vault");
         const bookBtnAgain = await s.waitForElement(
           testIdSelector("settings.icon-option", { "data-icon-name": "book" }),
         );
@@ -376,7 +376,7 @@ describeE2E("pf3 per-vault isolation (MYND-225)", () => {
         await selectPickerRow(s, a.vaultId);
         await unlockToEditor(s, a.password);
         await dismissImporterOffer(s);
-        await openSettings(s);
+        await openSettings(s, "vault");
         await (await s.byTestId("settings.label-input")).replaceText("Kasa-Bir");
         const save = await s.byTestId("settings.label-save");
         await save.click();

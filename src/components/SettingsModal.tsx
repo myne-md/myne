@@ -11,7 +11,7 @@
 // Carve-out: `decisions.md` 2026-05-08 "Desktop modal carve-out +
 // Settings 5-panel taxonomy + disabled-control discipline".
 //
-// In-flight gating: the AccountPanel raises `childInFlight` during the
+// In-flight gating: the VaultPanel raises `childInFlight` during the
 // change-password Argon2id window so Esc / backdrop / × all become
 // no-ops. The user must wait for the backend response before the modal
 // becomes dismissable again.
@@ -64,9 +64,11 @@ import {
 } from "./settings/settingsCompact";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
+import { VaultPanel } from "./settings/VaultPanel";
 import * as capabilities from "../platform/capabilities";
 import { AiPanel } from "./settings/AiPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
+import { CliPanel } from "./settings/CliPanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
 import { TranscriptionPanel } from "./settings/TranscriptionPanel";
@@ -82,14 +84,18 @@ import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
  * Panel taxonomy. The Editor panel was added (and Appearance scoped down to
  * purely-visual controls) by the `decisions.md` entry superseding the
  * 2026-05-08 5-panel lock; the Files panel (note-storage + startup behaviour,
- * MYND-462) was added by a further superseding `decisions.md` entry.
+ * MYND-462) was added by a further superseding `decisions.md` entry; the CLI
+ * panel (`decisions/ui/0678`) by another, which is also what moved the
+ * terminal-access block out of Privacy.
  */
 export type PanelId =
   | "account"
+  | "vault"
   | "privacy"
   | "sync"
   | "ai"
   | "network"
+  | "cli"
   | "editor"
   | "files"
   | "transcription"
@@ -123,17 +129,20 @@ interface PanelMeta {
 }
 
 // The `developer` group sits LAST: Developer mode is where the user leaves the
-// path Myne vouches for (prd.md "Solution"), and both of its members are
-// squarely that — local AI (user-supplied weights, an in-process runtime, no
-// isolation guarantee yet) and Tor routing (MYND-650: a bundled Tor client Myne
-// does not operate, over a volunteer relay network nobody here controls).
+// path Myne vouches for (prd.md "Solution"), and its members are squarely that —
+// local AI (user-supplied weights, an in-process runtime, no isolation
+// guarantee yet), Tor routing (MYND-650: a bundled Tor client Myne does not
+// operate, over a volunteer relay network nobody here controls), and terminal
+// access (the `myne` sidecar opens the unlocked vault to any program running as
+// the same OS user, with no identity gatekeeper in front of the socket).
 // Keeping PANELS_BASE a single flat array preserves the ArrowUp/ArrowDown cycle
 // + `itemRefs` logic unchanged — the Developer divider is a non-focusable
 // presentation row inserted at the group edge.
 //
-// **Capability gating (MYND-574 task 27).** Both are absent on web: the
-// on-device LLM needs multi-GiB weights and a CPU thread pool, and Tor routing
-// needs a subprocess and a raw socket — neither of which a Worker has. They are
+// **Capability gating (MYND-574 task 27).** All three are absent on web: the
+// on-device LLM needs multi-GiB weights and a CPU thread pool, Tor routing
+// needs a subprocess and a raw socket, and terminal access needs a Unix socket
+// no page can host — none of which a Worker has. They are
 // filtered OUT of the rail rather than rendered disabled: a greyed panel is an
 // offer the platform cannot honour, and `decisions.md` 2026-07-26 makes omission
 // normative rather than a UX preference.
@@ -155,6 +164,10 @@ interface PanelMeta {
 // `opensDeveloper` computation in the render below).
 const PANELS_BASE: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account", icon: "id-card" },
+  // The vault's own controls, split out of Account: the panel named after the
+  // account held nothing but vault actions, and the account itself had no
+  // surface after unlock. `key-round`: the vault is what this key opens.
+  { id: "vault", labelKey: "settings.shell.panels.vault", icon: "key-round" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy", icon: "lock" },
   { id: "sync", labelKey: "settings.shell.panels.sync", icon: "refresh-cw" },
   { id: "editor", labelKey: "settings.shell.panels.editor", icon: "pencil" },
@@ -185,6 +198,13 @@ const PANELS_BASE: readonly PanelMeta[] = [
     icon: "globe",
     group: "developer",
     capability: "torRouting",
+  },
+  {
+    id: "cli",
+    labelKey: "settings.shell.panels.cli",
+    icon: "code",
+    group: "developer",
+    capability: "cliAccess",
   },
 ] as const satisfies readonly PanelMeta[];
 
@@ -231,7 +251,7 @@ interface SettingsModalProps {
   onExportVault?: () => void;
   /**
    * Show a transient post-event toast at the parent's notification
-   * surface (Editor's Toast component). Used by AccountPanel after a
+   * surface (Editor's Toast component). Used by VaultPanel after a
    * successful change-password.
    */
   onShowToast?: (message: string) => void;
@@ -239,13 +259,13 @@ interface SettingsModalProps {
    * Out-of-band Stage set used by descendant flows that need to bypass
    * the `transition()` reducer with a fully-known target stage.
    * Threaded from Editor (which receives it from App.tsx's
-   * `setStageWithSuspicion` callback). AccountPanel's change-password
+   * `setStageWithSuspicion` callback). VaultPanel's change-password
    * force-relock arm dispatches this for `InvalidVaultMeta` /
    * `VaultMetaChangedExternally` / `VaultLockedDuringChange`.
    */
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
   /**
-   * Fired by AccountPanel after a successful `vault_delete` IPC OR
+   * Fired by VaultPanel after a successful `vault_delete` IPC OR
    * after the user clicks Continue on the post-fail banner. Threaded
    * from Editor → App.tsx, where it triggers a `reprobe()`; boot
    * routing then selects the return surface by remaining vault count
@@ -534,10 +554,12 @@ export function SettingsModal({
   useFocusTrap(modalRef, { enabled: open });
   const itemRefs = useRef<Record<PanelId, HTMLButtonElement | null>>({
     account: null,
+    vault: null,
     privacy: null,
     sync: null,
     ai: null,
     network: null,
+    cli: null,
     editor: null,
     files: null,
     transcription: null,
@@ -709,8 +731,9 @@ export function SettingsModal({
   if (!open) return null;
 
   const panelContent: Record<PanelId, ReactNode> = {
-    account: (
-      <AccountPanel
+    account: <AccountPanel vaultId={vaultId} />,
+    vault: (
+      <VaultPanel
         vaultId={vaultId}
         onChangePasswordSuccess={() => {
           onShowToast?.(t("settings.shell.passwordUpdatedToast"));
@@ -730,7 +753,8 @@ export function SettingsModal({
     ),
     ai: <AiPanel onShowToast={onShowToast} onDialogOpenChange={setChildDialogOpen} />,
     network: <NetworkPanel />,
-    editor: <EditorPanel onShowToast={onShowToast} />,
+    cli: <CliPanel onShowToast={onShowToast} />,
+    editor: <EditorPanel onShowToast={onShowToast} focusAnchorId={pendingScroll?.id} />,
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,
     hotkeys: <HotkeysPanel />,

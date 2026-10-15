@@ -441,6 +441,7 @@ export async function lockAndReunlock(session: Session, password: string): Promi
  *  opens on Account). */
 export type SettingsTab =
   | "account"
+  | "vault"
   | "privacy"
   | "sync"
   | "editor"
@@ -450,6 +451,7 @@ export type SettingsTab =
   | "storage"
   | "ai"
   | "network"
+  | "cli"
   | "transcription"
   | "about";
 
