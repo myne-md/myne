@@ -417,7 +417,7 @@
   padding: 0 2px;
   border-radius: 999px;
   background: var(--line-2, #c8c7c1);
-  transition: background var(--duration-fast, 0.1s) ease;
+  transition: background var(--duration-fast, 0.1s) var(--ease-standard);
 }
 
 .cm-recurrence-mode .cm-switch-knob {
@@ -427,7 +427,7 @@
   border-radius: 50%;
   background: var(--bg-1, #fbfaf7);
   box-shadow: var(--shadow-1, 0 1px 2px rgba(11, 11, 9, 0.2));
-  transition: transform var(--duration-fast, 0.1s) ease;
+  transition: transform var(--duration-fast, 0.1s) var(--ease-standard);
 }
 
 .cm-recurrence-mode .cm-switch[aria-checked="true"] .cm-switch-track {
@@ -665,7 +665,7 @@
      caret is already on this line (the widget is cursor-gated), so it is never a
      surprise. */
   opacity: 0.55;
-  transition: opacity 0.1s ease, background 0.1s ease, color 0.1s ease;
+  transition: opacity var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .cm-task-add:hover,

@@ -46,7 +46,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../platform/core";
-import { CenteredCard, ctaHover, ctaStyle } from "../components/primitives/CenteredCard";
+import { CenteredCard, ctaInteraction, ctaStyle } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { PasswordInput } from "../components/PasswordInput";
 import { Spinner } from "../components/Spinner";
@@ -307,7 +307,7 @@ export function AccountBootstrap({
               type="button"
               disabled={aborting}
               style={ctaStyle(aborting)}
-              {...ctaHover(aborting)}
+              {...ctaInteraction(aborting)}
               onClick={onBootstrapped}
             >
               <span>{t("accountBootstrap.sasMatch")}</span>
@@ -405,7 +405,7 @@ export function AccountBootstrap({
             data-testid="bootstrap.beta-terms.open"
             type="button"
             style={{ ...ctaStyle(false), marginTop: "var(--space-3)" }}
-            {...ctaHover(false)}
+            {...ctaInteraction(false)}
             onClick={() => setTermsOpen(true)}
           >
             <span>{t("sync.betaTerms.review")}</span>
@@ -540,7 +540,7 @@ export function AccountBootstrap({
           type="submit"
           disabled={password.length === 0 || busy}
           style={ctaStyle(password.length === 0 || busy)}
-          {...ctaHover(password.length === 0 || busy)}
+          {...ctaInteraction(password.length === 0 || busy)}
         >
           {busy && <Spinner size={14} />}
           <span>{busy ? t("accountBootstrap.working") : t("accountBootstrap.continue")}</span>

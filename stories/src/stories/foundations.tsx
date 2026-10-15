@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { interactiveSurface } from "../../../src/components/primitives/interactiveSurface";
 import tokensCss from "../../../client-core/src/tokens.css?raw";
 // The component sheet, read only for the `.t-*` role pairing (myne-md/myne#847
 // task 13): the values stay the token sheet's, this is where the three
@@ -462,6 +463,72 @@ function MotionRow({ name }: { name: string }) {
   );
 }
 
+/**
+ * The press treatment, on a surface a reviewer can actually press.
+ *
+ * The motion rows above replay durations; this shows the OTHER half of the same
+ * system, which is what a press looks like and where the value comes from. Two
+ * steps exist: `--accent-press` on an accent call to action, and the
+ * theme-independent neutral mix on everything else (`design-notes/ui/0683`
+ * records why the neutral one is a mix rather than the `--line-1` rung).
+ *
+ * The three controls deliberately come from two different mechanisms, because
+ * that split is the thing worth seeing: the first is a class-based control whose
+ * press is the component layer's `:active` rule (and so also fires for a keyboard
+ * user), and the other two are inline-styled surfaces driven by
+ * `interactiveSurface`, which is what a surface with a computed fill uses.
+ */
+export function PressSpecimen(): ReactNode {
+  const neutral = interactiveSurface({ hoverBg: "var(--bg-3)" });
+  const accent = interactiveSurface({
+    restBg: "var(--accent)",
+    hoverBg: "var(--accent-hover)",
+    accent: true,
+  });
+  return (
+    <div style={SPECIMEN_STYLE}>
+      <div style={LABEL_STYLE}>
+        Press each control. The class-based button takes its press from the shared
+        `.myne-btn:enabled:active` rule, so a keyboard user gets the same step; the two
+        inline surfaces take theirs from the press primitive.
+      </div>
+      <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "center" }}>
+        <button type="button" data-variant="primary" className="myne-btn">
+          Primary
+        </button>
+        {/* Both of these are deliberately raw `<button>`s rather than
+            `<Button>`s: the specimen's whole point is to show what the
+            INLINE-STYLED surfaces do, which is the majority the app actually has
+            and the case the primitive exists for. `check-primitive-adoption`
+            counts them, so this comment is what that guard asks for at a
+            call site that genuinely is not a primitive. */}
+        <button
+          type="button"
+          {...neutral}
+          style={{ background: "transparent", padding: "var(--space-3) var(--space-4)" }}
+        >
+          Neutral surface
+        </button>
+        <button
+          type="button"
+          {...accent}
+          style={{
+            background: "var(--accent)",
+            color: "var(--accent-on)",
+            padding: "var(--space-3) var(--space-4)",
+          }}
+        >
+          Accent surface
+        </button>
+      </div>
+      <div style={{ ...CAPTION_STYLE, marginBlockStart: "var(--space-3)" }}>
+        The neutral step is the same size in every palette, which the mix is why: a step measured in
+        the `--line-1` border token is 9/255 on light and dark but 18/255 on amoled.
+      </div>
+    </div>
+  );
+}
+
 export function MotionSpecimen(): ReactNode {
   const durations = TOKEN_GROUPS.motion.filter((name) => name.startsWith("--duration-"));
   return (
@@ -629,6 +696,7 @@ export const FOUNDATION_STORIES: StoryDescriptor[] = [
       <>
         <MotionSpecimen />
         <EasingSpecimen />
+        <PressSpecimen />
       </>
     ),
   },

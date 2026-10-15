@@ -89,7 +89,7 @@ export function PhraseGrid({
           border: "1px solid var(--line-1)",
           borderRadius: "var(--radius-2)",
           filter: revealed ? "none" : "blur(8px)",
-          transition: "filter 180ms cubic-bezier(0.2,0,0,1)",
+          transition: "filter var(--duration-base) var(--ease-standard)",
           userSelect: revealed ? "text" : "none",
         }}
       >

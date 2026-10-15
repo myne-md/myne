@@ -227,6 +227,7 @@ connect-src 'none';
 | `tests/stories/axes.test.ts` | the URL contract: that every view key round-trips through parse and serialise, and that an unknown key is ignored rather than fatal | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/type.test.ts`, `tests/stories/motion.test.ts` | the two things a page can only draw and a reader must take on trust: the `.t-*` role pairing read out of the component sheet, and the easing curve arithmetic (including the y-axis flip a hand-drawn curve gets wrong) | `pnpm stories:test` (CI `vitest`) |
 | `tests/stories/drift.test.tsx` | an unintended rendering change (WARNING only) | `pnpm stories:test` (CI `vitest`) |
+| `tsc -p stories/tsconfig.json` (via `pnpm stories:build`) | a story left passing a prop a shared component no longer takes, or a declaration line gone stale in `stories/src/source-map.ts`. Neither `pre-commit`'s `tsc` (which is `include: ["src"]`) nor `pnpm test` (which excludes `tests/stories/**`) reads the catalogue, so removing a prop from a shared component compiles clean everywhere locally and reddens only here. Run `npx tsc -p stories/tsconfig.json` after any component prop change | `stories-build` (CI) |
 
 `stories/` is a guarded shared root in `scripts/lib/shared-roots.mjs`, so the
 token, seam and i18n guards scan it like any other consumer of the shared tree.

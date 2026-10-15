@@ -25,7 +25,8 @@ import {
   DeleteConfirmModal,
 } from "../../notes/components/DeleteConfirmModal";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { EmptyState } from "../primitives/EmptyState";
 
 const LIST_STYLE: CSSProperties = {
@@ -81,7 +82,7 @@ const BTN_STYLE: CSSProperties = {
  *  (the accent/warning colour on Restore/Delete is a text colour, untouched by a
  *  background deepen). Pass the row's `disabled` so a mid-restore row stays inert. */
 const btnHover = (disabled = false) =>
-  hoverSurface({ restBg: "var(--paper-2)", hoverBg: "var(--paper-3)", disabled });
+  interactiveSurface({ restBg: "var(--paper-2)", hoverBg: "var(--paper-3)", disabled });
 
 const RESTORE_BTN_STYLE: CSSProperties = {
   ...BTN_STYLE,

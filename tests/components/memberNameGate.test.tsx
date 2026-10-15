@@ -7,6 +7,7 @@
 // writes NOTHING (story 7: an interrupted onboarding is not a lockout, and it is not
 // a half-written name either).
 
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -95,6 +96,23 @@ describe("MemberNameGate", () => {
     expect(screen.queryByTestId("name-gate.skip")).toBeNull();
     expect(submit().disabled).toBe(true);
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  // The dev-only hang (myne-md/myne#871): StrictMode mounts, cleans up and mounts
+  // again. The latch used to be set BEFORE the await, so the second run returned
+  // early on it while the first run bailed on its own `cancelled`, and
+  // `setChecking(false)` never ran: the card sat on "Checking your name…" forever.
+  // Release builds never double-mount, which is why this read as a dev-only bug.
+  it("leaves the checking state under a StrictMode double-mount", async () => {
+    listRoster.mockResolvedValue(rosterWithSelf({ name_state: "absent" }));
+    render(
+      <StrictMode>
+        <MemberNameGate onDone={vi.fn()} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByTestId("name-gate.input")).toBeDefined();
+    expect(screen.queryByTestId("name-gate.checking")).toBeNull();
   });
 
   it("asks again when the caller's record failed verification", async () => {

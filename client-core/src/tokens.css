@@ -381,7 +381,9 @@
   --z-local:          1;     /* one step up INSIDE its own stacking context: a
                                 segment above its thumb, a tab indicator above
                                 its rail */
-  --z-floating:       30;    /* an editor control floating beside its text */
+  --z-floating:       30;    /* an editor control floating beside its text, and
+                                a non-modal notice that floats over editor
+                                content without out-ranking a modal */
   --z-dropdown:       50;    /* a menu or disclosure anchored to a control */
   --z-modal:          1000;  /* a modal's backdrop and the surface it carries */
   --z-overlay:        1100;  /* must clear a modal: a menu opened INSIDE one,

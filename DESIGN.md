@@ -191,7 +191,7 @@ A near-monochrome system. The warm-paper neutral ramp does almost all the work; 
 ### Neutral
 - **Warm Paper** (`#fbfbfa`): The page background of the entire product. Not pure white; tinted to read as paper rather than as a screen surface.
 - **Warm Paper Recessed** (`#f4f4f2`): Recessed surfaces (sidebars, cards, the chrome around the editor).
-- **Warm Paper Pressed** (`#ecebe7`): Hover and pressed surfaces. The hover-to-press shift is the only chromatic feedback most controls give.
+- **Warm Paper Pressed** (`#ecebe7`): the **hover** surface, and the top rung of the neutral ramp. Press is NOT another rung: it deepens one step further by a theme-independent mix toward the ink, because a step measured in the hairline token lands twice as hard on the amoled palette (`docs/design/README.md` "Hover + press", `design-notes/ui/0683`). A control carrying only this fill therefore has a hover state and no press state.
 - **Hairline** (`#e3e2dd`): The 1px hairline that separates every region. The system's most-used color after `--paper`.
 - **Divider** (`#c8c7c1`): Stronger dividers, default input borders.
 - **Control Disabled** (`#a3a29c`): Disabled controls and inactive icon strokes.
@@ -273,7 +273,7 @@ Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/d
 ### Buttons
 
 - **Shape:** rounded medium (6px). Pill radius is reserved for status pills **and inline editor chips**; small radius (3px) is reserved for inputs and for chips outside the editor. (The inline-chip exception is deliberate — see "Inline editor chips" below.)
-- **Primary:** iron-blue background (`#2c4a7a`), white text (`#ffffff`), 14px Inter, 10px×16px padding. Hover shifts the background to `#233b62`, press to `#1b2e4d`. A 1px inset shadow is acceptable on press; **no scale or translate transforms**, the product is not playful. Focus ring is the standard 2px iron-blue stroke with a 1px paper offset.
+- **Primary:** iron-blue background (`#2c4a7a`), white text (`#ffffff`), 14px Inter, 10px×16px padding. Hover shifts the background to `#233b62`, press to `#1b2e4d`. **No scale or translate transforms**, and no inset shadow: the colour step is the whole signal, and the product is not playful. Focus ring is the standard 2px iron-blue stroke with a 1px paper offset.
 - **Secondary:** warm-paper background (`#fbfbfa`), ink-primary text (`#1a1a17`), 1px hairline border (`#e3e2dd`), same padding. Hover background shifts to `#ecebe7`.
 - **Ghost:** transparent background, ink-secondary text, no border. Used in dense toolbars only.
 - **Disabled:** opacity 0.4, control-disabled stroke for icons, no hover.
