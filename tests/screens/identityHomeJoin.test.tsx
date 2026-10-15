@@ -78,7 +78,6 @@ const PASSWORD = "correct horse battery staple";
 function renderHome(onAccepted: () => void = () => {}) {
   return render(
     <IdentityHome
-      personIdHex="person"
       identityCode="code"
       onCreateVault={() => {}}
       onAccepted={onAccepted}

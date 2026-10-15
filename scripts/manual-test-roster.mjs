@@ -2708,7 +2708,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm no type-back challenge is asked for the identity phrase.",
+        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm the phrase is followed by a SEPARATE type-back step whose Done is gated on four matching words, and that while that challenge is unanswered Esc, a backdrop click and the close button all leave the dialog open. It must be the words, not a click, that finish the ceremony, because the identity already exists server-side by then and the phrase is shown once.",
         whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same device walk also observes HTTPS trust on the native WebView and host.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
