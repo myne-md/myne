@@ -22,39 +22,33 @@ yanked = "deny"
 # Fail on any unmaintained / unsound advisory by default; add specific ignores
 # with rationale + tracking issue if absolutely necessary.
 #
-# The first block below is unmaintained-status advisories on transitive crates
-# pulled in by Tauri 2.10.x (GTK3 bindings, urlpattern → rust-unic, fxhash, etc.).
-# They have no safe upgrade path until Tauri itself migrates off them; revisit
-# when Tauri 3.x lands or when individual crates publish replacements.
-# Tracking: https://github.com/rustsec/advisory-db/issues/2414 (rust-unic)
+# FIFTEEN ENTRIES WERE DELETED HERE on 2026-10-15, all reported by
+# `cargo deny check advisories` as `advisory was not encountered`:
+#   · RUSTSEC-2024-0411 … -0420 — the gtk-rs GTK3 block. All ten are WITHDRAWN
+#     in the advisory DB (`withdrawn = "2026-08-14"`), so they can never fire
+#     again. (The old comment on 0420 said "fxhash"; the DB says `gtk-sys`.)
+#   · RUSTSEC-2025-0075/-0080/-0081/-0098/-0100 — the rust-unic block. These are
+#     NOT withdrawn and never matched because `urlpattern` 0.6.0 dropped the
+#     rust-unic stack for `icu_properties`: no `unic-*` crate is in Cargo.lock
+#     at all any more.
+# Re-checked under `[graph].targets = ["x86_64-unknown-linux-gnu"]` before
+# deleting, in case the ten GTK3 hits were only absent from the macOS graph —
+# same fifteen, so it is not a host-target artefact.
+# Do not re-add an entry without reproducing a real match; `cargo deny check
+# advisories` names every ignore that matches nothing.
 #
 # The arti block at the END is a different kind of entry — read its comment
 # before adding anything near it.
 ignore = [
     "RUSTSEC-2024-0370",  # proc-macro-error unmaintained (tauri build chain)
-    "RUSTSEC-2024-0411",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0412",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0413",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0414",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0415",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0416",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0417",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0418",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0419",  # gtk-rs GTK3 bindings unmaintained
-    "RUSTSEC-2024-0420",  # fxhash unmaintained
     "RUSTSEC-2025-0057",  # fxhash unmaintained, the SECOND advisory filed against the
-                          # same crate — an ignore naming only the 2024 id does not
+                          # same crate — an ignore naming only the first id does not
                           # cover it. Reaches this file through myne-mobile, which
                           # shares this config: the desktop lock has no fxhash at all,
                           # so the desktop tree never trips it and the gap was
                           # invisible here. Transitive via tauri-utils → kuchikiki →
                           # selectors; same no-safe-upgrade-until-Tauri story as the
-                          # block above.
-    "RUSTSEC-2025-0075",  # transitive (Tauri); no upgrade path
-    "RUSTSEC-2025-0080",  # transitive (Tauri); no upgrade path
-    "RUSTSEC-2025-0081",  # transitive (Tauri); no upgrade path
-    "RUSTSEC-2025-0098",  # unic-ucd-version (rust-unic) unmaintained; via urlpattern
-    "RUSTSEC-2025-0100",  # unic-ucd-ident (rust-unic) unmaintained; via urlpattern
+                          # other Tauri transitives here.
     "RUSTSEC-2024-0436",  # paste unmaintained; build-time proc-macro via gemm →
                           # candle (on-device AI). No safe upgrade; not a runtime path.
     "RUSTSEC-2026-0192",  # ttf-parser unmaintained; via lopdf (PDF export). No safe
