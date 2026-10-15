@@ -191,7 +191,7 @@ A near-monochrome system. The warm-paper neutral ramp does almost all the work; 
 ### Neutral
 - **Warm Paper** (`#fbfbfa`): The page background of the entire product. Not pure white; tinted to read as paper rather than as a screen surface.
 - **Warm Paper Recessed** (`#f4f4f2`): Recessed surfaces (sidebars, cards, the chrome around the editor).
-- **Warm Paper Pressed** (`#ecebe7`): the **hover** surface, and the top rung of the neutral ramp. Press is NOT another rung: it deepens one step further by a theme-independent mix toward the ink, because a step measured in the hairline token lands twice as hard on the amoled palette (`docs/design/README.md` "Hover + press", `design-notes/ui/0681`). A control carrying only this fill therefore has a hover state and no press state.
+- **Warm Paper Pressed** (`#ecebe7`): the **hover** surface, and the top rung of the neutral ramp. Press is NOT another rung: it deepens one step further by a theme-independent mix toward the ink, because a step measured in the hairline token lands twice as hard on the amoled palette (`docs/design/README.md` "Hover + press", `design-notes/ui/0683`). A control carrying only this fill therefore has a hover state and no press state.
 - **Hairline** (`#e3e2dd`): The 1px hairline that separates every region. The system's most-used color after `--paper`.
 - **Divider** (`#c8c7c1`): Stronger dividers, default input borders.
 - **Control Disabled** (`#a3a29c`): Disabled controls and inactive icon strokes.
