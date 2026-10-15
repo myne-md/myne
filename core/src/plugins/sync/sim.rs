@@ -1455,6 +1455,121 @@ fn chats_concurrent_append_converges_no_ping_pong() {
     assert_eq!(pushed, 0, "quiesced fleet stays silent (no CAS ping-pong)");
 }
 
+/// Agent-memory entries reach a device that has never authored one
+/// (myne-md/myne#883).
+///
+/// A is the desktop that wrote a memory; B is a phone that only pulls, so it
+/// holds NO `vault.agent-memory` and NO `memories/` directory at all. That
+/// asymmetry is the whole failure: the catalog is a vault-root singleton whose
+/// parent always exists, so it syncs, while the entry file is written into a
+/// directory that only a LOCAL memory write creates. The adopt arm then failed
+/// `NotFound` and the caller skipped the entry every cycle. The user sees a
+/// roster of rows that cannot be read, forever.
+///
+/// The chats plane has had this two-device coverage since it landed
+/// (`chats_concurrent_append_converges_no_ping_pong`); the memory plane had
+/// none, which is why nothing caught this.
+///
+/// The harness runs at v0.1 (its own documented generation gap), while a vault
+/// created today is v0.2. That does not weaken this scenario: the step it
+/// covers (create the entry file's parent directory, then write the adopted
+/// bytes) has no version branch, so the generation cannot change the answer.
+#[test]
+fn memory_entry_reaches_a_device_that_never_authored_one() {
+    use crate::plugins::memory::commands::{MemoryCatalogMap, MemoryEntryRow};
+    use protocol::{
+        decode_agent_memory_blob, decode_agent_memory_catalog_blob, derive_subkey,
+        encode_agent_memory_blob, encode_agent_memory_catalog_blob, SubkeyRole,
+    };
+
+    let (_guard, url) = server_or_skip!("memory_entry_pull");
+    let acct = Account::new(0xB1);
+    let devices = enroll_devices(&acct, &url, 2);
+    let catalog_key = derive_subkey(&acct.root_key, SubkeyRole::AgentMemoryCatalogKey);
+    let memory_key = derive_subkey(&acct.root_key, SubkeyRole::AgentMemoryKey);
+
+    // The plane is gated per device on the device-local `ai_enabled` opt-in
+    // (DeviceLocal in `prefs_classification`: the local value always survives
+    // the merge), so both devices carry their own.
+    let prefs_key = derive_subkey(&acct.root_key, SubkeyRole::PrefsKey);
+    for d in &devices {
+        let view = protocol::PrefsView {
+            ai_enabled: true,
+            ..protocol::PrefsView::default()
+        };
+        let bytes = protocol::encode_prefs_blob(&prefs_key, &acct.account_hash, &view).unwrap();
+        std::fs::write(d.vault_dir.join("vault.prefs"), &bytes).unwrap();
+    }
+
+    // The state the adopt arm exists for. Asserted, not assumed: a fixture that
+    // quietly starts with the directory present cannot fail the way production
+    // did.
+    assert!(
+        !devices[1].vault_dir.join("memories").exists(),
+        "B must start without `memories/`, or this test cannot reach the defect"
+    );
+    assert!(!devices[1].vault_dir.join("vault.agent-memory").exists());
+
+    let entry_id = [0xE0u8; 16];
+    let entry_hex = "e0".repeat(16);
+
+    // A authors one memory the way the plugin does: the catalog singleton plus
+    // one entry file, each sealed under its own family KEK.
+    let row = MemoryEntryRow {
+        created_at: 1,
+        deleted_at: None,
+        updated_at: 100,
+        version: 1,
+        quarantined: false,
+    };
+    let mut map = MemoryCatalogMap::new();
+    map.insert(entry_hex.clone(), row.clone());
+    let catalog_plaintext = serde_json::to_vec(&map).unwrap();
+    let catalog_bytes =
+        encode_agent_memory_catalog_blob(&catalog_key, &acct.account_hash, &catalog_plaintext)
+            .unwrap();
+    std::fs::write(
+        devices[0].vault_dir.join("vault.agent-memory"),
+        &catalog_bytes,
+    )
+    .unwrap();
+    let entry_plaintext = serde_json::to_vec(&serde_json::json!({ "text": "likes tea" })).unwrap();
+    let entry_bytes =
+        encode_agent_memory_blob(&memory_key, &acct.account_hash, &entry_id, &entry_plaintext)
+            .unwrap();
+    std::fs::create_dir_all(devices[0].vault_dir.join("memories")).unwrap();
+    std::fs::write(
+        devices[0].vault_dir.join("memories").join(&entry_hex),
+        &entry_bytes,
+    )
+    .unwrap();
+
+    quiesce(&devices, 16);
+
+    // B pulled the roster …
+    let b_catalog = std::fs::read(devices[1].vault_dir.join("vault.agent-memory"))
+        .expect("the memory roster reached the second device");
+    let b_catalog_plaintext =
+        decode_agent_memory_catalog_blob(&catalog_key, &acct.account_hash, &b_catalog)
+            .expect("B decodes the roster");
+    let b_map: MemoryCatalogMap = serde_json::from_slice(&b_catalog_plaintext).unwrap();
+    assert_eq!(b_map[&entry_hex], row, "the roster row reached B");
+
+    // … AND the body, which is the half that never landed: the entry file's
+    // parent directory is created by a LOCAL write on `memories/`, and B has
+    // never made one.
+    let b_entry = std::fs::read(devices[1].vault_dir.join("memories").join(&entry_hex))
+        .expect("the memory entry body reached the second device");
+    let b_entry_plaintext =
+        decode_agent_memory_blob(&memory_key, &acct.account_hash, &entry_id, &b_entry)
+            .expect("B decodes the entry body");
+    let decoded: serde_json::Value = serde_json::from_slice(&b_entry_plaintext).unwrap();
+    assert_eq!(
+        decoded["text"], "likes tea",
+        "B reads the text the desktop wrote"
+    );
+}
+
 /// Two devices create DIFFERENT notes offline; after sync both notes exist on
 /// both devices. Distinct-note concurrency is never a conflict.
 #[test]
