@@ -3,7 +3,6 @@
     "accountMismatch": "Ta przeglądarka przechowuje już skarbiec innego konta. Otwórz tamto konto albo najpierw wyloguj się i wymaż kopię z tej przeglądarki.",
     "changeAccount": "Użyj innego numeru konta",
     "continue": "Kontynuuj",
-    "failed": "Nie udało się otworzyć tego konta. Sprawdź numer konta i hasło, a potem spróbuj ponownie.",
     "hint": "Wprowadź hasło główne do tego konta. Myne pobierze Twój skarbiec i skonfiguruje tę przeglądarkę jako urządzenie na tym koncie.",
     "noEndpoint": "Ta kopia Myne nie ma skonfigurowanego serwera synchronizacji, więc nie może dotrzeć do Twojego skarbca. Skontaktuj się z osobą, która nią zarządza.",
     "passwordLabel": "Hasło główne",
@@ -30,9 +29,8 @@
   },
   "agent": {
     "composer": {
-      "placeholder": "Poproś AI o zmianę tych notatek",
+      "placeholder": "Poproś AI…",
       "scopeLabel": "Zakres pracy",
-      "scopeChange": "Zmień",
       "scopeOpenNote": "Ta notatka",
       "scopeCount_one": "{{count}} notatka",
       "scopeCount_few": "{{count}} notatki",
@@ -48,10 +46,18 @@
       "unchecked": "Nie udało się ukończyć sprawdzenia edycji, więc agent jest chwilowo niedostępny. Sprawdź, czy model lub dostawca jest osiągalny, a potem spróbuj ponownie.",
       "unsupported": "Ten model nie potrafi wprowadzać precyzyjnych zmian wystarczająco niezawodnie, więc agent jest niedostępny. Wybierz większy model lub dostawcę.",
       "unsupportedDetail": "Zaliczył {{passes}} z {{attempts}} sprawdzeń; wymagana liczba to {{required}}.",
-      "checking": "Sprawdzanie modelu…",
-      "checkingAt": "Sprawdzanie modelu… ({{attempt}}/{{of}})",
+      "checking": "Sprawdzanie",
       "unsupportedProvisional": "Ten próg zaliczenia nie został jeszcze zmierzony na różnych modelach, więc może być bardziej lub mniej wymagający, niż powinien.",
-      "scopeNone": "brak otwartej notatki, więc nie ma jeszcze nad czym pracować"
+      "scopeNone": "brak otwartej notatki, więc nie ma jeszcze nad czym pracować",
+      "scopeAllVault": "Wszystkie notatki",
+      "blockedScope": "Agent nie ma jeszcze nad czym pracować: każda notatka jest wykluczona z AI albo skarbiec jest pusty.",
+      "preparing": "Przygotowywanie…",
+      "blockedScopeSidebar": "Nie ma tu jeszcze o co pytać: folder tej notatki jest wykluczony z AI.",
+      "needsScope": "Wybierz folder poniżej albo otwórz notatkę, aby agent miał nad czym pracować.",
+      "scopeExcluded_one": "{{count}} notatka wykluczona z AI",
+      "scopeExcluded_few": "{{count}} notatki wykluczone z AI",
+      "scopeExcluded_many": "{{count}} notatek wykluczonych z AI",
+      "scopeExcluded_other": "{{count}} notatki wykluczone z AI"
     },
     "progress": {
       "working": "Pracuje",
@@ -74,7 +80,8 @@
       "grantsModel_few": "{{count}} zakresy na prośbę agenta",
       "grantsModel_many": "{{count}} zakresów na prośbę agenta",
       "grantsModel_other": "{{count}} zakresu na prośbę agenta",
-      "cancelledBackground": "Przebieg został anulowany, ponieważ Myne przeszła w tło. Nic nie zostało zapisane. Zapytaj ponownie, kiedy zechcesz."
+      "cancelledBackground": "Przebieg został anulowany, ponieważ Myne przeszła w tło. Nic nie zostało zapisane. Zapytaj ponownie, kiedy zechcesz.",
+      "legFailed": "Przebieg zatrzymał się przed ukończeniem."
     },
     "scope": {
       "title": "Uwzględnić {{folder}}?",
@@ -147,7 +154,9 @@
         "notProposed": "Nie można zastosować: ta zmiana nie należy do propozycji tego przebiegu.",
         "noteMoved": "Nie można zastosować: ta zmiana przeniosłaby notatkę do innego folderu.",
         "appendEmpty": "Nie można zastosować: nie było czego dodać.",
-        "appendWouldWriteFrontmatter": "Nie można zastosować: ten tekst stałby się blokiem właściwości notatki."
+        "appendWouldWriteFrontmatter": "Nie można zastosować: ten tekst stałby się blokiem właściwości notatki.",
+        "moveToSameFolder": "Nie przeniesiono: notatka jest już w tym folderze.",
+        "moveIntoExcludedFolder": "Nie przeniesiono: ten folder jest wykluczony z AI."
       },
       "applyFailed": "Nie udało się zastosować zmian.",
       "undo": "Cofnij ten przebieg",
@@ -179,13 +188,49 @@
       "runSummaryOnDevice": "nic nie opuściło tego urządzenia",
       "appendFlag": "dodaje na końcu",
       "diffCurrent": "Teraz w notatce",
-      "diffProposed": "Po tej zmianie"
+      "diffProposed": "Po tej zmianie",
+      "summaryShowAll": "Pokaż całe podsumowanie",
+      "summaryShorten": "Skróć podsumowanie",
+      "settingFolderFrom": "folder: {{from}} zmienia się na {{to}}",
+      "moveFlag": "przenosi do innego folderu",
+      "settingFromValue": "{{from}} zmienia się na {{to}}",
+      "settingFromUnset": "nieustawione, zmienia się na {{value}}",
+      "settingCleared": "{{from}} zostaje usunięte",
+      "settingAlreadyUnset": "nieustawione",
+      "settingFolder": "w {{folder}}",
+      "applySetting": "Zastosuj osobno",
+      "refusedSetting": {
+        "needsOwnAct": "Nie zastosowano tutaj: zmiana ustawienia jest zawsze zatwierdzana osobno.",
+        "notWritable": "Nie można zastosować: agent nie może już zmieniać tego ustawienia.",
+        "invalidValue": "Nie można zastosować: ta wartość nie jest akceptowana dla tego ustawienia.",
+        "folderRemoved": "Nie zastosowano: ten folder został usunięty, a agent go nie przywróci.",
+        "notClearable": "Nie można wyczyścić: to ustawienie nie ma stanu nieustawionego. Zmień je na konkretną wartość.",
+        "writeFailed": "Nie można zastosować: zapis ustawienia nie powiódł się. Pozostałe zmiany zostały zastosowane.",
+        "runStopped": "Nie zastosowano: przebieg został zatrzymany, więc nie podjęto żadnej zmiany.",
+        "notProposed": "Nie zastosowano: ten przebieg nigdy nie zaproponował tej zmiany, więc host jej nie zapisze."
+      },
+      "undoReportFailed_one": "{{count}} zmiana nie została przywrócona.",
+      "undoReportFailed_few": "{{count}} zmiany nie zostały przywrócone.",
+      "undoReportFailed_many": "{{count}} zmian nie zostało przywróconych.",
+      "undoReportFailed_other": "{{count}} zmiany nie zostało przywróconej.",
+      "undoReportSettings_one": "{{count}} ustawienie przywrócone.",
+      "undoReportSettings_few": "{{count}} ustawienia przywrócone.",
+      "undoReportSettings_many": "{{count}} ustawień przywróconych.",
+      "undoReportSettings_other": "{{count}} ustawienia przywrócone.",
+      "settingsHeading_one": "{{count}} ustawienie",
+      "settingsHeading_few": "{{count}} ustawienia",
+      "settingsHeading_many": "{{count}} ustawień",
+      "settingsHeading_other": "{{count}} ustawienia",
+      "settingsChanged_one": "Zmieniono {{count}} ustawienie.",
+      "settingsChanged_few": "Zmieniono {{count}} ustawienia.",
+      "settingsChanged_many": "Zmieniono {{count}} ustawień.",
+      "settingsChanged_other": "Zmieniono {{count}} ustawienia.",
+      "refusedCount_one": "{{count}} zmiana nie mogła zostać zastosowana",
+      "refusedCount_few": "{{count}} zmiany nie mogły zostać zastosowane",
+      "refusedCount_many": "{{count}} zmian nie mogło zostać zastosowanych",
+      "refusedCount_other": "{{count}} zmiany nie mogło zostać zastosowane"
     },
     "undo": {
-      "offer_one": "Ostatni przebieg zmienił {{count}} notatkę.",
-      "offer_few": "Ostatni przebieg zmienił {{count}} notatki.",
-      "offer_many": "Ostatni przebieg zmienił {{count}} notatek.",
-      "offer_other": "Ostatni przebieg zmienił {{count}} notatki.",
       "action": "Cofnij przebieg",
       "reverted_one": "Przywrócono {{count}} notatkę.",
       "reverted_few": "Przywrócono {{count}} notatki.",
@@ -200,7 +245,54 @@
       "createdNotReverted_many": "{{count}} notatek utworzonych przez przebieg pozostało na miejscu.",
       "createdNotReverted_other": "{{count}} notatki utworzonej przez przebieg pozostało na miejscu.",
       "sessionOnly": "To cofnięcie jednym dotknięciem działa, dopóki nie zablokujesz sejfu lub nie zamkniesz aplikacji. Potem przywracasz notatki pojedynczo z historii wersji notatki.",
-      "sessionOnlyLink": "Otwórz historię wersji"
+      "revertedSettings_one": "{{count}} ustawienie przywrócone.",
+      "revertedSettings_few": "{{count}} ustawienia przywrócone.",
+      "revertedSettings_many": "{{count}} ustawień przywróconych.",
+      "revertedSettings_other": "{{count}} ustawienia przywrócone."
+    },
+    "hub": {
+      "title": "Agent",
+      "loading": "Wczytywanie rozmów…",
+      "modeLabel": "Które rozmowy",
+      "modeVault": "Wszystkie",
+      "modeNote": "Ta notatka",
+      "renamedAnnouncement": "Zmieniono nazwę na {{name}}",
+      "deletedAnnouncement": "Rozmowa usunięta",
+      "loadFailed": "Nie udało się teraz wczytać Twoich rozmów.",
+      "emptyTitle": "Jeszcze brak rozmów",
+      "anchorLabel": "Przy notatce",
+      "anchorOpen": "Otwórz {{name}}",
+      "generateTitle": "Wygeneruj tytuł",
+      "generateTitleNeedsModel": "Wygeneruj tytuł, wymagany jest lokalny model tekstowy",
+      "generateTitleExcluded": "Wygeneruj tytuł, ta notatka jest w folderze wykluczonym z AI",
+      "titleGenerating": "Generowanie tytułu…",
+      "titleGenerated": "Tytuł wygenerowany: {{name}}",
+      "titleFailed": "Nie udało się wygenerować tytułu.",
+      "titleSaveFailed": "Nie udało się zapisać tytułu.",
+      "searchLabel": "Szukaj rozmów",
+      "searchPlaceholder": "Szukaj rozmów…",
+      "noMatchTitle": "Brak dopasowań",
+      "noMatchBody": "Żadna rozmowa nie pasuje do „{{query}}”. Wyczyść wyszukiwanie, aby zobaczyć wszystkie.",
+      "emptyBody": "Rozmowy, które rozpoczniesz, pojawią się tutaj.",
+      "menu": "Akcje rozmowy",
+      "unread": "Zakończony wynik, którego jeszcze nie przeczytano",
+      "targetFolder": "O folderze",
+      "targetNote": "O notatce",
+      "targetVault": "O całym skarbcu",
+      "running": "Pracuje nad tą rozmową",
+      "newConversation": "Nowa rozmowa",
+      "historyLabel": "Historia"
+    },
+    "focus": {
+      "title": "Agent przy notatce",
+      "openNote": "Otwórz notatkę"
+    },
+    "footprint": {
+      "disclosure": "Ile kosztował ten przebieg",
+      "memory_one": "Zapisano {{count}} wspomnienie",
+      "memory_few": "Zapisano {{count}} wspomnienia",
+      "memory_many": "Zapisano {{count}} wspomnień",
+      "memory_other": "Zapisano {{count}} wspomnienia"
     }
   },
   "ai": {
@@ -280,10 +372,10 @@
       "decrypting": "Odszyfrowywanie załączników…",
       "clearSearchAriaLabel": "Wyczyść wyszukiwanie",
       "emptyClearSearch": "Wyczyść wyszukiwanie",
-      "emptyImportHint": "Zaimportuj plik, aby przechowywać go w skarbcu.",
-      "emptyLoadError": "Nie udało się odczytać katalogu załączników.",
-      "emptyNoAttachments": "Brak załączników.",
-      "emptyNoResultsTitle": "Żaden załącznik nie pasuje do wyszukiwania.",
+      "emptyImportHint": "Pliki dodane do notatki są przechowywane w Twoim skarbcu, zaszyfrowane na tym urządzeniu, zanim trafią gdziekolwiek dalej. Zaimportuj jeden, aby zacząć.",
+      "emptyLoadError": "Nie udało się odczytać katalogu załączników",
+      "emptyNoAttachments": "Jeszcze brak załączników",
+      "emptyNoResultsTitle": "Żaden załącznik nie pasuje",
       "filterAriaLabel": "Filtruj według typu",
       "gridView": "Widok siatki",
       "import": "Importuj",
@@ -297,9 +389,7 @@
       "menuRename": "Zmień nazwę",
       "menuTranscribe": "Transkrybuj",
       "menuViewTranscription": "Pokaż transkrypcję",
-      "noMatch": "Żaden załącznik nie pasuje do wyszukiwania.",
       "noUnusedNotice": "Brak nieużywanych załączników do usunięcia.",
-      "preview": "Podgląd",
       "previewAttachment": "Podgląd załącznika",
       "searchAriaLabel": "Szukaj załączników według nazwy pliku",
       "searchPlaceholder": "Szukaj według nazwy pliku",
@@ -330,7 +420,11 @@
       "usedInCount_many": "Używany w {{count}} notatkach",
       "usedInCount_other": "Używany w {{count}} notatkach",
       "usedInLoading": "…",
-      "previewNamed": "Podgląd {{name}}"
+      "previewNamed": "Podgląd {{name}}",
+      "emptyFilteredBody": "Nic tu nie pasuje do bieżącego filtra typu. Wyczyść go, aby ponownie zobaczyć całą bibliotekę.",
+      "emptyFilteredBodyQuery": "Nic w bibliotece nie pasuje",
+      "emptyLoadErrorBody": "Katalog jest zaszyfrowany razem z Twoim skarbcem, więc zwykle jest to przerwany odczyt, a nie utrata danych. Spróbuj ponownie; jeśli błąd się powtarza, Twoje notatki i ich pliki pozostają nienaruszone.",
+      "emptyRetry": "Spróbuj ponownie"
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -409,7 +503,11 @@
       "preparing": "Przygotowywanie…",
       "successToast": "Kopia zapasowa zweryfikowana i zapisana.",
       "title": "Utwórz kopię zapasową skarbca",
-      "verifying": "Weryfikowanie {{done}} z {{total}}…"
+      "verifying": "Weryfikowanie {{done}} z {{total}}…",
+      "drillBody": "Sama kopia zapasowa nie przywróci Ci dostępu, jeśli zgubisz hasło.",
+      "drillCta": "Sprawdź ją",
+      "drillOnce": "Pokazywane raz. Gdy to zamkniesz, nie wróci.",
+      "drillTitle": "Czy sprawdzono też Twoją frazę odzyskiwania?"
     }
   },
   "clipper": {
@@ -611,17 +709,11 @@
       "restoreBackup": {
         "label": "Przywróć sejf z kopii zapasowej…"
       },
-      "toggleRealtimeSync": {
-        "label": "Przełącz synchronizację w czasie rzeczywistym"
-      },
       "revealVaultFolder": {
         "label": "Pokaż folder sejfu w menedżerze plików"
       },
       "aiSummarizeNote": {
         "label": "Podsumuj notatkę"
-      },
-      "aiSuggestTags": {
-        "label": "Zaproponuj tagi"
       },
       "aiRewriteSelection": {
         "label": "Przepisz zaznaczenie"
@@ -757,6 +849,18 @@
       },
       "showIsolatedGraph": {
         "label": "Otwórz odizolowany graf"
+      },
+      "aiOpenAgentVault": {
+        "label": "Agent: otwórz dla skarbca"
+      },
+      "aiOpenAgentNote": {
+        "label": "Agent: otwórz dla notatki"
+      },
+      "meetingSummarize": {
+        "label": "Podsumuj spotkanie za pomocą AI…"
+      },
+      "openPalette": {
+        "label": "Szukaj i uruchom polecenie…"
       }
     },
     "hotkeys": {
@@ -843,7 +947,7 @@
         "exportFailed": "Nie udało się wyeksportować {{filename}}.",
         "renamed": "Zmieniono nazwę na {{name}}.",
         "renameFailed": "Nie udało się zmienić nazwy załącznika.",
-        "saveDialogFailed": "Nie udało się otworzyć okna zapisu."
+        "saveDialogFailed": "Nie udało się wybrać miejsca zapisu tego pliku."
       },
       "compression": {
         "bulkNotice_one": "Skompresowano {{count}} obraz: {{from}} → {{to}}",
@@ -1052,11 +1156,9 @@
             "tooLong": "To nagranie jest zbyt długie, aby je transkrybować. Dźwięk pozostaje w załączniku, więc nadal możesz go odtworzyć.",
             "vaultLocked": "Odblokuj skarbiec, aby transkrybować."
           },
-          "disabledReason": "Włącz AI w Ustawienia → Developer → AI, aby transkrybować.",
           "failed": "Transkrypcja nie powiodła się. Spróbuj ponownie.",
           "heading": "Transkrypcja",
           "insert": "Wstaw transkrypcję do notatki",
-          "noModelHint": "Wybierz model transkrypcji w Ustawienia → Developer → AI.",
           "progress": "Transkrybowanie…",
           "stop": "Zatrzymaj"
         },
@@ -1121,7 +1223,6 @@
         "moveRight": "Przesuń w prawo",
         "saveStatus": "Stan zapisu",
         "settings": "Ustawienia",
-        "syncStatus": "Stan synchronizacji",
         "tags": "Tagi",
         "viewMode": "Tryb widoku",
         "views": "Widoki",
@@ -1221,14 +1322,14 @@
             "memoryUpdated_one": "Pamięć zaktualizowana o jeden wpis.",
             "memoryUpdated_other": "Pamięć zaktualizowana o {{count}} wpisów.",
             "memoryUpdated_few": "Pamięć zaktualizowana o {{count}} wpisów.",
-            "memoryUpdated_many": "Pamięć zaktualizowana o {{count}} wpisów."
+            "memoryUpdated_many": "Pamięć zaktualizowana o {{count}} wpisów.",
+            "honestyExpand": "Pokaż całą notatkę",
+            "honestyCollapse": "Skróć notatkę"
           },
           "askPlaceholder": "Zadaj pytanie o swoje notatki…",
           "askSubmit": "Zapytaj",
           "assistant": "Asystent",
-          "citations": "Źródła",
-          "composerPlaceholder": "Napisz do swoich notatek…",
-          "empty": "Wyniki AI (podsumowania, odpowiedzi i sugestie) pojawią się tutaj.",
+          "empty": "Podsumowania, odpowiedzi i sugestie pojawiają się tutaj, gdy o nie poprosisz.",
           "error": "Nie udało się zrealizować żądania AI.",
           "errorTurn": "Asystent nie mógł odpowiedzieć.",
           "gettingReadyHint": "Przygotowywanie notatek dla AI. Chwileczkę.",
@@ -1238,7 +1339,7 @@
           "newChat": "Nowa rozmowa",
           "noModelHint": "Nie skonfigurowano żadnego dostawcy AI, więc czat, podsumowania, przepisywanie i wyszukiwanie semantyczne nie mają na czym działać. Skonfiguruj dostawcę w Ustawienia → Deweloper → AI.",
           "unreachableHint": "Skonfigurowany dostawca nie odpowiada. Sprawdź, czy działa, a potem wyślij ponownie.",
-          "unavailableHint": "Tę kompilację Myne zbudowano bez lokalnego AI, więc nic tutaj nie zadziała.",
+          "unavailableHint": "Tę kompilację Myne zbudowano bez lokalnego AI, więc nic tutaj nie zadziała. Żadne ustawienie tego nie zmieni — potrzebna jest kompilacja z dołączonym AI.",
           "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Deweloper → AI.",
           "send": "Wyślij",
           "statusGettingReady": "Przygotowywanie…",
@@ -1260,8 +1361,6 @@
           "historyEmpty": "Brak rozmów. Nowe czaty pojawią się tutaj.",
           "historyError": "Nie udało się wczytać rozmów. Spróbuj ponownie.",
           "historyLoading": "Wczytywanie…",
-          "historyProposalAfter": "Po",
-          "historyProposalBefore": "Przed",
           "historyProposalNewNote": "Nowa notatka",
           "historyRename": "Zmień nazwę",
           "historyTitle": "Historia czatu",
@@ -1277,7 +1376,23 @@
           "memoryPopoverLoadFailed": "Nie udało się wczytać wspomnień. Nic się nie zmieniło.",
           "memoryPopoverRetry": "Spróbuj ponownie",
           "memoryPopoverSettings": "Zarządzaj w Ustawieniach",
-          "memoryPopoverClose": "Zamknij"
+          "memoryPopoverClose": "Zamknij",
+          "copied": "Skopiowano",
+          "copyAnswer": "Kopiuj odpowiedź",
+          "copyFailed": "Nie udało się skopiować",
+          "copyYourMessage": "Kopiuj swoją wiadomość",
+          "emptyTitle": "Zapytaj o swoje notatki",
+          "noticeLeaves": "Słowa, które wpisujesz, notatki czytane w danej turze, tytuły, identyfikatory i ścieżki folderów każdej notatki, którą przebieg może odczytać (cały skarbiec pomniejszony o wykluczone foldery, o ile nie zawęzisz go samodzielnie), a także to, co AI o Tobie pamięta, są wysyłane do tego, co odpowiada. Nic innego z tego urządzenia nie jest wysyłane.",
+          "noticeReceiver": "Odpowiada: {{provider}}, którego Myne nie prowadzi.",
+          "noticeReceiverLocal": "Odpowiada: program działający na tym urządzeniu. Nic nie opuszcza tego komputera, ale ten program nie jest częścią Myne i Myne nie widzi, co z nimi robi.",
+          "noticeRevoke": "Aby to zatrzymać, wyłącz AI w Ustawieniach albo zmień tam to, co odpowiada. Odebranie klucza dostawcy natychmiast zatrzymuje tego dostawcę.",
+          "noticeSettingsCta": "Otwórz ustawienia AI",
+          "viewDiff": "Zobacz zmiany",
+          "revertRun": "Cofnij ten przebieg",
+          "diffTitle": "Proponowane zmiany",
+          "revertConfirmTitle": "Cofnąć ten przebieg?",
+          "revertConfirmBody": "Notatki zmienione przez ten przebieg wracają do stanu sprzed niego. Notatki, które utworzył, pozostają na miejscu.",
+          "focusAgent": "Otwórz w karcie agenta"
         },
         "allHidden": "Wszystkie karty są ukryte. Kliknij prawym przyciskiem, aby przywrócić.",
         "outline": {
@@ -1291,7 +1406,8 @@
           "backlinks": "Linki",
           "outline": "Konspekt",
           "tasks": "Zadania",
-          "unlinked": "Niepowiązane wzmianki"
+          "unlinked": "Niepowiązane wzmianki",
+          "whoIsHere": "Kto tu jest"
         },
         "tabStripLabel": "Prawy panel"
       },
@@ -1328,6 +1444,16 @@
         "editor": "Edytor",
         "rightPanel": "Prawy panel",
         "sidebar": "Panel notatek"
+      },
+      "presence": {
+        "editing": "edytuje",
+        "empty": "Nie ma tu nikogo poza Tobą",
+        "jumpTo": "Przejdź do {{name}}",
+        "unknown": "Ktoś",
+        "title_one": "{{count}} osoba tutaj",
+        "title_few": "{{count}} osoby tutaj",
+        "title_many": "{{count}} osób tutaj",
+        "title_other": "{{count}} osoby tutaj"
       }
     },
     "noteActions": {
@@ -1449,7 +1575,8 @@
       "todoList": "Lista zadań",
       "voiceNote": "Notatka głosowa",
       "wikiLink": "Wikilink",
-      "remind": "Przypomnienie"
+      "remind": "Przypomnienie",
+      "meeting": "Sesja spotkania"
     },
     "spell": {
       "menu": {
@@ -1490,7 +1617,6 @@
         "priority": "Priorytet",
         "remind": "Przypomnienie"
       },
-      "timeLabel": "Godzina (opcjonalnie)",
       "invalidRemind": "Myne nie potrafi odczytać tej daty, więc nie pokaże przypomnienia.",
       "addTime": "Dodaj godzinę",
       "clear": "Wyczyść",
@@ -1789,6 +1915,47 @@
       "title": "Ta notatka została usunięta w innym miejscu",
       "body": "Została usunięta z innego okna lub zsynchronizowana z innego urządzenia. Wszystkie niezapisane zmiany w tym oknie zachowano jako osobną kopię.",
       "close": "Zamknij okno"
+    },
+    "meeting": {
+      "ai": {
+        "cancelled": "Zatrzymano. Do notatki nic nie dodano.",
+        "close": "Zamknij",
+        "discard": "Odrzuć",
+        "failed": "Przebieg AI nie powiódł się. Transkrypcja pozostaje bez zmian.",
+        "generate": "Wygeneruj",
+        "insert": "Wstaw do notatki",
+        "notice": "Wygenerowane przez AI z powyższej transkrypcji. Może być błędne; zapisem jest transkrypcja.",
+        "noAttribution": "Transkrypcja nie mówi, kto mówił, więc zadania do wykonania nie mają przypisanych osób.",
+        "noModel": "Nie zainstalowano modelu AI do generowania tekstu. Podsumowanie spotkania go wymaga; pobierz go w Ustawieniach, w sekcji AI.",
+        "offer": "Spotkanie zapisane. Podsumować je za pomocą AI?",
+        "offerAction": "Podsumuj",
+        "openSettings": "Otwórz ustawienia AI",
+        "pickIntro": "Wybierz, co wygenerować z transkrypcji.",
+        "progress": "Część {{done}} z {{total}}",
+        "reviewIntro": "Przejrzyj przed wstawieniem. Transkrypcja pozostaje bez zmian.",
+        "running": "Generowanie…",
+        "section": {
+          "actionItems": "Zadania do wykonania",
+          "decisions": "Decyzje",
+          "openQuestions": "Otwarte pytania",
+          "summary": "Podsumowanie"
+        },
+        "stop": "Zatrzymaj",
+        "title": "AI spotkania"
+      },
+      "barAria": "Sesja spotkania",
+      "cancel": "Anuluj",
+      "chunksMissing": "Część spotkania nie została przesłana, więc w notatce jest luka. Dźwięk, który dotarł, nadal tam jest.",
+      "clipFailed": "Nie udało się zapisać części spotkania. Reszta nadal jest w notatce.",
+      "machineNotice": "To maszynowa transkrypcja spotkania i może zawierać błędy.",
+      "noteTitle": "Spotkanie {{date}}",
+      "noteWriteFailed": "Nie udało się zapisać notatki ze spotkania. Nagrany dźwięk nadal jest w Twoim skarbcu jako załączniki.",
+      "saving": "Zapisywanie notatki…",
+      "stop": "Zatrzymaj",
+      "systemAudioUnavailable": "To urządzenie nie potrafi przechwytywać dźwięku systemowego, więc pozostali uczestnicy nie znajdą się w notatce.",
+      "tapSilent": "Dźwięk pozostałych uczestników nie dociera. Sprawdź Ustawienia systemowe, Prywatność i bezpieczeństwo, Nagrywanie ekranu i dźwięku systemowego.",
+      "transcriptHeading": "Transkrypcja",
+      "transcriptionFailed": "Nie udało się transkrybować części spotkania. Dźwięk nadal jest w notatce."
     }
   },
   "export": {
@@ -1963,7 +2130,6 @@
       "count_few": "{{count}} notatki",
       "count_many": "{{count}} notatek",
       "count_other": "{{count}} notatek",
-      "countEmpty": "Pusty",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
       "emptyBody": "Zarchiwizowane notatki i foldery są ukryte na pasku bocznym, ale bezpiecznie zachowane. Przywróć je tutaj, kiedy tylko będą potrzebne.",
@@ -1972,7 +2138,6 @@
       "folderDeleteBody_few": "„{{name}}” i jego {{count}} notatki",
       "folderDeleteBody_many": "„{{name}}” i jego {{count}} notatek",
       "folderDeleteBody_other": "„{{name}}” i jego {{count}} notatek",
-      "emptyState": "Archiwum jest puste.",
       "folderDeleteConfirm_one": "Przenieść {{count}} notatkę do kosza?",
       "folderDeleteConfirm_few": "Przenieść {{count}} notatki do kosza?",
       "folderDeleteConfirm_many": "Przenieść {{count}} notatek do kosza?",
@@ -2077,7 +2242,10 @@
         "tag": "Tag"
       },
       "unrepresentable": "Ten filtr został utworzony w zaawansowanym edytorze i nie można go tu edytować.",
-      "unresolved": "nierozwiązany"
+      "unresolved": "nierozwiązany",
+      "conditionNegate": "Warunek: jest lub nie jest",
+      "conditionType": "Warunek: co dopasować",
+      "conditionValue": "Warunek: wartość do dopasowania"
     },
     "folderManagement": {
       "illegalSegment": "Nazwa folderu nie może zawierać / \\ | # ^ [ ] ani zaczynać się/kończyć spacją.",
@@ -2085,7 +2253,7 @@
       "moveIntoSelf": "Nie można przenieść folderu do niego samego.",
       "moveCollision": "W tym miejscu jest już folder o takiej nazwie.",
       "unsettledSave": "Otwarta notatka nie zakończyła jeszcze zapisywania, więc folder pozostał nietknięty. Spróbuj ponownie, gdy zapis się zakończy.",
-      "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał on bez zmian.",
+      "renameFailed": "Nie udało się zmienić nazwy folderu, więc pozostał bez zmian.",
       "deliberateWriteFailed": "Nazwa folderu została zmieniona, ale jednego z jego ustawień nie udało się zapisać. Przy każdym odblokowaniu pod starą nazwą będzie pojawiać się pusty folder; można go bezpiecznie usunąć, co nie zmieni niczego innego. Ponowna zmiana nazwy folderu go nie usunie.",
       "folderListFull": "Myne może zapamiętać ograniczoną liczbę folderów, a ta lista jest pełna. Ten folder nadal działa, ale zniknie, gdy opuści go ostatnia notatka. Usunięcie folderu, którego już nie potrzebujesz, zwolni miejsce.",
       "folderNotRemembered": "Folder został utworzony, ale Myne nie mogło go zapamiętać. Zniknie, gdy opuści go ostatnia notatka, a przy następnym odblokowaniu przepadnie, jeśli nadal będzie pusty. Ponowne utworzenie go jest bezpieczne."
@@ -2096,7 +2264,6 @@
     "folderRow": {
       "createFolderNote": "Utwórz notatkę folderu",
       "empty": "pusty",
-      "folderNote": "notatka folderu",
       "openFolderNote": "Otwórz notatkę folderu"
     },
     "graph": {
@@ -2118,8 +2285,6 @@
         "filterConditions_many": "{{count}} warunków",
         "filterConditions_other": "{{count}} warunków",
         "heading": "Grupy kolorów",
-        "moveDown": "Przesuń regułę w dół",
-        "moveUp": "Przesuń regułę w górę",
         "namePlaceholder": "Reguła bez nazwy",
         "rowLabel": "{{name}}, grupa {{index}} z {{total}}. Alt ze strzałką w górę lub dół porządkuje ją ponownie.",
         "editRuleButton": "Edytuj",
@@ -2134,13 +2299,10 @@
       "depthToggleTitle": "Przełącz głębokość sąsiedztwa (1 ↔ 2 przeskoki)",
       "filterAll": "Wszystkie",
       "filterAroundNote": "Wokół tej notatki",
-      "filterByTag": "Filtruj według tagu",
       "filterIsolated": "Izolowane",
       "hop": "{{depth}} przeskok",
       "loading": "Ładowanie grafu…",
       "noNotes": "Brak notatek do wyświetlenia w grafie.",
-      "overCap": "Ten skarbiec jest duży — graf całego skarbca jest ograniczony. Przefiltruj według tagu lub pokaż izolowane notatki, aby przeglądać.",
-      "refresh": "Odśwież",
       "refreshTitle": "Skarbiec się zmienił: przebuduj graf",
       "settings": {
         "appearanceHeading": "Wygląd",
@@ -2156,7 +2318,7 @@
         "nodeSizeStrength": "Rozmiar wg połączeń",
         "openTitle": "Ustawienia grafu",
         "reset": "Przywróć domyślne",
-        "showArrows": "Pokaż strzałki kierunku",
+        "showArrows": "Strzałki kierunku po najechaniu",
         "title": "Ustawienia grafu"
       },
       "canvasLabel": "Graf wiedzy z {{count}} notatkami",
@@ -2165,7 +2327,6 @@
       "listLinkCount_other": "{{count}} odnośników",
       "listLinksFrom": "Odnośniki z: {{titles}}",
       "listLinksTo": "Odnośniki do: {{titles}}",
-      "relayout": "Przełóż układ",
       "relayoutTitle": "Ułóż graf od nowa od zera",
       "showingCount_one": "Wyświetlanie {{count}} notatki",
       "showingCount_other": "Wyświetlanie {{count}} notatek",
@@ -2200,7 +2361,6 @@
         "flagDetail": "{{kind}} „{{segment}}” {{reason}}.",
         "flagKindFolder": "Folder",
         "flagKindTitle": "Tytuł",
-        "folderPickerTitle": "Wybierz folder skarbca Obsidian",
         "hiddenIgnoredPrefix_one": "Zignorowano {{count}} element konfiguracyjny / ukryty (np. ",
         "hiddenIgnoredPrefix_few": "Zignorowano {{count}} elementy konfiguracyjne / ukryte (np. ",
         "hiddenIgnoredPrefix_many": "Zignorowano {{count}} elementów konfiguracyjnych / ukrytych (np. ",
@@ -2327,8 +2487,8 @@
         "myne": {
           "label": "Skarbiec Myne",
           "loses": "Historia wersji, usunięte notatki i szablony pozostają w źródłowym skarbcu. Załączniki, z których nie korzysta żadna zaimportowana notatka, zostają pominięte. Źródłowy skarbiec nie jest zmieniany i, jeśli go synchronizujesz, nadal się synchronizuje.",
-          "pickerTitle": "Wybierz skarbiec, z którego chcesz importować",
-          "short": "Inny skarbiec na tym urządzeniu",
+          "pickerTitle": "Wybierz plik .myne-backup, z którego chcesz zaimportować",
+          "short": "Wyeksportowany plik .myne-backup",
           "survives": "Notatki, foldery, tagi, linki między importowanymi notatkami oraz załączniki, z których te notatki korzystają. Przechodzą też słowa dodane do słownika źródłowego skarbca."
         }
       },
@@ -2340,14 +2500,14 @@
         "errors": {
           "alreadyOpen": "Ten skarbiec jest już otwarty na potrzeby importu. Najpierw zakończ lub anuluj tamten import.",
           "busy": "Trwa inna operacja na skarbcu. Poczekaj na jej zakończenie i spróbuj ponownie.",
-          "credential": "Tym hasłem lub frazą odzyskiwania nie udało się otworzyć skarbca. Sprawdź je i spróbuj ponownie."
+          "credential": "Tym hasłem lub frazą odzyskiwania nie udało się otworzyć skarbca. Sprawdź je i spróbuj ponownie.",
+          "backupInvalid": "Nie udało się odczytać tego pliku jako kopii zapasowej Myne. Sprawdź plik i spróbuj ponownie."
         },
         "importLabel": "Nazwij ten import",
         "importLabelHint": "Jeśli importowana notatka nazywa się tak samo jak notatka, którą już masz, i coś z tego importu do niej linkuje, zaimportowana notatka zostanie przemianowana przy użyciu tej nazwy. Jeśli powtórzysz ten import, zachowaj tę samą nazwę, a nic nie zostanie zaimportowane dwa razy.",
         "importLabelIllegal": "Tej nazwy nie można użyć: nazwa notatki nie może zawierać \\ / | # ^ [ ], nie może też zaczynać się ani kończyć spacją.",
         "loading": "Szukanie Twoich innych skarbców…",
         "noOtherVaults": "Na tym urządzeniu nie ma innych skarbców, z których można importować. Najpierw przywróć kopię zapasową — stanie się skarbcem, z którego możesz tu zaimportować.",
-        "opening": "Otwieranie…",
         "passwordLabel": "Hasło tamtego skarbca",
         "phraseLabel": "24-słowna fraza odzyskiwania tamtego skarbca",
         "report": {
@@ -2368,18 +2528,19 @@
         "usePhrase": "Użyj frazy odzyskiwania zamiast tego",
         "vaultLabel": "Importuj z",
         "vaultPlaceholder": "Wybierz skarbiec",
-        "wordAria": "Słowo {{number}} z 24"
+        "wordAria": "Słowo {{number}} z 24",
+        "backupLabel": "Plik kopii zapasowej",
+        "chooseBackup": "Wybierz plik kopii zapasowej",
+        "noBackupChosen": "Nie wybrano pliku kopii zapasowej"
       }
     },
     "list": {
       "addToFavorites": "Dodaj do ulubionych",
-      "archive": "Archiwizuj",
       "archiveBulkError": "Nie udało się zarchiwizować notatek.",
       "renameFailed": "Nie udało się zapisać tej nazwy, więc notatka zachowała poprzednią.",
       "archiveFolder": "Archiwizuj folder",
       "archiveNote": "Archiwizuj",
       "archiveSingleError": "Nie udało się zarchiwizować notatki.",
-      "attachments": "Załączniki",
       "bulkArchive": "Archiwizuj {{count}} notatek",
       "bulkArchive_one": "Zarchiwizuj {{count}} notatkę",
       "bulkArchive_few": "Archiwizuj {{count}} notatki",
@@ -2398,7 +2559,7 @@
       "bulkMove_other": "Przenieś {{count}} notatek do…",
       "caseMergeBody": "Folder o nazwie „{{name}}” już istnieje. Zostaną one scalone. Zmienić nazwę jednego, aby zachować je osobno?",
       "color": "Kolor…",
-      "createFirstNote": "+ Utwórz swoją pierwszą notatkę",
+      "createFirstNote": "Utwórz swoją pierwszą notatkę",
       "createFolderNote": "Utwórz notatkę folderu",
       "customize": "Dostosuj…",
       "delete": "Usuń",
@@ -2411,7 +2572,7 @@
       "deleteFolderWarning": "Notatki zostaną przeniesione do Kosza. Można je później przywrócić.",
       "duplicate": "Duplikuj",
       "editFilterTitle": "Edytuj filtr",
-      "emptyState": "Brak notatek.",
+      "emptyState": "Jeszcze brak notatek",
       "favoritesHeading": "Ulubione",
       "icon": "Ikona…",
       "mergeAnyway": "Scal mimo to",
@@ -2420,12 +2581,9 @@
       "newFolder": "Nowy folder",
       "newFolderInPlaceholder": "Nowy folder w {{path}}",
       "newFolderPlaceholder": "Nowy folder",
-      "newItem": "Nowy…",
       "newNote": "Nowa notatka",
-      "newNoteFromTemplate": "Nowa notatka z szablonu…",
       "newNoteHere": "Nowa notatka tutaj",
       "newNoteMenu": "Nowa notatka",
-      "newNoteShortcut": "Nowa notatka (⌘N)",
       "newSubfolder": "Nowy podfolder",
       "newViewTitle": "Nowy widok",
       "noteMovedToTrash": "Notatka przeniesiona do Kosza",
@@ -2434,12 +2592,9 @@
       "notesMovedToTrash_few": "Przeniesiono {{count}} notatki do kosza",
       "notesMovedToTrash_many": "Przeniesiono {{count}} notatek do kosza",
       "notesMovedToTrash_other": "Przeniesiono {{count}} notatek do kosza",
-      "openArchive": "Otwórz archiwum",
-      "openAttachments": "Otwórz załączniki",
       "openFolderNote": "Otwórz notatkę folderu",
       "openInNewTab": "Otwórz w nowej karcie",
       "openToSide": "Otwórz obok",
-      "openTrash": "Otwórz kosz",
       "removeFolderNote": "Usuń notatkę folderu",
       "removeFromFavorites": "Usuń z ulubionych",
       "rename": "Zmień nazwę",
@@ -2471,7 +2626,9 @@
       "moveFolderTo": "Przenieś folder do…",
       "treeLabel": "Notatki i foldery",
       "selectionAnnouncement": "Wybrano {{title}}",
-      "untitled": "Bez tytułu"
+      "untitled": "Bez tytułu",
+      "emptyBody": "Notatki to zwykły Markdown, szyfrowany na tym urządzeniu, zanim cokolwiek opuści to urządzenie. Utwórz jedną, aby zacząć, albo naciśnij wiersz wyszukiwania powyżej, aby uruchomić dowolne polecenie.",
+      "search": "Szukaj"
     },
     "newFromTemplate": {
       "back": "Wstecz",
@@ -2489,20 +2646,33 @@
       "untitledTemplate": "Szablon bez tytułu"
     },
     "newTab": {
-      "createNote": "Utwórz nową notatkę",
+      "createNote": "Nowa notatka",
       "createDrawing": "Nowy rysunek",
-      "noNotesMatch": "Brak pasujących notatek.",
       "noNotesYet": "Brak notatek.",
-      "recent": "Ostatnie",
-      "searchAriaLabel": "Szukaj notatek do otwarcia",
-      "searchPlaceholder": "Szukaj notatek…",
-      "untitled": "Bez tytułu"
+      "recent": "Wróć do ostatnich",
+      "searchAriaLabel": "Szukaj notatek i poleceń",
+      "searchPlaceholder": "Szukaj notatek i poleceń…",
+      "untitled": "Bez tytułu",
+      "createFromTemplate": "Z szablonu",
+      "kindCommand": "Polecenie",
+      "kindNote": "Notatka",
+      "noMatch": "Nic nie pasuje.",
+      "places": {
+        "agent": "Agent",
+        "attachments": "Załączniki",
+        "graph": "Graf",
+        "tasks": "Zadania",
+        "today": "Dziś"
+      },
+      "placesLabel": "Przejdź do",
+      "results": "Wyniki"
     },
     "pane": {
       "graphTab": "Graf",
       "tasksTab": "Zadania",
       "loading": "Ładowanie…",
-      "untitledView": "Widok bez tytułu"
+      "untitledView": "Widok bez tytułu",
+      "agentTab": "Agent"
     },
     "relativeTime": {
       "daysAgo": "{{d}} dni temu",
@@ -2587,7 +2757,9 @@
       "restoredStatus": "Przywrócono. Wersja, którą miałeś, jest zapisana jako migawka.",
       "selectPlaceholder": "Wybierz migawkę, aby zobaczyć, co się od tego czasu zmieniło.",
       "title": "Migawki",
-      "untitled": "Bez tytułu"
+      "untitled": "Bez tytułu",
+      "deviceFallback": "Urządzenie {{code}}",
+      "unknownAuthor": "Nieznane urządzenie"
     },
     "tabStrip": {
       "closeNewTab": "Zamknij nową kartę",
@@ -2632,7 +2804,6 @@
       "count_few": "{{count}} notatki",
       "count_many": "{{count}} notatek",
       "count_other": "{{count}} notatek",
-      "countEmpty": "Pusty",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tej notatki. Spróbuj ponownie.",
       "empty": "Opróżnij kosz",
@@ -2648,7 +2819,6 @@
       "emptyPartialFailure_other": "Nie udało się usunąć {{count}} notatek i pozostają one w koszu.",
       "emptyBody": "Usuwane notatki trafiają tutaj. Zostają, dopóki nie opróżnisz kosza. Każdą z nich możesz przywrócić w dowolnej chwili.",
       "emptyTitle": "Kosz jest pusty",
-      "emptyState": "Kosz jest pusty.",
       "purgeConfirmCta": "Usuń trwale",
       "purgeConfirmTitle": "Usunąć trwale?",
       "restore": "Przywróć",
@@ -2677,13 +2847,7 @@
         "setCoverImage": "Ustaw obraz okładki",
         "untitled": "Bez tytułu"
       },
-      "collapseViews": "Zwiń widoki",
       "empty": "Brak widoków. Zapisz bieżącą listę notatek jako widok.",
-      "expandViews": "Rozwiń widoki",
-      "heading": "Widoki",
-      "host": {
-        "unsupported": "Ten typ widoku pojawi się w późniejszej aktualizacji."
-      },
       "list": {
         "empty": "Brak notatek pasujących do tego widoku",
         "noValue": "Brak wartości"
@@ -2739,7 +2903,7 @@
       "viewTypeTable": "Tabela"
     },
     "welcome": {
-      "body": "Witamy w Myne, Twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko, co tu zapiszesz, jest zaszyfrowane i pozostaje na Twoim urządzeniu. Twoje **hasło** i **fraza odzyskiwania** to jedyne klucze do niego, więc przechowuj je w bezpiecznym miejscu. Jeśli oba kiedykolwiek zaginą, nikt nie odzyska Twoich notatek — nawet my.\n\nTo zwykła notatka, więc uczyń ją swoją. Edytuj ją, zmień jej nazwę lub usuń, kiedy tylko chcesz, i dodawaj nowe notatki w miarę rozwijania pomysłów.\n\nCieszymy się, że tu jesteś. Aby dowiedzieć się więcej o Myne, odwiedź https://myne.md\n",
+      "body": "Witamy w Myne, Twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko, co tu zapiszesz, jest zaszyfrowane i pozostaje na Twoim urządzeniu. Twoje **hasło** i **fraza odzyskiwania** to jedyne klucze do niego, więc przechowuj je w bezpiecznym miejscu. Jeśli oba kiedykolwiek zaginą, nikt nie odzyska Twoich notatek — nawet my.\n\n**Możesz łączyć notatki ze sobą.** Wpisz `[[`, a Myne zaproponuje notatki, które już masz; wybierz jedną, a stanie się linkiem. Notatka, DO której linkujesz, pokazuje, skąd pochodzi link, we własnym panelu linków zwrotnych, więc zbiór notatek można śledzić w obu kierunkach.\n\nTo zwykła notatka, więc uczyń ją swoją. Edytuj ją, zmień jej nazwę lub usuń, kiedy tylko chcesz, i dodawaj nowe notatki w miarę rozwijania pomysłów.\n\nAby dowiedzieć się więcej o Myne, odwiedź https://myne.md\n",
       "title": "Witamy w Myne"
     },
     "workspace": {
@@ -2757,7 +2921,7 @@
     "createForm": {
       "checkingStrength": "Sprawdzanie siły…",
       "confirmLabel": "Potwierdź hasło główne",
-      "defaultEmptyCaption": "Używane jako dane wejściowe do Argon2id (m=256 MiB, t=3, p=2). Wybierz coś, co zapamiętasz; nie można tego zresetować.",
+      "defaultEmptyCaption": "Wybierz coś, co zapamiętasz. Nie można tego zresetować.",
       "mismatch": "Hasła nie są zgodne.",
       "passwordLabel": "Hasło główne",
       "suggestPassword": "Zasugeruj hasło",
@@ -2914,7 +3078,7 @@
   },
   "restore": {
     "backLabel": "Wstecz",
-    "cancelLabel": "Anuluj",
+    "cancelLabel": "Wstecz",
     "collision": {
       "body": "Skarbiec z tej kopii zapasowej już istnieje na tym urządzeniu. Możesz zachować oba: przywrócona kopia pojawi się jako osobny skarbiec na liście skarbców. Albo możesz przywrócić teraz, a następnie samodzielnie usunąć istniejący skarbiec z listy skarbców. Usunięcie wymaga wpisania DELETE i ma sens dopiero po potwierdzeniu, że przywrócony skarbiec się otwiera.",
       "keepBoth": "Zachowaj oba",
@@ -2976,10 +3140,23 @@
       "threatModelHelper": "Otwórz publiczny dokument modelu zagrożeń w przeglądarce.",
       "threatModelLabel": "Model zagrożeń",
       "version": "Wersja",
-      "dev": "Dev"
+      "dev": "Dev",
+      "updateAutoCheckHelper": "Myne pobiera mały podpisany plik z myne.md, aby sprawdzić, czy istnieje nowsza wersja, a potem Cię o tym informuje. Wysyła Twoją bieżącą wersję i platformę, i nic więcej. Nadal możesz sprawdzić ręcznie przyciskiem powyżej.",
+      "updateAutoCheckLabel": "Sprawdzaj aktualizacje automatycznie",
+      "updateAvailable": "Dostępna jest wersja {{version}}.",
+      "updateChannelBeta": "Beta",
+      "updateChannelLabel": "Kanał aktualizacji",
+      "updateChannelStable": "Stabilny",
+      "updateCheckButton": "Sprawdź aktualizacje",
+      "updateChecking": "Sprawdzanie…",
+      "updateFailed": "Nie udało się sprawdzić aktualizacji. Ponowi próbę później.",
+      "updateHelper": "Myne weryfikuje każdą aktualizację względem klucza wydania przechowywanego offline, zanim ją zainstaluje. Sprawdzenie pyta downloads.myne.md o najnowszą wersję, wysyłając wyłącznie Twoją wersję i platformę (oraz Twój adres IP, którego to źródło nie rejestruje); nigdy Twoje notatki ani dane konta.",
+      "updateIdle": "Podpisane aktualizacje, pobierane z downloads.myne.md, gdy je sprawdzasz.",
+      "updateInstallButton": "Uruchom ponownie, aby zaktualizować",
+      "updateLabel": "Aktualizacje",
+      "updateUpToDate": "Masz najnowszą wersję."
     },
     "vault": {
-      "argon2idHeading": "Parametry Argon2id",
       "changePasswordButton": "Zmień hasło",
       "changePasswordError": {
         "invalidCredentialOrVault": "Nieprawidłowe obecne hasło lub plik skarbca jest uszkodzony.",
@@ -2987,7 +3164,9 @@
         "joinFailure": "Coś poszło nie tak, spróbuj ponownie.",
         "samePasswordRejected": "Nowe hasło jest takie samo jak obecne.",
         "serverAckPending": "Twoje nowe hasło działa na tym urządzeniu, ale Myne nie zdołało połączyć się z serwerem, aby je zapisać. Dopóki to nie nastąpi, Twoje pozostałe urządzenia nadal oczekują starego hasła, a jeśli kopia z tej przeglądarki zostanie wcześniej wyczyszczona, zmiana przepadnie. Próba zostanie ponowiona automatycznie.",
-        "weakNewPassword": "Nowe hasło musi mieć co najmniej 12 znaków."
+        "weakNewPassword": "Nowe hasło musi mieć co najmniej 12 znaków.",
+        "unexpected": "Zmiana hasła nie doszła do skutku. Spróbuj ponownie.",
+        "vaultNotUnlocked": "Odblokuj ten skarbiec, zanim zmienisz jego hasło."
       },
       "changePasswordHeading": "Zmień hasło",
       "changePasswordHelper": "Zmień hasło główne, zachowując ten sam skarbiec. Fraza odzyskiwania pozostaje bez zmian.",
@@ -2997,9 +3176,6 @@
       "localEraseHelper": "Wymaż kopię Twojego skarbca, którą Myne trzyma w tej przeglądarce. Twoje konto i wszystko, co już się zsynchronizowało, pozostają na serwerze.",
       "localEraseButton": "Wyloguj się i wymaż kopię z tej przeglądarki…",
       "deleteVaultButton": "Usuń skarbiec…",
-      "memoryCost": "Koszt pamięci",
-      "parallelism": "Równoległość",
-      "timeCost": "Koszt czasu",
       "vaultLabelEyebrow": "ETYKIETA SKARBCA",
       "vaultLabelHelper": "Nazwa tego skarbca, pokazywana w przełączniku w aplikacji oraz w wyborze skarbca przy uruchomieniu, zanim go odblokujesz. Przechowywana w zaszyfrowanej postaci wewnątrz skarbca; nigdy nie opuszcza Twojego urządzenia jako zwykły tekst.",
       "vaultLabelPlaceholder": "Dodaj etykietę…",
@@ -3018,7 +3194,8 @@
       "newPasswordPlaceholder": "Co najmniej 12 znaków",
       "reenterNewPassword": "Wprowadź ponownie nowe hasło",
       "changePasswordFootnote": "To unieważnia szybkie odblokowanie. Twoja fraza odzyskiwania pozostaje bez zmian.",
-      "changing": "Zmienianie…"
+      "changing": "Zmienianie…",
+      "memberVaultNotice": "To współdzielony skarbiec. Nie ma hasła skarbca. Użyj opcji Odblokowanie współdzielonego skarbca w sekcji Prywatność, aby dodać hasło lub PIN."
     },
     "appearance": {
       "accentHelper": "Wybierz kolor akcentu używany w całej aplikacji. Tylko na tym urządzeniu.",
@@ -3052,7 +3229,11 @@
       "showEditTimesSubtitle": "Znaczniki czasu pod każdą notatką",
       "graphSettingsLabel": "Wygląd grafu",
       "graphSettingsHelper": "Kolory węzłów, etykiety, rozmiary i siły układu ustawia się w samym grafie. Otwórz go i użyj koła zębatego w jego rogu. Są przechowywane osobno na każdym urządzeniu, więc zmiana tutaj nie przeniesie się na Twój telefon.",
-      "openGraph": "Otwórz graf"
+      "openGraph": "Otwórz graf",
+      "barCustomize": {
+        "label": "Dolny pasek",
+        "helper": "Wybierz, które wskaźniki pokazuje dolny pasek. Ukryj wszystkie, a sam pasek zniknie, odzyskując miejsce. Przeciągnij element na pasku lub kliknij go prawym przyciskiem, aby zmienić kolejność."
+      }
     },
     "archive": {
       "helper": "Pozwól na przenoszenie notatek do Archiwum, poza główną listę. Wyłączenie tej opcji przywraca każdą zarchiwizowaną notatkę do jej folderu, cofa archiwizację każdego zarchiwizowanego folderu i ukrywa elementy sterujące archiwum. Dotyczy całego skarbca, na każdym urządzeniu.",
@@ -3183,7 +3364,7 @@
       "confirm": "Potwierdź",
       "delete": "Usuń",
       "deleteError": "Nie udało się usunąć tego motywu. Spróbuj ponownie.",
-      "empty": "Brak własnych motywów. Zaimportuj plik motywu, aby zacząć.",
+      "empty": "Zaimportuj plik motywu albo przejrzyj galerię, aby znaleźć motyw.",
       "error": {
         "aColorFallback": "kolor",
         "invalidFile": "Nieprawidłowy plik motywu.",
@@ -3203,10 +3384,9 @@
       "importButton": "Importuj motyw…",
       "importError": "Ten plik nie jest prawidłowym motywem. Otwórz dokumentację, aby zobaczyć format.",
       "label": "Własne motywy",
-      "openFolderButton": "Otwórz folder motywów",
-      "openFolderError": "Nie udało się otworzyć folderu motywów.",
       "readError": "Nie udało się odczytać Twoich własnych motywów.",
-      "readOnlyHelper": "Własne motywy instaluje się na komputerze. Twoje pojawią się tutaj same po synchronizacji."
+      "readOnlyHelper": "Własne motywy instaluje się na komputerze. Twoje pojawią się tutaj same po synchronizacji.",
+      "emptyTitle": "Jeszcze brak własnych motywów"
     },
     "dailyNotes": {
       "blankTemplate": "Pusty (bez szablonu)",
@@ -3237,15 +3417,8 @@
       "periodFolderAriaLabel": "Folder notatek {{period}}",
       "periodFormatAriaLabel": "Format tytułu notatek {{period}}",
       "periodTemplateAriaLabel": "Szablon notatek {{period}}",
-      "dateFormatHelper": "Tytuł każdej notatki dziennej. Obsługuje YYYY, MM, DD. Domyślnie {{default}}.",
-      "dateFormatLabel": "Format daty notatki dziennej",
-      "dateFormatSaveError": "Nie udało się zapisać formatu daty. Spróbuj ponownie.",
-      "folderHelper": "Gdzie są zapisywane nowe notatki dzienne. Domyślnie {{default}}. Folder jest zachowywany, nawet gdy jest pusty.",
-      "folderLabel": "Folder notatek dziennych",
-      "folderSaveError": "Nie udało się zapisać folderu notatek dziennych. Spróbuj ponownie.",
-      "templateHelper": "Wybierz szablon, od którego zacznie się każda notatka dzienna, lub pozostaw puste, aby utworzyć pustą notatkę z tytułem w postaci daty.",
-      "templateLabel": "Szablon notatki dziennej",
-      "templateSaveError": "Nie udało się zapisać szablonu notatki dziennej. Spróbuj ponownie."
+      "sectionPeriodic": "Notatki okresowe",
+      "periodSwitcherAriaLabel": "Typ notatki okresowej"
     },
     "deleteVault": {
       "cancel": "Anuluj",
@@ -3398,7 +3571,7 @@
     "ai": {
       "autoTagHelper": "Gdy przerwiesz pisanie, mały model na Twoim urządzeniu czyta notatkę i proponuje tagi na jej górze. Nic nie zostaje dodane, dopóki nie zaakceptujesz sugestii.",
       "autoTagLabel": "Automatycznie proponuj tagi",
-      "autoTagUnavailable": "Ta kompilacja nie zawiera modelu tagów, więc nie da się proponować żadnych tagów. Myne nigdy go nie pobiera. Przełącznik włączy się sam w kompilacji, która go zawiera.",
+      "autoTagUnavailable": "Nie zainstalowano jeszcze modelu tagów. Pobierz go raz w Ustawieniach, AI, a przełącznik sam się włączy, gdy zostanie zainstalowany.",
       "consent": {
         "accept": "Wysyłaj moje notatki do {{provider}}",
         "cancel": "Anuluj",
@@ -3415,7 +3588,7 @@
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model. To, gdzie działa i czy Twoje notatki opuszczają to urządzenie, zależy od dostawcy, którego wskażesz poniżej. Eksperymentalne, domyślnie wyłączone.",
       "enableLabel": "Włącz lokalne AI",
-      "excludedHelper": "Notatki w tych folderach nigdy nie są odczytywane ani indeksowane przez AI. Jedna ścieżka folderu w wierszu.",
+      "excludedHelper": "Notatki w tych folderach nigdy nie są odczytywane ani indeksowane przez AI. Pusta lista oznacza, że AI widzi wszystko; to ta sama lista, którą respektuje klient wiersza poleceń. Jedna ścieżka folderu w wierszu.",
       "excludedLabel": "Wykluczone foldery",
       "excludedPlaceholder": "Prywatne/\nDziennik/",
       "endpointHelper": "Jeśli na tym komputerze działa już środowisko uruchomieniowe modeli, wskaż je Myne zamiast wybierać pliki modeli. Zostaw to pole puste, aby korzystać z plików powyżej.",
@@ -3457,7 +3630,7 @@
       "modelNone": "Nie wybrano pliku",
       "modelSaveFailed": "Nie udało się zapisać ścieżki modelu (musi znajdować się poza sejfem).",
       "modelTranscriptionLabel": "Model zamiany mowy na tekst (transkrypcja)",
-      "modelsHelper": "Myne nigdy nie pobiera modeli. Oznaczałoby to wysyłanie danych przez sieć. Otwórz link, aby pobrać model w przeglądarce, a następnie wskaż pobrane pliki tutaj. Model wybrany tutaj działa na Twoim urządzeniu; jeśli zamiast tego wskazano dostawcę, odpowiada ten dostawca.",
+      "modelsHelper": "Pobierz model tutaj albo otwórz link, aby pobrać go w przeglądarce, i wskaż pobrane pliki. Model działa na Twoim urządzeniu; jeśli zamiast tego wskazano dostawcę, odpowiada ten dostawca.",
       "providerHelper": "Zamiast uruchamiać model tutaj, Myne może wysłać żądanie do wskazanej przez Ciebie usługi. Twoje notatki opuszczają wtedy to urządzenie. Domyślna jest opcja „Brak”, która oznacza, że żadna usługa nie jest w ogóle odpytywana.",
       "providerKeyAdd": "wklej swój klucz API",
       "providerKeyLabel": "Klucz API",
@@ -3499,7 +3672,35 @@
       "mobileApproveLabel": "Zezwól na wysyłanie z tego telefonu",
       "mobileApproveHelper": "Dostawca i jego klucz pochodzą z innego urządzenia. Z tego telefonu nic nie jest wysyłane, dopóki nie przeczytasz, co zostanie wysłane, i nie zezwolisz na to tutaj.",
       "historyBudgetHelper": "Ile ostatniej rozmowy niesie każde żądanie, w znakach. Pozostaw puste, aby użyć wartości domyślnej. Większa liczba pozwala AI śledzić dłuższe rozmowy i wysyła ich więcej: u dostawcy, który nie działa na tym urządzeniu, oznacza to więcej twojego tekstu opuszczającego je, na każdym kroku uruchomienia.",
-      "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem"
+      "historyBudgetLabel": "Rozmowa wysyłana z każdym żądaniem",
+      "meetingPromptHelper": "Instrukcja, której przebieg AI spotkania używa, aby zamienić transkrypcję w sekcje. Pozostaw puste, aby użyć wbudowanego domyślnego. Zastępuje domyślny format wyniku, więc jeśli ją ustawisz, samodzielnie poproś o potrzebne sekcje.",
+      "meetingPromptLabel": "Polecenie podsumowania spotkania",
+      "meetingPromptReset": "Przywróć domyślne",
+      "groupAutoTag": "Automatyczne tagowanie",
+      "groupVoice": "Głos i spotkania",
+      "groupWriting": "Pisanie i czat",
+      "groupPrivacy": "Prywatność i limity",
+      "groupAdvanced": "Zaawansowane",
+      "excludedPickLabel": "Dodaj folder do pominięcia",
+      "excludedPickPlaceholder": "Wybierz folder…",
+      "modelShowInFolder": "Pokaż w folderze",
+      "modelShowLocation": "Pokaż lokalizację {{name}}",
+      "downloadsLabel": "Pobieranie modeli",
+      "downloadsHelper": "Pobierz model z własnego źródła Myne. Przed użyciem jest sprawdzany względem odcisku wbudowanego w aplikację, więc zmodyfikowane pobranie zostaje odrzucone. Nic nie jest pobierane, dopóki nie klikniesz.",
+      "downloadEmbeddingSize": "Model wielojęzyczny, około 449 MB.",
+      "downloadTagLabel": "Model tagów: automatyczne propozycje tagów",
+      "downloadTagSize": "Mały model lokalny, około 337 MB.",
+      "downloadInstalled": "Zainstalowany",
+      "downloadNotInstalled": "Niezainstalowany",
+      "downloadReinstall": "Pobierz",
+      "downloadInstall": "Pobierz",
+      "modelRemove": "Usuń",
+      "downloading": "Pobieranie…",
+      "downloadingPercent": "Pobieranie… {{percent}}%",
+      "downloadCancel": "Anuluj",
+      "downloadFailed": "Pobieranie nie zostało ukończone.",
+      "downloadFailedChecksum": "Pobrane dane nie zgadzały się z wbudowanym odciskiem i zostały odrzucone. Spróbuj ponownie.",
+      "sideloadDisclosure": "Tryb dewelopera pozwala też wskazać Myne plik modelu zdobyty samodzielnie. Plik pobrany z innego miejsca nie jest sprawdzany przez Myne, więc używaj tylko takiego, któremu ufasz."
     },
     "network": {
       "disabledCue": "Synchronizacja nie jest już kierowana przez Tor. Nowe połączenia idą prosto do serwera synchronizacji.",
@@ -3515,13 +3716,13 @@
       "postureInactive": "Synchronizacja idzie prosto do serwera synchronizacji",
       "postureUnavailable": "Tor jest niedostępny: synchronizacja wstrzymana",
       "postureUnavailableDetail": "Nic nie jest wysyłane bezpośrednio. Wyłącz i włącz to ustawienie ponownie, aby spróbować uruchomić klienta Tor, albo wyłącz je, by synchronizować bez Tora.",
-      "residualExit": "Ostatni przekaźnik w obwodzie Tora, węzeł wyjściowy, widzi, z którym serwerem synchronizacji się łączysz. Nie może odczytać tego, co synchronizujesz; to pozostaje zaszyfrowane od końca do końca.",
+      "residualExit": "Ostatni przekaźnik w obwodzie Tora, węzeł wyjściowy, widzi, z którym serwerem synchronizacji się łączysz, a na pulpicie przy włączonej tej opcji — z którym dostawcą AI się łączysz. Nie może odczytać tego, co synchronizujesz; to pozostaje zaszyfrowane od końca do końca.",
       "residualMetadata": "Serwer synchronizacji nadal widzi, kiedy synchronizujesz, ile blobów wysyłasz i jak są duże oraz ile masz urządzeń. Tor tego nie zmienia.",
       "residualPayment": "Jeśli płacisz za hostowaną synchronizację, płatność i Twoje konto nadal można powiązać z Tobą. Tor zmienia to, skąd pochodzi połączenie, a nie ślad rozliczeniowy.",
-      "residualScope": "Przez Tor przechodzi tylko własny ruch synchronizacji Myne. Nic innego na tym urządzeniu.",
+      "residualScope": "Na pulpicie obejmuje to Twój ruch synchronizacji oraz żądania do zdalnego dostawcy AI. Wersja mobilna nie ma jeszcze routingu przez Tora, więc jej żądania do dostawcy idą bezpośrednio. Nic innego na tym urządzeniu nie przechodzi przez Tora.",
       "residualsToggle": "Czego to nie ukrywa",
-      "torHelper": "Ukrywa Twój adres IP i lokalizację przed serwerem synchronizacji oraz ukrywa przed Twoją siecią i dostawcą internetu to, z którym serwerem się synchronizujesz. Nadal widzą, że to urządzenie łączy się z siecią Tor. Nie zapewnia anonimowości wobec Myne i nie ukrywa przed serwerem tego, co i kiedy synchronizujesz.",
-      "torLabel": "Kieruj synchronizację przez Tor"
+      "torHelper": "Ukrywa Twój adres IP i lokalizację przed serwerem synchronizacji oraz ukrywa przed Twoją siecią i dostawcą internetu, z którym serwerem się synchronizujesz (a na pulpicie — z którym dostawcą AI się łączysz). Nadal widzą, że to urządzenie łączy się z Torem. Nie zapewnia anonimowości wobec Myne i nie ukrywa przed serwerem tego, co i kiedy synchronizujesz.",
+      "torLabel": "Kieruj synchronizację i AI na pulpicie przez Tora"
     },
     "prefs": {
       "saveError": "Nie udało się zapisać preferencji. Spróbuj ponownie.",
@@ -3554,10 +3755,8 @@
       "hideVaultNamesErrorRead": "Nie udało się odczytać bieżącego ustawienia. Przestaw przełącznik, aby ustawić je ponownie.",
       "hideVaultNamesErrorSave": "Nie udało się zapisać ustawienia, więc pozostaje bez zmian. Jeśli włączałeś(-aś) tę opcję, część zapisanych nazw mogła już zostać zniszczona; włącz ją ponownie, aby dokończyć.",
       "hideVaultNamesErrorErase": "Jednej zapisanej nazwy nie udało się zniszczyć, więc opcja pozostała wyłączona. Myne nie ogłasza wymazania, do którego nie doszło. Spróbuj ponownie.",
-      "realtimeSyncHelper": "Zmiany z innych urządzeń docierają w ciągu kilku sekund przez sygnał bez treści — serwer przekazuje tylko „coś się zmieniło”, nigdy co. Gdy sejf jest odblokowany, aplikacja i tak regularnie sprawdza serwer, więc nie zwiększa to znacząco widoczności; nie ma nic do skonfigurowania.",
-      "realtimeSyncLabel": "Synchronizacja w czasie rzeczywistym",
       "screenCaptureHelperOff": "Ochrona zawsze obowiązuje przed odblokowaniem. Po odblokowaniu stosuje się ta preferencja.",
-      "screenCaptureHelperOn": "Działa w systemie Windows 10 (aktualizacja z maja 2020) i nowszym. macOS i Linux nie udostępniają do tego systemowego API, więc tam przechwytywania nie da się zablokować.",
+      "screenCaptureHelperOn": "Działa w systemie Windows 10 (aktualizacja z maja 2020) i nowszym. macOS i Linux nie mają do tego systemowego API, więc tam nie może blokować przechwytywania.",
       "screenCaptureLabel": "Ochrona przed przechwytywaniem ekranu",
       "screenCaptureSubtitle": "Blokuj zrzuty ekranu i nagrywanie ekranu",
       "screenshotBlocked": "Ochrona ekranu jest włączona: zrzuty ekranu z Myne wychodzą puste.",
@@ -3573,7 +3772,14 @@
       "screenCaptureOverrideLabel": "Zezwalaj na przechwytywanie ekranu na tym urządzeniu",
       "screenCaptureOverrideUnknown": "Nie udało się odczytać ustawienia przechwytywania ekranu na tym urządzeniu, więc ta preferencja nie jest stosowana. Otwórz Ustawienia ponownie, aby spróbować jeszcze raz.",
       "screenCaptureSuperseded": "Wyłączona na tym urządzeniu. Zobacz „Zezwalaj na przechwytywanie ekranu na tym urządzeniu” poniżej. Ta preferencja jest zachowana i zacznie znów obowiązywać, gdy wyłączysz tamtą opcję.",
-      "screenCaptureSupersededByFlag": "Wyłączona w tej sesji, ponieważ Myne uruchomiono z --disable-screen-capture-protection. Ta preferencja jest zachowana i zacznie znów obowiązywać przy następnym otwarciu Myne bez tego przełącznika."
+      "screenCaptureSupersededByFlag": "Wyłączona w tej sesji, ponieważ Myne uruchomiono z --disable-screen-capture-protection. Ta preferencja jest zachowana i zacznie znów obowiązywać przy następnym otwarciu Myne bez tego przełącznika.",
+      "recoveryDrillCheck": "Sprawdź frazę",
+      "recoveryDrillChecking": "Sprawdzanie…",
+      "recoveryDrillError": "Nie udało się teraz przeprowadzić sprawdzenia. Nic się nie zmieniło. Spróbuj ponownie za chwilę.",
+      "recoveryDrillHelper": "Wpisz zapisane 24 słowa. Myne sprawdza tylko, czy nadal otwierają ten skarbiec, i nie mówi nic więcej — nigdy nie pokazuje tu tych słów.",
+      "recoveryDrillLabel": "Sprawdź swoją frazę odzyskiwania",
+      "recoveryDrillPassed": "Te słowa otwierają ten skarbiec. Trzymaj je w miejscu, w którym je zapisano.",
+      "recoveryDrillPlaceholder": "24 słowa, po kolei, oddzielone spacjami"
     },
     "quickUnlock": {
       "errorBusy": "Trwa inna operacja na skarbcu. Spróbuj ponownie za chwilę.",
@@ -3620,7 +3826,9 @@
       "pinPlaceholder6": "Co najmniej 6 cyfr",
       "confirmPin": "Potwierdź PIN",
       "reenterPin": "Wprowadź ponownie PIN",
-      "setupButton": "Skonfiguruj szybkie odblokowanie"
+      "setupButton": "Skonfiguruj szybkie odblokowanie",
+      "errorBiometricAuthFailed": "Nie udało się skonfigurować Touch ID. Upewnij się, że w Ustawieniach systemowych zarejestrowano odcisk palca, albo użyj PIN-u.",
+      "biometricAuthFailed": "Nie udało się skonfigurować: {{method}}. Upewnij się, że jest włączone w ustawieniach urządzenia, albo użyj PIN-u."
     },
     "shell": {
       "closeLabel": "Zamknij ustawienia",
@@ -3640,7 +3848,9 @@
         "network": "Sieć",
         "privacy": "Prywatność",
         "storage": "Pamięć",
-        "sync": "Synchronizacja"
+        "sync": "Synchronizacja",
+        "cli": "CLI",
+        "vault": "Skarbiec"
       },
       "passwordUpdatedToast": "Hasło zaktualizowane",
       "title": "Ustawienia"
@@ -3771,12 +3981,8 @@
     "search": {
       "placeholder": "Szukaj w ustawieniach…",
       "ariaLabel": "Szukaj w ustawieniach",
-      "empty": "Żadne ustawienie nie pasuje do „{{query}}”.",
+      "empty": "Żadne ustawienie nie pasuje do „{{query}}”",
       "resultsLabel": "Wyniki wyszukiwania",
-      "extra": {
-        "lastActiveNoteTitle": "Kontynuuj od miejsca, w którym przerwano",
-        "lastActiveNoteDesc": "Synchronizuj informację o tym, która notatka była otwarta, aby wrócić do niej na innym urządzeniu."
-      },
       "keywords": {
         "aiAutoTag": "automatyczne tagi tag sugestie sugeruj etykiety ai auto tag suggest",
         "aiEndpoint": "ollama endpoint adres lokalne środowisko uruchomieniowe model serwer port loopback runtime",
@@ -3809,7 +4015,6 @@
         "import": "import importuj notatki obsidian notion evernote enex html csv migracja przeniesienie",
         "language": "język tłumaczenie interfejs lokalizacja language locale ui",
         "legal": "informacje prawne polityka prywatności warunki impressum rodo gdpr dsgvo organy ścigania zgłoszenie nadużyć ochrona danych legal privacy terms law enforcement",
-        "lastActiveNote": "ostatnia notatka kontynuuj wznów otwarta synchronizacja last note resume",
         "license": "licencja agpl otwarte źródło prawne open source license",
         "lineNumbers": "numery wierszy linii margines edytor wyświetlanie line numbers",
         "vimMode": "vim tryb modalny normalny wstawianie wizualny klawiatura modal editing",
@@ -3818,7 +4023,6 @@
         "torRouting": "tor kierowanie onion proxy sieć adres ip lokalizacja ukryj synchronizacja anonimowość routing",
         "quickUnlock": "szybkie odblokowanie pin touch id biometria twarz odblokuj quick unlock",
         "reminders": "przypomnienia powiadomienia alert zadanie termin przypomnij wyprzedzenie planuj rejestracja dni horyzont reminders notify",
-        "realtimeSync": "synchronizacja w czasie rzeczywistym na żywo połączenie realtime sync live",
         "screenCapture": "ochrona przed przechwytywaniem ekranu zrzut nagrywanie blokuj prywatność screenshot",
         "showEditTimes": "czasy edycji znaczniki czasu daty modyfikacji notatki timestamps",
         "spell": "sprawdzanie pisowni ortografia słownik autokorekta spell check",
@@ -3850,8 +4054,18 @@
         "aiMemory": "pamięć zapamiętane fakty asystent uczy się osobowość preferencje głosu",
         "ribbon": "lewy pasek szyna przypnij pin polecenia polecenia dostosuj uporządkuj odepnij pasek narzędzi skróty",
         "folderNotes": "folder notatka indeks folder_index strona główna dwuklik odnośnik folderu projekty wyłącz zablokuj",
-        "syncMembers": "członkowie, udostępnij, zaproś, zespół, współpraca, skarbiec"
-      }
+        "syncMembers": "członkowie, udostępnij, zaproś, zespół, współpraca, skarbiec",
+        "accountName": "nazwa konta grupa grupowanie zmień etykieta urządzenie lokalne",
+        "accountVaults": "konto skarbce zgrupowane które skarbce należą grupa lista",
+        "aiMeetingPrompt": "spotkanie podsumowanie polecenie instrukcja własne transkrypcja zadania do wykonania decyzje",
+        "update": "aktualizacja aktualizuj sprawdź aktualizacje nowa wersja wydanie pobierz",
+        "plainFile": "plik lokalny edytor markdown dysk lokalny poza skarbcem jawny tekst otwórz na miejscu",
+        "memberPassword": "współdzielony skarbiec hasło członek odblokuj dołącz fraza",
+        "recoveryDrill": "fraza odzyskiwania sprawdź zweryfikuj próba test 24 słowa seed kopia zapasowa utracone hasło",
+        "bar": "dolny pasek pasek stanu wskaźniki dostosuj kolejność ukryj pokaż pasek narzędzi",
+        "syncDeviceBindings": "urządzenia przypisane przez członków atrybucja kto podpisał które urządzenie należy"
+      },
+      "emptyBody": "Spróbuj krótszego słowa albo nazwy panelu."
     },
     "dateTime": {
       "dateLabel": "Format daty",
@@ -3875,7 +4089,7 @@
     },
     "ribbonCustomize": {
       "add": "Dodaj",
-      "empty": "Na pasku nie ma jeszcze poleceń. Użyj Dodaj, aby przypiąć.",
+      "empty": "Użyj przycisku Dodaj, aby przypiąć polecenie do paska.",
       "errorSave": "Nie udało się zapisać ustawienia paska.",
       "helper": "Polecenia na lewym pasku, w kolejności. Przeciągnij, aby uporządkować, dodaj kolejne z listy lub usuń przez ×. Szyna ukrywa polecenia niedostępne w bieżącym stanie.",
       "label": "Lewy pasek",
@@ -3885,12 +4099,13 @@
       "searchPlaceholder": "Szukaj poleceń…",
       "searchResultsLabel": "Pasujące polecenia",
       "showHelper": "Pokaż lewy pasek na tym urządzeniu.",
-      "showLabel": "Pokaż lewy pasek"
+      "showLabel": "Pokaż lewy pasek",
+      "emptyTitle": "Nic jeszcze nie przypięto"
     },
     "memory": {
       "heading": "Co pamięta asystent",
       "helper": "Fakty, których AI nauczyło się pracując z Tobą. Zapisuje je samo (maksymalnie jedno na uruchomienie); widzisz każde i możesz je poprawić. Wpisy synchronizują się z innymi urządzeniami i pozostają zaszyfrowane.",
-      "empty": "Jeszcze nic nie pamięta. Wpisy pojawiają się tutaj, gdy asystent czegoś nauczy się podczas uruchomienia.",
+      "empty": "Wpisy pojawiają się tutaj, gdy asystent czegoś nauczy się podczas przebiegu.",
       "editLabel": "Edytuj",
       "deleteLabel": "Usuń",
       "save": "Zapisz",
@@ -3913,7 +4128,54 @@
       "personalitySavedToast": "Preferencje głosu zaktualizowane.",
       "personalitySaveFailed": "Nie udało się zapisać preferencji głosu.",
       "loadFailed": "Nie udało się wczytać wspomnień ani preferencji głosu. Nic się nie zmieniło.",
-      "retryLabel": "Spróbuj ponownie"
+      "retryLabel": "Spróbuj ponownie",
+      "emptyTitle": "Jeszcze nic nie pamięta"
+    },
+    "account": {
+      "nameLabel": "Nazwa konta",
+      "nameHelper": "Nazwa dla tej grupy skarbców na tym urządzeniu. Ekran wyboru skarbca używa jej jako nagłówka grupy. Pozostaje na tym urządzeniu i nigdy nie jest zapisywana wewnątrz skarbca, więc nie jest synchronizowana, a inne urządzenie może pogrupować i nazwać te same skarbce inaczej.",
+      "namePlaceholder": "Dodaj nazwę…",
+      "nameSave": "Zapisz",
+      "nameSaving": "Zapisywanie…",
+      "vaultsLabel": "Skarbce na tym koncie",
+      "vaultsHelper": "Skarbce, które to urządzenie grupuje pod powyższą nazwą. Grupowanie to wybór organizacyjny na poziomie urządzenia, więc nie jest częścią treści żadnego skarbca i nie wędruje razem z nim.",
+      "vaultsCount": "{{count}} skarbców",
+      "currentVault": "Ten skarbiec",
+      "unknownVault": "Inny skarbiec na tym urządzeniu",
+      "standaloneHelper": "Ten skarbiec nie jest pogrupowany pod żadnym kontem na tym urządzeniu, więc występuje samodzielnie. Grupowanie działa na poziomie urządzenia: inne urządzenie może pokazywać go wewnątrz jakiegoś konta.",
+      "unresolvedHelper": "Ustalanie, który skarbiec jest otwarty…",
+      "devicesNote": "Urządzeniami, członkami współdzielonego skarbca i Twoją tożsamością zarządza się w sekcji Synchronizacja.",
+      "groupingHidden": "Nazwy kont są niedostępne, gdy nazwy skarbców są ukryte. Wyłącz tę opcję w sekcji Prywatność, aby zarządzać tym kontem.",
+      "groupingUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic nie zostało zmienione.",
+      "groupingError": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
+    },
+    "plainFile": {
+      "errorSaveSetting": "Nie udało się zapisać ustawienia plików lokalnych.",
+      "helper": "Otwieraj i edytuj pliki .md, które już masz na dysku, na miejscu, bez dodawania ich do skarbca. Te pliki są jawnym tekstem: Myne ich nie szyfruje, a ich zmiany nie są synchronizowane ani objęte kopią zapasową. Domyślnie włączone; wyłącz to tutaj.",
+      "label": "Edytor plików lokalnych",
+      "openFilesRemain": "Pliki z niezapisanymi zmianami są nadal otwarte. Rozwiąż to, a potem ponownie wyłącz tę opcję."
+    },
+    "memberPassword": {
+      "reminder": "To urządzenie nie ma jeszcze szybkiego odblokowania, więc ten skarbiec za każdym razem prosi o Twoją frazę odzyskiwania.",
+      "reminderDismiss": "Nie teraz",
+      "title": "Odblokowanie współdzielonego skarbca",
+      "helperConfigured": "Ten współdzielony skarbiec otwiera się na tym urządzeniu przy użyciu {{method}}.",
+      "helperNotConfigured": "Ustaw hasło lub PIN, aby nie wpisywać frazy odzyskiwania za każdym razem.",
+      "set": "Ustaw",
+      "change": "Zmień",
+      "remove": "Usuń",
+      "label": "Hasło skarbca",
+      "methodPassword": "hasła",
+      "methodPin": "PIN-u",
+      "methodBiometric": "biometrii urządzenia",
+      "usePin": "Użyj PIN-u",
+      "useBiometric": "Użyj Touch ID",
+      "pinLabel": "PIN skarbca",
+      "pinPlaceholder": "PIN, co najmniej {{count}} cyfr",
+      "setupHelper": "Co najmniej {{count}} znaków. Przechowywane tylko na tym urządzeniu; Twoja fraza odzyskiwania nadal otwiera ten skarbiec wszędzie.",
+      "pinSetupHelper": "Co najmniej {{count}} cyfr. Przechowywane tylko na tym urządzeniu; Twoja fraza odzyskiwania nadal otwiera ten skarbiec wszędzie.",
+      "errorTooShort": "Użyj co najmniej {{count}} znaków/cyfr.",
+      "errorGeneric": "Nie udało się ustawić poświadczenia. Spróbuj ponownie."
     }
   },
   "storageLost": {
@@ -3983,7 +4245,7 @@
       "compareTheirs": "Sprzeczna kopia",
       "compareTitle": "Porównywanie „{{title}}”",
       "discard": "Odrzuć",
-      "empty": "Brak konfliktów. Twoje urządzenia są zsynchronizowane.",
+      "empty": "Twoje urządzenia są zsynchronizowane.",
       "groupTitle_one": "{{count}} sprzeczna kopia: {{original}}",
       "groupTitle_few": "{{count}} sprzeczne kopie {{original}}",
       "groupTitle_many": "{{count}} sprzecznych kopii {{original}}",
@@ -3992,7 +4254,8 @@
       "tookTheirsToast": "Wersja lokalna przeniesiona do kosza.",
       "tookTheirsUndo": "Cofnij",
       "untitled": "Bez tytułu ({{hex}})",
-      "useThisVersion": "Użyj tej wersji"
+      "useThisVersion": "Użyj tej wersji",
+      "emptyTitle": "Brak konfliktów"
     },
     "deviceJoinQr": {
       "accountLabel": "Numer konta",
@@ -4012,7 +4275,7 @@
       "awaitingApproval_many": "{{count}} urządzeń oczekuje na zatwierdzenie",
       "awaitingApproval_other": "{{count}} urządzeń oczekuje na zatwierdzenie",
       "loading": "Ładowanie…",
-      "noDevices": "Nie zsynchronizowano jeszcze żadnego urządzenia.",
+      "noDevices": "Jeszcze brak innych urządzeń",
       "notEnrolled": "To urządzenie nie jest jeszcze połączone. Jeśli właśnie je dodałeś(-aś), poczekaj na zatwierdzenie z innego urządzenia; w przeciwnym razie dodaj je za pomocą formularza „Dodaj urządzenie” powyżej.",
       "platform": {
         "android": "Telefon Android",
@@ -4042,7 +4305,7 @@
       "reasonDeviceLimit": "konto osiągnęło limit urządzeń",
       "reasonAwaitingApproval": "to urządzenie wciąż czeka na zatwierdzenie",
       "reasonNotConfigured": "nie skonfigurowano serwera synchronizacji",
-      "transportHint": "Jeśli serwer został przeniesiony lub zmienił się jego certyfikat, wpisz ponownie adres serwera w sekcji „Serwer synchronizacji” powyżej, aby ponownie obdarzyć go zaufaniem.",
+      "transportHint": "Jeśli serwer został przeniesiony, wpisz jego nowy adres w sekcji „Serwer synchronizacji” powyżej. Sprawdź, czy jego certyfikat HTTPS jest ważny.",
       "unreachable": "Nie udało się połączyć z synchronizacją ({{error}}).",
       "verifyBody": "Sprawdź, czy ten sam kod pojawia się na urządzeniu, które właśnie zatwierdzono. Jeśli się zgadza, urządzenie jest na Twoim koncie. Jeśli nie, usuń urządzenie.",
       "verifyMatch": "Zgadzają się",
@@ -4052,19 +4315,28 @@
       "verifySyncing": "Synchronizowanie…",
       "verifyTitle": "Zweryfikuj nowe urządzenie",
       "verifyAction": "Porównaj kod",
-      "yourDevices": "Twoje urządzenia"
+      "yourDevices": "Twoje urządzenia",
+      "noDevicesBody": "Urządzenia dodane do tego konta pojawią się tutaj, z datą ostatniej synchronizacji każdego z nich.",
+      "reasonTls": "nie udało się zweryfikować certyfikatu HTTPS serwera",
+      "tlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera synchronizacji.",
+      "tlsFailureHint": "Sprawdź adres serwera, ważność certyfikatu i zaufanie do urzędu certyfikacji. Myne połączy się ponownie, gdy serwer przedstawi prawidłowy certyfikat."
     },
     "endpoint": {
       "connect": "Połącz",
       "connected": "Połączono",
       "connectedLocal": "Połączono (lokalnie, bez TLS).",
-      "connectedPlatformTrust": "Połączono przez TLS. Twoja przeglądarka zweryfikowała certyfikat tego serwera.",
+      "connectedPlatformTrust": "Połączono przez TLS. Certyfikat i nazwa serwera zostały zweryfikowane.",
       "connecting": "Łączenie…",
       "fixedOrigin": "Ten klient synchronizuje się z jednym serwerem, ustawionym przy jego wdrożeniu. Nie da się go tu zmienić: strona ma pozwolenie na komunikację wyłącznie z tym jednym adresem.",
       "fixedOriginNone": "Dla tego wdrożenia nie skonfigurowano serwera synchronizacji.",
-      "pinPlatformTrust": "Zweryfikowano magazynem certyfikatów Twojej przeglądarki. Ten klient nie może sam przypiąć certyfikatu.",
+      "pinPlatformTrust": "Certyfikat serwera zweryfikowany przez magazyn zaufania tego klienta.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "Nie udało się połączyć z tym serwerem. Sprawdź adres URL oraz to, czy serwer działa."
+      "unreachable": "Nie udało się połączyć z tym serwerem. Sprawdź adres URL oraz to, czy serwer działa.",
+      "tlsHelp": "Wprowadź ten sam adres serwera na każdym urządzeniu. Serwer hostowany samodzielnie wymaga zaufanego certyfikatu HTTPS.",
+      "tlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera, certyfikat i jego ważność.",
+      "inviteLabel": "Kod zaproszenia (tylko jeśli ten serwer go wymaga)",
+      "invitePlaceholder": "Kod, który przekazał Ci operator serwera",
+      "changeInviteCode": "Zmień kod zaproszenia"
     },
     "enroll": {
       "accountNumberLabel": "Numer konta",
@@ -4080,7 +4352,9 @@
         "notConfigured": "Ustaw serwer synchronizacji w ustawieniach, zanim dodasz to urządzenie.",
         "serverMismatch": "Tożsamość serwera synchronizacji nie zgadza się z tym, czego oczekiwało to urządzenie. Nie wprowadzaj ponownie swoich poświadczeń, dopóki nie ustalisz przyczyny.",
         "kdfTooLarge": "To urządzenie nie ma wystarczającej ilości pamięci, aby otworzyć ten skarbiec. Jego ustawienia szyfrowania wymagają więcej pamięci, niż aplikacja może tutaj wykorzystać. Otwórz go zamiast tego na komputerze.",
-        "transport": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź połączenie i spróbuj ponownie."
+        "transport": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź połączenie i spróbuj ponownie.",
+        "inviteCodeInvalid": "Ten kod zaproszenia nie został przyjęty. Sprawdź go i spróbuj ponownie.",
+        "inviteCodeRequired": "Ten serwer przyjmuje nowe konta tylko z kodem zaproszenia. Wprowadź kod, który przekazał Ci jego operator."
       },
       "mode": {
         "password": "Hasło",
@@ -4092,10 +4366,6 @@
       "signInWith": "Zaloguj się przez",
       "submit": "Dodaj to urządzenie",
       "wordAria": "Słowo {{number}}"
-    },
-    "fingerprint": {
-      "echoProgress_few": "Na razie {{count}} znaki z {{total}}.",
-      "echoProgress_many": "Na razie {{count}} znaków z {{total}}."
     },
     "join": {
       "accountLabel": "Numer konta",
@@ -4115,7 +4385,17 @@
       "verifyTitle": "Zweryfikuj to urządzenie",
       "waitingHint": "Pozostaw to okno otwarte. Po zatwierdzeniu pojawi się tutaj kod weryfikacyjny do porównania z drugim urządzeniem.",
       "waitingTitle": "Oczekiwanie na zatwierdzenie",
-      "sasAbortFailed": "Nie udało się odłączyć tego urządzenia. Nadal jest zarejestrowane na tym serwerze, więc traktuj je jako niezaufane: otwórz Ustawienia → Synchronizacja i usuń je tam. Twoje notatki nie zostały usunięte."
+      "sasAbortFailed": "Nie udało się odłączyć tego urządzenia. Nadal jest zarejestrowane na tym serwerze, więc traktuj je jako niezaufane: otwórz Ustawienia → Synchronizacja i usuń je tam. Twoje notatki nie zostały usunięte.",
+      "backToWaiting": "Wróć do oczekiwania",
+      "errorPhrase": "Nie udało się dodać tego urządzenia. Sprawdź adres serwera, numer konta i frazę odzyskiwania oraz to, czy serwer jest osiągalny.",
+      "modePassword": "Moje hasło",
+      "modePhrase": "Moja fraza odzyskiwania",
+      "noDeviceBody": "Nie masz innego urządzenia, które mogłoby zatwierdzić to jedno? Możesz zamiast tego potwierdzić swoją frazą odzyskiwania.",
+      "phraseEscapeBody": "Twoja fraza odzyskiwania jest pełnym kluczem do tego konta, więc potwierdza to urządzenie bez zatwierdzenia z innego urządzenia. Hasło, którego właśnie użyto, pozostaje bez zmian.",
+      "phraseTitle": "Potwierdź swoją frazą odzyskiwania",
+      "phraseWarning": "Twoja fraza odzyskiwania jest pełnym kluczem do tego konta, więc to urządzenie zostanie dodane bez zatwierdzenia z innego urządzenia. Użyj jej tylko wtedy, gdy nie masz innego urządzenia, z którego możesz zatwierdzić. Następnie ustawisz nowe hasło.",
+      "usePhrase": "Użyj mojej frazy odzyskiwania",
+      "back": "Wstecz"
     },
     "panel": {
       "addDevice": {
@@ -4138,7 +4418,7 @@
         "deleteConfirmTitle": "Usunąć tę odzyskaną notatkę?",
         "deleteConfirmWarning": "To trwale usuwa jedyną kopię przechowywaną na tym urządzeniu. Nie można tego cofnąć.",
         "deleteCta": "Usuń",
-        "empty": "Brak odzyskanych notatek.",
+        "empty": "Brak odzyskanych notatek",
         "errorGeneric": "Coś poszło nie tak. Spróbuj ponownie.",
         "helper": "Gdy notatka usunięta na innym urządzeniu znika także tutaj, jej zaszyfrowana kopia zostaje na tym urządzeniu. Przywróć ją jako nową notatkę albo usuń trwale.",
         "label": "Odzyskane notatki",
@@ -4156,6 +4436,14 @@
       "usage": {
         "helper": "Ile zaszyfrowanych danych to konto przechowuje na serwerze i ile urządzeń jest zalogowanych.",
         "label": "Pamięć i urządzenia"
+      },
+      "identity": {
+        "label": "Tożsamość",
+        "helper": "Tożsamość pozwala innym zaprosić Cię do skarbca i pozwala jednej tożsamości posiadać kilka skarbców.",
+        "cta": "Dodaj tożsamość",
+        "codeLabel": "Twój kod tożsamości",
+        "lockedHelper": "To urządzenie ma tożsamość. Jest zablokowana w tej sesji; odblokuj ją swoją frazą odzyskiwania, aby podpisywać synchronizację i zaproszenia.",
+        "unlockedHelper": "To urządzenie ma tożsamość odblokowaną w tej sesji."
       }
     },
     "reconcile": {
@@ -4187,7 +4475,10 @@
       "off": "Synchronizacja wyłączona",
       "synced": "Zsynchronizowano",
       "syncing": "Synchronizowanie…",
-      "syncNow": "Synchronizuj teraz"
+      "syncNow": "Synchronizuj teraz",
+      "errorIdentityLocked": "Odblokuj swoją tożsamość, aby synchronizować",
+      "errorTls": "Nie udało się zweryfikować połączenia HTTPS z serwerem synchronizacji",
+      "unlockIdentityCta": "Odblokuj tożsamość"
     },
     "usage": {
       "devices": "Urządzenia",
@@ -4216,7 +4507,7 @@
       "keepDevice": "Zachowaj",
       "notEnrolledHelp": "To urządzenie jeszcze się nie synchronizuje. Dodaj je z poprzedniego ekranu, aby zobaczyć swoje urządzenia.",
       "unauthenticated": "Dostęp tego urządzenia został cofnięty, prawdopodobnie usunięto je z innego urządzenia.",
-      "transportError": "Nie udało się połączyć z serwerem synchronizacji. Jeśli serwer został przeniesiony lub jego certyfikat się zmienił, połącz się ponownie z ekranu serwera synchronizacji.",
+      "transportError": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź adres serwera i jego certyfikat HTTPS.",
       "retiredSelf": "To urządzenie zostało usunięte z innego urządzenia.",
       "resetAndAddAgain": "Zresetuj i dodaj ponownie",
       "noDevices": "Brak urządzeń.",
@@ -4246,11 +4537,10 @@
       "loading": "Wczytywanie członków…",
       "error": "Nie udało się odczytać listy członków skarbca.",
       "hint": "Członkowie tego skarbca. Każdy dołącza z własną tożsamością i danymi.",
-      "empty": "Jeszcze brak członków. Zaproszenie kogoś to następny krok.",
+      "empty": "Zaproś kogoś, aby udostępnić ten skarbiec. Dołącza on z własną tożsamością.",
       "rotated": "Klucz zrotowany",
       "keyChanged": "Klucz się zmienił. Zweryfikuj z właścicielem.",
       "relinkConfirmed": "Ponowne powiązanie potwierdzone przez właściciela",
-      "epoch": "Epoka klucza grupowego {{epoch}}",
       "ownerBadge": "Właściciel",
       "memberBadge": "Członek",
       "invite": "Zaproś członka",
@@ -4274,12 +4564,69 @@
       "sasHint": "Przeczytaj ten odcisk palca osobie, którą zapraszasz, albo poproś ją o odczytanie go Tobie. Musi się zgadzać po obu stronach, zanim kontynuujesz.",
       "sasConfirm": "Potwierdziłem ten odcisk palca z osobą poza kanałem",
       "inviteCodeInvalid": "To nie jest prawidłowy kod tożsamości członka.",
-      "kemLabel": "Klucz publiczny ML-KEM",
-      "edLabel": "Klucz publiczny Ed25519",
-      "mldsaLabel": "Klucz publiczny ML-DSA",
       "untitledVault": "Skarbiec bez tytułu",
       "inviteFailed": "Nie udało się utworzyć zaproszenia.",
-      "removeFailed": "Nie udało się usunąć członka."
+      "removeFailed": "Nie udało się usunąć członka.",
+      "youBadge": "Ty",
+      "nameUnverified": "Nazwa niezweryfikowana",
+      "nameLabel": "Twoja nazwa wyświetlana",
+      "nameEdit": "Zmień nazwę",
+      "nameSave": "Zapisz",
+      "nameClear": "Wyczyść",
+      "nameCancel": "Anuluj",
+      "nameErrorEmpty": "Wprowadź nazwę albo użyj przycisku Wyczyść, aby usunąć swoją.",
+      "nameErrorTooLong": "Ta nazwa jest za długa.",
+      "nameErrorUnreadable": "Nie udało się odczytać magazynu nazw na tym urządzeniu. Nic nie zostało zapisane.",
+      "nameErrorUnshared": "Nazwy można ustawić, gdy ten skarbiec zostanie udostępniony.",
+      "nameErrorLocked": "Odblokuj skarbiec, aby zmienić swoją nazwę.",
+      "nameErrorGeneric": "Nie udało się zapisać Twojej nazwy. Spróbuj ponownie.",
+      "nameInvite": "Nie masz jeszcze nazwy wyświetlanej. Inni członkowie widzą Twój odcisk palca.",
+      "nameInviteCta": "Ustaw nazwę",
+      "nameInviteDismiss": "Nie teraz",
+      "noInvitations": "Nie wysłano jeszcze żadnych zaproszeń.",
+      "identityHeading": "Twoja tożsamość",
+      "membersHeading": "Członkowie",
+      "emptyTitle": "Jeszcze brak członków",
+      "personUnlockOpen": "Odblokuj",
+      "unsharedNotice": "Ten skarbiec nie jest jeszcze współdzielony. Udostępnienie jest nieodwracalne i następuje przy pierwszym zaproszeniu kogoś.",
+      "shareConfirmTitle": "Udostępnić ten skarbiec?",
+      "shareConfirmBody": "Zaproszenie kogoś zmienia ten skarbiec we współdzielony: zyskuje on klucz grupowy, a zaproszone osoby otwierają nim jego treść. Zmiana ta jest nieodwracalna i nie ma powrotu do skarbca jednoosobowego. Przejdź dalej, aby wybrać, kogo zaprosić.",
+      "shareConfirmCta": "Udostępnij i zaproś",
+      "shareFailed": "Nie udało się rozpocząć udostępniania tego skarbca.",
+      "identityForgetCta": "Zapomnij tę tożsamość na tym urządzeniu",
+      "identityForgetCheckbox": "Rozumiem, że ta tożsamość zostanie usunięta z tego urządzenia.",
+      "identityForgetConfirm": "Zapomnij tożsamość",
+      "identityForgetCancel": "Zachowaj ją",
+      "identityForgetWarning": "To usuwa tożsamość tylko z tego urządzenia. Konto na serwerze oraz każdy skarbiec, który ta tożsamość posiada lub do którego dołączyła, pozostają nienaruszone, a tożsamość możesz odzyskać jej 24-słowną frazą na innym urządzeniu. Zaproszenia i operacje na liście członków będą na tym urządzeniu wymagać ponownego odblokowania tożsamości.",
+      "identityForgetError": "Nie udało się zapomnieć tożsamości. Spróbuj ponownie."
+    },
+    "deviceBindings": {
+      "title": "Urządzenia i członkowie",
+      "heading": "Przypisane urządzenia",
+      "hint": "Każde urządzenie, które przypisało się w tym skarbcu, wraz z członkiem, którego własny podpis je przypisuje. Przypisanie nie jest dowodem własności: mówi, który członek podpisał oświadczenie, a nie że urządzenie należy do niego.",
+      "loading": "Wczytywanie urządzeń…",
+      "emptyTitle": "Nie przypisano jeszcze żadnych urządzeń",
+      "empty": "Urządzenie pojawi się tutaj, gdy przypisze się w tym współdzielonym skarbcu.",
+      "claimedBy": "przypisane przez {{name}}",
+      "unverified": "Niezweryfikowane",
+      "unverifiedHint": "Te identyfikatory urządzeń są w skarbcu, ale nic nie potwierdza dotyczącego ich przypisania: podpis się nie zgadza albo wskazuje kogoś, kogo nie ma na liście członków. Są pokazywane jako identyfikatory, ponieważ nie ma obok nich członka, którego można by nazwać.",
+      "claimHint": "To urządzenie nie ma w tym skarbcu własnego zweryfikowanego przypisania. Ponowne przypisanie rejestruje je pod Twoją tożsamością i jest też naprawą przypisania, które się nie zgadzało.",
+      "claim": "Przypisz to urządzenie",
+      "claiming": "Przypisywanie…",
+      "unshared": "Ten skarbiec nie jest jeszcze współdzielony, więc nie ma członka, któremu można przypisać urządzenie. Udostępnienie jest nieodwracalne i następuje przy pierwszym zaproszeniu kogoś.",
+      "errorLocked": "Odblokuj skarbiec, aby odczytać jego urządzenia.",
+      "errorUnshared": "Ten skarbiec nie jest współdzielony, więc nie zawiera powiązań urządzeń.",
+      "errorNoDeviceId": "To urządzenie nie zostało dodane do Twojego konta, więc nie ma tożsamości urządzenia, pod którą mogłoby się przypisać.",
+      "errorConflict": "Nie udało się odróżnić dwóch różnych przypisań o tej samej wersji, więc nic nie zostało zmienione. Przypisz to urządzenie ponownie, aby je zastąpić.",
+      "errorUnreadable": "Nie udało się odczytać listy urządzeń na tym urządzeniu. Nic nie zostało zmienione.",
+      "errorGeneric": "Nie udało się odczytać urządzeń tego skarbca. Spróbuj ponownie."
+    },
+    "nameGate": {
+      "title": "Wybierz nazwę wyświetlaną",
+      "body": "Tak zobaczą Cię inni członkowie tego skarbca na liście członków. Obok pozostaje Twój odcisk palca, a nazwę możesz zmienić później.",
+      "label": "Twoja nazwa wyświetlana",
+      "checking": "Sprawdzanie Twojej nazwy…",
+      "save": "Kontynuuj"
     }
   },
   "tasks": {
@@ -4307,7 +4654,6 @@
       "search": "Żadne zadanie nie pasuje do „{{query}}”."
     },
     "filter": {
-      "all": "Wszystkie",
       "overdue": "Zaległe",
       "today": "Dziś",
       "upcoming": "Nadchodzące"
@@ -4334,10 +4680,6 @@
       "notCompleted": "Zadanie, nieukończone",
       "tooLongToWrite": "Wiersz tego zadania jest za długi, aby edytować go stąd. Otwórz zamiast tego jego notatkę.",
       "untitled": "Zadanie bez tytułu"
-    },
-    "scope": {
-      "allFolders": "Wszystkie foldery",
-      "label": "Zawęź według"
     },
     "title": "Zadania",
     "axis": {
@@ -4394,13 +4736,6 @@
       "allNotes": "Wszystkie notatki",
       "anyPriority": "Dowolny priorytet",
       "anyTag": "Dowolny tag",
-      "dueLabel": "Filtruj według terminu",
-      "folderLabel": "Filtruj według folderu",
-      "noteLabel": "Filtruj według notatki",
-      "priorityLabel": "Filtruj według priorytetu",
-      "sortLabel": "Sortuj wewnątrz sekcji",
-      "statusLabel": "Filtruj według ukończenia",
-      "tagLabel": "Filtruj według tagu",
       "untitled": "Bez tytułu"
     },
     "search": {
@@ -4410,7 +4745,6 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "Zamknij szablony",
       "deleteRowLabel": "Usuń szablon {{name}} (przenieś do Kosza)",
       "editTemplateLabel": "Edytuj szablon {{name}}",
       "emptyBody": "Utwórz szablon, aby wielokrotnie używać szkieletu notatki: notatki ze spotkania, dziennika, notatki z lektury. Wybierz go, gdy tworzysz nową notatkę.",
@@ -4421,7 +4755,10 @@
       "newTemplateName": "Szablon bez tytułu",
       "removeFromTemplates": "Usuń z szablonów",
       "removeRowLabel": "Usuń {{name}} z szablonów (notatka pozostaje)",
-      "title": "Szablony notatek"
+      "title": "Szablony notatek",
+      "nameLabel": "Nazwa szablonu",
+      "create": "Utwórz",
+      "createFailed": "Nie udało się utworzyć szablonu. Spróbuj ponownie."
     },
     "emptyBefore": "Brak szablonów. Dotknij ",
     "newAction": "Nowy",
@@ -4479,8 +4816,9 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Odblokuj PIN-em",
       "unlockWithTouchId": "Odblokuj za pomocą Touch ID",
-      "usePasswordBelow": "lub użyj hasła poniżej",
-      "wrongCredential": "Nieprawidłowe. Pozostało prób: {{remaining}}."
+      "wrongCredential": "Nieprawidłowe. Pozostało prób: {{remaining}}.",
+      "showPin": "Pokaż PIN",
+      "hidePin": "Ukryj PIN"
     },
     "recoveryInterruptedBanner": "Proces odzyskiwania został przerwany. Najpierw ustaw nowe hasło.",
     "recoveryInterruptedBody": "Najpierw ustaw nowe hasło, a następnie ponownie zabezpiecz swój skarbiec.",
@@ -4494,7 +4832,7 @@
       "lockedDuringChange": "Zmiana hasła anulowana: skarbiec został zablokowany.",
       "metaChangedExternally": "Skarbiec został zmodyfikowany w innej sesji. Odblokuj ponownie."
     },
-    "title": "Odblokuj swój skarbiec.",
+    "title": "Odblokuj swój skarbiec",
     "vaultUnreadable": "Nie można odczytać pliku sejfu. Przywróć z kopii zapasowej.",
     "unlockFailedGeneric": "Nie udało się odblokować. Spróbuj ponownie.",
     "biometricTooManyAttempts": "Zbyt wiele prób {{biometric}}. Użyj hasła.",
@@ -4527,7 +4865,18 @@
     "memberHint": "Ten skarbiec jest z Tobą współdzielony. Odblokuj go własną frazą odzyskiwania.",
     "memberPhraseLabel": "Fraza odzyskiwania",
     "memberSubmit": "Odblokuj",
-    "memberError": "Ta fraza nie otworzyła tego współdzielonego skarbca."
+    "memberError": "Ta fraza nie otworzyła tego współdzielonego skarbca.",
+    "memberPasswordHint": "Ten skarbiec jest z Tobą współdzielony. Odblokuj go hasłem ustawionym na tym urządzeniu.",
+    "memberPasswordLabel": "Hasło skarbca",
+    "memberPasswordError": "To hasło nie otworzyło tego współdzielonego skarbca.",
+    "memberUsePhrase": "Użyj zamiast tego frazy odzyskiwania",
+    "memberUseFast": "Użyj zamiast tego szybkiego odblokowania",
+    "memberPinHint": "Ten skarbiec jest z Tobą współdzielony. Odblokuj go PIN-em ustawionym na tym urządzeniu.",
+    "memberPinLabel": "PIN skarbca",
+    "memberPinPlaceholder": "PIN skarbca (co najmniej {{count}} cyfr)",
+    "memberBiometricHint": "Ten skarbiec jest z Tobą współdzielony. Potwierdź danymi biometrycznymi urządzenia, aby go odblokować.",
+    "memberBiometricSubmit": "Odblokuj biometrycznie",
+    "titleNamed": "Odblokuj {{vault}}"
   },
   "vault": {
     "ioBanner": {
@@ -4537,28 +4886,10 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "ackLabel": "Zapisałem(-am) swój numer konta w miejscu, w którym później go znajdę.",
-      "back": "Wstecz",
-      "commit": "Utwórz skarbiec",
-      "committing": "Zapisywanie…",
-      "copied": "Skopiowano",
-      "copy": "Kopiuj",
-      "copyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz jako plik”.",
-      "downloadStarted": "Wysłano do pobranych plików przeglądarki. Sprawdź, czy plik dotarł: to przeglądarka decyduje, gdzie go umieści, a Myne nie może zobaczyć, czy tak się stało.",
-      "eyebrow": "Krok 4 z 4: numer konta",
-      "heading": "Zapisz swój numer konta.",
-      "intro": "To Twój token na okaziciela. Traktuj go jak gotówkę.",
-      "saveAsFile": "Zapisz jako plik",
-      "saveFailed": "Nie udało się zapisać pliku. Skopiuj zamiast tego numer albo zapisz go na papierze.",
-      "savedToFile": "Zapisano. To plik ze zwykłym tekstem, więc przechowuj go w miejscu, w którym tylko Ty możesz go odczytać.",
-      "shownOnceBody": "Zapisz go teraz. Myne nie może go dla Ciebie odzyskać. Wymagany do późniejszej rejestracji synchronizacji.",
-      "shownOnceEmphasis": "Jest on pokazywany tylko raz."
-    },
     "briefing": {
       "back": "Wstecz",
       "continue": "Przejdź do tworzenia skarbca",
-      "eyebrow": "Zanim utworzysz swój skarbiec",
+      "eyebrow": "Nowy skarbiec",
       "heading": "Zanim utworzysz swój skarbiec",
       "intro": "Myne szyfruje Twoje notatki tak, że tylko Ty możesz je otworzyć. Wynikają z tego trzy rzeczy. Przeczytaj je, a następnie kontynuuj.",
       "statements": {
@@ -4582,12 +4913,13 @@
     },
     "confirm": {
       "back": "Wstecz",
-      "continue": "Kontynuuj",
-      "eyebrow": "Krok 3 z 4: potwierdź frazę",
-      "heading": "Wpisz ponownie cztery słowa ze swojej frazy.",
-      "intro": "Poprosimy o konkretne pozycje, aby zweryfikować, że ją zapisałeś.",
-      "mismatch": "Nie pasuje do słowa nr {{pos}}.",
-      "wordAtPosition": "Słowo na pozycji {{pos}}"
+      "heading": "Potwierdź swoją frazę odzyskiwania",
+      "intro": "Wpisz słowa na tych czterech pozycjach, aby sprawdzić, czy je zapisałeś.",
+      "mismatch": "Nie pasuje do słowa {{pos}}.",
+      "wordAtPosition": "Słowo {{pos}}",
+      "commit": "Utwórz skarbiec",
+      "committing": "Zapisywanie…",
+      "eyebrowLabel": "Potwierdź frazę"
     },
     "encrypting": {
       "caption": "To chwilę potrwa.",
@@ -4691,45 +5023,69 @@
     },
     "password": {
       "back": "Wstecz",
-      "eyebrow": "Krok 1 z 4: hasło główne",
-      "heading": "Utwórz skarbiec",
+      "heading": "Wybierz hasło główne",
       "helperLead": "Myne nie przechowuje Twojego hasła ani frazy odzyskiwania.",
-      "submit": "Wygeneruj frazę odzyskiwania"
+      "submit": "Wygeneruj frazę odzyskiwania",
+      "eyebrowLabel": "Hasło główne"
     },
     "phrase": {
-      "back": "Wstecz",
       "clipboardNotCleared": "Twoja przeglądarka nie pozwoli Myne wyczyścić schowka po skopiowaniu, więc te 24 słowa zostaną w nim, dopóki nie skopiujesz czegoś innego. Wklej je do menedżera haseł, a potem skopiuj cokolwiek.",
-      "continue": "Mam to zapisane, potwierdź frazę",
       "copied": "Skopiowano. Myne wyczyści schowek po 30 sekundach, nawet jeśli przejdziesz dalej, o ile aplikacja będzie działać.",
       "copiedNoAutoClear": "Skopiowano. Myne nie może tutaj wyczyścić schowka, więc słowa zostaną w nim, dopóki nie skopiujesz czegoś innego.",
       "copy": "Kopiuj",
       "extensionNotice": "Rozszerzenia przeglądarki mające dostęp do tej strony mogą odczytać to, co się na niej znajduje. Jeśli nie masz pewności co do każdego rozszerzenia w tym profilu, wykonaj ten krok w aplikacji na komputer albo w czystym profilu przeglądarki.",
       "copyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz jako plik”.",
       "downloadStarted": "Wysłano do pobranych plików przeglądarki. Sprawdź, czy plik dotarł: to przeglądarka decyduje, gdzie go umieści, a Myne nie może zobaczyć, czy tak się stało.",
-      "eyebrow": "Krok 2 z 4: fraza odzyskiwania",
-      "heading": "Zapisz te 24 słowa.",
-      "intro": "Ta fraza, wraz z Twoim hasłem, jest jedynym sposobem odzyskania skarbca. Przechowuj ją offline: na papierze, w menedżerze haseł, w portfelu sprzętowym. Traktuj ją jak gotówkę.",
       "reveal": "Pokaż frazę",
       "saveAsFile": "Zapisz jako plik",
-      "saveFailed": "Nie udało się zapisać pliku. Skopiuj zamiast tego słowa albo zapisz je na papierze.",
+      "saveFailed": "Nie udało się zapisać pliku. Zamiast tego skopiuj słowa albo zapisz je na papierze.",
       "savedToFile": "Zapisano. To plik ze zwykłym tekstem, więc przechowuj go w miejscu, w którym tylko Ty możesz go odczytać."
     },
     "ready": {
-      "backedUp": "Utworzono kopię zapasową ✓",
+      "backedUp": "Kopia zapasowa utworzona",
       "backingUp": "Tworzenie kopii zapasowej…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Tworzenie kopii zapasowej nie zostało ukończone. Nie pozostawiono żadnego pliku. Możesz utworzyć kopię zapasową w dowolnej chwili w Ustawienia → Pamięć.",
       "backupFilterName": "Kopia zapasowa Myne",
-      "backUpNow": "Utwórz teraz kopię zapasową tego skarbca",
-      "body": "Myne zapisało Twój skarbiec w folderze danych aplikacji. Twoje hasło główne i fraza odzyskiwania to jedyny sposób powrotu. Upewnij się, że oba są zapisane w bezpiecznym miejscu.",
+      "backUpNow": "Utwórz kopię zapasową teraz",
+      "body": "Twoje notatki są zaszyfrowane i przechowywane na tym urządzeniu. Przechowuj swoje hasło i zestaw odzyskiwania w bezpiecznym miejscu: to jedyna droga z powrotem.",
       "decrypting": "Odszyfrowywanie…",
-      "done": "Gotowe",
-      "heading": "Twój skarbiec jest gotowy.",
+      "done": "Otwórz skarbiec",
+      "heading": "Twój skarbiec jest gotowy",
       "showFolder": "Pokaż folder skarbca"
     },
     "sessionLost": {
       "startOver": "Zacznij od początku"
-    }
+    },
+    "kit": {
+      "accountFor": "Numer konta — gdy dodasz kolejne urządzenie",
+      "back": "Wstecz",
+      "continue": "Zapisane, potwierdź frazę",
+      "copied": "Zestaw jest w Twoim schowku. Myne wyczyści go po 30 sekundach, nawet jeśli przejdziesz dalej, o ile aplikacja nadal działa.",
+      "copiedNoAutoClear": "Skopiowano. Myne nie może tu wyczyścić Twojego schowka, więc zestaw pozostanie w nim, dopóki nie skopiujesz czegoś innego.",
+      "copy": "Kopiuj",
+      "copyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz zestaw odzyskiwania”.",
+      "documentTitle": "Zestaw odzyskiwania Myne",
+      "downloadStarted": "Wysłano do pobranych w Twojej przeglądarce. Sprawdź, czy zestaw dotarł: to przeglądarka decyduje, gdzie trafia plik, a Myne nie widzi, czy tak się stało.",
+      "eyebrowLabel": "Zestaw odzyskiwania",
+      "heading": "Zapisz swój zestaw odzyskiwania",
+      "intro": "Plik, który zaraz zapiszesz, to dokładnie to. Pokazywane raz.",
+      "phraseFor": "Fraza odzyskiwania — jeśli zapomnisz hasła",
+      "save": "Zapisz zestaw odzyskiwania",
+      "saveFailed": "Nie udało się zapisać pliku. Skopiuj zestaw albo zapisz obie części ręcznie.",
+      "savedToFile": "Zapisano. To zwykły plik tekstowy zawierający oba sekrety, więc trzymaj go w miejscu, w którym tylko Ty możesz go odczytać.",
+      "whyEnglish": "Słowa są angielskie w każdym języku. Są częścią standardu BIP-39, więc każdy klient Myne potrafi odczytać frazę zapisaną przez dowolny inny. Nie tłumacz ich: przetłumaczone słowa nie występują na liście słów, więc fraza przestałaby działać."
+    },
+    "name": {
+      "back": "Wstecz",
+      "continue": "Kontynuuj",
+      "eyebrowLabel": "Nazwij swój skarbiec",
+      "heading": "Jak nazwać ten skarbiec?",
+      "helper": "Nazwa jest przechowywana zaszyfrowana razem ze skarbcem. Na tym urządzeniu jest pokazywana na ekranie wyboru skarbca przy uruchomieniu, zanim go odblokujesz, więc każdy, kto widzi ten ekran, może ją odczytać; aby to wyłączyć, ukryj nazwy skarbców w Ustawieniach. Możesz ją później zmienić.",
+      "intro": "Tę nazwę zobaczysz na ekranie blokady i na liście skarbców.",
+      "placeholder": "Osobisty"
+    },
+    "stepIndicator": "Krok {{n}} z {{total}} · {{label}}"
   },
   "vaultPicker": {
     "createAnother": "Utwórz kolejny skarbiec",
@@ -4751,7 +5107,10 @@
     "renameCancel": "Anuluj",
     "renamePlaceholder": "Nazwa konta",
     "renameSave": "Zmień nazwę",
-    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
+    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło.",
+    "createShort": "Nowy skarbiec",
+    "joinShort": "Dodaj urządzenie",
+    "restoreShort": "Przywróć kopię"
   },
   "vaultRecover": {
     "decrypting": {
@@ -4819,9 +5178,6 @@
   },
   "welcome": {
     "createCta": "Utwórz nowy skarbiec",
-    "headlineLine1": "Zaszyfrowane notatki Markdown.",
-    "headlineLine2": "Bez e-maila przy rejestracji.",
-    "joinCta": "Dodaj to urządzenie do konta",
     "repairResidue": {
       "cancel": "Anuluj",
       "cleaningUp": "Sprzątanie…",
@@ -4849,8 +5205,6 @@
       "partialBody_other": "{{count}} plików może być zablokowanych przez inną aplikację (antywirus, synchronizację plików lub indeksowanie wyszukiwania). Zamknij aplikację i spróbuj ponownie za chwilę lub usuń folder sejfu ręcznie.",
       "partialTitle": "Niektórych plików nie udało się usunąć"
     },
-    "restoreCta": "Przywróć z kopii zapasowej",
-    "subtitle": "Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą. Serwer przechowuje wyłącznie szyfrogram.",
     "repairCleanedUp_one": "Wyczyszczono {{count}} pozostały plik.",
     "repairCleanedUp_few": "Wyczyszczono {{count}} pozostałe pliki.",
     "repairCleanedUp_many": "Wyczyszczono {{count}} pozostałych plików.",
@@ -4862,9 +5216,22 @@
     "lede": "Markdown, szyfrowany na tym urządzeniu, zanim je opuści. Bez adresu e-mail do konta. Bez serwerów, które mogłyby przeczytać choć słowo.",
     "residueBanner": "Pozostałe pliki z przerwanego usuwania ({{n}}). Wyczyść je przed utworzeniem sejfu.",
     "cleanUpFiles": "Wyczyść pozostałe pliki",
-    "create": "Utwórz sejf",
     "connect": "Połącz z moim kontem",
-    "identityCta": "Utwórz tylko tożsamość"
+    "startIdentity": "Utwórz tożsamość",
+    "startLocal": "Utwórz zamiast tego lokalny skarbiec",
+    "tagline": "Zaszyfrowane notatki w Markdownie. Bez e-maila przy rejestracji.",
+    "identityTitle": "Utwórz tożsamość",
+    "identityBody": "Jedna tożsamość do wszystkich Twoich skarbców, aby inni mogli Cię zapraszać. Wymaga serwera synchronizacji.",
+    "localTitle": "Utwórz lokalny skarbiec",
+    "localBody": "Zaszyfrowany skarbiec na tym urządzeniu. Synchronizację lub tożsamość dodasz później.",
+    "restoreTitle": "Przywróć z kopii zapasowej",
+    "restoreBody": "Otwórz plik .myne-backup zapisany wcześniej.",
+    "joinTitle": "Dodaj to urządzenie do konta",
+    "joinBody": "Użyj skarbca, który masz już na innym urządzeniu.",
+    "createAction": "Utwórz",
+    "restoreAction": "Przywróć",
+    "joinAction": "Dodaj urządzenie",
+    "version": "Wersja {{version}} · pre-alfa"
   },
   "wikiGraph": {
     "emptyTitle": "Brak linków",
@@ -4983,7 +5350,6 @@
     "approvalHint": "Twoje notatki pojawią się, gdy zatwierdzisz to urządzenie z urządzenia, które ma już Twoje konto.",
     "connectingSubtitle": "Pobieranie konta i odblokowywanie sejfu na tym urządzeniu.",
     "qr": {
-      "cancel": "Anuluj",
       "confirmAccount": "Konto",
       "confirmServer": "Serwer",
       "confirmTitle": "Dodać to urządzenie?",
@@ -5001,7 +5367,6 @@
     "beginGeneric": "Nie udało się rozpocząć tworzenia sejfu. Spróbuj ponownie.",
     "wordNumber": "SŁOWO #{{position}}",
     "commitError": "Nie udało się zapisać sejfu. Spróbuj ponownie.",
-    "copyPhrase": "Kopiuj",
     "phraseCopied": "Skopiowano. Fraza zostaje na tym urządzeniu, a system usuwa ją po 30 sekundach.",
     "phraseCopyFailed": "Nie udało się skopiować. Użyj zamiast tego opcji „Zapisz do pliku”.",
     "savedToFile": "Zapisano do {{label}}",
@@ -5015,8 +5380,6 @@
     "confirmPasswordLabel": "Potwierdź hasło",
     "passwordHelper": "Nigdy nie przechowywane, nigdy nie przesyłane. Szyfruje Twoje klucze na tym urządzeniu.",
     "encryptingSubtitle": "Wyprowadzanie klucza za pomocą Argon2id. To potrwa kilka sekund i nie można tego przerwać.",
-    "phraseTitle": "Twoja fraza odzyskiwania",
-    "phraseIntro": "Dwadzieścia cztery słowa, w kolejności. Zapisz je na papierze i przechowuj w bezpiecznym miejscu.",
     "showSecondHalf": "Pokaż słowa 13–24",
     "saveToFile": "Zapisz do pliku",
     "writtenThemDown": "Zapisałem je",
@@ -5024,9 +5387,6 @@
     "typebackLead": "Wprowadź te cztery słowa z frazy odzyskiwania, którą właśnie zapisano.",
     "wordMismatch": "Nie pasuje do słowa #{{pos}}",
     "backToPhrase": "Powrót do frazy",
-    "accountTitle": "Twój numer konta",
-    "accountLead": "Zapisz to razem z frazą odzyskiwania. Będzie potrzebny do przywrócenia sejfu na nowym urządzeniu.",
-    "accountSavedAck": "Zapisałem swój numer konta.",
     "commit": "Zatwierdź",
     "committingTitle": "Zapisywanie sejfu…",
     "committingSubtitle": "Zapisywanie zaszyfrowanego sejfu na tym urządzeniu.",
@@ -5066,7 +5426,6 @@
       "backup": "Zaszyfrowane kopie zapasowe tworzy się i przywraca w aplikacji Myne na komputer, która potrafi zapisać plik kopii tam, gdzie wskażesz. Twoje notatki tutaj pochodzą z serwera, więc ta przeglądarka odtwarza się przez synchronizację.",
       "creation": "Ta przeglądarka ma już konto. Aby utworzyć kolejne, otwórz aplikację Myne na komputer lub użyj innego profilu przeglądarki.",
       "multiVault": "Ta przeglądarka trzyma jedno konto. Aby użyć innego, otwórz je w aplikacji Myne na komputer albo w innym profilu przeglądarki.",
-      "phraseRecovery": "Odzyskiwanie za pomocą frazy odbywa się w aplikacji Myne na komputer. Twojej frazy odzyskiwania nigdy nie należy wpisywać na stronie internetowej.",
       "title": "Niedostępne w przeglądarce"
     },
     "unsupported": {
@@ -5100,16 +5459,33 @@
     "savedForNextLaunch": "Zapisano. W tej sesji ochrona nadal jest wyłączona, ponieważ sesję uruchomiono z --disable-screen-capture-protection, więc ochrona wróci przy następnym otwarciu Myne bez tego przełącznika."
   },
   "identitySetup": {
-    "createCta": "Utwórz tożsamość",
     "doneCta": "Gotowe",
-    "error": "Nie udało się skonfigurować tożsamości. Sprawdź, czy serwer synchronizacji jest skonfigurowany, a spróbuj ponownie.",
+    "error": "Nie udało się skonfigurować tożsamości. Spróbuj ponownie.",
     "intro": "Tożsamość pozwala adresować do Ciebie zaproszenie, zanim masz jakikolwiek skarbiec. Nie tworzy skarbca i nie zapisuje notatek.",
     "pending": "To urządzenie czeka na zatwierdzenie przez inne urządzenie na koncie.",
     "phraseWarning": "Zapisz te 24 słowa i przechowuj bezpiecznie. To jedyny raz, gdy są pokazywane; to jedyny sposób na odzyskanie tej tożsamości.",
     "recoverCta": "Odzyskaj tożsamość",
-    "recoverIntro": "Masz już tożsamość? Podaj jej 24-słowową frazę odzyskiwania.",
+    "recoverIntro": "Fraza odzyskiwania tożsamości",
     "recovered": "Tożsomość odzyskana.",
-    "title": "Tylko tożsamość"
+    "title": "Utwórz tożsamość",
+    "errorAlreadyHeld": "To urządzenie ma już tożsamość. Odzyskaj ją jej frazą odzyskiwania albo zapomnij ją i utwórz nową.",
+    "errorNotConfigured": "Nie udało się skonfigurować tożsamości. Sprawdź, czy skonfigurowano serwer synchronizacji, i spróbuj ponownie.",
+    "forgetCancel": "Zachowaj ją",
+    "forgetConfirm": "Zapomnij i utwórz nową",
+    "forgetCta": "Zapomnij tę tożsamość i utwórz nową",
+    "forgetWarning": "To usuwa tożsamość przechowywaną na tym urządzeniu. Jeśli nie zapisano jej 24-słownej frazy odzyskiwania, przepadnie: to urządzenie straci dostęp do każdego skarbca, który posiada lub do którego dołączyło, dopóki nie odzyskasz tożsamości tą frazą. Kontynuuj tylko wtedy, gdy masz pewność.",
+    "heldIntro": "To urządzenie ma już tożsamość. Odzyskaj ją poniżej jej 24-słowną frazą.",
+    "typeBackLead": "Aby potwierdzić, że ją zapisano, wpisz te cztery słowa z powyższej frazy.",
+    "typeBackMismatch": "To nie pasuje do słowa nr {{pos}}.",
+    "typeBackWordAtPosition": "Słowo nr {{pos}}",
+    "newTitle": "Nowa tożsamość",
+    "createAction": "Utwórz",
+    "recoverTitle": "Mam już tożsamość",
+    "recoverHint": "Odzyskaj ją na tym urządzeniu jej 24-słowną frazą odzyskiwania.",
+    "recoverAction": "Odzyskaj",
+    "back": "Wstecz",
+    "changeServer": "Zmień lub zweryfikuj serwer synchronizacji",
+    "errorTlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera i jego certyfikat."
   },
   "personIdentityCode": {
     "copy": "Kopiuj kod tożsamości",
@@ -5135,6 +5511,169 @@
     "acceptInvalid": "To nie jest prawidłowy kod tożsamości właściciela.",
     "shareCodeHeading": "Twój kod zaproszenia",
     "shareCodeHint": "Udostępnij ten kod komukolwiek, kto Cię zaprasza. Zawiera tylko informacje publiczne (id tożsamości i klucze publiczne), nigdy Twoją frazę.",
-    "title": "Twoja tożsamość"
+    "title": "Twoja tożsamość",
+    "acceptPasswordNote": "Wybierz hasło dla tego urządzenia. Jest ono odrębne od hasła właściciela skarbca i od Twojej frazy odzyskiwania: odblokowuje ten skarbiec na tym urządzeniu, a Twoja fraza pozostaje przenośnym sposobem powrotu.",
+    "acceptErrorBadRequest": "Nie udało się zweryfikować zaproszenia. Wklej kod tożsamości właściciela skarbca (udostępnia go, gdy Cię zaprasza) i porównaj odcisk palca po obu stronach.",
+    "acceptErrorNotFound": "To zaproszenie nie jest już dostępne. Mogło zostać już użyte lub wycofane. Poproś właściciela o nowe zaproszenie.",
+    "acceptErrorNotEnrolled": "To urządzenie nie jest tożsamością, do której zaadresowano to zaproszenie. Otwórz tożsamość, do której wysłano zaproszenie, a następnie je zaakceptuj.",
+    "acceptErrorTransport": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź połączenie i spróbuj ponownie.",
+    "acceptErrorUnauthenticated": "Twoja tożsamość nie jest zalogowana na tym urządzeniu. Odblokuj swoją tożsamość i spróbuj ponownie.",
+    "claimedHeading": "Zaproszenia, które już zaakceptowano",
+    "claimedHint": "Dodaj jedno z nich do tego urządzenia swoją frazą odzyskiwania. Jeśli właściciel skarbca usunął Cię w międzyczasie ze skarbca, nie można go tu dodać.",
+    "join": "Dodaj do tego urządzenia",
+    "joinHint": "Ten skarbiec jest już współdzielony z Twoją tożsamością. Wprowadź swoją frazę odzyskiwania, aby zainstalować go na tym urządzeniu.",
+    "joinPhraseLabel": "Twoja fraza odzyskiwania",
+    "joinPasswordNote": "Wybierz hasło dla tego urządzenia. Jest ono odrębne od hasła właściciela skarbca: odblokowuje ten skarbiec tutaj, a Twoja fraza odzyskiwania pozostaje przenośnym sposobem powrotu.",
+    "joinSubmit": "Dodaj i odblokuj",
+    "joinError": "Nie udało się dodać skarbca do tego urządzenia.",
+    "joinErrorAlreadyHeld": "To urządzenie ma już ten skarbiec, więc nie ma czego dodawać. Otwórz skarbiec, który już tu masz.",
+    "joinErrorBadRequest": "To urządzenie nie mogło potwierdzić, do którego właściciela należy ten skarbiec, więc go nie dodało. Jeśli logujesz się do tego skarbca na tym urządzeniu po raz pierwszy, otwórz go raz na urządzeniu, które już go ma, i spróbuj ponownie.",
+    "joinErrorNotEnrolled": "Ta fraza odzyskiwania nie odpowiada tożsamości, z którą współdzielono ten skarbiec. Sprawdź, czy wprowadzono frazę tożsamości, która została zaproszona.",
+    "joinErrorNotConfigured": "Synchronizacja nie jest skonfigurowana na tym urządzeniu. Ustaw serwer synchronizacji i spróbuj ponownie.",
+    "joinErrorUnauthenticated": "Twoja tożsamość nie jest zalogowana na tym urządzeniu. Odblokuj swoją tożsamość i spróbuj ponownie.",
+    "joinErrorTransport": "Nie udało się połączyć z serwerem synchronizacji albo ten skarbiec nie został tam jeszcze opublikowany. Sprawdź połączenie i spróbuj ponownie.",
+    "forgetCancel": "Zachowaj ją",
+    "forgetCheckbox": "Rozumiem, że ta tożsamość zostanie usunięta z tego urządzenia.",
+    "forgetConfirm": "Zapomnij tożsamość",
+    "forgetCta": "Zapomnij tę tożsamość na tym urządzeniu",
+    "forgetError": "Nie udało się zapomnieć tożsamości. Spróbuj ponownie.",
+    "forgetWarning": "To usuwa tożsamość tylko z tego urządzenia. Konto na serwerze oraz każdy skarbiec, który ta tożsamość posiada lub do którego dołączyła, pozostają nienaruszone, a tożsamość możesz odzyskać jej 24-słowną frazą na innym urządzeniu. Jeśli nie zapisano tej frazy, to urządzenie nie będzie mogło jej odzyskać."
+  },
+  "aiOnboarding": {
+    "title": "Skonfiguruj AI",
+    "intro": "Myne może wyszukiwać Twoje notatki po znaczeniu, proponować tagi i rozmawiać o nich. Nic z tego nie jest wymagane, a możesz to włączyć później w Ustawieniach.",
+    "enableLabel": "Włącz funkcje AI",
+    "semantic": {
+      "title": "Wyszukiwanie semantyczne",
+      "body": "Pobierz wielojęzyczny model osadzeń (około 449 MB), aby wyszukiwać po znaczeniu, a nie tylko po słowach."
+    },
+    "tag": {
+      "title": "Automatyczne tagowanie",
+      "body": "Pobierz model tagów (około 337 MB), aby Myne proponowało tagi podczas pisania."
+    },
+    "chat": {
+      "title": "Czat",
+      "body": "Bez pobierania. Czat działa na modelu, który już samodzielnie uruchamiasz, albo u wskazanego przez Ciebie dostawcy, z krokiem zgody.",
+      "setup": "Skonfiguruj dostawcę"
+    },
+    "download": "Pobierz",
+    "downloading": "Pobieranie…",
+    "cancel": "Anuluj",
+    "complete": "Gotowe",
+    "retry": "Ponów",
+    "skip": "Pomiń",
+    "done": "Gotowe"
+  },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "Kontynuuj edycję",
+      "message": "Niektóre otwarte pliki mają niezapisane zmiany, których nie udało się zapisać na dysku. Zamknięcie teraz je odrzuci.",
+      "okLabel": "Odrzuć i zamknij",
+      "title": "Zamknąć Myne?"
+    },
+    "closeTab": "Zamknij {{name}}",
+    "conflict": {
+      "body": "Ten plik zmienił się na dysku w trakcie edycji. Myne nic nie zapisało.",
+      "copy": "Zapisz kopię…",
+      "copyFailed": "Nie udało się zapisać kopii. Oryginalny plik pozostał bez zmian.",
+      "overwrite": "Nadpisz moimi zmianami",
+      "reload": "Wczytaj ponownie z dysku"
+    },
+    "deeplink": {
+      "body": "Znajduje się poza każdym skarbcem, więc Myne go nie zaszyfruje.",
+      "cancel": "Anuluj",
+      "confirm": "Otwórz",
+      "failed": "Nie udało się otworzyć pliku. Mógł zostać przeniesiony lub zmieniony.",
+      "title": "Otworzyć ten plik lokalny?"
+    },
+    "empty": "Nie otwarto żadnego pliku.",
+    "import": "Importuj do skarbca",
+    "importFailed": "Nie udało się zaimportować pliku. Nic nie zostało zmienione.",
+    "importLocked": "Skarbiec jest zablokowany. Odblokuj go i spróbuj ponownie.",
+    "importNeedsVault": "Na tym urządzeniu nie ma jeszcze skarbca. Utwórz go i spróbuj ponownie.",
+    "marker": "Plik lokalny. Niezaszyfrowany i nienależący do żadnego skarbca.",
+    "open": "Otwórz plik lokalny",
+    "openFailed": "Nie udało się otworzyć tego pliku.",
+    "openRefusedTooLarge": "Ten plik jest za duży, aby go tu otworzyć.",
+    "openRefusedType": "Tutaj otwierają się tylko pliki .md i .markdown.",
+    "retry": "Spróbuj zapisać ponownie",
+    "saveError": "Nie udało się zapisać pliku. Twoje zmiany nadal tu są.",
+    "tabs": "Otwarte pliki lokalne",
+    "unsaved": "Niezapisane zmiany"
+  },
+  "update": {
+    "banner": {
+      "available": "Dostępna jest wersja Myne {{version}}.",
+      "failed": "Nie udało się zainstalować aktualizacji. Spróbuj ponownie.",
+      "installing": "Pobieranie aktualizacji…",
+      "later": "Później",
+      "restart": "Uruchom ponownie, aby zaktualizować"
+    }
+  },
+  "firstRun": {
+    "server": {
+      "heading": "Wybierz serwer synchronizacji",
+      "chooseHeading": "Gdzie mają synchronizować się Twoje notatki?",
+      "chooseIntro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Użyj usługi Myne Sync albo wskaż temu urządzeniu serwer, który sam prowadzisz. Tak czy inaczej Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
+      "myneSyncHint": "Serwer prowadzony przez Myne. Jego certyfikat HTTPS jest sprawdzany automatycznie.",
+      "intro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
+      "notConfigured": "Wprowadź powyżej adres serwera i naciśnij Połącz, aby kontynuować.",
+      "back": "Wstecz",
+      "continue": "Kontynuuj",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "Twój własny serwer",
+      "selfHostedHint": "Serwer synchronizacji, który sam prowadzisz. Jego adres podasz na następnym ekranie.",
+      "connectAction": "Połącz",
+      "setUpAction": "Skonfiguruj"
+    }
+  },
+  "identityFlow": {
+    "title": "Utwórz tożsamość",
+    "lead": "Tożsamość pozwala innym zaprosić Cię do skarbca i pozwala jednej tożsamości posiadać wiele skarbców. Wymaga serwera synchronizacji, który przechowuje Twoje zaszyfrowane notatki i pozwala do Ciebie dotrzeć.",
+    "start": "Utwórz tożsamość",
+    "skip": "Nie teraz, używaj tylko tego urządzenia",
+    "back": "Wstecz",
+    "serverUnreachable": "Nie udało się połączyć z tym serwerem. Sprawdź adres i spróbuj ponownie.",
+    "createFailed": "Nie udało się utworzyć tożsamości. Sprawdź serwer synchronizacji i spróbuj ponownie.",
+    "server": {
+      "title": "Wybierz serwer synchronizacji",
+      "lead": "Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą. Serwer przechowuje wyłącznie szyfrogram.",
+      "urlLabel": "Adres serwera",
+      "useMyneSync": "Użyj Myne Sync",
+      "selfHostedHint": "Albo wprowadź adres serwera, który sam prowadzisz.",
+      "connect": "Połącz",
+      "connecting": "Łączenie…"
+    },
+    "held": {
+      "title": "Na tym urządzeniu jest już tożsamość",
+      "lead": "To urządzenie ma już tożsamość. Zapomnienie jej sprawi, że to urządzenie straci dostęp do każdego skarbca, który posiada lub do którego dołączyło, dopóki nie odzyskasz tożsamości jej 24-słowną frazą. Jeśli nie zapisano tej frazy, nie da się jej odzyskać.",
+      "forget": "Zapomnij ją i zacznij od nowa"
+    },
+    "create": {
+      "title": "Utwórz swoją tożsamość",
+      "lead": "To tworzy dla Ciebie jedną tożsamość. Nie tworzy żadnego skarbca i nie zapisuje notatek.",
+      "cta": "Utwórz tożsamość",
+      "working": "Tworzenie…"
+    },
+    "phrase": {
+      "title": "Zapisz swoją frazę tożsamości",
+      "warning": "Zapisz te 24 słowa i przechowuj je bezpiecznie. To jedyny raz, gdy są pokazywane; to jedyny sposób na odzyskanie tej tożsamości. To inna fraza niż jakakolwiek fraza odzyskiwania skarbca.",
+      "reveal": "Pokaż",
+      "typebackLead": "Aby potwierdzić, że ją zapisano, wpisz te cztery słowa z powyższej frazy.",
+      "wordNumber": "Słowo nr {{position}}",
+      "wordMismatch": "To nie pasuje do słowa nr {{pos}}.",
+      "continue": "Kontynuuj"
+    },
+    "home": {
+      "title": "Twoja tożsamość",
+      "lead": "Inni mogą zaprosić Cię do skarbca. Nie musisz posiadać skarbca, aby zostać zaproszonym.",
+      "codeLabel": "Twój kod tożsamości",
+      "invitesHeading": "Zaproszenia",
+      "noInvites": "Jeszcze brak zaproszeń.",
+      "inviteHint": "Otwórz to zaproszenie z ekranu wyboru skarbca, aby dołączyć swoją frazą tożsamości.",
+      "forgetHeading": "To urządzenie",
+      "forget": "Zapomnij tę tożsamość na tym urządzeniu",
+      "forgetCheckbox": "Rozumiem, że ta tożsamość zostanie usunięta z tego urządzenia. Konto na serwerze pozostaje, a fraza pozwala ją odzyskać."
+    }
   }
 }

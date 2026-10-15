@@ -96,7 +96,8 @@ async function openAccept(page: Page): Promise<void> {
 
 /** The out-of-band half: paste the owner's code, inspect it, read the fingerprint
  *  back, and tick the compare. Nothing here is secret-dependent: the fingerprint
- *  is the owner's public material and the code never leaves the device. */
+ *  is the owner's public material and the code never leaves the device. All of it
+ *  lives on wizard step 1. */
 async function verifyOwner(page: Page): Promise<void> {
   await page.getByTestId("identity-flow.accept-owner-code").fill(OWNER_CODE);
   await page.getByTestId("identity-flow.accept-inspect").click();
@@ -104,8 +105,21 @@ async function verifyOwner(page: Page): Promise<void> {
   await page.getByTestId("identity-flow.accept-confirm").click();
 }
 
-/** Fill the 24 phrase cells. Cell 1 carries testid `…accept-phrase` and the rest
- *  are `…accept-phrase-cell-N`, the flow's own naming, not a positional gamble. */
+/** Step 1 → step 2 (the phrase). Gated on the fingerprint being confirmed. */
+async function toPhraseStep(page: Page): Promise<void> {
+  await page.getByTestId("identity-flow.accept-continue").click();
+  await expect(page.getByTestId("identity-flow.accept-phrase")).toBeVisible();
+}
+
+/** Step 2 → step 3 (the password). Gated on all 24 cells being filled. */
+async function toPasswordStep(page: Page): Promise<void> {
+  await page.getByTestId("identity-flow.accept-continue").click();
+  await expect(page.getByTestId("identity-flow.accept.password-input")).toBeVisible();
+}
+
+/** Fill the 24 phrase cells, which live on wizard step 2. Cell 1 carries testid
+ *  `…accept-phrase` and the rest are `…accept-phrase-cell-N`, the flow's own
+ *  naming, not a positional gamble. */
 async function typePhrase(page: Page): Promise<void> {
   for (let i = 0; i < PHRASE.length; i += 1) {
     const id = i === 0 ? "identity-flow.accept-phrase" : `identity-flow.accept-phrase-cell-${i + 1}`;
@@ -117,7 +131,9 @@ async function typePhrase(page: Page): Promise<void> {
  *  name step's own roster check decides that, and it can pass straight through. */
 async function submitAccept(page: Page): Promise<void> {
   await verifyOwner(page);
+  await toPhraseStep(page);
   await typePhrase(page);
+  await toPasswordStep(page);
   await page.getByTestId("identity-flow.accept.password-input").fill(PASSWORD);
   await page.getByTestId("identity-flow.accept.confirm-input").fill(PASSWORD);
   await expect(page.getByTestId("identity-flow.accept.submit")).toBeEnabled();
@@ -167,7 +183,9 @@ test.describe("member accept (myne-md/myne#851 task 14)", () => {
     await expect(page.getByTestId("identity-flow.accept-owner-fingerprint")).toHaveValue(
       OWNER_FINGERPRINT,
     );
+    await toPhraseStep(page);
     await typePhrase(page);
+    await toPasswordStep(page);
     await page.getByTestId("identity-flow.accept.password-input").fill(PASSWORD);
     await page.getByTestId("identity-flow.accept.confirm-input").fill(PASSWORD);
     await page.getByTestId("identity-flow.accept.submit").click();
@@ -203,6 +221,42 @@ test.describe("member accept (myne-md/myne#851 task 14)", () => {
       () => (window as unknown as { __memberNameArgs?: Record<string, unknown> }).__memberNameArgs,
     );
     expect(nameArgs!.name).toBe(MEMBER_NAME);
+  });
+
+  test("the accept wizard steps in order, and Back preserves the confirmed fingerprint", async ({
+    page,
+  }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      personStatus: ENROLLED,
+      personInvites: ONE_INVITE,
+      inviteOwner: { person_id_hex: "owner-person", fingerprint_hex: OWNER_FINGERPRINT },
+    });
+    await openIdentity(page);
+    await openAccept(page);
+
+    // Step 1: the owner check, and neither the phrase grid nor the password form.
+    await expect(page.getByTestId("identity-flow.accept-step")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.accept-phrase")).toHaveCount(0);
+    await expect(page.getByTestId("identity-flow.accept.password-input")).toHaveCount(0);
+    // The step's Continue is the gate on the owner check.
+    await expect(page.getByTestId("identity-flow.accept-continue")).toBeDisabled();
+
+    await verifyOwner(page);
+    await expect(page.getByTestId("identity-flow.accept-continue")).toBeEnabled();
+    await page.getByTestId("identity-flow.accept-continue").click();
+
+    // Step 2: the phrase grid, and NOT the password form.
+    await expect(page.getByTestId("identity-flow.accept-phrase")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.accept.password-input")).toHaveCount(0);
+
+    // Back to step 1: the fingerprint the inspect read is still there, and the
+    // confirmed state keeps Continue open.
+    await page.getByTestId("identity-flow.accept-step-back").click();
+    await expect(page.getByTestId("identity-flow.accept-owner-fingerprint")).toHaveValue(
+      OWNER_FINGERPRINT,
+    );
+    await expect(page.getByTestId("identity-flow.accept-continue")).toBeEnabled();
   });
 
   test("the name step cannot be left empty", async ({ page }) => {
@@ -290,7 +344,9 @@ test.describe("member accept (myne-md/myne#851 task 14)", () => {
     await openIdentity(page);
     await openAccept(page);
     await verifyOwner(page);
+    await toPhraseStep(page);
     await typePhrase(page);
+    await toPasswordStep(page);
     await page.getByTestId("identity-flow.accept.password-input").fill(PASSWORD);
     await page.getByTestId("identity-flow.accept.confirm-input").fill(PASSWORD);
     await page.getByTestId("identity-flow.accept.submit").click();
