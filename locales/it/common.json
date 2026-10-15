@@ -29,7 +29,7 @@
   },
   "agent": {
     "composer": {
-      "placeholder": "Chiedi all'AI di modificare queste note",
+      "placeholder": "Chiedi all'AI…",
       "scopeLabel": "Lavora su",
       "scopeOpenNote": "Questa nota",
       "scopeCount_one": "{{count}} nota",
@@ -45,7 +45,7 @@
       "unchecked": "Non è stato possibile completare la verifica delle modifiche, quindi l'agente non è disponibile per ora. Controlla che il tuo modello o provider sia raggiungibile, poi riprova.",
       "unsupported": "Questo modello non riesce a fare modifiche precise in modo affidabile, quindi l'agente non è disponibile. Scegli un modello più grande o un provider.",
       "unsupportedDetail": "Ha superato {{passes}} verifiche su {{attempts}}; ne servono {{required}}.",
-      "checking": "Verifica del modello…",
+      "checking": "Verifica in corso",
       "unsupportedProvisional": "Quella soglia di superamento non è ancora stata misurata su più modelli, quindi potrebbe essere più severa o più permissiva del dovuto.",
       "scopeNone": "nessuna nota aperta, quindi non c'è ancora nulla su cui lavorare",
       "scopeAllVault": "Tutte le note",
@@ -339,10 +339,10 @@
       "decrypting": "Decifratura degli allegati…",
       "clearSearchAriaLabel": "Cancella ricerca",
       "emptyClearSearch": "Cancella ricerca",
-      "emptyImportHint": "Importa un file per conservarlo nella tua cassaforte.",
+      "emptyImportHint": "I file che aggiungi a una nota restano nella tua cassaforte, crittografati su questo dispositivo prima di andare ovunque. Importane uno per iniziare.",
       "emptyLoadError": "Impossibile leggere il catalogo degli allegati.",
       "emptyNoAttachments": "Ancora nessun allegato.",
-      "emptyNoResultsTitle": "Nessun allegato corrisponde alla tua ricerca.",
+      "emptyNoResultsTitle": "Nessun allegato corrisponde.",
       "filterAriaLabel": "Filtra per tipo",
       "gridView": "Vista a griglia",
       "import": "Importa",
@@ -363,8 +363,8 @@
       "sort": {
         "createdAsc": "Prima i meno recenti",
         "createdDesc": "Prima i più recenti",
-        "nameAsc": "Nome A–Z",
-        "nameDesc": "Nome Z–A"
+        "nameAsc": "Nome A-Z",
+        "nameDesc": "Nome Z-A"
       },
       "sortAriaLabel": "Ordina allegati",
       "supportedFilesFilter": "File supportati",
@@ -910,7 +910,7 @@
         "exportFailed": "Impossibile esportare {{filename}}.",
         "renamed": "Rinominato in {{name}}.",
         "renameFailed": "Impossibile rinominare l'allegato.",
-        "saveDialogFailed": "Impossibile aprire la finestra di salvataggio."
+        "saveDialogFailed": "Impossibile scegliere dove salvare questo file."
       },
       "compression": {
         "bulkNotice_one": "{{count}} immagine compressa: {{from}} → {{to}}",
@@ -1272,7 +1272,7 @@
           "askPlaceholder": "Fai una domanda sulle tue note…",
           "askSubmit": "Chiedi",
           "assistant": "Assistente",
-          "empty": "L'output dell'AI (riassunti, risposte e suggerimenti) appare qui.",
+          "empty": "Riassunti, risposte e suggerimenti compaiono qui man mano che li chiedi.",
           "error": "Impossibile completare la richiesta AI.",
           "errorTurn": "L'assistente non è riuscito a rispondere.",
           "gettingReadyHint": "Preparazione delle tue note per l'AI. Un momento.",
@@ -1282,7 +1282,7 @@
           "newChat": "Nuova chat",
           "noModelHint": "Non è configurato alcun provider AI, quindi chat, riassunti, riscrittura e ricerca semantica non hanno nulla su cui funzionare. Configurane uno in Impostazioni → Developer → AI.",
           "unreachableHint": "Il provider che hai configurato non risponde. Verifica che sia in esecuzione, poi invia di nuovo.",
-          "unavailableHint": "Questa build di Myne è stata compilata senza l'AI locale, quindi qui non può essere eseguito nulla.",
+          "unavailableHint": "Questa build di Myne è stata compilata senza l'AI locale, quindi qui non può essere eseguito nulla. Nessuna impostazione lo cambierà — serve una build con l'AI inclusa.",
           "offHint": "L'AI locale è disattivata. Attivala da Impostazioni → Developer → AI.",
           "send": "Invia",
           "statusGettingReady": "Preparazione…",
@@ -2235,7 +2235,7 @@
         "nodeSizeStrength": "Dimensione in base ai collegamenti",
         "openTitle": "Impostazioni del grafico",
         "reset": "Ripristina i valori predefiniti",
-        "showArrows": "Mostra le frecce di direzione",
+        "showArrows": "Frecce di direzione al passaggio del mouse",
         "title": "Impostazioni del grafico"
       },
       "canvasLabel": "Grafo della conoscenza di {{count}} note",
@@ -2396,8 +2396,8 @@
         "myne": {
           "label": "Cassaforte Myne",
           "loses": "La cronologia delle versioni, le note eliminate e i modelli restano nella cassaforte di origine. Gli allegati che nessuna nota importata usa vengono lasciati indietro. La cassaforte di origine non viene modificata e, se la sincronizzi, continua a sincronizzarsi.",
-          "pickerTitle": "Scegli la cassaforte da cui importare",
-          "short": "Un'altra cassaforte su questo dispositivo",
+          "pickerTitle": "Scegli il file .myne-backup da cui importare",
+          "short": "Un file .myne-backup esportato",
           "survives": "Note, cartelle, tag, gli allegati usati dalle note che importi e i collegamenti fra quelle note. Arrivano anche le parole che hai aggiunto al dizionario della cassaforte di origine."
         }
       },
@@ -2465,7 +2465,7 @@
       "bulkMove_other": "Sposta {{count}} note in…",
       "caseMergeBody": "Esiste già una cartella di nome “{{name}}”. Queste verranno unite. Vuoi rinominarne una per tenerle separate?",
       "color": "Colore…",
-      "createFirstNote": "+ Crea la tua prima nota",
+      "createFirstNote": "Crea la tua prima nota",
       "createFolderNote": "Crea nota cartella",
       "customize": "Personalizza…",
       "delete": "Elimina",
@@ -2547,12 +2547,12 @@
       "untitledTemplate": "Modello senza titolo"
     },
     "newTab": {
-      "createNote": "Crea una nuova nota",
+      "createNote": "Nuova nota",
       "createDrawing": "Nuovo disegno",
       "noNotesYet": "Ancora nessuna nota.",
-      "recent": "Recenti",
-      "searchAriaLabel": "Cerca note da aprire",
-      "searchPlaceholder": "Cerca note…",
+      "recent": "Riprendi da dove eri",
+      "searchAriaLabel": "Cerca note e comandi",
+      "searchPlaceholder": "Cerca note e comandi…",
       "untitled": "Senza titolo",
       "createFromTemplate": "Da modello",
       "kindCommand": "Comando",
@@ -2798,7 +2798,7 @@
       "viewTypeTable": "Tabella"
     },
     "welcome": {
-      "body": "Benvenuto in Myne, il tuo spazio privato per pensare e scrivere.\n\nTutto ciò che salvi qui è crittografato e resta sul tuo dispositivo. La tua **password** e la tua **frase di recupero** sono le uniche chiavi per accedervi, quindi conservale in un luogo sicuro. Se le perdi entrambe, nessuno potrà recuperare le tue note, nemmeno noi.\n\nQuesta è solo una normale nota, quindi rendila tua. Modificala, rinominala o eliminala quando vuoi, e aggiungi nuove note man mano che le tue idee crescono.\n\nSiamo felici che tu sia qui. Per saperne di più su Myne, visita https://myne.md\n",
+      "body": "Benvenuto in Myne, il tuo spazio privato per pensare e scrivere.\n\nTutto ciò che salvi qui è crittografato e resta sul tuo dispositivo. La tua **password** e la tua **frase di recupero** sono le uniche chiavi per accedervi, quindi conservale in un luogo sicuro. Se le perdi entrambe, nessuno potrà recuperare le tue note, nemmeno noi.\n\n**Puoi collegare le note tra loro.** Digita `[[` e Myne ti propone le note che hai già; scegline una e diventa un collegamento. La nota a cui hai collegato mostra da dove arriva il collegamento, in un suo pannello dei backlink, così un insieme di note è qualcosa che puoi seguire in entrambe le direzioni.\n\nQuesta è solo una normale nota, quindi rendila tua. Modificala, rinominala o eliminala quando vuoi, e aggiungi nuove note man mano che le tue idee crescono.\n\nPer saperne di più su Myne, visita https://myne.md\n",
       "title": "Benvenuto in Myne"
     },
     "workspace": {
@@ -2816,7 +2816,7 @@
     "createForm": {
       "checkingStrength": "Verifica della robustezza…",
       "confirmLabel": "Conferma la password principale",
-      "defaultEmptyCaption": "Usata come input per Argon2id (m=256 MiB, t=3, p=2). Scegline una che puoi ricordare; non potrai reimpostarla.",
+      "defaultEmptyCaption": "Scegli qualcosa che riesci a ricordare. Non può essere reimpostata.",
       "mismatch": "Le password non corrispondono.",
       "passwordLabel": "Password principale",
       "suggestPassword": "Suggerisci una password",
@@ -2968,7 +2968,7 @@
   },
   "restore": {
     "backLabel": "Indietro",
-    "cancelLabel": "Annulla",
+    "cancelLabel": "Indietro",
     "collision": {
       "body": "Una cassaforte di questo backup esiste già su questo dispositivo. Puoi mantenerle entrambe: la copia ripristinata compare come cassaforte separata nell'elenco delle casseforti. Oppure puoi ripristinare ora e poi rimuovere tu stesso la cassaforte esistente dall'elenco. La rimozione ti chiede di digitare DELETE e ha senso solo dopo aver confermato che la cassaforte ripristinata si apre.",
       "keepBoth": "Mantieni entrambe",
@@ -3246,7 +3246,7 @@
       "confirm": "Conferma",
       "delete": "Elimina",
       "deleteError": "Impossibile eliminare quel tema. Riprova.",
-      "empty": "Ancora nessun tema personalizzato. Importa un file di tema per iniziare.",
+      "empty": "Importa un file di tema, oppure sfoglia la galleria per trovarne uno.",
       "error": {
         "aColorFallback": "un colore",
         "invalidFile": "File del tema non valido.",
@@ -3452,7 +3452,7 @@
     "ai": {
       "autoTagHelper": "Quando smetti di digitare, un piccolo modello sul tuo dispositivo legge la nota e suggerisce dei tag in cima. Non viene aggiunto nulla finché non accetti un suggerimento.",
       "autoTagLabel": "Suggerisci i tag automaticamente",
-      "autoTagUnavailable": "Questa build non include il modello per i tag, quindi non se ne può suggerire nessuno. Myne non ne scarica mai uno. L'interruttore si attiva da sé in una build che lo include.",
+      "autoTagUnavailable": "Non è ancora installato alcun modello per i tag. Scaricalo una volta da Impostazioni, AI: l'interruttore si attiva da sé una volta installato.",
       "consent": {
         "accept": "Invia le mie note a {{provider}}",
         "cancel": "Annulla",
@@ -3469,7 +3469,7 @@
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te. Dove viene eseguito, e se le tue note escono da questo dispositivo, dipende dal provider che indichi qui sotto. Sperimentale, disattivato per impostazione predefinita.",
       "enableLabel": "Abilita l'AI locale",
-      "excludedHelper": "Le note in queste cartelle non vengono mai lette o indicizzate dall'AI. Un percorso di cartella per riga.",
+      "excludedHelper": "Le note in queste cartelle non vengono mai lette né indicizzate dall'AI. Vuoto significa che l'AI può vedere tutto; è lo stesso elenco rispettato dal client da riga di comando. Un percorso di cartella per riga.",
       "excludedLabel": "Cartelle escluse",
       "excludedPlaceholder": "Privato/\nDiario/",
       "endpointHelper": "Se su questo computer hai già un runtime per modelli in esecuzione, indicalo a Myne invece di selezionare i file del modello. Lascia vuoto per usare i file qui sopra.",
@@ -3511,7 +3511,7 @@
       "modelNone": "Nessun file selezionato",
       "modelSaveFailed": "Impossibile salvare il percorso del modello (deve trovarsi fuori dalla tua cassaforte).",
       "modelTranscriptionLabel": "Modello da voce a testo (trascrizione)",
-      "modelsHelper": "Myne non scarica mai modelli. Significherebbe inviare dati sulla rete. Apri un link per ottenerne uno nel tuo browser, poi seleziona qui i file scaricati. Un modello selezionato qui viene eseguito sul tuo dispositivo; se invece hai indicato un provider, risponde quel provider.",
+      "modelsHelper": "Scarica qui un modello, oppure apri un link per ottenerne uno nel tuo browser e seleziona i file scaricati. Un modello viene eseguito sul tuo dispositivo; se invece hai indicato un provider, risponde quel provider.",
       "providerHelper": "Invece di eseguire un modello qui, Myne può inviare una richiesta a un servizio indicato da te. Quando lo fa, le tue note escono da questo dispositivo. “Nessuno” è l'impostazione predefinita e significa che non viene contattato alcun servizio.",
       "providerKeyAdd": "incolla la tua chiave API",
       "providerKeyLabel": "Chiave API",
@@ -3595,13 +3595,13 @@
       "postureInactive": "La sincronizzazione va direttamente al server di sincronizzazione",
       "postureUnavailable": "Tor non è disponibile: sincronizzazione in pausa",
       "postureUnavailableDetail": "Non viene inviato nulla in modo diretto. Disattiva e riattiva questa impostazione per provare ad avviare il client Tor, oppure disattivala per sincronizzare senza Tor.",
-      "residualExit": "L'ultimo relay di un circuito Tor, il nodo di uscita, vede a quale server di sincronizzazione ti colleghi. Non può leggere ciò che sincronizzi, che resta crittografato end-to-end.",
+      "residualExit": "L'ultimo relay di un circuito Tor, il nodo di uscita, vede a quale server di sincronizzazione ti colleghi e, su desktop con questa opzione attiva, a quale provider AI arrivi. Non può leggere ciò che sincronizzi; quello resta crittografato end-to-end.",
       "residualMetadata": "Il server di sincronizzazione continua a vedere quando sincronizzi, quanti blob invii e quanto sono grandi, e quanti dispositivi hai. Tor non cambia questo.",
       "residualPayment": "Se paghi per la sincronizzazione ospitata, il pagamento e il tuo account possono comunque essere ricondotti a te. Tor cambia da dove arriva la connessione, non la traccia della fatturazione.",
-      "residualScope": "Attraverso Tor passa solo il traffico di sincronizzazione di Myne. Nient'altro su questo dispositivo lo fa.",
+      "residualScope": "Su desktop questo copre il tuo traffico di sincronizzazione e le richieste al provider AI remoto. Mobile non ha ancora il routing Tor, quindi le sue richieste al provider passano dirette. Nient'altro su questo dispositivo passa attraverso Tor.",
       "residualsToggle": "Cosa non nasconde",
-      "torHelper": "Nasconde il tuo indirizzo IP e la tua posizione al server di sincronizzazione, e nasconde alla tua rete e al tuo provider internet con quale server sincronizzi. Possono comunque vedere questo dispositivo collegarsi a Tor. Non ti rende anonimo verso Myne, e non nasconde al server cosa sincronizzi né quando.",
-      "torLabel": "Instrada la sincronizzazione attraverso Tor"
+      "torHelper": "Nasconde il tuo indirizzo IP e la tua posizione al server di sincronizzazione, e nasconde alla tua rete e al tuo provider internet con quale server sincronizzi (e, su desktop, a quale provider AI arrivi). Possono comunque vedere questo dispositivo collegarsi a Tor. Non ti rende anonimo verso Myne, e non nasconde al server cosa sincronizzi né quando.",
+      "torLabel": "Instrada sincronizzazione e AI desktop attraverso Tor"
     },
     "prefs": {
       "saveError": "Impossibile salvare la preferenza. Riprova.",
@@ -3635,7 +3635,7 @@
       "hideVaultNamesErrorSave": "Impossibile salvare l'impostazione, che resta quindi invariata. Se la stavi attivando, alcuni nomi memorizzati potrebbero essere già stati distrutti; attivala di nuovo per completare.",
       "hideVaultNamesErrorErase": "Non è stato possibile distruggere un nome memorizzato, quindi l'impostazione è stata lasciata disattivata invece di dichiarare una cancellazione che non è avvenuta. Riprova.",
       "screenCaptureHelperOff": "La protezione si applica sempre prima dello sblocco. Dopo lo sblocco, segue questa preferenza.",
-      "screenCaptureHelperOn": "Attiva su Windows 10 (aggiornamento di maggio 2020) e versioni successive. macOS e Linux non offrono un’API di sistema per questo, quindi lì non può bloccare la cattura.",
+      "screenCaptureHelperOn": "Ha effetto su Windows 10 (aggiornamento di maggio 2020) e versioni successive. macOS e Linux non offrono un’API di sistema per questo, quindi lì non può bloccare la cattura.",
       "screenCaptureLabel": "Protezione dalla cattura schermo",
       "screenCaptureSubtitle": "Blocca screenshot e registrazione dello schermo",
       "screenshotBlocked": "La protezione dello schermo è attiva: gli screenshot di Myne risultano vuoti.",
@@ -3856,7 +3856,7 @@
     "search": {
       "placeholder": "Cerca nelle impostazioni…",
       "ariaLabel": "Cerca nelle impostazioni",
-      "empty": "Nessuna impostazione corrisponde a “{{query}}”.",
+      "empty": "Nessuna impostazione corrisponde a “{{query}}”",
       "resultsLabel": "Risultati della ricerca",
       "keywords": {
         "aiAutoTag": "tag automatici etichette suggerisci suggerimenti ai auto tag suggestions",
@@ -3964,7 +3964,7 @@
     },
     "ribbonCustomize": {
       "add": "Aggiungi",
-      "empty": "Ancora nessun comando sul nastro. Usa Aggiungi per fissarne uno.",
+      "empty": "Usa Aggiungi per fissare un comando al nastro.",
       "errorSave": "Impossibile salvare l'impostazione del nastro.",
       "helper": "I comandi sul nastro sinistro, in ordine. Trascina per riordinarne, aggiungine altri dall'elenco comandi o rimuovili con ×. La barra nasconde i comandi non disponibili nello stato attuale.",
       "label": "Nastro sinistro",
@@ -3980,7 +3980,7 @@
     "memory": {
       "heading": "Ciò che l'assistente ricorda",
       "helper": "Fatti che l'IA ha imparato lavorando con te. Li scrive essa stessa (al massimo uno per esecuzione); li vedi e puoi correggerne ciascuno. Le voci si sincronizzano con i tuoi altri dispositivi e restano crittografate.",
-      "empty": "Ancora nessun ricordo. Le voci appaiono qui quando l'assistente impara qualcosa durante un'esecuzione.",
+      "empty": "Le voci appaiono qui quando l'assistente impara qualcosa durante un'esecuzione.",
       "editLabel": "Modifica",
       "deleteLabel": "Elimina",
       "save": "Salva",
@@ -4118,7 +4118,7 @@
       "compareTheirs": "Copia in conflitto",
       "compareTitle": "Confronto di “{{title}}”",
       "discard": "Scarta",
-      "empty": "Nessun conflitto. I tuoi dispositivi sono sincronizzati.",
+      "empty": "I tuoi dispositivi sono sincronizzati.",
       "groupTitle_one": "{{count}} copia in conflitto di {{original}}",
       "groupTitle_many": "{{count}} copie in conflitto di {{original}}",
       "groupTitle_other": "{{count}} copie in conflitto di {{original}}",
@@ -4146,7 +4146,7 @@
       "awaitingApproval_many": "{{count}} dispositivi in attesa di approvazione",
       "awaitingApproval_other": "{{count}} dispositivi in attesa di approvazione",
       "loading": "Caricamento…",
-      "noDevices": "Ancora nessun dispositivo sincronizzato.",
+      "noDevices": "Ancora nessun altro dispositivo",
       "notEnrolled": "Questo dispositivo non è ancora connesso. Se l'hai appena aggiunto, attendi l'approvazione da un altro dispositivo; altrimenti aggiungilo con il modulo “Aggiungi un dispositivo” qui sopra.",
       "platform": {
         "android": "Telefono Android",
@@ -4176,7 +4176,7 @@
       "reasonDeviceLimit": "l'account ha raggiunto il limite di dispositivi",
       "reasonAwaitingApproval": "questo dispositivo è ancora in attesa di approvazione",
       "reasonNotConfigured": "non è configurato alcun server di sincronizzazione",
-      "transportHint": "Se il server è stato spostato o il suo certificato è cambiato, reinserisci l'URL del server in “Server di sincronizzazione” qui sopra per considerarlo di nuovo attendibile.",
+      "transportHint": "Se il server è stato spostato, inserisci il suo nuovo indirizzo sotto “Server di sincronizzazione” qui sopra. Controlla che il suo certificato HTTPS sia valido.",
       "unreachable": "Impossibile raggiungere la sincronizzazione ({{error}}).",
       "verifyBody": "Verifica che lo stesso codice appaia sul dispositivo che hai appena approvato. Se corrisponde, è sul tuo account. In caso contrario, rimuovi il dispositivo.",
       "verifyMatch": "Corrispondono",
@@ -4196,11 +4196,11 @@
       "connect": "Connetti",
       "connected": "Connesso",
       "connectedLocal": "Connesso (locale, senza TLS).",
-      "connectedPlatformTrust": "Connesso tramite TLS. Il tuo browser ha verificato il certificato di questo server.",
+      "connectedPlatformTrust": "Connesso tramite TLS. Il certificato e il nome del server sono stati verificati.",
       "connecting": "Connessione…",
       "fixedOrigin": "Questo client si sincronizza con un solo server, stabilito al momento dell'installazione. Non può essere cambiato da qui: alla pagina è consentito comunicare solo con questo indirizzo.",
       "fixedOriginNone": "Per questa installazione non è configurato alcun server di sincronizzazione.",
-      "pinPlatformTrust": "Verificato dall'archivio certificati del tuo browser. Questo client non può fissare da sé un certificato.",
+      "pinPlatformTrust": "Certificato del server verificato dall'archivio certificati fidati di questo client.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Impossibile raggiungere quel server. Controlla l'URL e che sia in esecuzione.",
       "tlsHelp": "Inserisci lo stesso URL del server su ogni dispositivo. Un server auto-ospitato necessita di un certificato HTTPS attendibile.",
@@ -4377,7 +4377,7 @@
       "keepDevice": "Mantienilo",
       "notEnrolledHelp": "Questo dispositivo non è ancora in sincronizzazione. Aggiungilo dalla schermata precedente per vedere i tuoi dispositivi.",
       "unauthenticated": "L'accesso di questo dispositivo è stato revocato, probabilmente rimosso da un altro dispositivo.",
-      "transportError": "Impossibile raggiungere il server di sincronizzazione. Se il server è cambiato o il suo certificato è cambiato, riconnettilo dalla schermata Server di sincronizzazione.",
+      "transportError": "Impossibile raggiungere il server di sincronizzazione. Controlla l'indirizzo del server e il suo certificato HTTPS.",
       "retiredSelf": "Questo dispositivo è stato rimosso da un altro dispositivo.",
       "resetAndAddAgain": "Reimposta e aggiungi di nuovo",
       "noDevices": "Ancora nessun dispositivo.",
@@ -4406,7 +4406,7 @@
       "loading": "Caricamento membri…",
       "error": "Impossibile leggere l'elenco del caveau.",
       "hint": "Membri di questo caveau. Ognuno si unisce con la propria identità e credenziali.",
-      "empty": "Ancora nessun membro. Invitare qualcuno è il passo successivo.",
+      "empty": "Invita qualcuno a condividere questa cassaforte. Si unisce con la propria identità.",
       "rotated": "Chiave ruotata",
       "keyChanged": "Chiave cambiata. Verificala con il proprietario.",
       "relinkConfirmed": "Ricollegamento confermato dal proprietario",
@@ -4699,7 +4699,7 @@
       "lockedDuringChange": "Cambio password annullato: la cassaforte era bloccata.",
       "metaChangedExternally": "La cassaforte è stata modificata in un'altra sessione. Sbloccala di nuovo."
     },
-    "title": "Sblocca la tua cassaforte.",
+    "title": "Sblocca la tua cassaforte",
     "vaultUnreadable": "Il file della cassaforte è illeggibile. Ripristina da un backup.",
     "unlockFailedGeneric": "Impossibile sbloccare. Riprova.",
     "biometricTooManyAttempts": "Troppi tentativi con {{biometric}}. Usa la tua password.",
@@ -4755,7 +4755,7 @@
     "briefing": {
       "back": "Indietro",
       "continue": "Continua alla creazione della cassaforte",
-      "eyebrow": "Prima di creare la tua cassaforte",
+      "eyebrow": "Nuova cassaforte",
       "heading": "Prima di creare la tua cassaforte",
       "intro": "Myne crittografa le tue note in modo che solo tu possa aprirle. Da questo derivano tre cose. Leggile, poi continua.",
       "statements": {
@@ -4779,10 +4779,10 @@
     },
     "confirm": {
       "back": "Indietro",
-      "heading": "Ridigita quattro parole della tua frase.",
-      "intro": "Ti chiederemo posizioni specifiche per verificare che tu l'abbia salvata.",
-      "mismatch": "Non corrisponde alla parola n. {{pos}}.",
-      "wordAtPosition": "Parola in posizione {{pos}}",
+      "heading": "Conferma la tua frase di recupero",
+      "intro": "Digita le parole in queste quattro posizioni, per verificare che tu le abbia salvate.",
+      "mismatch": "Non corrisponde alla parola {{pos}}.",
+      "wordAtPosition": "Parola {{pos}}",
       "commit": "Crea cassaforte",
       "committing": "Salvataggio…",
       "eyebrowLabel": "Conferma la frase"
@@ -4889,7 +4889,7 @@
     },
     "password": {
       "back": "Indietro",
-      "heading": "Crea cassaforte",
+      "heading": "Scegli una password principale",
       "helperLead": "Myne non memorizza la tua password né la tua frase di recupero.",
       "submit": "Genera frase di recupero",
       "eyebrowLabel": "Password principale"
@@ -4908,16 +4908,16 @@
       "savedToFile": "Salvato. È un file di testo semplice, quindi conservalo in un luogo che solo tu puoi leggere."
     },
     "ready": {
-      "backedUp": "Backup eseguito ✓",
+      "backedUp": "Backup eseguito",
       "backingUp": "Backup in corso…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Il backup non è stato completato. Non è stato lasciato alcun file. Puoi eseguire il backup in qualsiasi momento da Impostazioni → Archiviazione.",
       "backupFilterName": "Backup Myne",
-      "backUpNow": "Esegui ora il backup di questa cassaforte",
-      "body": "Myne ha scritto la tua cassaforte nella cartella dei dati dell'applicazione. La tua password principale e la tua frase di recupero sono l'unico modo per rientrare. Assicurati di averle salvate entrambe in un luogo sicuro.",
+      "backUpNow": "Esegui il backup ora",
+      "body": "Le tue note sono crittografate e archiviate su questo dispositivo. Conserva la tua password e il tuo kit di recupero in un luogo sicuro: sono l'unico modo per rientrare.",
       "decrypting": "Decifratura…",
-      "done": "Fatto",
-      "heading": "La tua cassaforte è pronta.",
+      "done": "Apri cassaforte",
+      "heading": "La tua cassaforte è pronta",
       "showFolder": "Mostra la cartella della cassaforte"
     },
     "sessionLost": {
@@ -5233,7 +5233,7 @@
     "confirmPasswordLabel": "Conferma la password",
     "passwordHelper": "Mai memorizzata, mai trasmessa. Cifra le tue chiavi su questo dispositivo.",
     "encryptingSubtitle": "Derivazione della tua chiave con Argon2id. Richiede qualche secondo e non può essere interrotta.",
-    "showSecondHalf": "Mostra le parole 13–24",
+    "showSecondHalf": "Mostra le parole 13-24",
     "saveToFile": "Salva su file",
     "writtenThemDown": "Le ho scritte",
     "typebackTitle": "Conferma la tua frase",
@@ -5313,14 +5313,14 @@
   },
   "identitySetup": {
     "doneCta": "Fatto",
-    "error": "Impossibile configurare l'identità. Controlla che sia configurato un server di sincronizzazione, poi riprova.",
+    "error": "Impossibile configurare l'identità. Riprova.",
     "intro": "Un'identità permette alle persone di indirizzare un invito a te prima che tu possieda un caveau. Non crea alcun caveau e non memorizza note.",
     "pending": "Questo dispositivo sta aspettando che un altro dispositivo dell'account lo approvi.",
     "phraseWarning": "Annota queste 24 parole e custodiscile al sicuro. È la sola volta che vengono mostrate; sono l'unico modo per recuperare questa identità.",
     "recoverCta": "Recupera un'identità",
-    "recoverIntro": "Hai già un'identità? Inserisci la sua frase di recupero di 24 parole.",
+    "recoverIntro": "Frase di recupero dell'identità",
     "recovered": "Identità recuperata.",
-    "title": "Solo identità",
+    "title": "Crea un'identità",
     "errorAlreadyHeld": "Questo dispositivo contiene già un'identità. Recuperala con la sua frase di recupero, oppure dimenticala e creane una nuova.",
     "errorNotConfigured": "Non è stato possibile configurare l'identità. Verifica che sia configurato un server di sincronizzazione, poi riprova.",
     "forgetCancel": "Mantienila",
