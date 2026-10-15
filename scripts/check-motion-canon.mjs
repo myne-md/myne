@@ -38,7 +38,11 @@
 //
 // VERIFYING THIS GUARD MEANS BREAKING IT. Each rule's fixture lives in
 // `tests/scripts/motionCanon.test.ts`, which injects the exact defect and
-// asserts this file names it. A guard that has never failed is untested.
+// asserts this file names it, and the declaration READER has fixtures there of
+// its own, because the two ways it has gone silently blind (an inline style's
+// quoted value, a value starting on the line AFTER the colon) were both found
+// by injection rather than by running it. A guard that has never failed is
+// untested.
 //
 // Run by hand:   node scripts/check-motion-canon.mjs
 // Wired into:    lefthook `pre-commit`, CI `pnpm-build`.
@@ -217,6 +221,27 @@ const LAYOUT_EXEMPT = new Map([
       "pointer-enter rather than continuously.",
   ],
   [
+    "client-core/src/components.css:width",
+    "The Segmented selection fill, which grows or shrinks between segments of " +
+      "different widths. Its `left` travel is already a `transform: translateX`, " +
+      "measured in the component; `width` is the one value a stylesheet cannot " +
+      "know, so a `scaleX` rewrite is not a stylesheet change: it moves a " +
+      "scale RATIO (and a base width to divide by) into the same measurement " +
+      "path myne-md/myne#727 had to fix for this exact primitive, whose thumb " +
+      "went zero-width in a pane that mounted hidden. Fires once per selection, " +
+      "not per frame.",
+  ],
+  [
+    "src/screens/Editor.tsx:width",
+    "The desktop sidebar collapse, the mobile twin of `EditorFlow.tsx:width` below " +
+      "and the same argument: the editor beside it must REFLOW into the reclaimed " +
+      "space, and a translated sidebar would slide over the editor instead of " +
+      "pushing it. Fires once per collapse toggle, and `resizing` turns the " +
+      "transition off entirely while the user is dragging the divider. It was " +
+      "invisible to this guard until myne-md/myne#868 put the value on one line, " +
+      "which is why the exemption lands with a formatting change.",
+  ],
+  [
     "mobile/src/app/flows/EditorFlow.tsx:width",
     "The sidebar collapse (248px <-> 0). This is the case a transform genuinely cannot " +
       "express: the editor beside it must REFLOW into the reclaimed space, and a " +
@@ -325,21 +350,47 @@ function maskReducedMotionBlocks(src) {
  * caught it; running the guard never would have, because a guard reading an
  * empty string finds nothing wrong with it.
  *
- * CSS:  `transition: opacity 200ms ease;`   -> ends at `;`, `}` or newline.
+ * The SAME empty-value hole had a second door, and this is the one that stayed
+ * open (myne-md/myne#868): skipping ` `/`\t` but not the newline meant
+ * `transition:\n    "…"`, the shape a formatter produces whenever the value is
+ * long enough to wrap, read as empty too. Rules 2, 3 and 4 were therefore blind
+ * to every wrapped declaration in the tree (13 sites under `.ts`/`.tsx` plus the
+ * CSS sheets). Both the quoted and the unquoted branch now skip ALL whitespace,
+ * newlines included, before the value.
+ *
+ * The unquoted branch stops at the declaration's own end, and where that end is
+ * depends on the syntax. The boundary is a judgement rather than a parse: in
+ * JS/TS a value on the next line is USUALLY the sibling property that follows
+ * it, while in a `.css` file it is a continuation of the SAME declaration, which
+ * there ends at `;` or `}`. So a JS/TS read stops at the newline and a `.css`
+ * read runs to the real terminator. Reading past that boundary charges this
+ * declaration for whatever the next line holds, a false positive rather than a
+ * miss, and `tests/scripts/motionCanon.test.ts` pins the boundary for that
+ * reason.
+ *
+ * One JS/TS shape stays out of reach, and it is the price of that boundary: an
+ * unquoted expression SPLIT ACROSS lines is read as its first line only, so rule
+ * 4 cannot see the property it names. `src/screens/Editor.tsx`'s sidebar
+ * collapse was written that way and its `width` transition was invisible until
+ * myne-md/myne#868; it now writes the expression on one line, which is the only
+ * reliable fix, because a regex cannot know where a JS expression ends.
+ *
+ * CSS:  `transition: opacity 200ms ease;`   -> ends at `;` or `}`.
  * JS:   `transition: "opacity 200ms ease",` -> ends at the matching quote, so a
  *       trailing `, nextProp: 400` cannot be swallowed and reported as part of
  *       this declaration.
  */
-function declValue(src, start) {
+function declValue(src, start, isCss = false) {
   let i = start;
-  while (i < src.length && (src[i] === " " || src[i] === "\t")) i++;
+  while (i < src.length && /\s/.test(src[i])) i++;
   const q = src[i];
   if (q === '"' || q === "'" || q === "`") {
     const end = src.indexOf(q, i + 1);
     return end === -1 ? "" : src.slice(i + 1, end);
   }
   let end = i;
-  while (end < src.length && !";}\n".includes(src[end])) end++;
+  const stops = isCss ? ";}" : ";}\n";
+  while (end < src.length && !stops.includes(src[end])) end++;
   return src.slice(i, end);
 }
 
@@ -418,6 +469,9 @@ for (const root of present) {
     const raw = readOrSkip(file);
     if (raw === null) continue;
     const src = scrub(raw);
+    // A `.css` value has no sibling property to swallow, so its unquoted read
+    // can run to the declaration's real terminator (see `declValue`).
+    const isCss = rel.endsWith(".css");
 
     // -- Rule 1: ease-in as a curve -----------------------------------------
     // `(?!-out)` is the whole subtlety: `ease-in-out` is a legitimate curve for
@@ -439,7 +493,7 @@ for (const root of present) {
     // token ORDER does not decide whether a loop is seen (see `animationNames`).
     const flaggedInfinite = new Set();
     for (const m of src.matchAll(/\banimation(?:-name)?\s*:/g)) {
-      const decl = declValue(src, m.index + m[0].length);
+      const decl = declValue(src, m.index + m[0].length, isCss);
       if (!/\binfinite\b/.test(decl)) continue;
       for (const name of animationNames(decl)) {
         seenInfinite.add(name);
@@ -480,7 +534,7 @@ for (const root of present) {
     for (const m of noReduced.matchAll(
       /\b(?:transition|animation)(?:-duration)?\s*:/g,
     )) {
-      const decl = declValue(noReduced, m.index + m[0].length);
+      const decl = declValue(noReduced, m.index + m[0].length, isCss);
       if ([...INFINITE_ALLOWLIST.keys()].some((n) => decl.includes(n))) continue;
       if ([...flaggedInfinite].some((n) => decl.includes(n))) continue;
       const exemptKey = [...DURATION_EXEMPT.keys()].find(
@@ -556,7 +610,7 @@ for (const root of present) {
 
     // -- Rule 4: transitioning a layout property ----------------------------
     for (const m of src.matchAll(/\btransition(?:-property)?\s*:/g)) {
-      const decl = declValue(src, m.index + m[0].length);
+      const decl = declValue(src, m.index + m[0].length, isCss);
       for (const prop of LAYOUT_PROPS) {
         const re = new RegExp(`(^|[\\s,"'\`])${prop}(\\s|,|$)`);
         if (!re.test(decl)) continue;

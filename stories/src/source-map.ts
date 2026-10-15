@@ -45,7 +45,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "BarCustomizeSettings": { file: "src/components/settings/BarCustomizeSettings.tsx", line: 48 },
   "BetaTermsConsent": { file: "src/components/sync/BetaTermsConsent.tsx", line: 117 },
   "BlockingProgressStep": { file: "src/components/BlockingProgressStep.tsx", line: 114 },
-  "BriefingStep": { file: "src/screens/vault-creation/BriefingStep.tsx", line: 52 },
+  "BriefingStep": { file: "src/screens/vault-creation/BriefingStep.tsx", line: 53 },
   "browser-icons": { file: "src/components/settings/browser-icons.tsx", line: 1 },
   "BuildingIndexState": { file: "src/components/sync/BuildingIndexState.tsx", line: 28 },
   "Button": { file: "src/components/primitives/Button.tsx", line: 37 },
