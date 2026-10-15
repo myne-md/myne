@@ -479,7 +479,7 @@
   dialog in front of it was refusing the first press because its Enter guard was
   a 16 ms window that opened when React ran the arming EFFECT rather than when
   the dialog appeared, and this harness's own press sequence is 10 to 14 ms long
-  (myne-md/myne#683; the instrumented reading is in `design-notes/ui/0680`).
+  (myne-md/myne#683; the instrumented reading is in `design-notes/ui/0685`).
   The retry worked because it was 8 s later, so every scenario using the helper
   went green and the defect reached users instead. The question to ask of a retry
   is which single press it is rescuing, and why that press failed; when the

@@ -133,7 +133,7 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         // reason to believe that rather than assert it: the guard those tests
         // exercised was refusing the harness's press at 14 ms of dialog age,
         // under load, with every jsdom-level check green. `design-notes/ui/
-        // 0680` records the measurement and what replaced the guard.
+        // 0685` records the measurement and what replaced the guard.
         //
         // It also exercises guard 4 end to end. The palette selects its row on an
         // Enter KEYDOWN, so the dialog mounts with that key still down and

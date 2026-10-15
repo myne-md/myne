@@ -7,7 +7,7 @@
 // So the key that normally activates a primary action did nothing, on a dialog
 // whose two buttons disagreed about which one was primary.
 //
-// `design-notes/ui/0564` records the reversal, and `design-notes/ui/0680`
+// `design-notes/ui/0564` records the reversal, and `design-notes/ui/0685`
 // records what #683 changed about it. The rule it settles on is that
 // **Enter follows the focus ring**: focus starts on the destructive button, so
 // the reflex press confirms, and a user who deliberately Tabs to Cancel gets an
