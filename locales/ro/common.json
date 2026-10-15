@@ -29,7 +29,7 @@
   },
   "agent": {
     "composer": {
-      "placeholder": "Cere-i AI-ului să modifice aceste note",
+      "placeholder": "Întreabă AI-ul…",
       "scopeLabel": "Se lucrează la",
       "scopeOpenNote": "Această notă",
       "scopeCount_one": "{{count}} notă",
@@ -45,7 +45,7 @@
       "unchecked": "Verificarea editării nu a putut fi finalizată, așa că agentul este momentan indisponibil. Verifică dacă modelul sau furnizorul tău este accesibil, apoi încearcă din nou.",
       "unsupported": "Acest model nu poate face editări precise în mod fiabil, așa că agentul este indisponibil. Alege un model mai mare sau un furnizor.",
       "unsupportedDetail": "A trecut {{passes}} din {{attempts}} verificări; sunt necesare {{required}}.",
-      "checking": "Se verifică modelul…",
+      "checking": "Se verifică",
       "unsupportedProvisional": "Acel prag de trecere nu a fost încă măsurat pe mai multe modele, așa că poate fi mai strict sau mai permisiv decât ar trebui.",
       "scopeNone": "nicio notiță deschisă, deci încă nu este nimic de lucrat",
       "scopeAllVault": "Toate notele",
@@ -339,10 +339,10 @@
       "decrypting": "Se decriptează atașamentele…",
       "clearSearchAriaLabel": "Șterge căutarea",
       "emptyClearSearch": "Șterge căutarea",
-      "emptyImportHint": "Importă un fișier pentru a-l păstra în seif.",
+      "emptyImportHint": "Fișierele pe care le adaugi într-o notă sunt păstrate în seiful tău, criptate pe acest dispozitiv înainte de a ajunge oriunde. Importă unul pentru a începe.",
       "emptyLoadError": "Catalogul de atașamente nu a putut fi citit.",
       "emptyNoAttachments": "Niciun atașament încă.",
-      "emptyNoResultsTitle": "Niciun atașament nu corespunde căutării tale.",
+      "emptyNoResultsTitle": "Niciun atașament nu corespunde.",
       "filterAriaLabel": "Filtrează după tip",
       "gridView": "Vizualizare grilă",
       "import": "Importă",
@@ -363,8 +363,8 @@
       "sort": {
         "createdAsc": "Cele mai vechi întâi",
         "createdDesc": "Cele mai noi întâi",
-        "nameAsc": "Nume A–Z",
-        "nameDesc": "Nume Z–A"
+        "nameAsc": "Nume A-Z",
+        "nameDesc": "Nume Z-A"
       },
       "sortAriaLabel": "Sortează atașamentele",
       "supportedFilesFilter": "Fișiere acceptate",
@@ -910,7 +910,7 @@
         "exportFailed": "{{filename}} nu a putut fi exportat.",
         "renamed": "Redenumit în {{name}}.",
         "renameFailed": "Atașamentul nu a putut fi redenumit.",
-        "saveDialogFailed": "Fereastra de salvare nu a putut fi deschisă."
+        "saveDialogFailed": "Nu s-a putut alege unde să salvezi acest fișier."
       },
       "compression": {
         "bulkNotice_one": "{{count}} imagine comprimată: {{from}} → {{to}}",
@@ -1272,7 +1272,7 @@
           "askPlaceholder": "Pune o întrebare despre notele tale…",
           "askSubmit": "Întreabă",
           "assistant": "Asistent",
-          "empty": "Rezultatele AI (rezumate, răspunsuri și sugestii) apar aici.",
+          "empty": "Rezumatele, răspunsurile și sugestiile apar aici pe măsură ce le ceri.",
           "error": "Solicitarea AI nu a putut fi finalizată.",
           "errorTurn": "Asistentul nu a putut răspunde.",
           "gettingReadyHint": "Se pregătesc notele tale pentru AI. Un moment.",
@@ -1282,7 +1282,7 @@
           "newChat": "Chat nou",
           "noModelHint": "Nu este configurat niciun furnizor AI, așa că chatul, rezumatele, rescrierea și căutarea semantică nu au pe ce să ruleze. Configurează unul din Setări → Developer → AI.",
           "unreachableHint": "Furnizorul pe care l-ai configurat nu răspunde. Verifică dacă rulează, apoi trimite din nou.",
-          "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula.",
+          "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula. Nicio setare nu va schimba asta — e nevoie de o versiune care include AI.",
           "offHint": "Funcția AI local este dezactivată. Activeaz-o din Setări → Developer → AI.",
           "send": "Trimite",
           "statusGettingReady": "Se pregătește…",
@@ -1400,7 +1400,7 @@
     },
     "noteActions": {
       "buttonLabel": "Acțiuni pentru notă",
-      "convertFailed": "Nu s-a putut converti această notă, așa că a rămas neschimbată.",
+      "convertFailed": "Nu s-a putut schimba tipul acestei note, așa că a rămas neschimbată.",
       "rename": "Redenumește",
       "move": "Mută în dosar…",
       "duplicate": "Duplică",
@@ -2235,7 +2235,7 @@
         "nodeSizeStrength": "Dimensiune după conexiuni",
         "openTitle": "Setări grafic",
         "reset": "Revino la valorile implicite",
-        "showArrows": "Arată săgețile de direcție",
+        "showArrows": "Săgeți de direcție la hover",
         "title": "Setări grafic"
       },
       "canvasLabel": "Graf de cunoștințe din {{count}} note",
@@ -2396,8 +2396,8 @@
         "myne": {
           "label": "Seif Myne",
           "loses": "Istoricul versiunilor, notele șterse și șabloanele rămân în seiful sursă. Atașamentele pe care nu le folosește nicio notă importată sunt lăsate în urmă. Seiful sursă nu este modificat și, dacă îl sincronizezi, continuă să se sincronizeze.",
-          "pickerTitle": "Alege seiful din care să imporți",
-          "short": "Un alt seif de pe acest dispozitiv",
+          "pickerTitle": "Alege fișierul .myne-backup din care să imporți",
+          "short": "Un fișier .myne-backup exportat",
           "survives": "Notele, folderele, etichetele, legăturile dintre notele pe care le imporți și atașamentele folosite de acele note. Vin și cuvintele pe care le-ai adăugat în dicționarul seifului sursă."
         }
       },
@@ -2465,7 +2465,7 @@
       "bulkMove_other": "Mută {{count}} de note în…",
       "caseMergeBody": "Există deja un folder numit „{{name}}”. Acestea se vor îmbina. Redenumești unul ca să le păstrezi separate?",
       "color": "Culoare…",
-      "createFirstNote": "+ Creează prima ta notă",
+      "createFirstNote": "Creează prima ta notă",
       "createFolderNote": "Creează notă de folder",
       "customize": "Personalizează…",
       "delete": "Șterge",
@@ -2547,12 +2547,12 @@
       "untitledTemplate": "Șablon fără titlu"
     },
     "newTab": {
-      "createNote": "Creează o notă nouă",
+      "createNote": "Notă nouă",
       "createDrawing": "Desen nou",
       "noNotesYet": "Nicio notă încă.",
-      "recent": "Recente",
-      "searchAriaLabel": "Caută note de deschis",
-      "searchPlaceholder": "Caută note…",
+      "recent": "Reia de unde ai rămas",
+      "searchAriaLabel": "Caută note și comenzi",
+      "searchPlaceholder": "Caută note și comenzi…",
       "untitled": "Fără titlu",
       "createFromTemplate": "Din șablon",
       "kindCommand": "Comandă",
@@ -2798,7 +2798,7 @@
       "viewTypeTable": "Tabel"
     },
     "welcome": {
-      "body": "Bine ai venit în Myne, spațiul tău privat pentru a gândi și a scrie.\n\nTot ce salvezi aici este criptat și rămâne pe dispozitivul tău. **Parola** și **fraza de recuperare** sunt singurele chei către el, așa că păstrează-le undeva în siguranță. Dacă le pierzi pe amândouă, nimeni nu îți poate recupera notele, nici măcar noi.\n\nAceasta este doar o notă obișnuită, așa că fă-o a ta. Editeaz-o, redenumește-o sau șterge-o oricând dorești și adaugă note noi pe măsură ce ideile tale cresc.\n\nNe bucurăm că ești aici. Pentru a afla mai multe despre Myne, vizitează https://myne.md\n",
+      "body": "Bine ai venit în Myne, spațiul tău privat pentru a gândi și a scrie.\n\nTot ce salvezi aici este criptat și rămâne pe dispozitivul tău. **Parola** și **fraza de recuperare** sunt singurele chei către el, așa că păstrează-le undeva în siguranță. Dacă le pierzi pe amândouă, nimeni nu îți poate recupera notele, nici măcar noi.\n\n**Poți lega notele între ele.** Tastează `[[` și Myne îți oferă notele pe care le ai deja; alege una și devine un link. Nota către care ai făcut legătura arată de unde a venit linkul, în propriul panou de legături inverse, așa că un set de note poate fi urmărit în ambele direcții.\n\nAceasta este doar o notă obișnuită, așa că fă-o a ta. Editeaz-o, redenumește-o sau șterge-o oricând dorești și adaugă note noi pe măsură ce ideile tale cresc.\n\nPentru a afla mai multe despre Myne, vizitează https://myne.md\n",
       "title": "Bine ai venit în Myne"
     },
     "workspace": {
@@ -2816,7 +2816,7 @@
     "createForm": {
       "checkingStrength": "Se verifică puterea…",
       "confirmLabel": "Confirmă parola principală",
-      "defaultEmptyCaption": "Folosită ca intrare pentru Argon2id (m=256 MiB, t=3, p=2). Alege ceva ce poți ține minte; nu o poți reseta.",
+      "defaultEmptyCaption": "Alege ceva ce poți ține minte. Nu poate fi resetată.",
       "mismatch": "Parolele nu se potrivesc.",
       "passwordLabel": "Parolă principală",
       "suggestPassword": "Sugerează o parolă",
@@ -2968,7 +2968,7 @@
   },
   "restore": {
     "backLabel": "Înapoi",
-    "cancelLabel": "Anulează",
+    "cancelLabel": "Înapoi",
     "collision": {
       "body": "Un seif din această copie de rezervă există deja pe acest dispozitiv. Le poți păstra pe amândouă: copia restaurată apare ca un seif separat în lista ta de seifuri. Sau poți restaura acum și apoi elimina chiar tu seiful existent din lista de seifuri. Eliminarea îți cere să tastezi DELETE și are sens doar după ce confirmi că seiful restaurat se deschide.",
       "keepBoth": "Păstrează-le pe amândouă",
@@ -3246,7 +3246,7 @@
       "confirm": "Confirmă",
       "delete": "Șterge",
       "deleteError": "Acea temă nu a putut fi ștearsă. Te rugăm să încerci din nou.",
-      "empty": "Nicio temă personalizată încă. Importă un fișier de temă pentru a începe.",
+      "empty": "Importă un fișier de temă sau răsfoiește galeria pentru a găsi una.",
       "error": {
         "aColorFallback": "o culoare",
         "invalidFile": "Fișier de temă nevalid.",
@@ -3452,7 +3452,7 @@
     "ai": {
       "autoTagHelper": "Când te oprești din scris, un model mic de pe dispozitivul tău citește nota și sugerează etichete în partea de sus a ei. Nimic nu este adăugat până când nu accepți o sugestie.",
       "autoTagLabel": "Sugerează etichete automat",
-      "autoTagUnavailable": "Această versiune nu include modelul de etichetare, așa că nu pot fi sugerate etichete. Myne nu descarcă niciodată unul. Comutatorul se activează singur într-o versiune care îl include.",
+      "autoTagUnavailable": "Nu este încă instalat niciun model de etichetare. Descarcă-l o dată din Setări, AI, iar comutatorul se activează singur odată ce este instalat.",
       "consent": {
         "accept": "Trimite notele mele către {{provider}}",
         "cancel": "Anulează",
@@ -3469,7 +3469,7 @@
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine. Unde rulează și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl indici mai jos. Experimental, dezactivat implicit.",
       "enableLabel": "Activează AI local",
-      "excludedHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. O cale de dosar pe linie.",
+      "excludedHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. Gol înseamnă că AI-ul poate vedea tot; aceasta este aceeași listă pe care o respectă clientul din linia de comandă. O cale de dosar pe linie.",
       "excludedLabel": "Dosare excluse",
       "excludedPlaceholder": "Privat/\nJurnal/",
       "endpointHelper": "Dacă rulezi deja un mediu de execuție pentru modele pe acest computer, îndreaptă Myne către el în loc să alegi fișiere de model. Lasă gol pentru a folosi fișierele de mai sus.",
@@ -3511,7 +3511,7 @@
       "modelNone": "Niciun fișier selectat",
       "modelSaveFailed": "Calea modelului nu a putut fi salvată (trebuie să fie în afara seifului tău).",
       "modelTranscriptionLabel": "Model de conversie a vorbirii în text (transcriere)",
-      "modelsHelper": "Myne nu descarcă niciodată modele. Asta ar însemna trimiterea de date prin rețea. Deschide un link pentru a obține unul în browserul tău, apoi alege fișierele descărcate aici. Un model ales aici rulează pe dispozitivul tău; dacă ai indicat în schimb un furnizor, acel furnizor răspunde.",
+      "modelsHelper": "Descarcă un model aici sau deschide un link pentru a obține unul în browserul tău și alege fișierele descărcate. Un model rulează pe dispozitivul tău; dacă ai indicat în schimb un furnizor, acel furnizor răspunde.",
       "providerHelper": "În loc să ruleze un model aici, Myne poate trimite o solicitare către un serviciu numit de tine. Când o face, notele tale părăsesc acest dispozitiv. „Niciunul” este valoarea implicită și înseamnă că nu este contactat niciun serviciu.",
       "providerKeyAdd": "lipește cheia ta API",
       "providerKeyLabel": "Cheie API",
@@ -3595,13 +3595,13 @@
       "postureInactive": "Sincronizarea merge direct la serverul de sincronizare",
       "postureUnavailable": "Tor nu este disponibil: sincronizarea este în pauză",
       "postureUnavailableDetail": "Nimic nu este trimis direct. Dezactivează și reactivează această setare pentru a încerca pornirea clientului Tor sau dezactiveaz-o pentru a sincroniza fără Tor.",
-      "residualExit": "Ultimul releu dintr-un circuit Tor, nodul de ieșire, vede la ce server de sincronizare te conectezi. Nu poate citi ce sincronizezi; asta rămâne criptat cap la cap.",
+      "residualExit": "Ultimul releu dintr-un circuit Tor, nodul de ieșire, vede la ce server de sincronizare te conectezi și, pe desktop cu această opțiune activată, la ce furnizor AI ajungi. Nu poate citi ce sincronizezi; asta rămâne criptat cap la cap.",
       "residualMetadata": "Serverul de sincronizare vede în continuare când sincronizezi, câte blocuri criptate trimiți și cât de mari sunt și câte dispozitive ai. Tor nu schimbă asta.",
       "residualPayment": "Dacă plătești pentru sincronizarea găzduită, plata și contul tău pot fi în continuare legate de tine. Tor schimbă de unde vine conexiunea, nu urma lăsată de facturare.",
-      "residualScope": "Doar traficul de sincronizare al lui Myne trece prin Tor. Nimic altceva de pe acest dispozitiv nu o face.",
+      "residualScope": "Pe desktop, aceasta acoperă traficul tău de sincronizare și cererile tale către furnizorul AI la distanță. Mobilul nu are încă rutare prin Tor, așa că cererile sale către furnizor merg direct. Nimic altceva de pe acest dispozitiv nu trece prin Tor.",
       "residualsToggle": "Ce nu ascunde asta",
-      "torHelper": "Îți ascunde adresa IP și locația față de serverul de sincronizare și ascunde cu ce server sincronizezi față de rețeaua ta și de furnizorul tău de internet. Ei pot vedea în continuare acest dispozitiv conectându-se la Tor. Nu te face anonim față de Myne și nu ascunde față de server ce sincronizezi sau când.",
-      "torLabel": "Rutează sincronizarea prin Tor"
+      "torHelper": "Îți ascunde adresa IP și locația față de serverul de sincronizare și ascunde cu ce server sincronizezi (și, pe desktop, la ce furnizor AI ajungi) față de rețeaua ta și de furnizorul tău de internet. Ei pot vedea în continuare acest dispozitiv conectându-se la Tor. Nu te face anonim față de Myne și nu ascunde față de server ce sincronizezi sau când.",
+      "torLabel": "Rutează sincronizarea și AI-ul de pe desktop prin Tor"
     },
     "prefs": {
       "saveError": "Preferința nu a putut fi salvată. Încearcă din nou.",
@@ -3964,7 +3964,7 @@
     },
     "ribbonCustomize": {
       "add": "Adaugă",
-      "empty": "Încă nu sunt comenzi pe bară. Folosiți „Adaugă” pentru a fixa.",
+      "empty": "Folosește Adaugă pentru a fixa o comandă pe bară.",
       "errorSave": "Setarea barei nu a putut fi salvată.",
       "helper": "Comenzile de pe bara stângă, în ordine. Trageți pentru a schimba ordinea, adăugați din lista de comenzi sau eliminați cu ×. Bara ascunde comenzile indisponibile în starea curentă.",
       "label": "Bara stângă",
@@ -3980,7 +3980,7 @@
     "memory": {
       "heading": "Ce își amintește asistentul",
       "helper": "Fapte pe care IA le-a învățat lucrând cu dvs. Le înregistrează singur (cel mult unul pe rulare); vedeți fiecare și puteți corecta. Înregistrările se sincronizează cu alte dispozitive și rămân criptate.",
-      "empty": "Deocamadă nu reține nimic. Înregistrările vor apărea aici când asistentul învață ceva la o rulare.",
+      "empty": "Înregistrările apar aici când asistentul învață ceva în timpul unei rulări.",
       "editLabel": "Editează",
       "deleteLabel": "Șterge",
       "save": "Salvează",
@@ -4118,7 +4118,7 @@
       "compareTheirs": "Copie aflată în conflict",
       "compareTitle": "Se compară „{{title}}”",
       "discard": "Renunță",
-      "empty": "Niciun conflict. Dispozitivele tale sunt sincronizate.",
+      "empty": "Dispozitivele tale sunt sincronizate.",
       "groupTitle_one": "{{count}} copie a {{original}} aflată în conflict",
       "groupTitle_few": "{{count}} copii ale {{original}} aflate în conflict",
       "groupTitle_other": "{{count}} de copii ale {{original}} aflate în conflict",
@@ -4146,7 +4146,7 @@
       "awaitingApproval_few": "{{count}} dispozitive în așteptarea aprobării",
       "awaitingApproval_other": "{{count}} de dispozitive în așteptarea aprobării",
       "loading": "Se încarcă…",
-      "noDevices": "Niciun dispozitiv sincronizat încă.",
+      "noDevices": "Niciun alt dispozitiv încă.",
       "notEnrolled": "Acest dispozitiv nu este încă conectat. Dacă tocmai l-ai adăugat, așteaptă aprobarea de pe alt dispozitiv; altfel, adaugă-l cu formularul „Adaugă un dispozitiv” de mai sus.",
       "platform": {
         "android": "Telefon Android",
@@ -4176,7 +4176,7 @@
       "reasonDeviceLimit": "contul a atins limita de dispozitive",
       "reasonAwaitingApproval": "acest dispozitiv încă așteaptă să fie aprobat",
       "reasonNotConfigured": "nu este configurat niciun server de sincronizare",
-      "transportHint": "Dacă serverul s-a mutat sau certificatul lui s-a schimbat, reintrodu adresa serverului la „Server de sincronizare” de mai sus pentru a-l considera din nou de încredere.",
+      "transportHint": "Dacă serverul s-a mutat, introdu noua sa adresă la „Server de sincronizare” de mai sus. Verifică dacă certificatul său HTTPS este valid.",
       "unreachable": "Sincronizarea nu a putut fi accesată ({{error}}).",
       "verifyBody": "Verifică dacă același cod apare pe dispozitivul pe care tocmai l-ai aprobat. Dacă se potrivește, este pe contul tău. Dacă nu, elimină dispozitivul.",
       "verifyMatch": "Se potrivesc",
@@ -4196,11 +4196,11 @@
       "connect": "Conectează",
       "connected": "Conectat",
       "connectedLocal": "Conectat (local, fără TLS).",
-      "connectedPlatformTrust": "Conectat prin TLS. Browserul tău a verificat certificatul acestui server.",
+      "connectedPlatformTrust": "Conectat prin TLS. Certificatul și numele serverului au fost verificate.",
       "connecting": "Se conectează…",
       "fixedOrigin": "Acest client se sincronizează cu un singur server, stabilit la implementarea lui. Nu poate fi schimbat de aici: pagina are voie să comunice doar cu această adresă.",
       "fixedOriginNone": "Pentru această implementare nu este configurat niciun server de sincronizare.",
-      "pinPlatformTrust": "Verificat cu depozitul de certificate al browserului tău. Acest client nu poate fixa el însuși un certificat.",
+      "pinPlatformTrust": "Certificatul serverului a fost verificat de depozitul de încredere al acestui client.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Acel server nu a putut fi accesat. Verifică adresa și dacă serverul rulează.",
       "tlsHelp": "Introdu aceeași adresă URL de server pe fiecare dispozitiv. Un server auto-găzduit are nevoie de un certificat HTTPS de încredere.",
@@ -4377,7 +4377,7 @@
       "keepDevice": "Păstrează-l",
       "notEnrolledHelp": "Acest dispozitiv nu se sincronizează încă. Adaugă-l din ecranul anterior pentru a-ți vedea dispozitivele.",
       "unauthenticated": "Accesul acestui dispozitiv a fost revocat, probabil eliminat de pe alt dispozitiv.",
-      "transportError": "Serverul de sincronizare nu a putut fi contactat. Dacă serverul s-a mutat sau certificatul său s-a schimbat, reconectează-l din ecranul Server de sincronizare.",
+      "transportError": "Serverul de sincronizare nu a putut fi contactat. Verifică adresa serverului și certificatul său HTTPS.",
       "retiredSelf": "Acest dispozitiv a fost eliminat de pe alt dispozitiv.",
       "resetAndAddAgain": "Resetează și adaugă din nou",
       "noDevices": "Niciun dispozitiv încă.",
@@ -4406,7 +4406,7 @@
       "loading": "Se încarcă membrii…",
       "error": "Lista membrilor depozitului nu a putut fi citită.",
       "hint": "Membrii acestui depozit. Fiecare se alătură cu propria identitate și credențiale.",
-      "empty": "Deocamadă niciun membru. Invitarea cuiva este pasul următor.",
+      "empty": "Invită pe cineva să împărtășească acest seif. Se alătură cu propria identitate.",
       "rotated": "Cheia a fost rotită",
       "keyChanged": "Cheia a fost schimbată. Verificați cu proprietarul.",
       "relinkConfirmed": "Relegarea a fost confirmată de proprietar",
@@ -4699,7 +4699,7 @@
       "lockedDuringChange": "Schimbarea parolei anulată: seiful a fost blocat.",
       "metaChangedExternally": "Seiful a fost modificat în altă sesiune. Te rugăm să deblochezi din nou."
     },
-    "title": "Deblochează-ți seiful.",
+    "title": "Deblochează-ți seiful",
     "vaultUnreadable": "Fișierul seifului nu poate fi citit. Restaurează dintr-o copie de rezervă.",
     "unlockFailedGeneric": "Deblocarea nu a reușit. Te rugăm să încerci din nou.",
     "biometricTooManyAttempts": "Prea multe încercări cu {{biometric}}. Folosește parola.",
@@ -4755,7 +4755,7 @@
     "briefing": {
       "back": "Înapoi",
       "continue": "Continuă la crearea seifului",
-      "eyebrow": "Înainte de a-ți crea seiful",
+      "eyebrow": "Seif nou",
       "heading": "Înainte de a-ți crea seiful",
       "intro": "Myne îți criptează notele astfel încât doar tu să le poți deschide. Din asta decurg trei lucruri. Citește-le, apoi continuă.",
       "statements": {
@@ -4779,10 +4779,10 @@
     },
     "confirm": {
       "back": "Înapoi",
-      "heading": "Tastează din nou patru cuvinte din fraza ta.",
-      "intro": "Îți vom cere poziții specifice pentru a verifica că ai salvat-o.",
-      "mismatch": "Nu corespunde cu cuvântul #{{pos}}.",
-      "wordAtPosition": "Cuvântul de la poziția {{pos}}",
+      "heading": "Confirmă fraza ta de recuperare",
+      "intro": "Tastează cuvintele de la aceste patru poziții, pentru a verifica dacă le-ai salvat.",
+      "mismatch": "Nu corespunde cuvântului {{pos}}.",
+      "wordAtPosition": "Cuvântul {{pos}}",
       "commit": "Creează seiful",
       "committing": "Se salvează…",
       "eyebrowLabel": "Confirmă fraza"
@@ -4889,7 +4889,7 @@
     },
     "password": {
       "back": "Înapoi",
-      "heading": "Creează seiful",
+      "heading": "Alege o parolă principală",
       "helperLead": "Myne nu îți stochează parola sau fraza de recuperare.",
       "submit": "Generează fraza de recuperare",
       "eyebrowLabel": "Parolă principală"
@@ -4908,16 +4908,16 @@
       "savedToFile": "Salvat. Este un fișier text simplu, așa că păstrează-l într-un loc unde numai tu îl poți citi."
     },
     "ready": {
-      "backedUp": "Copie de rezervă creată ✓",
+      "backedUp": "Copie de rezervă creată",
       "backingUp": "Se creează copia de rezervă…",
       "backupDefaultFilename": "Myne backup.myne-backup",
       "backupError": "Copia de rezervă nu s-a finalizat. Nu a rămas niciun fișier. Poți crea o copie de rezervă oricând din Setări → Stocare.",
       "backupFilterName": "Copie de rezervă Myne",
-      "backUpNow": "Creează acum o copie de rezervă a acestui seif",
-      "body": "Myne ți-a scris seiful în folderul de date al aplicației. Parola ta principală și fraza de recuperare sunt singura cale de întoarcere. Asigură-te că ambele sunt salvate undeva în siguranță.",
+      "backUpNow": "Creează acum o copie de rezervă",
+      "body": "Notele tale sunt criptate și stocate pe acest dispozitiv. Păstrează parola și kitul de recuperare undeva în siguranță: sunt singura cale de întoarcere.",
       "decrypting": "Se decriptează…",
-      "done": "Gata",
-      "heading": "Seiful tău este gata.",
+      "done": "Deschide seiful",
+      "heading": "Seiful tău este gata",
       "showFolder": "Arată folderul seifului"
     },
     "sessionLost": {
@@ -5233,7 +5233,7 @@
     "confirmPasswordLabel": "Confirmă parola",
     "passwordHelper": "Niciodată stocată, niciodată transmisă. Îți criptează cheile pe acest dispozitiv.",
     "encryptingSubtitle": "Se derivă cheia ta cu Argon2id. Aceasta durează câteva secunde și nu poate fi întreruptă.",
-    "showSecondHalf": "Afișează cuvintele 13–24",
+    "showSecondHalf": "Afișează cuvintele 13-24",
     "saveToFile": "Salvează în fișier",
     "writtenThemDown": "Le-am notat",
     "typebackTitle": "Confirmă-ți fraza",
@@ -5313,14 +5313,14 @@
   },
   "identitySetup": {
     "doneCta": "Gata",
-    "error": "Identitatea nu a putut fi configurată. Verificați dacă serverul de sincronizare este configurat și încercați din nou.",
+    "error": "Identitatea nu a putut fi configurată. Încearcă din nou.",
     "intro": "Identitatea permite cuiva să vă adreseze o invitație înainte să aveți un depozit. Nu creează un depozit și nu stochează note.",
     "pending": "Acest dispozitiv așteaptă confirmarea de la un alt dispozitiv al contului.",
     "phraseWarning": "Scrieți aceste 24 de cuvinte și păstrați-le în siguranță. Se arată doar acum; este singura cale de a recupera această identitate.",
     "recoverCta": "Recuperează identitatea",
-    "recoverIntro": "Aveți deja o identitate? Introduceți fraza de recuperare de 24 de cuvinte.",
+    "recoverIntro": "Fraza de recuperare a identității",
     "recovered": "Identitatea a fost recuperată.",
-    "title": "Doar identitate",
+    "title": "Creează o identitate",
     "errorAlreadyHeld": "Acest dispozitiv deține deja o identitate. Recupereaz-o cu fraza ei de recuperare sau uită-o și creează una nouă.",
     "errorNotConfigured": "Identitatea nu a putut fi configurată. Verifică dacă este configurat un server de sincronizare, apoi încearcă din nou.",
     "forgetCancel": "Păstreaz-o",
