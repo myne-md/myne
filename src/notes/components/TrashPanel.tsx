@@ -47,8 +47,28 @@ import {
 import { formatRelativeTime } from "./relativeTime";
 
 /**
- * A staged purge, plus how it was asked for. `viaKey` is the activating event's
- * own answer (`detail === 0` is keyboard activation) and it reaches
+ * Whether the activation that opened a purge left its key DOWN, which is what
+ * `DeleteConfirmModal` asks about through `openedByKey`.
+ *
+ * Only ENTER can. A `<button>` activates on Enter's KEYDOWN and on Space's
+ * KEYUP, so a Space-opened dialog is opened by a key that is already up and has
+ * nothing to release. `detail === 0` alone cannot tell the two apart, and
+ * claiming "a key opened this" for a Space press shut that guard with no key
+ * left to open it: Enter then refused until an Enter keyup, which the user's
+ * first Enter cannot produce because the keyup follows the keydown it refuses.
+ * That is myne-md/myne#683's symptom on the other irreversible dialog, found by
+ * the review of the branch that fixed it there.
+ */
+export function purgeOpenedByHeldEnter(
+  detail: number,
+  lastActivationKey: string | null,
+): boolean {
+  return detail === 0 && lastActivationKey === "Enter";
+}
+
+/**
+ * A staged purge, plus how it was asked for. `viaKey` says the activating key
+ * may still be down (see `purgeOpenedByHeldEnter`) and it reaches
  * `DeleteConfirmModal` as `openedByKey`: both of these are the cryptographic
  * erase of `docs/decisions/storage/0105`, so a key that is still held from
  * opening the dialog must not be able to answer it.
@@ -68,6 +88,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
   const ctx = useSelectedNote();
   const ws = useWorkspace();
   const [confirm, setConfirm] = useState<Confirm>(null);
+  // The key of the most recent keydown on a purge opener. Read by
+  // `purgeOpenedByHeldEnter` on the click that follows it, which is the only
+  // place the Enter/Space difference is visible.
+  const lastActivationKey = useRef<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   // The rest of the page goes INERT while this is open (myne-md/myne#728).
@@ -190,11 +214,17 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                 variant="ghost"
                 style={{ color: "var(--danger)" }}
                 data-testid="trash.empty"
+                onKeyDown={(e) => {
+                  lastActivationKey.current = e.key;
+                }}
                 onClick={(e) =>
                   setConfirm({
                     kind: "empty",
                     ids: records.map((r) => r.noteUuid),
-                    viaKey: e.detail === 0,
+                    viaKey: purgeOpenedByHeldEnter(
+                      e.detail,
+                      lastActivationKey.current,
+                    ),
                   })
                 }
               >
@@ -249,12 +279,18 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
                     style={{ color: "var(--danger)", padding: "var(--space-1)" }}
                     data-testid="trash.delete"
                     aria-label={t("notes.trash.delete")}
+                    onKeyDown={(e) => {
+                      lastActivationKey.current = e.key;
+                    }}
                     onClick={(e) =>
                       setConfirm({
                         kind: "single",
                         id: r.noteUuid,
                         title: r.title,
-                        viaKey: e.detail === 0,
+                        viaKey: purgeOpenedByHeldEnter(
+                          e.detail,
+                          lastActivationKey.current,
+                        ),
                       })
                     }
                   >
