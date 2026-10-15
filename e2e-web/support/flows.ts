@@ -214,26 +214,24 @@ export async function dismissImporterOfferIfPresent(session: Session): Promise<v
 }
 
 /**
- * Create a note through the sidebar's `+` menu and wait for its editor.
+ * Create a note from the sidebar's create button and wait for its editor.
  *
- * NO rename step, unlike the desktop helper: probed, the `+` menu holds
- * `notes.create`, `notes.new-from-template`, `notes.new-drawing` and
- * `notes.new-folder`, and clicking `notes.create` lands directly on a mounted
- * `editor.content` with no `notes.rename-input` anywhere in the tree. A helper
- * copied from `e2e/support/flows.ts` waits fifteen seconds for that input and
- * then reports a timeout that reads like a broken sidebar.
+ * The create actions used to live behind a `+` menu (`notes.new-menu` →
+ * `notes.new-menu-dropdown`). e35c8a7b (myne#779) replaced it with direct
+ * buttons on BOTH clients; `e2e/support/flows.ts` followed the move and this
+ * lane did not, so every scenario that creates a note clicked a `null` until
+ * this was fixed. `notes.create` is the button that carried over.
+ *
+ * NO rename step, unlike the desktop helper: `notes.create` lands directly on a
+ * mounted `editor.content` with no `notes.rename-input` anywhere in the tree. A
+ * helper copied from `e2e/support/flows.ts` waits fifteen seconds for that
+ * input and then reports a timeout that reads like a broken sidebar.
  *
  * Scripted clicks rather than driver clicks, which is this lane's working idiom
  * — `quarantine-roundtrip.e2e.ts` records that the driver cannot click a
  * settings tab here.
  */
 export async function createNote(session: Session): Promise<void> {
-  await session.execute(
-    "document.querySelector('[data-testid=\"notes.new-menu\"]').click();",
-  );
-  await session.waitForElement('[data-testid="notes.new-menu-dropdown"]', {
-    timeoutMs: 15_000,
-  });
   await session.execute(
     "document.querySelector('[data-testid=\"notes.create\"]').click();",
   );

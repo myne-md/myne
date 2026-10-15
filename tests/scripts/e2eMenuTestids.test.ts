@@ -108,6 +108,22 @@ describe("check-e2e-menu-testids, the submenu rule", () => {
     expect(r.out).toContain("clickNewItem");
   });
 
+  it("names the browser lane's scripted querySelector reach, not only byTestId", () => {
+    // The OTHER half of the gap that let `notes.new-menu` survive: the web lane
+    // clicks through executed JS (`document.querySelector('[data-testid="…"]')`)
+    // rather than `byTestId`, and the old regex knew only the latter. The escaped
+    // quotes are how it really appears in the file — a string literal inside a
+    // `session.execute(...)` call — so the matcher has to tolerate the `\`.
+    const r = runWith(
+      "await session.execute(\n" +
+        `  "document.querySelector('[data-testid=\\"notes.create\\"]').click();",\n` +
+        ");\n",
+      ["--menu-only", "notes.create"],
+    );
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("notes.create");
+  });
+
   it("is clean on the tree as it stands", () => {
     const out = execFileSync("node", [GUARD], { encoding: "utf8", cwd: ROOT });
     expect(out).toContain("ok");

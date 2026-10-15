@@ -65,6 +65,15 @@ RUN_FLAGS=(
 )
 
 E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store"
+# Host-side append, NOT inside the quoted literal above: that string is passed
+# through to the container's bash, where `$E2E_CARGO_JOBS` is unset and would
+# expand to nothing. See scripts/lib/e2e-docker.sh.
+#
+# This script built its own `E2E_ENV` and dropped the variable, so the job cap
+# `e2e/AGENTS.md` documents as the fix for `rustc … (signal: 9, SIGKILL)` on
+# `myne_desktop_lib` was unreachable from the one runner that does a full
+# release build as its normal job — `e2e-local.sh` had it, this did not.
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS"
 # Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
