@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -340,6 +340,10 @@ function AckRow({
   last?: boolean;
 }) {
   const { t } = useTranslation();
+  // The curve follows the direction, as it does on the desktop row and in
+  // NoteList's `DisclosureWrapper`: `--ease-out` leads an entrance and
+  // `--ease-standard` an exit.
+  const whyEasing = whyOpen ? "var(--ease-out)" : "var(--ease-standard)";
   // `useId`, not a constant: this component renders once per acknowledgement
   // on the same screen, and two labels sharing a DOM id would point every
   // `aria-labelledby` at whichever rendered first.
@@ -382,6 +386,8 @@ function AckRow({
             <button
               type="button"
               onClick={onToggleWhy}
+              aria-expanded={whyOpen}
+              data-testid="create-vault.briefing-why"
               style={{
                 marginTop: 8,
                 display: "inline-flex",
@@ -397,10 +403,23 @@ function AckRow({
               }}
             >
               {t("vaultCreation.briefing.why")}
-              <Icon name={whyOpen ? "chevron-up" : "chevron-down"} size={11} color="var(--accent)" strokeWidth={1.6} />
+              <Icon
+                name="chevron-down"
+                size={11}
+                color="var(--accent)"
+                strokeWidth={1.6}
+                style={{
+                  // One glyph turned over in place (myne-md/myne#868): swapping
+                  // chevron-up/chevron-down remounts the node, and a remount
+                  // cannot animate.
+                  transform: whyOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: `transform var(--duration-base) ${whyEasing}`,
+                }}
+              />
             </button>
-            {whyOpen && (
+            <WhyDisclosure open={!!whyOpen}>
               <div
+                data-testid="create-vault.briefing-why-text"
                 style={{
                   marginTop: 8,
                   background: "var(--bg-2)",
@@ -414,10 +433,90 @@ function AckRow({
               >
                 {why}
               </div>
-            )}
+            </WhyDisclosure>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * How long a collapsing body stays mounted after `open` flips false: one
+ * `--duration-base` transition (180ms) plus the same 60ms slack the desktop
+ * row's constant takes, so the node leaves the DOM only once the motion has
+ * settled. The phone's global `prefers-reduced-motion` rule zeroes the
+ * TRANSITION, but this deferral is a timer, so the reduced-motion arm below is
+ * what keeps it out of the way for those users.
+ */
+const WHY_SETTLE_MS = 240;
+
+/**
+ * The animated "Why?" body (myne-md/myne#868), mirroring `WhyDisclosure` in the
+ * desktop `src/screens/vault-creation/BriefingStep.tsx`, which carries the long
+ * rationale: a `grid-template-rows` 1fr<->0fr track plus an opacity fade, both
+ * on `--duration-base`, with the curve per direction (`--ease-out` opening,
+ * `--ease-standard` closing), an inner box clipped by `min-height: 0` +
+ * `overflow: hidden`, a deferred unmount so the collapse can finish, and an
+ * instant path under `prefers-reduced-motion`.
+ *
+ * The two rows differ in layout only, so the mobile row needs none of the
+ * desktop row's gap surgery: its children stack in a block, and the body's own
+ * `marginTop` sits INSIDE the clipped box, which is what keeps a collapsing
+ * body the same size as an absent one.
+ */
+function WhyDisclosure({ open, children }: { open: boolean; children: ReactNode }) {
+  // `mounted` = the node is in the DOM; `shown` = its animated (open) value.
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(open);
+
+  useLayoutEffect(() => {
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+    if (open) {
+      // Already open, which is the mount run whose initial state matches.
+      if (shown) return;
+      setMounted(true);
+      if (reduce) {
+        setShown(true);
+        return;
+      }
+      // Mount at the collapsed value, then flip on the next frame so the
+      // property change has a value to transition FROM.
+      const frame = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    // A row that was never opened has nothing mounted to animate out.
+    if (!mounted) return;
+    setShown(false);
+    if (reduce) {
+      setMounted(false);
+      return;
+    }
+    const timer = setTimeout(() => setMounted(false), WHY_SETTLE_MS);
+    return () => clearTimeout(timer);
+    // `[open]` alone, as on the desktop twin: this reacts to a CHANGE, so the
+    // reads above are the committed values at that moment, and reacting to them
+    // would re-enter on this effect's own updates.
+  }, [open]);
+
+  if (!mounted) return null;
+  const easing = shown ? "var(--ease-out)" : "var(--ease-standard)";
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: shown ? "1fr" : "0fr",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        minWidth: 0,
+        opacity: shown ? 1 : 0,
+        transition: `grid-template-rows var(--duration-base) ${easing}, opacity var(--duration-base) ${easing}`,
+      }}
+    >
+      <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>{children}</div>
     </div>
   );
 }

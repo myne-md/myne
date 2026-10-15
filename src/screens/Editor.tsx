@@ -5238,9 +5238,11 @@ function SidebarPane({
         justifyContent: side === "right" ? "flex-end" : "flex-start",
         overflow: "hidden",
         minHeight: 0,
-        transition: resizing
-          ? "none"
-          : "width var(--duration-base) var(--ease-standard)",
+        // One line on purpose: the motion guard reads an unquoted value to the
+        // END OF ITS LINE, so a wrapped ternary made this `width` transition
+        // invisible to it (myne-md/myne#868). The exemption that covers it is
+        // in `scripts/check-motion-canon.mjs`, beside the mobile twin's.
+        transition: resizing ? "none" : "width var(--duration-base) var(--ease-standard)",
       }}
     >
       {/* Fixed-width inner wrapper: keeps the children at their open width so
