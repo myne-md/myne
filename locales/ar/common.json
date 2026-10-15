@@ -3,7 +3,6 @@
     "accountMismatch": "هذا المتصفح يحتوي بالفعل على خزنة حساب آخر. افتح ذلك الحساب، أو سجّل الخروج وامسح نسخة هذا المتصفح أولًا.",
     "changeAccount": "استخدام رقم حساب آخر",
     "continue": "متابعة",
-    "failed": "تعذّر فتح هذا الحساب. تحقّق من رقم الحساب وكلمة المرور ثم أعد المحاولة.",
     "hint": "أدخل كلمة المرور الرئيسية لهذا الحساب. سيجلب Myne خزنتك ويجهّز هذا المتصفح كجهاز عليها.",
     "noEndpoint": "هذه النسخة من Myne ليس فيها خادم مزامنة مُعدّ، لذا لا يمكنها الوصول إلى خزنتك. تواصل مع من يشغّلها.",
     "passwordLabel": "كلمة المرور الرئيسية",
@@ -32,7 +31,6 @@
     "composer": {
       "placeholder": "اطلب من AI تعديل هذه الملاحظات",
       "scopeLabel": "يعمل على",
-      "scopeChange": "تغيير",
       "scopeOpenNote": "هذه الملاحظة",
       "scopeCount_zero": "{{count}} ملاحظة",
       "scopeCount_one": "{{count}} ملاحظة",
@@ -51,9 +49,19 @@
       "unsupported": "لا يستطيع هذا النموذج إجراء تعديلات دقيقة بموثوقية، لذا فالوكيل غير متاح. اختر نموذجًا أكبر أو مزوّدًا.",
       "unsupportedDetail": "اجتاز {{passes}} من {{attempts}} فحصًا؛ المطلوب {{required}}.",
       "checking": "جارٍ فحص النموذج…",
-      "checkingAt": "جارٍ فحص النموذج… ({{attempt}}/{{of}})",
       "unsupportedProvisional": "لم تُقَس درجة النجاح هذه عبر النماذج بعد، لذا قد تكون أشد أو أضعف مما ينبغي.",
-      "scopeNone": "لا توجد ملاحظة مفتوحة، لذا لا يوجد شيء للعمل عليه بعد"
+      "scopeNone": "لا توجد ملاحظة مفتوحة، لذا لا يوجد شيء للعمل عليه بعد",
+      "scopeAllVault": "كل الملاحظات",
+      "blockedScope": "لا شيء ليعمل عليه الوكيل بعد: كل الملاحظات مستثناة من AI، أو أن الخزنة فارغة.",
+      "preparing": "جارٍ التحضير…",
+      "blockedScopeSidebar": "لا شيء لطرح سؤال عنه بعد: مجلد هذه الملاحظة مستثنى من AI.",
+      "needsScope": "اختر مجلدًا أدناه، أو افتح ملاحظة، ليكون لدى الوكيل ما يعمل عليه.",
+      "scopeExcluded_zero": "{{count}} مستثناة من AI",
+      "scopeExcluded_one": "{{count}} مستثناة من AI",
+      "scopeExcluded_two": "{{count}} مستثناتان من AI",
+      "scopeExcluded_few": "{{count}} مستثناة من AI",
+      "scopeExcluded_many": "{{count}} مستثناة من AI",
+      "scopeExcluded_other": "{{count}} مستثناة من AI"
     },
     "progress": {
       "working": "جارٍ العمل",
@@ -82,7 +90,8 @@
       "grantsModel_few": "{{count}} نطاقات طلبها",
       "grantsModel_many": "{{count}} نطاقًا طلبه",
       "grantsModel_other": "{{count}} نطاق طلبه",
-      "cancelledBackground": "أُلغي التشغيل لأن Myne انتقل إلى الخلفية. لم يُكتب أي شيء. اسأل مرة أخرى عندما تكون مستعدًا."
+      "cancelledBackground": "أُلغي التشغيل لأن Myne انتقل إلى الخلفية. لم يُكتب أي شيء. اسأل مرة أخرى عندما تكون مستعدًا.",
+      "legFailed": "توقفت الجولة قبل أن تكتمل."
     },
     "scope": {
       "title": "تضمين {{folder}}؟",
@@ -171,7 +180,9 @@
         "notProposed": "تعذّر التطبيق: ذلك التغيير ليس ضمن مقترَح هذه الجولة.",
         "noteMoved": "تعذّر التطبيق: هذا التغيير سينقل الملاحظة إلى مجلد آخر.",
         "appendEmpty": "تعذّر التطبيق: لم يكن هناك ما يُضاف.",
-        "appendWouldWriteFrontmatter": "تعذّر التطبيق: كان ذلك النص سيتحوّل إلى كتلة خصائص الملاحظة."
+        "appendWouldWriteFrontmatter": "تعذّر التطبيق: كان ذلك النص سيتحوّل إلى كتلة خصائص الملاحظة.",
+        "moveToSameFolder": "لم تُنقل: الملاحظة موجودة أصلًا في ذلك المجلد.",
+        "moveIntoExcludedFolder": "لم تُنقل: ذلك المجلد مستثنى من AI."
       },
       "applyFailed": "تعذّر تطبيق التغييرات.",
       "undo": "التراجع عن هذه الجولة",
@@ -213,15 +224,59 @@
       "runSummaryOnDevice": "لم يغادر شيء هذا الجهاز",
       "appendFlag": "يُضاف إلى النهاية",
       "diffCurrent": "في الملاحظة الآن",
-      "diffProposed": "بعد هذا التغيير"
+      "diffProposed": "بعد هذا التغيير",
+      "summaryShowAll": "عرض الملخص كاملًا",
+      "summaryShorten": "اختصار الملخص",
+      "settingFolderFrom": "المجلد: {{from}} يصبح {{to}}",
+      "moveFlag": "ينتقل إلى مجلد آخر",
+      "settingFromValue": "{{from}} يصبح {{to}}",
+      "settingFromUnset": "غير مضبوط، يصبح {{value}}",
+      "settingCleared": "أُزيل {{from}}",
+      "settingAlreadyUnset": "غير مضبوط",
+      "settingFolder": "في {{folder}}",
+      "applySetting": "تطبيقه وحده",
+      "refusedSetting": {
+        "needsOwnAct": "لم يُطبَّق هنا: تغيير الإعداد يُوافق عليه دائمًا وحده.",
+        "notWritable": "تعذّر تطبيقه: لم يعد ذلك الإعداد مما يجوز للوكيل تغييره.",
+        "invalidValue": "تعذّر تطبيقه: هذه القيمة غير مقبولة لهذا الإعداد.",
+        "folderRemoved": "لم يُطبَّق: حذفت ذلك المجلد، ولن يعيده الوكيل.",
+        "notClearable": "تعذّر مسحه: لا حالة غير مضبوطة لهذا الإعداد. غيّره إلى قيمة بدلًا من ذلك.",
+        "writeFailed": "تعذّر تطبيقه: فشل كتابة الإعداد. ومع ذلك طُبّقت التغييرات الأخرى.",
+        "runStopped": "لم يُطبَّق: أُوقفت الجولة، فلم تُحاول أي تغيير.",
+        "notProposed": "لم يُطبَّق: لم تقترح هذه الجولة ذلك التغيير قط، فلن يكتبه المضيف."
+      },
+      "undoReportFailed_zero": "تعذّرت إعادة {{count}} تغيير.",
+      "undoReportFailed_one": "تعذّرت إعادة {{count}} تغيير.",
+      "undoReportFailed_two": "تعذّرت إعادة {{count}} تغييرين.",
+      "undoReportFailed_few": "تعذّرت إعادة {{count}} تغييرات.",
+      "undoReportFailed_many": "تعذّرت إعادة {{count}} تغييرًا.",
+      "undoReportFailed_other": "تعذّرت إعادة {{count}} تغيير.",
+      "undoReportSettings_zero": "أُعيد {{count}} إعداد.",
+      "undoReportSettings_one": "أُعيد {{count}} إعداد.",
+      "undoReportSettings_two": "أُعيد {{count}} إعدادان.",
+      "undoReportSettings_few": "أُعيدت {{count}} إعدادات.",
+      "undoReportSettings_many": "أُعيد {{count}} إعدادًا.",
+      "undoReportSettings_other": "أُعيد {{count}} إعداد.",
+      "settingsHeading_zero": "{{count}} إعداد",
+      "settingsHeading_one": "{{count}} إعداد",
+      "settingsHeading_two": "{{count}} إعدادان",
+      "settingsHeading_few": "{{count}} إعدادات",
+      "settingsHeading_many": "{{count}} إعدادًا",
+      "settingsHeading_other": "{{count}} إعداد",
+      "settingsChanged_zero": "تغيّر {{count}} إعداد.",
+      "settingsChanged_one": "تغيّر {{count}} إعداد.",
+      "settingsChanged_two": "تغيّر {{count}} إعدادان.",
+      "settingsChanged_few": "تغيّرت {{count}} إعدادات.",
+      "settingsChanged_many": "تغيّر {{count}} إعدادًا.",
+      "settingsChanged_other": "تغيّر {{count}} إعداد.",
+      "refusedCount_zero": "تعذّر تطبيق {{count}} تغيير",
+      "refusedCount_one": "تعذّر تطبيق {{count}} تغيير",
+      "refusedCount_two": "تعذّر تطبيق {{count}} تغييرين",
+      "refusedCount_few": "تعذّر تطبيق {{count}} تغييرات",
+      "refusedCount_many": "تعذّر تطبيق {{count}} تغييرًا",
+      "refusedCount_other": "تعذّر تطبيق {{count}} تغيير"
     },
     "undo": {
-      "offer_zero": "غيّرت الجولة الأخيرة {{count}} ملاحظة.",
-      "offer_one": "غيّرت الجولة الأخيرة {{count}} ملاحظة.",
-      "offer_two": "غيّرت الجولة الأخيرة {{count}} ملاحظتين.",
-      "offer_few": "غيّرت الجولة الأخيرة {{count}} ملاحظات.",
-      "offer_many": "غيّرت الجولة الأخيرة {{count}} ملاحظة.",
-      "offer_other": "غيّرت الجولة الأخيرة {{count}} ملاحظة.",
       "action": "التراجع عن الجولة",
       "reverted_zero": "تمت استعادة {{count}} ملاحظة.",
       "reverted_one": "تمت استعادة {{count}} ملاحظة.",
@@ -242,7 +297,58 @@
       "createdNotReverted_many": "تُركت {{count}} ملاحظة أنشأتها الجولة كما هي.",
       "createdNotReverted_other": "تُركت {{count}} ملاحظة أنشأتها الجولة كما هي.",
       "sessionOnly": "هذا التراجع بلمسة واحدة يدوم حتى تقفل الخزنة أو تغلق التطبيق. بعد ذلك تستعيد الملاحظات واحدة تلو الأخرى من سجل إصدارات الملاحظة.",
-      "sessionOnlyLink": "فتح سجل الإصدارات"
+      "revertedSettings_zero": "أُعيد {{count}} إعداد.",
+      "revertedSettings_one": "أُعيد {{count}} إعداد.",
+      "revertedSettings_two": "أُعيد {{count}} إعدادان.",
+      "revertedSettings_few": "أُعيدت {{count}} إعدادات.",
+      "revertedSettings_many": "أُعيد {{count}} إعدادًا.",
+      "revertedSettings_other": "أُعيد {{count}} إعداد."
+    },
+    "hub": {
+      "title": "الوكيل",
+      "loading": "جارٍ تحميل المحادثات…",
+      "modeLabel": "أي محادثات",
+      "modeVault": "الكل",
+      "modeNote": "هذه الملاحظة",
+      "renamedAnnouncement": "أُعيدت التسمية إلى {{name}}",
+      "deletedAnnouncement": "حُذفت المحادثة",
+      "loadFailed": "تعذّر تحميل محادثاتك الآن.",
+      "emptyTitle": "لا محادثات بعد",
+      "anchorLabel": "على ملاحظة",
+      "anchorOpen": "فتح {{name}}",
+      "generateTitle": "توليد عنوان",
+      "generateTitleNeedsModel": "توليد عنوان، يلزمه نموذج نصي محلي",
+      "generateTitleExcluded": "توليد عنوان، هذه الملاحظة في مجلد استثنيته من AI",
+      "titleGenerating": "جارٍ توليد عنوان…",
+      "titleGenerated": "وُلّد العنوان: {{name}}",
+      "titleFailed": "تعذّر توليد عنوان.",
+      "titleSaveFailed": "تعذّر حفظ العنوان.",
+      "searchLabel": "البحث في المحادثات",
+      "searchPlaceholder": "البحث في المحادثات…",
+      "noMatchTitle": "لا نتائج مطابقة",
+      "noMatchBody": "لا محادثة تطابق “{{query}}”. امسح البحث لعرضها كلها.",
+      "emptyBody": "تظهر هنا المحادثات التي تبدأها.",
+      "menu": "إجراءات المحادثة",
+      "unread": "نتيجة انتهت ولم تقرأها بعد",
+      "targetFolder": "عن مجلد",
+      "targetNote": "عن ملاحظة",
+      "targetVault": "عن الخزنة كلها",
+      "running": "جارٍ العمل على هذه المحادثة",
+      "newConversation": "محادثة جديدة",
+      "historyLabel": "السجل"
+    },
+    "focus": {
+      "title": "الوكيل على الملاحظة",
+      "openNote": "فتح الملاحظة"
+    },
+    "footprint": {
+      "disclosure": "ما كلفته هذه الجولة",
+      "memory_zero": "{{count}} ذاكرة محفوظة",
+      "memory_one": "{{count}} ذاكرة محفوظة",
+      "memory_two": "{{count}} ذاكرتان محفوظتان",
+      "memory_few": "{{count}} ذكريات محفوظة",
+      "memory_many": "{{count}} ذاكرة محفوظة",
+      "memory_other": "{{count}} ذاكرة محفوظة"
     }
   },
   "ai": {
@@ -386,9 +492,7 @@
       "menuRename": "إعادة تسمية",
       "menuTranscribe": "تفريغ نصي",
       "menuViewTranscription": "عرض التفريغ النصي",
-      "noMatch": "لا توجد مرفقات تطابق بحثك.",
       "noUnusedNotice": "لا توجد مرفقات غير مستخدمة لتنظيفها.",
-      "preview": "معاينة",
       "previewAttachment": "معاينة المرفق",
       "searchAriaLabel": "البحث في المرفقات باسم الملف",
       "searchPlaceholder": "ابحث باسم الملف",
@@ -414,7 +518,11 @@
         "other": "أخرى",
         "pdf": "ملفات PDF"
       },
-      "previewNamed": "معاينة {{name}}"
+      "previewNamed": "معاينة {{name}}",
+      "emptyFilteredBody": "لا شيء هنا يطابق مرشّح النوع الحالي. امسحه لرؤية المكتبة كاملة مرة أخرى.",
+      "emptyFilteredBodyQuery": "لا شيء في المكتبة يطابق",
+      "emptyLoadErrorBody": "الكتالوج مشفّر مع خزنتك، لذا يكون هذا عادةً قراءة انقطعت لا بيانات ضاعت. أعد المحاولة؛ وإن استمر الفشل، فملاحظاتك وملفاتها لم يتأثر شيء منها.",
+      "emptyRetry": "أعد المحاولة"
     },
     "thumbnail": {
       "audioLabel": "صوت: {{filename}}",
@@ -469,7 +577,11 @@
       "preparing": "جارٍ التحضير…",
       "successToast": "تم التحقق من النسخة الاحتياطية وحفظها.",
       "title": "نسخ الخزنة احتياطيًا",
-      "verifying": "جارٍ التحقق من {{done}} من {{total}}…"
+      "verifying": "جارٍ التحقق من {{done}} من {{total}}…",
+      "drillBody": "النسخة الاحتياطية وحدها لن تعيدك إلى الداخل إن فقدت كلمة مرورك.",
+      "drillCta": "تحقّق منها",
+      "drillOnce": "يُعرض مرة واحدة. بعد إغلاق هذا لن يعود.",
+      "drillTitle": "هل تحققت من عبارة الاسترداد لديك أيضًا؟"
     }
   },
   "clipper": {
@@ -811,6 +923,18 @@
       },
       "showIsolatedGraph": {
         "label": "فتح الرسم البياني المعزول"
+      },
+      "aiOpenAgentVault": {
+        "label": "الوكيل: الفتح على الخزنة"
+      },
+      "aiOpenAgentNote": {
+        "label": "الوكيل: الفتح على الملاحظة"
+      },
+      "meetingSummarize": {
+        "label": "تلخيص الاجتماع بالذكاء الاصطناعي…"
+      },
+      "openPalette": {
+        "label": "ابحث ونفّذ أمرًا…"
       }
     },
     "hotkeys": {
@@ -1312,13 +1436,13 @@
             "memoryUpdated_zero": "حُدِّثت الذاكرة بـ {{count}} قيود.",
             "memoryUpdated_two": "حُدِّثت الذاكرة بـ {{count}} قيود.",
             "memoryUpdated_few": "حُدِّثت الذاكرة بـ {{count}} قيود.",
-            "memoryUpdated_many": "حُدِّثت الذاكرة بـ {{count}} قيود."
+            "memoryUpdated_many": "حُدِّثت الذاكرة بـ {{count}} قيود.",
+            "honestyExpand": "عرض الملاحظة كاملة",
+            "honestyCollapse": "اختصار الملاحظة"
           },
           "askPlaceholder": "اطرح سؤالًا عن ملاحظاتك…",
           "askSubmit": "اسأل",
           "assistant": "المساعد",
-          "citations": "المصادر",
-          "composerPlaceholder": "راسل ملاحظاتك…",
           "empty": "مخرجات AI (الملخّصات والإجابات والاقتراحات) تظهر هنا.",
           "error": "تعذّر إتمام طلب AI.",
           "errorTurn": "تعذّر على المساعد الإجابة.",
@@ -1351,8 +1475,6 @@
           "historyEmpty": "لا محادثات بعد. تظهر الدردشات الجديدة هنا.",
           "historyError": "تعذر تحميل المحادثات. أعد المحاولة.",
           "historyLoading": "جارٍ التحميل…",
-          "historyProposalAfter": "بعد",
-          "historyProposalBefore": "قبل",
           "historyProposalNewNote": "ملاحظة جديدة",
           "historyRename": "إعادة تسمية",
           "historyTitle": "سجل الدردشة",
@@ -1368,7 +1490,23 @@
           "memoryPopoverLoadFailed": "تعذر تحميل الذكريات. لم يتغير شيء.",
           "memoryPopoverRetry": "أعد المحاولة",
           "memoryPopoverSettings": "إدارة في الإعدادات",
-          "memoryPopoverClose": "إغلاق"
+          "memoryPopoverClose": "إغلاق",
+          "copied": "نُسخ",
+          "copyAnswer": "نسخ الجواب",
+          "copyFailed": "تعذّر النسخ",
+          "copyYourMessage": "نسخ رسالتك",
+          "emptyTitle": "اسأل عن ملاحظاتك",
+          "noticeLeaves": "تُرسَل الكلمات التي تكتبها، والملاحظات التي تقرأها الجولة، وعناوين ومعرّفات ومسارات مجلدات كل ملاحظة قد تقرأها الجولة (الخزنة كلها ناقص المجلدات التي استثنيتها، إلا إن ضيّقت النطاق)، وما يتذكره AI عنك، إلى أي جهة تجيب. ولا يُرسَل شيء آخر على هذا الجهاز.",
+          "noticeReceiver": "الجهة المجيبة: {{provider}}، وهو ليس تحت تشغيل Myne.",
+          "noticeReceiverLocal": "الجهة المجيبة: برنامج يعمل على هذا الجهاز. لا شيء يغادر الجهاز، لكن ذلك البرنامج ليس جزءًا من Myne، ولا يستطيع Myne رؤية ما يفعله بها.",
+          "noticeRevoke": "لإيقافه، أطفئ AI من الإعدادات، أو غيّر الجهة المجيبة هناك. إبطال مفتاح مزوّد يوقف ذلك المزوّد فورًا.",
+          "noticeSettingsCta": "فتح إعدادات AI",
+          "viewDiff": "عرض التغييرات",
+          "revertRun": "التراجع عن هذه الجولة",
+          "diffTitle": "التغييرات المقترحة",
+          "revertConfirmTitle": "التراجع عن هذه الجولة؟",
+          "revertConfirmBody": "تعود الملاحظات التي غيّرتها هذه الجولة إلى ما كانت عليه قبلها. أما الملاحظات التي أنشأتها فتبقى حيث هي.",
+          "focusAgent": "الفتح في تبويب الوكيل"
         },
         "allHidden": "كل التبويبات مخفية. انقر بالزر الأيمن للاستعادة.",
         "outline": {
@@ -1382,7 +1520,8 @@
           "backlinks": "الروابط",
           "outline": "المخطط",
           "tasks": "المهام",
-          "unlinked": "الإشارات غير المرتبطة"
+          "unlinked": "الإشارات غير المرتبطة",
+          "whoIsHere": "من الموجودون هنا"
         },
         "tabStripLabel": "اللوحة اليمنى"
       },
@@ -1419,6 +1558,18 @@
         "editor": "المحرر",
         "rightPanel": "اللوحة اليمنى",
         "sidebar": "الشريط الجانبي للملاحظات"
+      },
+      "presence": {
+        "editing": "يحرّر الآن",
+        "empty": "أنت الوحيد هنا",
+        "jumpTo": "الانتقال إلى {{name}}",
+        "unknown": "شخص ما",
+        "title_zero": "{{count}} هنا الآن",
+        "title_one": "{{count}} موجود هنا الآن",
+        "title_two": "{{count}} موجودان هنا الآن",
+        "title_few": "{{count}} موجودون هنا الآن",
+        "title_many": "{{count}} موجودًا هنا الآن",
+        "title_other": "{{count}} موجود هنا الآن"
       }
     },
     "noteActions": {
@@ -1540,7 +1691,8 @@
       "todoList": "قائمة تحقّق",
       "voiceNote": "ملاحظة صوتية",
       "wikiLink": "رابط ويكي",
-      "remind": "تذكير"
+      "remind": "تذكير",
+      "meeting": "جلسة الاجتماع"
     },
     "spell": {
       "menu": {
@@ -1581,7 +1733,6 @@
         "priority": "الأولوية",
         "remind": "التذكير"
       },
-      "timeLabel": "الوقت (اختياري)",
       "invalidRemind": "لا يستطيع Myne قراءة هذا التاريخ، لذا لن يذكّرك.",
       "addTime": "إضافة وقت",
       "clear": "مسح",
@@ -1902,6 +2053,47 @@
       "title": "حُذفت هذه الملاحظة في مكان آخر",
       "body": "حُذفت من نافذة أخرى أو تزامنت من جهاز آخر. حُفظت أي تغييرات غير محفوظة في هذه النافذة كنسخة منفصلة.",
       "close": "إغلاق النافذة"
+    },
+    "meeting": {
+      "ai": {
+        "cancelled": "توقّف. لم يُضَف شيء إلى الملاحظة.",
+        "close": "إغلاق",
+        "discard": "تجاهل",
+        "failed": "فشلت جولة AI. التفريغ النصي كما هو.",
+        "generate": "توليد",
+        "insert": "إدراج في الملاحظة",
+        "notice": "مولَّد بـ AI من التفريغ النصي أعلاه. قد يكون خاطئًا؛ والتفريغ النصي هو السجل.",
+        "noAttribution": "لا يذكر التفريغ النصي من تحدّث، لذا لا مالكين لبنود الإجراءات.",
+        "noModel": "لا نموذج AI مثبّت لتوليد النص. يحتاج ملخص الاجتماع إليه؛ نزّله من الإعدادات، AI.",
+        "offer": "حُفظ الاجتماع. هل تريد تلخيصه بالذكاء الاصطناعي؟",
+        "offerAction": "تلخيص",
+        "openSettings": "فتح إعدادات AI",
+        "pickIntro": "اختر ما تريد توليده من التفريغ النصي.",
+        "progress": "الجزء {{done}} من {{total}}",
+        "reviewIntro": "راجع قبل الإدراج. يبقى التفريغ النصي كما هو.",
+        "running": "جارٍ التوليد…",
+        "section": {
+          "actionItems": "بنود الإجراءات",
+          "decisions": "القرارات",
+          "openQuestions": "الأسئلة المفتوحة",
+          "summary": "الملخص"
+        },
+        "stop": "إيقاف",
+        "title": "AI الاجتماع"
+      },
+      "barAria": "جلسة الاجتماع",
+      "cancel": "إلغاء",
+      "chunksMissing": "لم ينتقل جزء من الاجتماع، ففي الملاحظة فجوة. أما الصوت الذي وصل فهو موجود.",
+      "clipFailed": "تعذّر حفظ جزء من الاجتماع. أما البقية فهي في الملاحظة.",
+      "machineNotice": "هذا تفريغ نصي آلي للاجتماع وقد يحوي أخطاء.",
+      "noteTitle": "اجتماع {{date}}",
+      "noteWriteFailed": "تعذّرت كتابة ملاحظة الاجتماع. أما الصوت المسجَّل فهو في خزنتك كمرفقات.",
+      "saving": "جارٍ كتابة الملاحظة…",
+      "stop": "إيقاف",
+      "systemAudioUnavailable": "لا يستطيع هذا الجهاز التقاط صوت النظام، لذا لن يظهر المشاركون الآخرون في الملاحظة.",
+      "tapSilent": "لا يصل صوت المشاركين الآخرين. تحقّق من إعدادات النظام، الخصوصية والأمان، تسجيل الشاشة وصوت النظام.",
+      "transcriptHeading": "التفريغ النصي",
+      "transcriptionFailed": "تعذّر تفريغ جزء من الاجتماع نصيًا. أما الصوت فهو في الملاحظة."
     }
   },
   "export": {
@@ -2212,7 +2404,10 @@
         "is": "هو",
         "isNot": "ليس"
       },
-      "noConditions": "لا توجد شروط بعد. هذا العرض يظهر كل الصفحات."
+      "noConditions": "لا توجد شروط بعد. هذا العرض يظهر كل الصفحات.",
+      "conditionNegate": "الشرط: هو أو ليس",
+      "conditionType": "الشرط: ما يُطابَق",
+      "conditionValue": "الشرط: القيمة المطلوب مطابقتها"
     },
     "folderManagement": {
       "illegalSegment": "لا يمكن أن يحتوي اسم المجلد على / \\ | # ^ [ ] ولا أن يبدأ أو ينتهي بمسافة.",
@@ -2231,7 +2426,6 @@
     "folderRow": {
       "createFolderNote": "إنشاء ملاحظة مجلد",
       "empty": "فارغ",
-      "folderNote": "ملاحظة مجلد",
       "openFolderNote": "فتح ملاحظة المجلد"
     },
     "graph": {
@@ -2245,8 +2439,6 @@
         "filterConditions_many": "{{count}} شرطًا",
         "filterConditions_other": "{{count}} شرط",
         "heading": "المجموعات اللونية",
-        "moveDown": "تحريك القاعدة لأسفل",
-        "moveUp": "تحريك القاعدة لأعلى",
         "namePlaceholder": "قاعدة بلا عنوان",
         "addRule": "إضافة قاعدة",
         "colorSwatchTitle": "اختر لونًا",
@@ -2273,12 +2465,10 @@
       "depthToggleTitle": "تبديل عمق الجوار (قفزة ↔ قفزتان)",
       "filterAll": "الكل",
       "filterAroundNote": "حول هذه الملاحظة",
-      "filterByTag": "التصفية حسب الوسم",
       "filterIsolated": "المعزولة",
       "hop": "{{depth}} قفزة",
       "loading": "جارٍ تحميل الرسم البياني…",
       "noNotes": "لا توجد ملاحظات لرسمها بعد.",
-      "refresh": "تحديث",
       "refreshTitle": "تغيّرت الخزنة: أعد بناء الرسم البياني",
       "settings": {
         "appearanceHeading": "المظهر",
@@ -2303,7 +2493,6 @@
       "listLinkCount_other": "{{count}} روابط",
       "listLinksFrom": "مرتبط من: {{titles}}",
       "listLinksTo": "يربط إلى: {{titles}}",
-      "relayout": "إعادة تخطيط",
       "relayoutTitle": "أعد تخطيط الرسم من الصفر",
       "showingCount_one": "عرض {{count}} ملاحظة",
       "showingCount_other": "عرض {{count}} ملاحظات",
@@ -2422,7 +2611,6 @@
         "flagDetail": "{{kind}} «{{segment}}» {{reason}}.",
         "flagKindFolder": "المجلد",
         "flagKindTitle": "العنوان",
-        "folderPickerTitle": "اختر مجلد خزنة Obsidian",
         "foldersNotKeptNote": "{{count}} مجلد سيختفي عندما تغادره آخر ملاحظة فيه",
         "foldersNotKeptNote_few": "{{count}} مجلدات ستختفي عندما تغادرها آخر ملاحظة فيها",
         "foldersNotKeptNote_many": "{{count}} مجلدًا ستختفي عندما تغادرها آخر ملاحظة فيها",
@@ -2494,14 +2682,14 @@
         "errors": {
           "alreadyOpen": "تلك الخزنة مفتوحة بالفعل لعملية استيراد. أنهِ تلك العملية أو ألغِها أولًا.",
           "busy": "هناك عملية أخرى على الخزنة قيد التنفيذ. انتظر انتهاءها ثم أعد المحاولة.",
-          "credential": "كلمة المرور أو عبارة الاسترداد هذه لم تفتح الخزنة. تحقّق منها وأعد المحاولة."
+          "credential": "كلمة المرور أو عبارة الاسترداد هذه لم تفتح الخزنة. تحقّق منها وأعد المحاولة.",
+          "backupInvalid": "تعذّرت قراءة ذلك الملف كنسخة احتياطية من Myne. تحقّق من الملف وأعد المحاولة."
         },
         "importLabel": "سمِّ هذا الاستيراد",
         "importLabelHint": "إذا حملت ملاحظة تستوردها اسم ملاحظة لديك بالفعل، وكان شيء مما تستورده يرتبط بها، فستُعاد تسمية المستوردة بهذا الاسم. أبقِ الاسم نفسه إن أعدت تشغيل هذا الاستيراد، فلن يُجلب شيء مرتين.",
         "importLabelIllegal": "لا يمكن استخدام هذا الاسم: لا يجوز أن يحتوي اسم الملاحظة على \\ / | # ^ [ ]، ولا أن يبدأ أو ينتهي بمسافة.",
         "loading": "جارٍ البحث عن خزائنك الأخرى…",
         "noOtherVaults": "لا توجد خزائن أخرى على هذا الجهاز للاستيراد منها. استعد نسخة احتياطية أولًا، فتصبح خزنة يمكنك الاستيراد منها هنا.",
-        "opening": "جارٍ الفتح…",
         "passwordLabel": "كلمة مرور تلك الخزنة",
         "phraseLabel": "عبارة استرداد تلك الخزنة المكوّنة من 24 كلمة",
         "report": {
@@ -2522,7 +2710,10 @@
         "usePhrase": "استخدام عبارة الاسترداد بدلًا من ذلك",
         "vaultLabel": "الاستيراد من",
         "vaultPlaceholder": "اختر خزنة",
-        "wordAria": "الكلمة {{number}} من 24"
+        "wordAria": "الكلمة {{number}} من 24",
+        "backupLabel": "ملف النسخة الاحتياطية",
+        "chooseBackup": "اختر ملف النسخة الاحتياطية",
+        "noBackupChosen": "لم يُختَر ملف نسخة احتياطية"
       }
     },
     "list": {
@@ -2561,12 +2752,9 @@
       "notesMovedToTrash_few": "نُقلت {{count}} ملاحظات إلى المهملات",
       "notesMovedToTrash_many": "نُقلت {{count}} ملاحظةً إلى المهملات",
       "notesMovedToTrash_other": "نُقلت {{count}} ملاحظة إلى المهملات",
-      "openArchive": "فتح الأرشيف",
-      "openAttachments": "فتح المرفقات",
       "openFolderNote": "فتح ملاحظة المجلد",
       "openInNewTab": "فتح في تبويب جديد",
       "openToSide": "فتح إلى الجانب",
-      "openTrash": "فتح المهملات",
       "removeFolderNote": "إزالة ملاحظة المجلد",
       "removeFromFavorites": "إزالة من المفضّلة",
       "rename": "إعادة تسمية",
@@ -2593,24 +2781,19 @@
       "newFolder": "مجلد جديد",
       "newFolderInPlaceholder": "مجلد جديد في {{path}}",
       "newFolderPlaceholder": "مجلد جديد",
-      "newItem": "جديد…",
       "newNote": "ملاحظة جديدة",
-      "newNoteFromTemplate": "ملاحظة جديدة من قالب…",
       "newNoteHere": "ملاحظة جديدة هنا",
       "newNoteMenu": "ملاحظة جديدة",
-      "newNoteShortcut": "ملاحظة جديدة (⌘N)",
       "newSubfolder": "مجلد فرعي جديد",
       "newViewTitle": "عرض جديد",
       "noteMovedToTrash": "نُقلت الملاحظة إلى المهملات",
       "notesHeading": "الملاحظات",
       "addToFavorites": "إضافة إلى المفضّلة",
-      "archive": "الأرشيف",
       "archiveBulkError": "تعذّرت أرشفة الملاحظات.",
       "renameFailed": "تعذّر حفظ هذا الاسم، فاحتفظت الملاحظة باسمها السابق.",
       "archiveFolder": "أرشفة المجلد",
       "archiveNote": "أرشفة",
       "archiveSingleError": "تعذّرت أرشفة الملاحظة.",
-      "attachments": "المرفقات",
       "bulkArchive": "أرشفة {{count}} ملاحظة",
       "bulkArchive_zero": "أرشفة {{count}} ملاحظة",
       "bulkArchive_one": "أرشفة {{count}} ملاحظة",
@@ -2641,7 +2824,9 @@
       "delete": "حذف",
       "treeLabel": "الملاحظات والمجلدات",
       "selectionAnnouncement": "تم تحديد {{title}}",
-      "untitled": "بلا عنوان"
+      "untitled": "بلا عنوان",
+      "emptyBody": "الملاحظات نص markdown عادي، يُشفَّر على هذا الجهاز قبل أن يذهب إلى أي مكان. أنشئ واحدة للبدء، أو اضغط صف البحث أعلاه لتنفيذ أي أمر.",
+      "search": "بحث"
     },
     "newFromTemplate": {
       "back": "رجوع",
@@ -2661,18 +2846,31 @@
     "newTab": {
       "createNote": "إنشاء ملاحظة جديدة",
       "createDrawing": "رسم جديد",
-      "noNotesMatch": "لا توجد ملاحظات مطابقة.",
       "noNotesYet": "لا توجد ملاحظات بعد.",
       "recent": "الأخيرة",
       "searchAriaLabel": "ابحث عن ملاحظات لفتحها",
       "searchPlaceholder": "ابحث في الملاحظات…",
-      "untitled": "بدون عنوان"
+      "untitled": "بدون عنوان",
+      "createFromTemplate": "من قالب",
+      "kindCommand": "أمر",
+      "kindNote": "ملاحظة",
+      "noMatch": "لا شيء يطابق.",
+      "places": {
+        "agent": "الوكيل",
+        "attachments": "المرفقات",
+        "graph": "الرسم البياني",
+        "tasks": "المهام",
+        "today": "اليوم"
+      },
+      "placesLabel": "الانتقال إلى",
+      "results": "النتائج"
     },
     "pane": {
       "graphTab": "الرسم البياني",
       "tasksTab": "المهام",
       "loading": "جارٍ التحميل…",
-      "untitledView": "عرض بلا عنوان"
+      "untitledView": "عرض بلا عنوان",
+      "agentTab": "الوكيل"
     },
     "relativeTime": {
       "daysAgo": "قبل {{d}} أيام",
@@ -2761,7 +2959,9 @@
       "changeCount_few": "{{count}} تغييرات منذ هذه اللقطة",
       "changeCount_many": "{{count}} تغييرًا منذ هذه اللقطة",
       "changeCount_other": "{{count}} تغيير منذ هذه اللقطة",
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "deviceFallback": "جهاز {{code}}",
+      "unknownAuthor": "جهاز غير معروف"
     },
     "tabStrip": {
       "closeNewTab": "إغلاق التبويب الجديد",
@@ -2857,13 +3057,7 @@
         "setCoverImage": "تعيين صورة الغلاف",
         "untitled": "بدون عنوان"
       },
-      "collapseViews": "طيّ العروض",
       "empty": "لا توجد عروض بعد. احفظ قائمة الملاحظات الحالية كعرض.",
-      "expandViews": "توسيع العروض",
-      "heading": "العروض",
-      "host": {
-        "unsupported": "نوع العرض هذا يصل في تحديث لاحق."
-      },
       "list": {
         "empty": "لا توجد ملاحظات تطابق هذا العرض",
         "noValue": "لا قيمة"
@@ -3168,7 +3362,21 @@
       "threatModelHelper": "افتح وثيقة نموذج التهديد العلنية في متصفحك.",
       "threatModelLabel": "نموذج التهديد",
       "version": "الإصدار",
-      "dev": "تطوير"
+      "dev": "تطوير",
+      "updateAutoCheckHelper": "ينزّل Myne ملفًا صغيرًا موقّعًا من myne.md لمعرفة ما إذا كان هناك إصدار أحدث، ثم يخبرك. يرسل إصدارك الحالي والمنصة، ولا شيء غير ذلك. ويمكنك دائمًا التحقق يدويًا بالزر أعلاه.",
+      "updateAutoCheckLabel": "التحقق من التحديثات تلقائيًا",
+      "updateAvailable": "الإصدار {{version}} متاح.",
+      "updateChannelBeta": "تجريبي",
+      "updateChannelLabel": "قناة التحديثات",
+      "updateChannelStable": "مستقر",
+      "updateCheckButton": "التحقق من التحديثات",
+      "updateChecking": "جارٍ التحقق…",
+      "updateFailed": "تعذّر التحقق من التحديثات. سيُعاد المحاولة لاحقًا.",
+      "updateHelper": "يتحقق Myne من كل تحديث بمفتاح إصدار غير متصل بالشبكة قبل تثبيته. ويسأل الفحص downloads.myne.md عن أحدث إصدار، ويرسل إصدارك ومنصتك فقط (وعنوان IP الخاص بك، وهو ما لا يسجّله ذلك الأصل)؛ ولا يرسل ملاحظاتك أو حسابك أبدًا.",
+      "updateIdle": "تحديثات موقّعة، تُجلب من downloads.myne.md عند التحقق.",
+      "updateInstallButton": "أعِد التشغيل للتحديث",
+      "updateLabel": "التحديثات",
+      "updateUpToDate": "أنت على أحدث إصدار."
     },
     "vault": {
       "changePasswordButton": "تغيير كلمة المرور",
@@ -3178,7 +3386,9 @@
         "joinFailure": "حدث خلل ما، أعد المحاولة.",
         "samePasswordRejected": "كلمة المرور الجديدة مطابقة للحالية.",
         "serverAckPending": "كلمة مرورك الجديدة تعمل على هذا الجهاز، لكن تعذّر على Myne الوصول إلى الخادم لحفظها. وإلى أن يصل، تظل أجهزتك الأخرى تتوقّع كلمة المرور القديمة، وإن مُسحت نسخة هذا المتصفح قبل ذلك فسيضيع التغيير. ستُعاد المحاولة تلقائيًا.",
-        "weakNewPassword": "يجب ألّا تقل كلمة المرور الجديدة عن 12 حرفًا."
+        "weakNewPassword": "يجب ألّا تقل كلمة المرور الجديدة عن 12 حرفًا.",
+        "unexpected": "لم تكتمل عملية تغيير كلمة المرور. أعد المحاولة.",
+        "vaultNotUnlocked": "افتح قفل هذه الخزنة قبل تغيير كلمة مرورها."
       },
       "changePasswordHeading": "تغيير كلمة المرور",
       "changePasswordHelper": "غيّر كلمة المرور الرئيسية مع الإبقاء على الخزنة نفسها. عبارة الاسترداد لا تتغيّر.",
@@ -3206,7 +3416,8 @@
       "newPasswordPlaceholder": "12 حرفًا على الأقل",
       "reenterNewPassword": "أعد إدخال كلمة المرور الجديدة",
       "changePasswordFootnote": "هذا يُبطل الفتح السريع. عبارة استردادك تبقى كما هي.",
-      "changing": "جارٍ التغيير…"
+      "changing": "جارٍ التغيير…",
+      "memberVaultNotice": "هذه خزنة مشتركة. ولا كلمة مرور لها. استخدم فتح قفل الخزنة المشتركة في الخصوصية لإضافة كلمة مرور أو PIN."
     },
     "appearance": {
       "accentHelper": "اختر لون التمييز المستخدم في أنحاء التطبيق. على هذا الجهاز فقط.",
@@ -3240,7 +3451,11 @@
       "showEditTimesSubtitle": "طوابع زمنية أسفل كل ملاحظة",
       "graphSettingsLabel": "مظهر الرسم البياني",
       "graphSettingsHelper": "تُضبط ألوان العقد والتسميات والأحجام وقوى التخطيط داخل الرسم البياني نفسه. افتحه واستخدم زر الترس في زاويته. وتُحفظ لكل جهاز على حدة، لذا لا يتبعك التغيير هنا إلى هاتفك.",
-      "openGraph": "فتح الرسم البياني"
+      "openGraph": "فتح الرسم البياني",
+      "barCustomize": {
+        "label": "الشريط السفلي",
+        "helper": "اختر المؤشرات التي يعرضها الشريط السفلي. أخفِ كلها فيُزال الشريط نفسه وتُستعاد المساحة. اسحب عنصرًا على الشريط أو انقر عليه بزر الفأرة الأيمن لإعادة ترتيبه."
+      }
     },
     "archive": {
       "helper": "اسمح بنقل الملاحظات إلى الأرشيف، بعيدًا عن القائمة الرئيسية. إيقاف هذا يعيد كل ملاحظة مؤرشفة إلى مجلدها، ويلغي أرشفة كل مجلد مؤرشف، ويخفي عناصر التحكّم بالأرشيف. وينطبق على الخزنة بأكملها، على كل جهاز.",
@@ -3406,7 +3621,8 @@
       "importError": "هذا الملف ليس سمة صالحة. افتح المرجع لمعرفة التنسيق.",
       "label": "السمات المخصّصة",
       "readError": "تعذّرت قراءة سماتك المخصّصة.",
-      "readOnlyHelper": "تُثبَّت السمات المخصّصة على حاسوبك. وتصل سماتك إلى هنا من تلقاء نفسها بعد المزامنة."
+      "readOnlyHelper": "تُثبَّت السمات المخصّصة على حاسوبك. وتصل سماتك إلى هنا من تلقاء نفسها بعد المزامنة.",
+      "emptyTitle": "لا سمات مخصّصة بعد"
     },
     "dailyNotes": {
       "blankTemplate": "فارغة (بدون قالب)",
@@ -3437,15 +3653,8 @@
       "periodFolderAriaLabel": "مجلد الملاحظات {{period}}",
       "periodFormatAriaLabel": "تنسيق عنوان الملاحظات {{period}}",
       "periodTemplateAriaLabel": "قالب الملاحظات {{period}}",
-      "dateFormatHelper": "عنوان كل ملاحظة يومية. يدعم YYYY وMM وDD. الافتراضي {{default}}.",
-      "dateFormatLabel": "تنسيق تاريخ الملاحظة اليومية",
-      "dateFormatSaveError": "تعذّر حفظ تنسيق التاريخ. أعد المحاولة.",
-      "folderHelper": "المكان الذي تُحفظ فيه الملاحظات اليومية الجديدة. الافتراضي {{default}}. ويُبقى على المجلد حتى لو كان فارغًا.",
-      "folderLabel": "مجلد الملاحظات اليومية",
-      "folderSaveError": "تعذّر حفظ المجلد اليومي. أعد المحاولة.",
-      "templateHelper": "اختر قالبًا تبدأ منه كل ملاحظة يومية، أو اتركه فارغًا للحصول على ملاحظة فارغة عنوانها التاريخ.",
-      "templateLabel": "قالب الملاحظة اليومية",
-      "templateSaveError": "تعذّر حفظ القالب اليومي. أعد المحاولة."
+      "sectionPeriodic": "الملاحظات الدورية",
+      "periodSwitcherAriaLabel": "نوع الملاحظة الدورية"
     },
     "deleteVault": {
       "partialFailBody_zero": "تعذّر حذف {{count}} ملف من القرص. مفاتيح الخزنة مُصفّرة من الذاكرة سلفًا، لذا فأي نص مشفّر يتيم يبقى هو خردة مغلّفة بـ Argon2id لا يمكن استرجاعها.",
@@ -3705,7 +3914,35 @@
       "mobileApproveLabel": "اعتماد الإرسال من هذا الهاتف",
       "mobileApproveHelper": "جاء المزوِّد ومفتاحه من جهاز آخر. لا يُرسَل شيء من هذا الهاتف حتى تقرأ ما سيُرسَل وتعتمده هنا.",
       "historyBudgetHelper": "مقدار المحادثة الأخيرة الذي يحمله كل طلب، بالأحرف. اتركه فارغًا للقيمة الافتراضية. رقم أكبر يتيح للذكاء الاصطناعي متابعة محادثات أطول ويرسل جزءًا أكبر منها: مع مزوّد ليس على هذا الجهاز، يعني ذلك خروج مزيد من نصّك منه، في كل خطوة من التشغيل.",
-      "historyBudgetLabel": "المحادثة المُرسَلة مع كل طلب"
+      "historyBudgetLabel": "المحادثة المُرسَلة مع كل طلب",
+      "meetingPromptHelper": "التعليمة التي تستخدمها جولة AI الخاصة بالاجتماع لتحويل التفريغ النصي إلى أقسام. اتركها فارغة لاستخدام الافتراضي المدمج. فهي تحلّ محل صيغة الإخراج الافتراضية، لذا إن ضبطتها فاطلب الأقسام التي تريدها بنفسك.",
+      "meetingPromptLabel": "تعليمة ملخص الاجتماع",
+      "meetingPromptReset": "إعادة الضبط إلى الافتراضي",
+      "groupAutoTag": "الوسم التلقائي",
+      "groupVoice": "الصوت والاجتماعات",
+      "groupWriting": "الكتابة والمحادثة",
+      "groupPrivacy": "الخصوصية والحدود",
+      "groupAdvanced": "متقدّم",
+      "excludedPickLabel": "أضف مجلدًا لاستثنائه",
+      "excludedPickPlaceholder": "اختر مجلدًا…",
+      "modelShowInFolder": "إظهار في المجلد",
+      "modelShowLocation": "إظهار موقع {{name}}",
+      "downloadsLabel": "تنزيل النماذج",
+      "downloadsHelper": "يجلب نموذجًا من أصل Myne نفسه. ويُتحقّق منه مقابل بصمة مدمجة في التطبيق قبل استخدامه، فيُرفض أي تنزيل متلاعب به. ولا يُجلب شيء ما لم تنقر.",
+      "downloadEmbeddingSize": "نموذج متعدد اللغات، نحو 449 مبيبايت.",
+      "downloadTagLabel": "نموذج الوسوم: اقتراحات وسوم تلقائية",
+      "downloadTagSize": "نموذج محلي صغير، نحو 337 مبيبايت.",
+      "downloadInstalled": "مثبَّت",
+      "downloadNotInstalled": "غير مثبَّت",
+      "downloadReinstall": "تنزيل",
+      "downloadInstall": "تنزيل",
+      "modelRemove": "إزالة",
+      "downloading": "جارٍ التنزيل…",
+      "downloadingPercent": "جارٍ التنزيل… {{percent}}%",
+      "downloadCancel": "إلغاء",
+      "downloadFailed": "لم يكتمل التنزيل.",
+      "downloadFailedChecksum": "لم يطابق التنزيل بصمته فرُفض. أعد المحاولة.",
+      "sideloadDisclosure": "يتيح لك وضع المطوّر أيضًا أن توجّه Myne إلى ملف نموذج حصلت عليه بنفسك. الملف الذي تنزّله من مكان آخر لا يتحقق منه Myne، لذا لا تستخدم إلا ملفًا تثق به."
     },
     "network": {
       "disabledCue": "لم تعد المزامنة تمرّ عبر Tor. تذهب الاتصالات الجديدة مباشرة إلى خادم المزامنة.",
@@ -3777,7 +4014,14 @@
       "screenCaptureOverrideLabel": "السماح بالتقاط الشاشة على هذا الجهاز",
       "screenCaptureOverrideUnknown": "تعذّرت قراءة إعداد التقاط الشاشة على هذا الجهاز، لذا لا يُطبَّق هذا التفضيل. أعد فتح الإعدادات لتجربة ذلك مرة أخرى.",
       "screenCaptureSuperseded": "معطّلة على هذا الجهاز. راجع «السماح بالتقاط الشاشة على هذا الجهاز» أدناه. يُحتفظ بهذا التفضيل ويسري من جديد عندما توقف ذلك الخيار.",
-      "screenCaptureSupersededByFlag": "معطّلة في هذه الجلسة، لأن Myne بُدئ تشغيله بالخيار --disable-screen-capture-protection. يُحتفظ بهذا التفضيل ويسري من جديد في المرة التالية التي تفتح فيها Myne من دونه."
+      "screenCaptureSupersededByFlag": "معطّلة في هذه الجلسة، لأن Myne بُدئ تشغيله بالخيار --disable-screen-capture-protection. يُحتفظ بهذا التفضيل ويسري من جديد في المرة التالية التي تفتح فيها Myne من دونه.",
+      "recoveryDrillCheck": "التحقق من العبارة",
+      "recoveryDrillChecking": "جارٍ التحقق…",
+      "recoveryDrillError": "تعذّر إجراء التحقق الآن. لم يتغيّر شيء. أعد المحاولة بعد قليل.",
+      "recoveryDrillHelper": "اكتب الكلمات الـ24 التي دوّنتها. يتحقق Myne مما إذا كانت لا تزال تفتح هذه الخزنة، ولا يخبرك بشيء آخر — ولا تُعرض الكلمات هنا أبدًا.",
+      "recoveryDrillLabel": "التحقق من عبارة الاسترداد",
+      "recoveryDrillPassed": "هذه الكلمات تفتح هذه الخزنة. احفظها حيث وجدتها.",
+      "recoveryDrillPlaceholder": "الكلمات الـ24، بالترتيب، مفصولة بمسافات"
     },
     "quickUnlock": {
       "errorBusy": "هناك عملية أخرى على الخزنة قيد التنفيذ. أعد المحاولة بعد قليل.",
@@ -3828,7 +4072,9 @@
       "pinPlaceholder6": "6 أرقام على الأقل",
       "confirmPin": "تأكيد رمز PIN",
       "reenterPin": "أعد إدخال رمز PIN",
-      "setupButton": "إعداد الفتح السريع"
+      "setupButton": "إعداد الفتح السريع",
+      "errorBiometricAuthFailed": "تعذّر إعداد Touch ID. تأكّد من تسجيل بصمة في إعدادات النظام، أو استخدم PIN بدلًا من ذلك.",
+      "biometricAuthFailed": "تعذّر إعداد {{method}}. تأكّد من تفعيله في إعدادات جهازك، أو استخدم PIN بدلًا من ذلك."
     },
     "shell": {
       "closeLabel": "إغلاق الإعدادات",
@@ -3848,7 +4094,9 @@
         "network": "الشبكة",
         "privacy": "الخصوصية",
         "storage": "التخزين",
-        "sync": "المزامنة"
+        "sync": "المزامنة",
+        "cli": "CLI",
+        "vault": "الخزنة"
       },
       "passwordUpdatedToast": "تم تحديث كلمة المرور",
       "title": "الإعدادات"
@@ -4056,8 +4304,18 @@
         "aiMemory": "ذاكرة حقائق متذكر يتعلم المساعد شخصية صوت تفضيلات",
         "ribbon": "شريط أيسر سكة تثبيت مثبت أمر أوامر تخصيص إعادة ترتيب إلغاء التثبيت شريط أدوات اختصارات",
         "folderNotes": "مجلد ملاحظة فهرس folder_index صفحة هبوط نقر مزدوج رابط مجلد مشاريع إيقاف مفتاح تعطيل",
-        "syncMembers": "أعضاء، مشاركة، دعوة، فريق، تعاون، خزنة"
-      }
+        "syncMembers": "أعضاء، مشاركة، دعوة، فريق، تعاون، خزنة",
+        "accountName": "اسم الحساب مجموعة تجميع إعادة تسمية تسمية جهاز محلي",
+        "accountVaults": "حساب خزائن مجمّعة أي خزائن تنتمي قائمة مجموعة",
+        "aiMeetingPrompt": "اجتماع ملخص تعليمة مخصّص تفريغ نصي بنود الإجراءات قرارات",
+        "update": "تحديث ترقية التحقق من التحديثات إصدار جديد إصدار تنزيل",
+        "plainFile": "ملف عادي محرّر markdown قرص محلي خارج الخزنة نص واضح فتح في المكان",
+        "memberPassword": "خزنة مشتركة كلمة مرور عضو فتح قفل انضمام عبارة",
+        "recoveryDrill": "عبارة الاسترداد تحقق تأكيد تدريب اختبار 24 كلمة بذرة نسخة احتياطية فقدان كلمة المرور",
+        "bar": "شريط سفلي شريط الحالة مؤشرات تخصيص إعادة ترتيب إخفاء إظهار شريط أدوات",
+        "syncDeviceBindings": "أجهزة مطالب بها من الأعضاء إسناد من وقّع أي جهاز ينتمي"
+      },
+      "emptyBody": "جرّب كلمة أقصر، أو اسم لوحة."
     },
     "dateTime": {
       "dateLabel": "تنسيق التاريخ",
@@ -4091,7 +4349,8 @@
       "searchPlaceholder": "بحث في الأوامر…",
       "searchResultsLabel": "أوامر مطابقة",
       "showHelper": "إظهار الشريط الأيسر على هذا الجهاز.",
-      "showLabel": "إظهار الشريط الأيسر"
+      "showLabel": "إظهار الشريط الأيسر",
+      "emptyTitle": "لا شيء مثبّت بعد"
     },
     "memory": {
       "heading": "ما يتذكره المساعد",
@@ -4119,7 +4378,54 @@
       "personalitySavedToast": "حُدِّثت تفضيلات الصوت.",
       "personalitySaveFailed": "تعذر حفظ تفضيلات الصوت.",
       "loadFailed": "تعذر تحميل الذكريات أو تفضيلات الصوت. لم يتغير شيء.",
-      "retryLabel": "أعد المحاولة"
+      "retryLabel": "أعد المحاولة",
+      "emptyTitle": "لم يُتذكَّر شيء بعد"
+    },
+    "account": {
+      "nameLabel": "اسم الحساب",
+      "nameHelper": "اسم لمجموعة الخزائن هذه على هذا الجهاز. ويستخدمه منتقي الخزائن عنوانًا للمجموعة. يبقى على هذا الجهاز ولا يُخزَّن داخل أي خزنة أبدًا، لذا لا يتزامن، وقد يجمع جهاز آخر الخزائن نفسها ويسمّيها تسمية مختلفة.",
+      "namePlaceholder": "أضف اسمًا…",
+      "nameSave": "حفظ",
+      "nameSaving": "جارٍ الحفظ…",
+      "vaultsLabel": "الخزائن في هذا الحساب",
+      "vaultsHelper": "الخزائن التي يجمعها هذا الجهاز تحت الاسم أعلاه. والتجميع اختيار تنظيمي لكل جهاز، لذا ليس جزءًا من محتوى أي خزنة ولا ينتقل معها.",
+      "vaultsCount": "{{count}} خزنة",
+      "currentVault": "هذه الخزنة",
+      "unknownVault": "خزنة أخرى على هذا الجهاز",
+      "standaloneHelper": "هذه الخزنة غير مجمّعة تحت حساب على هذا الجهاز، لذا تقف وحدها. والتجميع لكل جهاز: قد يعرضها جهاز آخر داخل مجموعة.",
+      "unresolvedHelper": "جارٍ تحديد الخزنة المفتوحة…",
+      "devicesNote": "تُدار الأجهزة وأعضاء الخزنة المشتركة وهويّتك في المزامنة.",
+      "groupingHidden": "أسماء الحسابات غير متاحة ما دامت أسماء الخزائن مخفية. أوقف ذلك الخيار في الخصوصية لإدارة هذا الحساب.",
+      "groupingUnreadable": "تعذّرت قراءة تجميع حساب هذا الجهاز. لم يتغيّر شيء.",
+      "groupingError": "تعذّرت قراءة تجميع الحسابات على هذا الجهاز. لم يتغيّر شيء."
+    },
+    "plainFile": {
+      "errorSaveSetting": "تعذّر حفظ إعداد الملفات العادية.",
+      "helper": "افتح وحرّر ملفات .md الموجودة لديك على القرص، في مكانها، دون إضافتها إلى خزنة. هذه الملفات نص واضح: لا يشفّرها Myne، ولا تُزامن تغييراتها ولا تُنسخ احتياطيًا. مفعّل افتراضيًا؛ أوقفه من هنا.",
+      "label": "محرّر الملفات العادية",
+      "openFilesRemain": "لا تزال هناك ملفات مفتوحة فيها تغييرات غير محفوظة. عالجها ثم أوقف هذا مرة أخرى."
+    },
+    "memberPassword": {
+      "reminder": "ليس لديك بعد فتح سريع على هذا الجهاز، لذا تطلب هذه الخزنة عبارة الاسترداد في كل مرة.",
+      "reminderDismiss": "ليس الآن",
+      "title": "فتح قفل الخزنة المشتركة",
+      "helperConfigured": "تُفتح هذه الخزنة المشتركة باستخدام {{method}} على هذا الجهاز.",
+      "helperNotConfigured": "اضبط كلمة مرور أو PIN لتجنّب إعادة كتابة عبارة الاسترداد في كل مرة.",
+      "set": "ضبط",
+      "change": "تغيير",
+      "remove": "إزالة",
+      "label": "كلمة مرور الخزنة",
+      "methodPassword": "كلمة مرور",
+      "methodPin": "رمز PIN",
+      "methodBiometric": "التحقق الحيوي على جهازك",
+      "usePin": "استخدام PIN",
+      "useBiometric": "استخدام Touch ID",
+      "pinLabel": "PIN الخزنة",
+      "pinPlaceholder": "PIN، {{count}} رقمًا على الأقل",
+      "setupHelper": "{{count}} حرفًا على الأقل. يُخزَّن على هذا الجهاز فقط؛ وعبارة الاسترداد لا تزال تفتح الخزنة في أي مكان.",
+      "pinSetupHelper": "{{count}} رقمًا على الأقل. يُخزَّن على هذا الجهاز فقط؛ وعبارة الاسترداد لا تزال تفتح الخزنة في أي مكان.",
+      "errorTooShort": "استخدم {{count}} حرفًا/رقمًا على الأقل.",
+      "errorGeneric": "تعذّر ضبط بيانات الفتح. أعد المحاولة."
     }
   },
   "storageLost": {
@@ -4204,7 +4510,8 @@
       "compareTheirs": "النسخة المتعارضة",
       "compareTitle": "مقارنة “{{title}}”",
       "discard": "تجاهل",
-      "empty": "لا توجد تعارضات. أجهزتك متزامنة."
+      "empty": "لا توجد تعارضات. أجهزتك متزامنة.",
+      "emptyTitle": "لا تعارضات"
     },
     "deviceJoinQr": {
       "accountLabel": "رقم الحساب",
@@ -4266,7 +4573,11 @@
       "verifyTitle": "تحقّق من الجهاز الجديد",
       "verifyAction": "مقارنة الرمز",
       "yourDevices": "أجهزتك",
-      "approve": "موافقة"
+      "approve": "موافقة",
+      "noDevicesBody": "تظهر هنا الأجهزة التي تضيفها إلى هذا الحساب، مع تاريخ آخر مزامنة لكل منها.",
+      "reasonTls": "تعذّر التحقق من شهادة HTTPS للخادم",
+      "tlsFailure": "تعذّر التحقق من شهادة HTTPS لخادم المزامنة.",
+      "tlsFailureHint": "تحقّق من عنوان الخادم وصلاحية الشهادة وثقة جهة التصديق. وسيعيد Myne الاتصال عندما يقدّم الخادم شهادة صالحة."
     },
     "endpoint": {
       "connect": "اتصال",
@@ -4278,7 +4589,12 @@
       "fixedOriginNone": "لا يوجد خادم مزامنة مُعدّ لهذا النشر.",
       "pinPlatformTrust": "تم التحقق منها عبر مخزن شهادات متصفحك. ولا يستطيع هذا العميل تثبيت شهادة بنفسه.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
-      "unreachable": "تعذّر الوصول إلى ذلك الخادم. تحقّق من العنوان ومن أنه يعمل."
+      "unreachable": "تعذّر الوصول إلى ذلك الخادم. تحقّق من العنوان ومن أنه يعمل.",
+      "tlsHelp": "أدخل عنوان الخادم نفسه على كل جهاز. ويحتاج الخادم المستضاف ذاتيًا إلى شهادة HTTPS موثوقة.",
+      "tlsFailure": "تعذّر التحقق من شهادة HTTPS للخادم. تحقّق من عنوان الخادم وشهادته وصلاحيتها.",
+      "inviteLabel": "رمز الدعوة (فقط إن كان هذا الخادم يطلبه)",
+      "invitePlaceholder": "الرمز الذي أعطاك إياه مشغّل الخادم",
+      "changeInviteCode": "تغيير رمز الدعوة"
     },
     "enroll": {
       "accountNumberLabel": "رقم الحساب",
@@ -4294,7 +4610,9 @@
         "notConfigured": "اضبط خادم مزامنة في الإعدادات قبل إضافة هذا الجهاز.",
         "serverMismatch": "هوية خادم المزامنة لم تطابق ما توقّعه هذا الجهاز. لا تُدخل بيانات اعتمادك مرة أخرى حتى تعرف السبب.",
         "kdfTooLarge": "لا يملك هذا الجهاز ذاكرة كافية لفتح تلك الخزنة. فإعدادات تشفيرها تحتاج إلى ذاكرة أكبر مما يستطيع هذا التطبيق استخدامه هنا. افتحها على حاسوب مكتبي بدلًا من ذلك.",
-        "transport": "تعذّر الوصول إلى خادم المزامنة. تحقّق من اتصالك وأعد المحاولة."
+        "transport": "تعذّر الوصول إلى خادم المزامنة. تحقّق من اتصالك وأعد المحاولة.",
+        "inviteCodeInvalid": "لم يُقبل رمز الدعوة ذلك. تحقّق منه وأعد المحاولة.",
+        "inviteCodeRequired": "لا يقبل هذا الخادم حسابات جديدة إلا برمز دعوة. أدخل الرمز الذي أعطاك إياه مشغّله."
       },
       "mode": {
         "password": "كلمة المرور",
@@ -4306,12 +4624,6 @@
       "signInWith": "تسجيل الدخول باستخدام",
       "submit": "إضافة هذا الجهاز",
       "wordAria": "الكلمة {{number}}"
-    },
-    "fingerprint": {
-      "echoProgress_zero": "{{count}} حرف من أصل {{total}} حتى الآن.",
-      "echoProgress_two": "{{count}} حرفان من أصل {{total}} حتى الآن.",
-      "echoProgress_few": "{{count}} أحرف من أصل {{total}} حتى الآن.",
-      "echoProgress_many": "{{count}} حرفًا من أصل {{total}} حتى الآن."
     },
     "join": {
       "accountLabel": "رقم الحساب",
@@ -4331,7 +4643,17 @@
       "verifyTitle": "تحقّق من هذا الجهاز",
       "waitingHint": "أبقِ هذه النافذة مفتوحة. بعد الموافقة يظهر هنا رمز تحقّق لمقارنته بجهازك الآخر.",
       "waitingTitle": "بانتظار الموافقة",
-      "sasAbortFailed": "تعذّر فصل هذا الجهاز. لا يزال مسجّلًا لدى ذلك الخادم، فتعامل معه على أنه غير موثوق: افتح الإعدادات → المزامنة وأزِله من هناك. لم تُحذف ملاحظاتك."
+      "sasAbortFailed": "تعذّر فصل هذا الجهاز. لا يزال مسجّلًا لدى ذلك الخادم، فتعامل معه على أنه غير موثوق: افتح الإعدادات → المزامنة وأزِله من هناك. لم تُحذف ملاحظاتك.",
+      "backToWaiting": "العودة إلى الانتظار",
+      "errorPhrase": "تعذّرت إضافة هذا الجهاز. تحقّق من عنوان الخادم ورقم الحساب وعبارة الاسترداد، ومن إمكانية الوصول إلى الخادم.",
+      "modePassword": "كلمة مروري",
+      "modePhrase": "عبارة الاسترداد لديّ",
+      "noDeviceBody": "ألا جهاز آخر للموافقة على هذا؟ يمكنك التأكيد بعبارة الاسترداد بدلًا من ذلك.",
+      "phraseEscapeBody": "عبارة الاسترداد هي المفتاح الكامل لهذا الحساب، لذا تؤكّد هذا الجهاز دون موافقة من جهاز آخر. وتحتفظ بكلمة المرور التي استخدمتها للتو.",
+      "phraseTitle": "التأكيد بعبارة الاسترداد",
+      "phraseWarning": "عبارة الاسترداد هي المفتاح الكامل لهذا الحساب، لذا يُضاف هذا الجهاز دون موافقة من جهاز آخر. لا تستخدمها إلا إن لم يكن لديك جهاز آخر للموافقة منه. وستضبط كلمة مرور جديدة بعد ذلك.",
+      "usePhrase": "استخدام عبارة الاسترداد لديّ",
+      "back": "رجوع"
     },
     "panel": {
       "addDevice": {
@@ -4372,6 +4694,14 @@
       "usage": {
         "helper": "مقدار البيانات المشفّرة التي يخزّنها هذا الحساب على الخادم، وعدد الأجهزة المسجَّل دخولها.",
         "label": "التخزين والأجهزة"
+      },
+      "identity": {
+        "label": "الهوية",
+        "helper": "تتيح الهوية للناس دعوتك إلى خزنة، وتتيح لهوية واحدة امتلاك عدة خزائن.",
+        "cta": "إضافة هوية",
+        "codeLabel": "رمز هويتك",
+        "lockedHelper": "يحمل هذا الجهاز هوية. وهي مقفلة في هذه الجلسة؛ افتح قفلها بعبارة الاسترداد لتوقيع المزامنة والدعوات.",
+        "unlockedHelper": "يحمل هذا الجهاز هوية، مفتوحة القفل في هذه الجلسة."
       }
     },
     "reconcile": {
@@ -4405,7 +4735,10 @@
       "synced": "متزامن",
       "syncing": "جارٍ المزامنة…",
       "syncNow": "زامن الآن",
-      "awaitingApproval": "بانتظار الموافقة"
+      "awaitingApproval": "بانتظار الموافقة",
+      "errorIdentityLocked": "افتح قفل هويتك للمزامنة",
+      "errorTls": "تعذّر التحقق من اتصال HTTPS بخادم المزامنة",
+      "unlockIdentityCta": "فتح قفل الهوية"
     },
     "usage": {
       "devices": "الأجهزة",
@@ -4470,7 +4803,6 @@
       "rotated": "دُوِّر المفتاح",
       "keyChanged": "تغيّر المفتاح. تحقق مع المالك.",
       "relinkConfirmed": "أكّد المالك إعادة الربط",
-      "epoch": "حقبة مفتاح المجموعة {{epoch}}",
       "ownerBadge": "مالك",
       "memberBadge": "عضو",
       "invite": "دعوة عضو",
@@ -4494,12 +4826,69 @@
       "sasHint": "اقرأ هذه البصمة للشخص الذي تدعوه، أو ادعه يقرأها لك. يجب أن تتطابق من الجانبين قبل المتابعة.",
       "sasConfirm": "أكّدت هذه البصمة مع الشخص خارج التطبيق",
       "inviteCodeInvalid": "هذا ليس رمز هوية عضو صالحًا.",
-      "kemLabel": "مفتاح ML-KEM العام",
-      "edLabel": "مفتاح Ed25519 العام",
-      "mldsaLabel": "مفتاح ML-DSA العام",
       "untitledVault": "خزنة بلا عنوان",
       "inviteFailed": "تعذر إنشاء الدعوة.",
-      "removeFailed": "تعذر إزالة العضو."
+      "removeFailed": "تعذر إزالة العضو.",
+      "youBadge": "أنت",
+      "nameUnverified": "الاسم غير موثّق",
+      "nameLabel": "اسم العرض لديك",
+      "nameEdit": "إعادة التسمية",
+      "nameSave": "حفظ",
+      "nameClear": "مسح",
+      "nameCancel": "إلغاء",
+      "nameErrorEmpty": "أدخل اسمًا، أو استخدم مسح لإزالة اسمك.",
+      "nameErrorTooLong": "هذا الاسم طويل جدًا.",
+      "nameErrorUnreadable": "تعذّرت قراءة مخزن الأسماء على هذا الجهاز. لم يُحفظ شيء.",
+      "nameErrorUnshared": "يمكن ضبط الأسماء بمجرد مشاركة هذه الخزنة.",
+      "nameErrorLocked": "افتح قفل الخزنة لتغيير اسمك.",
+      "nameErrorGeneric": "تعذّر حفظ اسمك. أعد المحاولة.",
+      "nameInvite": "ليس لديك اسم عرض بعد. ويرى الأعضاء الآخرون بصمتك.",
+      "nameInviteCta": "ضبط اسم",
+      "nameInviteDismiss": "ليس الآن",
+      "noInvitations": "لم تُرسَل دعوات بعد.",
+      "identityHeading": "هويتك",
+      "membersHeading": "الأعضاء",
+      "emptyTitle": "لا أعضاء بعد",
+      "personUnlockOpen": "فتح القفل",
+      "unsharedNotice": "هذه الخزنة غير مشتركة بعد. ومشاركتها دائمة وتحدث عند أول دعوة لشخص.",
+      "shareConfirmTitle": "مشاركة هذه الخزنة؟",
+      "shareConfirmBody": "دعوة شخص تحوّل هذه الخزنة إلى خزنة مشتركة: فتكسب مفتاح مجموعة، ويفتح الأشخاص الذين تدعوهم محتواها به. هذا التغيير دائم ولا سبيل للعودة إلى خزنة بمستخدم واحد. تابع لاختيار من تدعوه.",
+      "shareConfirmCta": "مشاركة ودعوة",
+      "shareFailed": "تعذّر بدء مشاركة هذه الخزنة.",
+      "identityForgetCta": "نسيان هذه الهوية على هذا الجهاز",
+      "identityForgetCheckbox": "أفهم أن هذه الهوية ستُزال من هذا الجهاز.",
+      "identityForgetConfirm": "نسيان الهوية",
+      "identityForgetCancel": "إبقاؤها",
+      "identityForgetWarning": "هذا يزيل الهوية من هذا الجهاز فقط. وحساب الخادم وأي خزنة تملكها أو انضمّت إليها لم يمسّهما شيء، ويمكنك استرداد الهوية بعبارتها المكوّنة من 24 كلمة على جهاز آخر. وستحتاج إلى فتح قفلها من جديد للدعوات وإجراءات القائمة على هذا الجهاز.",
+      "identityForgetError": "تعذّر نسيان الهوية. أعد المحاولة."
+    },
+    "deviceBindings": {
+      "title": "الأجهزة والأعضاء",
+      "heading": "الأجهزة المطالب بها",
+      "hint": "كل جهاز طالب بنفسه في هذه الخزنة، مع العضو الذي تطالب به توقيعه هو. والمطالبة ليست دليل ملكية: فهي تقول أي عضو وقّع البيان، لا أن الجهاز له.",
+      "loading": "جارٍ تحميل الأجهزة…",
+      "emptyTitle": "لا أجهزة مطالب بها بعد",
+      "empty": "يظهر الجهاز هنا بمجرد أن يطالب بنفسه في هذه الخزنة المشتركة.",
+      "claimedBy": "يطالب به {{name}}",
+      "unverified": "غير موثّق",
+      "unverifiedHint": "معرّفات الأجهزة هذه موجودة في الخزنة لكن لا شيء يسند مطالبة بشأنها: فالتوقيع لم يثبت، أو أنه يسمّي شخصًا لا تضمّه قائمة الأعضاء. وتُعرض كمعرّفات لأنه لا عضو يُسمّى إلى جانبها.",
+      "claimHint": "لا مطالبة موثّقة لهذا الجهاز نفسه في هذه الخزنة. والمطالبة به من جديد تسجّله تحت هويتك، وهي أيضًا إصلاح لمطالبة لم تثبت.",
+      "claim": "المطالبة بهذا الجهاز",
+      "claiming": "جارٍ المطالبة…",
+      "unshared": "هذه الخزنة غير مشتركة بعد، فلا عضو يُنسب إليه جهاز. ومشاركتها دائمة وتحدث عند أول دعوة لشخص.",
+      "errorLocked": "افتح قفل الخزنة لقراءة أجهزتها.",
+      "errorUnshared": "هذه الخزنة غير مشتركة، لذا لا تحمل أي ارتباطات أجهزة.",
+      "errorNoDeviceId": "لم يُضَف هذا الجهاز إلى حسابك، فلا هوية جهاز يطالب بها نفسه تحتها.",
+      "errorConflict": "تعذّر التمييز بين مطالبتين مختلفتين عند الإصدار نفسه، فلم يتغيّر شيء. طالب بهذا الجهاز من جديد لاستبدالهما.",
+      "errorUnreadable": "تعذّرت قراءة قائمة الأجهزة على هذا الجهاز. لم يتغيّر شيء.",
+      "errorGeneric": "تعذّرت قراءة أجهزة هذه الخزنة. أعد المحاولة."
+    },
+    "nameGate": {
+      "title": "اختر اسم عرض",
+      "body": "هكذا سيراك الأعضاء الآخرون في هذه الخزنة في قائمة الأعضاء. وتبقى بصمتك إلى جانبه، ويمكنك تغيير الاسم لاحقًا.",
+      "label": "اسم العرض لديك",
+      "checking": "جارٍ التحقق من اسمك…",
+      "save": "متابعة"
     }
   },
   "tasks": {
@@ -4527,7 +4916,6 @@
       "search": "لا مهام تطابق “{{query}}”."
     },
     "filter": {
-      "all": "الكل",
       "overdue": "متأخرة",
       "today": "اليوم",
       "upcoming": "قادمة"
@@ -4558,10 +4946,6 @@
       "notCompleted": "مهمة، غير مكتملة",
       "tooLongToWrite": "سطر هذه المهمة أطول من أن يُحرَّر من هنا. افتح ملاحظتها بدلًا من ذلك.",
       "untitled": "مهمة بلا عنوان"
-    },
-    "scope": {
-      "allFolders": "كل المجلدات",
-      "label": "التضييق حسب"
     },
     "title": "المهام",
     "axis": {
@@ -4618,13 +5002,6 @@
       "allNotes": "كل الملاحظات",
       "anyPriority": "أي أولوية",
       "anyTag": "أي وسم",
-      "dueLabel": "تصفية حسب تاريخ الاستحقاق",
-      "folderLabel": "تصفية حسب المجلد",
-      "noteLabel": "تصفية حسب الملاحظة",
-      "priorityLabel": "تصفية حسب الأولوية",
-      "sortLabel": "ترتيب داخل الأقسام",
-      "statusLabel": "تصفية حسب الإنجاز",
-      "tagLabel": "تصفية حسب الوسم",
       "untitled": "بلا عنوان"
     },
     "search": {
@@ -4634,7 +5011,6 @@
   },
   "templates": {
     "manager": {
-      "closeLabel": "إغلاق القوالب",
       "deleteRowLabel": "حذف القالب {{name}} (نقل إلى المهملات)",
       "editTemplateLabel": "تحرير القالب {{name}}",
       "emptyBody": "أنشئ قالبًا لإعادة استخدام هيكل ملاحظة: ملاحظة اجتماع، أو سجل يومي، أو ملاحظة قراءة. واختر واحدًا عند إنشاء ملاحظة جديدة.",
@@ -4645,7 +5021,10 @@
       "newTemplateName": "قالب بدون عنوان",
       "removeFromTemplates": "إزالة من القوالب",
       "removeRowLabel": "إزالة {{name}} من القوالب (مع الاحتفاظ بالملاحظة)",
-      "title": "قوالب الملاحظات"
+      "title": "قوالب الملاحظات",
+      "nameLabel": "اسم القالب",
+      "create": "إنشاء",
+      "createFailed": "تعذّر إنشاء القالب. أعد المحاولة."
     },
     "emptyBefore": "لا توجد قوالب بعد. اضغط ",
     "newAction": "جديد",
@@ -4731,7 +5110,9 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "الفتح باستخدام PIN",
       "unlockWithTouchId": "الفتح باستخدام Touch ID",
-      "wrongCredential": "غير صحيح. بقيت {{remaining}} محاولة."
+      "wrongCredential": "غير صحيح. بقيت {{remaining}} محاولة.",
+      "showPin": "إظهار PIN",
+      "hidePin": "إخفاء PIN"
     },
     "recoveryInterruptedBanner": "انقطع مسار الاسترداد. اضبط كلمة مرور جديدة أولًا.",
     "recoveryInterruptedBody": "اضبط كلمة مرور جديدة أولًا، ثم أعد ختم خزنتك.",
@@ -4752,7 +5133,18 @@
     "memberHint": "هذه الخزنة مشتركة معك. افتحها بكعبرك الاحتياطي الخاص.",
     "memberPhraseLabel": "عبارة الاستعادة",
     "memberSubmit": "فتح",
-    "memberError": "لم تفتح هذه العبارة الخزنة المشتركة."
+    "memberError": "لم تفتح هذه العبارة الخزنة المشتركة.",
+    "memberPasswordHint": "هذه الخزنة مشتركة معك. افتح قفلها بكلمة المرور التي ضبطتها على هذا الجهاز.",
+    "memberPasswordLabel": "كلمة مرور الخزنة",
+    "memberPasswordError": "لم تفتح كلمة المرور هذه الخزنة المشتركة.",
+    "memberUsePhrase": "استخدام عبارة الاسترداد بدلًا من ذلك",
+    "memberUseFast": "استخدام الفتح السريع بدلًا من ذلك",
+    "memberPinHint": "هذه الخزنة مشتركة معك. افتح قفلها برمز PIN الذي ضبطته على هذا الجهاز.",
+    "memberPinLabel": "PIN الخزنة",
+    "memberPinPlaceholder": "PIN الخزنة ({{count}} رقمًا على الأقل)",
+    "memberBiometricHint": "هذه الخزنة مشتركة معك. أكّد بالتحقق الحيوي على جهازك لفتح القفل.",
+    "memberBiometricSubmit": "فتح القفل بالتحقق الحيوي",
+    "titleNamed": "فتح {{vault}}"
   },
   "vault": {
     "ioBanner": {
@@ -4762,24 +5154,6 @@
     }
   },
   "vaultCreation": {
-    "account": {
-      "ackLabel": "حفظت رقم حسابي في مكان أستطيع العودة إليه لاحقًا.",
-      "back": "رجوع",
-      "commit": "إنشاء الخزنة",
-      "committing": "جارٍ الحفظ…",
-      "copied": "تم النسخ",
-      "copy": "نسخ",
-      "copyFailed": "تعذّر النسخ. استخدم «حفظ كملف» بدلًا من ذلك.",
-      "downloadStarted": "أُرسل إلى تنزيلات متصفحك. تحقّق من وصوله: متصفحك هو من يقرّر أين يذهب الملف، ولا يستطيع Myne أن يرى ما إذا كان قد وصل.",
-      "eyebrow": "الخطوة 4 من 4: رقم الحساب",
-      "heading": "احفظ رقم حسابك.",
-      "intro": "هذا رمز لحامله. تعامل معه كالنقود.",
-      "saveAsFile": "حفظ كملف",
-      "saveFailed": "تعذّر حفظ الملف. انسخ الرقم بدلًا من ذلك، أو دوّنه.",
-      "savedToFile": "تم الحفظ. إنه ملف نص عادي، فاحفظه في مكان لا يستطيع قراءته سواك.",
-      "shownOnceBody": "احفظه الآن. لا يستطيع Myne استرجاعه لك. وهو مطلوب للتسجيل في المزامنة لاحقًا.",
-      "shownOnceEmphasis": "يُعرض هذا مرة واحدة فقط."
-    },
     "briefing": {
       "back": "رجوع",
       "continue": "المتابعة إلى إنشاء الخزنة",
@@ -4807,12 +5181,13 @@
     },
     "confirm": {
       "back": "رجوع",
-      "continue": "متابعة",
-      "eyebrow": "الخطوة 3 من 4: تأكيد العبارة",
       "heading": "أعد كتابة أربع كلمات من عبارتك.",
       "intro": "سنسألك عن مواضع محددة للتأكد من أنك حفظتها.",
       "mismatch": "لا تطابق الكلمة رقم {{pos}}.",
-      "wordAtPosition": "الكلمة في الموضع {{pos}}"
+      "wordAtPosition": "الكلمة في الموضع {{pos}}",
+      "commit": "إنشاء الخزنة",
+      "committing": "جارٍ الحفظ…",
+      "eyebrowLabel": "تأكيد العبارة"
     },
     "encrypting": {
       "caption": "يستغرق هذا لحظة.",
@@ -4916,24 +5291,19 @@
     },
     "password": {
       "back": "رجوع",
-      "eyebrow": "الخطوة 1 من 4: كلمة المرور الرئيسية",
       "heading": "إنشاء خزنة",
       "helperLead": "لا يخزّن Myne كلمة مرورك ولا عبارة استردادك.",
-      "submit": "توليد عبارة الاسترداد"
+      "submit": "توليد عبارة الاسترداد",
+      "eyebrowLabel": "كلمة المرور الرئيسية"
     },
     "phrase": {
-      "back": "رجوع",
       "clipboardNotCleared": "لن يسمح متصفحك لـ Myne بمسح حافظتك بعد ذلك، لذا تبقى الكلمات الـ24 فيها حتى تنسخ شيئًا آخر. الصقها في مدير كلمات المرور لديك، ثم انسخ أي شيء.",
-      "continue": "حفظتها، تأكيد العبارة",
       "copied": "تم النسخ. يمسحها Myne خلال 30 ثانية، حتى إن انتقلت إلى غيرها، ما دام التطبيق يعمل.",
       "copiedNoAutoClear": "تم النسخ. لا يستطيع Myne مسح حافظتك هنا، لذا تبقى الكلمات فيها حتى تنسخ شيئًا آخر.",
       "copy": "نسخ",
       "extensionNotice": "يمكن لإضافات المتصفح التي لها وصول إلى هذا الموقع قراءة ما في هذه الصفحة. إن لم تكن واثقًا من كل إضافة في هذا الملف الشخصي، فاستخدم تطبيق سطح المكتب أو ملفًا شخصيًا نظيفًا للمتصفح في هذه الخطوة.",
       "copyFailed": "تعذّر النسخ. استخدم «حفظ كملف» بدلًا من ذلك.",
       "downloadStarted": "أُرسل إلى تنزيلات متصفحك. تحقّق من وصوله: متصفحك هو من يقرّر أين يذهب الملف، ولا يستطيع Myne أن يرى ما إذا كان قد وصل.",
-      "eyebrow": "الخطوة 2 من 4: عبارة الاسترداد",
-      "heading": "اكتب هذه الكلمات الـ24.",
-      "intro": "هذه العبارة، مع كلمة مرورك، هي الطريقة الوحيدة لاسترداد خزنتك. احفظها دون اتصال: على ورق، أو في مدير كلمات مرور، أو محفظة عتادية. وتعامل معها كالنقود.",
       "reveal": "إظهار العبارة",
       "saveAsFile": "حفظ كملف",
       "saveFailed": "تعذّر حفظ الملف. انسخ الكلمات بدلًا من ذلك، أو دوّنها.",
@@ -4954,7 +5324,36 @@
     },
     "sessionLost": {
       "startOver": "ابدأ من جديد"
-    }
+    },
+    "kit": {
+      "accountFor": "رقم الحساب — عند إضافة جهاز آخر",
+      "back": "رجوع",
+      "continue": "حفظتُ هذا، تأكيد العبارة",
+      "copied": "العدّة الآن في حافظتك. ويمسحها Myne بعد 30 ثانية، حتى إن انتقلت إلى غيره، ما دام التطبيق يعمل.",
+      "copiedNoAutoClear": "نُسخت. لا يستطيع Myne مسح حافظتك هنا، فتبقى العدّة فيها حتى تنسخ شيئًا آخر.",
+      "copy": "نسخ",
+      "copyFailed": "تعذّر النسخ. استخدم “حفظ عدّة الاسترداد” بدلًا من ذلك.",
+      "documentTitle": "عدّة استرداد Myne",
+      "downloadStarted": "أُرسلت إلى تنزيلات متصفحك. تحقّق من وصول العدّة: فمتصفحك هو من يقرّر مصير الملف، ولا يستطيع Myne رؤية ما إذا وصل.",
+      "eyebrowLabel": "عدّة الاسترداد",
+      "heading": "احفظ عدّة الاسترداد",
+      "intro": "الملف الذي على وشك حفظه هو هذا بالضبط. ويُعرض مرة واحدة.",
+      "phraseFor": "عبارة الاسترداد — إن نسيت كلمة مرورك",
+      "save": "حفظ عدّة الاسترداد",
+      "saveFailed": "تعذّر حفظ الملف. انسخ العدّة بدلًا من ذلك، أو دوّن الجزأين كلاهما.",
+      "savedToFile": "حُفظ. وهو ملف نص واضح يحوي السرّين معًا، فاحفظه في مكان لا يقرأه غيرك.",
+      "whyEnglish": "الكلمات إنجليزية في كل اللغات. فهي جزء من معيار BIP-39، لذا يستطيع أي عميل Myne قراءة عبارة كتبها أي عميل آخر. لا تترجمها: فالكلمات المترجمة ليست في قائمة الكلمات، وستتوقف العبارة عن العمل."
+    },
+    "name": {
+      "back": "رجوع",
+      "continue": "متابعة",
+      "eyebrowLabel": "سمِّ خزنتك",
+      "heading": "بماذا نسمّي هذه الخزنة؟",
+      "helper": "يُخزَّن الاسم مشفّرًا مع الخزنة. وعلى هذا الجهاز يظهر في منتقي الخزائن عند بدء التشغيل قبل فتح القفل، فيستطيع كل من يرى تلك الشاشة قراءته؛ أخفِ أسماء الخزائن من الإعدادات لإيقاف ذلك. ويمكنك تغييره لاحقًا.",
+      "intro": "سترى هذا الاسم على شاشة القفل وفي قائمة خزائنك.",
+      "placeholder": "شخصية"
+    },
+    "stepIndicator": "الخطوة {{n}} من {{total}} · {{label}}"
   },
   "vaultPicker": {
     "createAnother": "إنشاء خزنة أخرى",
@@ -4976,7 +5375,10 @@
     "renameCancel": "إلغاء",
     "renamePlaceholder": "اسم الحساب",
     "renameSave": "إعادة تسمية",
-    "accountUnreadable": "تعذر قراءة تجميع الحسابات على هذا الجهاز. لم يتغير شيء."
+    "accountUnreadable": "تعذر قراءة تجميع الحسابات على هذا الجهاز. لم يتغير شيء.",
+    "createShort": "خزنة جديدة",
+    "joinShort": "إضافة جهاز",
+    "restoreShort": "استعادة نسخة احتياطية"
   },
   "vaultRecover": {
     "decrypting": {
@@ -5058,12 +5460,8 @@
     "lede": "Markdown، مشفّر على هذا الجهاز قبل أن يغادره. لا بريد إلكتروني للحساب. ولا خوادم تستطيع قراءة كلمة واحدة.",
     "residueBanner": "ملفات متبقية من عملية حذف انقطعت ({{n}}). نظّفها قبل إنشاء خزنة.",
     "cleanUpFiles": "تنظيف الملفات المتبقية",
-    "create": "إنشاء خزنة",
     "connect": "الاتصال بحسابي",
     "createCta": "إنشاء خزنة جديدة",
-    "headlineLine1": "ملاحظات Markdown مشفّرة.",
-    "headlineLine2": "بلا بريد إلكتروني عند التسجيل.",
-    "joinCta": "إضافة هذا الجهاز إلى حساب",
     "repairResidue": {
       "partialBody_zero": "{{count}} ملف قد يكون مقفلًا من تطبيق آخر (مضاد فيروسات، أو مزامنة ملفات، أو فهرسة بحث). أغلق التطبيق وأعد المحاولة بعد قليل، أو أزل مجلد الخزنة يدويًا.",
       "partialBody_one": "{{count}} ملف قد يكون مقفلًا من تطبيق آخر (مضاد فيروسات، أو مزامنة ملفات، أو فهرسة بحث). أغلق التطبيق وأعد المحاولة بعد قليل، أو أزل مجلد الخزنة يدويًا.",
@@ -5099,9 +5497,21 @@
       "cleaningUp": "جارٍ التنظيف…",
       "cleanUp": "تنظيف"
     },
-    "restoreCta": "استعادة من نسخة احتياطية",
-    "subtitle": "تُشفَّر ملاحظاتك على هذا الجهاز قبل أن تغادره. ولا يخزّن الخادم سوى نص مشفّر.",
-    "identityCta": "إنشاء هوية فقط"
+    "startIdentity": "إنشاء هوية",
+    "startLocal": "إنشاء خزنة محلية بدلًا من ذلك",
+    "tagline": "ملاحظات markdown مشفّرة. بلا بريد إلكتروني عند التسجيل.",
+    "identityTitle": "إنشاء هوية",
+    "identityBody": "هوية واحدة لكل خزائنك، ليدعوك الناس. وتحتاج إلى خادم مزامنة.",
+    "localTitle": "إنشاء خزنة محلية",
+    "localBody": "خزنة مشفّرة على هذا الجهاز. أضف المزامنة أو هوية لاحقًا.",
+    "restoreTitle": "الاستعادة من نسخة احتياطية",
+    "restoreBody": "افتح ملف .myne-backup حفظته سابقًا.",
+    "joinTitle": "إضافة هذا الجهاز إلى حساب",
+    "joinBody": "استخدم خزنة لديك بالفعل على جهاز آخر.",
+    "createAction": "إنشاء",
+    "restoreAction": "استعادة",
+    "joinAction": "إضافة جهاز",
+    "version": "الإصدار {{version}} · ما قبل ألفا"
   },
   "wikiGraph": {
     "emptyTitle": "لا توجد روابط بعد",
@@ -5234,7 +5644,6 @@
     "approvalHint": "تظهر ملاحظاتك بعد أن توافق على هذا الجهاز من جهاز يملك حسابك بالفعل.",
     "connectingSubtitle": "جارٍ جلب حسابك وفتح قفل خزنتك على هذا الجهاز.",
     "qr": {
-      "cancel": "إلغاء",
       "confirmAccount": "الحساب",
       "confirmServer": "الخادم",
       "confirmTitle": "إضافة هذا الجهاز؟",
@@ -5252,7 +5661,6 @@
     "beginGeneric": "تعذّر بدء إنشاء الخزنة. أعد المحاولة.",
     "wordNumber": "الكلمة رقم {{position}}",
     "commitError": "تعذّر حفظ خزنتك. أعد المحاولة.",
-    "copyPhrase": "نسخ",
     "phraseCopied": "تم النسخ. تبقى على هذا الجهاز، ويتخلّص منها النظام بعد 30 ثانية.",
     "phraseCopyFailed": "تعذّر النسخ. استخدم «حفظ إلى ملف» بدلًا من ذلك.",
     "savedToFile": "تم الحفظ في {{label}}",
@@ -5266,8 +5674,6 @@
     "confirmPasswordLabel": "تأكيد كلمة المرور",
     "passwordHelper": "لا تُخزَّن ولا تُرسَل أبدًا. تشفّر مفاتيحك على هذا الجهاز.",
     "encryptingSubtitle": "جارٍ اشتقاق مفتاحك باستخدام Argon2id. يستغرق ذلك بضع ثوانٍ ولا يمكن مقاطعته.",
-    "phraseTitle": "عبارة الاسترداد الخاصة بك",
-    "phraseIntro": "أربع وعشرون كلمة، بالترتيب. اكتبها على ورق واحفظها في مكان آمن.",
     "showSecondHalf": "عرض الكلمات 13–24",
     "saveToFile": "حفظ في ملف",
     "writtenThemDown": "لقد كتبتها",
@@ -5275,9 +5681,6 @@
     "typebackLead": "أدخل هذه الكلمات الأربع من عبارة الاسترداد التي حفظتها للتو.",
     "wordMismatch": "لا يطابق الكلمة رقم {{pos}}",
     "backToPhrase": "العودة إلى العبارة",
-    "accountTitle": "رقم حسابك",
-    "accountLead": "احفظه مع عبارة الاسترداد. ستحتاج إليه لاستعادة خزنتك على جهاز جديد.",
-    "accountSavedAck": "لقد حفظت رقم حسابي.",
     "commit": "إتمام",
     "committingTitle": "جارٍ حفظ خزنتك…",
     "committingSubtitle": "جارٍ كتابة الخزنة المشفّرة على هذا الجهاز.",
@@ -5317,7 +5720,6 @@
       "backup": "تُنشأ النسخ الاحتياطية المشفّرة وتُستعاد في تطبيق Myne لسطح المكتب، فهو قادر على كتابة ملف النسخة الاحتياطية حيث تختار. ملاحظاتك هنا تأتي من الخادم، لذا يستعيد هذا المتصفح نفسه عبر المزامنة.",
       "creation": "هذا المتصفح يحتوي بالفعل على حساب. ولإنشاء حساب آخر، افتح تطبيق Myne لسطح المكتب أو استخدم ملف متصفح آخر.",
       "multiVault": "يحمل هذا المتصفح حسابًا واحدًا. لاستخدام حساب آخر، افتحه في تطبيق Myne لسطح المكتب أو في ملف تعريف متصفح مختلف.",
-      "phraseRecovery": "الاسترداد بالعبارة يتم في تطبيق Myne لسطح المكتب. لا ينبغي أبدًا كتابة عبارة الاسترداد في صفحة ويب.",
       "title": "غير متاح في المتصفح"
     },
     "unsupported": {
@@ -5351,7 +5753,6 @@
     "savedForNextLaunch": "تم الحفظ. لا تزال الحماية معطّلة في هذه الجلسة لأنها بُدئت بالخيار --disable-screen-capture-protection، لذا تعود في المرة التالية التي تفتح فيها Myne من دونه."
   },
   "identitySetup": {
-    "createCta": "إنشاء هوية",
     "doneCta": "تم",
     "error": "تعذر إعداد الهوية. تحقق من تهيئة خادم مزامنة ثم أعد المحاولة.",
     "intro": "تسمح الهوية للأشخاص بإرسال دعوة إليك قبل أن تمتلك أي خزنة. لا تنشئ خزنة ولا تخزن ملاحظات.",
@@ -5360,7 +5761,25 @@
     "recoverCta": "استعادة هوية",
     "recoverIntro": "لديك هوية بالفعل؟ أدخل عبارتها الاحتياطية المكونة من 24 كلمة.",
     "recovered": "استُعيدت الهوية.",
-    "title": "هوية فقط"
+    "title": "هوية فقط",
+    "errorAlreadyHeld": "يحمل هذا الجهاز هوية بالفعل. استردّها بعبارة الاسترداد الخاصة بها، أو انسها وأنشئ هوية جديدة.",
+    "errorNotConfigured": "تعذّر إعداد الهوية. تحقّق من تهيئة خادم مزامنة ثم أعد المحاولة.",
+    "forgetCancel": "إبقاؤها",
+    "forgetConfirm": "نسيان وإنشاء جديد",
+    "forgetCta": "نسيان هذه الهوية وإنشاء هوية جديدة",
+    "forgetWarning": "هذا يمحو الهوية المحمولة على هذا الجهاز. وإن لم تكن قد دوّنت عبارة استردادها المكوّنة من 24 كلمة، فقد ضاعت: وسيفقد هذا الجهاز الوصول إلى أي خزنة يملكها أو انضمّ إليها حتى تستردّها بتلك العبارة. تابع فقط إذا كنت متأكدًا.",
+    "heldIntro": "يحمل هذا الجهاز هوية بالفعل. استردّها بعبارتها المكوّنة من 24 كلمة أدناه.",
+    "typeBackLead": "لتأكيد أنك حفظتها، اكتب هذه الكلمات الأربع من العبارة أعلاه.",
+    "typeBackMismatch": "هذا لا يطابق الكلمة رقم {{pos}}.",
+    "typeBackWordAtPosition": "الكلمة رقم {{pos}}",
+    "newTitle": "هوية جديدة",
+    "createAction": "إنشاء",
+    "recoverTitle": "لديّ واحدة بالفعل",
+    "recoverHint": "استردّها على هذا الجهاز بعبارة استردادها المكوّنة من 24 كلمة.",
+    "recoverAction": "استرداد",
+    "back": "رجوع",
+    "changeServer": "تغيير خادم المزامنة أو التحقق منه",
+    "errorTlsFailure": "تعذّر التحقق من شهادة HTTPS للخادم. تحقّق من عنوان الخادم وشهادته."
   },
   "personIdentityCode": {
     "copy": "نسخ رمز الهوية",
@@ -5386,6 +5805,169 @@
     "acceptInvalid": "هذا ليس رمز هوية مالك صالحًا.",
     "shareCodeHeading": "رمز الدعوة الخاص بك",
     "shareCodeHint": "شارك هذا الرمز مع من يدعوك. يحتوي على معلومات عامة فقط (معرّف هويتك ومفاتيحك العامة)، وليس عبارتك أبدًا.",
-    "title": "هويتك"
+    "title": "هويتك",
+    "acceptPasswordNote": "اختر كلمة مرور لهذا الجهاز. وهي منفصلة عن كلمة مرور مالك الخزنة وعن عبارة الاسترداد: فهي تفتح هذه الخزنة على هذا الجهاز، وتبقى عبارتك هي السبيل المحمول للعودة.",
+    "acceptErrorBadRequest": "تعذّر التحقق من الدعوة. الصق رمز هوية مالك الخزنة (يشاركه معك عند دعوتك) وقارن البصمة من الجانبين.",
+    "acceptErrorNotFound": "لم تعد هذه الدعوة متاحة. ربما استُخدمت بالفعل أو سُحبت. اطلب من المالك إرسال دعوة جديدة.",
+    "acceptErrorNotEnrolled": "هذا الجهاز ليس الهوية التي وُجّهت إليها هذه الدعوة. افتح الهوية التي أُرسلت إليها الدعوة ثم اقبلها.",
+    "acceptErrorTransport": "تعذّر الوصول إلى خادم المزامنة. تحقّق من اتصالك وأعد المحاولة.",
+    "acceptErrorUnauthenticated": "هويتك غير مسجّلة الدخول على هذا الجهاز. افتح قفل هويتك وأعد المحاولة.",
+    "claimedHeading": "الدعوات التي قبلتها بالفعل",
+    "claimedHint": "أضف واحدة إلى هذا الجهاز بعبارة الاسترداد. وإن كان مالك الخزنة قد أزالك منها منذ ذلك الحين، فلا يمكن إضافتها هنا.",
+    "join": "إضافة إلى هذا الجهاز",
+    "joinHint": "هذه الخزنة مشتركة مع هويتك بالفعل. أدخل عبارة الاسترداد لتثبيتها على هذا الجهاز.",
+    "joinPhraseLabel": "عبارة الاسترداد لديك",
+    "joinPasswordNote": "اختر كلمة مرور لهذا الجهاز. وهي منفصلة عن كلمة مرور مالك الخزنة: فهي تفتح هذه الخزنة هنا، وتبقى عبارة الاسترداد هي السبيل المحمول للعودة.",
+    "joinSubmit": "إضافة وفتح القفل",
+    "joinError": "تعذّرت إضافة الخزنة إلى هذا الجهاز.",
+    "joinErrorAlreadyHeld": "يحمل هذا الجهاز هذه الخزنة بالفعل، فلا شيء يُضاف. افتح الخزنة الموجودة لديك هنا.",
+    "joinErrorBadRequest": "تعذّر على هذا الجهاز التأكد من المالك الذي تنتمي إليه هذه الخزنة، فلم يُضف الخزنة. وإن كانت هذه أول مرة تسجّل الدخول فيها هنا، فافتحها مرة واحدة على جهاز لديه الخزنة بالفعل ثم أعد المحاولة.",
+    "joinErrorNotEnrolled": "عبارة الاسترداد هذه ليست الهوية التي شُوركت معها هذه الخزنة. تحقّق من أنك أدخلت عبارة الهوية التي دُعيت.",
+    "joinErrorNotConfigured": "المزامنة غير مهيّأة على هذا الجهاز. اضبط خادم المزامنة ثم أعد المحاولة.",
+    "joinErrorUnauthenticated": "هويتك غير مسجّلة الدخول على هذا الجهاز. افتح قفل هويتك وأعد المحاولة.",
+    "joinErrorTransport": "تعذّر الوصول إلى خادم المزامنة، أو أن هذه الخزنة لم تُنشر هناك بعد. تحقّق من اتصالك وأعد المحاولة.",
+    "forgetCancel": "إبقاؤها",
+    "forgetCheckbox": "أفهم أن هذه الهوية ستُزال من هذا الجهاز.",
+    "forgetConfirm": "نسيان الهوية",
+    "forgetCta": "نسيان هذه الهوية على هذا الجهاز",
+    "forgetError": "تعذّر نسيان الهوية. أعد المحاولة.",
+    "forgetWarning": "هذا يزيل الهوية من هذا الجهاز فقط. وحساب الخادم وأي خزنة تملكها أو انضمّت إليها لم يمسّهما شيء، ويمكنك استرداد الهوية بعبارتها المكوّنة من 24 كلمة على جهاز آخر. وإن لم تكن قد حفظت تلك العبارة، فلن يستطيع هذا الجهاز استردادها."
+  },
+  "aiOnboarding": {
+    "title": "إعداد AI",
+    "intro": "يستطيع Myne البحث في ملاحظاتك بالمعنى، واقتراح الوسوم، ومحادثتك عنها. لا شيء من ذلك إلزامي، ويمكنك تفعيله لاحقًا من الإعدادات.",
+    "enableLabel": "تفعيل ميزات AI",
+    "semantic": {
+      "title": "البحث الدلالي",
+      "body": "نزّل نموذج تضمين متعدد اللغات (نحو 449 مبيبايت) لتتمكن من البحث بالمعنى، لا بالكلمات فقط."
+    },
+    "tag": {
+      "title": "الوسم التلقائي",
+      "body": "نزّل نموذج الوسوم (نحو 337 مبيبايت) ليقترح Myne وسومًا أثناء كتابتك."
+    },
+    "chat": {
+      "title": "المحادثة",
+      "body": "بلا تنزيل. تعمل المحادثة مع نموذج تشغّله أنت بالفعل أو مزوّد تسمّيه، مع خطوة موافقة.",
+      "setup": "إعداد مزوّد"
+    },
+    "download": "تنزيل",
+    "downloading": "جارٍ التنزيل…",
+    "cancel": "إلغاء",
+    "complete": "جاهز",
+    "retry": "إعادة المحاولة",
+    "skip": "تخطّي",
+    "done": "تم"
+  },
+  "plainFile": {
+    "closePending": {
+      "cancelLabel": "متابعة التحرير",
+      "message": "بعض الملفات المفتوحة فيها تغييرات غير محفوظة تعذّرت كتابتها على القرص. الإغلاق الآن يتجاهلها.",
+      "okLabel": "تجاهل وإغلاق",
+      "title": "إغلاق Myne؟"
+    },
+    "closeTab": "إغلاق {{name}}",
+    "conflict": {
+      "body": "تغيّر هذا الملف على القرص أثناء تحريرك. ولم يكتب Myne شيئًا.",
+      "copy": "حفظ نسخة…",
+      "copyFailed": "تعذّر حفظ النسخة. الملف الأصلي كما هو.",
+      "overwrite": "الكتابة فوقه بتغييراتي",
+      "reload": "إعادة التحميل من القرص"
+    },
+    "deeplink": {
+      "body": "إنه خارج كل خزنة، لذا لن يشفّره Myne.",
+      "cancel": "إلغاء",
+      "confirm": "فتح",
+      "failed": "تعذّر فتح الملف. ربما نُقل أو تغيّر.",
+      "title": "فتح هذا الملف المحلي؟"
+    },
+    "empty": "لا ملف مفتوح.",
+    "import": "استيراد إلى الخزنة",
+    "importFailed": "تعذّر استيراد الملف. لم يتغيّر شيء.",
+    "importLocked": "الخزنة مقفلة. افتح قفلها ثم أعد المحاولة.",
+    "importNeedsVault": "لا خزنة على هذا الجهاز بعد. أنشئ واحدة ثم أعد المحاولة.",
+    "marker": "ملف محلي. غير مشفّر، وليس جزءًا من أي خزنة.",
+    "open": "فتح ملف محلي",
+    "openFailed": "تعذّر فتح ذلك الملف.",
+    "openRefusedTooLarge": "ذلك الملف كبير جدًا لفتحه هنا.",
+    "openRefusedType": "لا تُفتح هنا إلا ملفات .md و .markdown.",
+    "retry": "حاول الحفظ مرة أخرى",
+    "saveError": "تعذّر حفظ الملف. وتعديلاتك لا تزال هنا.",
+    "tabs": "الملفات المحلية المفتوحة",
+    "unsaved": "تغييرات غير محفوظة"
+  },
+  "update": {
+    "banner": {
+      "available": "Myne {{version}} متاح.",
+      "failed": "تعذّر تثبيت التحديث. أعد المحاولة.",
+      "installing": "جارٍ تنزيل التحديث…",
+      "later": "لاحقًا",
+      "restart": "أعِد التشغيل للتحديث"
+    }
+  },
+  "firstRun": {
+    "server": {
+      "heading": "اختر خادم مزامنة",
+      "chooseHeading": "أين تُزامن ملاحظاتك؟",
+      "chooseIntro": "يحتاج Myne إلى خادم لاستضافة ملاحظاتك المشفّرة وللوصول إليك من أجل الدعوات. استخدم خدمة Myne Sync، أو وجّه هذا الجهاز إلى خادم تشغّله بنفسك. وفي الحالتين تبقى ملاحظاتك مشفّرة على هذا الجهاز قبل أن تغادره؛ ولا يخزّن الخادم إلا نصًا مشفّرًا.",
+      "myneSyncHint": "الخادم الذي تشغّله Myne. ويُتحقّق من شهادة HTTPS الخاصة به تلقائيًا.",
+      "intro": "يحتاج Myne إلى خادم لاستضافة ملاحظاتك المشفّرة وللوصول إليك من أجل الدعوات. وتبقى ملاحظاتك مشفّرة على هذا الجهاز قبل أن تغادره؛ ولا يخزّن الخادم إلا نصًا مشفّرًا.",
+      "notConfigured": "أدخل عنوان خادم أعلاه واضغط اتصال للمتابعة.",
+      "back": "رجوع",
+      "continue": "متابعة",
+      "myneSyncTitle": "Myne Sync",
+      "selfHostedTitle": "خادمك الخاص",
+      "selfHostedHint": "خادم مزامنة تشغّله أنت. وتدخل عنوانه في الشاشة التالية.",
+      "connectAction": "اتصال",
+      "setUpAction": "إعداد"
+    }
+  },
+  "identityFlow": {
+    "title": "إنشاء هوية",
+    "lead": "تتيح الهوية للناس دعوتك إلى خزنة، وتتيح لهوية واحدة امتلاك خزائن كثيرة. وتحتاج إلى خادم مزامنة لاستضافة ملاحظاتك المشفّرة والوصول إليك.",
+    "start": "إنشاء هوية",
+    "skip": "ليس الآن، استخدم هذا الجهاز فقط",
+    "back": "رجوع",
+    "serverUnreachable": "تعذّر الوصول إلى ذلك الخادم. تحقّق من العنوان وأعد المحاولة.",
+    "createFailed": "تعذّر إنشاء الهوية. تحقّق من خادم المزامنة وأعد المحاولة.",
+    "server": {
+      "title": "اختر خادم مزامنة",
+      "lead": "تبقى ملاحظاتك مشفّرة على هذا الجهاز قبل أن تغادره. ولا يخزّن الخادم إلا نصًا مشفّرًا.",
+      "urlLabel": "عنوان الخادم",
+      "useMyneSync": "استخدام Myne Sync",
+      "selfHostedHint": "أو أدخل عنوان خادم تشغّله بنفسك.",
+      "connect": "اتصال",
+      "connecting": "جارٍ الاتصال…"
+    },
+    "held": {
+      "title": "توجد هوية على هذا الجهاز بالفعل",
+      "lead": "يحمل هذا الجهاز هوية بالفعل. ونسيانها يُفقد هذا الجهاز الوصول إلى أي خزنة يملكها أو انضمّ إليها حتى تستردّها بعبارتها المكوّنة من 24 كلمة. وإن لم تكن قد حفظت تلك العبارة، فلا سبيل لاستردادها.",
+      "forget": "تجاهلها وابدأ من جديد"
+    },
+    "create": {
+      "title": "أنشئ هويتك",
+      "lead": "هذا ينشئ لك هوية واحدة. ولا ينشئ أي خزنة ولا يخزّن أي ملاحظات.",
+      "cta": "إنشاء الهوية",
+      "working": "جارٍ الإنشاء…"
+    },
+    "phrase": {
+      "title": "احفظ عبارة هويتك",
+      "warning": "دوّن هذه الكلمات الـ24 واحفظها بأمان. هذه المرة الوحيدة التي تُعرض فيها؛ وهي السبيل الوحيد لاسترداد هذه الهوية. وهي عبارة مختلفة عن أي عبارة استرداد لخزنة.",
+      "reveal": "إظهار",
+      "typebackLead": "لتأكيد أنك حفظتها، اكتب هذه الكلمات الأربع من العبارة أعلاه.",
+      "wordNumber": "الكلمة رقم {{position}}",
+      "wordMismatch": "هذا لا يطابق الكلمة رقم {{pos}}.",
+      "continue": "متابعة"
+    },
+    "home": {
+      "title": "هويتك",
+      "lead": "يمكن للناس دعوتك إلى خزنة. ولا تحتاج إلى امتلاك خزنة لتُدعى.",
+      "codeLabel": "رمز هويتك",
+      "invitesHeading": "الدعوات",
+      "noInvites": "لا دعوات بعد.",
+      "inviteHint": "افتح هذه الدعوة من منتقي الخزائن للانضمام بعبارة هويتك.",
+      "forgetHeading": "هذا الجهاز",
+      "forget": "نسيان هذه الهوية على هذا الجهاز",
+      "forgetCheckbox": "أفهم أن هذه الهوية ستُزال من هذا الجهاز. ويبقى حساب الخادم، وتستردّها العبارة."
+    }
   }
 }
