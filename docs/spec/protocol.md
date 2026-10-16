@@ -175,7 +175,7 @@ the same phrase.
 
 The exact seed byte framing and the per-key-type expansion are pinned with the deterministic-identity codec and the `person-identity` vectors; the four domain strings above are frozen now so no implementation chooses them ad hoc. The domain strings are load-bearing in the same sense as the person-path strings above: a change to any re-derives every person keypair and fingerprint. Migration off the retired CSPRNG path is governed by the same decision and is gated on a person unlock, where the old key signs a `"myne.person-key-transition v1|"` record.
 
-**Person fingerprint and hybrid-wrap combiner** (the other two person-path byte constructions, both cross-implementation and pinned by the `person-identity` vectors). The fingerprint is the SAS value the invite compare uses; the combiner produces the per-recipient wrap key.
+**Person fingerprint and hybrid-wrap combiner** (the other two person-path byte constructions, both cross-implementation and pinned by the `person-identity` vectors). The fingerprint is the canonical per-person identifier: the recipient value bound into the per-recipient `itemsKey` wrap AAD (§5.2) and the value a roster row is keyed by. It is **not** a user-facing SAS — the invite flow performs no out-of-band compare of it (`decisions/protocol/0687`). The combiner produces the per-recipient wrap key.
 
 ```
 fingerprint       = SHA-256("myne.person-fingerprint v1|"

@@ -730,10 +730,6 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_person_lock", Class::Unsupported),
     ("plugin:sync|sync_start_b2b_migration", Class::Unsupported),
     ("plugin:sync|sync_person_create_invite", Class::Unsupported),
-    (
-        "plugin:sync|sync_person_inspect_invite_code",
-        Class::Unsupported,
-    ),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),
     // The member display-name store (`vault.member-names`, `MYO5`;

@@ -368,9 +368,12 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/transcribe.ts",
       "mobile/src-tauri/src/plugins/local_inference/",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
+      "mobile/src/app/flows/TranscriptSheet.tsx",
     ],
     clients: ["ios", "android"],
-    automatedBy: [],
+    automatedBy: [
+      "mobile/tests/flow-logic/voice/transcribe.flow.ts",
+    ],
     manual: [
       {
         see: "On the OLDEST iPhone model you support and on a mid-range Android phone, transcribe a 60-second recorded clip. Record wall-clock time, the battery percentage before and after, and whether the phone becomes noticeably hot. Confirm the app stays responsive (you can scroll the note) throughout and that segments appear progressively rather than all at once at the end.",
@@ -712,7 +715,8 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/platform/update.ts",
       "src/hooks/useUpdateAvailable.ts",
-      "src/components/UpdateBanner.tsx",
+      "src/components/update/UpdateNotice.tsx",
+      "src/screens/UpdatingScreen.tsx",
       "src/components/settings/AboutPanel.tsx",
       "src-tauri/src/update/",
       "src-tauri/src/plugins/update/",
@@ -721,8 +725,8 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/self-update.e2e.ts"],
     manual: [
       {
-        see: "On macOS, with a signed and notarized build installed and biometric quick-unlock enabled, let the app check for updates (or press Check for updates under Settings, About), open the update banner, press Restart to update, and confirm the app relaunches on the new version. Then confirm biometric quick-unlock still works, that the vault-label cache still shows the vault's name on the locked picker, and that Gatekeeper did not warn on the updated app. Repeat the update on Windows and on the Linux AppImage, confirming each replaces in place. Finally turn the automatic check off under About, relaunch, and confirm no request is made.",
-        whyNotAutomated: "The in-place bundle replacement and the keychain item's survival can only be observed on a signed build on real macOS hardware, and no CI lane builds a signed or notarized macOS app or holds a login keychain. Whether quick-unlock and the vault-label cache still work after the swap is a product-level outcome with no seam a test can drive.",
+        see: "On macOS, with a signed and notarized build installed and biometric quick-unlock enabled, let the app check for updates (or press Check for updates under Settings, About) and confirm the notice arrives at the bottom centre with the new version and its release notes, that it reduces to a pill after a few seconds, and that the pill reopens it. Press Update and restart, read the confirm, and confirm it names the vault lock and the restart. Confirm, and watch the full-window Updating Myne screen: the version resolves once, the app stays responsive, and it relaunches on the new version on its own. Then confirm the vault you were working in asked for its password again, that biometric quick-unlock still works, that the vault-label cache still shows the vault's name on the locked picker, and that Gatekeeper did not warn on the updated app. Repeat the update on Windows and on the Linux AppImage, confirming each replaces in place, and on one of them drive the failure path (deny the install, or cut the network mid download) and confirm the failed screen's Try again and Back to unlock both work. Finally turn the automatic check off under About, relaunch, and confirm no request is made.",
+        whyNotAutomated: "Reaching the offered state at all needs the check to answer, and the manifest endpoint is a build-time constant pointing at downloads.myne.md, whose reachability from the container is not guaranteed and whose live answer is whatever release is current, so no lane can reliably produce the notice. Past that, the in-place bundle replacement and the keychain item's survival can only be observed on a signed build on real macOS hardware, and no CI lane builds a signed or notarized macOS app or holds a login keychain. Whether quick-unlock and the vault-label cache still work after the swap is a product-level outcome with no seam a test can drive.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 25,
         tier: "core",

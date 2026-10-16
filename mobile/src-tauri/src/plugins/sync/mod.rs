@@ -89,7 +89,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             person_account::sync_person_profile_read,
             commands::sync_person_lock,
             commands::sync_person_create_invite,
-            commands::sync_person_inspect_invite_code,
             commands::sync_list_roster,
             commands::sync_remove_member,
             commands::sync_list_devices,

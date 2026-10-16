@@ -42,7 +42,6 @@ const personStatus = vi.hoisted(() => vi.fn());
 const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
-const inspectInviteCode = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
@@ -54,7 +53,6 @@ vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personLock,
   personAcceptInvite,
-  inspectInviteCode,
 }));
 vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
@@ -104,8 +102,6 @@ const ACCEPT_COPY_KEYS = [
   "identityHome.acceptHeading",
   "identityHome.acceptHint",
   "identityHome.acceptOwnerCodeLabel",
-  "identityHome.acceptInspect",
-  "identityHome.acceptSasHint",
   "identityHome.phraseHeading",
   "identityHome.acceptPhraseHint",
   "identityHome.acceptPhraseLabel",
@@ -137,7 +133,6 @@ const PHRASE = [
 
 const INVITE_ID = "invite-id-hex";
 const OWNER_CODE = "MYNE-PERSON-1:aa:bb:cc:dd";
-const OWNER_FINGERPRINT = "c0ffee01";
 const PASSWORD = "Correct-Horse-9-Battery";
 /** What the name step is given. A display name is a label, not a credential:
  *  SYNC-13 covers phrases and passwords, which are compared below by projected
@@ -176,10 +171,6 @@ beforeEach(() => {
   });
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
-  inspectInviteCode.mockReset().mockResolvedValue({
-    person_id_hex: "owner-person",
-    fingerprint_hex: OWNER_FINGERPRINT,
-  });
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
   // Default: an accepted member whose row carries no name yet, which is the state
   // the step exists for. `namedRoster()` below is the other answer.
@@ -224,15 +215,11 @@ function typePhrase(): void {
   });
 }
 
-/** Everything except the phrase: the owner code, the fingerprint compare and the
- *  out-of-band confirmation. All three live on wizard step 1. */
-async function verifyOwner(): Promise<void> {
+/** Fill the owner's identity code on wizard step 1, which releases Continue. */
+async function fillOwnerCode(): Promise<void> {
   fireEvent.change(screen.getByTestId("identity-flow.accept-owner-code"), {
     target: { value: OWNER_CODE },
   });
-  fireEvent.click(screen.getByTestId("identity-flow.accept-inspect"));
-  await screen.findByTestId("identity-flow.accept-owner-fingerprint");
-  fireEvent.click(screen.getByTestId("identity-flow.accept-confirm"));
 }
 
 /** The Continue control, which shares one testid across wizard steps 1 and 2
@@ -241,7 +228,7 @@ function continueButton(): HTMLButtonElement {
   return screen.getByTestId("identity-flow.accept-continue") as HTMLButtonElement;
 }
 
-/** Step 1 → step 2 (the phrase). Gated on the fingerprint being confirmed. */
+/** Step 1 → step 2 (the phrase). Gated on the owner's code being present. */
 function toPhraseStep(): void {
   fireEvent.click(continueButton());
 }
@@ -275,7 +262,7 @@ async function typeName(name: string): Promise<void> {
 
 /** Drive the whole accept wizard to the name step it now lands on. */
 async function acceptToNameStep(): Promise<void> {
-  await verifyOwner();
+  await fillOwnerCode();
   toPhraseStep();
   typePhrase();
   toPasswordStep();
@@ -311,10 +298,10 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     // Three steps, one segment filled.
     expect(segmentFill()).toEqual(["true", "false", "false"]);
 
-    // Step 1's Continue is the gate on the owner check: blocked until the code
-    // has been inspected AND confirmed out of band.
+    // Step 1's Continue is the gate on the owner's code: blocked until it is
+    // present.
     expect(continueButton().disabled).toBe(true);
-    await verifyOwner();
+    await fillOwnerCode();
     expect(continueButton().disabled).toBe(false);
     toPhraseStep();
 
@@ -333,13 +320,13 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(screen.queryByTestId("identity-flow.accept-phrase")).toBeNull();
     expect(segmentFill()).toEqual(["true", "true", "true"]);
 
-    // Back, twice, and step 1 still carries what it collected: the fingerprint
-    // the inspect read, and the confirmed state that keeps Continue unlocked.
+    // Back, twice, and step 1 still carries what it collected: the owner's code,
+    // which keeps Continue unlocked.
     fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
     fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
     expect(
-      (screen.getByTestId("identity-flow.accept-owner-fingerprint") as HTMLInputElement).value,
-    ).toBe(OWNER_FINGERPRINT);
+      (screen.getByTestId("identity-flow.accept-owner-code") as HTMLTextAreaElement).value,
+    ).toBe(OWNER_CODE);
     expect(continueButton().disabled).toBe(false);
   });
 
@@ -350,7 +337,7 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     // Nothing collected: step 1's gate is shut.
     expect(continueButton().disabled).toBe(true);
 
-    await verifyOwner();
+    await fillOwnerCode();
     // Fingerprint confirmed: step 1 opens, but the submit is not reachable yet.
     expect(continueButton().disabled).toBe(false);
     toPhraseStep();
@@ -392,7 +379,7 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
 
   it("keeps the credential behind the project's floor", async () => {
     await openAccept();
-    await verifyOwner();
+    await fillOwnerCode();
     toPhraseStep();
     typePhrase();
     toPasswordStep();
@@ -409,27 +396,20 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(submit().disabled).toBe(false);
   });
 
-  it("will not inspect without a code, and surfaces an unusable one", async () => {
+  it("gates the owner step on the owner's code being present", async () => {
     await openAccept();
-    const inspect = screen.getByTestId("identity-flow.accept-inspect") as HTMLButtonElement;
-    expect(inspect.disabled).toBe(true);
+    expect(continueButton().disabled).toBe(true);
 
     fireEvent.change(screen.getByTestId("identity-flow.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    expect(inspect.disabled).toBe(false);
-
-    inspectInviteCode.mockRejectedValueOnce(new Error("nope"));
-    fireEvent.click(inspect);
-    expect(await screen.findByTestId("identity-flow.accept-error")).toBeTruthy();
-    // No fingerprint was shown, so nothing can be confirmed against a lie.
-    expect(screen.queryByTestId("identity-flow.accept-owner-fingerprint")).toBeNull();
+    expect(continueButton().disabled).toBe(false);
   });
 
   it("maps a refused accept to the desktop's own message", async () => {
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
     toPhraseStep();
     typePhrase();
     toPasswordStep();
@@ -461,19 +441,8 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(
       screen.getByTestId("identity-flow.accept-owner-code").getAttribute("aria-label"),
     ).toBe("identityHome.acceptOwnerCodeLabel");
-    expect(screen.getByTestId("identity-flow.accept-inspect").textContent).toBe(
-      "identityHome.acceptInspect",
-    );
 
-    await verifyOwner();
-    expect(screen.getByTestId("identity-flow.accept-sas-hint").textContent).toBe(
-      "identityHome.acceptSasHint",
-    );
-    // `MonoBox` renders a readOnly `<input>`, so the fingerprint is its value
-    // rather than its text content.
-    expect(
-      (screen.getByTestId("identity-flow.accept-owner-fingerprint") as HTMLInputElement).value,
-    ).toBe(OWNER_FINGERPRINT);
+    await fillOwnerCode();
     toPhraseStep();
 
     // Step 2: the phrase.
@@ -545,7 +514,7 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     namedRoster();
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
     toPhraseStep();
     typePhrase();
     toPasswordStep();
@@ -568,7 +537,7 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     listRoster.mockRejectedValue(new Error("no session"));
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
     toPhraseStep();
     typePhrase();
     toPasswordStep();

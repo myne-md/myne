@@ -747,6 +747,7 @@ export function SettingsModal({
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     sync: (
       <SyncPanel
+        vaultId={vaultId}
         onMigrated={() => onForceRelock?.({ kind: "Exists" })}
         onDialogOpenChange={setChildDialogOpen}
       />

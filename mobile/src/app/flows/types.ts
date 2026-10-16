@@ -27,6 +27,14 @@ export interface IdentityFlowProps {
    *  dismisses the overlay. An identity, once created, is not undone here. */
   onCancel: () => void;
   /**
+   * Prefill from a scanned member-vault code: the endpoint to offer, and the
+   * vault whose invite row to open the join wizard for. Seeded into the server
+   * step's input (a visible, editable prefill, not a configured endpoint) and
+   * used to auto-open the join step once the home step's invites have loaded.
+   * Absent on every other entry into this flow, which is why it is optional.
+   */
+  fromQr?: { endpointUrl: string; accountHashHex: string };
+  /**
    * An invite was accepted, this device has named itself, and the member vault
    * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell
    * closes the overlay and re-probes, which is how every other flow hands a new
@@ -47,6 +55,14 @@ export interface JoinFlowProps {
    *  the flow (welcome / picker / editor), all of which land in the editor. */
   onComplete: (vaultId?: VaultId) => void;
   onCancel: () => void;
+  /**
+   * A scanned member-vault code: the shell closes this overlay and opens the
+   * identity flow at the join step for that vault. One door, the code decides —
+   * the `account` arm keeps its own confirm-then-form path (`onComplete` above),
+   * and this arm has no account number for that confirm step to show, so it
+   * hands the target straight back to the shell instead.
+   */
+  onMemberJoin: (target: { endpointUrl: string; accountHashHex: string }) => void;
 }
 
 export interface CreateVaultFlowProps {

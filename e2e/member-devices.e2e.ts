@@ -77,6 +77,21 @@
 // Self-skips without the tauri-driver harness AND the `myne-server` binary, the gate
 // every multi-device scenario here carries.
 //
+// # And the member device's OWN Sync panel, which is the other half (myne-md/myne)
+//
+// A member's device gets one thing an owner's never has to think about: the
+// credential in its vault directory is the `(person, vault)` **membership token**,
+// which the server accepts on the sync routes and refuses on the account routes
+// (`server-protocol.md` §3.1). The account plane therefore has to resolve to the
+// member's own PERSON account, or the device panel reads that refusal as "the
+// server rejected this device's sign-in" and offers a reset that clears the token
+// the whole vault syncs on. The block asserts the member's panel instead: no error,
+// no reset, no Remove, a row naming this device, and the member's own add-a-device
+// door — with the owner's panel asserted NOT to offer that door, so neither half is
+// vacuous. It runs early, right after that device's editor lands, because the
+// version-history step later opens an `aria-modal` panel the scenario never closes;
+// the reason is written at the block itself.
+//
 // SYNC-13: the passwords and the phrase are in-source scenario constants, and no
 // `expect` below prints one or a phrase-word length.
 
@@ -86,6 +101,7 @@ import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
   activeNoteId,
   clickNoteRow,
+  closeSettings,
   createNote,
   dismissImporterOfferIfPresent,
   openSettings,
@@ -392,6 +408,73 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // bare editor rather than behind an overlay.
       await dismissImporterOfferIfPresent(second.session);
 
+      // ---- the member's OWN Settings → Sync (myne-md/myne) ----
+      //
+      // WHERE this sits is load-bearing: it must run BEFORE the version-history step
+      // below, which opens the snapshots panel — an `aria-modal` surface with a
+      // backdrop that the scenario deliberately never closes ("nothing below needs
+      // the editor") — and a Settings modal cannot be opened behind it. Right after
+      // this device's editor lands is the only point at which its own Sync settings
+      // are reachable.
+      //
+      // The regression it guards: a member vault's `sync-token` file holds the
+      // `(person, vault)` **membership token**, and the account routes refuse it —
+      // `server-protocol.md` §3.1 lists what a membership token authorizes
+      // (`/sync/*`, `/account/status`) and `/auth/devices` is not among them, because
+      // the token is bound to a binding and carries no device id. The panel used to
+      // send it anyway, read the 401 as `Unauthenticated`, and render "the server
+      // rejected this device's sign-in" above a **"Reset sync on this device"** button
+      // — a control that clears the very token this vault syncs on, with no UI path
+      // back.
+      //
+      // So the assertions are three absences and two presences: no error line, no
+      // reset, no Remove (it cannot revoke this vault's access; only the owner can),
+      // a roster that names THIS device, and the member's own add-a-device door. The
+      // roster is the member's own PERSON account's, which is the account plane a
+      // member vault resolves to.
+      await openSettings(second.session, "sync");
+      await second.session.byTestId("sync.device-management", { timeoutMs: 30_000 });
+      expect(
+        await second.session.byTestIdAll("sync.device-error"),
+        "a member vault's device panel must not report a refusal",
+      ).toHaveLength(0);
+      expect(
+        await second.session.byTestIdAll("sync.reset-local"),
+        "the local reset must not be offered on a member vault: it clears the membership token",
+      ).toHaveLength(0);
+      expect(
+        await second.session.byTestIdAll("sync.remove-device"),
+        "Remove must not be offered on a member vault: revoking a person device cannot revoke this vault's access",
+      ).toHaveLength(0);
+      // `textContent()`, not `text()`: this driver's W3C getText drops text inside
+      // nested elements (its own note at `support/webdriver.ts` records the
+      // observation), so the badge read `""` while rendering its label correctly.
+      expect(
+        (await (await second.session.byTestId("sync.this-device")).textContent()) ?? "",
+        "the roster names this device",
+      ).toBeTruthy();
+      // …and the member's own way to bring a second device in is ON this panel. Its
+      // half of the pair lives on the owner further down, where the panel opened there
+      // is the one asserted NOT to offer it — an icon that appeared for everyone would
+      // satisfy this line alone.
+      const memberQr = await second.session.byTestId("sync.member-join-qr.open");
+      await memberQr.click();
+      // CLICKED, not merely asserted present, because this is the only tier where
+      // `sync_member_join_qr` runs for real: the component spec mocks `invoke`, and a
+      // case that stopped at the icon would leave the command's whole production path
+      // unexecuted. The dialog mints its code on mount, so a rendered image is the
+      // command having answered with one.
+      await second.session.byTestId("sync.member-join-qr.dialog", { timeoutMs: 30_000 });
+      await second.session.byTestId("sync.member-join-qr.image", { timeoutMs: 30_000 });
+      // The account variant is NOT what opened: it needs an account number a member
+      // does not have, and it renders an input this dialog must not carry.
+      expect(
+        await second.session.byTestIdAll("sync.device-join-qr.account-input"),
+        "the member dialog must not ask for an account number",
+      ).toHaveLength(0);
+      await (await second.session.byTestId("sync.member-join-qr.dialog-close")).click();
+      await closeSettings(second.session);
+
       // ---- the note, on the second device ----
       await openNoteOn(second.session, note);
 
@@ -555,6 +638,7 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
         "no revision resolved to a bare device or to unknown",
       ).toEqual([]);
 
+
       // ---- the owner's device list, which is what story 11 is for ----
       //
       // The panel reads the VAULT-scoped `device_bindings_list` and never the account
@@ -568,13 +652,25 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // holding only the owner's own device would satisfy. The read is a page-seat
       // invoke of production IPC, which is the sanctioned way to reach a backend path
       // on a device whose UI this scenario has already finished with.
+      //
+      // The `.ok` hop is not decoration: `pageSeatInvoke` resolves with an
+      // `{ok, err}` ENVELOPE (its declared type, and how every other caller reads
+      // it — `acl-refusal` reads `.err`, `agent-setting-intent` reads `.ok`), so
+      // reading a payload key off the envelope answers `undefined` whether the
+      // command succeeded or was refused. This call site did that, which made the
+      // assertion below fail on EVERY run while reading as a product defect, and
+      // is why this block had never been green.
       const secondView = (await pageSeatInvoke(
         second.session,
         "plugin:device-binding|device_bindings_list",
         {},
         20_000,
-      )) as { rows?: Array<{ device_id_hex?: string; is_this_device?: boolean }> };
-      const secondDeviceId = secondView.rows?.find((row) => row.is_this_device)?.device_id_hex;
+      )) as { ok?: { rows?: Array<{ device_id_hex?: string; is_this_device?: boolean }> }; err?: unknown };
+      expect(
+        secondView.err,
+        `device_bindings_list on the member's second device must resolve: ${JSON.stringify(secondView.err)}`,
+      ).toBeUndefined();
+      const secondDeviceId = secondView.ok?.rows?.find((row) => row.is_this_device)?.device_id_hex;
       expect(
         secondDeviceId,
         "the member's second device holds a verified binding naming itself",
@@ -584,6 +680,16 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
 
       await openSettings(owner.session, "sync");
       await owner.session.byTestId("device-bindings", { timeoutMs: 30_000 });
+
+      // The owner's half of the member-QR pair, read BEFORE the list settles: the
+      // icon exists only where the ACTIVE session is a member of the vault, and an
+      // owner's second device joins through the account-number path instead
+      // (myne-md/myne). Placed here rather than after the wait below so it runs even
+      // while that wait is red.
+      expect(
+        await owner.session.byTestIdAll("sync.member-join-qr.open"),
+        "an owner's Sync panel offers the account QR, never the member one",
+      ).toHaveLength(0);
 
       // The owner has to PULL the row the other device wrote, and that pull is a sync
       // cycle against a store the join materialised in the background, so one read is a

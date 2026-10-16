@@ -211,13 +211,16 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("125 twin(s) discovered");
+    // Then 125 to 126 for myne-md/myne: `src/hooks/useMemberVault.ts` is a new
+    // byte-identical pair, deliberately two files rather than one shared module
+    // because the answer it carries gates a destructive control on both clients.
+    expect(full.out).toContain("126 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("125 twin(s) discovered");
+    expect(full.out).toContain("126 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -227,7 +230,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("125 twin(s) discovered");
+    expect(full.out).toContain("126 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -282,7 +285,7 @@ describe("check-twin-inventory", () => {
     // written. Byte-different and semantically identical, since the two files
     // differ in one doc paragraph and in nothing the comparison counts, which is
     // why this number moves and the drift ratchet's does not.
-    expect(full.out).toContain("125 twin(s) discovered");
+    expect(full.out).toContain("126 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -456,7 +459,7 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(125);
+    expect(ROSTER.length).toBe(126);
   });
 
   it("keeps `screen` narrow", () => {

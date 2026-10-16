@@ -687,6 +687,12 @@ fn main() {
                 "sync_restore_quarantine",
                 "sync_delete_quarantine",
                 "sync_device_join_qr",
+                // myne-md/myne (member devices): the member's counterpart of the
+                // line above. Reads the ACTIVE vault's own account hash rather
+                // than taking one, and refuses unless the session is a member
+                // session — an owner's second device joins with the account
+                // number + password, not with a phrase.
+                "sync_member_join_qr",
                 // MYND-650 task 6: the device-local Tor-routing toggle. Joins
                 // this plugin rather than opening one of its own precisely so
                 // no new capability entry is needed — the surface is the same
@@ -713,7 +719,6 @@ fn main() {
                 "sync_person_unlock",
                 "sync_person_lock",
                 "sync_person_create_invite",
-                "sync_person_inspect_invite_code",
                 "sync_list_vault_invites",
                 "sync_person_accept_invite",
                 // member-devices task 7: a member's SECOND device joins the

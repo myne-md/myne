@@ -3337,7 +3337,20 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             grant={defaultGrantFor(editing?.id ?? lastNoteId)}
           />
         )}
-        {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
+        {tab === "files" && (
+          <AttachmentsSheet
+            variant="page"
+            onClose={() => setTab("notes")}
+            // Saving a transcript from the Files tab creates a note and opens
+            // it, so the action lands somewhere the user can see. `openFromList`
+            // flushes the in-progress buffer first (mobile has no autosave), so
+            // the switch cannot discard typed text.
+            onSavedNote={(id) => {
+              setTab("notes");
+              void openFromList(id);
+            }}
+          />
+        )}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
@@ -4008,6 +4021,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // (MYND-563) - distinct from onInsert, which embeds an attachment ref.
             insertIntoEditor(text);
             setManageAttachments(false);
+          }}
+          onSavedNote={(id) => {
+            // Saving a transcript from the in-editor sheet hands back the new
+            // note. `openFromList` rather than `openNote`: the editor may hold
+            // unsaved typing, and mobile has no autosave, so switching buffers
+            // without flushing first silently discards it.
+            setManageAttachments(false);
+            void openFromList(id);
           }}
         />
       )}

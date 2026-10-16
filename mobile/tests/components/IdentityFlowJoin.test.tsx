@@ -44,7 +44,6 @@ const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personJoinVault = vi.hoisted(() => vi.fn());
-const inspectInviteCode = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
@@ -57,7 +56,6 @@ vi.mock("../../src/lib/personAccount", () => ({
   personLock,
   personAcceptInvite,
   personJoinVault,
-  inspectInviteCode,
 }));
 vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
@@ -154,7 +152,6 @@ beforeEach(() => {
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
   personJoinVault.mockReset().mockResolvedValue(undefined);
-  inspectInviteCode.mockReset();
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
   // The name step is never reached from a join, but the accept spec's own path
   // passes through it and this module is shared state across both files' mocks.
@@ -164,8 +161,11 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-function renderFlow(onAccepted: () => void = () => {}): void {
-  render(<IdentityFlow onCancel={() => {}} onAccepted={onAccepted} />);
+function renderFlow(
+  onAccepted: () => void = () => {},
+  fromQr?: { endpointUrl: string; accountHashHex: string },
+): void {
+  render(<IdentityFlow onCancel={() => {}} onAccepted={onAccepted} fromQr={fromQr} />);
 }
 
 /** The join step's own first control, so it is the sentinel for "the step is on
@@ -249,9 +249,6 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // pasted value replace that anchor.
     const expectNoOwnerCode = (): void => {
       expect(screen.queryByTestId("identity-flow.accept-owner-code")).toBeNull();
-      expect(screen.queryByTestId("identity-flow.accept-inspect")).toBeNull();
-      expect(screen.queryByTestId("identity-flow.accept-owner-fingerprint")).toBeNull();
-      expect(screen.queryByTestId("identity-flow.accept-confirm")).toBeNull();
       // …and structurally, so a field arriving under a DIFFERENT testid convention is
       // caught too: this step collects no free text at all. The accept step's one
       // textarea IS the out-of-band owner code, so a textarea here is that field
@@ -269,7 +266,6 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     expect(joinCells()).toHaveLength(24);
     expect(screen.queryByTestId("identity-flow.join.password-input")).toBeNull();
     expectNoOwnerCode();
-    expect(inspectInviteCode).not.toHaveBeenCalled();
 
     // Step 2: the password form, and NO owner code.
     typeJoinPhrase();
@@ -278,7 +274,6 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     expect(screen.getByTestId("identity-flow.join-password-note")).toBeTruthy();
     expect(screen.queryByTestId("identity-flow.join-phrase")).toBeNull();
     expectNoOwnerCode();
-    expect(inspectInviteCode).not.toHaveBeenCalled();
   });
 
   it("joins with the invite id, the account hash, the phrase and the password", async () => {
@@ -435,14 +430,10 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
   // this holds, so it is worth the round trip.
   it("starts each step empty, whatever the last one collected", async () => {
     personListInvites.mockResolvedValue([PENDING, CLAIMED]);
-    inspectInviteCode.mockResolvedValue({
-      person_id_hex: "owner-person",
-      fingerprint_hex: "c0ffee01",
-    });
     renderFlow();
 
-    // The accept hides its phrase grid behind the owner check, so the code has to be
-    // inspected and confirmed before there is a phrase to type into it.
+    // The accept hides its phrase grid behind the owner's code, so the code has to be
+    // filled in before there is a phrase to type into it.
     const acceptCells = (): HTMLInputElement[] =>
       Array.from(
         document.querySelectorAll<HTMLInputElement>(
@@ -454,9 +445,6 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
       fireEvent.change(await screen.findByTestId("identity-flow.accept-owner-code"), {
         target: { value: "MYNE-PERSON-1:aa:bb:cc:dd" },
       });
-      fireEvent.click(screen.getByTestId("identity-flow.accept-inspect"));
-      await screen.findByTestId("identity-flow.accept-owner-fingerprint");
-      fireEvent.click(screen.getByTestId("identity-flow.accept-confirm"));
     };
 
     await openAcceptFromHome();
@@ -578,5 +566,61 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
         return typeof value !== "string" || value === "" || value === key;
       }),
     ).toEqual([]);
+  });
+});
+
+// ── A scanned member-vault QR (one door, the code decides) ────────────────────
+//
+// The join overlay scans the QR and, for a `member_vault` code, closes and
+// re-enters this flow with the target in `fromQr` (AppShell). What has to hold is
+// that the flow then lands the user IN the join wizard for the vault the code
+// named, and says so plainly when that vault has no invitation on this device.
+// The auto-open is a one-shot effect, so both cases are asserted through the
+// RENDERED step rather than through a call: the defect this spec exists for is a
+// wizard that never opens (the user is left staring at the invite list), which
+// without these two cases nothing in this file would catch.
+describe("IdentityFlow fromQr (scanned member-vault code)", () => {
+  it("opens the join wizard for the vault the code named", async () => {
+    // Both kinds of invite on the list, so a match that ignored the hash and took
+    // the first claimed row would still have to land on the RIGHT vault: the submit
+    // below proves which invite was opened, not merely that one was.
+    personListInvites.mockResolvedValue([PENDING, CLAIMED]);
+    renderFlow(() => {}, { endpointUrl: "https://sync.example", accountHashHex: CLAIMED_HASH });
+
+    // The wizard's own first step. Without the auto-open the home step stays up and
+    // this is absent — `identity-flow.join-open` would still be there to tap, which
+    // is exactly the dead-end the effect removes.
+    expect(await screen.findByTestId("identity-flow.join-hint")).toBeTruthy();
+    expect(screen.getByTestId("identity-flow.join-step")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.join-open")).toBeNull();
+
+    // …and it is bound to the code's vault, not to whichever row came first.
+    typeJoinPhrase();
+    toJoinPasswordStep();
+    setJoinPassword(PASSWORD);
+    fireEvent.click(submit());
+    expect(personJoinVault).toHaveBeenCalledTimes(1);
+    const call = personJoinVault.mock.calls[0] as [string, string, string, string];
+    expect(call[0]).toBe(CLAIMED_ID);
+    expect(call[1]).toBe(CLAIMED_HASH);
+  });
+
+  it("says so, rather than opening nothing, when the code names an uninvited vault", async () => {
+    renderFlow(() => {}, { endpointUrl: "https://sync.example", accountHashHex: "ee".repeat(32) });
+
+    expect(await screen.findByText("identityFlow.joinFromQr.notFound")).toBeTruthy();
+    // No wizard auto-opened: the not-found arm must not double as a match. The home
+    // LIST is still there (its own join affordance included), so what the user sees
+    // is the invite list plus the explanation, not a wizard or a blank step.
+    expect(screen.queryByTestId("identity-flow.join-hint")).toBeNull();
+    expect(screen.getByTestId("identity-flow.join-open")).toBeTruthy();
+
+    // The echoed-key half is vacuous on its own (mobile/AGENTS.md): a key the real
+    // catalog does not carry renders nothing in the shipped app while passing the
+    // assertion above. Resolve it in `locales/en/common.json`.
+    const value = localeValue("identityFlow.joinFromQr.notFound");
+    expect(typeof value).toBe("string");
+    expect(value).not.toBe("");
+    expect(value).not.toBe("identityFlow.joinFromQr.notFound");
   });
 });

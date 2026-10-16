@@ -102,6 +102,16 @@ function StageSwitch() {
   const [joinFrom, setJoinFrom] = useState<JoinEntry | null>(null);
   /** The identity-first overlay on the welcome arm (myne-md/myne#768). */
   const [identityOpen, setIdentityOpen] = useState(false);
+  /**
+   * A scanned member-vault QR awaiting the identity flow's join step. Held here
+   * rather than inside `JoinFlow` because the join overlay CLOSES when it hands
+   * off (see that flow's `onMemberJoin`), so the target has to outlive the flow
+   * that read it. `null` = no member-vault QR in flight.
+   */
+  const [identityFromQr, setIdentityFromQr] = useState<{
+    endpointUrl: string;
+    accountHashHex: string;
+  } | null>(null);
 
   /**
    * Land a stage — the single writer of `stage` and its ref mirror.
@@ -204,6 +214,38 @@ function StageSwitch() {
             dispatch({ type: JOIN_SUCCESS[joinFrom], vaultId });
           }}
           onCancel={() => setJoinFrom(null)}
+          // A scanned member-vault code: this overlay has nothing more to show
+          // (no account number to confirm), so it closes and the identity flow
+          // opens at the join step for the vault the code named.
+          onMemberJoin={(target) => {
+            setJoinFrom(null);
+            setIdentityFromQr(target);
+          }}
+        />
+      </PhoneColumn>
+    );
+  }
+
+  // A scanned member-vault QR: the join overlay closed and handed the target
+  // here, and the identity flow opens at the join step for that vault. Rendered
+  // ABOVE the switch for the same reason the join overlay above is, and the same
+  // reason is load-bearing: the door is reachable from picker and editor too, so
+  // scoping it to `case "welcome"` would make it unreachable on a device that
+  // already holds vaults. `identityOpen` and this never coexist: this returns
+  // first, and the welcome arm's own `identityOpen` overlay is untouched.
+  if (identityFromQr !== null) {
+    return (
+      <PhoneColumn>
+        <IdentityFlow
+          fromQr={identityFromQr}
+          onCancel={() => setIdentityFromQr(null)}
+          // The member vault is on disk and unlocked by the time the join wizard
+          // completes, so close and re-probe exactly as the welcome arm's identity
+          // overlay does; the probe decides where the user lands.
+          onAccepted={() => {
+            setIdentityFromQr(null);
+            reprobe();
+          }}
         />
       </PhoneColumn>
     );
