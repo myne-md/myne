@@ -130,6 +130,11 @@ describeE2E("deleting the vault erases the OPFS container", () => {
       ).toBeGreaterThan(0);
 
       await openSettingsTab(session, "settings.tab-vault");
+      // The erase CTA is the Vault panel's `danger` topic (myne-md/myne#885);
+      // only the active topic's body is mounted.
+      await session.execute(
+        "document.querySelector('[data-testid=\"settings.vault-tab-danger\"]').click();",
+      );
       await session.execute(
         "document.querySelector('[data-testid=\"settings.delete-vault-cta\"]').click();",
       );

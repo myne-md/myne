@@ -61,7 +61,11 @@ describe("the index, filtered by capability", () => {
 
   it("shows everything on a client with every capability", async () => {
     const { visibleSettingsIndex, SETTINGS_SEARCH_INDEX } = await load([]);
-    expect(visibleSettingsIndex(true).length).toBe(SETTINGS_SEARCH_INDEX.length);
+    // Both runtime gates held open (`developerModeEnabled`, `memberVault`):
+    // this test is about capability filtering, and the member-vault gate has
+    // its own block in `tests/settings-search-index.test.ts`. On web the entry
+    // is hidden anyway, by `memberSharing` being absent from the capability set.
+    expect(visibleSettingsIndex(true, true).length).toBe(SETTINGS_SEARCH_INDEX.length);
   });
 
   it("returns no result for an absent control, searched by its own label", async () => {

@@ -478,12 +478,19 @@ export const ROSTER = Object.freeze([
     title: "AI model download onboarding",
     paths: [
       "src/components/settings/AiOnboardingSurface.tsx",
+      "src/components/settings/AiModelCatalogue.tsx",
+      "src/components/settings/ModelPathButton.tsx",
       "src/lib/aiOnboardingSeen.ts",
       "src/lib/ai-model-download.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
       "e2e/ai-model-download.e2e.ts",
+      // The catalogue's own surface: reachable from the Models heading, both
+      // artefacts listed with their state, the tag role's row present, the
+      // Download button wired, and an installed model's Remove round trip
+      // (myne-md/myne#867).
+      "e2e/ai-model-surface.e2e.ts",
     ],
     manual: [
       {
@@ -494,8 +501,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "Download the embedding model on a real connection and watch it through to Ready, then cancel a second download mid-transfer and confirm no partial model is registered and Retry works. On a slow or flaky connection, confirm a failed transfer is named as a failure and offers Retry rather than a silent no-op. Then open Settings, Developer, AI and confirm the same model shows as Installed, that Remove returns it to Not installed and reclaims the disk space, and that a model you side-loaded yourself is only forgotten (your own file stays on disk).",
-        whyNotAutomated: "The E2E lane drives a local fixture origin that answers instantly, so the progress, cancel and flaky-connection states are exercised only against a fixture with no latency. A real transfer over a real network, and a real cancel at an arbitrary byte, are the conditions a human has to create. It also drives the download command and the first-run surface rather than the Settings management rows, and has no side-loaded file to prove the remove path only deletes the app's own copy.",
+        see: "Download the embedding model on a real connection and watch it through to Ready, then cancel a second download mid-transfer and confirm no partial model is registered and Retry works. On a slow or flaky connection, confirm a failed transfer is named as a failure and offers Retry rather than a silent no-op. Then open Settings, Developer, AI, Models, and confirm the catalogue table lists every model Myne's own origin serves whether or not it is installed: the downloaded one shows as Installed with its file name beside it, Remove returns it to Not installed and reclaims the disk space, and a model you side-loaded yourself is only forgotten (your own file stays on disk). Look at the table itself: the header row and the two artefact rows must line up on the same columns at the default window width, and the four columns must restack into one line each, with the header gone, once the window is narrow enough that the other settings rows restack.",
+        whyNotAutomated: "The E2E lane drives a local fixture origin that answers instantly, so the progress, cancel and flaky-connection states are exercised only against a fixture with no latency. A real transfer over a real network, and a real cancel at an arbitrary byte, are the conditions a human has to create. Column ALIGNMENT is the second half: the harness asserts the catalogue's DOM and its row content, and jsdom reports every box as zero by zero, so whether the four columns actually line up, and whether the narrow-dialog restack reads correctly, is a judgement only a laid-out window can make. What the lane DOES cover is the management row's own surface (`e2e/ai-model-surface.e2e.ts`): the catalogue is inline in the Models topic with no button and no modal, both artefacts are listed with their state, the Download button's wiring is proven by the request the pinned origin receives, and Remove clears the stored path. What is still a human's is the last clause: a file you side-loaded yourself, and that Remove forgets the selection without touching your file.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 8,
         tier: "standard",
@@ -4596,14 +4603,14 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "For each of the three roles, press the pick control and use the real OS file dialog to choose a downloaded model file, including one on an external volume and one in a location the OS guards (macOS Downloads on a freshly installed app, Windows C:\\Program Files). Confirm the chosen path replaces \"None\", that cancelling the dialog leaves the previous value untouched, and that a path inside Myne's own vault directory is refused with a message that does NOT echo the path back.",
+        see: "For each of the FOUR roles (text, search, speech-to-text and tag), press the pick control and use the real OS file dialog to choose a downloaded model file, including one on an external volume and one in a location the OS guards (macOS Downloads on a freshly installed app, Windows C:\\Program Files). Confirm the chosen path replaces \"None\", that cancelling the dialog leaves the previous value untouched, and that a path inside Myne's own vault directory is refused with a message that does NOT echo the path back.",
         whyNotAutomated: "Every native dialog in the suite is bypassed with page-seat IPC or answered by intercepting one IPC URL, and macOS TCC prompts for Downloads/Desktop and Windows ACL denials have no equivalent on the Linux runner.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 12,
         tier: "standard",
       },
       {
-        see: "Press the recommended-model link for each of the three roles on macOS and on Windows. Confirm the user's own browser opens at the model page rather than the app's own WebView navigating away.",
+        see: "Press the recommended-model link for each of the FOUR roles (text, search, speech-to-text and tag) on macOS and on Windows. Confirm the user's own browser opens at the model page rather than the app's own WebView navigating away.",
         whyNotAutomated: "The link is an OS handoff through the opener plugin to whatever LSOpenURLs or ShellExecute resolves; no scenario observes a second process launching, and neither of those platforms has a lane. (The no-handler-installed failure path IS drivable on the browser-less runner and is recorded as debt.)",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 8,
@@ -5432,6 +5439,15 @@ export const ROSTER = Object.freeze([
       "e2e/state-machine.e2e.ts",
       "e2e/clipper-install.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
+      // The in-panel topic strip (myne-md/myne#885 task 11). Account is the
+      // second split panel the scenario drives, and it is the one whose split
+      // exists to put the irreversible erase on its own destination: the
+      // scenario selects `danger` from the strip, asserts the vault topic's own
+      // control is gone rather than scrolled away, and measures this panel's
+      // strip against the settings search row. The AI entry above carries the
+      // strip's own manual verdict (whether the band reads as one line and the
+      // topics read as one surface), which is the half no driver can judge.
+      "e2e/settings-tabs.e2e.ts",
     ],
     manual: [],
     exemptionReason: "Everything this panel renders is a machine-checkable claim. ConnectedExtensions is capability-gated and its list/revoke calls are asserted with mocks plus the clipper-install scenario, and the account grouping the panel renders is the same device-local record `e2e/account-grouping.e2e.ts` and the picker's manual item already cover (myne-md/myne#554 ruled the candidate items automatable). The vault-scoped controls this entry used to carry moved to `settings.panel.vault`.",
@@ -5465,6 +5481,11 @@ export const ROSTER = Object.freeze([
     title: "AI panel (Developer-mode + capability gated)",
     paths: [
       "src/components/settings/AiPanel.tsx",
+      // The in-panel topic strip (myne-md/myne#885) ships first on this panel,
+      // so this entry owns its manual verdict: what a human still has to look at
+      // is whether the strip's band lines up with the settings search box and
+      // whether the five topics read as one surface rather than five screens.
+      "src/components/settings/SettingsTabs.tsx",
       "src/lib/ai-capability.ts",
       "src/lib/load-bearing-copy.ts",
       "src/hooks/useAiModelReady.ts",
@@ -5479,6 +5500,11 @@ export const ROSTER = Object.freeze([
       "e2e/ai-degradation.e2e.ts",
       "e2e/developer-mode.e2e.ts",
       "e2e/ai-embeddings-persistence.e2e.ts",
+      // The in-panel topic strip's own scenario (myne-md/myne#885): selection,
+      // the strip's row measured against the search row's, Left/Right, Up/Down
+      // left to the rail, the topic held across a close and reopen, and a
+      // single-concern panel rendering no strip.
+      "e2e/settings-tabs.e2e.ts",
     ],
     manual: [
       {
@@ -5534,6 +5560,11 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/components/settings/EditorPanel.tsx",
       "src/components/settings/SettingsSection.tsx",
+      // The in-panel topic strip (myne-md/myne#885) splits this panel and drives
+      // its specimen. The strip's own manual verdict lives on
+      // `settings.panel.ai`; what this entry adds is the specimen, which no
+      // other panel has.
+      "src/components/settings/SettingsTabs.tsx",
       "mobile/src/app/flows/SettingsSheet.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
@@ -5546,8 +5577,22 @@ export const ROSTER = Object.freeze([
       "e2e/reading-source-modes.e2e.ts",
       "e2e/vim-mode.e2e.ts",
       "e2e/files-settings.e2e.ts",
+      // The topic split and the per-topic specimen (myne-md/myne#885 tasks 6
+      // and 7): the scenario selects each Editor topic, asserts which specimen
+      // band is drawn for it, drives the date format, hides and restores a
+      // toolbar button, flips the chip colour and icon-only mode, and asserts
+      // the two topics with nothing to show say so. What it cannot do is judge
+      // the two renderings by eye, which is the manual item below.
+      "e2e/settings-tabs.e2e.ts",
     ],
     manual: [
+      {
+        see: "On macOS and on Windows, walk the Editor panel's six topics and read the specimen against a real note open in the same session. Text and display shows the note; Editing adds the date and time line and the toolbar band; Writing adds the spell squiggle; Tasks shows a priority chip; Periodic notes and Features say there is nothing to show. Then reorder and hide two toolbar buttons and confirm the band matches the toolbar the editor actually draws, and set the chip colour to each of its four values and confirm a chip in a note reads the same as the specimen. PASS is that no topic shows the previous topic's specimen, and that every band agrees with the live editor.",
+        whyNotAutomated: "The desktop lane's only seat is WebKitGTK in a Linux container, and the WKWebView and WebView2 renderings have no lane at all. What that container CAN assert is the band's DOM, and e2e/settings-tabs.e2e.ts does: which band is mounted, the printed date and time, the absent hidden button, the chip's colour attribute. What it cannot is whether the specimen and a real note LOOK like the same document, which is a reading of two renderings side by side on a display the container does not have; jsdom computes no layout either, so the unit tier asserts text and attributes rather than appearance.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 8,
+        tier: "standard",
+      },
       {
         see: "On iOS and Android open the Editor section of the settings sheet. Confirm the controls it does offer each take effect in a real note (change text size and line spacing, then open a note and see the change), and that no control appears that the mobile client cannot honour.",
         whyNotAutomated: "Mobile ships its own settings sheet with a different subset and no specimen, and there is no mobile WebDriver lane, so nothing about this panel transfers to iOS or Android by inspection.",
@@ -5736,10 +5781,14 @@ export const ROSTER = Object.freeze([
       "src/components/settings/search/foldAccents.ts",
       "src/components/settings/settingsCompact.ts",
       "src/components/settings/SettingRow.tsx",
+      "src/components/settings/HelperDisclosure.tsx",
       "src/components/settings/ControlBlock.tsx",
       "src/components/settings/SettingsSection.tsx",
       "src/components/settings/panel-styles.ts",
       "mobile/src/app/flows/SettingsSheet.tsx",
+      "mobile/src/components/AttachmentOcrBlock.tsx",
+      "mobile/src/components/AiLimitsBlock.tsx",
+      "mobile/src/components/AiExcludedFoldersBlock.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
@@ -5749,6 +5798,14 @@ export const ROSTER = Object.freeze([
       "e2e/developer-mode.e2e.ts",
       "e2e/a11y-axe.e2e.ts",
       "e2e/hotkeys.e2e.ts",
+      "e2e/settings-tabs.e2e.ts",
+      "mobile/tests/flow-logic/settings/attachment-ocr.flow.ts",
+      "mobile/tests/flow-logic/settings/ai-limits.flow.ts",
+      "mobile/tests/flow-logic/settings/daily-notes.flow.ts",
+      "mobile/tests/flow-logic/settings/spell-gate.flow.ts",
+      "mobile/tests/components/AiExcludedFoldersRow.test.tsx",
+      "mobile/tests/components/OcrAndTaskMarkerRows.test.tsx",
+      "mobile/tests/components/ColorGroupsRow.test.tsx",
     ],
     manual: [
       {
@@ -5759,8 +5816,15 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On iOS and Android open Settings. Confirm it is a push-navigation sheet (not a modal with a left rail), that there is NO search box, that back returns to the previous screen, and that the panels listed are the ones mobile actually ships. Walk each one and confirm it opens without a blank screen.",
-        whyNotAutomated: "mobile/src/app/flows/SettingsSheet.tsx is a different component with a different roster; there is no mobile WebDriver lane in this repo, so nothing here transfers from the desktop scenarios by inspection.",
+        see: "Open Privacy and hover, then Tab onto, the question mark beside `Hide vault names on the lock screen` (myne-md/myne#885). Pass condition, stated so it is not a taste call: the popover opens on BOTH, sits clear of the row it belongs to without covering the label or the switch, wraps to a readable measure rather than one clipped line, and is NOT CUT OFF by the panel it floats over, at the top and at the bottom of a scrolled panel. Then press Escape once and confirm only the popover closed, not Settings. Repeat in the longest locale offered, where the label wraps and the question mark moves with it.",
+        whyNotAutomated: "The behavioural half is asserted (e2e/settings-tabs.e2e.ts opens it on press, reads the copy and closes it on Escape), and the container can read rects, so the item is scoped to what a rect cannot say. The popover is a floating surface inside a scrolling column, and an ancestor's `overflow: auto` clips it WITHOUT moving its reported box: the element's own getBoundingClientRect stays the full size while the visible part is cut, which is why the failure looks like a truncated paragraph rather than a misplaced element and why no assertion in this tree expresses it. Whether the measure then READS as prose is a second judgement of the same kind. The container renders WebKitGTK at one fixed window size; WKWebView, WebView2 and the two browser engines have no lane.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 4,
+        tier: "standard",
+      },
+      {
+        see: "On iOS and Android open Settings and walk it against the restructured roster (myne-md/myne#880). Confirm it is a push-navigation sheet (not a modal with a left rail), that there is NO search box, that back returns to the previous screen, and that the categories are named and ordered as the desktop rail is: Account, Vault, Privacy, Sync, Editor, Appearance, Data, About, then AI. Open Vault and confirm the vault-scoped controls (the vault's name, its icon, Change password, quick unlock) are all reachable there, and that Delete vault stays under Account rather than in the vault group. Open AI and confirm the excluded-folders list is editable and that a folder you add is omitted from an AI answer. Open Appearance and confirm a color group that already exists recolors the phone's graph. Pass condition for the layout half, stated so it is not a taste call: each category reads as its own group, the Vault group is separable from Account at a glance, and no control or its value is clipped at the sheet's edges in the longest locale offered.",
+        whyNotAutomated: "mobile/src/app/flows/SettingsSheet.tsx is a different component with a different roster; there is no mobile WebDriver lane in this repo, so nothing here transfers from the desktop scenarios by inspection. The behavioural half of every row this work added is automated (the mobile flow-logic scenarios and the component specs named above), so what is left is the part a driver cannot reach: the flow tier drives headless Chromium at one fixed viewport and never a WKWebView or an Android WebView, and whether the grouped categories READ as separate groups on a real screen, whether a control's value is clipped by the sheet's edge, and whether a color group the phone recolors matches what the desktop graph shows are perceptual and cross-engine calls rather than assertions.",
         clients: ["ios", "android"],
         estimateMin: 10,
         tier: "standard",

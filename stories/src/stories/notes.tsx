@@ -5,6 +5,7 @@
 // signature requires, and a fixture supplying the prefs the panels read; a bare
 // mount would render an empty box and would be worse than the recorded debt.
 
+import { useRef } from "react";
 import type { Fixture, StoryDescriptor } from "../types";
 import { DEFAULT_PREFS } from "../../fixtures";
 import { action } from "../actions";
@@ -21,6 +22,7 @@ import { DiffView } from "@app/notes/components/DiffView";
 import { FolderGlyph } from "@app/notes/components/FolderGlyph";
 import { LeftRibbon } from "@app/notes/components/LeftRibbon";
 import { MemoryPopover } from "@app/notes/components/MemoryPopover";
+import { IconButton } from "@app/components/primitives/IconButton";
 import { NewTabChooser } from "@app/notes/components/NewTabChooser";
 import { NoteActionsMenu } from "@app/notes/components/NoteActionsMenu";
 import { NoteRow } from "@app/notes/components/NoteRow";
@@ -84,6 +86,18 @@ const NOTES_FIXTURE: Fixture = {
     "plugin:sync|sync_account_status": () => null,
     "plugin:sync|sync_list_devices": () => [],
     "plugin:vault-indices|note_titles": () => [],
+    // The memory surfaces read `{ rows, cap }` since myne-md/myne#867: the cap
+    // travels WITH the roster so no client keeps a second copy of the number.
+    // An unhandled command answers `[]`, which reads as a response with no
+    // `rows` at all and throws in the popover, which is how the stories lane
+    // found this, rather than a reviewer.
+    "plugin:memory|memory_list": () => ({
+      rows: [
+        { id: "m1", created_at: 1, updated_at: 2, version: 1, quarantined: false },
+      ],
+      cap: 100,
+    }),
+    "plugin:memory|memory_read": () => "The user's name is Ömer.",
   },
 };
 
@@ -368,6 +382,29 @@ const NOTES_POPULATED_FIXTURE: Fixture = {
   },
 };
 
+/**
+ * `MemoryPopover` takes its trigger as a REF rather than rendering one
+ * (myne-md/myne#867): `AnchoredPanel` measures the anchor and portals the card
+ * to the body, so a story with no real anchor element renders nothing at all.
+ * The trigger below is the same icon button the chat header mounts it beside.
+ */
+function MemoryPopoverStory() {
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  return (
+    <Frame>
+      <span ref={anchorRef} style={{ display: "inline-flex" }}>
+        <IconButton icon="bookmark" label="Memory" onClick={action("onToggle")} />
+      </span>
+      <MemoryPopover
+        anchorRef={anchorRef}
+        onClose={action("onClose")}
+        onOpenSettings={action("onOpenSettings")}
+        onShowToast={action("onShowToast")}
+      />
+    </Frame>
+  );
+}
+
 export const NOTES_STORIES: StoryDescriptor[] = [
   {
     id: "notes/treerails/depth-3",
@@ -484,15 +521,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     fixture: NOTES_FIXTURE,
     description: "The agent-memory popover: what the assistant has been told to remember.",
     tags: ["notes", "ai", "memory", "popover"],
-    render: () => (
-      <Frame>
-        <MemoryPopover
-          onClose={action("onClose")}
-          onOpenSettings={action("onOpenSettings")}
-          onShowToast={action("onShowToast")}
-        />
-      </Frame>
-    ),
+    render: () => <MemoryPopoverStory />,
   },
 
   // ── Batch: the prop-driven surfaces (myne-md/myne#845 task 16) ─────────────

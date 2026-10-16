@@ -19,6 +19,7 @@ import {
   selectPickerRow,
   switchToVault,
   unlockToEditor,
+  waitForBannerText,
 } from "./support/flows";
 import {
   corruptVaultMetaWholesale,
@@ -329,8 +330,9 @@ describeE2E("multi-vault flow surfaces (MYND-125 task 6)", () => {
         const input = await app.session.byTestId("unlock.password-input");
         await input.sendKeys(PASSWORD_A);
         await (await app.session.byTestId("unlock.submit")).click();
-        const banner = await app.session.byTestId("unlock.error-banner", { timeoutMs: 15_000 });
-        expect(await banner.text()).toBe(UNLOCK_NON_DISTINGUISHING_BANNER);
+        // Wait for the rendered TEXT, not only the element (WebKit's `/text`
+        // can answer `""` on the first read of a just-inserted banner).
+        await waitForBannerText(app.session, "unlock.error-banner", UNLOCK_NON_DISTINGUISHING_BANNER);
         // Flow internal: the wrong attempt is preserved for editing.
         expect(await input.property<string>("value")).toBe(PASSWORD_A);
         await input.replaceText(PASSWORD_B);

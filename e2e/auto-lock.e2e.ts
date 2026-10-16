@@ -35,7 +35,7 @@
 import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, openSettings, closeSettings, unlockToEditor } from "./support/flows";
+import { dismissImporterOffer, openSettings, closeSettings, selectSettingsTopic, unlockToEditor } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
 
 describeE2E("al1 idle auto-lock returns to the same vault (MYND-229)", () => {
@@ -63,6 +63,9 @@ describeE2E("al1 idle auto-lock returns to the same vault (MYND-229)", () => {
         // The control is now a searchable dropdown: open the trigger, click
         // the 60s option, then confirm the trigger label registered the choice.
         await openSettings(s, "privacy");
+        // Auto-lock lives in Privacy's `locking` topic since myne-md/myne#885;
+        // only the active topic's body is mounted.
+        await selectSettingsTopic(s, "privacy", "locking");
         await (await s.byTestId("settings.auto-lock-select")).click();
         await (
           await s.waitForElement(

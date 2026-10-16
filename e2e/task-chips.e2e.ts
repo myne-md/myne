@@ -22,6 +22,7 @@ import {
   editorSourceText,
   openSettings,
   pickSelect,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -271,6 +272,9 @@ describeE2E("tc4 the chosen date format reaches the chip (myne-md/myne#609)", ()
         // default is the `system` preset, whose output is the platform's to
         // choose, so asserting it would test `Intl` rather than the wiring.
         await openSettings(s, "editor");
+        // The date/time display rows live in the Editor panel's `editing` topic
+        // since myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "editing");
         await pickSelect(s, "settings.date-format", "dmy");
         await closeSettings(s);
 
@@ -327,6 +331,7 @@ describeE2E("tc5 the chip repaints while Settings is still open (myne-md/myne#60
         await waitForSaved(s);
 
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "editing");
         await pickSelect(s, "settings.date-format", "iso");
 
         const chipText = async (): Promise<string> => {

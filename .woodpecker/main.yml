@@ -421,6 +421,24 @@ steps:
     commands:
       - node scripts/check-manual-test-roster.mjs --check
 
+  # ─── Every vault.prefs command says which client surfaces it (#880) ──────────
+  # No `when:` filter, and it is the same reason bundle-record, twin-inventory and
+  # manual-test-roster carry none: the `--check` half compares the GENERATED
+  # docs/dev/settings-parity.md against what `--emit` would write, so a docs/**
+  # file is one of its inputs. A hand edit to that document is a docs-only commit,
+  # and under the filter CI would never look, leaving only the
+  # --no-verify-bypassable pre-commit hook. Do NOT add `when: *code-paths` here as
+  # a cleanup: that filter is exactly what this step must not have.
+  #
+  # It is its own step rather than a line inside `pnpm-build` so it needs no
+  # `pnpm install` and can go red on a commit that touches nothing else. It reads
+  # Rust sources and TypeScript sources with node builtins only, so it costs
+  # seconds.
+  prefs-parity:
+    image: node:25
+    commands:
+      - node scripts/check-prefs-parity.mjs --check
+
   # ─── Translation coverage is measured rather than asserted (#589) ────────────
   # No `code-paths` filter, for exactly the reason bundle-record and
   # twin-inventory carry none: the `--check` half compares the GENERATED
@@ -1655,6 +1673,12 @@ steps:
       # pushes a failure to the maintainer, so a step added without a slot here
       # is a gate that goes quiet.
       - name: manual-test-roster
+        optional: true
+      # myne#880. Unfiltered like `twin-inventory` and `manual-test-roster` above
+      # and listed for the same reason: a stale generated projection is a
+      # docs-only commit away, and a gate nobody is paged for is a gate that stays
+      # red.
+      - name: prefs-parity
         optional: true
       # Unfiltered for the same reason, and listed for the same one: a stale
       # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody

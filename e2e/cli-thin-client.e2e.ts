@@ -71,6 +71,7 @@ import {
   dismissImporterOffer,
   enableDeveloperMode,
   openSettings,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -593,6 +594,11 @@ describeE2E("cli6 hiding the CLI panel does not close the door (#181)", () => {
         // lived in Privacy. Anchored on a core tab that must still be there, so
         // the absence cannot pass on a Settings modal that never opened.
         await (await s.byTestId("settings.tab-privacy")).click();
+        // Privacy renders an in-panel topic strip since myne-md/myne#885, and
+        // only the ACTIVE topic's body is mounted. `settings.auto-lock-select`
+        // moved into `locking`, so the render probe the panel already used has
+        // to name that topic first.
+        await selectSettingsTopic(s, "privacy", "locking");
         await s.byTestId("settings.auto-lock-select");
         expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
         expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);

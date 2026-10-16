@@ -32,9 +32,21 @@
 // and nothing anywhere would have said so.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
+
+/** Capabilities this fixture's client is missing, empty by default so every
+ *  case above runs on the desktop set. Only the member-section case fills it. */
+const { absentCaps } = vi.hoisted(() => ({ absentCaps: new Set<string>() }));
+
+vi.mock("../../src/platform/capabilities", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/platform/capabilities")>();
+  return {
+    ...actual,
+    has: (cap: string) => !absentCaps.has(cap) && actual.has(cap as never),
+  };
+});
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
@@ -45,6 +57,16 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 import { ENROLL_PENDING_NOTICE } from "../../src/lib/load-bearing-copy";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
+
+/** Select one of the Sync panel's topics, the way the strip does
+ *  (myne-md/myne#885). `connection` is the default. */
+function selectTopic(id: "connection" | "devices" | "conflicts") {
+  act(() => setActiveSettingsTopic("sync", id));
+}
 
 /**
  * `syncState` is the whole variable under test. The shared router ALWAYS
@@ -68,13 +90,24 @@ function mountWith(
 
 beforeEach(() => {
   invokeMock.mockReset();
+  // Module scope by design, so a block that selects a topic cannot decide the
+  // next one (myne-md/myne#885).
+  resetSettingsTopics();
 });
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  absentCaps.clear();
 });
 
 describe("the enrol gate, for a device that cannot read the roster", () => {
+  beforeEach(() => {
+    // The enrol form, the waiting notice and the device roster live in the
+    // `devices` topic; the migration block below lives in `connection`, the
+    // default, so only this block selects.
+    selectTopic("devices");
+  });
+
   it("offers the enrol form when the device is genuinely not enrolled", async () => {
     // The case the form is FOR, pinned first — otherwise a fix that simply
     // deleted the form would pass every assertion below.
@@ -198,15 +231,27 @@ describe("the migration block, per vault generation", () => {
     await waitFor(() => {
       expect(screen.getByTestId("migrate.phrase-input")).toBeTruthy();
     });
+    // And the section that carries it is there, which is the positive half of
+    // the heading assertion below.
+    expect(document.querySelector('section[aria-label="Server"]')).not.toBeNull();
   });
 
   it("hides the whole block — heading included — on a current vault", async () => {
     mountWith("idle", true, { offerable: false, pending: false });
-    await waitFor(() => {
-      expect(screen.getByTestId("sync.device-management")).toBeTruthy();
-    });
+    // The panel is up, so the absence below is about the block and not about a
+    // render that never happened. `settings.sync-panel` is the panel's root:
+    // the probe cannot be a row, because which rows exist is the topic's
+    // question and this test is about a block that renders in no topic.
+    await waitFor(() => expect(screen.getByTestId("settings.sync-panel")).toBeTruthy());
     expect(screen.queryByTestId("migrate.phrase-input")).toBeNull();
     expect(document.querySelector('[data-setting-anchor="sync.migrate"]')).toBeNull();
+    // `SettingsSection` renders its heading and accent rule unconditionally, so
+    // gating the BLOCK alone left a titled rule above nothing here. The section
+    // is gated with its one child, and this is the assertion that says so.
+    expect(
+      document.querySelector('section[aria-label="Server"]'),
+      "the Server section renders its heading over nothing on a current vault",
+    ).toBeNull();
   });
 
   it("keeps the block for an unsettled migration, but without the form", async () => {
@@ -220,5 +265,42 @@ describe("the migration block, per vault generation", () => {
       expect(document.querySelector('[data-setting-anchor="sync.migrate"]')).toBeTruthy();
     });
     expect(screen.queryByTestId("migrate.phrase-input")).toBeNull();
+  });
+});
+
+/**
+ * The members section, and the client that has no member surface at all.
+ *
+ * Both of its blocks are gated on `memberSharing`, and the web client has that
+ * capability absent (it has no person-identity carrier). The section used to be
+ * drawn unconditionally around two `: null` arms, so web rendered a titled
+ * `Members` rule above nothing, for the same reason the `Server` heading did.
+ */
+describe("the members section, per client", () => {
+  it("renders on a client with the member surface", async () => {
+    // The positive half, so a fix that deleted the section everywhere fails here.
+    selectTopic("devices");
+    mountWith("idle");
+    await waitFor(() =>
+      expect(document.querySelector('section[aria-label="Members"]')).not.toBeNull(),
+    );
+  });
+
+  it("renders no Members heading where memberSharing is absent", async () => {
+    absentCaps.add("memberSharing");
+    try {
+      selectTopic("devices");
+      mountWith("idle");
+      await waitFor(() => expect(screen.getByTestId("settings.sync-panel")).toBeTruthy());
+      expect(
+        document.querySelector('section[aria-label="Members"]'),
+        "the Members section renders its heading over nothing on web",
+      ).toBeNull();
+      // The section it sits beside is unaffected, so the absence above is about
+      // this section and not about a panel that failed to render.
+      expect(document.querySelector('section[aria-label="Enrolled devices"]')).not.toBeNull();
+    } finally {
+      absentCaps.clear();
+    }
   });
 });

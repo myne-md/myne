@@ -167,15 +167,27 @@ export function DateTimeSettings() {
       />
       <SettingRow
         anchorId="editor.timezone"
+        testId="settings.timezone-row"
         label={t("settings.dateTime.zoneLabel")}
-        helper={t("settings.dateTime.zoneHelper")}
+        // 345 characters was the longest helper in the catalog (myne-md/myne#885).
+        // The sentence that says what the setting DOES stays on the row; the
+        // paragraph behind the question mark is the same key it always was,
+        // unchanged, and it is the part that explains how the choice settles
+        // across devices.
+        helper={t("settings.dateTime.zoneInline")}
+        explanation={[t("settings.dateTime.zoneHelper")]}
         error={zoneError}
-        control={
+        control={(helperId, explanationId) => (
           <input
             type="text"
             value={zone}
             placeholder={t("settings.dateTime.zonePlaceholder")}
             aria-label={t("settings.dateTime.zoneLabel")}
+            aria-describedby={
+              explanationId === undefined
+                ? helperId
+                : `${helperId} ${explanationId}`
+            }
             data-testid="settings.timezone"
             onChange={(e) => {
               setZone(e.target.value);
@@ -197,7 +209,7 @@ export function DateTimeSettings() {
               font: "inherit",
             }}
           />
-        }
+        )}
       />
     </>
   );

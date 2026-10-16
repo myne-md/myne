@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./tokens.css": "./src/tokens.css",
     "./components.css": "./src/components.css",
+    "./emptyState": "./src/emptyState.tsx",
     "./*": "./src/*.ts"
   }
 }

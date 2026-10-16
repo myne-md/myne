@@ -53,6 +53,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
+import { SettingsSection } from "./SettingsSection";
+import { SettingsTopicPanel } from "./SettingsTabs";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
@@ -125,26 +127,8 @@ interface VaultPanelProps {
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
 }
 
-const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "var(--tracking-caps)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  margin: 0,
-};
 
-const DANGER_HEADING_STYLE: CSSProperties = {
-  ...SECTION_HEADING_STYLE,
-  color: "var(--danger)",
-};
 
-const SECTION_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-3)",
-  alignSelf: "stretch",
-};
 
 const HELPER_TEXT_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -158,17 +142,6 @@ const HELPER_TEXT_MUTED_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-// VAULT LABEL section (MYND-205 task 6). Pinned to the Penpot spec rather
-// than the panel's semantic-token helpers so the eyebrow / input / Save button
-// match the rename-control frame exactly (Inter 11/600 eyebrow, 36px controls).
-const LABEL_EYEBROW_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  fontWeight: "var(--weight-semibold)",
-  letterSpacing: "var(--tracking-caps)",
-  textTransform: "uppercase",
-  color: "var(--ink-3)",
-  margin: 0,
-};
 
 const LABEL_HELPER_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -336,13 +309,6 @@ const ROOT_STYLE: CSSProperties = {
   width: "100%",
 };
 
-const DIVIDER_STYLE: CSSProperties = {
-  height: 1,
-  background: "var(--line-1)",
-  border: 0,
-  margin: 0,
-  alignSelf: "stretch",
-};
 
 type View = "idle" | "change-password" | "delete-vault";
 
@@ -702,25 +668,26 @@ export function VaultPanel({
 
   return (
     <div style={ROOT_STYLE}>
+      {/* **Vault**: what this vault is called, what it looks like, and its
+          password (myne-md/myne#885). The panel's two topics split the rows a
+          user opens this panel to change from the one control that destroys the
+          vault. The password and erase forms still replace the whole panel body
+          (the early returns above), so a form never sits beside the rows it
+          replaces whichever topic is selected. */}
+      <SettingsTopicPanel panelId="vault" topicId="vault">
       {/* A member vault has no owner vault password to change: the backend has
           no `root_key` for it and refuses with `VaultNotUnlocked`. The control is
           hidden entirely and the member fast-unlock surface (Privacy) is pointed
           at instead, rather than offering a button that silently does nothing
           (myne-md/myne#858). */}
       {memberVault ? (
-        <section style={SECTION_STYLE}>
-          <h3 style={SECTION_HEADING_STYLE}>
-            {t("settings.vault.changePasswordHeading")}
-          </h3>
+        <SettingsSection title={t("settings.vault.changePasswordHeading")}>
           <p data-testid="settings.member-vault-notice" style={HELPER_TEXT_STYLE}>
             {t("settings.vault.memberVaultNotice")}
           </p>
-        </section>
+        </SettingsSection>
       ) : (
-        <section style={SECTION_STYLE}>
-          <h3 style={SECTION_HEADING_STYLE}>
-            {t("settings.vault.changePasswordHeading")}
-          </h3>
+        <SettingsSection title={t("settings.vault.changePasswordHeading")}>
           <p style={HELPER_TEXT_STYLE}>{t("settings.vault.changePasswordHelper")}</p>
           <div>
             <Button
@@ -731,11 +698,10 @@ export function VaultPanel({
               {t("settings.vault.changePasswordButton")}
             </Button>
           </div>
-        </section>
+        </SettingsSection>
       )}
 
-      <section style={SECTION_STYLE}>
-        <h3 style={LABEL_EYEBROW_STYLE}>{t("settings.vault.vaultLabelEyebrow")}</h3>
+      <SettingsSection title={t("settings.vault.sections.identity")}>
         <p style={LABEL_HELPER_STYLE}>{t("settings.vault.vaultLabelHelper")}</p>
         <div style={LABEL_INPUT_ROW_STYLE}>
           <input
@@ -838,9 +804,16 @@ export function VaultPanel({
             </button>
           ))}
         </div>
-      </section>
+      </SettingsSection>
+      </SettingsTopicPanel>
 
-      <hr style={DIVIDER_STYLE} aria-hidden="true" />
+      {/* **Danger zone**: the one control here that destroys the vault, on its
+          own tab so a reader reaches it without scrolling past the icon picker,
+          and so it is not one keystroke from the rows a user opens this panel
+          to change. The shared section treatment replaces the private heading
+          and `<hr>` this region used to draw; the heading keeps its red through
+          the treatment's one tone (`tone="danger"`). */}
+      <SettingsTopicPanel panelId="vault" topicId="danger">
 
       {/* The danger zone, and what "danger" means here (MYND-574 task 72).
           Where the local vault may be the only copy it is a destruction; where
@@ -849,12 +822,14 @@ export function VaultPanel({
           promise, because the desktop promise would be false on the other
           client in the direction that loses a user's trust rather than their
           data. */}
-      <section style={SECTION_STYLE}>
-        <h3 style={DANGER_HEADING_STYLE}>
-          {capabilities.has("localOnlyVault")
+      <SettingsSection
+        tone="danger"
+        title={
+          capabilities.has("localOnlyVault")
             ? t("settings.vault.dangerZoneHeading")
-            : t("settings.vault.localEraseHeading")}
-        </h3>
+            : t("settings.vault.localEraseHeading")
+        }
+      >
         <p style={HELPER_TEXT_MUTED_STYLE}>
           {capabilities.has("localOnlyVault")
             ? t("settings.vault.dangerZoneHelper")
@@ -874,7 +849,8 @@ export function VaultPanel({
               : t("settings.vault.localEraseButton")}
           </Button>
         </div>
-      </section>
+      </SettingsSection>
+      </SettingsTopicPanel>
     </div>
   );
 }

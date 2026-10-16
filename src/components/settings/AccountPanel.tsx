@@ -35,6 +35,7 @@ import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import * as capabilities from "../../platform/capabilities";
 import { ConnectedExtensions } from "./ConnectedExtensions";
+import { SettingsSection, SettingsSectionCounter } from "./SettingsSection";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE } from "./panel-styles";
@@ -195,7 +196,15 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
   const groupingKnown = account !== null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }} data-testid="settings.account-panel">
+    // The shared section treatment (myne-md/myne#885): the account grouping and
+    // the paired browser extensions are two concerns, so two seams, and the
+    // counter drops the heading where the extensions section is absent (the web
+    // client) and the grouping is the panel's only section.
+    <SettingsSectionCounter>
+    <div
+      style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}
+      data-testid="settings.account-panel"
+    >
       {loadError !== null ? (
         <p
           role="alert"
@@ -216,7 +225,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
           {t("settings.account.standaloneHelper")}
         </p>
       ) : (
-        <>
+        <SettingsSection title={t("settings.account.sections.grouping")}>
           <ControlBlock
             label={t("settings.account.nameLabel")}
             anchorId="account.name"
@@ -333,7 +342,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
           <p data-testid="settings.account-devices-note" style={HELPER_STYLE}>
             {t("settings.account.devicesNote")}
           </p>
-        </>
+        </SettingsSection>
       )}
 
       {/* Browser clipper: absent on web (MYND-574 task 27). A page cannot be a
@@ -345,10 +354,13 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
           pairing token is bound to the account, which is why they sit here and
           not under Sync. */}
       {capabilities.has("clipper") && (
-        <div style={{ marginTop: "var(--space-5)" }} data-testid="settings.account-extensions">
-          <ConnectedExtensions />
-        </div>
+        <SettingsSection title={t("settings.account.sections.extensions")}>
+          <div data-testid="settings.account-extensions">
+            <ConnectedExtensions />
+          </div>
+        </SettingsSection>
       )}
     </div>
+    </SettingsSectionCounter>
   );
 }

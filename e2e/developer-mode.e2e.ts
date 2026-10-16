@@ -60,6 +60,7 @@ import {
   enableDeveloperMode,
   openPalette,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -167,10 +168,11 @@ describeE2E("dm1 developer-mode gating: rail + search + palette (MYND-593)", () 
         await (await s.byTestId("settings.tab-ai")).click();
         await s.byTestId("settings.ai-panel");
 
-        // The transcription picker is present; enable the AI opt-in (the
-        // picker's OWN gate, independent of developer_mode) so "Choose…" is
-        // usable rather than merely rendered-but-disabled.
+        // The transcription picker is in the Models topic, and the AI opt-in is in
+        // Answering (the panel's first topic) since myne-md/myne#885.
+        await selectSettingsTopic(s, "ai", "models");
         await s.byTestId("ai.model-select-transcription");
+        await selectSettingsTopic(s, "ai", "answering");
         await (await s.byTestId("ai.enable-toggle")).click();
         await s.waitUntil(
           async () =>
@@ -179,6 +181,7 @@ describeE2E("dm1 developer-mode gating: rail + search + palette (MYND-593)", () 
               : null,
           { label: "ai_enabled toggled on", timeoutMs: 10_000 },
         );
+        await selectSettingsTopic(s, "ai", "models");
         const chooseTranscription = await s.byTestId("ai.model-choose-transcription");
         expect(await chooseTranscription.attribute("disabled")).toBeNull();
         await closeSettings(s);
@@ -219,7 +222,9 @@ describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#18
         // Privacy itself is present — that is the whole point of a setting-level
         // gate, and it is what distinguishes this from dm1. Anchored on an
         // ungated neighbour rather than a panel root, because PrivacyPanel's
-        // root carries no testid of its own.
+        // root carries no testid of its own. That neighbour lives in Privacy's
+        // `locking` topic (myne-md/myne#885), so the topic is opened for it.
+        await selectSettingsTopic(s, "privacy", "locking");
         await s.byTestId("settings.auto-lock-select");
         // The CLI rows are NOT here any more: they moved into a panel of their
         // own, so their absence from Privacy is structural rather than gated.
@@ -229,6 +234,7 @@ describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#18
         expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
 
         await (await s.byTestId("settings.tab-editor")).click();
+        await selectSettingsTopic(s, "editor", "editing");
         await s.byTestId("settings.section.editor-editing");
         expect((await s.byTestIdAll("settings.vim-mode")).length).toBe(0);
 
@@ -260,6 +266,7 @@ describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#18
         await s.byTestId("settings.cli-rate-limit");
 
         await (await s.byTestId("settings.tab-editor")).click();
+        await selectSettingsTopic(s, "editor", "editing");
         await s.byTestId("settings.vim-mode");
 
         const cliOn = await searchResultIds(s, CLI_ONLY_QUERY);

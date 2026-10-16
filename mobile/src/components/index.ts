@@ -40,6 +40,15 @@ export {
   type ReminderSwitchBlockProps,
   horizonDate,
 } from "./ReminderSettings";
+export { PeriodicNotesBlock, persistPeriodSetting, listTemplateNotes } from "./PeriodicNotesBlock";
+export { ColorGroupsBlock, withGroupPatched } from "./ColorGroupsBlock";
+export {
+  AiExcludedFoldersBlock,
+  excludeFolder,
+  includeFolder,
+} from "./AiExcludedFoldersBlock";
+export { AiLimitsBlock, budgetFromDraft } from "./AiLimitsBlock";
+export { AttachmentOcrBlock } from "./AttachmentOcrBlock";
 export {
   HideVaultNamesBlock,
   type HideVaultNamesBlockProps,

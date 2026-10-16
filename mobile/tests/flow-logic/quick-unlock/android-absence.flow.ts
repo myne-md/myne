@@ -45,11 +45,12 @@
 import { test, expect } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
 
-/** Settings → Privacy & security → Quick unlock. */
+/** Settings → Vault → Quick unlock (myne-md/myne#880 task 12 moved quick unlock
+ *  out of Privacy into the vault-scoped group). */
 async function openQuickUnlockPanel(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Settings" }).first().click();
-  await page.getByText("Privacy & security", { exact: true }).click();
+  await page.getByTestId("settings.category-vault").click();
   await page.getByTestId("settings.quick-unlock-row").click();
 }
 

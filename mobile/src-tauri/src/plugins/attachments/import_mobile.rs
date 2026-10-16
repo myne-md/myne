@@ -50,11 +50,7 @@ pub async fn attachment_import<R: Runtime>(
     .await
     .map(|p| p.attachment_ocr_enabled)
     .unwrap_or(true);
-    let extractor = if ocr_enabled {
-        myne_core::plugins::attachments::ocr::extract_image_only
-    } else {
-        no_ocr_extract
-    };
+    let extractor = ocr_extractor(ocr_enabled);
     // `StdVaultIo` + `TauriHost`: the same `std::fs` and the same Tauri app
     // handle this path already used before the shared core moved filesystem
     // access and host services behind seams. Mobile is a native target — the
@@ -95,4 +91,104 @@ fn no_ocr_extract(
         myne_core::plugins::attachments::ExtractStatus::Unsupported,
         myne_core::plugins::attachments::SourceFormat::Other,
     )
+}
+
+/// The extractor the opt-out selects. Named rather than written inline at the
+/// call site so the BRANCH is testable: myne-md/myne#880 added the switch that
+/// writes `attachment_ocr_enabled`, and the property that makes it more than a
+/// stored value is that this path injects a no-op extractor when it is off.
+/// Asserting the pref was written would pass over a path that ignored it.
+fn ocr_extractor(
+    ocr_enabled: bool,
+) -> fn(&str, &str, &[u8]) -> myne_core::plugins::attachments::ExtractedText {
+    if ocr_enabled {
+        myne_core::plugins::attachments::ocr::extract_image_only
+    } else {
+        no_ocr_extract
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use myne_core::plugins::attachments::{ExtractStatus, SourceFormat};
+
+    /// The content types the import path treats as OCR-able, so a case below
+    /// cannot pass by choosing a format nothing would have extracted anyway.
+    const IMAGE_TYPES: &[&str] = &["image/png", "image/jpeg", "image/webp", "image/heic"];
+
+    #[test]
+    fn the_opt_out_disables_extraction_for_every_image_format() {
+        // The property the switch exists for: with OCR off, an image-only
+        // attachment is no longer indexed. Asserted through the same function
+        // the command calls, not through the pref.
+        let extractor = ocr_extractor(false);
+        for content_type in IMAGE_TYPES {
+            let out = extractor(content_type, "scan.png", b"\x89PNG\r\n\x1a\n");
+            assert_eq!(
+                out.status,
+                ExtractStatus::Unsupported,
+                "OCR off must decline {content_type}"
+            );
+            assert_eq!(out.source_format, SourceFormat::Other);
+            assert!(out.text.is_empty(), "OCR off must produce no text");
+        }
+    }
+
+    #[test]
+    fn the_opt_in_selects_the_real_extractor() {
+        // The other direction, so the case above is not satisfied by a path that
+        // declines everything unconditionally. `extract_image_only` on a
+        // non-image content type reports `Unsupported` too, so this asserts the
+        // SELECTION rather than a successful extraction, in two halves.
+        //
+        // Identity first: the opt-in hands back a different function.
+        assert!(!std::ptr::fn_addr_eq(
+            ocr_extractor(true) as fn(&str, &str, &[u8]) -> _,
+            ocr_extractor(false) as fn(&str, &str, &[u8]) -> _,
+        ));
+        // Then behaviour, since identity alone would pass over two distinct
+        // functions that both decline (myne-md/myne#867 review). The input is an
+        // image content type carrying a truncated PNG (the signature and nothing
+        // after it), which the real extractor ATTEMPTS: it claims the bytes as an
+        // image, and with the bundled weights loaded it reports the decode as
+        // `Failed`. The no-op reports `Unsupported` with `SourceFormat::Other`
+        // for the same input, as the case above asserts.
+        //
+        // A checkout without the Git-LFS weights has no OCR engine, and the real
+        // extractor then honestly reports `Unsupported` before reading a byte, so
+        // that branch can assert only the source format. The helper PANICS when
+        // the weights are present and will not load, so a broken engine cannot
+        // pass as the weightless branch.
+        let truncated_png = b"\x89PNG\r\n\x1a\n";
+        let weights_loaded = myne_core::plugins::attachments::ocr::init_bundled_models_for_tests();
+        for content_type in IMAGE_TYPES {
+            let out = ocr_extractor(true)(content_type, "scan.png", truncated_png);
+            assert_eq!(
+                out.source_format,
+                SourceFormat::Image,
+                "OCR on must claim {content_type} as an image"
+            );
+            let expected = if weights_loaded {
+                ExtractStatus::Failed
+            } else {
+                ExtractStatus::Unsupported
+            };
+            assert_eq!(
+                out.status, expected,
+                "OCR on, {content_type}, truncated PNG (weights loaded: {weights_loaded})"
+            );
+            assert!(out.text.is_empty(), "a truncated image yields no text");
+        }
+        // And a non-image is declined by BOTH, which is why the assertion above
+        // is about identity rather than about a format neither would read.
+        assert_eq!(
+            ocr_extractor(true)("text/plain", "notes.txt", b"hello").status,
+            ExtractStatus::Unsupported
+        );
+        assert_eq!(
+            ocr_extractor(false)("text/plain", "notes.txt", b"hello").status,
+            ExtractStatus::Unsupported
+        );
+    }
 }

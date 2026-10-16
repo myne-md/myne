@@ -56,6 +56,7 @@ import { endStatusLabel } from "./components/AgentProgress";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { Spinner } from "../../components/Spinner";
 import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
+import { ScrollArea } from "../../components/primitives/ScrollArea";
 import { byUpdatedDesc, relativeDay } from "../ai/conversationList";
 
 /**
@@ -63,11 +64,11 @@ import { byUpdatedDesc, relativeDay } from "../ai/conversationList";
  *
  * It was ONE line holding a title, an anchor pill, a date and two text buttons
  * ("Rename", "Delete"). At the rail's 248px that is far more than fits, and
- * because `LIST_STYLE` sets `overflow-y: auto` — which per spec computes
+ * because the list set `overflow-y: auto`, which per spec computes
  * `overflow-x` to `auto` as well — the whole list scrolled SIDEWAYS. The user
  * saw rows shifted half out of view with a horizontal scrollbar under them.
  *
- * Two lines is what a 248px column can hold. The list also pins
+ * Two lines is what a 248px column can hold. The list's scroller pins
  * `overflow-x: hidden` now, so a future row that outgrows it truncates rather
  * than reintroducing the scroll.
  */
@@ -283,19 +284,33 @@ const RAIL_HEADER_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
+/** The list's outer box: it takes the rail's remaining height.
+ *
+ *  **The app's own `ScrollArea`, not a native `overflow-y: auto`**
+ *  (myne-md/myne#867, on the user's read: "the scroll bar stays open all the
+ *  time, and it is too thick"). The native bar follows the OS setting and on a
+ *  machine set to always show scroll bars it never hides; the primitive's
+ *  indicator appears on hover, focus and scroll only. It also pins
+ *  `overflow-x: hidden` on its scroller, which this list relies on: a row wider
+ *  than the rail must truncate, not scroll the whole history sideways. */
 const LIST_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-1)",
-  overflowY: "auto",
-  // Explicit, and load-bearing: setting `overflow-y` alone computes
-  // `overflow-x` to `auto` rather than leaving it `visible`, so a row wider
-  // than the rail gave the whole list a horizontal scrollbar. A history rail
-  // that scrolls sideways is a history rail nobody can read at a glance.
-  overflowX: "hidden",
   minHeight: 0,
   minWidth: 0,
   flex: 1,
+};
+
+/** The scroller's own layout: one column of rows.
+ *
+ *  **No `gap`** (myne-md/myne#867, on the user's read: "the space above and
+ *  below the hover is different"). The separator is each row's BOTTOM border,
+ *  so a gap put four pixels between a card and the rule above it and none
+ *  between the card and the rule below it, which the hover background made
+ *  visible. Rows carry their own symmetric block padding instead
+ *  (`ROW_WRAP_STYLE`). */
+const LIST_CONTENT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
 };
 
 export interface AgentHubListProps {
@@ -812,7 +827,11 @@ export function AgentHubList({
           }
         />
       ) : (
-        <div data-testid="agent.hub-list" style={LIST_STYLE}>
+        <ScrollArea
+          testId="agent.hub-list"
+          style={LIST_STYLE}
+          contentStyle={LIST_CONTENT_STYLE}
+        >
           {visible.map((row, index) => {
             // **The unread mark** (myne-md/myne#848): a run settled for this
             // conversation and nothing has displayed it since. Read from the run
@@ -865,6 +884,9 @@ export function AgentHubList({
               // what makes a list read as a list; a border on all four sides of
               // every row reads as a grid of highlighted boxes.
               style={{
+                // The same space on both sides of the card, so a hovered or
+                // open card sits centred between its two rules.
+                paddingBlock: "var(--space-1)",
                 borderBottom:
                   index < visible.length - 1 ? "1px solid var(--line-1)" : undefined,
               }}
@@ -969,12 +991,19 @@ export function AgentHubList({
                     // read as "every card is highlighted"; a ring drawn INSIDE
                     // the open card marks exactly one and cannot reflow the list
                     // by a pixel, which a border would.
+                    // A hovered card takes the canon hover ramp (`--bg-3`), so
+                    // the pointer finds a row by its surface and not only by the
+                    // three-dot button fading in. The open card keeps its own
+                    // treatment, which already reads as selected.
+                    transition: "background var(--duration-fast) var(--ease-standard)",
                     ...(row.id === activeId
                       ? {
                           background: "var(--bg-2)",
                           boxShadow: "inset 0 0 0 1px var(--accent)",
                         }
-                      : {}),
+                      : hoveredId === row.id
+                        ? { background: "var(--bg-3)" }
+                        : {}),
                   }}
                   data-testid="agent.hub-card"
                   data-conversation-id={row.id}
@@ -1411,7 +1440,7 @@ export function AgentHubList({
             </div>
             );
           })}
-        </div>
+        </ScrollArea>
       )}
     </div>
   );

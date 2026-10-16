@@ -17,7 +17,7 @@
 // `Switch`/`Input` primitives, the same set every other settings section uses.
 
 import { useCallback, useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   memoryDelete,
@@ -30,13 +30,21 @@ import {
   type PersonalityDirective,
 } from "../../lib/memory";
 import { EmptyState } from "../primitives/EmptyState";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
+import { IconButton } from "../primitives/IconButton";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
 } from "./panel-styles";
 
+/**
+ * **The roster is a bounded, scrolling region** (myne-md/myne#867). Up to
+ * `MAX_MEMORY_ENTRIES` rows (100) each carrying up to 2000 characters, in a
+ * settings panel that is itself a scroll container: unbounded, the list pushed
+ * the personality editor and the clear-all control off the end of the panel, so
+ * the controls a full list makes you need were the ones it hid.
+ */
 const LIST_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -44,6 +52,18 @@ const LIST_STYLE: CSSProperties = {
   margin: 0,
   padding: 0,
   listStyle: "none",
+  maxHeight: 360,
+  overflowY: "auto",
+};
+
+/** The `N / cap` readout and, at the cap, the sentence that says what to do
+ *  about it. Two elements because they are two facts, and the second only
+ *  exists in one state. */
+const COUNT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  margin: "var(--space-1) 0 0",
 };
 
 const ROW_STYLE: CSSProperties = {
@@ -222,10 +242,23 @@ function MemoryRow(props: {
   );
 }
 
-/** The memory + personality section, rendered inside AiPanel (the AI rail). */
-export function MemorySection(props: { onShowToast: (message: string) => void; aiEnabled: boolean }) {
+/** The memory + personality section, rendered inside AiPanel (the AI rail).
+ *
+ *  `layout` places the two halves (myne-md/myne#867, on the user's read: the
+ *  Advanced topic is two sections, "Preferences" holding the meeting prompt and
+ *  the voice preferences, and "Memory" holding what the assistant remembers).
+ *  The halves share one load and one busy flag, so they stay one component and
+ *  the caller only decides WHERE each renders. Without it they render stacked,
+ *  as before. */
+export function MemorySection(props: {
+  onShowToast: (message: string) => void;
+  aiEnabled: boolean;
+  layout?: (parts: { memory: ReactNode; personality: ReactNode }) => ReactNode;
+}) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<MemoryListRow[] | null>(null);
+  // The host's cap, not a constant here: see `MemoryListView`.
+  const [cap, setCap] = useState<number | null>(null);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [personalityDraft, setPersonalityDraft] = useState("");
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -236,8 +269,10 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
 
   const reload = useCallback(async () => {
     try {
-      const list = await memoryList();
+      const view = await memoryList();
+      const list = view.rows;
       setRows(list);
+      setCap(view.cap);
       const nextTexts: Record<string, string> = {};
       const failed = new Set<string>();
       for (const row of list) {
@@ -308,9 +343,17 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
 
   const disabled = !props.aiEnabled || busy;
 
-  return (
+  const memory = (
     <div style={BLOCK_STYLE} data-testid="settings.memory-section">
-      <h3 style={{ ...LABEL_STYLE, fontSize: "var(--text-md)", margin: "var(--space-3) 0 0" }}>
+      {/* `data-setting-anchor` here because the settings-search registry carries
+          an `ai.memory` entry whose `id` IS the anchor a hit scrolls to, and it
+          had none: search found "memory", navigated to the panel and scrolled
+          to nothing (myne-md/myne#867). The personality block below already
+          rendered its anchor through `ControlBlock`. */}
+      <h3
+        data-setting-anchor="ai.memory"
+        style={{ ...LABEL_STYLE, fontSize: "var(--text-md)", margin: "var(--space-3) 0 0" }}
+      >
         {t("settings.memory.heading")}
       </h3>
       <p style={HELPER_STYLE}>{t("settings.memory.helper")}</p>
@@ -332,7 +375,27 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
           testId="settings.memory.empty"
         />
       ) : (
-        <ul style={LIST_STYLE} data-testid="settings.memory.list">
+        <>
+          {/* **What a limit owes the person it limits** (myne-md/myne#867): the
+              count, and at the cap the one action that unblocks it. The write
+              refusal itself belongs to the path that writes (the agent's
+              `remember`, which is not this surface), so saying it HERE is what
+              turns a limit into a job the user can do in advance rather than a
+              dead end discovered mid-run. */}
+          <div style={COUNT_STYLE}>
+            <span data-testid="settings.memory.count" style={HELPER_STYLE}>
+              {t("settings.memory.count", { used: rows.length, cap: cap ?? rows.length })}
+            </span>
+            {cap !== null && rows.length >= cap ? (
+              <span
+                data-testid="settings.memory.at-cap"
+                style={{ ...HELPER_STYLE, color: "var(--fg-1)" }}
+              >
+                {t("settings.memory.atCap")}
+              </span>
+            ) : null}
+          </div>
+          <ul style={LIST_STYLE} data-testid="settings.memory.list">
           {rows.map((row) => (
             <MemoryRow
               key={row.id}
@@ -345,7 +408,8 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
               onShowToast={props.onShowToast}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
@@ -381,37 +445,49 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
           </button>
         )}
       </div>
-
-      <ControlBlock
-        anchorId="ai.personality"
-        label={t("settings.memory.personalityLabel")}
-        helper={t("settings.memory.personalityHelper")}
-        testId="settings.memory.personality-block"
-        control={
-          <>
-            <textarea
-              id="ai-personality"
-              data-testid="settings.memory.personality-input"
-              value={personalityDraft}
-              disabled={disabled}
-              onChange={(e) => setPersonalityDraft(e.target.value)}
-              rows={4}
-              spellCheck={false}
-              placeholder={t("settings.memory.personalityPlaceholder")}
-              style={{ ...TEXTAREA_STYLE, background: "var(--paper)" }}
-            />
-            <button
-              type="button"
-              data-testid="settings.memory.personality-save"
-              disabled={disabled}
-              onClick={() => void savePersonality()}
-              style={LINK_BUTTON_STYLE}
-            >
-              {t("settings.memory.personalitySaveLabel")}
-            </button>
-          </>
-        }
-      />
     </div>
+  );
+  const personality = (
+    // A setting row whose control is the save (myne-md/myne#867): the same
+    // square bordered icon the meeting prompt's reset uses beside it, so the
+    // two standing instructions in Preferences read as one kind of row.
+    <SettingRow
+      anchorId="ai.personality"
+      testId="settings.memory.personality-block"
+      label={t("settings.memory.personalityLabel")}
+      helper={t("settings.memory.personalityHelper")}
+      control={
+        <IconButton
+          icon="circle-check"
+          label={t("settings.memory.personalitySaveLabel")}
+          tooltip
+          bordered
+          disabled={disabled}
+          testId="settings.memory.personality-save"
+          onClick={() => void savePersonality()}
+        />
+      }
+    >
+      <textarea
+        id="ai-personality"
+        data-testid="settings.memory.personality-input"
+        aria-label={t("settings.memory.personalityLabel")}
+        value={personalityDraft}
+        disabled={disabled}
+        onChange={(e) => setPersonalityDraft(e.target.value)}
+        rows={4}
+        spellCheck={false}
+        placeholder={t("settings.memory.personalityPlaceholder")}
+        style={{ ...TEXTAREA_STYLE, background: "var(--paper)" }}
+      />
+    </SettingRow>
+  );
+
+  if (props.layout !== undefined) return <>{props.layout({ memory, personality })}</>;
+  return (
+    <>
+      {memory}
+      {personality}
+    </>
   );
 }

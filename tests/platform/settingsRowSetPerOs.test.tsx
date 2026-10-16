@@ -27,7 +27,7 @@
 // 2 by name, even in a panel this file never renders.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -37,6 +37,19 @@ vi.mock("../../src/platform/core", () => ({
 }));
 
 const { PrivacyPanel } = await import("../../src/components/settings/PrivacyPanel");
+const { resetSettingsTopics, setActiveSettingsTopic } = await import(
+  "../../src/components/settings/SettingsTabs"
+);
+
+/**
+ * The Privacy panel's topics, in roster order (myne-md/myne#885).
+ *
+ * The bodies are mutually exclusive by design - an inactive topic's body is not
+ * mounted at all - so the row set this file compares per OS is the UNION over
+ * these, and a comparison that read only one topic would silently narrow the
+ * claim to it.
+ */
+const PRIVACY_TOPICS = ["access", "locking"] as const;
 
 // `process.cwd()`, not `import.meta.url`: under the jsdom environment Vitest
 // serves modules through its `/@fs/…` URL space, so a URL-derived path resolves
@@ -226,13 +239,20 @@ function renderedTestIds(container: HTMLElement): string[] {
     .sort();
 }
 
-async function mountUnder(platform: string): Promise<HTMLElement> {
+async function mountUnder(
+  platform: string,
+  topic: (typeof PRIVACY_TOPICS)[number] = "locking",
+): Promise<HTMLElement> {
   setPlatform(platform);
   stubIpc();
+  // The topic store is module scope, so a mount has to say which topic it is
+  // rendering rather than inheriting it from the previous one.
+  resetSettingsTopics();
+  act(() => setActiveSettingsTopic("privacy", topic));
   const { container } = render(<PrivacyPanel />);
-  // The quick-unlock row resolves its status asynchronously; without waiting
-  // the comparison would be between three EMPTY sets, which agree trivially.
-  await screen.findByTestId("settings.quick-unlock-toggle");
+  // The row resolves its status asynchronously; without waiting the comparison
+  // would be between EMPTY sets, which agree trivially.
+  await waitFor(() => expect(container.querySelector("[data-testid]")).not.toBeNull());
   return container;
 }
 
@@ -249,27 +269,34 @@ afterEach(() => {
 
 describe("the Privacy row set does not vary by desktop OS", () => {
   it("renders a non-trivial row set (the comparison has something in it)", async () => {
-    const container = await mountUnder("Linux x86_64");
-    const ids = renderedTestIds(container);
-    // A floor, so three empty sets can never pass by agreeing.
-    expect(ids.length).toBeGreaterThanOrEqual(3);
-    expect(ids).toContain("settings.quick-unlock-toggle");
+    // A floor per topic, because the per-OS comparison below runs topic by topic
+    // and two empty sets agree trivially on whichever one it is.
+    const access = renderedTestIds(await mountUnder("Linux x86_64", "access"));
+    expect(access.length).toBeGreaterThanOrEqual(2);
+    cleanup();
+    const locking = renderedTestIds(await mountUnder("Linux x86_64", "locking"));
+    expect(locking.length).toBeGreaterThanOrEqual(3);
+    expect(locking).toContain("settings.quick-unlock-toggle");
   });
 
   it.each(DESKTOP_PLATFORMS)(
     "%s renders the same testids as every other desktop OS",
     async (_label, value) => {
-      const mine = renderedTestIds(await mountUnder(value));
-      cleanup();
-      const linux = renderedTestIds(await mountUnder("Linux x86_64"));
-      expect(mine).toEqual(linux);
+      for (const topic of PRIVACY_TOPICS) {
+        cleanup();
+        const mine = renderedTestIds(await mountUnder(value, topic));
+        cleanup();
+        const linux = renderedTestIds(await mountUnder("Linux x86_64", topic));
+        expect(mine, `topic ${topic} on ${value}`).toEqual(linux);
+      }
     },
   );
 
   it("the one platform-conditioned control is a BUTTON inside a row every OS renders", async () => {
-    // Open the PIN setup, which is where the Touch ID button lives.
+    // Open the PIN setup, which is where the Touch ID button lives. Both rows
+    // are in the `locking` topic, so the mount selects it.
     const openSetup = async (platform: string) => {
-      const container = await mountUnder(platform);
+      const container = await mountUnder(platform, "locking");
       fireEvent.click(screen.getByTestId("settings.quick-unlock-toggle"));
       await screen.findByTestId("settings.quick-unlock-setup-pin");
       return container;

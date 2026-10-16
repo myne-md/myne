@@ -1223,6 +1223,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::live_sessions(),
+                crate::session::hooks(),
                 vault_io(),
                 a.note_id,
                 a.markdown,
@@ -1254,6 +1255,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 host_ctx(),
                 crate::session::state(),
                 crate::session::live_sessions(),
+                crate::session::hooks(),
                 vault_io(),
                 a.note_id,
             )

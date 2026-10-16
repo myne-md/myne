@@ -20,6 +20,7 @@
 //! The transport (task 4) carries the change bytes; the awareness frame codec and
 //! the relay are other layers.
 
+use crate::hooks::Hooks;
 use crate::host::HostCtx;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::paths;
@@ -205,6 +206,7 @@ pub async fn live_session_patch_frontmatter_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     registry: &LiveSessionRegistry,
+    hooks: &Hooks,
     io: &dyn VaultIo,
     note_id: String,
     markdown: String,
@@ -220,7 +222,123 @@ pub async fn live_session_patch_frontmatter_from_host(
         Some(Ok(())) => {}
         Some(Err(e)) => return Err(e.into()),
     }
-    flush_session(host, state, registry, io, &note_id_str).await
+    // The flush owns the indexing (myne-md/myne#867): a live-owned note's save
+    // owes the same live-index side effects a stateless `note_update` performs,
+    // and `flush_live_session_to_dir` fires them for EVERY caller, so the editor
+    // save, the close and the sync cycle's post-pull merge are one mechanism
+    // rather than three copies.
+    flush_session(host, state, registry, hooks, io, &note_id_str).await?;
+    Ok(())
+}
+
+/// Feed a live-owned note's saved body into the live indexes: the same side
+/// effects a stateless `note_update` performs (search body doc, per-attachment
+/// docs, AI re-embed, and a REMOVAL for a tombstone), because a live-owned note
+/// never takes that path (`SYNC-33`).
+///
+/// Called from [`flush_live_session_to_dir`], which is the single durable writer's
+/// one exit, so every caller of the flush is covered by construction: the editor's
+/// whole-markdown save, the close, and the sync cycle's post-pull merge. The
+/// failure this closes is that the whole editor path bypassed the search index, so
+/// content typed in a live-owned note was unfindable for the rest of the session,
+/// and the lock-time persist then sealed that stale index against an on-disk
+/// manifest that already matched, so the next unlock's hydrate skipped the note and
+/// the staleness survived the relock.
+///
+/// Every call that ADDS plaintext to an index goes through [`while_unlocked`] for
+/// the session's own vault, and the reason is the lock path's ordering rather than
+/// anything here (myne-md/myne#867 review). A flush that is already past its disk
+/// write when the vault locks still reaches this function, and "the session is
+/// still in the registry" says nothing about the vault: on the manual lock the
+/// slot is dropped and the search index wiped BEFORE the live sessions are
+/// cleared, so a session-only check let the note's title and body back into the
+/// index the lock had just zeroized. The attachment await widens that window for
+/// `ai_note_changed`, so the state is checked again after it.
+async fn index_live_note(
+    hooks: &Hooks,
+    state: &VaultRuntimeState,
+    vault_id: &str,
+    note_id: &str,
+    markdown: &str,
+) {
+    use crate::plugins::notes::daily_match::fm_deleted_value_strict;
+    use crate::plugins::notes::drawing_text::{is_drawing, project_drawing_text};
+    use crate::plugins::notes::title_extract::{extract_title_slices, resolve_note_title};
+    let title = resolve_note_title(markdown.as_bytes()).unwrap_or_default();
+    // A tombstone is a removal from the index, not a re-index of it (test-audit
+    // #20, mirrored from `note_update`). With sync configured a permanent delete
+    // is a `deleted:` frontmatter stamp written through `noteUpdate`, and for a
+    // note open in a live session that write is routed into the session
+    // (`live_session_patch_frontmatter`) and reaches the index here. Upserting it
+    // put the purged note's full body back into the live search index, which the
+    // lock then sealed into `vault.search`.
+    let fm_bytes = extract_title_slices(markdown.as_bytes()).frontmatter_bytes;
+    if fm_bytes.and_then(fm_deleted_value_strict).is_some() {
+        // A removal carries no plaintext, so it is not gated: dropping a doc from
+        // an index the lock already wiped is a no-op, never a leak.
+        hooks.search_remove(note_id);
+        while_unlocked(state, vault_id, || hooks.ai_note_changed(note_id, markdown)).await;
+        return;
+    }
+    // The same drawing fold as the stateless writers (SF5 / SYNC-4): a drawing
+    // body is scene JSON, so its doc is the projected text and it gets no
+    // attachment docs. A live session is refused for a drawing today
+    // (`live_session_applies`), so this arm is parity rather than a live case.
+    if is_drawing(markdown.as_bytes()) {
+        let body = project_drawing_text(markdown.as_bytes()).unwrap_or_default();
+        if !while_unlocked(state, vault_id, || {
+            hooks.search_upsert(note_id, &title, &body)
+        })
+        .await
+        {
+            return;
+        }
+    } else {
+        if !while_unlocked(state, vault_id, || {
+            hooks.search_upsert(note_id, &title, markdown)
+        })
+        .await
+        {
+            return;
+        }
+        // Not run under the slot guard: the hook resolves the vault through
+        // `state` itself, and a nested read on a tokio `RwLock` with a lock's
+        // write queued behind the outer guard deadlocks. It refuses a locked
+        // vault on its own key peek.
+        hooks
+            .index_note_attachments(state, note_id, &title, markdown)
+            .await;
+    }
+    // Raw body, the AI arm projects for itself (myne#304). Re-checked rather than
+    // carried over from the upsert above: the attachment await is the widest
+    // window in this function, and a lock landing inside it must not be followed
+    // by a re-embed of the note's body.
+    while_unlocked(state, vault_id, || hooks.ai_note_changed(note_id, markdown)).await;
+}
+
+/// Run `index` only if `vault_id` is still `Unlocked`, HOLDING that slot's read
+/// guard across the call, and report whether it ran (myne-md/myne#867 review).
+///
+/// The guard is what makes this a gate rather than a hint. A bare "is it unlocked"
+/// probe followed by the hook leaves the lock free to land between the two, and
+/// every lock path drops the slot under its WRITE guard before it wipes the search
+/// index (`lock_with_state` and the switch's `set_unlocked_locking_others` on the
+/// manual paths, the idle take on auto-lock). Holding the read guard therefore
+/// orders the hook strictly before the wipe or strictly after the slot left,
+/// which is the case refused here. `index` must stay synchronous and must not
+/// touch `state`: a nested read behind a queued writer deadlocks.
+async fn while_unlocked(state: &VaultRuntimeState, vault_id: &str, index: impl FnOnce()) -> bool {
+    // A session keyed by an id that does not parse belongs to no slot, so it has
+    // no unlocked vault to index into.
+    let Ok(id) = crate::vault_id::VaultId::parse(vault_id) else {
+        return false;
+    };
+    let slot = state.slot_read(id).await;
+    if !matches!(&*slot, Slot::Unlocked(_)) {
+        return false;
+    }
+    index();
+    true
 }
 
 /// Close a live session: flush the pending durable write, then drop it. Returns
@@ -229,6 +347,7 @@ pub async fn live_session_close_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     registry: &LiveSessionRegistry,
+    hooks: &Hooks,
     io: &dyn VaultIo,
     note_id: String,
 ) -> Result<(), LiveSessionCommandError> {
@@ -240,7 +359,10 @@ pub async fn live_session_close_from_host(
     if !registry.is_note_open(&note_id_str) {
         return Err(LiveSessionCommandError::NotOpen);
     }
-    flush_session(host, state, registry, io, &note_id_str).await?;
+    // The close flushes through the same exit as a save, so a session made dirty
+    // by the live channel (`apply_remote_change`, which does not itself persist) is
+    // indexed on the way out rather than written to disk with a stale index.
+    flush_session(host, state, registry, hooks, io, &note_id_str).await?;
     registry
         .remove_note(&note_id_str)
         .ok_or(LiveSessionCommandError::NotOpen)?;
@@ -253,6 +375,7 @@ async fn flush_session(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     registry: &LiveSessionRegistry,
+    hooks: &Hooks,
     io: &dyn VaultIo,
     note_id_str: &str,
 ) -> Result<(), LiveSessionCommandError> {
@@ -261,6 +384,7 @@ async fn flush_session(
         io,
         &notes_dir,
         registry,
+        LiveIndexCtx { state, hooks },
         &items_key,
         &items_key_id,
         note_id_str,
@@ -280,17 +404,32 @@ pub fn live_session_take_remote_splices_from_host(
     Ok(registry.take_pending_splices(&note_id.to_string()))
 }
 
+/// The live-index context a flush needs after its durable write: the runtime
+/// state (which the attachment hook resolves the vault from) and the hooks seam.
+/// Bundled rather than passed as two more positional arguments so
+/// [`flush_live_session_to_dir`] stays inside clippy's argument budget without an
+/// `allow`; both callers already hold the two values.
+pub(crate) struct LiveIndexCtx<'a> {
+    pub state: &'a VaultRuntimeState,
+    pub hooks: &'a Hooks,
+}
+
 /// Seal a session's document under the registry lock, write it OUTSIDE the lock
 /// (serialized with the sync pull's note write under `notes_write_mutex`, the §11.3
-/// linearizability point), then mark the heads durable. No-op if nothing is dirty.
+/// linearizability point), then mark the heads durable and feed the live indexes.
+/// No-op if nothing is dirty.
 ///
 /// Shared by the command path (which resolves the dir from host+state) and the sync
 /// cycle's post-pull merge (`collab-editor-bridge` task 7), which already holds the
-/// notes dir + keys.
+/// notes dir + keys. It is the ONE exit through which a live-owned note reaches
+/// disk (`SYNC-33`), so the index side effects live here rather than at either
+/// caller: a fix on the editor-save path alone left a remote merge followed by a
+/// close with a stale index, which the lock-time persist then sealed.
 pub(crate) async fn flush_live_session_to_dir(
     io: &dyn VaultIo,
     notes_dir: &std::path::Path,
     registry: &LiveSessionRegistry,
+    index: LiveIndexCtx<'_>,
     items_key: &[u8; 32],
     items_key_id: &[u8; 16],
     note_id_str: &str,
@@ -301,19 +440,60 @@ pub(crate) async fn flush_live_session_to_dir(
             Some(Ok(v)) => v,
             Some(Err(e)) => return Err(e.into()),
         };
-    if let Some((blob, heads)) = sealed {
-        let path = notes_dir.join(format!("{note_id_str}.myn"));
-        // The guard is released before `mark_flushed` so the registry lock is not
-        // held across it (and the two mutexes never nest).
-        {
-            let _notes_guard = crate::plugins::notes::commands::notes_write_mutex()
-                .lock()
-                .await;
-            io.write(&path, &blob, WriteOpts::default())
-                .await
-                .map_err(|io_error_kind| LiveSessionCommandError::Io { io_error_kind })?;
+    // The body text arrives WITH the blob, captured under the same acquisition as
+    // the seal (see `SealedFlush`), so the index below describes the document that
+    // reached disk rather than whatever the session holds a disk-write later. A
+    // body that could not be read at the seal arrives as `None`: the blob is
+    // still written (it is the user's edit), and the note's search doc is
+    // removed rather than left describing an older body.
+    let Some((blob, heads, markdown)) = sealed else {
+        return Ok(());
+    };
+    let path = notes_dir.join(format!("{note_id_str}.myn"));
+    // The guard is released before `mark_flushed` so the registry lock is not
+    // held across it (and the two mutexes never nest).
+    {
+        let _notes_guard = crate::plugins::notes::commands::notes_write_mutex()
+            .lock()
+            .await;
+        io.write(&path, &blob, WriteOpts::default())
+            .await
+            .map_err(|io_error_kind| LiveSessionCommandError::Io { io_error_kind })?;
+    }
+    // Mark the heads durable, then index OUTSIDE the lock: the attachment hook
+    // awaits IO, and the registry mutex must never be held across an await.
+    //
+    // The mark also answers whether the session is still open, and indexing is
+    // skipped when it is not, so a close or a delete that removed the session is
+    // not followed by a re-index that resurrects a search doc it just dropped.
+    // That check does NOT cover a lock: the lock path wipes the search index
+    // before it clears the sessions, so a session can still be registered for a
+    // vault that is already locked. The lock is answered by vault state inside
+    // `index_live_note`, which re-checks the session's own vault before every
+    // hook that adds plaintext (myne-md/myne#867 review).
+    let open_in = registry.with_note_mut(note_id_str, |s| {
+        s.mark_flushed(heads);
+        s.key().0.clone()
+    });
+    if let Some(vault_id) = open_in {
+        match markdown {
+            Some(markdown) => {
+                index_live_note(index.hooks, index.state, &vault_id, note_id_str, &markdown).await;
+            }
+            None => {
+                // No `note_id` FIELD. It is on `src-tauri/AGENTS.md`'s DENY list
+                // (a per-note vault-stable correlation tag), and this level
+                // reaches the desktop's opt-in log file, which the user is
+                // invited to attach to a public issue. The message already says
+                // what happened, which is the actionable half a report needs
+                // (myne#892 review).
+                tracing::warn!(
+                    event = "live_flush_body_unreadable",
+                    "live flush wrote a document whose body could not be read; search doc removed"
+                );
+                index.hooks.search_remove(note_id_str);
+            }
         }
-        registry.with_note_mut(note_id_str, |s| s.mark_flushed(heads));
     }
     Ok(())
 }
@@ -349,6 +529,7 @@ pub async fn live_session_patch_frontmatter<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
     registry: tauri::State<'_, LiveSessionRegistry>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
     note_id: String,
     markdown: String,
 ) -> Result<(), LiveSessionCommandError> {
@@ -356,6 +537,7 @@ pub async fn live_session_patch_frontmatter<R: tauri::Runtime>(
         &crate::host::tauri_host::TauriHost::new(app),
         state.inner(),
         registry.inner(),
+        hooks.inner(),
         &crate::vault_io::StdVaultIo,
         note_id,
         markdown,
@@ -369,12 +551,14 @@ pub async fn live_session_close<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
     registry: tauri::State<'_, LiveSessionRegistry>,
+    hooks: tauri::State<'_, crate::hooks::Hooks>,
     note_id: String,
 ) -> Result<(), LiveSessionCommandError> {
     live_session_close_from_host(
         &crate::host::tauri_host::TauriHost::new(app),
         state.inner(),
         registry.inner(),
+        hooks.inner(),
         &crate::vault_io::StdVaultIo,
         note_id,
     )

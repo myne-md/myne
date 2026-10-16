@@ -100,6 +100,10 @@ vi.mock("../../src/components/DeleteVaultConfirmForm", () => ({
 }));
 
 import { VaultPanel } from "../../src/components/settings/VaultPanel";
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
 
 const PREFS = { label: "" };
 
@@ -112,9 +116,18 @@ beforeEach(() => {
   memberVaultStatus.mockReset().mockResolvedValue(false);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetSettingsTopics();
+});
 
-function renderPanel(overrides: Partial<Parameters<typeof VaultPanel>[0]> = {}) {
+/** `topic` picks the panel's active topic (myne-md/myne#885): the danger zone is
+ *  its own topic, and only the active topic's body is mounted. */
+function renderPanel(
+  overrides: Partial<Parameters<typeof VaultPanel>[0]> = {},
+  topic: "vault" | "danger" = "vault",
+) {
+  setActiveSettingsTopic("vault", topic);
   const props = {
     // #250: the panel no longer resolves its own target — the vault it erases
     // is threaded in from Settings, which got it from the Editor's stage.
@@ -130,12 +143,17 @@ function renderPanel(overrides: Partial<Parameters<typeof VaultPanel>[0]> = {}) 
 }
 
 describe("VaultPanel — idle view", () => {
-  it("renders the change-password CTA + danger zone", async () => {
+  it("renders the change-password CTA in the vault topic and the danger zone in its own", async () => {
     renderPanel();
     expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
-    expect(screen.getByText("Delete vault…")).toBeTruthy();
+    // The erase is a topic of its own, so it is not on the default screen.
+    expect(screen.queryByText("Delete vault…")).toBeNull();
     // The label loads from prefs on mount.
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    cleanup();
+    renderPanel({}, "danger");
+    expect(screen.getByText("Delete vault…")).toBeTruthy();
+    expect(screen.queryByTestId("settings.change-password-cta")).toBeNull();
   });
 
   it("CTA switches to the change-password sub-view; Cancel returns to idle", () => {
@@ -295,7 +313,7 @@ describe("VaultPanel — change password", () => {
 
 describe("VaultPanel — delete vault", () => {
   it("Delete vault… opens the confirm sub-view; Cancel returns to idle", () => {
-    renderPanel();
+    renderPanel({}, "danger");
     fireEvent.click(screen.getByText("Delete vault…"));
     expect(screen.getByTestId("dvcf")).toBeTruthy();
     fireEvent.click(screen.getByTestId("dvcf.cancel"));
@@ -303,7 +321,7 @@ describe("VaultPanel — delete vault", () => {
   });
 
   it("success targets the vault it was given + fires onDeleteVaultSuccess", async () => {
-    const props = renderPanel();
+    const props = renderPanel({}, "danger");
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
@@ -319,7 +337,7 @@ describe("VaultPanel — delete vault", () => {
       kind: "PartialDelete",
       detail: { remaining_count: 3 },
     });
-    const props = renderPanel();
+    const props = renderPanel({}, "danger");
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
@@ -339,7 +357,7 @@ describe("VaultPanel — delete vault", () => {
   // panel used to pass `undefined`, which the backend read as "the active
   // vault" — resolved from a cache the quick-unlock path never stamped.
   it("refuses to delete when no vault id has resolved", async () => {
-    const props = renderPanel({ vaultId: null });
+    const props = renderPanel({ vaultId: null }, "danger");
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
@@ -350,7 +368,7 @@ describe("VaultPanel — delete vault", () => {
 
   it("bug-canary reject (VaultNotUnlocked) shows no post-fail banner, no success", async () => {
     deleteVault.mockRejectedValueOnce({ kind: "VaultNotUnlocked" });
-    const props = renderPanel();
+    const props = renderPanel({}, "danger");
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));

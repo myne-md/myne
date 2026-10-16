@@ -19,6 +19,7 @@ import { Button } from "../primitives/Button";
 import { AutomaticBackupBlock } from "./AutomaticBackupBlock";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
+import { SettingsSection } from "./SettingsSection";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 // Module-scope memoized resolution. The vault path doesn't change
@@ -135,97 +136,107 @@ export function StoragePanel({
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <ControlBlock
-        anchorId="storage.location"
-        label={t("settings.storage.locationLabel")}
-        helper={t("settings.storage.locationHelper")}
-        control={
-          <div style={PATH_ROW_STYLE}>
-            <code style={PATH_DISPLAY_STYLE} data-testid="storage.vault-path">
-              {displayPath}
-            </code>
+      {/* Three sections, and the grouping moves the import row down beside the
+          export block (myne-md/myne#885): both are "move notes across the
+          boundary", while backup is about this vault's own encrypted copies.
+          The order is the only thing the grouping changed. */}
+      <SettingsSection title={t("settings.storage.sections.location")}>
+        <ControlBlock
+          anchorId="storage.location"
+          label={t("settings.storage.locationLabel")}
+          helper={t("settings.storage.locationHelper")}
+          control={
+            <div style={PATH_ROW_STYLE}>
+              <code style={PATH_DISPLAY_STYLE} data-testid="storage.vault-path">
+                {displayPath}
+              </code>
+              <Button
+                variant="secondary"
+                data-testid="storage.open-in-files"
+                onClick={() => {
+                  if (pathPending) return;
+                  void openPath(vaultPath).catch(() => {
+                    /* opener-plugin failure is non-fatal: the path is
+                     * already shown for manual copy/paste. */
+                  });
+                }}
+                disabled={pathPending}
+              >
+                {t("settings.storage.openInFiles")}
+              </Button>
+            </div>
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.storage.sections.backup")}>
+        <SettingRow
+          anchorId="storage.backup"
+          label={t("settings.storage.backupLabel")}
+          helper={t("settings.storage.backupHelper")}
+          control={
+            <>
+              <Button
+                variant="secondary"
+                onClick={onBackupVault}
+                disabled={onBackupVault === undefined}
+                data-testid="settings.backup-vault"
+              >
+                {t("settings.storage.backUpVault")}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onRestoreBackup}
+                disabled={onRestoreBackup === undefined}
+                data-testid="settings.restore-backup"
+              >
+                {t("settings.storage.restoreBackup")}
+              </Button>
+            </>
+          }
+        />
+
+        <AutomaticBackupBlock vaultId={vaultId} onShowToast={onShowToast} />
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.storage.sections.transfer")}>
+        <SettingRow
+          anchorId="storage.import"
+          label={t("settings.storage.importLabel")}
+          helper={t("settings.storage.importHelper")}
+          control={
             <Button
               variant="secondary"
-              data-testid="storage.open-in-files"
-              onClick={() => {
-                if (pathPending) return;
-                void openPath(vaultPath).catch(() => {
-                  /* opener-plugin failure is non-fatal — the path is
-                   * already shown for manual copy/paste. */
-                });
-              }}
-              disabled={pathPending}
+              onClick={onImportObsidian}
+              disabled={onImportObsidian === undefined}
+              data-testid="storage.import"
             >
-              {t("settings.storage.openInFiles")}
+              {t("settings.storage.importObsidian")}
             </Button>
-          </div>
-        }
-      />
+          }
+        />
 
-      <SettingRow
-        anchorId="storage.import"
-        label={t("settings.storage.importLabel")}
-        helper={t("settings.storage.importHelper")}
-        control={
-          <Button
-            variant="secondary"
-            onClick={onImportObsidian}
-            disabled={onImportObsidian === undefined}
-            data-testid="storage.import"
-          >
-            {t("settings.storage.importObsidian")}
-          </Button>
-        }
-      />
-
-      <SettingRow
-        anchorId="storage.backup"
-        label={t("settings.storage.backupLabel")}
-        helper={t("settings.storage.backupHelper")}
-        control={
-          <>
-            <Button
-              variant="secondary"
-              onClick={onBackupVault}
-              disabled={onBackupVault === undefined}
-              data-testid="settings.backup-vault"
-            >
-              {t("settings.storage.backUpVault")}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onRestoreBackup}
-              disabled={onRestoreBackup === undefined}
-              data-testid="settings.restore-backup"
-            >
-              {t("settings.storage.restoreBackup")}
-            </Button>
-          </>
-        }
-      />
-
-      <AutomaticBackupBlock vaultId={vaultId} onShowToast={onShowToast} />
-
-      <ControlBlock
-        anchorId="storage.export"
-        label={t("settings.storage.exportLabel")}
-        helper={t("settings.storage.exportHelper")}
-        control={
-          <div style={EXPORT_ROW_STYLE}>
-            <span style={EXPORT_BODY_STYLE}>
-              {t("settings.storage.exportBody")}
-            </span>
-            <Button
-              variant="secondary"
-              onClick={onExportVault}
-              disabled={onExportVault === undefined}
-              data-testid="vault-export.block-button"
-            >
-              {t("settings.storage.exportAction")}
-            </Button>
-          </div>
-        }
-      />
+        <ControlBlock
+          anchorId="storage.export"
+          label={t("settings.storage.exportLabel")}
+          helper={t("settings.storage.exportHelper")}
+          control={
+            <div style={EXPORT_ROW_STYLE}>
+              <span style={EXPORT_BODY_STYLE}>
+                {t("settings.storage.exportBody")}
+              </span>
+              <Button
+                variant="secondary"
+                onClick={onExportVault}
+                disabled={onExportVault === undefined}
+                data-testid="vault-export.block-button"
+              >
+                {t("settings.storage.exportAction")}
+              </Button>
+            </div>
+          }
+        />
+      </SettingsSection>
     </div>
   );
 }

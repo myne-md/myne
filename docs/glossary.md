@@ -1381,6 +1381,12 @@ The managed keys of a note's frontmatter (`title:`, `folder:`, `updated:`, `dele
 
 Used in: `spec/sync-protocol.md` §10.1; `decisions/sync/0658`; `agent-tooling/epics/live-collab/`
 
+### **resting cause** &nbsp; 📦 *Product*
+
+Why an AI surface is not answering, as ONE closed label rather than a sentence (`src/notes/ai/restingCause.ts`, myne-md/myne#867). Three of the values name states of the app rather than failures (`off`, `unavailable`, `ready`), and the remaining members are the host's own error causes, so a chip can say "no model" or "key rejected" in one or two words without each surface inventing its own sentence for the same condition. `restingIsDegraded` marks the subset that means the surface CANNOT answer rather than that it is merely idle, which is the distinction a caller branches on, and the label and body tables are exhaustive over the type on purpose: adding a cause fails at the compiler rather than rendering a blank chip.
+
+Used in: `decisions/ai/0692`; `src/notes/ai/restingCause.ts`
+
 ### **run indicator** &nbsp; 📦 *Product*
 
 *(Alias: the orb.)*
@@ -2122,6 +2128,12 @@ The note a [conversation](#conversation) is about, when it is about one: an opti
 
 Used in: `protocol.md` §9.23; `decisions/ai/0634`
 
+### **note mention** &nbsp; 📦 *Product*
+
+A note's name written inside an assistant answer, rendered as a link that opens that note in a new tab (myne-md/myne#867). It is recognised by an **exact** match against the strings that name a note the vault already holds: a vault-relative path, that path without its `.md`, or a bare title, all from the resolver's single `notePath` projection, so a mention and a displayed path cannot disagree about what a note is called. There is no fuzzy matching, deliberately: a text that only prefixes a real title (`Pixel 10` where the note is `Pixel 10 Graphene OS`) stays plain text, because a link that opens a note the model never named is worse than no link at all. A `[[wikilink]]` token whose target the vault holds renders through the same matcher, so a folder target (`[[Projects/]]`) and an unknown target stay plain labels. The click opens an in-vault note and does nothing else, and the renderer navigates nothing itself: the surface supplies the callback, and with none the text is rendered as it was before. Bounded in `threat-model.md` §7.
+
+Used in: `decisions/ai/0692`; `src/notes/ai/noteMentions.ts`
+
 ### **note-task** &nbsp; 📦 *Product*
 
 A whole note the user has declared a unit of work, marked by the value-strict `kind: task` frontmatter field (`spec/markdown-dialect.md` §3.6.1). Distinct from a [line-task](#line-task), which is a single `- [ ]` line inside any note: a note-task is the note itself.
@@ -2155,6 +2167,12 @@ Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7
 `downloads.myne.md`, Myne's own static artefact origin, which hosts the AI model weights the desktop client fetches on demand rather than bundling (myne-md/myne#805; `decisions/ai/0628`). Distinct from a [remote AI provider](#remote-ai-provider) and from a [local model runtime](#local-model-runtime): a fetch from this origin carries no note content and no credential, only a request for a named model file, so the only thing it can reveal is that this device chose to fetch a model. The trust anchor is a SHA-256 **compiled into the client binary**, never the origin's own `SHA256SUMS` or `index.json` (which are discovery and display only), so a tampered origin cannot serve bytes that agree with the check. The origin keeps no IP logs and no analytics (threat-model **TB14**). The non-LLM utility models (OCR, Whisper) stay bundled; only the LLM-shaped embeddings and tag weights are downloaded.
 
 Used in: `decisions/ai/0628`; `threat-model.md` §3 TB14, §7; `src-tauri/src/plugins/local_inference/download.rs`
+
+### **model catalogue** &nbsp; 📦 *Product*
+
+The list of model artefacts [Myne's own origin](#model-artefact-origin) can serve, whether or not each one is installed (myne-md/myne#867). It answers "what can I get"; the per-role assignment rows beside it answer "which file does this role use", and the two were blocks in the same group competing for one reading until the catalogue became an inline table in the `Models` [settings topic](#settings-topic) (superseded by `decisions/ui/0693`, which withdrew the modal a download icon used to open). Fetching and installing stay separate acts: the catalogue only starts a download, and what a role then uses is recorded by the model-path store. A download is verified against a digest compiled into the client, so the origin is never the trust anchor.
+
+Used in: `decisions/ai/0628`, `decisions/ui/0693`; `src/components/settings/AiModelCatalogue.tsx`
 
 ### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
@@ -3142,6 +3160,18 @@ Distinct from an [agent-writability verdict](#agent-writability-verdict), which 
 own declaration: an intent is the permission, a preference is the storage.
 
 Used in: `decisions/ai/0676`; `core/src/plugins/agent/setting.rs`; `scripts/agent-setting-intents.json`; myne-md/myne#850
+
+### **settings parity** &nbsp; 🛠️ *Tooling*
+
+The shared settings ROSTER and panel NAMING across clients, with the layout and interaction primitives staying per-client: a preference is a fact about the vault rather than a fact about the screen, so two clients must agree on which setting exists and what it is called while their rows remain their own. Distinct from [token parity](#token-parity), which is the same question asked of the design-token layer rather than the settings roster. The record is the projection `docs/dev/settings-parity.md`, generated by `scripts/check-prefs-parity.mjs` from the Rust `#[tauri::command]` roster in `core/src/plugins/prefs/commands.rs`: one row per command carrying each client's state and a written reason on every row that is not `both`.
+
+Used in: `decisions/ui/0694`; `docs/dev/settings-parity.md`; `scripts/check-prefs-parity.mjs`; myne-md/myne#880
+
+### **settings topic** &nbsp; 📦 *Product*
+
+The second level of navigation inside the desktop Settings modal: a panel that holds more than one concern renders a topic strip (`role="tablist"`) at the top of the content column, and picking a topic shows that topic's body and no other. Distinct from the rail's **panel**, which is the first level. A panel earns a strip when it holds more than one concern, where a concern is a question a reader arrives holding, **and** every topic that rule produces is non-empty on every client and in every state that renders the panel; a capability-gated block joins the topic that owns its question rather than getting a topic of its own, because the strip renders the roster and not a filtered set, so a topic whose only member is gated off would be an empty tab. A topic whose WHOLE body is gated is therefore not produced on a client that has none of its capabilities (the roster's optional `liveOn`, resolved by `livePanelTopics`), and a panel left with one topic renders no strip at all: Privacy's `Access` is the one topic that carries it, and on the web client the panel falls to its single `Locking` concern. The active topic is remembered for the session and is deliberately not a `vault.prefs` field: a pref is a synced blob, and which sub-tab a reader was on is a surface fact rather than a vault fact.
+
+Used in: `docs/design/README.md` ("The settings panel: one section treatment, and topics where a panel needs them"); `decisions/ui/0693`; `src/components/settings/settingsTopics.ts`; myne-md/myne#885
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 

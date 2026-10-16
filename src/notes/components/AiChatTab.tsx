@@ -28,7 +28,13 @@
 // chat rather than as a page with an input somewhere down it, and it is what lets
 // the composer stay where the user last left their hands.
 
-import { useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
@@ -38,10 +44,20 @@ import {
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
 import { useChat } from "../ai/chatStore";
+import { buildMentionTargets } from "../ai/noteMentions";
+import { useResolverNotes } from "../resolverNotes";
+import { useWorkspace } from "../workspaceContext";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
 import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Tooltip } from "../../components/primitives/Tooltip";
+import {
+  restingBody,
+  restingIdOf,
+  restingIsDegraded,
+  restingLabel,
+  type RestingId,
+} from "../ai/restingCause";
 import { startNewConversation } from "../ai/startNewConversation";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
@@ -51,44 +67,6 @@ import {
   ConversationSurface,
   type ConversationSurfaceStatus,
 } from "../ai/ConversationSurface";
-
-/** Why the chat surface is at rest, as a fixed identifier — never content
- *  (#191 task 3). `ready` covers both "working" and "still asking the host":
- *  a surface that flashed a degraded state while the one host read was in
- *  flight would tell the user something false for a frame. */
-type TFn = (key: string, opts?: Record<string, unknown>) => string;
-
-type RestingCause = "off" | "no-provider" | "unreachable" | "unavailable" | "ready";
-
-/** Causes that mean *the thing you set up is not answering*, as distinct from
- *  *you have not set anything up*. Different sentence, different fix — which is
- *  the whole point of the slice. */
-const NOT_ANSWERING: ReadonlySet<string> = new Set([
-  "unreachable",
-  "Unreachable",
-  "timeout",
-  "Timeout",
-  "refused",
-  "Refused",
-]);
-
-/** Total switches over the union rather than lookup tables, and the reason is
- *  `scripts/check-i18n.mjs`: it verifies **static `t("…")` call sites**, so a
- *  key sitting in a `Record` is a key no guard checks and a typo in it renders
- *  the raw key at the user. Written this way the compiler catches a missing
- *  cause and the guard catches a missing translation. */
-function chipKey(cause: Exclude<RestingCause, "ready">, t: TFn): string {
-  switch (cause) {
-    case "off":
-      return t("editor.chrome.rightPanel.aiChat.statusOff");
-    case "no-provider":
-      return t("editor.chrome.rightPanel.aiChat.statusNoModel");
-    case "unreachable":
-      return t("editor.chrome.rightPanel.aiChat.statusUnreachable");
-    case "unavailable":
-      return t("editor.chrome.rightPanel.aiChat.statusUnavailable");
-  }
-}
 
 const HEADER_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -158,6 +136,23 @@ export function AiChatTab({
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const aiEnabled = prefs.ai_enabled;
+  // **Note mentions in an answer** (myne-md/myne#867). The vault's own note set,
+  // projected to the strings that name a note, plus where a press lands. The
+  // projection is memoized on the note set's identity, which is what
+  // `useResolverNotes` already stabilises; `openNewTabInFocused` is the SAME
+  // call the workspace's own "open in a new tab" makes, so a mention opens a tab
+  // exactly as the sidebar would, and neither this surface nor the renderer
+  // performs a navigation of its own.
+  const ws = useWorkspace();
+  const resolverNotes = useResolverNotes();
+  const mentionTargets = useMemo(
+    () => buildMentionTargets(resolverNotes),
+    [resolverNotes],
+  );
+  const openMention = useCallback(
+    (noteUuid: string) => ws.openNewTabInFocused(noteUuid),
+    [ws],
+  );
   // One host read, four states (#191 task 1) — replacing a private
   // `get_model_path` probe that could only say yes/no and defaulted to no.
   const backend = useAiSurfaceState(aiEnabled);
@@ -185,17 +180,21 @@ export function AiChatTab({
     !noSearchModel &&
     retrieval.embedding.kind === "available" &&
     !retrieval.indexReady;
-  const resting: RestingCause = !aiEnabled
+  // **The host names the cause; this only decides whether there is one.** Every
+  // arm reaches `restingCause.ts`, which the chip, its tooltip and the
+  // transcript's empty state all share, so they cannot name the same fault two
+  // ways (myne-md/myne#867). The bucket that used to live here turned consent
+  // missing, no credential, no model chosen and "nothing named at all" into one
+  // sentence, "No provider", on a vault whose provider was named.
+  const restingId: RestingId = !aiEnabled
     ? "off"
     : backend.kind === "absent"
       ? "unavailable"
       : backend.kind === "unavailable"
-        ? NOT_ANSWERING.has(backend.cause ?? "")
-          ? "unreachable"
-          : "no-provider"
+        ? restingIdOf(backend.cause)
         : "ready";
-  const noModel = resting === "no-provider" || resting === "unreachable" || resting === "unavailable";
-  const ready = aiEnabled && !noModel;
+  const degraded = restingIsDegraded(restingId);
+  const ready = aiEnabled && !degraded;
 
   const chat = useChat();
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
@@ -203,6 +202,8 @@ export function AiChatTab({
   const [historyOpen, setHistoryOpen] = useState(false);
   // Memory popover (myne-md/myne#697): tab-local boolean like the history modal.
   const [memoryOpen, setMemoryOpen] = useState(false);
+  // The memory button's wrapper, as an anchor for the popover's own placement.
+  const memoryAnchorRef = useRef<HTMLSpanElement | null>(null);
   /**
    * Whether the user has expanded the honesty note back open.
    *
@@ -231,13 +232,15 @@ export function AiChatTab({
    * deliberately absent — AI being switched off is a state the user chose, and
    * a chip offering to undo a deliberate choice is nagging.
    */
+  //
+  // The sentence for a host cause is the taxonomy's own (`providerError.*`),
+  // and it is the SAME one the transcript renders, so the tooltip and the
+  // transcript are one statement rather than two that have to be kept in step.
   const STATUS_HINT = noSearchModel
     ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
-    : resting === "no-provider"
-      ? t("editor.chrome.rightPanel.aiChat.noModelHint")
-      : resting === "unreachable"
-        ? t("editor.chrome.rightPanel.aiChat.unreachableHint")
-        : "";
+    : degraded
+      ? restingBody(restingId, t)
+      : "";
   // `unavailable` is a build without local AI and `off` is the user's own
   // switch: neither has a setting that would change it, so neither gets a
   // click target. Offering one would be a control that goes somewhere and
@@ -277,7 +280,17 @@ export function AiChatTab({
             testId="ai.history-button"
             onClick={() => setHistoryOpen(true)}
           />
-          <div style={{ position: "relative", display: "inline-flex" }}>
+          {/* The anchor `MemoryPopover` measures. It used to be a
+              `position: relative` wrapper for an absolutely positioned card,
+              which is why the card was clipped by the panel's own overflow;
+              the primitive portals it to the body instead (myne-md/myne#867).
+              The testid is kept from that shape so nothing reaching for it
+              has to care which of the two it is. */}
+          <span
+            ref={memoryAnchorRef}
+            data-testid="ai.memory-popover-anchor"
+            style={{ display: "inline-flex" }}
+          >
             <IconButton
               icon="bookmark"
               label={t("editor.chrome.rightPanel.aiChat.memory")}
@@ -298,6 +311,7 @@ export function AiChatTab({
                 (myne-md/myne#574). */}
             {memoryOpen ? (
               <MemoryPopover
+                anchorRef={memoryAnchorRef}
                 onClose={() => setMemoryOpen(false)}
                 onOpenSettings={() => {
                   setMemoryOpen(false);
@@ -308,7 +322,7 @@ export function AiChatTab({
                 onShowToast={onShowToast ?? (() => {})}
               />
             ) : null}
-          </div>
+          </span>
           {onFocusAgent !== undefined ? (
             <IconButton
               icon="maximize-2"
@@ -378,16 +392,16 @@ export function AiChatTab({
                 type="button"
                 data-testid="ai.chrome-status"
                 data-ai-enabled={aiEnabled ? "true" : "false"}
-                data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
-                data-ai-cause={resting}
+                data-ai-model-ready={aiEnabled ? (degraded ? "false" : "true") : ""}
+                data-ai-cause={restingId}
                 data-actionable="true"
                 onClick={() => onOpenSettings?.("ai", "ai.models")}
                 className="myne-pill"
                 data-interactive="true"
-                data-tone={aiEnabled && !noModel ? "ready" : undefined}
+                data-tone={aiEnabled && !degraded ? "ready" : undefined}
               >
-                {resting !== "ready"
-                  ? chipKey(resting, t)
+                {restingId !== "ready"
+                  ? restingLabel(restingId, t)
                   : noSearchModel
                     ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
                     : gettingReady
@@ -400,13 +414,13 @@ export function AiChatTab({
             <span
               data-testid="ai.chrome-status"
               data-ai-enabled={aiEnabled ? "true" : "false"}
-              data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
-              data-ai-cause={resting}
+              data-ai-model-ready={aiEnabled ? (degraded ? "false" : "true") : ""}
+              data-ai-cause={restingId}
               className="myne-pill"
-              data-tone={aiEnabled && !noModel ? "ready" : undefined}
+              data-tone={aiEnabled && !degraded ? "ready" : undefined}
             >
-              {resting !== "ready"
-                ? chipKey(resting, t)
+              {restingId !== "ready"
+                ? restingLabel(restingId, t)
                 : noSearchModel
                   ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
                   : gettingReady
@@ -559,8 +573,10 @@ export function AiChatTab({
           onStatusChange={setSurfaceStatus}
           confirmRevertRunId={fallbackRevertRunId}
           onConfirmRevertConsumed={() => setFallbackRevertRunId(null)}
-          restingCause={resting}
-          degraded={noModel}
+          restingCause={restingId}
+          degraded={degraded}
+          mentionTargets={mentionTargets}
+          onOpenNote={openMention}
         />
       ) : null}
 

@@ -37,6 +37,7 @@ import {
   pickSelect,
   replaceFieldText,
   runPaletteAction,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -256,6 +257,9 @@ describeE2E("fr3 a date typed as it is displayed is found, and Replace is off (m
         await waitForSaved(s);
 
         await openSettings(s, "editor");
+        // The date/time display rows live in the Editor panel's `editing` topic
+        // since myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "editing");
         await pickSelect(s, "settings.date-format", "dmy");
         await closeSettings(s);
 

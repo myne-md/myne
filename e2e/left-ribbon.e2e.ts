@@ -23,6 +23,7 @@ import {
   dismissImporterOffer,
   openPalette,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
@@ -95,6 +96,9 @@ describeE2E("lr-ribbon left ribbon pin/run/reorder/unpin (#699)", () => {
 
         // Appearance roster: add a command from the dropdown, then remove it.
         await openSettings(s, "appearance");
+        // The ribbon roster lives in Appearance's `interface` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "appearance", "interface");
         await s.byTestId("settings.ribbon-customize");
         const beforeLen = (await railOrder(s)).length;
         await (await s.byTestId("settings.ribbon-customize.add")).click();

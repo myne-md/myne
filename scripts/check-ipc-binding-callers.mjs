@@ -79,7 +79,19 @@ import { join, relative, resolve } from "node:path";
 import { SHARED_ROOTS } from "./lib/shared-roots.mjs";
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
-const RECORD = join(ROOT, "scripts", "ipc-binding-callers.json");
+
+/**
+ * The record's path, overridable so a test can drive the `--record` seed path and
+ * the `--check` that follows it against a scratch file.
+ *
+ * `check-prefs-parity.mjs`'s `MYNE_PREFS_PARITY_RECORD` is the precedent, and the
+ * reason is the one this file's own header records: the WRITER is the half nobody
+ * tests, and driving it against the committed record means saving and restoring a
+ * file, which leaves the tree wrong when the run is interrupted.
+ */
+const RECORD = process.env.MYNE_IPC_BINDING_CALLERS_RECORD
+  ? resolve(process.env.MYNE_IPC_BINDING_CALLERS_RECORD)
+  : join(ROOT, "scripts", "ipc-binding-callers.json");
 
 /** Trees whose modules may declare an IPC binding. */
 const BINDING_ROOTS = ["src/lib", "mobile/src/lib"];
@@ -208,10 +220,30 @@ function invokesCommand(body) {
  */
 const CHOKEPOINTS = ["writePref"];
 
-/** `writePref("plugin:x|y", …)` — the literal as the chokepoint's first argument. */
-function invokesThroughChokepoint(body) {
+/** `writePref("plugin:x|y", …)`, the literal as the chokepoint's first argument.
+ *
+ * **The generic form is the same call and this guard used to miss it**
+ * (myne-md/myne#880). `check-prefs-nonce.mjs` accepts `writePref<number>("plugin:prefs|…")`,
+ * and since myne-md/myne#613 the five set-union mutators are written that way
+ * because they return how many additions the reserved byte budget refused. The
+ * matcher here required the literal immediately after `writePref(`, so those
+ * five desktop and three mobile bindings never entered the denominator at all:
+ * measured, desktop showed 71 of its 76 prefs bindings and mobile 55 of its 58.
+ * The asymmetry was one guard following the rule and its sibling not.
+ *
+ * The generic argument list is OPTIONAL and matched up to the call's own
+ * parenthesis, so `writePref<Record<string, number>>(…)` is covered too. It is
+ * deliberately NOT a generic function-name pattern: `invoke("plugin:…")` must
+ * not satisfy a chokepoint test, because a bare `invoke` is the shape the
+ * chokepoint exists to forbid. `tests/scripts/ipcBindingCallers.test.ts` asserts
+ * both directions.
+ *
+ * Exported so that test can drive the two shapes directly: the difference is
+ * invisible through `deadBindings`, since a direct `invoke` is detected by
+ * `invokesCommand` either way. */
+export function invokesThroughChokepoint(body) {
   return CHOKEPOINTS.some((fn) =>
-    new RegExp(`${fn}\\s*\\(\\s*["'\`]plugin:[a-z0-9-]+\\|`).test(body),
+    new RegExp(`${fn}\\s*(?:<[^()]*>)?\\s*\\(\\s*["'\`]plugin:[a-z0-9-]+\\|`).test(body),
   );
 }
 
@@ -347,8 +379,15 @@ export function exportedBodies(src) {
  * identity check is what stops a module calling itself into liveness, and it is
  * silently false when one side is absolute. Every file is read ONCE:
  * re-reading per binding is what turns a 1 s guard into a 40 s one on a tree
- * this size. */
-function readTree() {
+ * this size.
+ *
+ * Exported so `scripts/check-prefs-parity.mjs` reads the tree the same way this
+ * guard does rather than keeping a second copy of `BINDING_ROOTS`,
+ * `CALLER_ROOTS` and the test filter. That guard asks a different question of
+ * the same measurement (which prefs command is surfaced on which client) and
+ * imports `deadBindings` for the caller decision, so the read has to be the
+ * same read or the two would disagree about what a caller is. */
+export function readTree() {
   const bindingFiles = BINDING_ROOTS.flatMap((r) => walk(join(ROOT, r)));
   const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r))))].filter(
     (f) => !IS_TEST.test(relative(ROOT, f)),
@@ -501,6 +540,36 @@ export function ratchet(dead, exempt) {
   };
 }
 
+/**
+ * What `--record` writes: the measured dead set, with every reason that still
+ * describes a live entry carried over.
+ *
+ * **This is a MERGE, and it is a fix rather than a nicety.** The writer used to
+ * build the file from the measured set alone, so every entry got the
+ * placeholder: running the command the failure message recommends destroyed all
+ * thirty hand-written reasons in one go, and the reader then had to re-derive
+ * what each dead binding was. The header and the root `AGENTS.md` row both
+ * described the merge as existing behaviour, so the code and its own
+ * documentation had already parted company.
+ *
+ * The placeholder survives where it belongs: an entry with no prior reason is
+ * still written as the placeholder, which `ratchet` rejects BY NAME, so a
+ * genuinely new exemption still fails until a human argues for it. A stale entry
+ * (the binding acquired a caller) is dropped, which is the one edit `--record`
+ * exists to make.
+ *
+ * Exported so `tests/scripts/ipcBindingCallers.test.ts` can drive it: the write
+ * half is the half this file's own history says nobody tests.
+ */
+export function mergeRecord(dead, prior) {
+  const exempt = {};
+  for (const key of dead) {
+    const why = prior?.[key];
+    exempt[key] = typeof why === "string" && why.trim() ? why : PLACEHOLDER;
+  }
+  return exempt;
+}
+
 // Run the check only when this file IS the command, the shape
 // `check-mobile-export-backup.mjs` already uses. Without it, importing
 // `deadBindings` or `ratchet` to test them walks the whole tree as a side
@@ -516,27 +585,37 @@ function main() {
   const { dead, checked } = deadBindings(tree);
 
   if (process.argv.includes("--record")) {
+    const existing = existsSync(RECORD)
+      ? JSON.parse(readFileSync(RECORD, "utf8"))
+      : null;
+    const exempt = mergeRecord(dead, existing?.exempt ?? {});
+    const kept = dead.filter((d) => exempt[d] !== PLACEHOLDER).length;
     writeFileSync(
       RECORD,
       `${JSON.stringify(
         {
-          $comment: [
-            "IPC bindings with no production caller. Each entry needs a REASON,",
-            "because an entry without one is indistinguishable from a defect",
-            "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
-            "",
-            "THIS FILE FAILS THE GUARD AS WRITTEN, deliberately: every entry",
-            "carries the placeholder and the guard rejects it by name. `--record`",
-            "gives you the LIST, never the licence. Replace each one with what",
-            "you found out, or the entry is not an exemption.",
-          ],
-          exempt: Object.fromEntries(dead.map((d) => [d, PLACEHOLDER])),
+          $comment: Array.isArray(existing?.$comment)
+            ? existing.$comment
+            : [
+                "IPC bindings with no production caller. Each entry needs a REASON,",
+                "because an entry without one is indistinguishable from a defect",
+                "somebody recorded instead of fixing. Ratchet: may shrink, never grow.",
+                "",
+                "THIS FILE FAILS THE GUARD AS WRITTEN, deliberately: every entry",
+                "carries the placeholder and the guard rejects it by name. `--record`",
+                "gives you the LIST, never the licence. Replace each one with what",
+                "you found out, or the entry is not an exemption.",
+              ],
+          exempt,
         },
         null,
         2,
       )}\n`,
     );
-    console.log(`ipc-binding-callers: recorded ${dead.length} exemption(s)`);
+    console.log(
+      `ipc-binding-callers: recorded ${dead.length} exemption(s); ` +
+        `${kept} kept their reason, ${dead.length - kept} carry the placeholder`,
+    );
     process.exit(0);
   }
 

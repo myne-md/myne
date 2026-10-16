@@ -106,9 +106,20 @@ export interface PersonalityView {
   directives: PersonalityDirective[];
 }
 
+/**
+ * The roster plus the cap it is bounded by (myne-md/myne#867). The cap comes
+ * from the HOST rather than a constant here: it is enforced there, so a copy
+ * here would be a second statement of the same number, printing a counter over
+ * a denominator nothing keeps in step.
+ */
+export interface MemoryListView {
+  rows: MemoryListRow[];
+  cap: number;
+}
+
 /** List the memory roster: live rows ordered by `updated_at` desc, each with its id. */
-export async function memoryList(): Promise<MemoryListRow[]> {
-  return await invoke<MemoryListRow[]>("plugin:memory|memory_list");
+export async function memoryList(): Promise<MemoryListView> {
+  return await invoke<MemoryListView>("plugin:memory|memory_list");
 }
 
 /** Read one memory entry's text. */

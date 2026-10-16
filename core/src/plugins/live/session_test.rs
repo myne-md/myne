@@ -6,12 +6,31 @@ use super::state::LiveSessionRegistry;
 use crate::host::test_host::TestHost;
 use crate::plugins::notes::crdt::{decode_note_blob, encode_note_blob};
 use crate::test_support::{block_on, ScopedTempDir};
-use crate::vault_io::{StdVaultIo, VaultIo as _};
+use crate::vault_io::{StdVaultIo, VaultIo};
 
 const IO: StdVaultIo = StdVaultIo;
 
 fn hex_lower(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// An UNLOCKED runtime state, and the vault id a test session must be keyed by to
+/// belong to it. The flush indexes only while the session's own vault is unlocked
+/// (myne-md/myne#867 review), so a flush test on a default (locked) state would
+/// assert nothing about indexing: its "no upsert" half would pass vacuously and
+/// its "upsert" half would fail for a reason unrelated to the path under test.
+async fn unlocked_state() -> (
+    crate::plugins::vault_unlock::state::VaultRuntimeState,
+    String,
+) {
+    use crate::plugins::vault_unlock::state::{
+        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
+    };
+    let state = VaultRuntimeState::default();
+    state
+        .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(1, 0x11, 0x22))
+        .await;
+    (state, test_vault_id().to_string())
 }
 
 /// `collab-verification` D7: the single-writer refusal covers the OTHER two write
@@ -153,6 +172,290 @@ fn a_session_opens_edits_and_flushes_under_the_device_actor() {
     });
 }
 
+/// The flush is the ONE place a live-owned note's save reaches the live indexes
+/// (myne-md/myne#867). Both call sites (the editor's whole-markdown save and the
+/// sync cycle's post-pull merge) go through `flush_live_session_to_dir`, so this
+/// asserts the shared mechanism rather than either caller. Before the fix a
+/// live-owned note never took the stateless `note_update` path (`SYNC-33`), so
+/// content typed in it was unfindable for the rest of the session and the
+/// lock-time persist then sealed the stale index against a manifest that already
+/// matched.
+#[test]
+fn a_flush_feeds_the_live_indexes_for_every_caller() {
+    use crate::test_support::{IndexCall, RecordingHooks};
+    block_on(async {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+            .as_uuid()
+            .as_bytes();
+        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+        let base = encode_note_blob(
+            "---\ntitle: T\n---\nbody\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &[0xAAu8; 16],
+            &host,
+        )
+        .expect("seal");
+        let tmp = ScopedTempDir::new("live-index-flush").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        IO.create_dir_all(&notes_dir).await.expect("mkdir");
+        let (state, vault_id) = unlocked_state().await;
+
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            vault_id.clone(),
+            note_id.clone(),
+            uuid,
+            None,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
+        session
+            .apply_body_markdown("---\ntitle: T\n---\nbody edited\n", 5_000)
+            .expect("edit");
+        let reg = LiveSessionRegistry::new();
+        assert!(reg.insert(session), "the session is open for the note");
+
+        let rec = RecordingHooks::new();
+        let hooks: crate::hooks::Hooks = rec.clone();
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &IO,
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("flush");
+
+        let calls = rec.index_calls();
+        assert_eq!(
+            calls.len(),
+            3,
+            "a flush owes search_upsert + index_note_attachments + ai_note_changed, got {calls:?}"
+        );
+        match &calls[0] {
+            IndexCall::SearchUpsert {
+                note_id: id, body, ..
+            } => {
+                assert_eq!(id, &note_id, "the body doc is keyed by the note id");
+                assert!(body.contains("body edited"), "the saved body is indexed");
+            }
+            other => panic!("first call must be search_upsert, got {other:?}"),
+        }
+        assert!(
+            matches!(&calls[1], IndexCall::IndexAttachments { note_id: id, .. } if id == &note_id),
+            "second call must be index_note_attachments for the note, got {:?}",
+            calls[1]
+        );
+        assert!(
+            matches!(&calls[2], IndexCall::AiNoteChanged { note_id: id, .. } if id == &note_id),
+            "third call must be ai_note_changed for the note, got {:?}",
+            calls[2]
+        );
+
+        // A second flush with nothing dirty must NOT re-index: the disk did not
+        // move, so the counter-assertion is what keeps this from passing merely
+        // because the index ran unconditionally.
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &IO,
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("second flush");
+        assert_eq!(
+            rec.index_calls().len(),
+            3,
+            "a no-op flush (nothing dirty) must not re-index"
+        );
+    });
+}
+
+/// The indexed body is the body that REACHED DISK, not whatever the session holds
+/// a disk-write later (myne-md/myne#867 review).
+///
+/// The flush used to seal the document under the registry lock, write it OUTSIDE
+/// the lock, and then re-read the body in a SECOND acquisition to feed the
+/// indexes. Anything that merged into the session during the write (a sync pull's
+/// `apply_remote_change`, a peer revision) landed in between, so the index
+/// described a document that never reached disk. The body now travels WITH the
+/// sealed blob, captured under the same acquisition as the seal.
+///
+/// The fixture is that window itself: a `VaultIo` that mutates the open session
+/// while it writes. Under the old shape the indexed body carries the mutation;
+/// under this one it cannot, because the text was taken before the write.
+#[test]
+fn a_flush_indexes_the_body_that_reached_disk_not_a_later_session_state() {
+    use crate::test_support::{IndexCall, RecordingHooks};
+    use crate::vault_io::{IoResult, WriteOpts};
+
+    /// Delegates every call to `StdVaultIo` except `write`, which lands a
+    /// RAM-only edit on the open session first.
+    struct MutatesDuringWrite<'a> {
+        registry: &'a LiveSessionRegistry,
+        note_id: &'a str,
+    }
+
+    #[async_trait::async_trait]
+    impl VaultIo for MutatesDuringWrite<'_> {
+        async fn read(&self, path: &std::path::Path) -> IoResult<Vec<u8>> {
+            IO.read(path).await
+        }
+
+        async fn read_prefix(&self, path: &std::path::Path, len: usize) -> IoResult<Vec<u8>> {
+            IO.read_prefix(path, len).await
+        }
+
+        async fn write(
+            &self,
+            path: &std::path::Path,
+            bytes: &[u8],
+            opts: WriteOpts,
+        ) -> IoResult<()> {
+            let _ = self.registry.with_note_mut(self.note_id, |s| {
+                s.apply_body_markdown("---\ntitle: T\n---\nRAM ONLY\n", 9_000)
+            });
+            IO.write(path, bytes, opts).await
+        }
+
+        async fn remove_file(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.remove_file(path).await
+        }
+
+        async fn remove_dir_all(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.remove_dir_all(path).await
+        }
+
+        async fn create_dir_all(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.create_dir_all(path).await
+        }
+
+        async fn read_dir(
+            &self,
+            path: &std::path::Path,
+        ) -> IoResult<Vec<crate::vault_io::DirEntry>> {
+            IO.read_dir(path).await
+        }
+
+        async fn exists(&self, path: &std::path::Path) -> IoResult<bool> {
+            IO.exists(path).await
+        }
+
+        async fn is_dir(&self, path: &std::path::Path) -> IoResult<bool> {
+            IO.is_dir(path).await
+        }
+
+        async fn stat(
+            &self,
+            path: &std::path::Path,
+        ) -> IoResult<Option<crate::vault_io::FileStat>> {
+            IO.stat(path).await
+        }
+
+        async fn rename(&self, from: &std::path::Path, to: &std::path::Path) -> IoResult<()> {
+            IO.rename(from, to).await
+        }
+    }
+
+    block_on(async {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+            .as_uuid()
+            .as_bytes();
+        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+        let base = encode_note_blob(
+            "---\ntitle: T\n---\nbody\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &[0xAAu8; 16],
+            &host,
+        )
+        .expect("seal");
+        let tmp = ScopedTempDir::new("live-index-race").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        IO.create_dir_all(&notes_dir).await.expect("mkdir");
+        let (state, vault_id) = unlocked_state().await;
+
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            vault_id.clone(),
+            note_id.clone(),
+            uuid,
+            None,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
+        session
+            .apply_body_markdown("---\ntitle: T\n---\nbody edited\n", 5_000)
+            .expect("edit");
+        let reg = LiveSessionRegistry::new();
+        assert!(reg.insert(session), "the session is open for the note");
+
+        let rec = RecordingHooks::new();
+        let hooks: crate::hooks::Hooks = rec.clone();
+        let io = MutatesDuringWrite {
+            registry: &reg,
+            note_id: &note_id,
+        };
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &io,
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("flush");
+
+        // What actually reached disk, read back through the real IO.
+        let blob = IO
+            .read(&notes_dir.join(format!("{note_id}.myn")))
+            .await
+            .expect("read back");
+        let on_disk = decode_note_blob(&blob, &uuid, &ik, &ikid).expect("decode");
+        assert!(
+            on_disk.contains("body edited") && !on_disk.contains("RAM ONLY"),
+            "the fixture must have written the sealed body, got {on_disk:?}"
+        );
+
+        let calls = rec.index_calls();
+        let indexed = calls.iter().find_map(|c| match c {
+            IndexCall::SearchUpsert { body, .. } => Some(body.clone()),
+            _ => None,
+        });
+        let indexed = indexed.expect("the flush indexes the body");
+        assert!(
+            indexed.contains("body edited") && !indexed.contains("RAM ONLY"),
+            "the index must describe the body that reached disk, got {indexed:?}"
+        );
+    });
+}
+
 /// The registry attaches rather than duplicating: a second open for the same
 /// `(vault, note)` is refused and the existing session is reused (`SYNC-34`).
 #[test]
@@ -208,6 +511,7 @@ fn live_command_inners_return_typed_errors() {
         let host = TestHost::new("/base");
         let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
         let reg = LiveSessionRegistry::new();
+        let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
         let id = crate::plugins::notes::note_id::NoteId::new_v7().to_string();
 
         assert!(matches!(
@@ -215,6 +519,7 @@ fn live_command_inners_return_typed_errors() {
                 &host,
                 &state,
                 &reg,
+                &hooks,
                 &IO,
                 id.clone(),
                 String::new()
@@ -223,7 +528,7 @@ fn live_command_inners_return_typed_errors() {
             Err(LiveSessionCommandError::NotOpen)
         ));
         assert!(matches!(
-            live_session_close_from_host(&host, &state, &reg, &IO, id).await,
+            live_session_close_from_host(&host, &state, &reg, &hooks, &IO, id).await,
             Err(LiveSessionCommandError::NotOpen)
         ));
         assert!(matches!(
@@ -646,4 +951,342 @@ fn pending_remote_splices_round_trip_and_clear() {
         reg.take_pending_splices("n2").is_empty(),
         "the vault-leaving teardown drops pending splices too"
     );
+}
+
+/// A flushed TOMBSTONE is removed from the search index, not upserted into it
+/// (test-audit #20, now on the live path). With sync configured a permanent
+/// delete is a `deleted:` stamp written through `noteUpdate`, which a live-owned
+/// note routes into its session, so the flush is where the purge reaches the
+/// index. Upserting it put the purged body back into search and the lock sealed
+/// it into `vault.search`.
+#[test]
+fn a_flushed_tombstone_is_removed_from_search_not_upserted() {
+    use crate::test_support::{IndexCall, RecordingHooks};
+    block_on(async {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+            .as_uuid()
+            .as_bytes();
+        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+        let base = encode_note_blob(
+            "---\ntitle: T\n---\nsecret body\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &[0xAAu8; 16],
+            &host,
+        )
+        .expect("seal");
+        let tmp = ScopedTempDir::new("live-index-tombstone").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        IO.create_dir_all(&notes_dir).await.expect("mkdir");
+        let (state, vault_id) = unlocked_state().await;
+
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            vault_id.clone(),
+            note_id.clone(),
+            uuid,
+            None,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
+        session
+            .apply_body_markdown(
+                "---\ntitle: T\ndeleted: 2026-10-16T12:00:00Z\n---\nsecret body\n",
+                5_000,
+            )
+            .expect("tombstone");
+        let reg = LiveSessionRegistry::new();
+        assert!(reg.insert(session), "the session is open for the note");
+
+        let rec = RecordingHooks::new();
+        let hooks: crate::hooks::Hooks = rec.clone();
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &IO,
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("flush");
+
+        let calls = rec.index_calls();
+        assert!(
+            calls
+                .iter()
+                .any(|c| matches!(c, IndexCall::SearchRemove { note_id: id } if id == &note_id)),
+            "a tombstone must leave the search index, got {calls:?}"
+        );
+        assert!(
+            !calls.iter().any(|c| matches!(
+                c,
+                IndexCall::SearchUpsert { .. } | IndexCall::IndexAttachments { .. }
+            )),
+            "a tombstone must not be re-indexed, got {calls:?}"
+        );
+    });
+}
+
+/// A flush that is past its disk write when the vault locks must not put the note
+/// back into the search index the lock just wiped (myne-md/myne#867 review).
+///
+/// The lock path drops the slot and zeroizes the search index before it clears
+/// the live sessions, so the session is still registered when the flush comes
+/// back from its write. The old guard asked only "is the session still open", got
+/// yes, and upserted the note's title and body into the freshly emptied index.
+/// The fixture is that window itself: a `VaultIo` whose `write` locks the vault
+/// (drops its slot) and leaves the session registered, exactly the state the lock
+/// path is in between its two hooks.
+#[test]
+fn a_flush_that_outlives_a_lock_does_not_reindex_the_note() {
+    use crate::plugins::vault_unlock::state::{test_vault_id, VaultRuntimeState};
+    use crate::test_support::{IndexCall, RecordingHooks};
+    use crate::vault_io::{IoResult, WriteOpts};
+
+    /// Delegates every call to `StdVaultIo` except `write`, which locks the vault
+    /// first.
+    struct LocksDuringWrite<'a> {
+        state: &'a VaultRuntimeState,
+    }
+
+    #[async_trait::async_trait]
+    impl VaultIo for LocksDuringWrite<'_> {
+        async fn read(&self, path: &std::path::Path) -> IoResult<Vec<u8>> {
+            IO.read(path).await
+        }
+
+        async fn read_prefix(&self, path: &std::path::Path, len: usize) -> IoResult<Vec<u8>> {
+            IO.read_prefix(path, len).await
+        }
+
+        async fn write(
+            &self,
+            path: &std::path::Path,
+            bytes: &[u8],
+            opts: WriteOpts,
+        ) -> IoResult<()> {
+            drop(self.state.take(test_vault_id()).await);
+            IO.write(path, bytes, opts).await
+        }
+
+        async fn remove_file(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.remove_file(path).await
+        }
+
+        async fn remove_dir_all(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.remove_dir_all(path).await
+        }
+
+        async fn create_dir_all(&self, path: &std::path::Path) -> IoResult<()> {
+            IO.create_dir_all(path).await
+        }
+
+        async fn read_dir(
+            &self,
+            path: &std::path::Path,
+        ) -> IoResult<Vec<crate::vault_io::DirEntry>> {
+            IO.read_dir(path).await
+        }
+
+        async fn exists(&self, path: &std::path::Path) -> IoResult<bool> {
+            IO.exists(path).await
+        }
+
+        async fn is_dir(&self, path: &std::path::Path) -> IoResult<bool> {
+            IO.is_dir(path).await
+        }
+
+        async fn stat(
+            &self,
+            path: &std::path::Path,
+        ) -> IoResult<Option<crate::vault_io::FileStat>> {
+            IO.stat(path).await
+        }
+
+        async fn rename(&self, from: &std::path::Path, to: &std::path::Path) -> IoResult<()> {
+            IO.rename(from, to).await
+        }
+    }
+
+    block_on(async {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+            .as_uuid()
+            .as_bytes();
+        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+        let base = encode_note_blob(
+            "---\ntitle: T\n---\nbody\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &[0xAAu8; 16],
+            &host,
+        )
+        .expect("seal");
+        let tmp = ScopedTempDir::new("live-index-lock-race").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        IO.create_dir_all(&notes_dir).await.expect("mkdir");
+        let (state, vault_id) = unlocked_state().await;
+
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            vault_id.clone(),
+            note_id.clone(),
+            uuid,
+            None,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
+        session
+            .apply_body_markdown("---\ntitle: T\n---\nsecret typed before the lock\n", 5_000)
+            .expect("edit");
+        let reg = LiveSessionRegistry::new();
+        assert!(reg.insert(session), "the session is open for the note");
+
+        let rec = RecordingHooks::new();
+        let hooks: crate::hooks::Hooks = rec.clone();
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &LocksDuringWrite { state: &state },
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("flush");
+
+        // The fixture must have reached the state the defect needs: the vault
+        // locked AND the session still registered. Without the second half this
+        // is the session-gone case the old guard already handled.
+        assert_eq!(
+            state.slot_kind(test_vault_id()).await,
+            crate::plugins::vault_unlock::state::SlotKind::Empty,
+            "the write must have locked the vault"
+        );
+        assert!(
+            reg.is_note_open(&note_id),
+            "the session must still be registered, or this tests the wrong window"
+        );
+        // The user's edit still reaches disk: the lock refuses the index, not the
+        // durable write that was already under way.
+        let blob = IO
+            .read(&notes_dir.join(format!("{note_id}.myn")))
+            .await
+            .expect("read back");
+        assert!(decode_note_blob(&blob, &uuid, &ik, &ikid)
+            .expect("decode")
+            .contains("secret typed before the lock"));
+
+        let calls = rec.index_calls();
+        assert!(
+            !calls.iter().any(|c| matches!(
+                c,
+                IndexCall::SearchUpsert { .. }
+                    | IndexCall::IndexAttachments { .. }
+                    | IndexCall::AiNoteChanged { .. }
+            )),
+            "a flush that outlives a lock must not index the note, got {calls:?}"
+        );
+    });
+}
+
+/// The re-check after the attachment await (myne-md/myne#867 review). A lock that
+/// lands while the flush awaits `index_note_attachments` must stop the AI re-embed
+/// that follows it, because that await is the widest window in the indexing and a
+/// check taken before it says nothing about the state after it.
+#[test]
+fn a_lock_during_the_attachment_await_stops_the_ai_reembed() {
+    use crate::plugins::vault_unlock::state::test_vault_id;
+    use crate::test_support::{IndexCall, RecordingHooks};
+    block_on(async {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+            .as_uuid()
+            .as_bytes();
+        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+        let base = encode_note_blob(
+            "---\ntitle: T\n---\nbody\n",
+            &ik,
+            &ikid,
+            &uuid,
+            &[0xAAu8; 16],
+            &host,
+        )
+        .expect("seal");
+        let tmp = ScopedTempDir::new("live-index-lock-await").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        IO.create_dir_all(&notes_dir).await.expect("mkdir");
+        let (state, vault_id) = unlocked_state().await;
+
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            vault_id.clone(),
+            note_id.clone(),
+            uuid,
+            None,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
+        session
+            .apply_body_markdown("---\ntitle: T\n---\nbody edited\n", 5_000)
+            .expect("edit");
+        let reg = LiveSessionRegistry::new();
+        assert!(reg.insert(session), "the session is open for the note");
+
+        let rec = RecordingHooks::locking_on_attachments(test_vault_id());
+        let hooks: crate::hooks::Hooks = rec.clone();
+        crate::plugins::live::commands::flush_live_session_to_dir(
+            &IO,
+            &notes_dir,
+            &reg,
+            crate::plugins::live::commands::LiveIndexCtx {
+                state: &state,
+                hooks: &hooks,
+            },
+            &ik,
+            &ikid,
+            &note_id,
+        )
+        .await
+        .expect("flush");
+
+        let calls = rec.index_calls();
+        // The upsert and the attachment call happened while the vault was
+        // unlocked, which is what puts the fixture inside the window rather than
+        // before it.
+        assert!(
+            matches!(calls.first(), Some(IndexCall::SearchUpsert { .. })),
+            "the upsert runs before the lock, got {calls:?}"
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| matches!(c, IndexCall::IndexAttachments { .. })),
+            "the attachment hook must have run (it is what locks), got {calls:?}"
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|c| matches!(c, IndexCall::AiNoteChanged { .. })),
+            "a lock inside the attachment await must stop the re-embed, got {calls:?}"
+        );
+    });
 }

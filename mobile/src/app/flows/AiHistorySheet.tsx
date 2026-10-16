@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { EmptyState } from "@myne/client-core/emptyState";
 import { chatsDelete, chatsList, chatsRename, type ConversationListRow } from "../../lib/chats";
 import { formatRelativeTime } from "../../lib/relative-time";
 
@@ -108,11 +109,6 @@ const ROW_META: CSSProperties = {
 const META: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-2)",
-};
-
-const ERROR_TEXT: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  color: "var(--danger)",
 };
 
 const ACTIONS: CSSProperties = {
@@ -285,15 +281,42 @@ export function AiHistorySheet({
           <h2 id="ai-history-title" data-testid="ai.history-title" style={TITLE}>
             {t("editor.chrome.rightPanel.aiChat.historyTitle")}
           </h2>
+          {/* **`EmptyState`, carrying the hub's copy** (myne-md/myne#867). Three
+              states used to render three hand-written sentences here while the
+              hub's rail rendered the same three facts in its own words: the two
+              surfaces list the same conversations over the same store, so a
+              reader who saw both read two vocabularies for one thing. The hub
+              owns the copy and this sheet renders it, and the component is the
+              app's zero state rather than a second one with the same words.
+
+              `EmptyState` moved to `@myne/client-core` in this same change (it
+              was desktop-only while its stylesheet was already shared), which is
+              what lets the phone render it. `aiChat.historyError` stays in the
+              catalog for the two transcript banners that still render it
+              (`ConversationSurface`, mobile `AiChatFlow`); the empty and loading
+              keys are the hub's now.
+
+              The glyph is a NODE because each client owns its icon registry: the
+              names below are this client's (`alert-triangle`,
+              `message-square`), not the desktop's. Loading has no glyph at all,
+              which is what "defer to the skeleton convention" looks like when
+              the phone has no skeleton for a sheet. */}
           {error ? (
-            <p data-testid="ai.history-error" style={ERROR_TEXT}>
-              {t("editor.chrome.rightPanel.aiChat.historyError")}
-            </p>
+            <EmptyState
+              variant="error"
+              size="sm"
+              glyph={<Icon name="alert-triangle" size={20} />}
+              title={t("agent.hub.loadFailed")}
+              testId="ai.history-error"
+            />
           ) : null}
           {rows === null && !error ? (
-            <p data-testid="ai.history-loading" style={META}>
-              {t("editor.chrome.rightPanel.aiChat.historyLoading")}
-            </p>
+            <EmptyState
+              variant="loading"
+              size="sm"
+              title={t("agent.hub.loading")}
+              testId="ai.history-loading"
+            />
           ) : null}
           {rows !== null && rows.length > 0 ? (
             <>
@@ -337,18 +360,42 @@ export function AiHistorySheet({
             </>
           ) : null}
           {rows !== null && rows.length === 0 ? (
-            <p data-testid="ai.history-empty" style={META}>
-              {t("editor.chrome.rightPanel.aiChat.historyEmpty")}
-            </p>
+            <EmptyState
+              variant="firstRun"
+              size="sm"
+              glyph={<Icon name="message-square" size={20} />}
+              title={t("agent.hub.emptyTitle")}
+              body={t("agent.hub.emptyBody")}
+              testId="ai.history-empty"
+            />
           ) : null}
           {rows !== null && rows.length > 0 && visible.length === 0 ? (
-            // Filtered to nothing is NOT an empty vault, and the distinction is
-            // the same one the desktop hub draws: this state echoes what was
-            // typed and offers the way back, where the empty one above explains
-            // what would put something here.
-            <p data-testid="ai.history-no-match" style={META}>
-              {t("agent.hub.noMatchTitle")}
-            </p>
+            // **Filtered to nothing is NOT an empty vault** (the distinction the
+            // desktop hub draws). It echoes what was typed (`noMatchBody` takes
+            // the query) and offers the way back, which this sheet was NOT
+            // doing: it rendered the title and dropped the body, so the one
+            // sentence naming the fix never reached the phone.
+            <EmptyState
+              variant="filtered"
+              size="sm"
+              glyph={<Icon name="message-square" size={20} />}
+              title={t("agent.hub.noMatchTitle")}
+              // The query is echoed by the SENTENCE rather than by the
+              // component's own `query` prop, because `noMatchBody` already
+              // interpolates it: passing both would print it twice.
+              body={t("agent.hub.noMatchBody", { query })}
+              action={
+                <Button
+                  variant="secondary"
+                  full={false}
+                  data-testid="ai.history-clear-search"
+                  onClick={() => setQuery("")}
+                >
+                  {t("agent.hub.searchClear")}
+                </Button>
+              }
+              testId="ai.history-no-match"
+            />
           ) : null}
           {rows !== null && visible.length > 0 ? (
             <div data-testid="ai.conversation-list">
@@ -505,7 +552,17 @@ export function AiHistorySheet({
                         // open it, and it is what the user reads as "about this
                         // note" rather than as "about something".
                         <span
-                          className="myne-chiplet"
+                          // **`myne-pill`, not `myne-chiplet`** (myne-md/myne#867).
+                          // `chiplet` is a fixed 40x28 COLOUR SWATCH with
+                          // `overflow: hidden` (it is the theme swatch), so a
+                          // text label inside it was cut off: the row read "On a"
+                          // where it meant "On a note". The desktop hub was moved
+                          // to the pill when this was first found, and the phone
+                          // kept the swatch; `docs/design/README.md`'s "a text chip
+                          // is not a theme swatch" is the rule, and
+                          // `tests/styles/componentLayer.test.ts` holds the two
+                          // classes apart.
+                          className="myne-pill"
                           data-testid="ai.conversation-anchor"
                           data-note-id={row.note_id}
                         >

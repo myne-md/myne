@@ -100,6 +100,40 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_date_format,
             commands::set_daily_folder,
             commands::set_daily_template,
+            // Periodic-notes settings (myne#177, wired to mobile by
+            // myne-md/myne#880). One weekly/monthly entry of the `periodic_notes`
+            // map. Body is the SHARED `myne-core` prefs core; mobile only
+            // registers it, and it does so because the panel that writes it
+            // landed in the same change (mobile/src/components/
+            // PeriodicNotesBlock.tsx). Same three-site lockstep as every other
+            // prefs setter: this list, permissions/prefs/default.toml and
+            // build.rs's inlined command list, or the ACL resolver fails closed.
+            commands::set_periodic_note_setting,
+            // Graph colour groups (myne-md/myne#727), writable on mobile since
+            // myne-md/myne#880. A WHOLE-LIST replace, because rule order is
+            // precedence. Body is the SHARED `myne-core` prefs core; mobile only
+            // registers it. Same three-site lockstep as every other prefs setter.
+            commands::set_color_groups,
+            // AI excluded folders (local-ai epic MYND-408), writable on mobile
+            // since myne-md/myne#880. An EGRESS CONTROL: the set the refusal
+            // path honours, so §10.2 keeps its union monotone and a removal is
+            // never inherited from a peer. Body is the SHARED `myne-core` prefs
+            // core; mobile only registers it. Same three-site lockstep.
+            commands::set_ai_excluded_folders,
+            // AI limits (myne-md/myne#880). `set_chat_history_budget` is
+            // DEVICE-LOCAL (a per-machine off-device volume bound, clamped
+            // host-side); `set_meeting_ai_prompt` is SHARED / scalar LWW, and it
+            // matters most here because the phone is where meeting capture
+            // happens. Bodies are the SHARED `myne-core` prefs core; mobile only
+            // registers them. Same three-site lockstep.
+            commands::set_chat_history_budget,
+            // Attachment image OCR (MYND-441), switchable on mobile since
+            // myne-md/myne#880. DEVICE-LOCAL: OCR runs in-process here, so the
+            // device paying the compute cost owns the switch. Body is the SHARED
+            // `myne-core` prefs core; mobile only registers it. Same three-site
+            // lockstep.
+            commands::set_attachment_ocr_enabled,
+            commands::set_meeting_ai_prompt,
             // Display date & time (myne#279, wired to mobile by
             // myne-md/myne#609). Bodies live in the SHARED myne-core prefs core
             // and the desktop has registered all three since myne#279; mobile

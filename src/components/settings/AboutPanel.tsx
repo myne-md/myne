@@ -47,6 +47,7 @@ import { MyneMark } from "../primitives/MyneMark";
 import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
+import { SettingsSection } from "./SettingsSection";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -460,23 +461,53 @@ export function AboutPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <Block>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-          <MyneMark size={44} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
-            <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+      {/* Four sections (myne-md/myne#885). The build-commit block moves up to sit
+          with the version and the build channel, so "what am I running" is one
+          group and the update machinery is another; the only order the grouping
+          changed is that block, which used to sit between the two. */}
+      <SettingsSection title={t("settings.about.sections.version")}>
+        <Block>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+            <MyneMark size={44} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
+              <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+            </div>
           </div>
-        </div>
-      </Block>
+        </Block>
 
-      <Block data-setting-anchor="about.build-channel" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
-        <p style={VALUE_STYLE}>{buildChannelLabel}</p>
-      </Block>
+        <Block data-setting-anchor="about.build-channel" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
+          <p style={VALUE_STYLE}>{buildChannelLabel}</p>
+        </Block>
+
+        <Block>
+          <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
+          {/* Served build first, compile-time define second. On web the commit is
+              a property of the SERVED bundle, not of whoever built it: the web
+              config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
+              build environment (myne-md/myne#458), and `version.json` carries the
+              real commit (the document this panel already fetches for the hash).
+              Desktop answers `null` from the seam by construction and renders the
+              define, which is the identity of the installer that was run.
+              Sliced because `version.json` holds the full 40-hex SHA while the
+              desktop define is `--short=9`; `"unknown"` survives the slice. */}
+          <p style={VALUE_STYLE} data-testid="about.build-commit">
+            {(served?.commit ?? __BUILD_COMMIT__).slice(0, 9)}
+          </p>
+          {served !== null && (
+            <p
+              style={{ ...VALUE_STYLE, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}
+              data-testid="about.bundle-hash"
+            >
+              {served.bundleHash}
+            </p>
+          )}
+        </Block>
+      </SettingsSection>
 
       {has("selfUpdate") && (
-        <>
+        <SettingsSection title={t("settings.about.sections.updates")}>
           <Block data-setting-anchor="about.update-channel" data-setting-row="true">
             <span style={LABEL_STYLE}>{t("settings.about.updateChannelLabel")}</span>
             <p style={VALUE_STYLE} data-testid="about.update-channel">
@@ -484,21 +515,30 @@ export function AboutPanel() {
             </p>
           </Block>
 
-          <Block data-setting-anchor="about.update" data-setting-row="true">
-            <span style={LABEL_STYLE}>{t("settings.about.updateLabel")}</span>
-            <div>
+          {/* A `SettingRow` like its neighbours (myne-md/myne#885 visual pass):
+              the button in the control slot on the right, the short status line
+              inline, and the long verification paragraph behind the question
+              mark, where the settings panels keep the rest of what a row has to
+              say. The status line stays inline because it IS the readout. */}
+          <SettingRow
+            anchorId="about.update"
+            testId="about.update-row"
+            label={t("settings.about.updateLabel")}
+            helper={updateStatusText}
+            helperTestId="about.update-status"
+            explanation={[t("settings.about.updateHelper")]}
+            control={(_helperId, explanationId) => (
               <Button
                 variant="secondary"
                 onClick={runUpdateCheck}
                 disabled={check.kind === "checking"}
                 data-testid="about.update-check"
+                aria-describedby={explanationId}
               >
                 {t("settings.about.updateCheckButton")}
               </Button>
-            </div>
-            <p style={HELPER_STYLE} data-testid="about.update-status">
-              {updateStatusText}
-            </p>
+            )}
+          >
             {check.kind === "status" && check.status.kind === "available" && (
               <div>
                 <Button
@@ -511,8 +551,7 @@ export function AboutPanel() {
                 </Button>
               </div>
             )}
-            <p style={HELPER_STYLE}>{t("settings.about.updateHelper")}</p>
-          </Block>
+          </SettingRow>
 
           {autoCheck !== null && (
             <SettingRow
@@ -529,270 +568,264 @@ export function AboutPanel() {
               )}
             />
           )}
-        </>
+        </SettingsSection>
       )}
 
-      <Block>
-        <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
-        {/* Served build first, compile-time define second. On web the commit is
-            a property of the SERVED bundle, not of whoever built it: the web
-            config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
-            build environment (myne-md/myne#458), and `version.json` carries the
-            real commit — the document this panel already fetches for the hash.
-            Desktop answers `null` from the seam by construction and renders the
-            define, which is the identity of the installer that was run.
-            Sliced because `version.json` holds the full 40-hex SHA while the
-            desktop define is `--short=9`; `"unknown"` survives the slice. */}
-        <p style={VALUE_STYLE} data-testid="about.build-commit">
-          {(served?.commit ?? __BUILD_COMMIT__).slice(0, 9)}
-        </p>
-        {served !== null && (
-          <p
-            style={{ ...VALUE_STYLE, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}
-            data-testid="about.bundle-hash"
+      <SettingsSection title={t("settings.about.sections.legal")}>
+        <Block data-setting-anchor="about.threat-model" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
+          <button
+            type="button"
+            onClick={handleThreatModelClick}
+            {...linkHover}
+            style={LINK_STYLE}
           >
-            {served.bundleHash}
-          </p>
-        )}
-      </Block>
+            myne.md/threat-model
+            <span aria-hidden="true">↗</span>
+          </button>
+          <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
+        </Block>
 
-      <Block data-setting-anchor="about.threat-model" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
-        <button
-          type="button"
-          onClick={handleThreatModelClick}
-          {...linkHover}
-          style={LINK_STYLE}
-        >
-          myne.md/threat-model
-          <span aria-hidden="true">↗</span>
-        </button>
-        <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
-      </Block>
-
-      <Block data-setting-anchor="about.legal" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.legalLabel")}</span>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: "var(--space-1)",
-          }}
-        >
-          {LEGAL_LINKS.map(({ doc, labelKey, testId }) => (
-            <button
-              key={doc}
-              type="button"
-              onClick={() => {
-                handleLegalClick(doc, i18n.language);
-              }}
-              {...linkHover}
-              style={LINK_STYLE}
-              data-testid={testId}
-            >
-              {t(labelKey)}
-              <span aria-hidden="true">↗</span>
-            </button>
-          ))}
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.about.legalHelper")}</p>
-      </Block>
-
-      <Block data-setting-anchor="about.license" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
-        <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
-      </Block>
-
-      {/* Rendered unconditionally (#181). It used to be hidden wherever the
-          rail's Developer GROUP would have no capability-eligible member —
-          `capabilities.has("localAi")`, i.e. never shown on web. That test
-          stopped describing the gate the moment Developer mode also began
-          hiding individual settings inside core panels: the Vim toggle exists
-          on every client, so on web the old guard removed the only control
-          that could reveal it and left the setting permanently unreachable
-          (`developer_mode` is device-local, so it cannot arrive by sync
-          either). An empty Developer group is now just an empty group — the
-          rail already derives its own divider from that — and is no longer a
-          reason to withhold the switch. */}
-      <SettingRow
-        label={t("settings.about.developerModeLabel")}
-        helper={t("settings.about.developerModeHelper")}
-        control={(helperId) => (
-          <Switch
-            checked={prefs.developer_mode}
-            onChange={(next) => {
-              void setDeveloperMode(next);
+        <Block data-setting-anchor="about.legal" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.legalLabel")}</span>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "var(--space-1)",
             }}
-            ariaLabel={t("settings.about.developerModeLabel")}
-            ariaDescribedBy={helperId}
-            testId="about.developer-mode-toggle"
-          />
-        )}
-      />
-
-      {/* myne-md/myne#860. Gated on the capability rather than rendered
-          disabled: on web the whole logging half is absent, because a served
-          bundle installs no `tracing` subscriber at all
-          (`design-notes/ops/0366`), so a greyed switch would be an offer the
-          platform cannot honour (`decisions.md` 2026-07-26).
-
-          Deliberately NOT behind the Developer-mode toggle. That gate hides
-          capabilities a normal user does not configure (a self-supplied
-          inference model, the terminal door, Tor routing); this switch is the
-          front door of a feature built for the user who has hit a bug, so
-          hiding it there would hide it from exactly the person it is for. */}
-      {/* The report block renders on EVERY client, deliberately, and it is the
-          one part of this surface that is not behind the `diagnosticLog`
-          capability. Copying the diagnostics block is the half the issue's scope
-          sentence keeps for the web client, and it is the half that matters most
-          there, because a browser user cannot open a devtools panel and read a
-          failure back to anyone. A capability descriptor that claims this while
-          the row sits behind the gate is the "canon and shipped screen disagree"
-          failure, caught in review.
-
-          The preview is composed from `ControlBlock`, the canon's documented
-          stacked exception for a control that needs the full content width: it
-          is the EXACT string Copy writes, rendered from one source, because a
-          preview assembled separately is a preview that can lie. */}
-      <ControlBlock
-        label={t("settings.about.diagnosticBlockLabel")}
-        helper={t("settings.about.diagnosticBlockHelper")}
-        anchorId="about.diagnostic-report"
-        control={
-          <>
-            <pre style={PREVIEW_STYLE} data-testid="about.diagnostic-block-preview">
-              {diagnosticBlock ?? ""}
-            </pre>
-            <div>
-              <Button
-                variant="secondary"
-                disabled={diagnosticBlock === null}
-                onClick={copyDiagnostics}
-                data-testid="about.diagnostic-copy"
-              >
-                {t("settings.about.diagnosticCopy")}
-              </Button>
-            </div>
-          </>
-        }
-      />
-
-      {has("diagnosticLog") && (
-        <>
-          <SettingRow
-            label={t("settings.about.diagnosticLogLabel")}
-            helper={t("settings.about.diagnosticLogHelper")}
-            error={diagnosticLogError}
-            anchorId="about.diagnostic-log"
-            testId="about.diagnostic-log-row"
-            helperTestId="about.diagnostic-log-helper"
-            control={(helperId) => (
-              <Switch
-                checked={diagnostics.enabled}
-                disabled={diagnostics.loading}
-                onChange={(next) => {
-                  void diagnostics.setEnabled(next);
+          >
+            {LEGAL_LINKS.map(({ doc, labelKey, testId }) => (
+              <button
+                key={doc}
+                type="button"
+                onClick={() => {
+                  handleLegalClick(doc, i18n.language);
                 }}
-                ariaLabel={t("settings.about.diagnosticLogLabel")}
-                ariaDescribedBy={helperId}
-                testId="about.diagnostic-log-toggle"
-              />
-            )}
-          />
+                {...linkHover}
+                style={LINK_STYLE}
+                data-testid={testId}
+              >
+                {t(labelKey)}
+                <span aria-hidden="true">↗</span>
+              </button>
+            ))}
+          </div>
+          <p style={HELPER_STYLE}>{t("settings.about.legalHelper")}</p>
+        </Block>
 
-          {/* The crash record is shown rather than hidden: privacy requires a
-              no-consent artefact's existence to be visible and its lifetime
-              bounded, so a row appears whenever one exists and Delete is the
-              manual half of that bound (a report that includes it clears it
-              too). The row is absent, not disabled, when there is no record,
-              because "no crash" is not a control.
+        <Block data-setting-anchor="about.license" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
+          <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
+        </Block>
+      </SettingsSection>
 
-              A REFUSED read is the third state, and it renders its own line
-              rather than nothing: an absent row would be indistinguishable from
-              the host answering "no record", which is the one thing a no-consent
-              artefact's disclosure must not hide. Delete is not offered here,
-              because it is the record's absence that is unknown. */}
-          {diagnostics.crashReadFailed ? (
-            <Block data-setting-anchor="about.crash-record" data-setting-row="true">
-              <span style={LABEL_STYLE}>{t("settings.about.crashRecordLabel")}</span>
-              <p style={HELPER_STYLE} data-testid="about.crash-record-read-failed">
-                {t("settings.about.crashRecordReadFailed")}
-              </p>
-            </Block>
-          ) : diagnostics.crash !== null ? (
-            <SettingRow
-              label={t("settings.about.crashRecordLabel")}
-              helper={t("settings.about.crashRecordHelper", {
-                date:
-                  formatCrashDate(diagnostics.crash.at_epoch_seconds, i18n.language) ??
-                  t("settings.about.crashRecordDateUnknown"),
-              })}
-              anchorId="about.crash-record"
-              testId="about.crash-record-row"
-              helperTestId="about.crash-record-helper"
-              control={
+      <SettingsSection title={t("settings.about.sections.developer")}>
+        {/* Rendered unconditionally (#181). It used to be hidden wherever the
+            rail's Developer GROUP would have no capability-eligible member:
+            `capabilities.has("localAi")`, i.e. never shown on web. That test
+            stopped describing the gate the moment Developer mode also began
+            hiding individual settings inside core panels: the Vim toggle exists
+            on every client, so on web the old guard removed the only control
+            that could reveal it and left the setting permanently unreachable
+            (`developer_mode` is device-local, so it cannot arrive by sync
+            either). An empty Developer group is now just an empty group (the
+            rail already derives its own divider from that) and is no longer a
+            reason to withhold the switch. */}
+        <SettingRow
+          label={t("settings.about.developerModeLabel")}
+          testId="about.developer-mode"
+          // 287 characters under a switch that does one thing (myne-md/myne#885).
+          // The row keeps what the mode IS; the rest, including the two things a
+          // reader actually wants to know before flipping it (that turning it off
+          // changes nothing already switched on, and where to switch that off),
+          // moves behind the question mark unchanged.
+          helper={t("settings.about.developerModeInline")}
+          explanation={[t("settings.about.developerModeHelper")]}
+          control={(helperId, explanationId) => (
+            <Switch
+              checked={prefs.developer_mode}
+              onChange={(next) => {
+                void setDeveloperMode(next);
+              }}
+              ariaLabel={t("settings.about.developerModeLabel")}
+              ariaDescribedBy={
+                explanationId === undefined
+                  ? helperId
+                  : `${helperId} ${explanationId}`
+              }
+              testId="about.developer-mode-toggle"
+            />
+          )}
+        />
+
+        <Block data-setting-anchor="about.changelog" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
+          <div>
+            <Button variant="secondary" disabled>
+              {t("settings.about.changelogButton")}
+            </Button>
+          </div>
+          <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
+        </Block>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.about.sections.diagnostics")}>
+        {/* myne-md/myne#860. Gated on the capability rather than rendered
+            disabled: on web the whole logging half is absent, because a served
+            bundle installs no `tracing` subscriber at all
+            (`design-notes/ops/0366`), so a greyed switch would be an offer the
+            platform cannot honour (`decisions.md` 2026-07-26).
+
+            Deliberately NOT behind the Developer-mode toggle. That gate hides
+            capabilities a normal user does not configure (a self-supplied
+            inference model, the terminal door, Tor routing); this switch is the
+            front door of a feature built for the user who has hit a bug, so
+            hiding it there would hide it from exactly the person it is for. */}
+        {/* The report block renders on EVERY client, deliberately, and it is the
+            one part of this surface that is not behind the `diagnosticLog`
+            capability. Copying the diagnostics block is the half the issue's scope
+            sentence keeps for the web client, and it is the half that matters most
+            there, because a browser user cannot open a devtools panel and read a
+            failure back to anyone. A capability descriptor that claims this while
+            the row sits behind the gate is the "canon and shipped screen disagree"
+            failure, caught in review.
+
+            The preview is composed from `ControlBlock`, the canon's documented
+            stacked exception for a control that needs the full content width: it
+            is the EXACT string Copy writes, rendered from one source, because a
+            preview assembled separately is a preview that can lie. */}
+        <ControlBlock
+          label={t("settings.about.diagnosticBlockLabel")}
+          helper={t("settings.about.diagnosticBlockHelper")}
+          anchorId="about.diagnostic-report"
+          control={
+            <>
+              <pre style={PREVIEW_STYLE} data-testid="about.diagnostic-block-preview">
+                {diagnosticBlock ?? ""}
+              </pre>
+              <div>
                 <Button
                   variant="secondary"
-                  onClick={clearCrashFlow}
-                  data-testid="about.crash-record-clear"
+                  disabled={diagnosticBlock === null}
+                  onClick={copyDiagnostics}
+                  data-testid="about.diagnostic-copy"
                 >
-                  {t("settings.about.crashRecordClear")}
+                  {t("settings.about.diagnosticCopy")}
                 </Button>
+              </div>
+            </>
+          }
+        />
+
+        {has("diagnosticLog") && (
+          <>
+            <SettingRow
+              label={t("settings.about.diagnosticLogLabel")}
+              helper={t("settings.about.diagnosticLogHelper")}
+              error={diagnosticLogError}
+              anchorId="about.diagnostic-log"
+              testId="about.diagnostic-log-row"
+              helperTestId="about.diagnostic-log-helper"
+              control={(helperId) => (
+                <Switch
+                  checked={diagnostics.enabled}
+                  disabled={diagnostics.loading}
+                  onChange={(next) => {
+                    void diagnostics.setEnabled(next);
+                  }}
+                  ariaLabel={t("settings.about.diagnosticLogLabel")}
+                  ariaDescribedBy={helperId}
+                  testId="about.diagnostic-log-toggle"
+                />
+              )}
+            />
+
+            {/* The crash record is shown rather than hidden: privacy requires a
+                no-consent artefact's existence to be visible and its lifetime
+                bounded, so a row appears whenever one exists and Delete is the
+                manual half of that bound (a report that includes it clears it
+                too). The row is absent, not disabled, when there is no record,
+                because "no crash" is not a control.
+
+                A REFUSED read is the third state, and it renders its own line
+                rather than nothing: an absent row would be indistinguishable from
+                the host answering "no record", which is the one thing a no-consent
+                artefact's disclosure must not hide. Delete is not offered here,
+                because it is the record's absence that is unknown. */}
+            {diagnostics.crashReadFailed ? (
+              <Block data-setting-anchor="about.crash-record" data-setting-row="true">
+                <span style={LABEL_STYLE}>{t("settings.about.crashRecordLabel")}</span>
+                <p style={HELPER_STYLE} data-testid="about.crash-record-read-failed">
+                  {t("settings.about.crashRecordReadFailed")}
+                </p>
+              </Block>
+            ) : diagnostics.crash !== null ? (
+              <SettingRow
+                label={t("settings.about.crashRecordLabel")}
+                helper={t("settings.about.crashRecordHelper", {
+                  date:
+                    formatCrashDate(diagnostics.crash.at_epoch_seconds, i18n.language) ??
+                    t("settings.about.crashRecordDateUnknown"),
+                })}
+                anchorId="about.crash-record"
+                testId="about.crash-record-row"
+                helperTestId="about.crash-record-helper"
+                control={
+                  <Button
+                    variant="secondary"
+                    onClick={clearCrashFlow}
+                    data-testid="about.crash-record-clear"
+                  >
+                    {t("settings.about.crashRecordClear")}
+                  </Button>
+                }
+              />
+            ) : null}
+
+            {/* What a saved report WOULD contain, before anything is written, and
+                the two actions that move the log off the device: open the folder,
+                or save one bundle. This is the disclosure half of the file-save
+                decision: the user reads the size and the file count first, and can
+                open the log itself with Reveal before deciding. */}
+            <ControlBlock
+              label={t("settings.about.diagnosticFilesLabel")}
+              anchorId="about.diagnostic-report-files"
+              control={
+                <>
+                  <p style={HELPER_STYLE} data-testid="about.diagnostic-files-manifest">
+                    {diagnostics.manifest === null
+                      ? t("settings.about.diagnosticFilesUnknown")
+                      : t("settings.about.diagnosticFilesHelper", {
+                          count: diagnostics.manifest.log_files,
+                          size: formatBytes(diagnostics.manifest.total_bytes),
+                        })}
+                  </p>
+                  <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                    <Button
+                      variant="secondary"
+                      onClick={revealFlow}
+                      data-testid="about.diagnostic-reveal"
+                    >
+                      {t("settings.about.diagnosticReveal")}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={diagnosticBlock === null}
+                      onClick={saveReportFlow}
+                      data-testid="about.diagnostic-save"
+                    >
+                      {t("settings.about.diagnosticSave")}
+                    </Button>
+                  </div>
+                </>
               }
             />
-          ) : null}
+          </>
+        )}
 
-          {/* What a saved report WOULD contain, before anything is written, and
-              the two actions that move the log off the device: open the folder,
-              or save one bundle. This is the disclosure half of the file-save
-              decision: the user reads the size and the file count first, and can
-              open the log itself with Reveal before deciding. */}
-          <ControlBlock
-            label={t("settings.about.diagnosticFilesLabel")}
-            anchorId="about.diagnostic-report-files"
-            control={
-              <>
-                <p style={HELPER_STYLE} data-testid="about.diagnostic-files-manifest">
-                  {diagnostics.manifest === null
-                    ? t("settings.about.diagnosticFilesUnknown")
-                    : t("settings.about.diagnosticFilesHelper", {
-                        count: diagnostics.manifest.log_files,
-                        size: formatBytes(diagnostics.manifest.total_bytes),
-                      })}
-                </p>
-                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <Button
-                    variant="secondary"
-                    onClick={revealFlow}
-                    data-testid="about.diagnostic-reveal"
-                  >
-                    {t("settings.about.diagnosticReveal")}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={diagnosticBlock === null}
-                    onClick={saveReportFlow}
-                    data-testid="about.diagnostic-save"
-                  >
-                    {t("settings.about.diagnosticSave")}
-                  </Button>
-                </div>
-              </>
-            }
-          />
-        </>
-      )}
-
-      <Block data-setting-anchor="about.changelog" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
-        <div>
-          <Button variant="secondary" disabled>
-            {t("settings.about.changelogButton")}
-          </Button>
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
-      </Block>
+      </SettingsSection>
     </div>
   );
 }

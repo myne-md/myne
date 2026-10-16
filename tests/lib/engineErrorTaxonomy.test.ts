@@ -86,8 +86,15 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     // rather than reworded.
     vault_locked:
       "a provider request only runs from an unlocked vault; the lock tears the transcript down instead",
-    no_model:
-      "this arm has no local model — the model is named by the user and its absence is a NoCredential-shaped setup problem, not a missing file",
+    // `no_model` USED to be here, claiming "the model is named by the user and
+    // its absence is a NoCredential-shaped setup problem, not a missing file".
+    // myne-md/myne#867 made that false in both directions: the capability report
+    // emits `NoModel` at rest (the local arm with no file, and now a provider
+    // named with no model chosen, reported deliberately by
+    // `LocalInferenceState::remote_refusal`), and the chat header rendered it as
+    // "No provider" precisely because this table had never heard of it. It is a
+    // handled cause now, with its own sentence and its own chip label, so the
+    // entry is gone rather than reworded.
     model_load_failed: "same — nothing is loaded on this side",
     inference_failed:
       "a provider failure arrives as a status, which maps to unauthorized / quota_exhausted / the catch-all; this variant is the in-process runtime's",

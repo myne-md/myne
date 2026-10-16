@@ -239,8 +239,8 @@ pub(crate) async fn cycle_account_number_hash(
 /// pointed a browser at a filesystem that is not there.
 /// Feed every note the cycle wrote into the live indexes (myne#305).
 ///
-/// The same three side effects a local `note_update` performs — full-text body
-/// doc, per-attachment docs, AI re-embed — because a note arriving from another
+/// The same side effects a local `note_update` performs (full-text body doc,
+/// per-attachment docs, AI re-embed, and a removal for a tombstone), because a note arriving from another
 /// device is, from this device's point of view, exactly a note that changed.
 ///
 /// Best-effort per note: a body that will not decrypt (locked mid-cycle, or a
@@ -269,6 +269,21 @@ async fn reindex_pulled_notes(
         };
         let title = crate::plugins::notes::title_extract::resolve_note_title(plaintext.as_bytes())
             .unwrap_or_default();
+        // A pulled TOMBSTONE leaves the index rather than re-entering it, as in
+        // `note_update` (test-audit #20): a peer's permanent delete arrives as a
+        // `deleted:` frontmatter stamp, and upserting it put the purged body back
+        // into search, where the lock sealed it into `vault.search`.
+        let fm_bytes =
+            crate::plugins::notes::title_extract::extract_title_slices(plaintext.as_bytes())
+                .frontmatter_bytes;
+        if fm_bytes
+            .and_then(crate::plugins::notes::daily_match::fm_deleted_value_strict)
+            .is_some()
+        {
+            hooks.search_remove(id);
+            hooks.ai_note_changed(id, &plaintext);
+            continue;
+        }
         // The same drawing fold as the local writers: a `kind: drawing` body is
         // scene JSON, so the body doc is its projected text and it gets no
         // attachment docs (SF5 / SYNC-4).
@@ -283,6 +298,42 @@ async fn reindex_pulled_notes(
         }
         // Raw body — the AI arm projects for itself (myne#304).
         hooks.ai_note_changed(id, &plaintext);
+    }
+}
+
+/// Feed the live indexes a note a deferred-live-pull FALLBACK arm just wrote, and
+/// only when it actually wrote one (myne-md/myne#867 review).
+///
+/// The deferred-pull loop's session flush is what normally indexes a merged peer
+/// revision: the session is the note's single durable writer (`SYNC-33`), and its
+/// flush carries the index side effects. **Both fallback arms bypass that flush**,
+/// one because the flush failed and one because the session refused the blob or
+/// was already gone, so in both the plain write is the note's content and nothing
+/// else has indexed it. These ids are in `deferred_live_pulls` rather than
+/// `pulled_note_ids`, so the loop's own `reindex_pulled_notes` never saw them
+/// either. `reindex_pulled_notes` re-reads the blob rather than the session, so
+/// the index describes what reached disk.
+///
+/// Gated on [`PulledNoteApply::Applied`] rather than on `is_ok()`:
+/// `SkippedDirty` wrote nothing (a local edit won the race) and `StorageFull`
+/// wrote nothing, so re-reading the disk in those arms would index a document
+/// this fallback did not produce.
+async fn index_fallback_written_note(
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    notes_dir: &std::path::Path,
+    note_id: &str,
+    applied: &Result<
+        crate::plugins::sync::orchestrator::PulledNoteApply,
+        crate::plugins::sync::orchestrator::SyncCycleError,
+    >,
+) {
+    if matches!(
+        applied,
+        Ok(crate::plugins::sync::orchestrator::PulledNoteApply::Applied)
+    ) {
+        reindex_pulled_notes(io, state, hooks, notes_dir, &[note_id.to_string()]).await;
     }
 }
 
@@ -661,10 +712,20 @@ pub async fn run_active_cycle_from_host(
                     // Persist the merged document so the on-disk blob carries the
                     // peer's revision too, then raise the calm "updated from another
                     // device" signal (the same one the durable merge path uses).
+                    // The flush feeds the live indexes itself (myne-md/myne#867),
+                    // so a peer revision merged into an open session is indexed
+                    // here and NOT via `reindex_pulled_notes` above: these ids are
+                    // in `deferred_live_pulls`, not `pulled_note_ids`, and the
+                    // session is the single writer for the note (`SYNC-33`).
+                    // **Both fallback arms below re-index explicitly**, because they
+                    // are the two paths where that flush does NOT feed the indexes:
+                    // one where it failed, and one where the session refused the
+                    // blob or was already gone.
                     let flushed = crate::plugins::live::commands::flush_live_session_to_dir(
                         io,
                         &notes_dir_for_reindex,
                         live_registry,
+                        crate::plugins::live::commands::LiveIndexCtx { state, hooks },
                         &live_merge_keys.0,
                         &live_merge_keys.1,
                         &note_id,
@@ -678,12 +739,24 @@ pub async fn run_active_cycle_from_host(
                     // before the deferral, and the merged document is a superset, so
                     // either write carries the peer's revision).
                     if flushed.is_err() {
-                        let _ = crate::plugins::sync::orchestrator::apply_pulled_note_blob(
+                        let applied = crate::plugins::sync::orchestrator::apply_pulled_note_blob(
                             io,
                             &notes_dir_for_reindex,
                             id,
                             bytes,
                             baseline_nonce.as_deref(),
+                        )
+                        .await;
+                        // The flush was the path that feeds the live indexes, and it
+                        // failed, so nothing indexed the revision this write put on
+                        // disk.
+                        index_fallback_written_note(
+                            io,
+                            state,
+                            hooks,
+                            &notes_dir_for_reindex,
+                            &note_id,
+                            &applied,
                         )
                         .await;
                     }
@@ -707,6 +780,22 @@ pub async fn run_active_cycle_from_host(
                         // unconditional write here could discard a local edit that
                         // landed between the scan and this fallback.
                         baseline_nonce.as_deref(),
+                    )
+                    .await;
+                    // The flush above feeds the live indexes for a merge it took, and
+                    // this arm is the one where it could NOT: the session is gone or
+                    // refused the blob, so this write is the note's content now and
+                    // nothing else has indexed it. These ids are in
+                    // `deferred_live_pulls` rather than `pulled_note_ids`, so the
+                    // `reindex_pulled_notes` at the top of this block never saw them
+                    // either.
+                    index_fallback_written_note(
+                        io,
+                        state,
+                        hooks,
+                        &notes_dir_for_reindex,
+                        &note_id,
+                        &applied,
                     )
                     .await;
                     if applied.is_ok() {
@@ -1039,6 +1128,9 @@ mod tests {
 
     use super::*;
     use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
+    // Method resolution for `IO`'s inherent-looking calls (`create_dir_all`,
+    // `write`): the trait is the only place they exist.
+    use crate::vault_io::VaultIo as _;
 
     const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
 
@@ -1140,6 +1232,148 @@ mod tests {
             assert_eq!(
                 cycle_account_number_hash(&IO, tmp.path(), &seeded(0x2A)).await,
                 Err(AccountHashRefusal::MetaUnavailable)
+            );
+        });
+    }
+
+    /// A deferred live pull's FALLBACK write must feed the live indexes, and a
+    /// write that did not happen must not (myne-md/myne#867 review).
+    ///
+    /// The session flush indexes a merged peer revision, and BOTH fallback arms
+    /// bypass it, so this helper is the only thing that indexes what they wrote.
+    /// The gate is `Applied` rather than `is_ok()`: `SkippedDirty` and
+    /// `StorageFull` wrote nothing, so re-reading the disk there would index a
+    /// document the arm did not produce.
+    #[test]
+    fn a_fallback_write_is_indexed_only_when_it_wrote() {
+        use crate::plugins::sync::orchestrator::{PulledNoteApply, SyncCycleError};
+        use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+        use crate::test_support::{IndexCall, RecordingHooks};
+
+        block_on(async {
+            let tmp = ScopedTempDir::new("cycle-fallback-index").unwrap();
+            let notes_dir = tmp.path().join("notes");
+            IO.create_dir_all(&notes_dir).await.unwrap();
+
+            let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+                .as_uuid()
+                .as_bytes();
+            let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+            let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+            let host = crate::host::test_host::TestHost::new("/base");
+            let blob = crate::plugins::notes::crdt::encode_note_blob(
+                "---\ntitle: Peer\n---\npeer revision\n",
+                &ik,
+                &ikid,
+                &uuid,
+                &[0xAAu8; 16],
+                &host,
+            )
+            .expect("seal");
+            IO.write(
+                &notes_dir.join(format!("{note_id}.myn")),
+                &blob,
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("write");
+
+            // An UNLOCKED slot holding the key the blob was sealed under, so
+            // `reindex_pulled_notes` can actually decrypt what is on disk.
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    fixture_unlocked_with_keys(0x33, 0x11, 0x22),
+                )
+                .await;
+            let rec = RecordingHooks::new();
+            let hooks: crate::hooks::Hooks = rec.clone();
+
+            for (label, applied) in [
+                ("SkippedDirty", Ok(PulledNoteApply::SkippedDirty)),
+                ("StorageFull", Ok(PulledNoteApply::StorageFull)),
+                ("Err(Io)", Err(SyncCycleError::Io)),
+            ] {
+                index_fallback_written_note(&IO, &state, &hooks, &notes_dir, &note_id, &applied)
+                    .await;
+                assert_eq!(
+                    rec.index_calls().len(),
+                    0,
+                    "{label} wrote nothing, so it must not index"
+                );
+            }
+
+            // Written: the index must describe the blob on disk.
+            index_fallback_written_note(
+                &IO,
+                &state,
+                &hooks,
+                &notes_dir,
+                &note_id,
+                &Ok(PulledNoteApply::Applied),
+            )
+            .await;
+            let calls = rec.index_calls();
+            assert_eq!(
+                calls.len(),
+                3,
+                "an applied write owes search_upsert + index_note_attachments + ai_note_changed, got {calls:?}"
+            );
+            match &calls[0] {
+                IndexCall::SearchUpsert {
+                    note_id: id, body, ..
+                } => {
+                    assert_eq!(id, &note_id, "the body doc is keyed by the note id");
+                    assert!(
+                        body.contains("peer revision"),
+                        "the indexed body is the blob that reached disk, got {body:?}"
+                    );
+                }
+                other => panic!("first call must be search_upsert, got {other:?}"),
+            }
+
+            // A peer TOMBSTONE written by the same arm leaves the index.
+            let tomb = crate::plugins::notes::crdt::encode_note_blob(
+                "---\ntitle: Peer\ndeleted: 2026-10-16T12:00:00Z\n---\npeer revision\n",
+                &ik,
+                &ikid,
+                &uuid,
+                &[0xBBu8; 16],
+                &host,
+            )
+            .expect("seal tombstone");
+            IO.write(
+                &notes_dir.join(format!("{note_id}.myn")),
+                &tomb,
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("write tombstone");
+            let before = rec.index_calls().len();
+            index_fallback_written_note(
+                &IO,
+                &state,
+                &hooks,
+                &notes_dir,
+                &note_id,
+                &Ok(PulledNoteApply::Applied),
+            )
+            .await;
+            let after = rec.index_calls();
+            let tail = &after[before..];
+            assert!(
+                tail.iter().any(
+                    |c| matches!(c, IndexCall::SearchRemove { note_id: id } if id == &note_id)
+                ),
+                "a pulled tombstone must leave the search index, got {tail:?}"
+            );
+            assert!(
+                !tail.iter().any(|c| matches!(
+                    c,
+                    IndexCall::SearchUpsert { .. } | IndexCall::IndexAttachments { .. }
+                )),
+                "a pulled tombstone must not be re-indexed, got {tail:?}"
             );
         });
     }
