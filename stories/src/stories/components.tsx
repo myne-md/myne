@@ -1008,16 +1008,28 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "DeviceJoinQr",
     state: "default",
-    description: "Device Join Qr, a default state.",
+    description:
+      "The owner's device-join code: the account number is pasted in, and the scanning device is asked for the vault password.",
     tags: ["components", "devicejoinqr", "default"],
     render: () => <DeviceJoinQr />,
+  },
+  {
+    id: "components/devicejoinqr/member",
+    group: "components",
+    surface: "DeviceJoinQr",
+    state: "member",
+    description:
+      "A member's own-device code: no input at all, the code is built from the active session, and the three steps beside it send the other device through the recovery phrase.",
+    tags: ["components", "devicejoinqr", "member"],
+    render: () => <DeviceJoinQr variant="member" />,
   },
   {
     id: "components/devicemanagementpanel/default",
     group: "components",
     surface: "DeviceManagementPanel",
     state: "default",
-    description: "Device Management Panel, a default state.",
+    description:
+      "The account's devices on an owner vault: the roster, with rename and remove.",
     tags: ["components", "devicemanagementpanel", "default"],
     render: () => (
       <DeviceManagementPanel
@@ -1031,6 +1043,31 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           remove: asyncNoop,
           resetLocal: asyncNoop,
         }}
+        plane="owner"
+      />
+    ),
+  },
+  {
+    id: "components/devicemanagementpanel/member-vault",
+    group: "components",
+    surface: "DeviceManagementPanel",
+    state: "member-vault",
+    description:
+      "The same roster on a vault this person joined: no Remove, because only the vault's owner can revoke that access, and no local reset, because it would clear the membership token the vault syncs on.",
+    tags: ["components", "devicemanagementpanel", "member"],
+    render: () => (
+      <DeviceManagementPanel
+        hook={{
+          devices: [],
+          pending: [],
+          error: null,
+          busy: false,
+          refresh: asyncNoop,
+          approve: async () => true,
+          remove: asyncNoop,
+          resetLocal: asyncNoop,
+        }}
+        plane="member"
       />
     ),
   },
@@ -1878,7 +1915,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "InviteWizard",
     state: "accept",
     description:
-      "Step 1 of 3 of accepting an invitation (myne-md/myne#871): the owner's identity code, its fingerprint check, and the out-of-band confirmation that gates Continue. The member's own phrase and the device password are the two steps that follow, each on its own screen.",
+      "Step 1 of 3 of accepting an invitation (myne-md/myne#871): the owner's identity code, pasted and nothing else. The member's own phrase and the device password are the two steps that follow, each on its own screen.",
     tags: ["components", "invitewizard", "accept", "onboarding", "wizard"],
     fixture: {
       description: "an unclaimed invite addressed to this identity; nothing is submitted from this step",

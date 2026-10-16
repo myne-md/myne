@@ -713,7 +713,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "IPC wrapper and DTO mirror over the shared person-account sync core, the chats-twin shape (myne-md/myne#768). Desktop's wrapper is async and carries AcceptedInviteView; mobile's is a sync 1:1 port of the six `sync_person_*` commands plus inspectInviteCode and PersonStatusView. The one return-shape divergence is personJoinVault, added on both sides for member-devices (myne-md/myne#852): AcceptedInviteView on desktop, void on mobile, because mobile's shell re-probes after the call and its accept has never returned the view. Both sides call every member-vault binding, each from its own identity screen (desktop's src/screens/IdentityHome.tsx, mobile's mobile/src/app/flows/IdentityFlow.tsx), so this reason used to claim two things that were no longer true: that mobile called only setup/status/list-invites, and that the member-vault bindings were recorded as unbuilt in scripts/ipc-binding-callers.json, which carries no personAccount entry at all.",
+      "IPC wrapper and DTO mirror over the shared person-account sync core, the chats-twin shape (myne-md/myne#768). Desktop's wrapper is async and carries AcceptedInviteView; mobile's is a sync 1:1 port of the six `sync_person_*` commands plus PersonStatusView. The one return-shape divergence is personJoinVault, added on both sides for member-devices (myne-md/myne#852): AcceptedInviteView on desktop, void on mobile, because mobile's shell re-probes after the call and its accept has never returned the view. Both sides call every member-vault binding, each from its own identity screen (desktop's src/screens/IdentityHome.tsx, mobile's mobile/src/app/flows/IdentityFlow.tsx), so this reason used to claim two things that were no longer true: that mobile called only setup/status/list-invites, and that the member-vault bindings were recorded as unbuilt in scripts/ipc-binding-callers.json, which carries no personAccount entry at all.",
   },
   {
     a: "src/lib/prefs.ts",
@@ -1154,6 +1154,15 @@ const ROSTER = [
     destination: "undecided",
     reason:
       "When two devices have converged, and what the UI says while they have not (myne-md/myne#462). One question, one answer, and a wrong answer on either client tells the user their vaults match when they do not. The twins were kept byte-identical through that change deliberately; nothing about convergence is per-client.",
+  },
+
+  {
+    a: "src/hooks/useMemberVault.ts",
+    b: "mobile/src/hooks/useMemberVault.ts",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "Which account plane the active vault speaks for (myne-md/myne), asked by the device-management and usage surfaces. The two files are BYTE-IDENTICAL by design, and that is the point rather than an accident: the answer gates a destructive control (the local reset clears the token the vault syncs on, and on a member vault that is the membership token), so a client that answered it differently, or that failed open where the other failed closed, would be a defect the other client cannot see. Kept as two files rather than hoisted because each client imports it from its own hooks tree, which is what leaves the comparison guard free to catch a drift.",
   },
 
   {

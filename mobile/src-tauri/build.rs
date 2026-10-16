@@ -409,7 +409,6 @@ fn main() {
                     "sync_person_list_invites",
                     "sync_person_lock",
                     "sync_person_create_invite",
-                    "sync_person_inspect_invite_code",
                     "sync_list_vault_invites",
                     "sync_person_accept_invite",
                     // member-devices task 7: a member's SECOND device joins the

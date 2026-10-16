@@ -61,6 +61,7 @@ import { toast } from "../toast/toastStore";
 import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
+import { useMemberVault } from "../../hooks/useMemberVault";
 import { useAccountStatus } from "../../hooks/useAccountStatus";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -80,6 +81,13 @@ const SECTION_TITLE_STYLE: CSSProperties = {
 
 export interface SyncPanelProps {
   /**
+   * The active vault's id. Used for ONE question now — is this vault a MEMBER
+   * vault (myne-md/myne)? — which decides whether the account-plane surfaces
+   * below describe the vault or the member's own account. `null` while unknown,
+   * which reads as "not a member vault" and is the pre-change behaviour.
+   */
+  vaultId?: string | null;
+  /**
    * Routed to Unlock after a successful vault migration (#420). Migration re-keys
    * the vault and drops the running slot, so the session must re-unlock; the
    * Settings shell wires this to `onForceRelock({ kind: "Exists" })`.
@@ -93,7 +101,7 @@ export interface SyncPanelProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
-export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
+export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // `MY01`-only by construction (#422, ASM-6→B): keep-both conflict copies carry
@@ -108,6 +116,13 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // Device roster, lifted here so its poll feeds BOTH the device list and the
   // "Add a device" enroll gate (single source of enrollment truth).
   const devicesHook = useDevices();
+
+  // Which account plane the ACTIVE vault speaks for (myne-md/myne) — the twin of
+  // the mobile hook, same file name and same content, so the two clients cannot
+  // answer this differently. See its header for why `unknown` is a third state
+  // rather than a flavour of `owner`: the owner shape re-offers the destructive
+  // reset, so an unresolved probe must render neither side's arms.
+  const plane = useMemberVault(vaultId ?? undefined);
 
   // Plan-free usage projection (MYND-570). Absent (`null`) on a server without
   // the route — self-hosted or older — in which case the block is simply not
@@ -212,6 +227,9 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // The device-join QR dialog (myne-md/myne#831): an icon in the Devices header
   // rather than a full-width block.
   const [qrOpen, setQrOpen] = useState(false);
+  // A member's own-device QR dialog (myne-md/myne) — the same slot, a different
+  // producer. Held separately from `qrOpen` so the two can never both be up.
+  const [memberQrOpen, setMemberQrOpen] = useState(false);
   // The identity-code copy outcome, for the icon-chip + inline line
   // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
   const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
@@ -227,7 +245,8 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // writer of the shell's flag and last-writer-wins cannot clear it while a
   // dialog is still up (myne-md/myne#831 review).
   const [rosterDialogOpen, setRosterDialogOpen] = useState(false);
-  const childModalOpen = termsOpen || identityOpen || qrOpen || rosterDialogOpen;
+  const childModalOpen =
+    termsOpen || identityOpen || qrOpen || memberQrOpen || rosterDialogOpen;
   useEffect(() => {
     onDialogOpenChange?.(childModalOpen);
     return () => onDialogOpenChange?.(false);
@@ -235,9 +254,14 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
   // Still roster-derived, because it asks something status cannot: the QR
   // invite is only meaningful for a device the ACCOUNT lists as an approved
   // member, and only the roster knows that.
-  const enrolledHere = (devicesHook.devices ?? []).some(
-    (d) => d.is_current && d.approved && !d.retired,
-  );
+  //
+  // Deliberately NOT on a member vault even though the roster now loads there:
+  // this is the OWNER's QR, which carries an account number a member does not
+  // have and leads to the `{account# + password}` enroll path a member cannot
+  // complete. A member gets their own QR icon below.
+  const enrolledHere =
+    plane === "owner" &&
+    (devicesHook.devices ?? []).some((d) => d.is_current && d.approved && !d.retired);
 
   // Cold-start "building search index…" state. Producer: the MYND-426 engine
   // re-derives vault.search/vault.indices after a full-reconcile or a fresh
@@ -536,11 +560,26 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
 
-      {accountStatus !== null && (
+      {/* The plane has to be KNOWN before either label is chosen: `unknown` would
+          otherwise print the owner's "Storage and devices" over the member's
+          numbers, or the reverse. */}
+      {accountStatus !== null && plane !== "unknown" && (
         <div style={BLOCK_STYLE}>
-          <span style={LABEL_STYLE}>{t("sync.panel.usage.label")}</span>
-          <SyncUsageBlock status={accountStatus} />
-          <p style={HELPER_STYLE}>{t("sync.panel.usage.helper")}</p>
+          <span style={LABEL_STYLE}>
+            {t(
+              plane === "member"
+                ? "sync.panel.usage.memberLabel"
+                : "sync.panel.usage.label",
+            )}
+          </span>
+          <SyncUsageBlock status={accountStatus} showStorage={plane === "owner"} />
+          <p style={HELPER_STYLE}>
+            {t(
+              plane === "member"
+                ? "sync.panel.usage.memberHelper"
+                : "sync.panel.usage.helper",
+            )}
+          </p>
         </div>
       )}
 
@@ -598,6 +637,12 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
       <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
 
+      <DeviceJoinQrDialog
+        open={memberQrOpen}
+        onClose={() => setMemberQrOpen(false)}
+        variant="member"
+      />
+
       {/* What that form is replaced BY for a device that is already waiting
           (MYND-635). Stating the situation rather than offering an action,
           because there is no action to take here: approval happens on another
@@ -641,8 +686,21 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
               />
             </Tooltip>
           ) : null}
+          {/* A member's own-device QR (myne-md/myne). Same slot as the owner's
+              above and never both: this one needs no pasted account number,
+              because it describes the shared vault this device is already in. */}
+          {plane === "member" ? (
+            <Tooltip label={t("sync.memberJoinQr.title")}>
+              <IconButton
+                icon="plus"
+                label={t("sync.memberJoinQr.title")}
+                onClick={() => setMemberQrOpen(true)}
+                testId="sync.member-join-qr.open"
+              />
+            </Tooltip>
+          ) : null}
         </div>
-        <DeviceManagementPanel hook={devicesHook} />
+        <DeviceManagementPanel hook={devicesHook} plane={plane} />
       </div>
 
       {/* The B2B member roster (myne-md/myne#698): the membership extension's

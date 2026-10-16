@@ -150,6 +150,8 @@ pub fn revoke_device(
 mod tests {
     use super::*;
     use crate::plugins::sync::transport::FakeTransport;
+    use crate::plugins::vault_unlock::state::VaultRuntimeState;
+    use crate::vault_io::VaultIo as _;
 
     /// The two device MUTATIONS refuse before they resolve a vault root or read
     /// a token, when nothing is unlocked (myne#382).
@@ -413,6 +415,179 @@ mod tests {
             DeviceMgmtError::Unauthenticated
         );
     }
+
+    // ── the account plane (myne-md/myne, 2026-10-16) ─────────────────────────
+    //
+    // The defect these pin: a member vault's `sync-token` file holds a
+    // `(person, vault)` MEMBERSHIP token, and the account routes refuse it
+    // (`server-protocol.md` §3.1 lists the routes it is accepted on; `/auth/devices`
+    // is not one, because it carries no device id). Sending it anyway answered
+    // `Unauthenticated`, and the device panel renders that as "the server rejected
+    // this device's sign-in" beside a "Reset sync on this device" button that
+    // clears the very token the whole vault syncs on.
+
+    /// The plane follows the SESSION's authority, which is the only thing that
+    /// decides it. Written as a pair because the failure is asymmetric: an owner
+    /// vault mis-resolved to the person plane would read the wrong account's
+    /// roster, and a member vault mis-resolved to the vault plane is the bug.
+    #[test]
+    fn the_account_plane_follows_the_session_authority() {
+        crate::test_support::block_on(async {
+            use crate::plugins::vault_unlock::state::UnlockedVault;
+            use zeroize::Zeroizing;
+            let state = VaultRuntimeState::default();
+            let id = crate::vault_id::VaultId::mint();
+
+            state
+                .set_unlocked(
+                    id,
+                    UnlockedVault::owner(
+                        Zeroizing::new([1u8; 32]),
+                        Some(Zeroizing::new([2u8; 32])),
+                        Zeroizing::new([3u8; 32]),
+                        [4u8; 16],
+                        0,
+                        [5u8; 32],
+                    ),
+                )
+                .await;
+            assert_eq!(account_plane_from_host(&state).await, AccountPlane::Vault);
+
+            // A member session is constructed without a root key.
+            state
+                .set_unlocked(
+                    id,
+                    UnlockedVault::member(
+                        Zeroizing::new([2u8; 32]),
+                        Zeroizing::new([3u8; 32]),
+                        [4u8; 16],
+                        0,
+                        [5u8; 32],
+                    ),
+                )
+                .await;
+            assert_eq!(account_plane_from_host(&state).await, AccountPlane::Person);
+        });
+    }
+
+    /// The defect itself, plus the boundary the fix must not cross.
+    ///
+    /// On a member vault: the account plane hands back the PERSON token and the
+    /// person device id; with no person credential on the device the answer is the
+    /// honest `NotEnrolled`; and the VAULT-plane resolver still returns the vault
+    /// directory's membership token, because `ensure_owner_member_token` depends on
+    /// that resolver NOT quietly becoming member-aware.
+    #[test]
+    fn a_member_vaults_account_plane_is_the_person_account_not_the_vault_token() {
+        crate::test_support::block_on(async {
+            use crate::plugins::sync::config::{
+                config_path_from_host, write_config, SyncEndpointConfig,
+            };
+            use crate::plugins::sync::person_auth::{
+                person_auth_path, write_person_auth, PersonAuth,
+            };
+            use crate::plugins::sync::token_store::TokenStore as _;
+            use crate::plugins::vault_unlock::state::UnlockedVault;
+            use zeroize::Zeroizing;
+
+            let tmp = crate::test_support::ScopedTempDir::new("account-plane").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = &crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            let vault_id = crate::vault_id::VaultId::mint();
+
+            // The vault directory holds the membership token, exactly as
+            // `materialize_member_vault` leaves it.
+            let dir = crate::paths::vault_dir_for_id_from_host_io(&host, io, Some(vault_id))
+                .await
+                .unwrap();
+            io.create_dir_all(&dir).await.unwrap();
+            super::super::token_store::default_store()
+                .store(io, &dir, b"membership-token")
+                .await
+                .unwrap();
+
+            // A configured endpoint, so the transport builds and the assertion
+            // reads the TOKEN rather than a `NotConfigured` refusal.
+            let cfg_path = config_path_from_host(&host, io).await.unwrap();
+            write_config(
+                io,
+                &cfg_path,
+                &SyncEndpointConfig {
+                    // Loopback http: `build_transport` constructs without dialing.
+                    endpoint_url: Some("http://127.0.0.1:9".to_string()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+            state
+                .set_unlocked(
+                    vault_id,
+                    UnlockedVault::member(
+                        Zeroizing::new([2u8; 32]),
+                        Zeroizing::new([3u8; 32]),
+                        [4u8; 16],
+                        0,
+                        [5u8; 32],
+                    ),
+                )
+                .await;
+
+            // No person credential on this device (never set up, or the identity
+            // is locked/forgotten): NOT `Unauthenticated`. That distinction is the
+            // whole safety property — the panel's reset button is gated on the
+            // refusals, and this arm must not reach it.
+            assert_eq!(
+                list_devices_from_host(&host, io, &state).await.unwrap_err(),
+                SyncDeviceError::NotEnrolled,
+            );
+
+            // With one, the ACCOUNT plane returns the person token + the person
+            // device id.
+            let auth_path = person_auth_path(&host, io).await.unwrap();
+            let person_device = "bb".repeat(16);
+            write_person_auth(
+                io,
+                &auth_path,
+                &PersonAuth {
+                    person_id_hex: "aa".repeat(16),
+                    device_id_hex: person_device.clone(),
+                    token_hex: "cc".repeat(32),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            let (credential, _transport) = account_plane_transport_from_host(&host, io, &state)
+                .await
+                .unwrap();
+            assert_eq!(
+                credential.token_hex,
+                "cc".repeat(32),
+                "a member vault's account plane must carry the PERSON token"
+            );
+            assert_eq!(
+                credential.device_id_hex.as_deref(),
+                Some(person_device.as_str()),
+                "the roster's This-device marker matches the PERSON device id, not \
+                 the vault directory's CRDT actor id"
+            );
+
+            // …and the VAULT plane is untouched: the membership token, hex-encoded.
+            let (vault_token, _t) = authed_transport_from_host(&host, io, &state).await.unwrap();
+            let mut expected = String::new();
+            for b in b"membership-token" {
+                expected.push_str(&format!("{b:02x}"));
+            }
+            assert_eq!(
+                vault_token, expected,
+                "the vault-plane resolver keeps reading the vault directory, which is \
+                 what the owner registration needs"
+            );
+        });
+    }
 }
 
 // ── the command cores, lifted out of the host-gated `commands.rs` ───────────
@@ -609,25 +784,101 @@ pub fn hex16(s: &str) -> Option<[u8; 16]> {
     Some(out)
 }
 
-/// Resolve the per-device token (hex) + a transport for the configured endpoint.
+/// Which ACCOUNT the device-management + account-status plane speaks for.
 ///
-/// The precondition for every authed command below, and the reason they could be
-/// ported as a group: none of them needs `root_key` (device management is
-/// token-authed), so this is the whole of what they required from the host.
-pub async fn authed_transport_from_host(
+/// `Vault` is the vault account itself: the token in the vault directory is that
+/// account's per-device token, so it authorizes the sync routes AND `/auth/*`.
+///
+/// `Person` is the MEMBER's own account, and it exists because the VAULT plane
+/// cannot serve a member. A member vault's `sync-token` file holds the
+/// `(person, vault)` **membership token** written at accept/join
+/// (`person_account.rs`), and the server refuses that credential on the account
+/// routes: `docs/spec/server-protocol.md` §3.1 lists the routes a membership
+/// token is accepted on (`/sync/*`, `/account/status`) and `/auth/devices` is not
+/// among them, because the token is bound to a binding and **carries no device
+/// id**. The member's own account plane is authenticated instead by the
+/// device-scoped token in `person-auth.json` — a §3.1 device token of the person
+/// account, which those routes DO accept.
+///
+/// Getting this wrong is not a cosmetic error, which is why it is an enum at one
+/// resolver rather than a bool at one call site: on a member vault the vault
+/// token is PRESENT and REJECTED, so the roster call answers `Unauthenticated`,
+/// which the device panel renders as "the server rejected this device's
+/// sign-in" beside a **"Reset sync on this device"** button. That button clears
+/// the member's membership token — the credential the entire vault syncs on,
+/// which no UI path can restore (myne-md/myne, 2026-10-16).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccountPlane {
+    Vault,
+    Person,
+}
+
+/// The ACTIVE vault's account plane.
+///
+/// Read off the unlock slot rather than off disk, because
+/// [`crate::plugins::vault_unlock::state::UnlockedVault::authority`] is exactly
+/// this question (it is `root_key.is_some()`, the same fact `sync_list_roster`
+/// branches on to pick the owner's own identity over the pinned one) and a
+/// member session is constructed without a root key by definition.
+///
+/// The Settings panels decide the same thing from disk, through
+/// `sync_member_vault_status` → the device-local member-key store, which is the
+/// predicate `VaultPanel` already uses to hide the owner password section
+/// (`myne-md/myne#858`). The two cannot disagree in practice: a member vault is
+/// materialized with that store or not at all, and a missing store refuses the
+/// materialization rather than producing a half-member session.
+///
+/// Public because two other callers ask the same question: the member QR command
+/// (`sync_member_join_qr`, which only a member session may render) and this
+/// module's own tests.
+pub async fn account_plane_from_host(
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> AccountPlane {
+    use crate::plugins::vault_unlock::state::{Slot, VaultAuthority};
+    let slot = state.slot_read_active().await;
+    match &*slot {
+        Slot::Unlocked(uv) if matches!(uv.authority(), VaultAuthority::Member) => {
+            AccountPlane::Person
+        }
+        _ => AccountPlane::Vault,
+    }
+}
+
+/// The account plane's bearer token (hex) + the device id that identifies THIS
+/// device **on that plane**, for the roster's "This device" marker.
+pub(crate) struct AccountPlaneCredential {
+    /// Hex bearer token for the account routes. Never logged, never crosses IPC.
+    token_hex: String,
+    /// The `device_id` this device is registered under on that plane. `None`
+    /// when it cannot be read — the marker is cosmetic, so the roster still
+    /// renders rather than failing over a label.
+    ///
+    /// The two planes store different ids, and this is the field a reader is
+    /// most likely to get wrong: on a member vault the vault directory's
+    /// `device_id_hex` is a freshly minted **CRDT actor id**
+    /// (`materialize_member_vault`), NOT the person account's device id, so
+    /// matching the person roster against it would mark no row at all.
+    device_id_hex: Option<String>,
+}
+
+/// Resolve the active vault's account-plane credential + a transport for the
+/// configured endpoint.
+///
+/// The precondition for the four account-plane commands below
+/// ([`list_devices_from_host`], [`approve_device_from_host`],
+/// [`remove_device_from_host`], [`account_status_from_host`]). It is NOT the
+/// sync plane: the sync cycle reads its token straight off the vault directory
+/// (`cycle.rs`), where a membership token is exactly right, and neither
+/// function may be swapped for the other in either direction.
+pub(crate) async fn account_plane_transport_from_host(
     host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
-) -> Result<(String, Box<dyn SyncTransport>), SyncDeviceError> {
-    use super::token_store::TokenStore as _;
-    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
-        .map_err(|_| SyncDeviceError::Internal)?;
-    let token = super::token_store::default_store()
-        .read(io, &dir)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?
-        .ok_or(SyncDeviceError::NotEnrolled)?;
-    let token_hex = super::to_hex(&token);
+) -> Result<(AccountPlaneCredential, Box<dyn SyncTransport>), SyncDeviceError> {
+    let credential = match account_plane_from_host(state).await {
+        AccountPlane::Person => person_plane_credential_from_host(host, io).await?,
+        AccountPlane::Vault => vault_plane_credential_from_host(host, io, state).await?,
+    };
     let cfg_path = super::config::config_path_from_host(host, io)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
@@ -637,7 +888,90 @@ pub async fn authed_transport_from_host(
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
     let transport =
         super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
-    Ok((token_hex, transport))
+    Ok((credential, transport))
+}
+
+/// The member's OWN account credential: the device-scoped person token.
+///
+/// `NotEnrolled` when this device holds no person account, or holds one whose
+/// identity is locked/forgotten (an empty token). That is the honest answer and
+/// the safe one: the panel then says this device is not connected to sync rather
+/// than offering the destructive local reset.
+async fn person_plane_credential_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<AccountPlaneCredential, SyncDeviceError> {
+    let path = super::person_auth::person_auth_path_for_read(host)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let (token_hex, device_id_hex) = match auth {
+        Some(a) => (a.token_hex, Some(a.device_id_hex)),
+        None => (String::new(), None),
+    };
+    if token_hex.is_empty() {
+        return Err(SyncDeviceError::NotEnrolled);
+    }
+    Ok(AccountPlaneCredential {
+        token_hex,
+        device_id_hex,
+    })
+}
+
+/// The VAULT account's credential: the per-device token in the vault directory.
+async fn vault_plane_credential_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> Result<AccountPlaneCredential, SyncDeviceError> {
+    use super::token_store::TokenStore as _;
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let token = super::token_store::default_store()
+        .read(io, &dir)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+    // `.ok()` is deliberate HERE and nowhere else (task 86): nothing is written
+    // back, and the only consequence of not knowing our own `device_id` is that
+    // the roster does not mark which row is this device. A cosmetic degrade on a
+    // read-only path.
+    let device_id_hex = super::state::read_sync_state(io, &dir)
+        .await
+        .ok()
+        .and_then(|st| st.device_id_hex);
+    Ok(AccountPlaneCredential {
+        token_hex: super::to_hex(&token),
+        device_id_hex,
+    })
+}
+
+/// The per-device token of the vault account + a transport for the configured
+/// endpoint.
+///
+/// **This is the VAULT plane and nothing else.** It is the credential the owner
+/// registration needs (`ensure_owner_member_token`), which is an owner-only call
+/// site, and it deliberately does NOT learn about member vaults: on a member
+/// vault the file it reads holds a membership token that `/auth/*` refuses, and
+/// a caller that needs the account plane must use
+/// [`account_plane_transport_from_host`] instead.
+pub async fn authed_transport_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> Result<(String, Box<dyn SyncTransport>), SyncDeviceError> {
+    let credential = vault_plane_credential_from_host(host, io, state).await?;
+    let cfg_path = super::config::config_path_from_host(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let cfg = super::config::read_config(io, &cfg_path)
+        .await
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+    let transport =
+        super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
+    Ok((credential.token_hex, transport))
 }
 
 /// The server's `GET /account/status` projection (MYND-506 server-side; MYND-570
@@ -664,33 +998,33 @@ pub struct AccountStatusView {
 }
 
 /// List the account's devices, marking which row is this device.
+///
+/// "The account" is the active vault's account PLANE, not necessarily the vault:
+/// on a member vault this lists the member's OWN person-account devices, because
+/// that is the account whose device registry the caller can authenticate against
+/// (see [`AccountPlane`]).
 pub async fn list_devices_from_host(
     host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
 ) -> Result<Vec<DeviceEntry>, SyncDeviceError> {
-    // The locally-stored device_id identifies which roster entry is "this
-    // device" (the server roster never marks it — it cannot know which client is
-    // asking). Read it BEFORE the transport call, which consumes the token.
-    let current_device =
-        match crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await) {
-            // `.ok()` is deliberate HERE and nowhere else (task 86): nothing is
-            // written back, and the only consequence of not knowing our own
-            // `device_id` is that the roster does not mark which row is this
-            // device. A cosmetic degrade on a read-only path.
-            Ok(dir) => super::state::read_sync_state(io, &dir)
-                .await
-                .ok()
-                .and_then(|st| st.device_id_hex),
-            Err(_) => None,
-        };
-    let (token, transport) = authed_transport_from_host(host, io, state).await?;
-    let mut roster = crate::task::run_blocking(move || list_devices(transport.as_ref(), &token))
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?
-        .map_err(SyncDeviceError::from_mgmt)?;
+    // The plane resolves the token AND the id that identifies this device on it,
+    // because the server roster never marks it — it cannot know which client is
+    // asking. Both come from the same read, so the marker cannot match against
+    // the wrong plane's id (on a member vault the vault directory's id is a CRDT
+    // actor id, not a device id).
+    let (credential, transport) = account_plane_transport_from_host(host, io, state).await?;
+    let AccountPlaneCredential {
+        token_hex,
+        device_id_hex,
+    } = credential;
+    let mut roster =
+        crate::task::run_blocking(move || list_devices(transport.as_ref(), &token_hex))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(SyncDeviceError::from_mgmt)?;
     for d in &mut roster {
-        d.is_current = Some(&d.device_id_hex) == current_device.as_ref();
+        d.is_current = Some(&d.device_id_hex) == device_id_hex.as_ref();
     }
     Ok(roster)
 }
@@ -708,7 +1042,8 @@ pub async fn approve_device_from_host(
     }
 
     let id = hex16(device_id_hex).ok_or(SyncDeviceError::BadRequest)?;
-    let (token, transport) = authed_transport_from_host(host, io, state).await?;
+    let (credential, transport) = account_plane_transport_from_host(host, io, state).await?;
+    let token = credential.token_hex;
     let outcome =
         crate::task::run_blocking(move || approve_device(transport.as_ref(), &token, &id))
             .await
@@ -747,7 +1082,8 @@ pub async fn remove_device_from_host(
     }
 
     let id = hex16(device_id_hex).ok_or(SyncDeviceError::BadRequest)?;
-    let (token, transport) = authed_transport_from_host(host, io, state).await?;
+    let (credential, transport) = account_plane_transport_from_host(host, io, state).await?;
+    let token = credential.token_hex;
     crate::task::run_blocking(move || revoke_device(transport.as_ref(), &token, &id))
         .await
         .map_err(|_| SyncDeviceError::Internal)?
@@ -771,9 +1107,11 @@ pub async fn account_status_from_host(
     io: &dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
 ) -> Result<Option<AccountStatusView>, super::config::SyncConfigError> {
-    let Ok((token, transport)) = authed_transport_from_host(host, io, state).await else {
+    let Ok((credential, transport)) = account_plane_transport_from_host(host, io, state).await
+    else {
         return Ok(None);
     };
+    let token = credential.token_hex;
     let parsed = crate::task::run_blocking(move || {
         let resp = transport
             .request(HttpMethod::Get, "/account/status", &[], Some(&token))

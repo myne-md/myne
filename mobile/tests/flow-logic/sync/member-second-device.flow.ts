@@ -160,8 +160,6 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     // the point is that the wizard never grows such a field as it advances.
     const expectNoOwnerCode = async (): Promise<void> => {
       await expect(page.getByTestId("identity-flow.accept-owner-code")).toHaveCount(0);
-      await expect(page.getByTestId("identity-flow.accept-inspect")).toHaveCount(0);
-      await expect(page.getByTestId("identity-flow.accept-owner-fingerprint")).toHaveCount(0);
     };
     await expectNoOwnerCode();
 

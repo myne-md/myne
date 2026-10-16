@@ -5,8 +5,8 @@
 // # Why they are steps now
 //
 // Accepting an invitation collects three independent things: the owner's
-// identity code and its out-of-band fingerprint confirmation, the person's OWN
-// recovery phrase, and a password for this device. The single long form these
+// identity code, the person's OWN recovery phrase, and a password for this
+// device. The single long form these
 // flows used to be asked for all three at once, so the submit sat below the
 // fold and every field competed for one screen. Each step now asks one
 // question and says which question it is (`WizardStepCounter`), and the steps
@@ -57,48 +57,12 @@ import {
 } from "../../lib/personAccount";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
-import { inspectInviteCode } from "../../lib/invite";
 
 const BODY_SMALL_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-sm)",
   lineHeight: "var(--leading-normal)",
   color: "var(--fg-2)",
-};
-
-const STACK_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-};
-
-const FINGERPRINT_STYLE: CSSProperties = {
-  display: "block",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-2)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  padding: "var(--space-2) var(--space-3)",
-  wordBreak: "break-all",
-  userSelect: "all",
-};
-
-const CHECKBOX_LABEL_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  cursor: "pointer",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-};
-
-const CHECKBOX_STYLE: CSSProperties = {
-  width: 16,
-  height: 16,
-  accentColor: "var(--accent)",
-  flexShrink: 0,
 };
 
 const ACTIONS_ROW_STYLE: CSSProperties = {
@@ -224,19 +188,16 @@ function PhraseStepBody({
 }
 
 /**
- * Accepting an invitation, in three steps: verify the owner, enter the phrase,
- * choose a password.
+ * Accepting an invitation, in three steps: paste the owner's identity code,
+ * enter the phrase, choose a password.
  *
- * The fingerprint confirmation is step 1's gate rather than a checkbox buried
- * under the phrase grid: it is the one step whose failure is a security
- * failure, and the copy says so.
+ * The owner's code is a pinned input: the accepted group package is verified
+ * against it, so a server that substitutes the owner's key is refused there.
  */
 export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizardProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [ownerCode, setOwnerCode] = useState("");
-  const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [cells, setCells] = useState<string[]>(() => emptyPhraseCells());
@@ -247,16 +208,6 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
   const goToPhrase = () => {
     clearError();
     setStep(1);
-  };
-
-  const inspect = async () => {
-    clearError();
-    try {
-      const view = await inspectInviteCode(ownerCode.trim());
-      setOwnerFingerprint(view.fingerprint_hex);
-    } catch {
-      setError(t("identityHome.acceptInvalid"));
-    }
   };
 
   const submit = async (password: string) => {
@@ -304,45 +255,11 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
                 value={ownerCode}
                 onChange={(e) => {
                   setOwnerCode(e.target.value);
-                  // The code changed, so the fingerprint that was read from it
-                  // is no longer about this code.
-                  setOwnerFingerprint(null);
-                  setConfirmed(false);
                   clearError();
                 }}
                 rows={3}
                 style={MULTILINE_STYLE}
               />
-              {ownerFingerprint === null ? (
-                <Button
-                  type="button"
-                  data-testid="identity-home.accept-inspect"
-                  disabled={ownerCode.trim() === ""}
-                  onClick={inspect}
-                >
-                  {t("identityHome.acceptInspect")}
-                </Button>
-              ) : (
-                <div data-testid="identity-home.accept-sas" style={STACK_STYLE}>
-                  <p style={BODY_SMALL_STYLE}>{t("identityHome.acceptSasHint")}</p>
-                  <code
-                    data-testid="identity-home.accept-owner-fingerprint"
-                    style={FINGERPRINT_STYLE}
-                  >
-                    {ownerFingerprint}
-                  </code>
-                  <label style={CHECKBOX_LABEL_STYLE}>
-                    <input
-                      type="checkbox"
-                      data-testid="identity-home.accept-confirm"
-                      checked={confirmed}
-                      onChange={(e) => setConfirmed(e.target.checked)}
-                      style={CHECKBOX_STYLE}
-                    />
-                    {t("identityHome.acceptConfirm")}
-                  </label>
-                </div>
-              )}
             </StepCard>
             {error ? (
               <DestructiveBanner testId="identity-home.accept-error">{error}</DestructiveBanner>
@@ -360,7 +277,7 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
               <Button
                 variant="primary"
                 data-testid="identity-home.accept-continue"
-                disabled={!confirmed}
+                disabled={ownerCode.trim() === ""}
                 onClick={goToPhrase}
               >
                 {t("common.continue")}
@@ -424,11 +341,11 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
               label={t("identityHome.stepDevicePassword")}
             />
             <StepHeading>{t("identityHome.passwordHeading")}</StepHeading>
-            {/* The form's own submit IS the accept button, so the phrase, the
-                out-of-band confirmation and a password meeting the project
-                floor are all satisfied in one gesture, and an accepted vault
-                always carries a credential this device can open it with. The
-                copy says plainly that this is not the owner's password. */}
+            {/* The form's own submit IS the accept button, so the phrase and a
+                password meeting the project floor are both satisfied in one
+                gesture, and an accepted vault always carries a credential this
+                device can open it with. The copy says plainly that this is not
+                the owner's password. */}
             {/* The two password fields live in `PasswordCreateForm`, whose own state
                 lasts one step: Back to the phrase and forward again remounts the
                 form, so the password is retyped. Deliberate, and the opposite of
@@ -441,7 +358,7 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
             <PasswordCreateForm
               testIdPrefix="identity-home.accept"
               submitLabel={t("identityHome.acceptSubmit")}
-              disabled={submitting || !confirmed || !phraseReady}
+              disabled={submitting || !phraseReady}
               autoFocus={false}
               fieldsCard
               errorBanner={

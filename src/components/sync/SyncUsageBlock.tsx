@@ -63,7 +63,29 @@ function fillRatio(used: number, ceiling: number): number {
   return Math.max(0, Math.min(1, used / ceiling));
 }
 
-export function SyncUsageBlock({ status }: { status: AccountStatus }) {
+export function SyncUsageBlock({
+  status,
+  showStorage,
+}: {
+  status: AccountStatus;
+  /**
+   * Whether to render the STORAGE row and its meter. True only where the account
+   * plane is known to be this person's own vault (myne-md/myne): on a member vault
+   * the projection is the member's PERSON account, whose namespace holds none of
+   * the shared vault's blobs, so the figure would read "0 B of 5 GB" above a vault
+   * full of notes, which is true and misleading at once. The vault's real footprint
+   * is the owner's account's business.
+   *
+   * The device row is always rendered, and is meaningful on both planes: it counts
+   * the devices of whichever account this is and matches the roster above it.
+   *
+   * Required rather than defaulted, because the two callers know the plane and the
+   * component does not: a `false` default would be right for the member and wrong
+   * for the owner, and a `true` default would re-print the member's misleading
+   * figure.
+   */
+  showStorage: boolean;
+}) {
   const { t } = useTranslation();
   const storageUnlimited = isUnlimited(status.quota_bytes);
   const devicesUnlimited = isUnlimited(status.max_devices);
@@ -74,37 +96,41 @@ export function SyncUsageBlock({ status }: { status: AccountStatus }) {
       data-testid="sync.usage"
       style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
     >
-      <div style={ROW_STYLE} data-testid="sync.usage-storage">
-        <span style={TERM_STYLE}>{t("sync.usage.storage")}</span>
-        <span style={VALUE_STYLE}>
-          {storageUnlimited
-            ? formatBytes(status.stored_bytes)
-            : t("sync.usage.ofTotal", {
-                used: formatBytes(status.stored_bytes),
-                total: formatBytes(status.quota_bytes),
-              })}
-        </span>
-      </div>
+      {showStorage && (
+        <>
+          <div style={ROW_STYLE} data-testid="sync.usage-storage">
+            <span style={TERM_STYLE}>{t("sync.usage.storage")}</span>
+            <span style={VALUE_STYLE}>
+              {storageUnlimited
+                ? formatBytes(status.stored_bytes)
+                : t("sync.usage.ofTotal", {
+                    used: formatBytes(status.stored_bytes),
+                    total: formatBytes(status.quota_bytes),
+                  })}
+            </span>
+          </div>
 
-      {/* Unlimited renders no meter — there is nothing to measure against. */}
-      {!storageUnlimited && (
-        <div
-          style={METER_TRACK_STYLE}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={status.quota_bytes}
-          aria-valuenow={status.stored_bytes}
-          aria-label={t("sync.usage.storage")}
-          data-testid="sync.usage-meter"
-        >
-          <div
-            style={{
-              width: `${ratio * 100}%`,
-              height: "100%",
-              background: "var(--accent)",
-            }}
-          />
-        </div>
+          {/* Unlimited renders no meter — there is nothing to measure against. */}
+          {!storageUnlimited && (
+            <div
+              style={METER_TRACK_STYLE}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={status.quota_bytes}
+              aria-valuenow={status.stored_bytes}
+              aria-label={t("sync.usage.storage")}
+              data-testid="sync.usage-meter"
+            >
+              <div
+                style={{
+                  width: `${ratio * 100}%`,
+                  height: "100%",
+                  background: "var(--accent)",
+                }}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <div style={ROW_STYLE} data-testid="sync.usage-devices">

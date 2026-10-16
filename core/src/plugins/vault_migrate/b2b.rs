@@ -57,12 +57,21 @@ type EncodeOpaque<E> = fn(&[u8; 32], &[u8; 16], &[u8]) -> Result<Vec<u8>, E>;
 
 /// Migrate an unlocked owner vault after the user explicitly starts its first
 /// B2B action. The caller owns the lifecycle permit and lock ordering.
+///
+/// `owner_person_id` is the owner's own `person_id_hash`, from the session's
+/// person identity. It is written onto the owner's roster row so the roster can
+/// map that row to the owner's `vault.member-names` record (the store is keyed
+/// by person id, and the member list resolves a name by looking the row's person
+/// id up in it). Omitting it is not cosmetic: the owner's own chosen name would
+/// never resolve, so the list would keep offering "Set a name" and every other
+/// member would read the owner as a bare fingerprint.
 pub async fn migrate_owner_vault_to_ntv6(
     io: &dyn VaultIo,
     vault_root: &Path,
     root_key: &[u8; 32],
     items_key: &[u8; 32],
     owner: &protocol::PersonKeyPair,
+    owner_person_id: &[u8; 16],
     owner_display_name: &str,
 ) -> Result<B2bMigrationOutput, B2bMigrationError> {
     let meta_path = vault_root.join("vault.meta");
@@ -129,8 +138,10 @@ pub async fn migrate_owner_vault_to_ntv6(
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
     let mut members = vec![protocol::person_invite::GroupRosterMember {
         fingerprint_hex: owner_fingerprint.clone(),
-        // The pre-B2B migration has no person account id for the owner row.
-        person_id_hex: None,
+        // The owner's own person id, so the roster can map this row to the name
+        // the owner writes in `vault.member-names` (keyed by person id). The old
+        // `None` here left the owner's own name unresolvable on every device.
+        person_id_hex: Some(hex_lower(owner_person_id)),
         display_name: owner_display_name.to_owned(),
         role: protocol::person_invite::GroupRosterRole::Owner,
         state: protocol::person_invite::GroupMemberState::Live,
@@ -719,6 +730,7 @@ mod tests {
                 &owner_root,
                 &items,
                 &owner(),
+                &[0x11u8; 16],
                 "Owner",
             )
             .await
@@ -733,8 +745,34 @@ mod tests {
                 b"attachment-ciphertext"
             );
             let meta = std::fs::read(root.join("vault.meta")).unwrap();
-            assert!(protocol::parse_vault_meta_ntv6(&meta).is_ok());
+            let parsed = protocol::parse_vault_meta_ntv6(&meta).expect("ntv6");
             assert!(!root.join(B2B_MIGRATION_JOURNAL).exists());
+
+            // The owner row carries the person id, so the roster can map it to the
+            // owner's `vault.member-names` record. Without it the owner's own name
+            // never resolves on any device.
+            let envelope = protocol::person_invite::open_group_roster(
+                &out.group_key,
+                &parsed.base.account_number_hash,
+                parsed.group_key_epoch,
+                &parsed.signed_roster_envelope,
+            )
+            .expect("roster opens under the group key");
+            let roster = protocol::person_invite::verify_group_roster(
+                &owner().public_half(),
+                &envelope,
+                &parsed.base.account_number_hash,
+            )
+            .expect("roster verifies");
+            let owner_row = roster
+                .members
+                .iter()
+                .find(|m| m.role == protocol::person_invite::GroupRosterRole::Owner)
+                .expect("owner row");
+            assert_eq!(
+                owner_row.person_id_hex.as_deref(),
+                Some("11".repeat(16).as_str())
+            );
         });
     }
 
@@ -766,9 +804,17 @@ mod tests {
 
             // Build a valid committed journal through the production migration,
             // then reconstruct the interrupted state with one expected target wrong.
-            migrate_owner_vault_to_ntv6(&StdVaultIo, root, &owner_root, &items, &owner, "Owner")
-                .await
-                .unwrap();
+            migrate_owner_vault_to_ntv6(
+                &StdVaultIo,
+                root,
+                &owner_root,
+                &items,
+                &owner,
+                &[0x11u8; 16],
+                "Owner",
+            )
+            .await
+            .unwrap();
             let ntv6 = std::fs::read(root.join("vault.meta")).unwrap();
             let journal = Journal {
                 meta: ntv6,
@@ -827,6 +873,7 @@ mod tests {
                         &owner_root,
                         &items,
                         &owner(),
+                        &[0x11u8; 16],
                         "Owner",
                     )
                     .await

@@ -32,7 +32,6 @@ permissions = [
     "allow-sync-now",
     "allow-resolve-identity",
     "allow-sync-person-create-invite",
-    "allow-sync-person-inspect-invite-code",
     "allow-sync-list-vault-invites",
     "allow-sync-person-accept-invite",
     "allow-sync-member-join-vault",
@@ -76,6 +75,7 @@ permissions = [
     "allow-sync-restore-quarantine",
     "allow-sync-delete-quarantine",
     "allow-sync-device-join-qr",
+    "allow-sync-member-join-qr",
     "allow-sync-beta-terms-accepted",
     "allow-sync-accept-beta-terms",
     "allow-sync-get-tor-routing",
@@ -166,11 +166,6 @@ commands.allow = ["sync_start_b2b_migration"]
 identifier = "allow-sync-person-create-invite"
 description = "Allow invoking sync:sync_person_create_invite (B2B invite by person identity code: decode the invitee's public halves from the pasted out-of-band code, seal the invite locally, bind the owner person to the vault once, and POST the sealed frame to the relay with the owner's per-vault token). Requires an unlocked active vault held as owner PLUS a held person identity; the recipient code carries public material only."
 commands.allow = ["sync_person_create_invite"]
-
-[[permission]]
-identifier = "allow-sync-person-inspect-invite-code"
-description = "Allow invoking sync:sync_person_inspect_invite_code (pure: parse a pasted person identity code and return the person id + SAS fingerprint for the out-of-band compare; no vault, no network)."
-commands.allow = ["sync_person_inspect_invite_code"]
 
 [[permission]]
 identifier = "allow-sync-list-vault-invites"
@@ -341,6 +336,11 @@ commands.allow = ["sync_delete_quarantine"]
 identifier = "allow-sync-device-join-qr"
 description = "Allow invoking sync:sync_device_join_qr (MYND-466 — render a device-join QR for the user-pasted account number + this device's own endpoint/cert-pin. Read-only affordance: reads the endpoint config, moves no vault bytes, carries no secret in the QR — SYNC-47. The account# is a paste argument, never read from storage)."
 commands.allow = ["sync_device_join_qr"]
+
+[[permission]]
+identifier = "allow-sync-member-join-qr"
+description = "Allow invoking sync:sync_member_join_qr (myne-md/myne — render a device-join QR for ANOTHER DEVICE OF THE SAME PERSON in the shared vault this device is a member of. Reads the endpoint config and the ACTIVE member vault's own account hash from device-local sync state; the vault id is resolved backend-side and never arrives as an argument. Refuses on any non-member session, so it cannot describe an owner's vault. Read-only, moves no vault bytes, and carries no secret (the scanner is still asked for the 24-word phrase) — SYNC-47.)"
+commands.allow = ["sync_member_join_qr"]
 
 [[permission]]
 identifier = "allow-sync-beta-terms-accepted"
