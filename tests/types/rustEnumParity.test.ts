@@ -386,6 +386,23 @@ const STRUCT_MIRRORS: StructMirror[] = [
     rs: "core/src/plugins/sync/identity_resolver.rs",
     rsStruct: "DeviceAttributionView",
   },
+  {
+    // The diagnostic plugin's two payload structs (myne-md/myne#860). They were
+    // hand-mirrored in the same seam whose ENUM got a row and they had none, so a
+    // renamed `at_epoch_seconds` folded to an unknown date and a renamed
+    // `log_files` read as `undefined` inside the manifest sentence, with every
+    // gate green (myne#860 third-round review).
+    ts: "src/platform/diagnostics.ts",
+    tsType: "CrashState",
+    rs: "src-tauri/src/logging/crash.rs",
+    rsStruct: "CrashState",
+  },
+  {
+    ts: "src/platform/diagnostics.ts",
+    tsType: "ReportManifest",
+    rs: "src-tauri/src/plugins/diagnostics/report.rs",
+    rsStruct: "ReportManifest",
+  },
 ];
 
 /**
