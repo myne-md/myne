@@ -5421,7 +5421,7 @@ export const ROSTER = Object.freeze([
       "e2e/developer-mode.e2e.ts",
     ],
     manual: [],
-    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). Version/channel/commit are compile-time defines a scenario compares against package.json and git HEAD; the served bundle hash is comparable against version.json inside scripts/web-smoke.sh, which already runs against the public origin; the per-language legal slug is a pure function plus an interception of the opener IPC (the same template note-export.e2e.ts uses for plugin:dialog|save); and the no-browser-handler failure path is the e2e container's DEFAULT state.",
+    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). Version/channel/commit are compile-time defines a scenario compares against package.json and git HEAD; the bundle hash the About panel renders is the one the build wrote into version.json, so it is comparable on one runner without a live origin (which is the only way it CAN be checked since 2026-10-16, when the hosted origin closed); the legal link set is a single document, the privacy policy, and its per-language slug is a pure function plus an interception of the opener IPC (the same template note-export.e2e.ts uses for plugin:dialog|save); and the no-browser-handler failure path is the e2e container's DEFAULT state.",
   },
   {
     id: "settings.panel.account",

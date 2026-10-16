@@ -3131,9 +3131,6 @@
       "legalLabel": "Právní informace",
       "legalHelper": "Otevře se na myne.md ve vašem prohlížeči. Německy tam, kde je rozhraní německé.",
       "legalPrivacy": "Zásady ochrany osobních údajů",
-      "legalTerms": "Podmínky bety",
-      "legalNotice": "Nahlásit nezákonný obsah",
-      "legalLawEnforcement": "Žádosti orgánů činných v trestním řízení",
       "licenseBody": "Pre-alfa · dokumentace CC-BY-4.0 · kód aplikace AGPL-3.0 při vydání 1. fáze.",
       "licenseLabel": "Licence",
       "tagline": "Pre-alfa · desktopový klient 1. fáze",
@@ -4208,10 +4205,6 @@
       "intro": "Synchronizace odesílá vaše poznámky zašifrované na server. Nejdřív je dobré vědět čtyři věci.",
       "whatThisIsLabel": "Co to je",
       "dataLossLabel": "Pokud přijdete o heslo i frázi pro obnovení",
-      "whatHappensNextLabel": "Až beta skončí",
-      "whatWeCanSeeLabel": "Co vidíme my",
-      "readFull": "Přečíst celé podmínky",
-      "review": "Zkontrolovat podmínky bety",
       "accept": "Rozumím, zapnout synchronizaci"
     },
     "materialising": "Stahují se vaše poznámky: {{done}} z {{total}}. Můžete začít pracovat; zbytek se objeví, jak bude přicházet.",
@@ -4335,8 +4328,7 @@
       "tlsHelp": "Na každém zařízení zadejte stejnou adresu serveru. Server, který provozujete sami, potřebuje důvěryhodný HTTPS certifikát.",
       "tlsFailure": "HTTPS certifikát serveru se nepodařilo ověřit. Zkontrolujte adresu serveru, certifikát a jeho platnost.",
       "inviteLabel": "Pozvánkový kód (jen pokud ho tento server vyžaduje)",
-      "invitePlaceholder": "Kód, který vám dal provozovatel serveru",
-      "changeInviteCode": "Změnit pozvánkový kód"
+      "invitePlaceholder": "Kód, který vám dal provozovatel serveru"
     },
     "enroll": {
       "accountNumberLabel": "Číslo účtu",
@@ -5604,18 +5596,10 @@
   "firstRun": {
     "server": {
       "heading": "Zvolte synchronizační server",
-      "chooseHeading": "Kam se mají vaše poznámky synchronizovat?",
-      "chooseIntro": "Myne potřebuje server, který uchová vaše zašifrované poznámky a přes nějž vás zastihnou pozvánky. Použijte službu Myne Sync, nebo namiřte toto zařízení na server, který provozujete sami. V obou případech zůstávají vaše poznámky zašifrované na tomto zařízení, než ho opustí; server ukládá jen šifrovaný text.",
-      "myneSyncHint": "Server provozovaný Myne. Jeho HTTPS certifikát se kontroluje automaticky.",
       "intro": "Myne potřebuje server, který uchová vaše zašifrované poznámky a přes nějž vás zastihnou pozvánky. Vaše poznámky zůstávají zašifrované na tomto zařízení, než ho opustí; server ukládá jen šifrovaný text.",
       "notConfigured": "Zadejte výše adresu serveru a pokračujte stisknutím Připojit.",
       "back": "Zpět",
-      "continue": "Pokračovat",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Váš vlastní server",
-      "selfHostedHint": "Synchronizační server, který provozujete. Jeho adresu zadáte na další obrazovce.",
-      "connectAction": "Připojit",
-      "setUpAction": "Nastavit"
+      "continue": "Pokračovat"
     }
   },
   "identityFlow": {
@@ -5630,8 +5614,6 @@
       "title": "Zvolte synchronizační server",
       "lead": "Vaše poznámky zůstávají zašifrované na tomto zařízení, než ho opustí. Server ukládá jen šifrovaný text.",
       "urlLabel": "Adresa serveru",
-      "useMyneSync": "Použít Myne Sync",
-      "selfHostedHint": "Nebo zadejte adresu serveru, který provozujete sami.",
       "connect": "Připojit",
       "connecting": "Připojuje se…"
     },

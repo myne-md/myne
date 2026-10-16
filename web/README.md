@@ -110,10 +110,11 @@ runs the seam contract against this implementation plus the artefact greps, the
 bundle budget and the screen/surface/testid rosters; `e2e-web` drives the built
 bundle in a real browser. Publishing is **by hand** and not in the pipeline
 (myne-md/myne#584): `web-container-check` builds the `container/` image to ask it
-questions, and the deploy that publishes `app.myne.md` is one procedure in the
-`myne-ops` runbook `web-client-deploy.md`, carrying its
-`check-bundle-record.mjs --has` precondition against
-[`docs/web-bundle-hashes.md`](../docs/web-bundle-hashes.md) and its post-deploy smoke.
+questions. The procedure that used to publish `app.myne.md` is in the `myne-ops`
+runbook `web-client-deploy.md`, and it is retired as of 2026-10-16: the
+maintainer-run origin closed, so a bundle now reaches users only from an origin
+they or someone else runs. The `check-bundle-record.mjs --has` precondition it
+carried is likewise no longer a deploy gate.
 CI verifies and does not publish, so a green pipeline is not a release.
 
 **Durability is not the desktop's, and cannot be.** OPFS offers no crash-atomic

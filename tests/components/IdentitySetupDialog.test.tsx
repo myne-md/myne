@@ -84,29 +84,25 @@ describe("IdentitySetupDialog", () => {
     );
   });
 
-  it("fronts the first-run server choice when no endpoint is configured", async () => {
+  it("fronts the first-run server step when no endpoint is configured", async () => {
     invoke.mockReset().mockResolvedValue({ endpoint_url: null });
     render(<IdentitySetupDialog open onClose={() => {}} />);
 
     const step = await screen.findByTestId("first-run-server.root");
     expect(step).toBeTruthy();
-    // Both doors are offered, and the identity form is not reachable until a
-    // server is configured.
-    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
-    expect(screen.getByTestId("first-run-server.self-hosted")).toBeTruthy();
+    // The URL form is the only door, and there is no hosted one. The identity
+    // form is not reachable until a server is configured.
+    expect(screen.getByTestId("sync.endpoint-config")).toBeTruthy();
+    expect(screen.queryByTestId("first-run-server.myne-sync")).toBeNull();
     expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
   });
 
-  it("offers both server choices without Settings when a vault-less device has an old endpoint", async () => {
+  it("reaches the server step without Settings when a vault-less device has an old endpoint", async () => {
     render(<IdentitySetupDialog open onClose={() => {}} />);
     fireEvent.click(await screen.findByTestId("identity-setup.change-server"));
 
-    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
-    expect(screen.getByTestId("first-run-server.self-hosted")).toBeTruthy();
-    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
-    fireEvent.click(screen.getByTestId("first-run-server.self-hosted"));
     expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("first-run-server.back"));
+    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
     fireEvent.click(screen.getByTestId("first-run-server.back"));
     // Back on the identity form: its recover door is the choice row's button
     // (the 24-word grid opens behind it, #772), not the grid's own submit.
@@ -122,7 +118,7 @@ describe("IdentitySetupDialog", () => {
       "identitySetup.errorTlsFailure",
     );
     fireEvent.click(screen.getByTestId("identity-setup.change-server"));
-    expect(screen.getByTestId("first-run-server.myne-sync")).toBeTruthy();
+    expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
   });
 
   // myne-md/myne#780: a device that already holds a sealed identity is offered

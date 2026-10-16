@@ -2909,9 +2909,6 @@
       "legalLabel": "Kisheria",
       "legalHelper": "Hufunguka kwenye myne.md katika kivinjari chako. Kwa Kijerumani pale kiolesura kilipo Kijerumani.",
       "legalPrivacy": "Sera ya faragha",
-      "legalTerms": "Masharti ya beta",
-      "legalNotice": "Ripoti maudhui haramu",
-      "legalLawEnforcement": "Maombi ya vyombo vya sheria",
       "licenseBody": "Pre-alpha · nyaraka za CC-BY-4.0 · msimbo wa programu wa AGPL-3.0 katika toleo la Awamu ya 1.",
       "licenseLabel": "Leseni",
       "tagline": "Pre-alpha · kiteja cha kompyuta cha Awamu ya 1",
@@ -3954,10 +3951,6 @@
       "intro": "Usawazishaji hutuma madokezo yako, yakiwa yamesimbwa, kwenye seva. Mambo manne yanafaa kujulikana kwanza.",
       "whatThisIsLabel": "Hili ni nini",
       "dataLossLabel": "Ukipoteza siri zote mbili",
-      "whatHappensNextLabel": "Beta itakapokwisha",
-      "whatWeCanSeeLabel": "Tunachoweza kukiona",
-      "readFull": "Soma masharti kamili",
-      "review": "Kagua masharti ya beta",
       "accept": "Naelewa, washa usawazishaji"
     },
     "materialising": "Inapakua madokezo yako: {{done}} kati ya {{total}}. Unaweza kuanza kufanya kazi; yaliyobaki yataonekana yanapowasili.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Weka URL ile ile ya seva kwenye kila kifaa. Seva unayoiendesha mwenyewe inahitaji cheti cha HTTPS kinachoaminika.",
       "tlsFailure": "Imeshindwa kuthibitisha cheti cha HTTPS cha seva. Angalia anwani ya seva, cheti na uhalali wake.",
       "inviteLabel": "Msimbo wa mkaribisho (tu kama seva hii inauomba)",
-      "invitePlaceholder": "Msimbo ambao mwendeshaji wa seva alikupa",
-      "changeInviteCode": "Badilisha msimbo wa mkaribisho"
+      "invitePlaceholder": "Msimbo ambao mwendeshaji wa seva alikupa"
     },
     "enroll": {
       "accountNumberLabel": "Nambari ya akaunti",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Chagua seva ya usawazishaji",
-      "chooseHeading": "Madokezo yako yasawazishwe wapi?",
-      "chooseIntro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Tumia huduma ya Myne Sync, au elekeza kifaa hiki kwenye seva unayoendesha mwenyewe. Kwa njia yoyote, madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
-      "myneSyncHint": "Seva inayoendeshwa na Myne. Cheti chake cha HTTPS hukaguliwa kiotomatiki.",
       "intro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
       "notConfigured": "Weka anwani ya seva juu na ubonyeze Unganisha ili kuendelea.",
       "back": "Nyuma",
-      "continue": "Endelea",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Seva yako mwenyewe",
-      "selfHostedHint": "Seva ya usawazishaji unayoendesha. Utaweka anwani yake kwenye skrini inayofuata.",
-      "connectAction": "Unganisha",
-      "setUpAction": "Sanidi"
+      "continue": "Endelea"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Chagua seva ya usawazishaji",
       "lead": "Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka. Seva huhifadhi maandishi yaliyosimbwa pekee.",
       "urlLabel": "Anwani ya seva",
-      "useMyneSync": "Tumia Myne Sync",
-      "selfHostedHint": "Au weka anwani ya seva unayoendesha mwenyewe.",
       "connect": "Unganisha",
       "connecting": "Inaunganisha…"
     },

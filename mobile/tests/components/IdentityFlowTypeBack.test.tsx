@@ -73,7 +73,10 @@ afterEach(() => cleanup());
 async function reachPhrase(reveal: boolean): Promise<void> {
   render(<IdentityFlow onCancel={() => {}} />);
   fireEvent.click(await screen.findByTestId("identity-flow.start"));
-  fireEvent.click(await screen.findByTestId("identity-flow.server-myne-sync"));
+  fireEvent.change(await screen.findByTestId("identity-flow.server-input"), {
+    target: { value: "https://sync.example" },
+  });
+  fireEvent.click(screen.getByTestId("identity-flow.server-connect"));
   fireEvent.click(await screen.findByTestId("identity-flow.create"));
   await screen.findByTestId("identity-flow.phrase-reveal");
   if (reveal) fireEvent.click(screen.getByTestId("identity-flow.phrase-reveal"));

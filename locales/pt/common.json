@@ -3020,9 +3020,6 @@
       "legalLabel": "Informação legal",
       "legalHelper": "Abre em myne.md no seu navegador. Em alemão quando a interface está em alemão.",
       "legalPrivacy": "Política de privacidade",
-      "legalTerms": "Termos da beta",
-      "legalNotice": "Denunciar conteúdo ilegal",
-      "legalLawEnforcement": "Pedidos das autoridades",
       "licenseBody": "Pré-alfa · documentação CC-BY-4.0 · código da aplicação AGPL-3.0 no lançamento da Fase 1.",
       "licenseLabel": "Licença",
       "tagline": "Pré-alfa · cliente de ambiente de trabalho da Fase 1",
@@ -4081,10 +4078,6 @@
       "intro": "A sincronização envia as suas notas, encriptadas, para um servidor. Vale a pena saber quatro coisas primeiro.",
       "whatThisIsLabel": "O que isto é",
       "dataLossLabel": "Se perder os dois segredos",
-      "whatHappensNextLabel": "Quando a beta terminar",
-      "whatWeCanSeeLabel": "O que conseguimos ver",
-      "readFull": "Ler os termos completos",
-      "review": "Rever os termos da beta",
       "accept": "Compreendo, ligar a sincronização"
     },
     "materialising": "A transferir as suas notas: {{done}} de {{total}}. Pode começar a trabalhar; as restantes aparecem à medida que chegam.",
@@ -4206,8 +4199,7 @@
       "tlsHelp": "Introduza o mesmo URL de servidor em todos os dispositivos. Um servidor auto-hospedado precisa de um certificado HTTPS de confiança.",
       "tlsFailure": "Não foi possível verificar o certificado HTTPS do servidor. Verifique o endereço do servidor, o certificado e a sua validade.",
       "inviteLabel": "Código de convite (apenas se este servidor pedir um)",
-      "invitePlaceholder": "O código que o operador do servidor lhe deu",
-      "changeInviteCode": "Alterar o código de convite"
+      "invitePlaceholder": "O código que o operador do servidor lhe deu"
     },
     "enroll": {
       "accountNumberLabel": "Número de conta",
@@ -5457,18 +5449,10 @@
   "firstRun": {
     "server": {
       "heading": "Escolha um servidor de sincronização",
-      "chooseHeading": "Onde devem as suas notas sincronizar?",
-      "chooseIntro": "O Myne precisa de um servidor para guardar as suas notas encriptadas e para o alcançar para convites. Use o serviço Myne Sync, ou aponte este dispositivo para um servidor que executa por si. De qualquer das formas, as suas notas permanecem encriptadas neste dispositivo antes de o deixarem; o servidor guarda apenas texto cifrado.",
-      "myneSyncHint": "O servidor gerido pelo Myne. O seu certificado HTTPS é verificado automaticamente.",
       "intro": "O Myne precisa de um servidor para guardar as suas notas encriptadas e para o alcançar para convites. As suas notas permanecem encriptadas neste dispositivo antes de o deixarem; o servidor guarda apenas texto cifrado.",
       "notConfigured": "Introduza um endereço de servidor acima e prima Ligar para continuar.",
       "back": "Voltar",
-      "continue": "Continuar",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "O seu próprio servidor",
-      "selfHostedHint": "Um servidor de sincronização executado por si. Introduza o seu endereço no ecrã seguinte.",
-      "connectAction": "Ligar",
-      "setUpAction": "Configurar"
+      "continue": "Continuar"
     }
   },
   "identityFlow": {
@@ -5483,8 +5467,6 @@
       "title": "Escolha um servidor de sincronização",
       "lead": "As suas notas permanecem encriptadas neste dispositivo antes de o deixarem. O servidor guarda apenas texto cifrado.",
       "urlLabel": "Endereço do servidor",
-      "useMyneSync": "Usar o Myne Sync",
-      "selfHostedHint": "Ou introduza o endereço de um servidor que executa por si.",
       "connect": "Ligar",
       "connecting": "A ligar…"
     },

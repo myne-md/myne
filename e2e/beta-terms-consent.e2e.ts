@@ -62,7 +62,7 @@ const CLAUSES: ReadonlyArray<[string, string]> = [
   ["sync.beta-terms.what-this-is", BETA_TERMS_WHAT_THIS_IS],
   ["sync.beta-terms.data-loss", BETA_TERMS_DATA_LOSS],
   ["sync.beta-terms.what-happens-next", BETA_TERMS_WHAT_HAPPENS_NEXT],
-  ["sync.beta-terms.what-we-can-see", BETA_TERMS_WHAT_WE_CAN_SEE],
+  ["sync.beta-terms.what-the-operator-can-see", BETA_TERMS_WHAT_WE_CAN_SEE],
 ];
 
 /**

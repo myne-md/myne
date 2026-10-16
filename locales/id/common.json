@@ -2909,9 +2909,6 @@
       "legalLabel": "Hukum",
       "legalHelper": "Terbuka di myne.md pada peramban Anda. Berbahasa Jerman jika antarmukanya berbahasa Jerman.",
       "legalPrivacy": "Kebijakan privasi",
-      "legalTerms": "Ketentuan beta",
-      "legalNotice": "Laporkan konten ilegal",
-      "legalLawEnforcement": "Permintaan penegak hukum",
       "licenseBody": "Pra-alfa · Dokumen CC-BY-4.0 · Kode aplikasi AGPL-3.0 pada rilis Fase 1.",
       "licenseLabel": "Lisensi",
       "tagline": "Pra-alfa · Klien desktop Fase 1",
@@ -3954,10 +3951,6 @@
       "intro": "Sinkronisasi mengirim catatan Anda, dalam bentuk terenkripsi, ke sebuah server. Ada empat hal yang perlu diketahui lebih dulu.",
       "whatThisIsLabel": "Apa ini",
       "dataLossLabel": "Jika Anda kehilangan kedua rahasia",
-      "whatHappensNextLabel": "Saat beta berakhir",
-      "whatWeCanSeeLabel": "Apa yang dapat kami lihat",
-      "readFull": "Baca ketentuan lengkapnya",
-      "review": "Tinjau ketentuan beta",
       "accept": "Saya mengerti, aktifkan sinkronisasi"
     },
     "materialising": "Mengunduh catatan Anda: {{done}} dari {{total}}. Anda sudah dapat mulai bekerja; sisanya akan muncul seiring kedatangannya.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Masukkan URL server yang sama di setiap perangkat. Server yang Anda kelola sendiri memerlukan sertifikat HTTPS yang tepercaya.",
       "tlsFailure": "Tidak dapat memverifikasi sertifikat HTTPS server. Periksa alamat server, sertifikat, dan masa berlakunya.",
       "inviteLabel": "Kode undangan (hanya jika server ini memintanya)",
-      "invitePlaceholder": "Kode yang diberikan operator server kepada Anda",
-      "changeInviteCode": "Ubah kode undangan"
+      "invitePlaceholder": "Kode yang diberikan operator server kepada Anda"
     },
     "enroll": {
       "accountNumberLabel": "Nomor akun",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Pilih server sinkronisasi",
-      "chooseHeading": "Ke mana catatan Anda harus disinkronkan?",
-      "chooseIntro": "Myne memerlukan server untuk menyimpan catatan terenkripsi Anda dan menjangkau Anda untuk undangan. Gunakan layanan Myne Sync, atau arahkan perangkat ini ke server yang Anda kelola sendiri. Apa pun pilihannya, catatan Anda tetap terenkripsi di perangkat ini sebelum meninggalkannya; server hanya menyimpan ciphertext.",
-      "myneSyncHint": "Server yang dijalankan Myne. Sertifikat HTTPS-nya diperiksa secara otomatis.",
       "intro": "Myne memerlukan server untuk menyimpan catatan terenkripsi Anda dan menjangkau Anda untuk undangan. Catatan Anda tetap terenkripsi di perangkat ini sebelum meninggalkannya; server hanya menyimpan ciphertext.",
       "notConfigured": "Masukkan alamat server di atas dan tekan Sambungkan untuk melanjutkan.",
       "back": "Kembali",
-      "continue": "Lanjutkan",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Server Anda sendiri",
-      "selfHostedHint": "Server sinkronisasi yang Anda kelola. Anda memasukkan alamatnya di layar berikutnya.",
-      "connectAction": "Sambungkan",
-      "setUpAction": "Siapkan"
+      "continue": "Lanjutkan"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Pilih server sinkronisasi",
       "lead": "Catatan Anda tetap terenkripsi di perangkat ini sebelum meninggalkannya. Server hanya menyimpan ciphertext.",
       "urlLabel": "Alamat server",
-      "useMyneSync": "Gunakan Myne Sync",
-      "selfHostedHint": "Atau masukkan alamat server yang Anda kelola sendiri.",
       "connect": "Sambungkan",
       "connecting": "Menyambungkan…"
     },

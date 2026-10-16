@@ -2909,9 +2909,6 @@
       "legalLabel": "Pháp lý",
       "legalHelper": "Mở tại myne.md trong trình duyệt của bạn. Bằng tiếng Đức nếu giao diện là tiếng Đức.",
       "legalPrivacy": "Chính sách quyền riêng tư",
-      "legalTerms": "Điều khoản bản beta",
-      "legalNotice": "Báo cáo nội dung bất hợp pháp",
-      "legalLawEnforcement": "Yêu cầu từ cơ quan thực thi pháp luật",
       "licenseBody": "Tiền alpha · Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
       "licenseLabel": "Giấy phép",
       "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
@@ -3954,10 +3951,6 @@
       "intro": "Đồng bộ gửi ghi chú của bạn, đã mã hóa, tới một máy chủ. Có bốn điều bạn nên biết trước.",
       "whatThisIsLabel": "Đây là gì",
       "dataLossLabel": "Nếu bạn mất cả hai bí mật",
-      "whatHappensNextLabel": "Khi bản beta kết thúc",
-      "whatWeCanSeeLabel": "Những gì chúng tôi có thể thấy",
-      "readFull": "Đọc toàn bộ điều khoản",
-      "review": "Xem lại điều khoản bản beta",
       "accept": "Tôi hiểu, bật đồng bộ"
     },
     "materialising": "Đang tải ghi chú của bạn về: {{done}} trên {{total}}. Bạn có thể bắt đầu làm việc; phần còn lại sẽ lần lượt xuất hiện.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Nhập cùng một URL máy chủ trên mọi thiết bị. Một máy chủ tự vận hành cần một chứng chỉ HTTPS đáng tin cậy.",
       "tlsFailure": "Không xác minh được chứng chỉ HTTPS của máy chủ. Hãy kiểm tra địa chỉ máy chủ, chứng chỉ và hiệu lực của nó.",
       "inviteLabel": "Mã mời (chỉ khi máy chủ này yêu cầu)",
-      "invitePlaceholder": "Mã mà người vận hành máy chủ đã đưa cho bạn",
-      "changeInviteCode": "Đổi mã mời"
+      "invitePlaceholder": "Mã mà người vận hành máy chủ đã đưa cho bạn"
     },
     "enroll": {
       "accountNumberLabel": "Số tài khoản",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Chọn một máy chủ đồng bộ",
-      "chooseHeading": "Ghi chú của bạn nên đồng bộ ở đâu?",
-      "chooseIntro": "Myne cần một máy chủ để giữ ghi chú đã mã hóa của bạn và để liên lạc với bạn cho các lời mời. Hãy dùng dịch vụ Myne Sync, hoặc trỏ thiết bị này tới một máy chủ do bạn tự vận hành. Dù thế nào, ghi chú của bạn vẫn được mã hóa trên thiết bị này trước khi rời khỏi nó; máy chủ chỉ lưu bản mã.",
-      "myneSyncHint": "Máy chủ do Myne vận hành. Chứng chỉ HTTPS của nó được kiểm tra tự động.",
       "intro": "Myne cần một máy chủ để giữ ghi chú đã mã hóa của bạn và để liên lạc với bạn cho các lời mời. Ghi chú của bạn vẫn được mã hóa trên thiết bị này trước khi rời khỏi nó; máy chủ chỉ lưu bản mã.",
       "notConfigured": "Hãy nhập địa chỉ máy chủ ở trên và nhấn Kết nối để tiếp tục.",
       "back": "Quay lại",
-      "continue": "Tiếp tục",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Máy chủ của riêng bạn",
-      "selfHostedHint": "Một máy chủ đồng bộ do bạn vận hành. Bạn nhập địa chỉ của nó ở màn hình tiếp theo.",
-      "connectAction": "Kết nối",
-      "setUpAction": "Thiết lập"
+      "continue": "Tiếp tục"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Chọn một máy chủ đồng bộ",
       "lead": "Ghi chú của bạn vẫn được mã hóa trên thiết bị này trước khi rời khỏi nó. Máy chủ chỉ lưu bản mã.",
       "urlLabel": "Địa chỉ máy chủ",
-      "useMyneSync": "Dùng Myne Sync",
-      "selfHostedHint": "Hoặc nhập địa chỉ của một máy chủ do bạn tự vận hành.",
       "connect": "Kết nối",
       "connecting": "Đang kết nối…"
     },

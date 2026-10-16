@@ -194,26 +194,27 @@ describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
 });
 
 // ic7 is the zero-vault first-run path, so it launches on the Welcome screen with
-// no seeded vault. The identity dialog's hosted one-tap door must surface the
-// invite-code field, because the hosted server is the gated one.
-describe.skipIf(!uiSupported)("ic-ui · first-run hosted door", () => {
-  it("ic7: the Myne Sync door offers the invite field with the origin locked", async () => {
+// no seeded vault. The server step offers one door now: the free-text URL form.
+// There is no hosted door, because Myne offers no sync service to point one at,
+// and nothing pre-fills the address.
+describe.skipIf(!uiSupported)("ic-ui · first-run server step", () => {
+  it("ic7: the server step offers an empty URL form and no hosted door", async () => {
     const a = await launchDevice(0, {
       // No vault: boot routes to Welcome, whose identity CTA opens the dialog.
       seedConfig: () => {},
     });
     try {
       await (await a.session.byTestId("welcome.identity-cta")).click();
-      // First-run server step fronts the dialog (no endpoint yet), so its
-      // choose screen is what appears; the Myne Sync door is the hosted one.
-      await (await a.session.byTestId("first-run-server.myne-sync")).click();
-      const invite = await a.session.byTestId("sync.endpoint-invite-input", {
+      // First-run server step fronts the dialog (no endpoint yet).
+      const url = await a.session.byTestId("sync.endpoint-input", {
         timeoutMs: 20_000,
       });
-      expect(invite).toBeTruthy();
-      // The origin is seeded and read-only on the hosted door.
-      const url = await a.session.byTestId("sync.endpoint-input");
-      expect(await url.attribute("readonly")).not.toBeNull();
+      expect(url).toBeTruthy();
+      // Editable and empty, and the invite field a gated server needs is there.
+      expect(await url.attribute("readonly")).toBeNull();
+      expect(await url.property<string>("value")).toBe("");
+      expect(await a.session.byTestId("sync.endpoint-invite-input")).toBeTruthy();
+      expect(await a.session.byTestIdAll("first-run-server.myne-sync")).toHaveLength(0);
     } finally {
       await a.teardown();
     }

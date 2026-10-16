@@ -2909,9 +2909,6 @@
       "legalLabel": "法律信息",
       "legalHelper": "在浏览器中打开 myne.md 上的页面。界面为德语时显示德语版本。",
       "legalPrivacy": "隐私政策",
-      "legalTerms": "测试版条款",
-      "legalNotice": "举报违法内容",
-      "legalLawEnforcement": "执法请求",
       "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
@@ -3954,10 +3951,6 @@
       "intro": "同步会将你的笔记加密后发送到服务器。有四件事值得先了解。",
       "whatThisIsLabel": "这是什么",
       "dataLossLabel": "如果两项机密都丢失",
-      "whatHappensNextLabel": "测试版结束时",
-      "whatWeCanSeeLabel": "我们能看到什么",
-      "readFull": "阅读完整条款",
-      "review": "审阅测试版条款",
       "accept": "我已了解，开启同步"
     },
     "materialising": "正在下载你的笔记：第 {{done}} 篇，共 {{total}} 篇。你可以先开始写；其余的会陆续出现。",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "请在每台设备上输入相同的服务器 URL。自托管服务器需要受信任的 HTTPS 证书。",
       "tlsFailure": "无法验证服务器的 HTTPS 证书。请检查服务器地址、证书及其有效期。",
       "inviteLabel": "邀请码（仅当此服务器要求时）",
-      "invitePlaceholder": "服务器运营者给你的代码",
-      "changeInviteCode": "更改邀请码"
+      "invitePlaceholder": "服务器运营者给你的代码"
     },
     "enroll": {
       "accountNumberLabel": "账号",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "选择同步服务器",
-      "chooseHeading": "你的笔记应同步到哪里？",
-      "chooseIntro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你可以使用 Myne Sync 服务，或将此设备指向你自己运行的服务器。无论哪种方式，你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
-      "myneSyncHint": "由 Myne 运营的服务器。其 HTTPS 证书会自动核对。",
       "intro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
       "notConfigured": "请在上方输入服务器地址，然后按“连接”继续。",
       "back": "返回",
-      "continue": "继续",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "你自己的服务器",
-      "selfHostedHint": "由你运行的同步服务器。你将在下一个屏幕输入其地址。",
-      "connectAction": "连接",
-      "setUpAction": "设置"
+      "continue": "继续"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "选择同步服务器",
       "lead": "你的笔记在离开本设备之前都保持加密。服务器只存储密文。",
       "urlLabel": "服务器地址",
-      "useMyneSync": "使用 Myne Sync",
-      "selfHostedHint": "或输入你自己运行的服务器地址。",
       "connect": "连接",
       "connecting": "正在连接…"
     },

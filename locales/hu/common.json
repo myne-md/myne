@@ -2909,9 +2909,6 @@
       "legalLabel": "Jogi információk",
       "legalHelper": "A böngésződben nyílik meg a myne.md oldalon. Ahol a felület német, ott németül.",
       "legalPrivacy": "Adatvédelmi tájékoztató",
-      "legalTerms": "Béta feltételek",
-      "legalNotice": "Jogsértő tartalom bejelentése",
-      "legalLawEnforcement": "Hatósági megkeresések",
       "licenseBody": "Pre-alfa · CC-BY-4.0 dokumentáció · AGPL-3.0 alkalmazáskód az 1. fázis kiadásakor.",
       "licenseLabel": "Licenc",
       "tagline": "Pre-alfa · 1. fázisú asztali kliens",
@@ -3954,10 +3951,6 @@
       "intro": "A szinkronizálás titkosítva küldi a jegyzeteidet egy szerverre. Négy dolgot érdemes előbb tudnod.",
       "whatThisIsLabel": "Mi ez",
       "dataLossLabel": "Ha mindkét titkodat elveszíted",
-      "whatHappensNextLabel": "Amikor a béta véget ér",
-      "whatWeCanSeeLabel": "Mit látunk mi",
-      "readFull": "Teljes feltételek elolvasása",
-      "review": "A béta feltételek áttekintése",
       "accept": "Megértettem, szinkronizálás bekapcsolása"
     },
     "materialising": "A jegyzeteid letöltése: {{done}} / {{total}}. Elkezdhetsz dolgozni; a többi megjelenik, ahogy megérkezik.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Minden eszközön ugyanazt a szerver URL-t add meg. Egy saját üzemeltetésű szerverhez megbízható HTTPS-tanúsítvány kell.",
       "tlsFailure": "Nem sikerült ellenőrizni a szerver HTTPS-tanúsítványát. Ellenőrizd a szerver címét, a tanúsítványt és annak érvényességét.",
       "inviteLabel": "Meghívókód (csak ha ez a szerver kér egyet)",
-      "invitePlaceholder": "A kód, amelyet a szerver üzemeltetője adott",
-      "changeInviteCode": "Meghívókód módosítása"
+      "invitePlaceholder": "A kód, amelyet a szerver üzemeltetője adott"
     },
     "enroll": {
       "accountNumberLabel": "Fiókszám",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Válassz szinkronszervert",
-      "chooseHeading": "Hová szinkronizálódjanak a jegyzeteid?",
-      "chooseIntro": "A Myne-nek kell egy szerver, amely tárolja a titkosított jegyzeteidet, és elér téged a meghívókhoz. Használd a Myne Sync szolgáltatást, vagy irányítsd ezt az eszközt egy általad üzemeltetett szerverre. Mindkét esetben a jegyzeteid titkosítva maradnak ezen az eszközön, mielőtt elhagyják; a szerver csak titkosított szöveget tárol.",
-      "myneSyncHint": "A Myne által üzemeltetett szerver. A HTTPS-tanúsítványát automatikusan ellenőrzi.",
       "intro": "A Myne-nek kell egy szerver, amely tárolja a titkosított jegyzeteidet, és elér téged a meghívókhoz. A jegyzeteid titkosítva maradnak ezen az eszközön, mielőtt elhagyják; a szerver csak titkosított szöveget tárol.",
       "notConfigured": "Adj meg fent egy szervercímet, és a folytatáshoz nyomd meg a Csatlakozás gombot.",
       "back": "Vissza",
-      "continue": "Folytatás",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "A saját szervered",
-      "selfHostedHint": "Egy általad üzemeltetett szinkronszerver. A címét a következő képernyőn adod meg.",
-      "connectAction": "Csatlakozás",
-      "setUpAction": "Beállítás"
+      "continue": "Folytatás"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Válassz szinkronszervert",
       "lead": "A jegyzeteid titkosítva maradnak ezen az eszközön, mielőtt elhagyják. A szerver csak titkosított szöveget tárol.",
       "urlLabel": "Szerver címe",
-      "useMyneSync": "Myne Sync használata",
-      "selfHostedHint": "Vagy add meg egy általad üzemeltetett szerver címét.",
       "connect": "Csatlakozás",
       "connecting": "Csatlakozás…"
     },

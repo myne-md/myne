@@ -2,10 +2,11 @@
 // button that does it on the right (the Obsidian vault-picker shape).
 //
 // Used where the first run asks a person to pick a path: the Welcome screen's
-// four doors and the sync-server step's two. The description is the point: a
-// first-run user cannot tell "an identity" from "a vault", or "Myne Sync" from
-// "my own server", by a verb alone, so every door says where it leads before
-// it is opened.
+// four doors today (the sync-server step carried a second card until
+// 2026-10-16, when the Myne Sync door was removed). The description is the
+// point: a first-run user cannot tell "an identity" from "a vault", or one
+// server from another, by a verb alone, so every door says where it leads
+// before it is opened.
 
 import type { ReactNode } from "react";
 

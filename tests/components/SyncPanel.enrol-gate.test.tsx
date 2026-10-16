@@ -175,7 +175,7 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     expect(await screen.findByTestId("sync.beta-terms.what-this-is")).toBeTruthy();
     expect(screen.getByTestId("sync.beta-terms.data-loss")).toBeTruthy();
     expect(screen.getByTestId("sync.beta-terms.what-happens-next")).toBeTruthy();
-    expect(screen.getByTestId("sync.beta-terms.what-we-can-see")).toBeTruthy();
+    expect(screen.getByTestId("sync.beta-terms.what-the-operator-can-see")).toBeTruthy();
 
     // Dismissing records nothing and reveals nothing.
     fireEvent.click(screen.getByTestId("sync.beta-terms.cancel"));
