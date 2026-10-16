@@ -421,6 +421,25 @@ steps:
     commands:
       - node scripts/check-manual-test-roster.mjs --check
 
+  # ─── F-Droid store metadata against the Android build it describes ───────────
+  # No `when:` filter, and the reason is the same one bundle-record,
+  # twin-inventory and manual-test-roster carry: its inputs include `fastlane/**`,
+  # which no `code-paths` glob covers, so a listing-only commit is exactly when
+  # it can go red. What it catches is arithmetic that no compiler and no test can
+  # see: the version in `mobile/src-tauri/tauri.conf.json` against the four
+  # build blocks in `mobile/fdroid/md.myne.mobile.yml` and the four
+  # `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` file names.
+  # Drift does not fail anything, it just publishes an empty "What's new" tab and
+  # drops three of four architectures from the repository.
+  #
+  # Its own step rather than a line inside `pnpm-build` for the same reason
+  # manual-test-roster is: it needs no `pnpm install`, and it must be able to go
+  # red on a commit that touches nothing else.
+  fdroid-metadata:
+    image: node:25
+    commands:
+      - node scripts/check-fdroid-metadata.mjs
+
   # ─── Every vault.prefs command says which client surfaces it (#880) ──────────
   # No `when:` filter, and it is the same reason bundle-record, twin-inventory and
   # manual-test-roster carry none: the `--check` half compares the GENERATED
@@ -1673,6 +1692,13 @@ steps:
       # pushes a failure to the maintainer, so a step added without a slot here
       # is a gate that goes quiet.
       - name: manual-test-roster
+        optional: true
+      # Unfiltered like `manual-test-roster` above and red for the same shape of
+      # reason: its inputs include `fastlane/**`, which no `code-paths` glob
+      # covers, so a listing-only commit is when it can go red. This file is the
+      # only thing that pushes a failure to the maintainer, so a step added
+      # without a slot here is a gate that goes quiet.
+      - name: fdroid-metadata
         optional: true
       # myne#880. Unfiltered like `twin-inventory` and `manual-test-roster` above
       # and listed for the same reason: a stale generated projection is a

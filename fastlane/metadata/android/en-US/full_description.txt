@@ -1,0 +1,37 @@
+Myne is a local-first, end-to-end encrypted markdown notes app for Android.
+
+<b>Private by default</b>
+
+There is no plaintext mode and no encryption opt-in. Every note, attachment, setting and index is encrypted on the device before it is written to disk.
+
+There is no email address at signup. An account number identifies your vault, and a 24-word recovery phrase is the only thing that can restore it. You choose your password: keys are derived with Argon2id and note bodies are sealed with XChaCha20-Poly1305.
+
+<b>Sync is optional, and yours</b>
+
+Myne works fully offline. To use one vault on more than one device you point the app at a sync server you run yourself. The server stores only ciphertext and holds no key, so it cannot read your notes. Nothing is sent anywhere until you configure this yourself.
+
+<b>What it does</b>
+
+<ul>
+<li>Markdown notes with tables, callouts and code blocks</li>
+<li>[[wikilinks]], backlinks and a knowledge graph</li>
+<li>Full-text search that runs entirely on the device</li>
+<li>Tags, tasks and nested folders</li>
+<li>Attachments, including images and PDFs</li>
+<li>Voice notes, transcribed on the device: the audio never leaves the phone</li>
+<li>Export of the whole vault as a plain markdown tree, so your notes are never locked in</li>
+<li>Light, dark and AMOLED themes, plus custom themes that arrive from your other devices</li>
+<li>A home-screen widget and a share-sheet target</li>
+</ul>
+
+<b>No tracking</b>
+
+No analytics, no telemetry, no crash reporting and no advertising identifiers. The app opens no network connection until you configure sync or name an AI provider yourself.
+
+<b>Installing this build</b>
+
+F-Droid compiles this app from source and signs it with F-Droid's signing key. If you already installed the .apk published on myne.md, this build cannot be installed over it, because the two are signed by different keys. Uninstall the old one first. Uninstalling removes the app's private storage, which is where the vault lives, so export your notes to markdown before you switch.
+
+<b>Myne is pre-alpha</b>
+
+The vault format and the apps are still moving. Desktop builds for macOS, Linux and Windows, the specifications and the threat model are all at https://myne.md. Myne is free software, licensed AGPL-3.0.
