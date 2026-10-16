@@ -214,6 +214,15 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // served page cannot replace itself. Absent by platform fact; the About and
   // banner affordances are omitted here rather than greyed.
   "selfUpdate",
+  // myne-md/myne#860. The opt-in device-local diagnostic log. The web build
+  // installs NO `tracing` subscriber and compiles every event below `warn` out
+  // of the bundle (`design-notes/ops/0366`), so there is no log for it to
+  // write, no platform log directory to resolve and no folder to reveal. The
+  // logging half is omitted here rather than greyed; COPYING the diagnostics
+  // block is present on web, because that is the half the issue's scope
+  // sentence keeps and because the browser is where a user cannot open a
+  // devtools panel and read a failure back.
+  "diagnosticLog",
   // Live-collab, `SYNC-31`. Multi-user co-editing needs a PERSON identity: the
   // B2B group substrate, the roster and the member removal rekey, all held in a
   // device-local sealed file outside browser storage whose panel prompt is

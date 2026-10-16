@@ -38,7 +38,7 @@
 // carry is therefore "a link only where the vault holds the target", not "no
 // links at all": a wikilink to something the vault does not hold, a folder
 // target and an alias all stay the plain label they were. The bound, and why the
-// candidate set is the vault's rather than the run's, is `decisions/ai/0690`.
+// candidate set is the vault's rather than the run's, is `decisions/ai/0693`.
 
 import type { CSSProperties, ReactNode } from "react";
 import {

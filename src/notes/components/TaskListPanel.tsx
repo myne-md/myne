@@ -43,7 +43,9 @@ import {
 } from "../taskView";
 import { folderInScope } from "../taskScope";
 import { visibleDepths } from "../taskTree";
-import { taskRowKey } from "../taskWriteCore";
+import { readTaskField, rewriteTaskField, taskRowKey } from "../taskWriteCore";
+import type { TaskFieldKind } from "../taskWriteCore";
+import { openTaskFieldMenu } from "@myne/editor/task-field-menu";
 import { TASK_ROW_HEIGHT, computeTaskWindow, flattenTaskList } from "../taskWindowing";
 import type { VaultTask } from "../taskIndex";
 import { MIN_TARGET } from "../../components/primitives/targetSize";
@@ -63,10 +65,22 @@ export type TaskListPanelProps = {
   minimal?: boolean;
   /** Roomier row checkboxes for touch surfaces; desktop keeps the dense box. */
   roomyBox?: boolean;
+  /**
+   * Write one inline field on a task's line (myne-md/myne#884 task 8). Absent →
+   * no row control, which is what a client with no field write gets.
+   *
+   * Injected rather than imported, exactly like `onToggle`: the panel is shared
+   * by two clients whose IO differs, and neither of them may reach for the
+   * other's.
+   */
+  onWriteField?: (task: VaultTask, kind: TaskFieldKind, value: string) => Promise<void>;
 };
 
 const NO_TAGS: readonly string[] = [];
 const PRIORITIES = ["highest", "high", "medium", "low", "lowest"] as const;
+
+/** Menu order, and the roster `present()` is computed over. */
+const FIELD_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
 function toRowData(task: VaultTask, depth: number): TaskRowData {
   return {
@@ -904,6 +918,7 @@ export function TaskListPanel({
   testIdPrefix = "tasks",
   minimal = false,
   roomyBox = false,
+  onWriteField,
 }: TaskListPanelProps): ReactElement {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -935,6 +950,59 @@ export function TaskListPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(0);
+
+  /**
+   * Open the field menu for one row, in the presentation the client declared
+   * (myne-md/myne#884 task 8).
+   *
+   * **The line is held here rather than read from the record**, because a
+   * record's `rawLine` is as old as the index's last apply and the writer refuses
+   * a line that no longer matches disk. The local copy is kept current with the
+   * byte-identical rewrite `writeTaskField` applies, so a second edit in the same
+   * session is not refused.
+   */
+  const openFields = useCallback(
+    (task: VaultTask, control: HTMLElement): void => {
+      if (onWriteField === undefined) return;
+      const held = { line: task.rawLine };
+      openTaskFieldMenu({
+        anchor: control,
+        target: {
+          present: () => {
+            const out = new Set<TaskFieldKind>();
+            for (const kind of FIELD_KINDS) {
+              if (readTaskField(held.line, kind) !== undefined) out.add(kind);
+            }
+            return out;
+          },
+          valueOf: (kind) => readTaskField(held.line, kind) ?? "",
+          lineText: () => held.line,
+          commit: async (kind, value) => {
+            await onWriteField({ ...task, rawLine: held.line }, kind, value);
+            held.line = rewriteTaskField(held.line, kind, value) ?? held.line;
+          },
+        },
+      });
+    },
+    [onWriteField],
+  );
+
+  /** Per-row binding, or undefined so a client with no field write renders no
+   *  control. Built per row because the surface must be anchored to the control
+   *  AND write THAT row's task.
+   *
+   *  Two rows are excluded because their write cannot succeed, and offering a
+   *  control that quietly does nothing is worse than not offering one: a
+   *  note-task has no line to rewrite (`line-missing`), and an over-cap record's
+   *  raw line is truncated, so it cannot be verified (`oversized`). Both would
+   *  otherwise open the menu, commit, and refuse behind a `console.warn`. */
+  const editFieldsFor = (
+    task: VaultTask,
+  ): ((row: TaskRowData, control: HTMLElement) => void) | undefined => {
+    if (onWriteField === undefined) return undefined;
+    if (task.lineIndex === null || task.oversized) return undefined;
+    return (_row, control) => openFields(task, control);
+  };
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -1136,6 +1204,10 @@ export function TaskListPanel({
                 testIdPrefix={`${testIdPrefix}.row`}
                 {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                 {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+                {...(() => {
+                  const edit = editFieldsFor(item.task);
+                  return edit === undefined ? {} : { onEditFields: edit };
+                })()}
               />
             ),
           )
@@ -1158,6 +1230,10 @@ export function TaskListPanel({
                     testIdPrefix={`${testIdPrefix}.row`}
                     {...(onToggle === undefined ? {} : { onToggle: () => onToggle(item.task) })}
                     {...(onOpen === undefined ? {} : { onOpen: () => onOpen(item.task) })}
+                    {...(() => {
+                      const edit = editFieldsFor(item.task);
+                      return edit === undefined ? {} : { onEditFields: edit };
+                    })()}
                   />
                 </div>
               ),

@@ -29,6 +29,12 @@ import {
 } from "../dialect/taskRecurrence";
 import type { VaultTask } from "./taskIndex";
 import { TASK_LINE_RE } from "@myne/dialect/taskMarker";
+import { isTaskLine, planTaskFieldWrite } from "@myne/dialect/taskFieldWriter";
+import {
+  parseTaskFields,
+  parseTaskInstant,
+  type TaskFields,
+} from "@myne/dialect/taskFields";
 
 // Re-exported so a consumer needs only this module — `taskIndex.ts` itself is
 // Tauri- and React-coupled and must not be aliased into another client.
@@ -278,6 +284,174 @@ export async function writeTaskCompletion(
   } catch (err) {
     if (!isBaseMismatchError(err)) throw err;
     // Keep-both, not overwrite: the body this tick WOULD have written is
+    // preserved as a conflict copy, and what sync delivered stays on disk
+    // untouched. No write, no snapshot, no index touch on the original.
+    await createConflictCopy(body, task.noteId);
+    throw new TaskWriteRefused("base-mismatch", task.noteId);
+  }
+  announce(task.noteId);
+}
+
+/** The four editable inline fields, in the same vocabulary the field editor
+ *  uses.
+ *
+ *  Declared here rather than imported from `@myne/editor`, because this module
+ *  is the VIEW-FREE half of the write path and an editor import would put the
+ *  editor in a list surface's graph. The two unions are structurally identical;
+ *  what the equivalence spec holds is that the writers AGREE on every kind its
+ *  table lists, which is not the same as catching a member added to one side
+ *  alone (myne-md/myne#884 review).
+ */
+export type TaskFieldKind = "due" | "remind" | "repeat" | "priority";
+
+/**
+ * Rewrite one inline field on a task line, view-free. Returns the new line, or
+ * `null` when the line already reads exactly as the write would.
+ *
+ * **The same coercion the editor's span-based write performs**, then the same
+ * `planTaskFieldWrite` edit applied to the line instead of dispatched at a view.
+ * The duplication is bounded by `tests/notes/taskFieldWrite.test.ts`, which
+ * drives both over one table: the editor's half needs an `EditorView`, and this
+ * half must not know the editor exists. A value `parseTaskInstant` refuses is
+ * carried as `malformed` rather than dropped, so a list edit cannot delete a
+ * typo the user typed.
+ *
+ * The caller must hand it a task line; `planTaskFieldWrite` has no opinion about
+ * list markers, because its caller owns any conversion.
+ */
+export function rewriteTaskField(
+  line: string,
+  kind: TaskFieldKind,
+  value: string,
+): string | null {
+  const current = parseTaskFields(line);
+  const next: TaskFields = { ...current };
+
+  if (kind === "priority") {
+    next.priority = value === "" ? undefined : (value as TaskFields["priority"]);
+  } else if (kind === "repeat") {
+    next.repeat = value === "" ? undefined : value;
+  } else {
+    const instant = value === "" ? null : parseTaskInstant(value);
+    next[kind] = instant ?? undefined;
+    if (instant === null && value !== "") {
+      next.malformed = [
+        ...current.malformed.filter((f) => f.key !== kind),
+        // `raw` is left empty rather than carrying a byte-shaped string: the
+        // dialect writer emits `raw` in place of `key`/`value` exactly when the
+        // value contains a `]` (taskFieldWriter.ts), and no value this function
+        // is handed can (the editor's own coercion does the same).
+        { key: kind, value, raw: "" },
+      ];
+    } else {
+      next.malformed = current.malformed.filter((f) => f.key !== kind);
+    }
+  }
+
+  const edit = planTaskFieldWrite(line, next);
+  if (edit === null) return null;
+  return line.slice(0, edit.range.start) + edit.text + line.slice(edit.range.end);
+}
+
+/**
+ * One inline field's SOURCE value on a task line, or `undefined` when the line
+ * does not carry that field.
+ *
+ * The read half of {@link rewriteTaskField}, so a caller holding only a record's
+ * raw line can answer what the field editor should prefill. A value that did not
+ * parse is reported as absent rather than as its raw bytes, which matches what
+ * the note's own chips do: an unreadable date renders as plain text with a hint,
+ * not as a chip, so there is nothing for a surface to prefill from either.
+ */
+export function readTaskField(line: string, kind: TaskFieldKind): string | undefined {
+  const fields = parseTaskFields(line);
+  if (kind === "priority") return fields.priority;
+  if (kind === "repeat") return fields.repeat;
+  const instant = fields[kind];
+  if (instant === undefined) return undefined;
+  return instant.time === undefined ? instant.date : `${instant.date} ${instant.time}`;
+}
+
+/**
+ * The IO a field rewrite needs. Deliberately NOT the completion path's full set:
+ * a field never touches the frontmatter, so the note-completion pair and the
+ * recurrence clock are absent rather than accepted-and-ignored. A client that
+ * already satisfies the wider type satisfies this one structurally.
+ */
+export type TaskFieldWriteIo = Required<
+  Omit<
+    TaskWriteDeps,
+    "flushDirtyPanes" | "today" | "completeNoteTask" | "uncompleteNoteTask"
+  >
+> & {
+  /** Flush every pane with unsaved keystrokes. Omitted in tests. */
+  flushDirtyPanes?: () => Promise<void>;
+};
+
+/**
+ * Rewrite one inline field on `task`'s line. The second mutation beside
+ * {@link writeTaskCompletion}, for the same reason it exists: a surface with no
+ * editor in it has to be able to write, and the sequence that makes that safe is
+ * not one a second caller should reimplement.
+ *
+ * Rejects with {@link TaskWriteRefused} when the record cannot be written safely
+ * (a stale stored line, an over-cap record, a line that has gone or is no longer
+ * a task), and with whatever the IPC layer propagates otherwise.
+ */
+export async function writeTaskField(
+  task: VaultTask,
+  kind: TaskFieldKind,
+  value: string,
+  io: TaskFieldWriteIo,
+): Promise<void> {
+  const { flushDirtyPanes, readNote, writeNote, announce, createConflictCopy } = io;
+
+  // Flush BEFORE anything reads: a pane holding unsaved keystrokes has a newer
+  // body than disk, and patching the stale copy would be undone by the flush.
+  await flushDirtyPanes?.();
+
+  // A note-task has no line: its "fields" are the note's own frontmatter, which
+  // the completion path patches and this mutation does not. The locator IS the
+  // discriminator, exactly as it is there.
+  if (task.lineIndex === null) throw new TaskWriteRefused("line-missing", task.noteId);
+
+  // An over-cap record carries a truncated raw line, so the verification below
+  // is impossible. Refuse rather than write something unverifiable.
+  if (task.oversized) throw new TaskWriteRefused("oversized", task.noteId);
+
+  const source = await readNote(task.noteId);
+  const lines = source.split("\n");
+  const current = lines[task.lineIndex];
+  if (current === undefined) throw new TaskWriteRefused("line-missing", task.noteId);
+
+  // The index is a cache and may be an autosave behind. The stored raw line is
+  // the evidence the record still describes reality; a mismatch means the note
+  // moved and this write would land on the wrong text. The terminator is the
+  // file's business, so a CRLF note is not a mismatch.
+  const cr = current.endsWith("\r") ? "\r" : "";
+  const lineText = cr === "" ? current : current.slice(0, -1);
+  if (lineText !== task.rawLine) throw new TaskWriteRefused("line-changed", task.noteId);
+
+  // A task line, not prose. The writer appends a field to ANY line it is handed
+  // (its caller owns the conversion), so a row whose line has since become a
+  // paragraph would otherwise turn that paragraph into a task.
+  if (!isTaskLine(lineText)) throw new TaskWriteRefused("line-changed", task.noteId);
+
+  const rewritten = rewriteTaskField(lineText, kind, value);
+  if (rewritten === null) return; // already reads as the write would - no write
+
+  lines[task.lineIndex] = `${rewritten}${cr}`;
+  const body = lines.join("\n");
+
+  // The content-hash guard, for the reason the marker flip carries it: a sync
+  // pull-apply racing this write is rejected by the backend rather than
+  // clobbered. The hash is of what was READ, and the transactional batch writer
+  // takes no hash at all, so it must not be used here.
+  try {
+    await writeNote(task.noteId, body, await sha256Hex(source));
+  } catch (err) {
+    if (!isBaseMismatchError(err)) throw err;
+    // Keep-both, not overwrite: the body this edit WOULD have written is
     // preserved as a conflict copy, and what sync delivered stays on disk
     // untouched. No write, no snapshot, no index touch on the original.
     await createConflictCopy(body, task.noteId);

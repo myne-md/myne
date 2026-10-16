@@ -58,6 +58,29 @@ export interface SeamModules {
     appDataDir: () => Promise<string>;
     join: (...parts: string[]) => Promise<string>;
   };
+  /**
+   * The diagnostic-log pair (myne-md/myne#860).
+   *
+   * Added because the two implementations must expose the SAME operations and
+   * the web arm is otherwise driven by nothing: the About rows are gated out on
+   * web, so a mirror whose signature drifted would be invisible and the
+   * "same tree, only the seam differs" premise would be asserted nowhere. The
+   * operations here are the ones the surface actually calls, which is what makes
+   * this a contract rather than a census.
+   */
+  diagnostics: {
+    diagnosticLogEnabledGet: () => Promise<boolean>;
+    diagnosticLogEnabledSet: (enabled: boolean) => Promise<void>;
+    crashRecordState: () => Promise<{ at_epoch_seconds: number } | null>;
+    crashRecordClear: () => Promise<void>;
+    revealLogsFolder: () => Promise<void>;
+    reportManifest: () => Promise<{
+      log_files: number;
+      total_bytes: number;
+      crash_at_epoch_seconds: number | null;
+    }>;
+    saveReport: (block: string, destination: string) => Promise<void>;
+  };
   window: { getCurrentWindow: () => { destroy: () => Promise<void> } };
   webviewWindow: {
     getCurrentWebviewWindow: () => {
@@ -270,6 +293,30 @@ export function runSeamContract(subject: SeamSubject): void {
         expect(await seam.dialog.open()).toBeNull();
       });
     }
+
+    // The diagnostic-log pair (myne-md/myne#860). A presence sweep plus one
+    // routed call, because the web arm is driven by nothing else: the About rows
+    // are gated out on web, so a drifted signature on the mirror would be
+    // invisible and "same tree, only the seam differs" would be asserted
+    // nowhere. The names are the operations the surface actually calls, so this
+    // is a contract rather than a census.
+    it("diagnostics: the whole surface exists on both arms and reaches the transport", async () => {
+      const names = [
+        "diagnosticLogEnabledGet",
+        "diagnosticLogEnabledSet",
+        "crashRecordState",
+        "crashRecordClear",
+        "revealLogsFolder",
+        "reportManifest",
+        "saveReport",
+      ] as const;
+      for (const name of names) {
+        expect(typeof seam.diagnostics[name], `diagnostics.${name}`).toBe("function");
+      }
+      subject.program.resolveWith(true);
+      expect(await seam.diagnostics.diagnosticLogEnabledGet()).toBe(true);
+      expect(subject.program.calls().length).toBeGreaterThan(0);
+    });
 
     contractFor(
       "dialog.save",

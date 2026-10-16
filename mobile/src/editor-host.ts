@@ -151,6 +151,13 @@ const host: EditorHost = {
     remove: (noteId) =>
       window.dispatchEvent(new CustomEvent(REMOVE_COVER_EVENT, { detail: { noteId } })),
   },
+  // How this client wants the editor's own floating surfaces presented
+  // (myne-md/myne#884). The phone declares `docked`: the task-field sheet and the
+  // three typeahead pickers arrive as bottom sheets, sized for a thumb and pinned
+  // above the software keyboard, rather than as desktop popovers anchored beside
+  // the caret. Desktop and web omit this member, which is why their popovers are
+  // unchanged.
+  floatingSurface: "docked",
   // PrefsView ⊇ EditorPrefs (identical field types), so this is structurally sound.
   prefsRead: async (): Promise<EditorPrefs> => prefsRead(),
   openExternal: (url) => {

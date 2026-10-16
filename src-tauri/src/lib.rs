@@ -26,6 +26,10 @@ pub use myne_core::export_naming;
 // side-effects the shared command cores trigger (search/spell/attachments/
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
 mod hooks;
+// myne-md/myne#860: the diagnostic log's runtime. Installed in `Builder::setup`
+// because the file layer needs an `AppHandle` to resolve the platform log
+// directory, and that hook is the earliest one that has it.
+mod logging;
 /// The meeting-session menubar indicator (myne-md/myne#789).
 mod tray;
 pub use myne_core::io_failure_kind;
@@ -234,19 +238,17 @@ fn host_mode_app_data_dir() -> Option<std::path::PathBuf> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Install the log sink so the app's `tracing::*!` events reach stdout —
-    // without this nothing is printed (the protocol crate + plugins emit
-    // `tracing` but no subscriber was wired). Filter via the `RUST_LOG` env var
-    // (e.g. `RUST_LOG=debug pnpm tauri dev`); defaults to `info`. `try_init`
-    // never panics if a subscriber is already set (e.g. in tests). Honors the
-    // secret-handling logging discipline — only bounded variant names / stage
-    // tags / OS status codes are emitted, never key material.
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .try_init();
+    // The subscriber is installed in `Builder::setup` (see `crate::logging`),
+    // not here, because the FILE layer needs an `AppHandle` to resolve the
+    // platform log directory. That hook is the earliest one holding it, and it
+    // still runs before the WebView exists.
+    //
+    // What moved with it, and why the shape changed: the install used to be a
+    // single `fmt()` with an `EnvFilter`, which could only ever write to stdout.
+    // It is now a `registry` with two layers, so stdout keeps honouring
+    // `RUST_LOG` (a developer's console knob) while the file layer carries its
+    // own fixed `info` floor and ignores `RUST_LOG` entirely (an environment
+    // variable must not decide what persists on a user's disk; myne-md/myne#860).
 
     let builder = tauri::Builder::default();
 
@@ -393,6 +395,10 @@ pub fn run() {
         // Readable in every vault state by construction (its own file, not a
         // vault.prefs field), which is the whole reason it exists.
         .plugin(plugins::plain_file::init())
+        // myne-md/myne#860: the device-local diagnostic-log switch (and, in
+        // later tasks of the same feature, the log state read, the crash
+        // record, the reveal action and the report bundle).
+        .plugin(plugins::diagnostics::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         .plugin(plugins::detached_window::init())
@@ -457,6 +463,22 @@ pub fn run() {
     builder
         .setup(|app| {
             use tauri::Manager;
+
+            // myne-md/myne#860: install the one subscriber, and manage the file
+            // sink so the toggle command can flip it without a restart. Runs
+            // first, before the boot migration below, so the migration's own
+            // events are captured when logging is on. A failure leaves stdout
+            // only and does not stop the app: logging is a diagnostic aid.
+            //
+            // The `enabled` it reads comes from the device-local
+            // `diagnostic-log.json`, read here rather than after unlock, which is
+            // the whole reason that flag is a plaintext file.
+            let handle = app.handle().clone();
+            if let Ok(sink) = crate::logging::init(&handle) {
+                let _ = app.manage(sink);
+            }
+            // On `Err`, `init` has already installed a stdout-only subscriber
+            // and warned on the same path.
             // MYND-202: SAFETY-CRITICAL eager boot migration `vault/` →
             // `vaults/<id>/`, run FIRST — before screen-capture init, before
             // any timer/state setup, and (by virtue of `setup` running during
