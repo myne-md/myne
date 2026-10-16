@@ -30,10 +30,13 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
+import { floatingSurfacePresentation } from "../host";
+import { createDockedPicker, type DockedPicker } from "../floating/docked-sheet";
 import { isSlashSuppressed } from "../slash/plugin";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
 import { readTemplateFromFmBody } from "@myne/dialect";
 import { SUPPORTED_TOKENS } from "@myne/dialect/templateEngine";
+import i18n from "@myne/editor/i18n";
 
 /** True iff the doc carries the value-strict `template: true` flag. */
 function isTemplateDoc(view: EditorView): boolean {
@@ -57,6 +60,7 @@ type MenuState = {
 
 class TemplateTokenMenuView implements PluginValue {
   private container: HTMLDivElement | null = null;
+  private docked: DockedPicker | null = null;
   private state: MenuState | null = null;
   private rafHandle: number | null = null;
 
@@ -131,7 +135,37 @@ class TemplateTokenMenuView implements PluginValue {
       this.container.remove();
       this.container = null;
     }
+    if (this.docked !== null) {
+      this.docked.dispose();
+      this.docked.root.remove();
+      this.docked = null;
+    }
     this.state = null;
+  }
+
+  /** The element the rows go into: the anchored popover's own box, or, when the
+   *  host declares the docked presentation, the sheet shell's list
+   *  (myne-md/myne#884). */
+  private surface(): HTMLElement {
+    if (floatingSurfacePresentation() === "docked") {
+      if (this.docked === null) {
+        this.docked = createDockedPicker({
+          title: i18n.t("editor.templateToken.sheetTitle"),
+          testId: "editor.template-token-sheet",
+          closeLabel: i18n.t("common.close"),
+          onClose: () => this.dismiss(),
+        });
+        document.body.appendChild(this.docked.root);
+      }
+      return this.docked.list;
+    }
+    if (this.container === null) {
+      this.container = document.createElement("div");
+      this.container.className = "cm-slash-menu";
+      this.container.setAttribute("role", "menu");
+      document.body.appendChild(this.container);
+    }
+    return this.container;
   }
 
   private scheduleRender(): void {
@@ -160,13 +194,8 @@ class TemplateTokenMenuView implements PluginValue {
       this.state.selectedIndex = filtered.length - 1;
     }
 
-    if (this.container === null) {
-      this.container = document.createElement("div");
-      this.container.className = "cm-slash-menu";
-      this.container.setAttribute("role", "menu");
-      document.body.appendChild(this.container);
-    }
-    this.container.replaceChildren();
+    const surface = this.surface();
+    surface.replaceChildren();
     let selectedRow: HTMLDivElement | null = null;
     filtered.forEach((token, i) => {
       const row = document.createElement("div");
@@ -183,8 +212,8 @@ class TemplateTokenMenuView implements PluginValue {
       row.addEventListener("mousemove", () => {
         if (this.state === null || this.state.selectedIndex === i) return;
         this.state.selectedIndex = i;
-        this.container
-          ?.querySelectorAll(".cm-slash-menu-row")
+        surface
+          .querySelectorAll(".cm-slash-menu-row")
           .forEach((r, idx) =>
             r.classList.toggle("cm-slash-menu-row-selected", idx === i),
           );
@@ -197,40 +226,44 @@ class TemplateTokenMenuView implements PluginValue {
         e.preventDefault();
         this.applyToken(token);
       });
-      this.container!.appendChild(row);
+      surface.appendChild(row);
     });
 
-    const surfaceWidth = 220;
-    const surfaceHeight = Math.min(40 + filtered.length * 32, 300);
-    const coords = this.view.coordsAtPos(this.state.triggerTo);
-    let anchorRect;
-    if (coords !== null) {
-      anchorRect = {
-        left: coords.left,
-        top: coords.top,
-        right: coords.right,
-        bottom: coords.bottom,
-      };
-    } else {
-      const editorRect = this.view.contentDOM.getBoundingClientRect();
-      anchorRect = {
-        left: editorRect.left + 16,
-        top: editorRect.top + 16,
-        right: editorRect.left + 32,
-        bottom: editorRect.top + 32,
-      };
+    // The docked sheet is pinned by its own stylesheet; only the anchored
+    // popover is positioned against the caret.
+    if (this.docked === null) {
+      const surfaceWidth = 220;
+      const surfaceHeight = Math.min(40 + filtered.length * 32, 300);
+      const coords = this.view.coordsAtPos(this.state.triggerTo);
+      let anchorRect;
+      if (coords !== null) {
+        anchorRect = {
+          left: coords.left,
+          top: coords.top,
+          right: coords.right,
+          bottom: coords.bottom,
+        };
+      } else {
+        const editorRect = this.view.contentDOM.getBoundingClientRect();
+        anchorRect = {
+          left: editorRect.left + 16,
+          top: editorRect.top + 16,
+          right: editorRect.left + 32,
+          bottom: editorRect.top + 32,
+        };
+      }
+      const pos = computePosition({
+        anchor: anchorRect,
+        surfaceWidth,
+        surfaceHeight,
+        preferredPlacement: "below",
+      });
+      surface.style.position = "fixed";
+      surface.style.left = `${pos.left}px`;
+      surface.style.top = `${pos.top}px`;
+      surface.style.width = `${surfaceWidth}px`;
+      surface.style.zIndex = "1000";
     }
-    const pos = computePosition({
-      anchor: anchorRect,
-      surfaceWidth,
-      surfaceHeight,
-      preferredPlacement: "below",
-    });
-    this.container.style.position = "fixed";
-    this.container.style.left = `${pos.left}px`;
-    this.container.style.top = `${pos.top}px`;
-    this.container.style.width = `${surfaceWidth}px`;
-    this.container.style.zIndex = "1000";
 
     if (selectedRow !== null) {
       (selectedRow as HTMLDivElement).scrollIntoView({ block: "nearest" });

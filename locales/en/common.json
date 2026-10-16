@@ -1541,6 +1541,7 @@
       "priority": "Priority",
       "quote": "Quote",
       "repeat": "Repeat",
+      "sheetTitle": "Insert",
       "table": "Table",
       "taskQuery": "Task list",
       "time": "Time",
@@ -1603,6 +1604,9 @@
         "remind": "Reminder"
       },
       "invalidRemind": "Myne can't read this date, so it won't remind you."
+    },
+    "templateToken": {
+      "sheetTitle": "Insert token"
     },
     "toolbar": {
       "apply": "Apply",
@@ -1710,6 +1714,9 @@
       },
       "convertCore": {
         "noMatch": "no match"
+      },
+      "picker": {
+        "sheetTitle": "Link to note"
       }
     },
     "flow": {
@@ -4539,6 +4546,7 @@
     "row": {
       "completed": "Task, completed",
       "notCompleted": "Task, not completed",
+      "editFields": "Edit task fields",
       "tooLongToWrite": "This task's line is too long to edit from here. Open its note instead.",
       "untitled": "Untitled task"
     },

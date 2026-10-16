@@ -75,11 +75,19 @@ export type TaskFieldEditorOptions = {
    */
   labels?: { commit?: string; cancel?: string; field?: string };
   /**
-   * Mount into this element (the two-pane menu's right pane) instead of
-   * creating a modal. The CALLER owns the backdrop, the focus trap and
-   * Escape/Enter routing (myne-md/myne#656 review).
+   * Mount into caller-owned chrome instead of creating a modal. The CALLER owns
+   * the backdrop, the focus trap and the Escape/Enter routing.
+   *
+   * TWO shapes, and the difference is whether the actions row stays with the body:
+   *
+   *   - `{ body }` alone: the surface is a card inside BODY, its Cancel/Save row
+   *     included. That is the anchored two-pane menu's right pane.
+   *   - `{ body, actions }`: the controls go into BODY and the Cancel/Save row into
+   *     ACTIONS, with no card around either. That is the docked sheet, whose
+   *     actions row is a SIBLING of its scrolling region so the two cannot scroll
+   *     apart (myne-md/myne#884).
    */
-  host?: HTMLElement;
+  host?: { body: HTMLElement; actions?: HTMLElement };
 };
 
 export type TaskFieldEditorHandle = {
@@ -822,13 +830,39 @@ export function openTaskFieldEditor(
   // bare test DOM never applies the imported CSS. Hosted in a pane, it flows.
   if (host === undefined) surface.style.position = "fixed";
 
+  // The docked shape (myne-md/myne#884): the caller handed us two hosts, so the
+  // controls and the actions row live in different parents and neither is wrapped
+  // in a card. In every other shape both halves go inside `surface`, which is why
+  // it is still created here and simply goes unused when split.
+  const split = host !== undefined && host.actions !== undefined;
+
   const close = (): void => {
     if (modal !== null) modal.close();
-    else surface.remove();
+    else if (split) {
+      host!.body.replaceChildren();
+      actions.remove();
+    } else surface.remove();
   };
 
   const body = buildBody(kind, value, popupHost);
-  surface.appendChild(body.root);
+  if (split) {
+    // In the split shape the editor OWNS both hosts: the sheet may have a field
+    // list in the body from the previous step, and appending under it would leave
+    // two steps on screen at once.
+    //
+    // The controls mount inside a `.cm-task-field-editor` WRAPPER, because that
+    // is the element every control skin is scoped through and in this shape it is
+    // otherwise never mounted: `surface` above is not appended, so a bare
+    // `host.body.replaceChildren(body.root)` left every `.cm-task-field-editor …`
+    // rule dead in the sheet and the calendar days, the select trigger and the
+    // inputs all lost their skins (myne-md/myne#884 review). The wrapper is a
+    // plain div and the shell supplies the card, so the docked reset rules that
+    // also target this class are no-ops here.
+    const card = document.createElement("div");
+    card.className = "cm-task-field-editor";
+    card.appendChild(body.root);
+    host!.body.replaceChildren(card);
+  } else surface.appendChild(body.root);
 
   const actions = document.createElement("div");
   actions.className = "cm-task-field-actions";
@@ -845,7 +879,8 @@ export function openTaskFieldEditor(
   commitButton.setAttribute("data-testid", "editor.task-field-commit");
   actions.appendChild(commitButton);
 
-  surface.appendChild(actions);
+  if (split) host!.actions!.replaceChildren(actions);
+  else surface.appendChild(actions);
 
   function commit(): void {
     committed = true;
@@ -861,10 +896,22 @@ export function openTaskFieldEditor(
   });
 
   if (host !== undefined) {
-    host.replaceChildren(surface);
-    // Enter commits from inside the pane, with the same listbox / date carve-outs
-    // the modal path encodes.
-    surface.addEventListener("keydown", (e) => {
+    // The card wrapper belongs to the element-host shape only. Split, the caller
+    // owns the chrome and a wrapper here would be an unstyleable div between the
+    // two hosts.
+    if (!split) host.body.replaceChildren(surface);
+    // Enter commits from inside the controls, with the same listbox / date
+    // carve-outs the modal path encodes.
+    //
+    // **Attached to a node this editor OWNS and removes, never to the caller's
+    // container.** Split, that is `body.root`; hosting it on `sheet.body` instead
+    // (which is what this did) outlives the editor, and the wizard reuses one
+    // body across steps, so every open/Back/open cycle left a listener that
+    // closed over a DEAD `body` and `commit`: one Enter then wrote the abandoned
+    // field as well as the live one (myne-md/myne#884 review). The pinned actions
+    // row is a sibling of `body.root`, so it is not covered here, deliberately:
+    // its buttons own their own Enter.
+    (split ? body.root : surface).addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       const target = e.target as HTMLElement | null;
       if (

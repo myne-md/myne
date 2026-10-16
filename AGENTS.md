@@ -405,6 +405,44 @@ revert-and-run that STILL passes is the finding, not a formality to tick.
 - **`String.replace`'s replacement STRING expands `$1`, `$&`, `` $` `` and `$$` — which defeats a quote sanitizer placed before it.** A theme value of `$1 onload=…` filtered clean of `["'<>]` still expanded to the captured group, whose own quote closed the attribute it was being interpolated into and landed a live event handler. `$` cannot be filtered (a legitimate CSS value may contain one), so the fix is a replacer **function**, to which no `$` sequence means anything. Any `replace(re, `…${untrusted}…`)` has this shape; `myne-themes/tools/render-preview.mjs` carries the worked example.
 - **`git add -N` to widen a diff leaves a zero-byte index entry behind, and deleting the file does not clear it.** Intent-to-add is how you get new files into `git diff HEAD` so a review or a guard can see them, and it is the right tool for that. What it also does is stage an empty blob (`e69de29`) for each path. Delete or rename such a file afterwards and the entry survives in the index while `git status` shows only ` D`, so a plain `git commit` lands an empty file named after work that moved elsewhere, and `git diff HEAD` shows neither the path nor the problem. The mirror-image failure costs more: a file created AFTER the `add -N` is untracked, so it is absent from that same diff, and a commit lands the imports that reference it without the module itself, with `pre-commit`'s `tsc` green because it reads the working copy rather than the index. Both shapes landed together on one branch. `git ls-files --stage | grep e69de29` finds the first, `git status --porcelain | grep '^??'` the second, and both are worth a look before any commit that followed an `add -N`.
 - **A cancelled subagent leaves the tree exactly as dirty as its last command, and a reviewer that ran an injection leaves it reverted.** `/pr-review` reviewers are told to prove a finding by injecting the defect and restoring it, and a reviewer that is cancelled mid-experiment (the batch was killed to save wall clock on a long review) never gets to the restore. What is left is a file reverted to the pre-fix state, with every test that measured the fix still green in the report because they were measured before the cancel, and nothing in the working tree saying so: `git status` shows the file as modified, which is what it looked like when the reviewer started. The dimension reviewers caught it here (both `mountZoom` call sites reading as still on the old wheel mode, against a source file the session had edited an hour earlier), but only because the tree happened to be read fresh rather than trusted. Two cheap habits close the class: after any cancelled or interrupted subagent, `git diff` the files that reviewer was pointed at before believing any green result, and let `/done` Gate 2's read of the staged diff be the last word on what the commit contains. The lesson generalises past reviewers: any subagent permitted to edit the shared tree is permitted to be interrupted mid-write, and "the tests passed" is a claim about a moment, not about the bytes that get committed.
+- **A listener added to a container the CALLER owns outlives the component that added it, and the
+  second copy of it is the one that bites.** `editor/src/task-field-editor.ts` binds its Enter
+  handler in the docked (split) shape to the element the controls live in, which for a sheet is the
+  caller's body: the editor's own `close()` removes the controls and the actions row, never that
+  listener, and the task-field wizard reuses ONE body across its steps. So every open/Back/open cycle
+  left a handler closing over a dead body and a dead commit, and one Enter wrote the ABANDONED
+  field's seeded value as well as the live one (`- [ ] call mum [priority:: medium]` appearing from a
+  step the user had backed out of). Nothing sees it: it compiles, the specs that exercise the sheet
+  never press Enter, jsdom computes no layout, and no lane renders the docked host but a phone, so
+  the corruption is silent. Bind to a node the component created and removes (`body.root` here) and
+  let the caller's own controls own their own Enter. The general shape is wider than dialogs: any
+  listener, observer or timer attached to something you do not own needs an explicit teardown, and
+  the deletion of the component is not it.
+- **A shared stylesheet may not scope a surface's chrome on an element that one of its shapes never
+  mounts.** `editor/src/task-surfaces.css` scopes every field control's skin through
+  `.cm-task-field-editor` (the calendar days and their selected state, the time spinbox, the select
+  trigger, the shared input skin and the focus ring) and `editor/src/floating-styles.ts` adds the
+  docked reset with the same prefix. In the docked split shape that element is deliberately NOT
+  appended, because the caller supplies the card, so every one of those rules was dead inside the
+  sheet: the controls rendered unstyled and the chosen calendar day showed no selection. The
+  failure is invisible to the whole tree in the same way the listener above is, since a value bound
+  by an ancestor that is never mounted is as unreachable as a hardcoded literal but reads as
+  ordinary CSS. When a component gains a second mount shape, mount the scoping element in it too (a
+  plain wrapper) or re-scope the rules onto a class the new shape does carry, and assert the wrapper
+  where a unit test can see it.
+- **A sink that resolves on a refused write makes the surface above it lie, and the lie compounds.**
+  The desktop field binding deliberately caught a `TaskWriteRefused`, warned, and returned (the
+  behaviour the review then removed), which is right
+  for a checkbox (a box that does not move is self evident) and wrong for a field editor: the
+  surface above it holds its own copy of the line so that a second edit in the same session can pass
+  the writer a line that still matches disk, and the swallowed refusal made that copy advance to
+  bytes that were never written. The menu then showed "Edit due date" for a field the note did not
+  carry, and every later edit in it was refused `line-changed` and swallowed in turn. Two rules
+  follow. A refusal is not an error to be silenced at the boundary; if the surface needs to know, the
+  boundary must let it through (the wizard's own commit handler catches it, so nothing escapes as an
+  unhandled rejection). And a surface that keeps a local copy of remote state owes it a way to learn
+  that the write did not land, or it will report a value nobody can find on disk.
+
 - **Tauri lib must keep `_lib` suffix** (`myne_desktop_lib`) to avoid Windows lib-vs-bin collision (rust-lang/cargo#8519). See `src-tauri/AGENTS.md`.
 
 ## Cryptographically load-bearing identifiers

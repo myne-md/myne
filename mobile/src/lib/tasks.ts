@@ -23,7 +23,7 @@ import {
   patchNoteCompletion,
   type NoteCompletionIo,
 } from "@myne/note-completion";
-import { writeTaskCompletion, type VaultTask } from "@myne/task-write";
+import { writeTaskCompletion, writeTaskField, type TaskFieldKind, type VaultTask } from "@myne/task-write";
 import { fromWire, type VaultTaskWire } from "@myne/task-wire";
 import { HAS_TAURI } from "./app-window";
 import { noteRead, noteUpdate } from "./notes";
@@ -90,6 +90,30 @@ export async function setTaskCompleted(task: VaultTask, completed: boolean): Pro
 
 /** Fired after a task write so a surface showing that note re-reads it. */
 export const TASK_WRITE_EVENT = "myne-task-written";
+
+/**
+ * Write one inline field on a task's line (myne-md/myne#884 task 8).
+ *
+ * The sibling of {@link setTaskCompleted}, sharing the same mobile IO: the read,
+ * the hash-guarded `noteUpdate`, the conflict copy and the announce. The
+ * completion pair is absent because a field never touches the frontmatter, and
+ * the write path itself is shared with desktop, so the two clients cannot drift
+ * on the order it does run (verify the raw line, write with the content hash,
+ * announce, then let the caller re-read). Mobile passes no `flushDirtyPanes`
+ * for the same reason its toggle does not: it has no pane tree to flush.
+ */
+export async function setTaskField(
+  task: VaultTask,
+  kind: TaskFieldKind,
+  value: string,
+): Promise<void> {
+  await writeTaskField(task, kind, value, {
+    readNote: noteRead,
+    writeNote: (noteId, body, baseHashHex) => noteUpdate(noteId, body, baseHashHex),
+    announce: announceTaskWrite,
+    createConflictCopy,
+  });
+}
 
 function announceTaskWrite(noteId: string): void {
   if (typeof window === "undefined") return;

@@ -35,7 +35,7 @@ import {
 } from "react";
 import i18n from "@myne/editor/i18n";
 import { TASK_CHIP_TOKEN, taskChipStyle } from "./taskChipToken";
-import { taskChipIcon } from "./taskChipIcon";
+import { taskChipIcon, type ChipIconKind } from "./taskChipIcon";
 import "./task-row.css";
 import { formatStoredValue } from "../lib/datetimeFormat";
 import { useDateTimeDisplay } from "../lib/useDateTimeDisplay";
@@ -114,15 +114,34 @@ export type TaskRowProps = {
    * right-hand chip, for the narrow note-scoped panel (myne-md/myne#656 review).
    */
   inlineDate?: boolean;
+  /**
+   * Open the field editor for this task, anchored to the control that was
+   * activated (myne-md/myne#884 task 8). Absent → no trailing control, which is
+   * what a read-only mount and a client with no field write get.
+   *
+   * The CONTROL is passed as well as the task because the surface is anchored to
+   * it: an anchored popover has to point at the thing the user pressed, and
+   * `TaskRowData` is a projection without the raw line a write needs, so the
+   * caller closes over its own record either way.
+   */
+  onEditFields?: (task: TaskRowData, control: HTMLElement) => void;
 };
 
-/** The chip's leading Lucide glyph, as a React element. */
-function ChipGlyph({ kind }: { kind: "due" | "remind" }): ReactElement {
+/** The chip's leading Lucide glyph, as a React element. `value` carries the
+ *  LEVEL for `priority`, whose shapes distinguish highest from lowest without
+ *  colour. */
+function ChipGlyph({
+  kind,
+  value = "",
+}: {
+  kind: ChipIconKind;
+  value?: string;
+}): ReactElement {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (el !== null) el.replaceChildren(taskChipIcon(kind, ""));
-  }, [kind]);
+    if (el !== null) el.replaceChildren(taskChipIcon(kind, value));
+  }, [kind, value]);
   return (
     <span
       ref={ref}
@@ -286,6 +305,46 @@ const META_STYLE: CSSProperties = {
   justifyContent: "flex-end",
 };
 
+/**
+ * An icon-only field mark beside the date (myne-md/myne#884 task 6).
+ *
+ * **A mark, not a chip**: no background, no border, no pill. The canon carries
+ * state as a mark or as text and reserves the fill for completion, and a row is a
+ * list of work rather than a scoreboard. Nothing but the glyph's own colour is
+ * set, and that comes from a token, so a theme repaints it like everything else.
+ *
+ * The glyph is `taskChipIcon`, the same source the note's own field chips and the
+ * field menu draw from, so one priority level has one shape in all three places.
+ * That matters most for `priority`, whose five levels are shapes (two chevrons up
+ * through two down) rather than colours, which is what survives a monochrome or
+ * colour-blind reading.
+ */
+const MARK_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  color: "var(--fg-2)",
+  flex: "0 0 auto",
+};
+
+/**
+ * The trailing field control (myne-md/myne#884 task 8): the row's way into the
+ * field editor for a task whose note is not open. A bare glyph, no border and no
+ * fill, because the row is a list of work and this is its third affordance.
+ */
+const FIELDS_BUTTON_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  width: 24,
+  height: 24,
+  padding: 0,
+  border: "none",
+  background: "none",
+  cursor: "pointer",
+  color: "var(--fg-3)",
+  fontFamily: "inherit",
+  fontSize: "var(--text-lg)",
+  lineHeight: 1,
+};
+
 const NOTE_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   minWidth: 0,
@@ -312,6 +371,7 @@ export function TaskRow({
   compactX = false,
   inlineDate = false,
   roomyBox = false,
+  onEditFields,
 }: TaskRowProps): ReactElement {
   const stacked = twoLine || inlineDate;
   const overdue = isOverdue(task, today);
@@ -344,6 +404,36 @@ export function TaskRow({
   // exactly the drift one shared component exists to prevent.
   const meta = (
     <>
+      {/* Field marks, beside the date (myne-md/myne#884 task 6). Nothing renders
+          for a field the record does not carry: an empty glyph would claim a
+          value the line does not have. */}
+      {task.priority == null ? null : (
+        <span
+          style={MARK_STYLE}
+          role="img"
+          // The field's name plus what the mark shows, the shape the note's own
+          // chip announces with. Literal keys so `check-i18n.mjs` sees them
+          // (`decorations/task-chip.ts`'s FIELD_NAME records why). The value half
+          // is the STORED bytes: the chip localizes a recurrence rule through
+          // `recurrenceLabel`, and this row does not import a decoration-layer
+          // module to do the same.
+          aria-label={`${i18n.t("editor.taskField.title.priority")}, ${task.priority}`}
+          data-testid={`${testIdPrefix}.priority`}
+        >
+          <ChipGlyph kind="priority" value={task.priority} />
+        </span>
+      )}
+      {task.repeat == null ? null : (
+        <span
+          style={MARK_STYLE}
+          role="img"
+          aria-label={`${i18n.t("editor.taskField.title.repeat")}, ${task.repeat}`}
+          data-testid={`${testIdPrefix}.repeat`}
+        >
+          <ChipGlyph kind="repeat" />
+        </span>
+      )}
+
       {date === undefined ? null : inlineDate ? (
         // Inline date (note-scoped panel): accent icon + text, no pill.
         <span
@@ -491,6 +581,32 @@ export function TaskRow({
             {meta}
           </span>
         </>
+      )}
+
+      {onEditFields === undefined ? null : (
+        <button
+          type="button"
+          className="myne-task-fields"
+          style={FIELDS_BUTTON_STYLE}
+          data-testid={`${testIdPrefix}.fields`}
+          aria-label={i18n.t("tasks.row.editFields")}
+          // No native `title`: the sheet's own controls carry an aria-label and
+          // nothing else, and `check-tooltip-convention.mjs` counts a native
+          // title on an interactive element as drift (the editor has no Tooltip
+          // primitive to use instead - that one lives in the desktop tree).
+          // The row is a navigation target, and so is the checkbox and the source
+          // note. This control stops its own events for the same reason they do:
+          // opening the field editor must not also open the note.
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditFields(task, e.currentTarget);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
+        >
+          {"\u22ef"}
+        </button>
       )}
     </div>
   );
