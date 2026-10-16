@@ -208,7 +208,11 @@ pub async fn claim_own_binding_best_effort(
         Err(error) => {
             tracing::warn!(
                 event = "device_binding_claim_failed",
-                error = %error,
+                // `?` rather than `%`: this enum's variants are unit-shaped or
+                // carry a closed enum, so Debug is structurally bounded while
+                // Display is a hand-written string a future variant could fill
+                // with anything (myne-md/myne#860).
+                error = ?error,
                 "the unlock-time device-binding claim did not complete; the next unlock retries"
             );
         }

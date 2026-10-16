@@ -313,6 +313,7 @@ import { promptForText } from "../lib/promptForText";
 import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
 import { listCustomThemes } from "../lib/themes";
 import { applyCustomTheme } from "../lib/theme";
+import { failClosedCode } from "../lib/global-failure";
 import { ornamentRole } from "@myne/ornaments";
 import { rewriteSelectionToEditor } from "../notes/ai/rewriteToEditor";
 
@@ -688,6 +689,13 @@ export function Editor({
     return (
       <FailClosedError
         reason={{ kind: "invalid-state" }}
+        // The bounded code appears on the card's own Copy affordance. Without
+        // this the prop is never passed, so the button never rendered and the
+        // recorded global failure had no reader at all (myne-md/myne#860). The
+        // code is this card's own closed reason, NOT joined with the recorded
+        // failure: see `failClosedCode` for the review finding that removed the
+        // join.
+        code={failClosedCode("invalid-state")}
         onCtaClick={() => {
           void (async () => {
             // vault_lock is idempotent (Ok(()) on already-empty slot)

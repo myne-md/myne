@@ -50,6 +50,7 @@
     "account:default",
     "screen-capture:default",
     "plain-file:default",
+    "diagnostics:default",
     "spell:default",
     "clipper-pairing:default",
     "cli-bridge:default",
