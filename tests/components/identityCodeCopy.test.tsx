@@ -10,7 +10,6 @@ import {
 const writeTextMock = vi.hoisted(() => vi.fn());
 const personListInvitesMock = vi.hoisted(() => vi.fn());
 const personAcceptInviteMock = vi.hoisted(() => vi.fn());
-const inspectInviteCodeMock = vi.hoisted(() => vi.fn());
 const startB2bMigrationMock = vi.hoisted(() => vi.fn());
 const listRosterMock = vi.hoisted(() => vi.fn());
 
@@ -63,7 +62,6 @@ vi.mock("../../src/lib/personAccount", () => ({
 }));
 
 vi.mock("../../src/lib/invite", () => ({
-  inspectInviteCode: inspectInviteCodeMock,
   startB2bMigration: startB2bMigrationMock,
   listRoster: listRosterMock,
 }));
@@ -145,7 +143,6 @@ beforeEach(() => {
   writeTextMock.mockReset().mockResolvedValue(undefined);
   personListInvitesMock.mockReset().mockResolvedValue([]);
   personAcceptInviteMock.mockReset().mockResolvedValue(undefined);
-  inspectInviteCodeMock.mockReset();
   startB2bMigrationMock.mockReset();
   // The post-accept name gate (myne-md/myne#851 task 8) sits between the accept
   // and `onAccepted`, which several tests here assert. This file is about the
@@ -298,7 +295,6 @@ describe("IdentityHome invite phrase", () => {
         claimed: false,
       },
     ]);
-    inspectInviteCodeMock.mockResolvedValue({ fingerprint_hex: "bb".repeat(32) });
     const onAccepted = vi.fn();
     render(
       <IdentityHome
@@ -314,11 +310,8 @@ describe("IdentityHome invite phrase", () => {
     fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
-    await screen.findByTestId("identity-home.accept-sas");
-    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
-    // Two steps now (myne-md/myne#871): the fingerprint confirmation releases the
-    // owner step, the 24 cells release the phrase step.
+    // Two steps now (myne-md/myne#871): the owner's code releases the owner step,
+    // the 24 cells release the phrase step.
     fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
     await screen.findByTestId("identity-home.accept-phrase-grid");
     fillIdentityPhrase();

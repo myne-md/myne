@@ -255,7 +255,6 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_member_unlock_status",
     "plugin:sync|sync_person_clear_member_unlock",
     "plugin:sync|sync_person_create_invite",
-    "plugin:sync|sync_person_inspect_invite_code",
     "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",

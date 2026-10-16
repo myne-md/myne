@@ -302,6 +302,41 @@ pub fn continuity_of(entry: &RosterMemberEntry) -> protocol::person_invite::Grou
     }
 }
 
+/// Fill a Live OWNER row's missing `person_id_hex` from the owner's own person
+/// id, returning `true` when a row actually changed (so a caller re-signs only
+/// then).
+///
+/// The field exists so the member list can map a roster row to a person's
+/// `vault.member-names` record, which is keyed by `person_id_hash`. A vault
+/// migrated by a build that wrote `None` on the owner row therefore cannot
+/// resolve the owner's name on ANY device, and the owner keeps being offered
+/// "Set a name" after saving one. Every owner-signed roster write backfills it,
+/// so an old vault heals on the next invite or removal.
+///
+/// It matches on the owner fingerprint as well as the role: an owner-signed
+/// roster has exactly one owner row, but the fingerprint check keeps the write
+/// scoped to the row that really is this signer.
+pub fn backfill_owner_person_id(
+    roster: &mut protocol::person_invite::GroupRosterPayload,
+    owner_fingerprint_hex: &str,
+    owner_person_id: &[u8; 16],
+) -> bool {
+    use protocol::person_invite::{GroupMemberState, GroupRosterRole};
+    let id = crate::account::person_identity::hex_lower(owner_person_id);
+    let mut changed = false;
+    for member in roster.members.iter_mut() {
+        if member.role == GroupRosterRole::Owner
+            && member.state == GroupMemberState::Live
+            && member.person_id_hex.is_none()
+            && member.fingerprint_hex == owner_fingerprint_hex
+        {
+            member.person_id_hex = Some(id.clone());
+            changed = true;
+        }
+    }
+    changed
+}
+
 /// Canonical-JSON serialization of the roster plaintext (the bytes
 /// `protocol::seal_membership_roster_raw` seals).
 ///

@@ -4115,6 +4115,18 @@
       "scanWithApp": "Scan with the iOS app",
       "title": "Add a device with a QR"
     },
+    "memberJoinQr": {
+      "error": "Couldn’t make the code.",
+      "noAccount": "This vault’s account isn’t recorded on this device yet. Open the vault once, then try again.",
+      "hint": "This code carries your server’s address and this vault’s id. It never carries your recovery phrase or your password.",
+      "notAMember": "This vault isn’t a shared vault you’re a member of, so there’s no code to show.",
+      "notConfigured": "Configure a sync server first, then make the code.",
+      "scanWithApp": "Scan with Myne on your other device",
+      "stepIdentity": "On your other device, open Myne and choose “I already have an identity”.",
+      "stepJoin": "This shared vault will be waiting in your invitations. Open it to join.",
+      "stepPhrase": "Enter your 24-word recovery phrase there.",
+      "title": "Add your own device"
+    },
     "devices": {
       "approve": "Approve",
       "awaitingApproval_one": "{{count}} device awaiting approval",
@@ -4295,7 +4307,9 @@
       },
       "usage": {
         "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
-        "label": "Storage and devices"
+        "label": "Storage and devices",
+        "memberHelper": "How many devices are signed in to your account.",
+        "memberLabel": "Devices"
       }
     },
     "reconcile": {
@@ -4420,10 +4434,6 @@
       "personError": "That phrase did not open a member identity.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
       "inviteCodeLabel": "Member identity code",
-      "inspect": "Check fingerprint",
-      "sasHint": "Read this fingerprint to the person you are inviting, or have them read it to you. It must match on both sides before you continue.",
-      "sasConfirm": "I confirmed this fingerprint with the person out of band",
-      "inviteCodeInvalid": "That is not a valid member identity code.",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
       "removeFailed": "The member could not be removed.",
@@ -5068,6 +5078,14 @@
       "cta": "Create identity",
       "working": "Creating…"
     },
+    "recover": {
+      "open": "I already have an identity",
+      "title": "Recover your identity",
+      "lead": "Enter the 24 words of your identity recovery phrase to bring that identity onto this device. It is a different phrase from any vault recovery phrase.",
+      "submit": "Recover identity",
+      "working": "Recovering…",
+      "failed": "Could not recover an identity on this device. Check the 24 words and try again."
+    },
     "phrase": {
       "title": "Save your identity phrase",
       "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
@@ -5079,6 +5097,9 @@
     },
     "typeback": {
       "title": "Confirm your phrase"
+    },
+    "joinFromQr": {
+      "notFound": "This code names a vault that isn’t in your invitations on this device. Ask the vault owner to send the invitation to this identity again."
     },
     "home": {
       "title": "Your identity",
@@ -5146,20 +5167,16 @@
     "acceptHeading": "Accept this invitation",
     "acceptHint": "Paste the owner’s identity code (they share it when they invite you).",
     "acceptOwnerCodeLabel": "Owner identity code",
-    "acceptInspect": "Check fingerprint",
-    "acceptSasHint": "Read this fingerprint to the vault owner, or have them read it to you. It must match on both sides before you continue.",
-    "acceptConfirm": "I confirmed this fingerprint with the owner out of band",
     "acceptSubmit": "Accept and unlock",
     "acceptPhraseLabel": "Your recovery phrase",
     "acceptPhraseHint": "Enter the 24 words of your recovery phrase. It is yours, not the vault owner’s.",
     "acceptPasswordNote": "Choose a password for this device. It is separate from the vault owner’s password and from your recovery phrase: it unlocks this vault on this device, and your phrase remains the portable way back in.",
     "acceptError": "The invite could not be accepted.",
-    "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
+    "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner’s identity code (they share it when they invite you).",
     "acceptErrorNotFound": "This invitation is no longer available. It may already have been used or withdrawn. Ask the owner to send a new invite.",
     "acceptErrorNotEnrolled": "This device is not the identity this invitation was addressed to. Open the identity the invite was sent to, then accept.",
     "acceptErrorTransport": "Could not reach the sync server. Check your connection and try again.",
     "acceptErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
-    "acceptInvalid": "That is not a valid owner identity code.",
     "claimedHeading": "Invites you have already claimed",
     "claimedHint": "Add one to this device with your recovery phrase. If the vault owner has since removed you from the vault, it cannot be added here.",
     "join": "Add to this device",

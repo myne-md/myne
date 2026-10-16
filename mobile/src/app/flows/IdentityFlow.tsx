@@ -36,12 +36,11 @@ import {
   personListInvites,
   personAcceptInvite,
   personJoinVault,
-  inspectInviteCode,
   personLock,
   type PersonSetupView,
   type InviteSummary,
 } from "../../lib/personAccount";
-import { syncSetEndpoint, listRoster } from "../../lib/sync";
+import { syncSetEndpoint, syncGetEndpoint, listRoster } from "../../lib/sync";
 import { setMyMemberName, memberNameErrorKey } from "../../lib/memberNames";
 import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
 import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
@@ -54,6 +53,10 @@ type Step =
   | "held"
   | "server"
   | "create"
+  // The gate's third door: this device has never held the identity, and the user
+  // brings it across with its 24-word phrase instead of minting a new one. It
+  // sits beside `create` because it is the same fork, one step over.
+  | "recover"
   | "phrase"
   // The type-back challenge gets a step of its own (myne-md/myne#869), the
   // `kit`/`typeback` split `CreateVaultFlow` has had since it shipped: the
@@ -372,7 +375,7 @@ function DevicePasswordField({
  * mobile flow: `Screen` → `FlowHeader` → padded `ScreenScroll` carrying a
  * `Title`/`Lead`, and a `FooterBar` for the step's actions.
  */
-export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
+export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps) {
   const { t } = useTranslation();
   // Names the accept step's phrase grid, which is 24 bare inputs with no visible
   // label of their own.
@@ -381,12 +384,24 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // ids rather than one: the accept's `aria-labelledby` must not point at a label
   // that belongs to a step that is not on screen.
   const joinPhraseLabelId = useId();
+  // …and the recover step's, a third grid of the same fields, for the same reason
+  // a third time.
+  const recoverPhraseLabelId = useId();
   const [step, setStep] = useState<Step>("gate");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Server step
-  const [serverUrl, setServerUrl] = useState("");
+  // Server step. A scanned member-vault QR prefills the address (its issuer's
+  // endpoint), so a device with no endpoint reaches the server step with the right
+  // one already typed. A PREFILL, and for this step nothing more: it is a visible,
+  // editable input, and this screen never writes the config itself.
+  //
+  // The one place the flow does write it is the recover arm below, and only when
+  // nothing is configured (there is no step to reach from that door, and
+  // `personSetup` resolves the endpoint before it can register anything). It is the
+  // same `syncSetEndpoint` call this step makes, so it verifies TLS before it
+  // writes; a device that already has an endpoint is never repointed.
+  const [serverUrl, setServerUrl] = useState(fromQr?.endpointUrl ?? "");
   // The shared invite code for a gated server (myne-md/myne#800); empty for an
   // open one. Identity creation registers a new account, so a gated server
   // refuses it without the code.
@@ -414,15 +429,9 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // id, so the step cannot render for a row that has left the list.
   const [acceptInvite, setAcceptInvite] = useState<InviteSummary | null>(null);
   const [ownerCode, setOwnerCode] = useState("");
-  // The fingerprint read back from the owner's code, once the owner has been
-  // asked to read it aloud. Null means "not inspected", and the SAS block and
-  // everything behind it stay closed: an unchecked code must not be acceptable.
-  const [ownerFingerprint, setOwnerFingerprint] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [acceptWords, setAcceptWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [inspecting, setInspecting] = useState(false);
 
   // Join step (myne-md/myne#852 task 7). A member's SECOND device adding a vault
   // this identity already belongs to. Its own state rather than the accept's,
@@ -439,6 +448,14 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // does not belong to.
   const [joinError, setJoinError] = useState<string | null>(null);
 
+  // Recover step. The gate's third door: a phone that has never held the identity
+  // brings it across with its 24-word phrase rather than minting a new person id.
+  // Its own state, for the same reason the join's is its own: the three
+  // credential-collecting steps are never open together, and sharing the fields
+  // would make "this step never inherits another's phrase" a property of every
+  // reset path instead of a property of the shape.
+  const [recoverWords, setRecoverWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+
   // Name step (myne-md/myne#851 task 15). It runs after an accept lands and its
   // completion callback is withheld until it finishes, so an accepted vault cannot
   // reach the editor unnamed, the same ordering the desktop gate holds.
@@ -447,15 +464,16 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   const [nameBusy, setNameBusy] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  // Secret-wipe artefact for the two credential-collecting steps, accept and join.
-  // Mirrors the in-flight phrase, the owner code and the device password so the
-  // unmount cleanup can drop them: V8 strings are immutable, so this is best-effort
-  // on the JS side (the load-bearing zeroize is Rust-side), but the reference goes
-  // on every exit. Same mechanism as `RecoverFlow`, which holds the same two kinds
-  // of secret; the phrase is a full identity credential and the password becomes
-  // this device's `vault.member-unlock` credential. One artefact for both steps
-  // rather than one each: the unmount cleanup is the half that cannot be forgotten
-  // per-path, and a second object here would be a second thing to remember to wipe.
+  // Secret-wipe artefact for the three credential-collecting steps, recover,
+  // accept and join. Mirrors the in-flight phrase, the owner code and the device
+  // password so the unmount cleanup can drop them: V8 strings are immutable, so
+  // this is best-effort on the JS side (the load-bearing zeroize is Rust-side),
+  // but the reference goes on every exit. Same mechanism as `RecoverFlow`, which
+  // holds the same two kinds of secret; the phrase is a full identity credential
+  // and the password becomes this device's `vault.member-unlock` credential. One
+  // artefact for all three steps rather than one each: the unmount cleanup is the
+  // half that cannot be forgotten per-path, and a second object here would be a
+  // second thing to remember to wipe.
   const acceptSecretsRef = useRef<{
     ownerCode: string;
     words: string[];
@@ -464,6 +482,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     joinWords: string[];
     joinPassword: string;
     joinConfirmPassword: string;
+    recoverWords: string[];
   }>({
     ownerCode: "",
     words: [],
@@ -472,6 +491,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     joinWords: [],
     joinPassword: "",
     joinConfirmPassword: "",
+    recoverWords: [],
   });
   const wipeSecrets = useCallback(() => {
     acceptSecretsRef.current = {
@@ -482,6 +502,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       joinWords: [],
       joinPassword: "",
       joinConfirmPassword: "",
+      recoverWords: [],
     };
   }, []);
   useEffect(() => {
@@ -493,6 +514,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       joinWords,
       joinPassword,
       joinConfirmPassword,
+      recoverWords,
     };
   });
   useEffect(() => () => wipeSecrets(), [wipeSecrets]);
@@ -625,8 +647,6 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   const clearAcceptSecrets = useCallback(() => {
     wipeSecrets();
     setOwnerCode("");
-    setOwnerFingerprint(null);
-    setConfirmed(false);
     setAcceptWords(Array(PHRASE_WORDS).fill(""));
     setPassword("");
     setConfirmPassword("");
@@ -689,6 +709,41 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     setStep("join-phrase");
   }, [clearJoinSecrets]);
 
+  /**
+   * Open the join wizard for a vault named by a scanned member-vault QR.
+   *
+   * One door, the code decides: the join overlay scans the QR and, for a
+   * `member_vault` code, closes and re-enters the identity flow with the target in
+   * `fromQr` (AppShell). Once this flow reaches the home step and its invites have
+   * loaded, the invite whose vault is the one the code named is opened here, so the
+   * user lands directly in the join wizard rather than on a list to hunt through.
+   *
+   * ONCE, through a ref, for the reason the name gate's latch exists: the effect's
+   * dependencies move on every parent render, and a second open would yank the user
+   * back to step 1 of a wizard they had moved past — or reopen it after they
+   * cancelled out. The latch goes DOWN before the match is tested, so the not-found
+   * arm is stated once and never re-run. That arm sets the shared `error` (rendered
+   * on the home step) rather than opening nothing in silence: a code that names a
+   * vault this identity has no invitation for is a dead end the user has to be told
+   * about, and the alternative is a screen that looks like the tap did nothing.
+   */
+  const qrJoinOpened = useRef(false);
+  useEffect(() => {
+    if (qrJoinOpened.current || !fromQr || step !== "home" || invites === null) return;
+    qrJoinOpened.current = true;
+    // Case-insensitively, for the reason the desktop producer canonicalises the
+    // same field: `vault_account_hash_hex` arrives from the server verbatim
+    // (stored by `materialize_member_vault` from the claim reply), while the codec
+    // hands this one over in lowercase, so an uppercase reply would read as "this
+    // device has no invitation for that vault" on a vault it can actually join.
+    const wanted = fromQr.accountHashHex.toLowerCase();
+    const match = invites.find(
+      (inv) => inv.vault_account_hash_hex.toLowerCase() === wanted,
+    );
+    if (match) openJoin(match);
+    else setError(t("identityFlow.joinFromQr.notFound"));
+  }, [fromQr, step, invites, openJoin, t]);
+
   /** Leave the join wizard for the home. The header chevron on step 1 and the
    *  footer cancel both land here. */
   const leaveJoin = useCallback(() => {
@@ -703,31 +758,32 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     setStep(next);
   }, []);
 
-  /**
-   * Read the fingerprint out of the owner's identity code, so the user can
-   * compare it with the owner out of band.
-   *
-   * A failed read clears any fingerprint already on screen and un-confirms, and
-   * the desktop form does the same when the code is edited (its `onChange`): a
-   * confirmed fingerprint that belongs to a code no longer in the box is a
-   * confirmation of nothing.
-   */
-  const inspectOwner = useCallback(async () => {
-    const code = ownerCode.trim();
-    if (!code) return;
-    setInspecting(true);
+  // ── Recover step (the gate's third door) ────────────────────────────────────
+
+  /** Drop the recover step's words from the state, and the banner with them: a
+   *  refusal about a step the user has left is stale the moment they leave it.
+   *  The phrase itself is the only secret this step collects, and it is a full
+   *  identity credential, so this runs on every exit that keeps the flow mounted
+   *  (the home step on success, the gate on back); the unmount cleanup covers the
+   *  rest. */
+  const clearRecoverSecrets = useCallback(() => {
+    setRecoverWords(Array(PHRASE_WORDS).fill(""));
     setError(null);
-    setOwnerFingerprint(null);
-    setConfirmed(false);
-    try {
-      const view = await inspectInviteCode(code);
-      setOwnerFingerprint(view.fingerprint_hex);
-    } catch {
-      setError(t("identityHome.acceptInvalid"));
-    } finally {
-      setInspecting(false);
-    }
-  }, [ownerCode, t]);
+  }, []);
+
+  /** Open the recover step from the gate. Everything the step collects is RESET
+   *  here rather than on the way out, so a second attempt can never inherit the
+   *  first one's words — the same ordering `openAccept` and `openJoin` keep. */
+  const openRecover = useCallback(() => {
+    clearRecoverSecrets();
+    setStep("recover");
+  }, [clearRecoverSecrets]);
+
+  /** Leave the recover step for the gate, dropping what it collected. */
+  const leaveRecover = useCallback(() => {
+    clearRecoverSecrets();
+    setStep("gate");
+  }, [clearRecoverSecrets]);
 
   const setAcceptWord = useCallback((index: number, value: string) => {
     setError(null);
@@ -739,12 +795,18 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     setJoinWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
   }, []);
 
-  /** Paste-to-grid, shared by the accept grid and the join grid. A 24-word phrase
-   *  is pasted rather than typed, so a paste that lands whole in the first cell is
-   *  the only usable shape. Fewer than two tokens is left to the browser, so pasting
-   *  a single word into a cell still works. `setWords` is whichever grid's setter
-   *  was pasted into, so the two steps cannot inherit each other's words, and `onEdit`
-   *  clears the banner of the step the paste belongs to. */
+  const setRecoverWord = useCallback((index: number, value: string) => {
+    setError(null);
+    setRecoverWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
+  }, []);
+
+  /** Paste-to-grid, shared by the accept grid, the join grid and the recover
+   *  grid. A 24-word phrase is pasted rather than typed, so a paste that lands
+   *  whole in the first cell is the only usable shape. Fewer than two tokens is
+   *  left to the browser, so pasting a single word into a cell still works.
+   *  `setWords` is whichever grid's setter was pasted into, so the three steps
+   *  cannot inherit each other's words, and `onEdit` clears the banner of the step
+   *  the paste belongs to. */
   const pasteWords = useCallback(
     (
       setWords: Dispatch<SetStateAction<string[]>>,
@@ -777,7 +839,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
   // Split per step (myne-md/myne#871): each step's Continue is gated on what
   // THAT step collects, and the final `acceptReady` stays the submit gate so
   // the full check is what guards the call.
-  const acceptOwnerReady = ownerFingerprint !== null && confirmed;
+  const acceptOwnerReady = ownerCode.trim() !== "";
   const acceptPhraseReady = acceptWords.every((word) => word.length > 0);
   const acceptReady =
     acceptOwnerReady &&
@@ -793,6 +855,13 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
     joinPhraseReady &&
     [...joinPassword].length >= MIN_PASSWORD_LEN &&
     joinPassword === joinConfirmPassword;
+
+  /** The recover step's gate, and it is the phrase alone: there is no second
+   *  credential to collect and nothing to confirm. A recovered identity has no
+   *  phrase to show (the backend returns one only when it GENERATED it), so the
+   *  ceremony here is the 24 words themselves — typing them is the demonstration
+   *  the desktop arm treats them as. */
+  const recoverReady = recoverWords.every((word) => word.length > 0);
 
   /**
    * Claim the invite and materialize the member vault on this device.
@@ -871,6 +940,72 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       setJoining(false);
     }
   }, [joinInvite, joinReady, joinWords, joinPassword, clearJoinSecrets, t]);
+
+  /**
+   * Recover an existing identity from its 24-word phrase, and install it on this
+   * device.
+   *
+   * The gate had exactly one way forward before this: `createIdentity`, which
+   * calls `personSetup()` with NO phrase and therefore MINTS a new person id. The
+   * binding has had the other arm from the day it landed — `personSetup(phrase)`
+   * recovers an existing identity — and the desktop dialog has the door
+   * (`IdentitySetupDialog`'s `recoverOpen` grid). Only this gate was missing it,
+   * and the cost is exactly the case the mobile flow exists for: a scanned
+   * member-vault QR hands the target to this flow (`fromQr`, AppShell) and the
+   * join wizard's own steps tell the user to bring their identity across with its
+   * phrase, so on a phone that had never held the identity the only available
+   * person id was a brand-new one with no invitations, and the effect below fell
+   * through to `joinFromQr.notFound`. A dead end in the case the feature is for.
+   *
+   * On success the step is DONE: a recovered identity comes back from the backend
+   * with no phrase (`PersonSetupView.phrase` is non-null only when the call
+   * generated one), so there is nothing to reveal, nothing to type back and no
+   * ceremony to run. It lands on the home step, which is where the QR effect above
+   * takes over once the recovered identity's invites have loaded.
+   *
+   * The failure copy is ONE sentence for every refusal this path can raise, and
+   * that is a decision rather than an omission. On a recover the backend folds a
+   * wrong phrase and a sealed identity this device cannot open into the SAME kind
+   * (`core/src/plugins/sync/person_account.rs` maps `CannotDecrypt` to
+   * `AlreadyHeldIdentity` only when the call GENERATED the phrase; with a phrase
+   * supplied it is `BadRequest`), so the device genuinely cannot tell the two
+   * apart and copy that picked one would be inventing a distinction it does not
+   * have. Nothing about the words reaches the banner, and nothing here is logged:
+   * the phrase is a full identity credential and it goes straight into the call.
+   */
+  const recoverIdentity = useCallback(async () => {
+    if (!recoverReady) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // A device reaching this step has no identity, and the common way it got
+      // here is a scanned member-vault code (`fromQr`), which means it very
+      // probably has no sync endpoint either — and `personSetup` resolves the
+      // endpoint BEFORE it can register anything, so without one it fails
+      // `NotConfigured` and the user reads a failure on a phrase that was correct.
+      //
+      // `syncSetEndpoint` is the same call the server step makes, and it verifies
+      // TLS (hostname + public CA) before it writes, so this is not a new trust
+      // decision: the endpoint came from a QR the user scanned off the screen of a
+      // device they already trust, which is the channel `decisions/protocol/0338`
+      // established for exactly this. It writes ONLY when nothing is configured, so
+      // a configured endpoint is never silently repointed (a different, deliberate
+      // act, and the server step is where it belongs).
+      if (fromQr?.endpointUrl && !(await syncGetEndpoint().then((c) => c.endpoint_url))) {
+        await syncSetEndpoint(fromQr.endpointUrl, "");
+      }
+      const view = await personSetup(recoverWords.join(" "));
+      // Dropped BEFORE the step changes, so the words do not survive onto a step
+      // that has no use for them.
+      clearRecoverSecrets();
+      setIdentityCode(view.identity_code);
+      setStep("home");
+    } catch {
+      setError(t("identityFlow.recover.failed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [recoverReady, recoverWords, clearRecoverSecrets, t, fromQr]);
 
   // ── Name step (myne-md/myne#851 task 15) ─────────────────────────────────────
 
@@ -1044,6 +1179,14 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
         <Button onClick={() => setStep("server")} data-testid="identity-flow.start">
           {t("identityFlow.start")}
         </Button>
+        {/* The third door, between the two that were already here. A device that
+            has never held this identity can bring an EXISTING one across with its
+            24-word phrase; without it the gate could only mint a new person id,
+            which is what made the scanned-QR path a dead end (see
+            `recoverIdentity`). */}
+        <Button variant="secondary" onClick={openRecover} data-testid="identity-flow.recover-open">
+          {t("identityFlow.recover.open")}
+        </Button>
         <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.skip">
           {t("identityFlow.skip")}
         </Button>
@@ -1162,6 +1305,83 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       </Screen>
     );
   };
+
+  /**
+   * The recover step: the 24-word phrase that brings an EXISTING identity onto
+   * this device.
+   *
+   * It mirrors the join grid deliberately, down to the reused keys — the label
+   * (`identityHome.joinPhraseLabel`), the hint (`sync.enroll.recoveryPhraseHint`),
+   * the per-cell accessible name (`sync.enroll.wordAria`) and the cell testids'
+   * shape. A user typing a phrase on either screen is doing the same thing, and a
+   * second set of near-identical strings is how the two drift into saying
+   * different things about the same words.
+   *
+   * There is no `StepProgress` here, and it is not an oversight: this step is one
+   * screen with one decision, not a wizard. Adding a one-of-one counter would
+   * promise a sequence that does not exist.
+   */
+  const renderRecover = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.recover.title")} onBack={leaveRecover} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.recover.title")}</Title>
+        <Lead>{t("identityFlow.recover.lead")}</Lead>
+
+        <div
+          id={recoverPhraseLabelId}
+          data-testid="identity-flow.recover-phrase-label"
+          style={{ marginTop: "var(--space-4)" }}
+        >
+          <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
+        </div>
+        <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
+        <div role="group" aria-labelledby={recoverPhraseLabelId} style={PHRASE_GRID_STYLE}>
+          {recoverWords.map((word, i) => (
+            <PhraseCell
+              key={i}
+              index={i}
+              word={word}
+              testId={
+                i === 0 ? "identity-flow.recover-phrase" : `identity-flow.recover-phrase-cell-${i + 1}`
+              }
+              label={t("sync.enroll.wordAria", { number: i + 1 })}
+              onChange={setRecoverWord}
+              onPaste={(index, event) => pasteWords(setRecoverWords, () => setError(null), index, event)}
+            />
+          ))}
+        </div>
+
+        {/* The refusal belongs to THIS step, so its banner does. One message for
+            every kind this call can refuse with, because a wrong phrase and a
+            sealed identity this device cannot open arrive as the same kind: see
+            `recoverIdentity`. */}
+        {error ? (
+          <Banner kind="danger" testID="identity-flow.recover-error" style={{ marginTop: "var(--space-4)" }}>
+            {error}
+          </Banner>
+        ) : null}
+      </ScreenScroll>
+      <FooterBar>
+        <Button
+          variant="secondary"
+          full={false}
+          onClick={leaveRecover}
+          data-testid="identity-flow.recover-back"
+        >
+          {t("identityFlow.back")}
+        </Button>
+        <Button
+          onClick={() => void recoverIdentity()}
+          disabled={!recoverReady || busy}
+          data-testid="identity-flow.recover-submit"
+        >
+          {busy ? t("identityFlow.recover.working") : t("identityFlow.recover.submit")}
+        </Button>
+      </FooterBar>
+      {busy && <BlockingOverlay title={t("identityFlow.recover.working")} />}
+    </Screen>
+  );
 
   const renderHome = () => {
     // The invite list is recipient-scoped and carries CLAIMED rows too, and a
@@ -1371,8 +1591,6 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
                   value={ownerCode}
                   onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
                     setOwnerCode(e.target.value);
-                    setOwnerFingerprint(null);
-                    setConfirmed(false);
                     setError(null);
                   }}
                   rows={3}
@@ -1384,37 +1602,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
                 />
               </div>
 
-              {ownerFingerprint === null ? (
-                <div style={{ marginTop: "var(--space-3)" }}>
-                  <Button
-                    variant="secondary"
-                    full={false}
-                    data-testid="identity-flow.accept-inspect"
-                    disabled={inspecting || ownerCode.trim() === ""}
-                    onClick={() => void inspectOwner()}
-                  >
-                    {t("identityHome.acceptInspect")}
-                  </Button>
-                </div>
-              ) : (
-                <div data-testid="identity-flow.accept-sas">
-                  <div data-testid="identity-flow.accept-sas-hint" style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}>
-                    {t("identityHome.acceptSasHint")}
-                  </div>
-                  <div style={{ marginTop: "var(--space-3)" }}>
-                    <MonoBox value={ownerFingerprint} testId="identity-flow.accept-owner-fingerprint" />
-                  </div>
-                  <AckRow
-                    checked={confirmed}
-                    onToggle={() => setConfirmed((v) => !v)}
-                    testId="identity-flow.accept-confirm"
-                  >
-                    {t("identityHome.acceptConfirm")}
-                  </AckRow>
-                </div>
-              )}
-
-              {/* The inspect failure belongs to THIS step, so its banner does too. */}
+              {/* The accept refusal belongs to THIS step, so its banner does too. */}
               {error ? (
                 <Banner kind="danger" testID="identity-flow.accept-error" style={{ marginTop: "var(--space-4)" }}>
                   {error}
@@ -1805,6 +1993,7 @@ export function IdentityFlow({ onCancel, onAccepted }: IdentityFlowProps) {
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}
       {step === "typeback" && renderTypeback()}
+      {step === "recover" && renderRecover()}
       {step === "home" && renderHome()}
       {(step === "accept-owner" || step === "accept-phrase" || step === "accept-password") &&
         renderAccept()}

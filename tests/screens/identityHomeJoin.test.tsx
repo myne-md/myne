@@ -23,7 +23,6 @@ const personListInvites = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personJoinVault = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
-const inspectInviteCode = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -46,7 +45,6 @@ vi.mock("../../src/lib/personAccount", () => ({
 }));
 
 vi.mock("../../src/lib/invite", () => ({
-  inspectInviteCode,
   personLock,
   listRoster,
 }));
@@ -126,7 +124,6 @@ beforeEach(() => {
   personAcceptInvite.mockReset().mockResolvedValue({});
   personJoinVault.mockReset().mockResolvedValue({});
   personLock.mockReset().mockResolvedValue(undefined);
-  inspectInviteCode.mockReset();
   listRoster.mockReset();
   setMyMemberName.mockReset().mockResolvedValue({});
 });
@@ -175,7 +172,6 @@ describe("IdentityHome second-device join", () => {
     expect(screen.queryByTestId("identity-home.accept-owner-code")).toBeNull();
     expect(screen.queryByTestId("identity-home.accept-inspect")).toBeNull();
     expect(screen.queryByTestId("identity-home.accept-owner-fingerprint")).toBeNull();
-    expect(inspectInviteCode).not.toHaveBeenCalled();
 
     // …and structurally, so a field arriving under a DIFFERENT testid convention is
     // caught too: this form collects no free text at all. The accept form's one

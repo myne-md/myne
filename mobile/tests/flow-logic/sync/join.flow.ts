@@ -72,6 +72,7 @@ test.describe("sync join flow", () => {
       freshDevice: true,
       qrScan: { value: "MYQR1|https://sync.example.com|4K7P9RH2JR3T8XW6VZ0A|-|9999999999" },
       qrDecode: {
+        kind: "account",
         endpoint_url: "https://sync.example.com",
         account_number: "4K7P9RH2JR3T8XW6VZ0A",
         fresh: true,
@@ -103,6 +104,7 @@ test.describe("sync join flow", () => {
       freshDevice: true,
       qrScan: { value: "MYQR1|https://sync.example.com|4K7P9RH2JR3T8XW6VZ0A|-|1" },
       qrDecode: {
+        kind: "account",
         endpoint_url: "https://sync.example.com",
         account_number: "4K7P9RH2JR3T8XW6VZ0A",
         fresh: false,

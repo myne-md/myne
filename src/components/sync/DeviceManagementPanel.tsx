@@ -34,6 +34,7 @@ import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitiv
 import { Icon } from "../primitives/Icon";
 import { Tooltip } from "../primitives/Tooltip";
 import { EmptyState } from "../primitives/EmptyState";
+import type { AccountPlane } from "../../hooks/useMemberVault";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -262,7 +263,35 @@ function removeDeviceSurface(busy: boolean): InteractiveSurfaceHandlers {
   };
 }
 
-export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
+export function DeviceManagementPanel({
+  hook,
+  plane,
+}: {
+  hook: DevicesHook;
+  /**
+   * Which account plane the active vault speaks for (myne-md/myne), from
+   * `useMemberVault`. The roster itself renders in every case — the backend
+   * resolves the same question and answers with the right account's devices — but
+   * two affordances are honesty obligations rather than cosmetics:
+   *
+   * - **`Remove device` is offered only on `"owner"`.** Revoking a person device's
+   *   token stops that device signing in to your account; it does NOT stop it
+   *   syncing this vault, because a member's vault access is the `(person, vault)`
+   *   membership binding and only the vault's OWNER can revoke that. The shared
+   *   `REMOVE_DEVICE_DISCLOSURE` ("sync stops … the device keeps what it has")
+   *   would be false here.
+   * - **`resetLocal` is never offered unless the plane is KNOWN to be the owner's**,
+   *   not even from the error arm. That command clears the token in the VAULT
+   *   directory, which on a member vault is the membership token the whole vault
+   *   syncs on, and no UI path restores it. `"unknown"` — a probe still in flight,
+   *   a failed read, or no vault id — is therefore NOT a licence to offer it: the
+   *   owner shape is exactly what would come back.
+   *
+   *  REQUIRED rather than defaulted, for the same reason: any default is one of
+   *  the two answers, and the wrong one of those is a destructive control.
+   */
+  plane: AccountPlane;
+}) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = hook;
   // The synced `device_names` map (MYND-548). Read off the shared prefs hook like
@@ -302,7 +331,13 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   // This device, if the roster came back marking it retired — it was removed from
   // another device. It is filtered out of `approved`/`pending`, so without this it
   // would vanish silently; surface it with the reset+re-add recovery instead.
-  const retiredSelf = (devices ?? []).find((d) => d.is_current && d.retired);
+  //
+  // Only on a positively-OWNER vault: there the roster is the member's PERSON
+  // account, so a retired row means this device was removed from that ACCOUNT
+  // rather than from this vault, and this arm's copy (and its reset) is worded for
+  // the latter.
+  const retiredSelf =
+    plane === "owner" ? (devices ?? []).find((d) => d.is_current && d.retired) : undefined;
 
   const [sas, setSas] = useState<SasState | null>(null);
   // The device id whose removal is awaiting confirmation, or `null`. One at a
@@ -439,10 +474,11 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                 ? t("sync.devices.tlsFailure")
               : t("sync.devices.unreachable", { error: t(deviceErrorReason(error)) })}
           </span>
-          {error === "Unauthenticated" ||
-          error === "AccountFrozen" ||
-          error === "DeviceLimitReached" ||
-          error === "AwaitingApproval" ? (
+          {plane === "owner" &&
+          (error === "Unauthenticated" ||
+            error === "AccountFrozen" ||
+            error === "DeviceLimitReached" ||
+            error === "AwaitingApproval") ? (
             // A rejected credential (e.g. this device was removed elsewhere) — a local
             // reset is the actual remedy.
             //
@@ -644,7 +680,7 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                     </button>
                   </Tooltip>
                 )}
-                {!d.is_current && (
+                {!d.is_current && plane === "owner" && (
                   <Tooltip label={t("sync.devices.remove")}>
                     <button
                       type="button"

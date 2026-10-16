@@ -513,6 +513,10 @@ const V = {
   ],
   "src/hooks/useConflictMaterializer.ts": ["ported", "Keep-both conflict drain; the sync engine is shared."],
   "src/hooks/useDevices.ts": ["ported", "Device roster; the commands are dispatched (task 69)."],
+  "src/hooks/useMemberVault.ts": [
+    "typed-unsupported",
+    "Which account plane the active vault speaks for (myne-md/myne). `sync_member_vault_status` is a sync-plugin command and the web dispatcher answers it with a typed refusal (`Class::Unsupported`: a browser container joins an already-current account and holds one vault), so the hook resolves to its `unknown` state there and every gate it feeds renders neither side's arms. That is a capability refusal rather than a build-time substitution, which is why it is typed-unsupported rather than excluded; the surfaces it gates (`SyncPanel`, the usage block, the device panel) are all ported, so the file does reach served code.",
+  ],
   "src/hooks/useRoster.ts": [
     "typed-unsupported",
     "The B2B member commands are `Class::Unsupported` on web (`memberSharing` absent), and the only module that imports this hook is `MemberRosterPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",

@@ -633,12 +633,25 @@ pub async fn rotate_group_from_host(
         &b2b_meta.signed_roster_envelope,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
-    let current_roster = verify_group_roster(
+    let mut current_roster = verify_group_roster(
         &owner.public_half(),
         &current_envelope,
         &account_number_hash,
     )
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    // Heal an old vault's owner row on this write: a vault migrated
+    // before the owner row carried a person id cannot resolve the owner's chosen
+    // name anywhere, and a removal is an owner-signed roster write like an invite.
+    // Done BEFORE the rotate so the new signed roster inherits the fill.
+    if let Some(person_id) = state.clone_person_id().await {
+        let owner_fingerprint_hex =
+            crate::account::person_identity::hex_lower(owner.public_half().fingerprint());
+        super::roster::backfill_owner_person_id(
+            &mut current_roster,
+            &owner_fingerprint_hex,
+            &person_id,
+        );
+    }
 
     // (2) Fresh keys + nonces.
     let new_group_key = Zeroizing::new(random_key()?);

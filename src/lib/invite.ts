@@ -95,24 +95,7 @@ export async function startB2bMigration(ownerDisplayName: string): Promise<B2bMi
   });
 }
 
-/** The invitee's addressable id + SAS fingerprint, decoded from a pasted
- *  identity code before the invite is sealed. */
-export interface InviteCodeView {
-  person_id_hex: string;
-  fingerprint_hex: string;
-}
-
-/** Parse a pasted person identity code for the out-of-band SAS compare (pure:
- *  no vault, no network). */
-export async function inspectInviteCode(recipientCode: string): Promise<InviteCodeView> {
-  return invoke<InviteCodeView>("plugin:sync|sync_person_inspect_invite_code", {
-    recipientCode,
-  });
-}
-
-/** Create and relay an invite from a pasted person identity code. The owner
- *  should have confirmed the SAS fingerprint from {@link inspectInviteCode}
- *  first. */
+/** Create and relay an invite from a pasted person identity code. */
 export async function personCreateInvite(input: {
   recipientCode: string;
   vaultLabel: string;

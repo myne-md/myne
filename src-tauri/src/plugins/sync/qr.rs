@@ -1,14 +1,23 @@
 //! Desktop-only QR device-join generation (MYND-466).
 //!
-//! `sync_device_join_qr` takes the **user-pasted** account number (Option 1,
-//! prompt-to-paste — the account# is an AS9 bearer token Myne never persists at
-//! rest, `account-number.md §8`, so it cannot be read from storage), reads THIS
-//! device's own sync endpoint from the endpoint config, builds the
-//! scanner-only join payload (`myne_core::plugins::sync::qr_join`), and renders it
-//! to an SVG QR the WebView displays. The phone scans it to prefill
-//! `{server_url, account#}` — SYNC-47: the password/phrase are NEVER carried.
-//! The legacy cert-pin slot is emitted empty (decisions/sync/0620: native trust
-//! is public CA + hostname), while the codec still decodes a pinned older QR.
+//! Two producers, both rendering a scanner-only payload from
+//! `myne_core::plugins::sync::qr_join`:
+//!
+//! - [`sync_device_join_qr`] — the OWNER's. Takes the **user-pasted** account
+//!   number (Option 1, prompt-to-paste — the account# is an AS9 bearer token Myne
+//!   never persists at rest, `account-number.md §8`, so it cannot be read from
+//!   storage), reads this device's own sync endpoint, and renders it. The phone
+//!   scans it to prefill `{server_url, account#}`.
+//! - [`sync_member_join_qr`] — a MEMBER's, for bringing another device of the
+//!   SAME person into the shared vault they belong to (myne-md/myne). It takes no
+//!   argument: the vault is resolved from the ACTIVE session, and the payload
+//!   names the vault by its `account_number_hash`, which is the only name a member
+//!   has for it.
+//!
+//! SYNC-47 holds for both: the password and the 24-word phrase are NEVER carried,
+//! and the scanning device is always asked for its own credential. The legacy
+//! cert-pin slot is emitted empty (decisions/sync/0620: native trust is public CA
+//! + hostname), while the codec still decodes a pinned older QR.
 //!
 //! Desktop-only: mobile scans, never generates — so the `qrcode` dependency lives
 //! here rather than in the shared core (kept off the mobile build).
@@ -29,7 +38,7 @@ pub struct DeviceJoinQr {
     pub ttl_secs: u64,
 }
 
-/// Failure surface for [`sync_device_join_qr`].
+/// Failure surface for [`sync_device_join_qr`] and [`sync_member_join_qr`].
 #[derive(Debug, Clone, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum DeviceJoinQrError {
@@ -46,6 +55,16 @@ pub enum DeviceJoinQrError {
     /// bounded join payload; surfaced rather than panicking).
     #[error("could not render the QR")]
     Render,
+    /// `sync_member_join_qr` was called on a session that is not a member of a
+    /// shared vault. An owner's second device joins with the account number plus
+    /// the vault password (`sync_device_join_qr`), and a QR that led an owner down
+    /// the phrase path would create a MEMBER device for a vault they own.
+    #[error("this vault is not a shared vault you are a member of")]
+    NotAMemberVault,
+    /// A member vault with no account hash recorded, which means its join never
+    /// completed. Refused rather than emitting a QR that names no vault.
+    #[error("this member vault has no account recorded")]
+    VaultAccountUnknown,
 }
 
 /// Build the SVG QR for adding a device, from the user-pasted `account_number`.
@@ -57,32 +76,110 @@ pub async fn sync_device_join_qr<R: Runtime>(
     app: AppHandle<R>,
     account_number: String,
 ) -> Result<DeviceJoinQr, DeviceJoinQrError> {
-    let endpoint = sync_get_endpoint(app)
-        .await
-        .map_err(|_| DeviceJoinQrError::EndpointRead)?;
-    let endpoint_url = endpoint
-        .endpoint_url
-        .ok_or(DeviceJoinQrError::NotConfigured)?;
-
-    let now_unix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let endpoint_url = endpoint_url_from_host(&app).await?;
 
     // `None` in the legacy pin slot, always: the phone no longer adopts a pin from
     // a QR (native trust is CA + hostname, 0620), and `sync_get_endpoint` reports
     // the retired field as `None` regardless of what a legacy config holds. Emitting
     // it explicitly keeps a future reader from reading the local `endpoint` binding
     // as the source of trust material.
-    let payload = QrJoinPayload::new(endpoint_url, account_number.trim(), None, now_unix)
+    let payload = QrJoinPayload::new(endpoint_url, account_number.trim(), None, now_unix())
         .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
 
-    let encoded = payload
-        .encode()
-        .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
+    render_payload(&payload)
+}
 
+/// Build the SVG QR for bringing **another device of the same person** into the
+/// shared vault this device is a member of (myne-md/myne).
+///
+/// The member's counterpart of [`sync_device_join_qr`], and different in kind
+/// rather than in degree: the owner's QR carries the vault ACCOUNT NUMBER and the
+/// scanning device proves `{account# + password}`, but a member holds neither —
+/// the display form is the owner's and never reaches them. So this payload names
+/// the vault by its `account_number_hash` and the scanner proves the **24-word
+/// recovery phrase** instead, which self-approves and fetches the vault's keys
+/// from the group package the owner already pushed. Nothing in the payload is a
+/// secret.
+///
+/// Takes **no argument**: the vault is resolved from the active session, so a
+/// caller cannot ask for a QR describing some other vault. Refuses unless the
+/// session is a member session — an owner's own second device belongs on the
+/// account-number path, and a QR that led an owner down the phrase path would
+/// create a member device for a vault they own.
+#[tauri::command]
+pub async fn sync_member_join_qr<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+) -> Result<DeviceJoinQr, DeviceJoinQrError> {
+    use myne_core::plugins::sync::devices::{account_plane_from_host, AccountPlane};
+
+    if account_plane_from_host(state.inner()).await != AccountPlane::Person {
+        return Err(DeviceJoinQrError::NotAMemberVault);
+    }
+
+    // `account_hash_hex` is written when the vault was materialized
+    // (`materialize_member_vault`), and it is the vault's public id rather than a
+    // credential: it names the server namespace the shared blobs live under and it
+    // is already on this device in plaintext sync state.
+    let vault_dir = crate::paths::active_vault_root_io(&app, state.inner().active_vault_id().await)
+        .map_err(|_| DeviceJoinQrError::VaultAccountUnknown)?;
+    let sync_state = myne_core::plugins::sync::state::read_sync_state(
+        &myne_core::vault_io::StdVaultIo,
+        &vault_dir,
+    )
+    .await
+    .map_err(|_| DeviceJoinQrError::VaultAccountUnknown)?;
+    let mut account_hash_hex = sync_state
+        .account_hash_hex
+        .filter(|h| !h.is_empty())
+        .ok_or(DeviceJoinQrError::VaultAccountUnknown)?;
+    // Canonicalised HERE rather than trusted, because this value is not ours: it
+    // was stored verbatim from the server's claim reply
+    // (`person_account.rs::materialize_member_vault`), and the codec refuses
+    // anything but lowercase hex. Uppercase is a legal spelling of the same 16
+    // bytes and every other reader of this field accepts it (`devices::hex16`
+    // tests `is_ascii_hexdigit`), so without this a vault that syncs perfectly
+    // would be told "this member vault has no account recorded" about a vault whose
+    // account IS recorded. The strict rule stays on the codec's own inputs, which is
+    // what keeps one spelling of a vault id travelling between two devices.
+    if account_hash_hex.len() == 32 && account_hash_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        account_hash_hex = account_hash_hex.to_ascii_lowercase();
+    }
+
+    let endpoint_url = endpoint_url_from_host(&app).await?;
+    let payload = QrJoinPayload::member_vault(endpoint_url, account_hash_hex.trim(), now_unix())
+        .map_err(|_| DeviceJoinQrError::VaultAccountUnknown)?;
+
+    render_payload(&payload)
+}
+
+/// This device's configured sync endpoint URL, or the typed refusal.
+async fn endpoint_url_from_host<R: Runtime>(
+    app: &AppHandle<R>,
+) -> Result<String, DeviceJoinQrError> {
+    let endpoint = sync_get_endpoint(app.clone())
+        .await
+        .map_err(|_| DeviceJoinQrError::EndpointRead)?;
+    endpoint
+        .endpoint_url
+        .ok_or(DeviceJoinQrError::NotConfigured)
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Encode + render an already-validated payload.
+///
+/// Both constructors validate their target, so an `encode` refusal here is a bug
+/// rather than user input; it surfaces as [`DeviceJoinQrError::Render`] instead of
+/// panicking, because a QR that cannot be drawn is still not a crash.
+fn render_payload(payload: &QrJoinPayload) -> Result<DeviceJoinQr, DeviceJoinQrError> {
+    let encoded = payload.encode().map_err(|_| DeviceJoinQrError::Render)?;
     let svg = render_qr_svg(&encoded).ok_or(DeviceJoinQrError::Render)?;
-
     Ok(DeviceJoinQr {
         svg,
         ttl_secs: QR_JOIN_TTL_SECS,
@@ -360,6 +457,49 @@ mod tests {
         let svg = render_qr_svg(&encoded).expect("svg");
         std::fs::write("/tmp/device-join-qr-sample.svg", &svg).unwrap();
         println!("wrote /tmp/device-join-qr-sample.svg ({} bytes)", svg.len());
+    }
+
+    /// The member payload is the one the new affordance displays, so it owes the
+    /// same two facts the account payload's tests pin: it renders, and the vault
+    /// hash never becomes SVG text.
+    #[test]
+    fn a_member_payload_renders_decodes_and_carries_no_text() {
+        let hash = "ab".repeat(16);
+        let payload =
+            QrJoinPayload::member_vault("https://sync.example.org", &hash, 1_700).unwrap();
+        let encoded = payload.encode().unwrap();
+        let svg = render_qr_svg(&encoded).expect("svg");
+        assert!(
+            !svg.contains(&hash),
+            "the vault hash must not survive as SVG text"
+        );
+        assert!(!svg.contains("MYQR"));
+        assert_eq!(QrJoinPayload::decode(&encoded).unwrap(), payload);
+    }
+
+    #[test]
+    fn a_member_payload_fits_the_display_budget() {
+        // Same 340 px / >=4 px-per-module budget as the account worst case
+        // (`DeviceJoinQr.tsx`'s `QR_IMG`), for the payload the member dialog shows:
+        // a long self-host URL plus a full 32-hex vault hash.
+        use qrcode::{EcLevel, QrCode};
+        let hash = "ab".repeat(16);
+        let encoded = QrJoinPayload::member_vault(
+            "https://sync.selfhosted.example.org:8443/myne/endpoint/v1",
+            &hash,
+            1_700_000_000,
+        )
+        .unwrap()
+        .encode()
+        .unwrap();
+        let n = QrCode::with_error_correction_level(encoded.as_bytes(), EcLevel::H)
+            .unwrap()
+            .width();
+        let side = n + 2 * QUIET_ZONE_MODULES;
+        assert!(
+            side <= 85,
+            "member payload side {side} modules exceeds the 85 budget"
+        );
     }
 
     #[test]
