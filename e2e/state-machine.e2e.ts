@@ -18,8 +18,10 @@ import {
   enterRecoveryPhrase,
   openSettings,
   selectPickerRow,
+  selectSettingsTopic,
   switchToVault,
   unlockToEditor,
+  waitForBannerText,
 } from "./support/flows";
 import {
   corruptVaultMetaWholesale,
@@ -154,9 +156,14 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
         const input = await app.session.byTestId("unlock.password-input");
         await input.sendKeys(PASSWORD_A);
         await (await app.session.byTestId("unlock.submit")).click();
-        const banner = await app.session.byTestId("unlock.error-banner", { timeoutMs: 15_000 });
-        // Full-literal non-distinguishing copy (§7.3, SYNC-8).
-        expect(await banner.text()).toBe(UNLOCK_NON_DISTINGUISHING_BANNER);
+        // Full-literal non-distinguishing copy (§7.3, SYNC-8). The helper waits
+        // for the rendered TEXT, not only the element: WebKit's `/text` can
+        // answer `""` on the first read of a just-inserted banner.
+        await waitForBannerText(
+          app.session,
+          "unlock.error-banner",
+          UNLOCK_NON_DISTINGUISHING_BANNER,
+        );
 
         // …and B's password opens B.
         await input.clear();
@@ -216,8 +223,11 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
       async (app) => {
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
         await (await app.session.byTestId("picker.create-cta")).click();
-        // Creation flow entry = PasswordStep (its form is the first step).
-        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+        // Creation-flow entry = the flow's FIRST step, which is the vault-name
+        // screen since myne-md/myne#468 put `name` ahead of `password`
+        // (`reducer.ts` `initialState.step = "name"`, `NUMBERED_STEPS`). Waiting
+        // on `create.password-input` here waits for step 2.
+        await app.session.byTestId("create.name-input", { timeoutMs: 10_000 });
       },
     );
   });
@@ -273,6 +283,19 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
       async (app) => {
         // No pre-routing: boot lands on the picker, both rows present.
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        // The shell paints before its rows: `picker.root` resolves on the
+        // container, while the rows arrive once `listVaults()` settles, so a
+        // one-shot count here reads an empty list on a boot merely slower than
+        // the assertion (measured: 1 failure in 3). Wait for the count, which is
+        // the shape `e2e/AGENTS.md` asks for (the success condition belongs in
+        // the predicate, and a non-null return resolves the wait).
+        await app.session.waitUntil(
+          async () => {
+            const rows = await app.session.byTestIdAll("picker.vault-row");
+            return rows.length === 2 ? rows.length : null;
+          },
+          { label: "the picker lists both vaults", timeoutMs: 15_000 },
+        );
         expect(await app.session.byTestIdAll("picker.vault-row")).toHaveLength(2);
 
         // Selecting the corrupted vault mounts the password form (the
@@ -312,6 +335,9 @@ describeE2E("post-delete routing (Settings → Account delete)", () => {
   async function deleteOpenVaultFromSettings(session: Session): Promise<void> {
     // Settings → Account → Danger zone → typed-DELETE gate → Submit.
     await openSettings(session, "account");
+    // The erase CTA is Account's `danger` topic since myne-md/myne#885; only
+    // the active topic's body is mounted.
+    await selectSettingsTopic(session, "account", "danger");
     await (await session.byTestId("settings.delete-vault-cta")).click();
     const confirmInput = await session.byTestId("delete-vault.confirm-input", {
       timeoutMs: 10_000,
@@ -567,7 +593,9 @@ describeE2E("in-app switcher transitions (MYND-127 task 5)", () => {
         // editor.create-vault: chip dropdown → "Create another vault".
         await (await app.session.byTestId("switcher.chip")).click();
         await (await app.session.byTestId("switcher.create-cta")).click();
-        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+        // Same first step as the picker entry above: the vault-name screen
+        // (myne-md/myne#468), not `create.password-input`.
+        await app.session.byTestId("create.name-input", { timeoutMs: 10_000 });
       },
     );
   });

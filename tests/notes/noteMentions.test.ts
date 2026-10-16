@@ -128,3 +128,24 @@ describe("a refused longer name does not hand the position to a shorter one (myn
     ]);
   });
 });
+
+describe("a title two notes share links neither (myne-md/myne#867 review, D7)", () => {
+  const shared: ResolverNote[] = [
+    { noteUuid: "n-a", title: "Meeting", folder: "A/" },
+    { noteUuid: "n-b", title: "Meeting", folder: "B/" },
+  ];
+  const sharedTargets = buildMentionTargets(shared);
+
+  it("leaves the shared bare title plain, rather than opening the first note listed", () => {
+    expect(
+      linkifyMentions("see Meeting today", sharedTargets).filter((s) => s.noteUuid !== undefined),
+    ).toEqual([]);
+  });
+
+  it("still links each note by its full path, which only one of them can have", () => {
+    const linked = linkifyMentions("see A/Meeting and B/Meeting", sharedTargets).filter(
+      (s) => s.noteUuid !== undefined,
+    );
+    expect(linked.map((s) => s.noteUuid)).toEqual(["n-a", "n-b"]);
+  });
+});

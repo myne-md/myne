@@ -106,6 +106,15 @@ describe("PersonIdentityUnlock", () => {
     expect(screen.getAllByLabelText("sync.enroll.wordAria")[0]).toBe(input);
   });
 
+  it("pads its own body, inset like the header", () => {
+    // `ModalShell`'s body has no padding, so the grid and the buttons ran flush
+    // to the border (myne-md/myne#867, on the user's read).
+    render(<PersonIdentityUnlock open onOpenChange={() => {}} />);
+    const body = document.querySelector(".myne-modal-body")?.firstElementChild as HTMLElement;
+    expect(body.contains(screen.getByTestId("sync.panel.identity-unlock.submit"))).toBe(true);
+    expect(body.style.padding).toBe("var(--space-4) var(--space-5) var(--space-5)");
+  });
+
   it("keeps the phrase grid inside its container at any panel width", () => {
     render(<PersonIdentityUnlock open onOpenChange={() => {}} />);
     const grid = screen.getByTestId(

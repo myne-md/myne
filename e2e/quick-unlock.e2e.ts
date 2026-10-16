@@ -59,6 +59,7 @@ import {
   openSettings,
   closeSettings,
   searchAndOpenNote,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -96,6 +97,9 @@ async function selectedNoteId(s: Session): Promise<string> {
  */
 async function configurePinInSettings(s: Session): Promise<void> {
   await openSettings(s, "privacy");
+  // Quick-unlock lives in Privacy's `locking` topic since myne-md/myne#885;
+  // only the active topic's body is mounted.
+  await selectSettingsTopic(s, "privacy", "locking");
   await (await s.byTestId("settings.quick-unlock-toggle")).click();
   // Toggling on reveals the PIN setup row.
   await (await s.byTestId("settings.quick-unlock-pin-input")).replaceText(PIN);

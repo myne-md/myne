@@ -17,7 +17,7 @@
 // `Switch`/`Input` primitives, the same set every other settings section uses.
 
 import { useCallback, useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   memoryDelete,
@@ -30,7 +30,8 @@ import {
   type PersonalityDirective,
 } from "../../lib/memory";
 import { EmptyState } from "../primitives/EmptyState";
-import { ControlBlock } from "./ControlBlock";
+import { SettingRow } from "./SettingRow";
+import { IconButton } from "../primitives/IconButton";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -241,8 +242,19 @@ function MemoryRow(props: {
   );
 }
 
-/** The memory + personality section, rendered inside AiPanel (the AI rail). */
-export function MemorySection(props: { onShowToast: (message: string) => void; aiEnabled: boolean }) {
+/** The memory + personality section, rendered inside AiPanel (the AI rail).
+ *
+ *  `layout` places the two halves (myne-md/myne#867, on the user's read: the
+ *  Advanced topic is two sections, "Preferences" holding the meeting prompt and
+ *  the voice preferences, and "Memory" holding what the assistant remembers).
+ *  The halves share one load and one busy flag, so they stay one component and
+ *  the caller only decides WHERE each renders. Without it they render stacked,
+ *  as before. */
+export function MemorySection(props: {
+  onShowToast: (message: string) => void;
+  aiEnabled: boolean;
+  layout?: (parts: { memory: ReactNode; personality: ReactNode }) => ReactNode;
+}) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<MemoryListRow[] | null>(null);
   // The host's cap, not a constant here: see `MemoryListView`.
@@ -331,7 +343,7 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
 
   const disabled = !props.aiEnabled || busy;
 
-  return (
+  const memory = (
     <div style={BLOCK_STYLE} data-testid="settings.memory-section">
       {/* `data-setting-anchor` here because the settings-search registry carries
           an `ai.memory` entry whose `id` IS the anchor a hit scrolls to, and it
@@ -433,37 +445,49 @@ export function MemorySection(props: { onShowToast: (message: string) => void; a
           </button>
         )}
       </div>
-
-      <ControlBlock
-        anchorId="ai.personality"
-        label={t("settings.memory.personalityLabel")}
-        helper={t("settings.memory.personalityHelper")}
-        testId="settings.memory.personality-block"
-        control={
-          <>
-            <textarea
-              id="ai-personality"
-              data-testid="settings.memory.personality-input"
-              value={personalityDraft}
-              disabled={disabled}
-              onChange={(e) => setPersonalityDraft(e.target.value)}
-              rows={4}
-              spellCheck={false}
-              placeholder={t("settings.memory.personalityPlaceholder")}
-              style={{ ...TEXTAREA_STYLE, background: "var(--paper)" }}
-            />
-            <button
-              type="button"
-              data-testid="settings.memory.personality-save"
-              disabled={disabled}
-              onClick={() => void savePersonality()}
-              style={LINK_BUTTON_STYLE}
-            >
-              {t("settings.memory.personalitySaveLabel")}
-            </button>
-          </>
-        }
-      />
     </div>
+  );
+  const personality = (
+    // A setting row whose control is the save (myne-md/myne#867): the same
+    // square bordered icon the meeting prompt's reset uses beside it, so the
+    // two standing instructions in Preferences read as one kind of row.
+    <SettingRow
+      anchorId="ai.personality"
+      testId="settings.memory.personality-block"
+      label={t("settings.memory.personalityLabel")}
+      helper={t("settings.memory.personalityHelper")}
+      control={
+        <IconButton
+          icon="circle-check"
+          label={t("settings.memory.personalitySaveLabel")}
+          tooltip
+          bordered
+          disabled={disabled}
+          testId="settings.memory.personality-save"
+          onClick={() => void savePersonality()}
+        />
+      }
+    >
+      <textarea
+        id="ai-personality"
+        data-testid="settings.memory.personality-input"
+        aria-label={t("settings.memory.personalityLabel")}
+        value={personalityDraft}
+        disabled={disabled}
+        onChange={(e) => setPersonalityDraft(e.target.value)}
+        rows={4}
+        spellCheck={false}
+        placeholder={t("settings.memory.personalityPlaceholder")}
+        style={{ ...TEXTAREA_STYLE, background: "var(--paper)" }}
+      />
+    </SettingRow>
+  );
+
+  if (props.layout !== undefined) return <>{props.layout({ memory, personality })}</>;
+  return (
+    <>
+      {memory}
+      {personality}
+    </>
   );
 }

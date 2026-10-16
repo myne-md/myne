@@ -41,12 +41,35 @@ import type { Session } from "./support/webdriver";
 
 const RAIL = '[data-testid="editor.ribbon.button"]';
 
-/** Run the rail entry for a registry command id. */
+/**
+ * Click the rail entry for a registry command id, and FAIL LOUDLY when the rail
+ * does not carry it.
+ *
+ * The version this replaces clicked nothing when the button was absent and
+ * returned as if it had opened the surface, so the scenario went on to wait for
+ * an element that was never going to appear and reported a timeout naming the
+ * element. `graph.show` is ribbon-ELIGIBLE but not in `RIBBON_DEFAULT_IDS`, so
+ * a fresh vault's rail does not carry it and AXS-1 failed exactly that way,
+ * measured six times across two batches plus two isolated runs.
+ *
+ * A helper that verifies nothing is the shape `e2e/AGENTS.md` names, so this one
+ * throws instead. A command the rail does not carry is reached through the
+ * palette, which is the door AXS-6 already uses for the same reason.
+ */
 async function runRail(s: Session, commandId: string): Promise<void> {
-  await s.execute(
+  const clicked = await s.execute<boolean>(
     `const el = document.querySelector('${RAIL}[data-command-id="${commandId}"]');` +
-      `if (el !== null) el.click();`,
+      `if (el === null) return false;` +
+      `el.click();` +
+      `return true;`,
   );
+  if (clicked !== true) {
+    throw new Error(
+      `runRail: the rail carries no [data-command-id="${commandId}"] button. ` +
+        `The command is not in RIBBON_DEFAULT_IDS, so it has no default rail ` +
+        `entry; reach it through runPaletteAction instead (see AXS-6).`,
+    );
+  }
 }
 
 /** Unlock, dismiss the importer offer, and hand back the session. */
@@ -66,7 +89,11 @@ describeE2E("AXS-1 the graph tab has no WCAG 2.2 AA violations", () => {
       { seed: (dir) => { fixture = seedVault(dir); } },
       async (app) => {
         const s = await ready(app, fixture.password);
-        await runRail(s, "graph.show");
+        // The palette, not the rail: `graph.show` is ribbon-ELIGIBLE but not in
+        // `RIBBON_DEFAULT_IDS`, so a fresh vault's rail does not carry it (see
+        // `runRail`). The wait below is what proves the action opened the graph
+        // rather than that a click landed somewhere.
+        await runPaletteAction(s, "graph.show", "graph");
         await s.byTestId("editor.graph-view", { timeoutMs: 15_000 });
         // The canvas itself is not axe's business — it is one element with a
         // label. What is: the toolbar cluster floating on it, which is where
@@ -108,7 +135,13 @@ describeE2E("AXS-3 the task list tab has no WCAG 2.2 AA violations", () => {
       { seed: (dir) => { fixture = seedVault(dir); } },
       async (app) => {
         const s = await ready(app, fixture.password);
-        await runRail(s, "tasks.show");
+        // The palette, not the rail, for the same reason as AXS-1: `tasks.show`
+        // is ribbon-ELIGIBLE but not in `RIBBON_DEFAULT_IDS`.
+        // `e2e/task-panel.e2e.ts` opens the same tab the same way. The wait is
+        // what makes this non-vacuous: with the old `runRail` a missing rail
+        // button clicked nothing and axe ran over the editor instead.
+        await runPaletteAction(s, "tasks.show", "tasks");
+        await s.byTestId("tasks.panel", { timeoutMs: 15_000 });
         const violations = await runAxeInPage(s);
         expect(violations, formatAxe(violations)).toEqual([]);
       },

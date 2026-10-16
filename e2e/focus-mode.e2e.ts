@@ -30,6 +30,7 @@ import {
   dismissImporterOffer,
   openSettings,
   runPaletteAction,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -93,6 +94,9 @@ describeE2E("fm2 focus-mode behaviour toggles persist (focus-mode, MYND-348)", (
         await dismissImporterOffer(s);
 
         await openSettings(s, "editor");
+        // The focus-mode switches live in the Editor panel's `editing` topic
+        // since myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "editing");
 
         // Both behaviour switches default ON (null ≡ unset → host default-on).
         const typewriter = await s.byTestId("settings.focus-typewriter");

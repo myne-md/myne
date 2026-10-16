@@ -97,6 +97,24 @@ fn main() {
                     "ai_provider_has_key",
                     "set_deliberate_folders",
                     "set_archived_folders",
+                    // Periodic-notes settings (myne#177, wired to mobile by
+                    // myne-md/myne#880): one weekly/monthly entry of the
+                    // `periodic_notes` map. Shared core setter; same three-site
+                    // lockstep as every other prefs command here.
+                    "set_periodic_note_setting",
+                    // Graph colour groups (myne-md/myne#880): a whole-list replace of
+                    // the rule sequence. Shared core setter; same three-site lockstep.
+                    "set_color_groups",
+                    // AI excluded folders (myne-md/myne#880): the set the AI
+                    // refusal path honours, mutated by verbs. Shared core setter.
+                    "set_ai_excluded_folders",
+                    // AI limits (myne-md/myne#880): the device-local chat-history
+                    // budget and the shared meeting prompt. Shared core setters.
+                    "set_chat_history_budget",
+                    // Attachment image OCR (myne-md/myne#880): the device-local
+                    // opt-out the mobile import path already reads.
+                    "set_attachment_ocr_enabled",
+                    "set_meeting_ai_prompt",
                     "set_device_name",
                     "device_platform",
                     "vault_set_label",

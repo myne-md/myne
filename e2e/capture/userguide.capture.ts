@@ -55,6 +55,7 @@ import {
   rowMenuPick,
   nameNewNote,
   searchAndOpenNote,
+  selectSettingsTopic,
   setFolderNotesEnabled,
   setViewsEnabled,
   waitForSaved,
@@ -1434,6 +1435,9 @@ runner(
         async () => {
           await enableDeveloperModeInSettings(s);
           await (await s.byTestId("settings.tab-editor")).click();
+          // The vim toggle lives in the Editor panel's `editing` topic since
+          // myne-md/myne#885; only the active topic's body is mounted.
+          await selectSettingsTopic(s, "editor", "editing");
           const block = await s.byTestId("settings.vim-mode", { timeoutMs: 6000 });
           await safe("scroll vim-mode into view", async () => {
             await s.execute(

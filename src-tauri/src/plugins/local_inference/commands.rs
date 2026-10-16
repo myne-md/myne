@@ -292,32 +292,50 @@ pub(super) fn capability_report_from(
     // every AI scenario driving a surface stuck in its empty state. `auto_tag`
     // below is the row that already asked the engine, and the row that already
     // worked.
-    // A NAMED provider whose remote arm is not answering says WHY, before the
-    // local arm is consulted at all (myne-md/myne#867). Without this branch the
-    // four ways a named provider can be unusable (the beta off, no key, no
-    // consent, no model chosen) all fell through to `NoModel` below, and the
-    // chat header rendered every one of them as "No provider" on a vault whose
-    // provider was named. The gate already computes the right `EngineError`;
-    // `LocalInferenceState::remote_refusal` is what stopped discarding it.
-    let generation = match state.remote_refusal() {
-        Some(cause) => FeatureStatus::blocked(cause),
-        None => match state.engine_for(RequestClass::UserInitiated) {
-            Err(cause) => FeatureStatus::blocked(cause),
-            // A locally side-loaded GGUF is required only by the in-process arm.
-            // A remote provider or a loopback runtime BRINGS ITS OWN model,
-            // which is the entire point of naming one. Reporting `NoModel`
-            // there told a user whose generation demonstrably works that the
-            // feature is unavailable.
-            Ok(engine)
-                if !generation_model
-                    && !engine.carries_own_models()
-                    && state.class_for(RequestClass::UserInitiated)
-                        == Ok(super::state::BackendClass::InProcessLocal) =>
-            {
-                FeatureStatus::blocked(EngineError::NoModel)
-            }
-            Ok(_) => FeatureStatus::ok(),
-        },
+    // **The local reading is computed FIRST, and its `ok()` wins** (myne-md/myne#867
+    // review). `remote_refusal` answers "why is the named provider not the arm
+    // that answers", which is NOT the question this row asks. `active()` falls
+    // back to the LOCAL arm for every one of those causes, so a vault with a
+    // working local engine and a half-configured provider serves generation
+    // locally, while a report that took the refusal first said
+    // `available: false` about a surface that still answers.
+    //
+    // The refusal is the better CAUSE only where the local arm cannot serve
+    // either, and there it is strictly more useful: it names what the user can
+    // act on (accept the consent, paste the key, choose a model) instead of the
+    // local arm's own `NoModel`, which is not the reason they cannot send.
+    let local_generation = match state.engine_for(RequestClass::UserInitiated) {
+        Err(cause) => FeatureStatus::blocked(cause),
+        // A locally side-loaded GGUF is required only by the in-process arm.
+        // A remote provider or a loopback runtime BRINGS ITS OWN model,
+        // which is the entire point of naming one. Reporting `NoModel`
+        // there told a user whose generation demonstrably works that the
+        // feature is unavailable.
+        Ok(engine)
+            if !generation_model
+                && !engine.carries_own_models()
+                && state.class_for(RequestClass::UserInitiated)
+                    == Ok(super::state::BackendClass::InProcessLocal) =>
+        {
+            FeatureStatus::blocked(EngineError::NoModel)
+        }
+        Ok(_) => FeatureStatus::ok(),
+    };
+    // A NAMED provider whose remote arm is not answering says WHY, in the one
+    // case where the local arm cannot answer either (myne-md/myne#867). Without
+    // this branch the four ways a named provider can be unusable (the beta off,
+    // no key, no consent, no model chosen) all fell through to the local arm's
+    // `NoModel`, and the chat header rendered every one of them as "No provider"
+    // on a vault whose provider was named. The gate already computes the right
+    // `EngineError`; `LocalInferenceState::remote_refusal` is what stopped
+    // discarding it.
+    let generation = if local_generation.available {
+        local_generation
+    } else {
+        match state.remote_refusal() {
+            Some(cause) => FeatureStatus::blocked(cause),
+            None => local_generation,
+        }
     };
     let embedding = match state.embedding_engine() {
         Err(cause) => FeatureStatus::blocked(cause),

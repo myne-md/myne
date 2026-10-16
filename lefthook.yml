@@ -332,6 +332,31 @@ pre-commit:
       # 128 ms and `check-token-adoption.mjs` at 196 ms in this same hook.
       run: node scripts/check-manual-test-roster.mjs --check
 
+    prefs-parity:
+      # myne#880. Desktop and mobile share one `vault.prefs` blob, so a phone
+      # that cannot author a value inherits whatever a computer last set, and
+      # nothing compared the two clients' settings surfaces: 31 of the 76 Rust
+      # prefs commands were surfaced on desktop only. The guard's denominator is
+      # the RUST command roster (`core/src/plugins/prefs/commands.rs`), never a
+      # client's wrapper list, because a denominator derived from a client is
+      # blind to that client.
+      #
+      # `--check` gates the GENERATED `docs/dev/settings-parity.md`, and CI runs
+      # the same invocation in its own UNFILTERED step for the reason
+      # `twin-inventory` above records: a hand edit to a generated projection is
+      # a docs-only commit, which the `code-paths` filter would skip, leaving
+      # this bypassable hook as the only gate. Until this entry existed that
+      # sentence was in the CI comment and nowhere in the hooks, so the local
+      # backstop the three sibling guards all have was missing.
+      #
+      # The glob covers the caller trees rather than only the files the script
+      # opens by name: the "is this binding reached" decision is IMPORTED from
+      # `check-ipc-binding-callers.mjs`, whose `CALLERS_FOR` walks `src`,
+      # `web/src`, `editor/src`, `dialect/src` and `mobile/src`. It costs ~4.4 s,
+      # measured, which is why it is globbed rather than run on every commit.
+      glob: "{src/**,web/src/**,editor/src/**,dialect/src/**,mobile/**,src-tauri/src/**,core/src/**,scripts/check-prefs-parity.mjs,scripts/check-ipc-binding-callers.mjs,scripts/prefs-parity.json,docs/dev/settings-parity.md}"
+      run: node scripts/check-prefs-parity.mjs --check
+
     embed-layout-drift:
       # myne#409: the form-C embed-layout grammar is written in TypeScript
       # (canonical, source-consumed by all three clients) and, for the export

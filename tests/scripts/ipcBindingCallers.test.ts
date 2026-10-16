@@ -13,8 +13,19 @@
 // of them can leave a half-restored checkout behind.
 
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { deadBindings, ratchet } from "../../scripts/check-ipc-binding-callers.mjs";
+import {
+  PLACEHOLDER,
+  deadBindings,
+  invokesThroughChokepoint,
+  mergeRecord,
+  ratchet,
+} from "../../scripts/check-ipc-binding-callers.mjs";
 import {
   LEAVING_PATHS,
   TEARDOWN_CALLS,
@@ -307,6 +318,66 @@ export async function hydrate(): Promise<void> {
     });
     expect(dead).toEqual([]);
   });
+
+  it("recognises a GENERIC chokepoint call with no caller", () => {
+    // The generic form (myne-md/myne#880). Since myne-md/myne#613 the five
+    // set-union mutators are written `writePref<number>("plugin:prefs|…")`,
+    // because they return how many additions the reserved byte budget refused,
+    // and the matcher required the literal immediately after `writePref(`. So
+    // those five desktop and three mobile bindings never entered the
+    // denominator: measured, desktop showed 71 of its 76 prefs bindings and
+    // mobile 55 of its 58. This is `mutateSpellLanguages`' shape, the mobile
+    // binding the widening surfaced as genuinely uncalled.
+    const PREFS = `export async function setFoo(mutation: SetMutation): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_foo", { mutation });
+}
+`;
+    const { dead, checked } = deadBindings({
+      bindings: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+      callers: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+    });
+    expect(checked).toBe(1);
+    expect(dead).toEqual(["mobile/src/lib/prefs.ts:setFoo"]);
+  });
+
+  it("accepts a GENERIC chokepoint binding called from its own client", () => {
+    // The passing direction of the widening: the identical generic setter
+    // called from `mobile/src` is live, so the widening did not simply report
+    // every generic binding.
+    const PREFS = `export async function setFoo(mutation: SetMutation): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_foo", { mutation });
+}
+`;
+    const { dead } = deadBindings({
+      bindings: new Map([["mobile/src/lib/prefs.ts", PREFS]]),
+      callers: new Map([
+        ["mobile/src/lib/prefs.ts", PREFS],
+        ["mobile/src/app/flows/Settings.tsx", `await setFoo(mutation);`],
+      ]),
+    });
+    expect(dead).toEqual([]);
+  });
+
+  it("does not accept a bare invoke as a chokepoint call", () => {
+    // The direction the widening must NOT take. The chokepoint is the mandated
+    // write path, and `invoke("plugin:prefs|…")` is exactly the shape it exists
+    // to forbid, so a matcher written as a generic function-name pattern (which
+    // would match `invoke<number>(…)` too) would make a bypass look compliant.
+    // Driven directly because the difference is invisible through
+    // `deadBindings`: a direct `invoke` is detected by `invokesCommand` either
+    // way, so only this assertion distinguishes the two spellings.
+    expect(invokesThroughChokepoint(`await invoke("plugin:prefs|set_foo", {})`)).toBe(false);
+    expect(invokesThroughChokepoint(`await invoke<number>("plugin:prefs|set_foo", {})`)).toBe(
+      false,
+    );
+    // And the two real shapes still count.
+    expect(invokesThroughChokepoint(`await writePref("plugin:prefs|set_foo", { enabled })`)).toBe(
+      true,
+    );
+    expect(
+      invokesThroughChokepoint(`return await writePref<number>("plugin:prefs|set_foo", { mutation })`),
+    ).toBe(true);
+  });
 });
 
 describe("check-ipc-binding-callers: the ratchet", () => {
@@ -340,6 +411,103 @@ describe("check-ipc-binding-callers: the ratchet", () => {
     expect(v.stale).toEqual(["a.ts:x"]);
   });
 });
+
+describe("check-ipc-binding-callers: the writer", () => {
+  // The half this file's own history says nobody tests, and the one that was
+  // wrong: `--record` built the file from the measured set alone, so running the
+  // command the failure message recommends replaced all thirty hand-written
+  // reasons with the placeholder. The header and the root AGENTS.md row both
+  // described the merge as existing behaviour, which is how the code and its
+  // documentation had already parted company.
+
+  const reason = "Recorded because the surface it belongs to has not been built yet.";
+
+  it("keeps the reason of every entry that is still dead", () => {
+    const exempt = mergeRecord(["a.ts:x", "b.ts:y"], { "a.ts:x": reason, "b.ts:y": reason });
+    expect(exempt).toEqual({ "a.ts:x": reason, "b.ts:y": reason });
+    // And the result passes the reader, which is the property that matters: a
+    // merge that lost a reason would come back as `unreasoned`.
+    expect(ratchet(["a.ts:x", "b.ts:y"], exempt)).toEqual({ news: [], unreasoned: [], stale: [] });
+  });
+
+  it("still seeds a genuinely new entry with the placeholder", () => {
+    // The placeholder is not a regression: it is how a fresh exemption fails
+    // until a human argues for it.
+    const exempt = mergeRecord(["a.ts:x", "b.ts:y"], { "a.ts:x": reason }) as Record<string, string>;
+    expect(exempt["b.ts:y"]).toBe(PLACEHOLDER);
+    expect(ratchet(["a.ts:x", "b.ts:y"], exempt).unreasoned).toEqual(["b.ts:y"]);
+  });
+
+  it("drops an entry whose binding acquired a caller", () => {
+    // The one edit `--record` exists to make.
+    const exempt = mergeRecord(["a.ts:x"], { "a.ts:x": reason, "b.ts:y": reason });
+    expect(Object.keys(exempt)).toEqual(["a.ts:x"]);
+    expect(ratchet(["a.ts:x"], exempt).stale).toEqual([]);
+  });
+
+  it("treats a blank prior reason as absent rather than preserving it", () => {
+    const exempt = mergeRecord(["a.ts:x"], { "a.ts:x": "   " }) as Record<string, string>;
+    expect(exempt["a.ts:x"]).toBe(PLACEHOLDER);
+  });
+
+  // ── The same claim, driven through the CLI ────────────────────────────────
+  //
+  // The cases above are pure functions, and that leaves the GLUE untested: the
+  // record path, the JSON shape, the exit code and the message. A regression
+  // there stays green behind a passing unit, which is the "writer's half nobody
+  // tests" shape this file's own header records. `check-prefs-parity.mjs`'s suite
+  // drives its `--record` the same way, through a record-path override.
+  it("--record seeds the placeholder and the very next --check is red", () => {
+    withTempRecord((path) => {
+      const recorded = runCli(["--record"], path);
+      expect(recorded.code).toBe(0);
+      expect(recorded.out).toContain("carry the placeholder");
+
+      const written = JSON.parse(readFileSync(path, "utf8")) as {
+        exempt: Record<string, string>;
+      };
+      const keys = Object.keys(written.exempt);
+      expect(keys.length, "the scratch record must carry the measured dead set").toBeGreaterThan(0);
+      for (const key of keys) expect(written.exempt[key]).toBe(PLACEHOLDER);
+
+      const checked = runCli(["--check"], path);
+      expect(checked.code).toBe(1);
+      expect(checked.out).toContain("carry no reason");
+      expect(checked.out).toContain(keys[0]);
+    });
+  }, 120_000);
+});
+
+const ROOT: string = fileURLToPath(new URL("../..", import.meta.url));
+const SCRIPT: string = join(ROOT, "scripts/check-ipc-binding-callers.mjs");
+
+/** Spawn the guard, pointed at a scratch record. */
+function runCli(args: string[], recordPath: string): { code: number; out: string } {
+  try {
+    return {
+      code: 0,
+      out: execFileSync("node", [SCRIPT, ...args], {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: { ...process.env, MYNE_IPC_BINDING_CALLERS_RECORD: recordPath },
+      }),
+    };
+  } catch (e) {
+    const err = e as { status: number; stdout: string; stderr: string };
+    return { code: err.status, out: `${err.stdout}${err.stderr}` };
+  }
+}
+
+/** Run `body` with a scratch record path, removed afterwards either way. */
+function withTempRecord(body: (path: string) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "myne-ipc-binding-callers-"));
+  const path = join(dir, "ipc-binding-callers.json");
+  try {
+    body(path);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /** A file set that satisfies both real rosters, as the baseline each case mutates. */
 function healthyFiles(): Record<string, string> {

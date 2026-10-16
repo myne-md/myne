@@ -213,6 +213,15 @@ pub async fn unlock_from_host(
     // empty map.
     super::import_source::close_all(state).await;
     if is_vault_switch(active_before, target_id) {
+        // live-collab: drop the prior vault's live co-editing sessions before
+        // vault B hydrates, a session holds decrypted note plaintext. FIRST, ahead
+        // of the search wipe (myne-md/myne#867 review): a flush already past its
+        // disk write indexes only while its session is registered, so clearing
+        // the sessions before the wipe shuts that door before the index is
+        // emptied. The hook only clears the registry (no flush, no index), so
+        // moving it earlier changes nothing else. The flush's vault-state check
+        // is the gate; this ordering is the second line behind it.
+        hooks.live_session_teardown_on_lock();
         hooks.zeroize_search_index();
         // MYND-262/266: drop the prior vault's spell engine + personal/ignore
         // sets before the new vault hydrates — no cross-vault dictionary bleed.
@@ -228,9 +237,6 @@ pub async fn unlock_from_host(
         // myne#679: destroy vault A's detached (pop-out) note windows before
         // vault B hydrates: its plaintext must not survive the switch.
         hooks.detached_windows_teardown_on_lock();
-        // live-collab: drop the prior vault's live co-editing sessions before
-        // vault B hydrates, a session holds decrypted note plaintext.
-        hooks.live_session_teardown_on_lock();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -1498,6 +1504,16 @@ pub async fn lock_from_host(
     // sensitive as the keys), so it is overwritten + reset here so no terms
     // survive the manual lock. The persist above already flushed it to the
     // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
+    //
+    // live-collab: drop every open live co-editing session on the manual lock,
+    // a session holds decrypted note plaintext, so locking means locked for it
+    // too. It runs BEFORE the search wipe (myne-md/myne#867 review): a live flush
+    // that is past its disk write indexes only while its session is registered,
+    // so clearing the registry first means no session outlives the wipe to feed
+    // it. The hook only clears the registry (no flush, no index), so the earlier
+    // position is safe. The flush's own vault-state check is the actual gate,
+    // since the slot is already gone by here; this ordering is the second line.
+    hooks.live_session_teardown_on_lock();
     hooks.zeroize_search_index();
     // MYND-262/266: wipe the spell engine + personal/ignore sets on lock (each
     // add already persisted, so nothing to flush — only RAM to zeroize).
@@ -1515,9 +1531,6 @@ pub async fn lock_from_host(
     // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
-    // live-collab: drop every open live co-editing session on the manual lock ,
-    // a session holds decrypted note plaintext, so locking means locked for it too.
-    hooks.live_session_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -2648,13 +2661,13 @@ mod tests {
                 recorder.calls(),
                 vec![
                     "persist_search_index",
+                    "live_session_teardown_on_lock",
                     "zeroize_search_index",
                     "zeroize_spell",
                     "clear_staged_descriptor",
                     "pdf_export_teardown_on_lock",
                     "agent_teardown_on_lock",
                     "detached_windows_teardown_on_lock",
-                    "live_session_teardown_on_lock",
                     "zeroize_vault_indices",
                     "zeroize_attachment_refs",
                     "abort_active_recording",

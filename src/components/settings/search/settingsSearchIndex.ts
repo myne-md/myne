@@ -18,6 +18,7 @@
 // resolution + panel coverage, but cannot know about an entry that was never added.
 
 import type { PanelId } from "../../SettingsModal";
+import type { SettingsTopicId } from "../settingsTopics";
 import { has, type Capability } from "../../../platform/capabilities";
 
 /**
@@ -98,10 +99,53 @@ export interface SettingsIndexEntry {
    */
   developerGated?: boolean;
   /**
+   * Whether this entry additionally requires the ACTIVE VAULT to be a member
+   * vault (myne-md/myne#885).
+   *
+   * **The third gate axis, and it is a runtime per-vault fact rather than a
+   * per-build capability.** `capability` is a static descriptor the seam-contract
+   * tests rest on, and `developerGated` is a runtime user toggle; neither can say
+   * "this vault is shared with other people". The shared-vault-unlock row in
+   * Privacy renders only while a B2B member vault is open
+   * (`MemberPasswordSettings` returns `null` for a single-account vault), so on a
+   * vault that is not shared the entry navigated to an anchor that was never
+   * rendered: the exact failure `capability` exists to prevent, wearing a
+   * different gate. The status is resolved at the shell (one
+   * `memberVaultStatus(activeVaultId)` probe) and threaded through
+   * {@link visibleSettingsIndex}, the same way `developerModeEnabled` is.
+   *
+   * Absent ⇒ the setting renders on any vault. Present ⇒ the entry is filtered
+   * out unless the active vault is a member vault. The default when the status is
+   * unknown is `false`, which hides the entry: the safe direction, since a hidden
+   * setting is a smaller failure than one the user is sent to and cannot find.
+   */
+  memberVaultGated?: boolean;
+  /**
    * Whether the in-app agent may change this setting. See
    * {@link AgentWritability} for why this is required rather than optional.
    */
   agentWritability: AgentWritability;
+  /**
+   * The topic the setting lives in, for a panel that renders an in-panel tab
+   * strip (myne-md/myne#885 task 5).
+   *
+   * REQUIRED for every entry whose panel has a strip, and enforced by
+   * `tests/settings-search-index.test.ts` rather than by the type, because the
+   * relationship is between this array and `settingsTopics.ts` and no single
+   * interface can express it.
+   *
+   * **The regression this field exists to prevent is the feature's likeliest
+   * one.** An inactive topic's body is not mounted, so a search hit that
+   * resolved to a panel and an anchor but NOT to the topic would scroll to an
+   * element that is not in the document: `SettingsModal` would switch the rail
+   * panel, find no anchor, and leave the user at the top of a tab with no
+   * answer. Every entry in such a panel therefore names its topic, and
+   * `handleSelectResult` selects it before arming the scroll - the same one
+   * channel the `initialAnchor` deep link already uses.
+   *
+   * Absent for a panel with no strip, which is most of them.
+   */
+  topic?: SettingsTopicId;
 }
 
 /**
@@ -165,6 +209,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "account.vault-label",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
+    topic: "vault",
     testid: "settings.label-input",
     titleKey: "settings.account.vaultLabelEyebrow",
     descriptionKey: "settings.account.vaultLabelHelper",
@@ -174,6 +219,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "account.vault-icon",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
+    topic: "vault",
     testid: "settings.icon-picker",
     titleKey: "settings.account.vaultIconLabel",
     keywordsKey: "settings.search.keywords.vaultIcon",
@@ -182,15 +228,38 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "account.change-password",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
+    topic: "vault",
     testid: "settings.change-password-cta",
     titleKey: "settings.account.changePasswordHeading",
     descriptionKey: "settings.account.changePasswordHelper",
     keywordsKey: "settings.search.keywords.changePassword",
   },
   {
+    // The browser-clipper install toggle (MYND-443 / MYND-549). It was indexed
+    // under `storage` because "the clipper" reads like an install concern, but
+    // its only render site is `ConnectedExtensions`, which AccountPanel alone
+    // mounts (`capabilities.has("clipper")`, inside the `vault` topic). So the
+    // hit navigated to Storage, found nothing, and degraded to a plain panel
+    // switch: the exact failure `capability` gating exists to prevent, reached
+    // through a wrong `panelId` instead. The entry now names the panel and topic
+    // that actually render the control, and
+    // `tests/components/settingsPanelTopics.test.tsx` walks every entry against
+    // the panel it claims rather than against a blob of every panel source.
+    id: "account.clipper",
+    agentWritability: WRITABILITY_NONE,
+    capability: "clipper",
+    panelId: "account",
+    topic: "vault",
+    testid: "settings.clipper-install",
+    titleKey: "settings.clipperInstall.label",
+    descriptionKey: "settings.clipperInstall.helper",
+    keywordsKey: "settings.search.keywords.clipper",
+  },
+  {
     id: "account.danger-zone",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
+    topic: "danger",
     testid: "settings.delete-vault-cta",
     titleKey: "settings.account.dangerZoneHeading",
     descriptionKey: "settings.account.dangerZoneHelper",
@@ -201,15 +270,15 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "privacy.screen-capture",
     agentWritability: WRITABILITY_CONTROL,
-    // NO `capability`, and that is the asymmetry with the override entry
-    // below. `PrivacyPanel` renders THIS row unconditionally, so tagging it
-    // was the inverse of the rule `src/AGENTS.md` states: search filtered it
-    // out on web while the panel rendered it, which is a setting a user can
-    // see and cannot find. The prose in this file and in
-    // `check-web-surfaces.mjs` said the two rows matched; correcting the
-    // prose without correcting the gate would have left the same defect with
-    // better documentation.
+    // Gated the way the panel gates the row: `PrivacyPanel` renders it only
+    // behind `has("screenCaptureProtection")`, so an untagged entry offered a
+    // web hit that landed on a panel with no such row (and, since the `access`
+    // topic is dropped on a client with none of its capabilities, on a topic
+    // that does not exist there). `src/AGENTS.md` states the rule: an entry
+    // carries the capability its row renders behind.
+    capability: "screenCaptureProtection",
     panelId: "privacy",
+    topic: "access",
     titleKey: "settings.privacy.screenCaptureLabel",
     descriptionKey: "settings.privacy.screenCaptureHelperOn",
     keywordsKey: "settings.search.keywords.screenCapture",
@@ -234,6 +303,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_CONTROL,
     capability: "screenCaptureProtection",
     panelId: "privacy",
+    topic: "access",
     titleKey: "settings.privacy.screenCaptureOverrideLabel",
     descriptionKey: "settings.privacy.screenCaptureOverrideHelper",
     keywordsKey: "settings.search.keywords.screenCaptureOverride",
@@ -255,6 +325,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "lockedVaultNames",
     panelId: "privacy",
+    topic: "access",
     testid: "settings.hide-vault-names",
     titleKey: "settings.privacy.hideVaultNamesLabel",
     descriptionKey: "settings.privacy.hideVaultNamesHelper",
@@ -273,6 +344,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "privacy.recovery-drill",
     agentWritability: WRITABILITY_NONE,
     panelId: "privacy",
+    topic: "locking",
     testid: "settings.recovery-drill",
     titleKey: "settings.privacy.recoveryDrillLabel",
     descriptionKey: "settings.privacy.recoveryDrillHelper",
@@ -282,6 +354,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "privacy.auto-lock",
     agentWritability: WRITABILITY_CONTROL,
     panelId: "privacy",
+    topic: "locking",
     testid: "settings.auto-lock-select",
     titleKey: "settings.privacy.autoLockLabel",
     descriptionKey: "settings.privacy.autoLockHelper",
@@ -292,19 +365,28 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "biometricQuickUnlock",
     panelId: "privacy",
+    topic: "locking",
     testid: "settings.quick-unlock",
     titleKey: "settings.quickUnlock.title",
     descriptionKey: "settings.quickUnlock.setupHelper",
     keywordsKey: "settings.search.keywords.quickUnlock",
   },
-  // Shared vault password (myne-md/myne#711). Carries `memberSharing`: the row is
-  // rendered only while a B2B member vault is active, so an ungated entry would
-  // navigate to an anchor that was never rendered.
+  // Shared vault password (myne-md/myne#711). Two gates, and they answer
+  // different questions: `capability: memberSharing` keeps it off a client where
+  // the feature does not exist at all, and `memberVaultGated` keeps it off a
+  // single-account vault on a client that has the feature. The row itself
+  // renders only while a B2B member vault is the ACTIVE vault
+  // (`MemberPasswordSettings` returns `null` otherwise), so an entry carrying
+  // only the capability would still navigate to an anchor that was never
+  // rendered on the ordinary desktop vault. That was the defect this field
+  // fixes.
   {
     id: "privacy.member-password",
     agentWritability: WRITABILITY_NONE,
     capability: "memberSharing",
+    memberVaultGated: true,
     panelId: "privacy",
+    topic: "locking",
     testid: "settings.member-password",
     titleKey: "settings.memberPassword.title",
     descriptionKey: "settings.memberPassword.helperNotConfigured",
@@ -324,6 +406,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
+    topic: "access",
     titleKey: "settings.cliAccess.label",
     descriptionKey: "settings.cliAccess.helperOff",
     keywordsKey: "settings.search.keywords.cliAccess",
@@ -334,6 +417,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
+    topic: "access",
     titleKey: "settings.cliAccess.excludedLabel",
     descriptionKey: "settings.cliAccess.excludedHelper",
     keywordsKey: "settings.search.keywords.cliExcludedFolders",
@@ -344,6 +428,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "cliAccess",
     developerGated: true,
     panelId: "privacy",
+    topic: "access",
     titleKey: "settings.cliAccess.rateLimitLabel",
     descriptionKey: "settings.cliAccess.rateLimitHelper",
     keywordsKey: "settings.search.keywords.cliRateLimit",
@@ -354,6 +439,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.status",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "connection",
     titleKey: "sync.panel.status.label",
     descriptionKey: "sync.panel.status.helper",
     keywordsKey: "settings.search.keywords.syncStatus",
@@ -362,6 +448,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.devices",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "devices",
     titleKey: "sync.panel.devices.label",
     keywordsKey: "settings.search.keywords.syncDevices",
   },
@@ -369,6 +456,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.members",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "devices",
     titleKey: "sync.memberRoster.title",
     descriptionKey: "sync.memberRoster.hint",
     keywordsKey: "settings.search.keywords.syncMembers",
@@ -382,6 +470,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.device-bindings",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "devices",
     titleKey: "sync.deviceBindings.title",
     descriptionKey: "sync.deviceBindings.hint",
     keywordsKey: "settings.search.keywords.syncDeviceBindings",
@@ -394,6 +483,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.add-device",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "devices",
     titleKey: "sync.panel.addDevice.label",
     descriptionKey: "sync.panel.addDevice.helper",
     keywordsKey: "settings.search.keywords.syncAddDevice",
@@ -402,6 +492,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.conflicts",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "conflicts",
     titleKey: "sync.panel.conflicts.label",
     descriptionKey: "sync.panel.conflicts.helper",
     keywordsKey: "settings.search.keywords.syncConflicts",
@@ -410,6 +501,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.recovered",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "conflicts",
     titleKey: "sync.panel.recovered.label",
     descriptionKey: "sync.panel.recovered.helper",
     keywordsKey: "settings.search.keywords.syncRecovered",
@@ -418,6 +510,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "sync.server",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
+    topic: "connection",
     titleKey: "sync.panel.server.label",
     keywordsKey: "settings.search.keywords.syncServer",
   },
@@ -427,6 +520,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.text-size",
     agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "editor",
+    topic: "text",
     titleKey: "settings.typography.textSizeLabel",
     keywordsKey: "settings.search.keywords.textSize",
   },
@@ -434,6 +528,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.line-spacing",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "text",
     titleKey: "settings.typography.lineSpacingLabel",
     keywordsKey: "settings.search.keywords.lineSpacing",
   },
@@ -441,6 +536,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.content-width",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "text",
     titleKey: "settings.typography.contentWidthLabel",
     descriptionKey: "settings.typography.contentWidthHelper",
     keywordsKey: "settings.search.keywords.contentWidth",
@@ -449,6 +545,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.font",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "text",
     titleKey: "settings.typography.fontLabel",
     keywordsKey: "settings.search.keywords.font",
   },
@@ -456,6 +553,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.line-numbers",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "text",
     testid: "settings.line-numbers",
     titleKey: "settings.lineNumbers.label",
     descriptionKey: "settings.lineNumbers.helper",
@@ -470,6 +568,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     developerGated: true,
     panelId: "editor",
+    topic: "editing",
     testid: "settings.vim-mode",
     titleKey: "settings.vimMode.label",
     descriptionKey: "settings.vimMode.helper",
@@ -486,6 +585,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "plainFile",
     panelId: "editor",
+    topic: "editing",
     testid: "settings.plain-file",
     titleKey: "settings.plainFile.label",
     descriptionKey: "settings.plainFile.helper",
@@ -495,6 +595,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.toolbar",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "editing",
     testid: "settings.toolbar-customize",
     titleKey: "settings.toolbarCustomize.label",
     descriptionKey: "settings.toolbarCustomize.helper",
@@ -504,6 +605,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.view-mode",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "editing",
     titleKey: "settings.viewMode.label",
     descriptionKey: "settings.viewMode.helper",
     keywordsKey: "settings.search.keywords.viewMode",
@@ -512,6 +614,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.date-format",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "editing",
     titleKey: "settings.dateTime.dateLabel",
     descriptionKey: "settings.dateTime.dateHelper",
     keywordsKey: "settings.search.keywords.dateFormat",
@@ -520,6 +623,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.time-format",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "editing",
     titleKey: "settings.dateTime.timeLabel",
     descriptionKey: "settings.dateTime.timeHelper",
     keywordsKey: "settings.search.keywords.timeFormat",
@@ -528,6 +632,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.timezone",
     agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "editor",
+    topic: "editing",
     titleKey: "settings.dateTime.zoneLabel",
     descriptionKey: "settings.dateTime.zoneHelper",
     keywordsKey: "settings.search.keywords.timezone",
@@ -536,6 +641,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.focus-dim",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "editing",
     testid: "settings.focus-dim",
     titleKey: "settings.focusMode.dimLabel",
     descriptionKey: "settings.focusMode.dimHelper",
@@ -545,6 +651,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.focus-typewriter",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "editing",
     testid: "settings.focus-typewriter",
     titleKey: "settings.focusMode.typewriterLabel",
     descriptionKey: "settings.focusMode.typewriterHelper",
@@ -555,6 +662,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "spellCheck",
     panelId: "editor",
+    topic: "writing",
     testid: "settings.spell-check",
     titleKey: "settings.spell.label",
     descriptionKey: "settings.spell.helper",
@@ -565,6 +673,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "spellCheck",
     panelId: "editor",
+    topic: "writing",
     titleKey: "settings.spell.languagesLabel",
     descriptionKey: "settings.spell.languagesHelper",
     keywordsKey: "settings.search.keywords.spellLanguages",
@@ -573,6 +682,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.daily-notes-folder",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
@@ -581,6 +691,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.daily-notes-date-format",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
@@ -589,6 +700,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.daily-notes-template",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionDaily",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
     keywordsKey: "settings.search.keywords.dailyNotes",
@@ -604,6 +716,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     // registers a folder backend-side, so the write needs no new seam.
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -612,6 +725,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.weekly-notes-date-format",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -620,6 +734,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.weekly-notes-template",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionWeekly",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -628,6 +743,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.monthly-notes-folder",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodFolderLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -636,6 +752,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.monthly-notes-date-format",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodFormatLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -644,6 +761,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.monthly-notes-template",
     agentWritability: WRITABILITY_WRITABLE,
     panelId: "editor",
+    topic: "periodic",
     titleKey: "settings.dailyNotes.sectionMonthly",
     descriptionKey: "settings.dailyNotes.periodTemplateLabel",
     keywordsKey: "settings.search.keywords.periodicNotes",
@@ -652,6 +770,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.reminders",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "writing",
     testid: "settings.reminders-toggle",
     titleKey: "settings.reminders.label",
     keywordsKey: "settings.search.keywords.reminders",
@@ -660,6 +779,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.archive",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "features",
     testid: "settings.archive-disabled",
     titleKey: "settings.archive.label",
     descriptionKey: "settings.archive.helper",
@@ -669,6 +789,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.views",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "features",
     testid: "settings.views-enabled",
     titleKey: "settings.views.label",
     descriptionKey: "settings.views.helper",
@@ -677,6 +798,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.task-chip-color",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "tasks",
     testid: "settings.editor.taskChipColor",
     titleKey: "settings.editor.taskChipColor.label",
     descriptionKey: "settings.editor.taskChipColor.help",
@@ -685,6 +807,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "editor.task-chip-icon-only",
     agentWritability: WRITABILITY_NONE,
     panelId: "editor",
+    topic: "tasks",
     testid: "settings.editor.taskChipIconOnly",
     titleKey: "settings.editor.taskChipIconOnly.label",
     descriptionKey: "settings.editor.taskChipIconOnly.help",
@@ -763,6 +886,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.theme",
     agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "appearance",
+    topic: "display",
     titleKey: "settings.appearance.themeLabel",
     descriptionKey: "settings.appearance.themeHelper",
     keywordsKey: "settings.search.keywords.theme",
@@ -771,6 +895,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.accent",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "display",
     testid: "settings.accent-color",
     titleKey: "settings.appearance.accentLabel",
     descriptionKey: "settings.appearance.accentHelper",
@@ -779,6 +904,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.show-edit-times",
     agentWritability: WRITABILITY_DEVICE_LOCAL,
     panelId: "appearance",
+    topic: "notes",
     testid: "settings.note-timestamps-toggle",
     titleKey: "settings.appearance.showEditTimesLabel",
     descriptionKey: "settings.appearance.showEditTimesHelper",
@@ -792,6 +918,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.graph-settings",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "interface",
     testid: "settings.open-graph",
     titleKey: "settings.appearance.graphSettingsLabel",
     descriptionKey: "settings.appearance.graphSettingsHelper",
@@ -801,6 +928,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.custom-themes",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "display",
     titleKey: "settings.customThemes.label",
     keywordsKey: "settings.search.keywords.customThemes",
   },
@@ -808,6 +936,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.language",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "display",
     titleKey: "settings.language.label",
     descriptionKey: "settings.language.helper",
     keywordsKey: "settings.search.keywords.language",
@@ -816,6 +945,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.ribbon",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "interface",
     testid: "settings.ribbon-customize",
     titleKey: "settings.ribbonCustomize.label",
     descriptionKey: "settings.ribbonCustomize.helper",
@@ -825,6 +955,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     id: "appearance.bar",
     agentWritability: WRITABILITY_NONE,
     panelId: "appearance",
+    topic: "interface",
     testid: "settings.bar-customize",
     titleKey: "settings.appearance.barCustomize.label",
     descriptionKey: "settings.appearance.barCustomize.helper",
@@ -873,16 +1004,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.autoBackup.title",
     descriptionKey: "settings.autoBackup.helper",
     keywordsKey: "settings.search.keywords.autoBackup",
-  },
-  {
-    id: "storage.clipper",
-    agentWritability: WRITABILITY_NONE,
-    capability: "clipper",
-    panelId: "storage",
-    testid: "settings.clipper-install",
-    titleKey: "settings.clipperInstall.label",
-    descriptionKey: "settings.clipperInstall.helper",
-    keywordsKey: "settings.search.keywords.clipper",
   },
 
   // ── About ──────────────────────────────────────────────────────────────────
@@ -963,8 +1084,9 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
-    titleKey: "settings.ai.providerLabel",
-    descriptionKey: "settings.ai.providerHelper",
+    topic: "answering",
+    titleKey: "settings.ai.providerChooseLabel",
+    descriptionKey: "settings.ai.providerChooseHelper",
     keywordsKey: "settings.search.keywords.aiProvider",
   },
   {
@@ -978,17 +1100,25 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "answering",
     testid: "ai.provider-section",
     titleKey: "settings.ai.providerModelLabel",
     descriptionKey: "settings.ai.providerModelHelper",
     keywordsKey: "settings.search.keywords.aiProviderModel",
   },
   {
+    // The provider block as the fallback target, the same shape as
+    // `ai.provider-model` above and for the mirror reason: the local runtime
+    // block renders only while NO service is named (myne-md/myne#867), so with
+    // a provider chosen its own anchor is absent, and the hit lands on the
+    // chooser that brings it back.
     id: "ai.endpoint",
     agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "answering",
+    testid: "ai.provider-section",
     titleKey: "settings.ai.endpointLabel",
     descriptionKey: "settings.ai.endpointHelper",
     keywordsKey: "settings.search.keywords.aiEndpoint",
@@ -999,6 +1129,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "answering",
     titleKey: "settings.ai.enableLabel",
     descriptionKey: "settings.ai.enableHelper",
     keywordsKey: "settings.search.keywords.aiEnable",
@@ -1009,6 +1140,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "models",
     titleKey: "settings.ai.autoTagLabel",
     descriptionKey: "settings.ai.autoTagHelper",
     keywordsKey: "settings.search.keywords.aiAutoTag",
@@ -1025,6 +1157,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "limits",
     titleKey: "settings.ai.historyBudgetLabel",
     descriptionKey: "settings.ai.historyBudgetHelper",
     keywordsKey: "settings.search.keywords.aiHistoryBudget",
@@ -1036,6 +1169,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "advanced",
     titleKey: "settings.ai.meetingPromptLabel",
     descriptionKey: "settings.ai.meetingPromptHelper",
     keywordsKey: "settings.search.keywords.aiMeetingPrompt",
@@ -1047,20 +1181,28 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "models",
     titleKey: "settings.ai.modelsLabel",
     descriptionKey: "settings.ai.modelsHelper",
     keywordsKey: "settings.search.keywords.aiModels",
   },
   {
-    // On-demand downloads (myne-md/myne#805). Both gates apply as everywhere in
-    // this panel; the block itself is desktop-only because the download command
-    // is, but a `localAi` host always has it, so `capability` is the right
-    // predicate here rather than a new one.
+    // On-demand downloads (myne-md/myne#805), listed inline in the Models topic
+    // since myne-md/myne#885. Both gates apply as everywhere in this panel; the
+    // block itself is desktop-only because the download command is, but a
+    // `localAi` host always has it, so `capability` is the right predicate here
+    // rather than a new one.
+    //
+    // It carries no `testid`: the target is the `ai.downloads` anchor on the
+    // catalogue table itself, which is where the row's button used to sit. The
+    // anchor moved with the surface rather than being left pointing at a control
+    // that no longer exists.
     id: "ai.downloads",
     agentWritability: WRITABILITY_NONE,
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "models",
     titleKey: "settings.ai.downloadsLabel",
     descriptionKey: "settings.ai.downloadsHelper",
     keywordsKey: "settings.search.keywords.aiModels",
@@ -1071,6 +1213,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "models",
     titleKey: "settings.ai.sideloadDisclosure",
     keywordsKey: "settings.search.keywords.aiModels",
   },
@@ -1080,6 +1223,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "limits",
     titleKey: "settings.ai.excludedLabel",
     descriptionKey: "settings.ai.excludedHelper",
     keywordsKey: "settings.search.keywords.aiExcluded",
@@ -1090,6 +1234,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "advanced",
     titleKey: "settings.memory.heading",
     descriptionKey: "settings.memory.helper",
     keywordsKey: "settings.search.keywords.aiMemory",
@@ -1100,6 +1245,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "localAi",
     developerGated: true,
     panelId: "ai",
+    topic: "advanced",
     titleKey: "settings.memory.personalityLabel",
     descriptionKey: "settings.memory.personalityPlaceholder",
     keywordsKey: "settings.search.keywords.aiMemory",
@@ -1131,12 +1277,20 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
  * hides. `developerModeEnabled` is the live `vault.prefs.developer_mode` value
  * (developer-mode feature, MYND-593) - a runtime toggle, unlike `capability`,
  * so it's threaded in as a parameter rather than read from a module-level
- * static the way the capability set is.
+ * static the way the capability set is. `memberVault` is the same kind of
+ * runtime fact one step further out: whether the ACTIVE VAULT is a B2B member
+ * vault (myne-md/myne#885), which decides whether the shared-vault-unlock row
+ * is on screen at all. It defaults to `false` so a caller that has not resolved
+ * the vault hides the entry rather than offering one that does not render.
  */
-export function visibleSettingsIndex(developerModeEnabled: boolean): readonly SettingsIndexEntry[] {
+export function visibleSettingsIndex(
+  developerModeEnabled: boolean,
+  memberVault = false,
+): readonly SettingsIndexEntry[] {
   return SETTINGS_SEARCH_INDEX.filter(
     (e) =>
       (e.capability === undefined || has(e.capability)) &&
-      (!e.developerGated || developerModeEnabled),
+      (!e.developerGated || developerModeEnabled) &&
+      (!e.memberVaultGated || memberVault),
   );
 }

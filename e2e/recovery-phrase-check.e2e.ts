@@ -28,7 +28,13 @@
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
-import { openSettings, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  openSettings,
+  selectSettingsTopic,
+  unlockToEditor,
+  waitForBannerText,
+} from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { scanForPlaintext } from "./support/plaintext-scan";
 import { RECOVERY_DRILL_FAILED_SENTENCE } from "@myne/copy";
@@ -54,7 +60,16 @@ describeE2E("RD-1 the Settings recovery-phrase check", () => {
       async (app) => {
         const s = app.session;
         await unlockToEditor(s, fixture.password);
+        // The first unlocked editor on a fresh vault shows the importer
+        // onboarding offer, a full-screen `aria-modal` backdrop that
+        // `useOverlayInert`s the editor behind it. Every reach into the editor
+        // owes this dismissal (e2e/AGENTS.md); without it `openSettings`'s gear
+        // click is refused as "element not interactable" for its whole budget.
+        await dismissImporterOffer(s);
         await openSettings(s, "privacy");
+        // The recovery drill lives in Privacy's `locking` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "privacy", "locking");
 
         const row = await s.byTestId("settings.recovery-drill", { timeoutMs: 15_000 });
         const input = await s.byTestId("settings.recovery-drill-input");
@@ -65,7 +80,10 @@ describeE2E("RD-1 the Settings recovery-phrase check", () => {
         // live region must EXIST already, because a screen reader announces a
         // region it knows about, and it must be empty so there is no verdict
         // about a phrase nobody has entered.
-        expect((await result.text()).trim()).toBe("");
+        // `textContent()`, not `text()`: this asserts EMPTINESS, and WebKit's
+        // `/text` answers `""` on a just-inserted element, so a `text()` read
+        // here would pass vacuously whatever the region held.
+        expect((await result.textContent()).trim()).toBe("");
         expect(await row.attribute("data-outcome")).toBe("idle");
         expect(await submit.enabled(), "Check is live with an empty field").toBe(false);
 
@@ -87,11 +105,22 @@ describeE2E("RD-1 the Settings recovery-phrase check", () => {
 
         // FULL-literal equality, not a substring. A substring match would pass a
         // future edit that appended "word 7 does not match" to the end, which is
-        // the exact regression the sentence exists to prevent.
-        expect((await result.text()).trim()).toBe(RECOVERY_DRILL_FAILED_SENTENCE);
+        // the exact regression the sentence exists to prevent. Asserted through
+        // `waitForBannerText`, which re-reads on every poll: the `data-outcome`
+        // wait above resolves when the ROW's attribute flips, and WebKit's `/text`
+        // can still answer `""` for the just-updated region until its render tree
+        // catches up, so a one-shot `text()` here reads a correct screen as an
+        // empty one (measured: 1 failure in 3).
+        await waitForBannerText(
+          s,
+          "settings.recovery-drill-result",
+          RECOVERY_DRILL_FAILED_SENTENCE,
+        );
         // And it names no position. Checked independently of the literal above,
         // so a change to BOTH still fails here.
-        const refusal = (await result.text()).toLowerCase();
+        const refusal = (
+          await (await s.byTestId("settings.recovery-drill-result")).textContent()
+        ).toLowerCase();
         expect(refusal, "the refusal names a position").not.toMatch(/word\s*#?\s*\d/);
         expect(refusal, "the refusal names a position").not.toMatch(/position\s*\d/);
 

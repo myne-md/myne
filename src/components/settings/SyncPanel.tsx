@@ -71,6 +71,9 @@ import {
   LABEL_STYLE,
   HELPER_STYLE,
 } from "./panel-styles";
+import { SettingsTopicPanel } from "./SettingsTabs";
+import { SettingRow } from "./SettingRow";
+import { SettingsSection } from "./SettingsSection";
 
 const SECTION_TITLE_STYLE: CSSProperties = {
   fontSize: "var(--text-base)",
@@ -433,89 +436,109 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
+      {/* **Connection**: this device's account and the server it talks to.
+          The identity block leads it because whether this device holds a person
+          identity is the question that decides what any of the rest can do.
+
+          Migration is the last block of this topic rather than a topic of its
+          own. It is a real concern, but it renders only where the vault is still
+          v0.1 or has an unsettled `legacy/` snapshot, and a vault created today
+          has neither: the strip draws the roster rather than the filtered set,
+          so a tab for it would be an empty body on nearly every install. What it
+          upgrades is what leaves this device for the server, which is this
+          topic's own subject.
+
+          Each topic's body keeps the indentation of the code it replaced, the
+          convention the AI panel set, so the diff is about which rows moved. */}
+      <SettingsTopicPanel panelId="sync" topicId="connection">
+      {/* Two sections (myne-md/myne#885): this device's account (its identity
+          and what it uses) against the server it talks to. The server section's
+          only content today is the vault migration, which upgrades what this
+          device sends the server, so the section is gated WITH that one block
+          rather than drawn around it: `SettingsSection` renders its heading and
+          accent rule unconditionally, so an ungated section would show a title
+          above nothing on a v0.2 vault and on web. */}
+      <SettingsSection title={t("sync.panel.sections.account")}>
       {/* Identity block (myne-md/myne#768). Shown whenever sharing is available:
           with no identity on this device it offers to add one; with an identity
           it shows THAT identity (its public code) and, while the private identity
           is locked for the session (decisions/protocol/0612), the unlock action.
           Before, the block vanished once an identity existed, so a locked
           identity had no surface here at all (myne-md/myne#792 follow-up). */}
-      {hasCapability("memberSharing") && (
-        <div style={BLOCK_STYLE} data-setting-anchor="sync.identity" data-setting-row="true">
-          <span style={LABEL_STYLE}>{t("sync.panel.identity.label")}</span>
-          {!identityLoaded ? null : !hasIdentity ? (
-            <>
-              <p style={HELPER_STYLE}>{t("sync.panel.identity.helper")}</p>
-              <Button
-                variant="secondary"
-                style={{ alignSelf: "flex-start" }}
-                onClick={() => setIdentityOpen(true)}
-                data-testid="sync.panel.add-identity"
-              >
-                {t("sync.panel.identity.cta")}
-              </Button>
-              {/* Derive the identity from an existing phrase without a server
-                  round trip; the dialog above can only recover with an
-                  endpoint, because it registers the person account. */}
-              <PersonIdentityUnlock
-                open={identityUnlockOpen}
-                onOpenChange={setIdentityUnlockOpen}
-              />
-            </>
-          ) : identityUnlocked ? (
-            <p style={HELPER_STYLE} data-testid="sync.panel.identity-unlocked">
-              {t("sync.panel.identity.unlockedHelper")}
-            </p>
-          ) : (
-            <>
-              <p style={HELPER_STYLE} data-testid="sync.panel.identity-locked">
-                {t("sync.panel.identity.lockedHelper")}
-              </p>
-              {/* Identity box with its actions inline, matching the
-                  sync-server row: the copy chip sits at the end of the box
-                  rather than on its own full-width row (myne-md/myne#818).
-                  The unlock is the inline phrase entry below, the ONE surface
-                  for it since the member roster's grid was removed
-                  (myne-md/myne#831). */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "var(--space-2)",
-                  alignItems: "center",
-                }}
-              >
-                {identityCode ? (
-                  <Input
-                    readOnly
-                    mono
-                    aria-label={t("sync.panel.identity.codeLabel")}
-                    value={identityCode}
-                    data-testid="sync.panel.identity-code"
-                    style={{ flex: 1, minWidth: 0, userSelect: "all" }}
-                    onFocus={(e) => e.target.select()}
-                  />
-                ) : null}
-                {identityCode ? (
-                  <IconButton
-                    icon={
-                      identityCopyFeedback === "success"
-                        ? "check"
-                        : identityCopyFeedback === "error"
-                          ? "circle-x"
-                          : "copy"
-                    }
-                    label={t("personIdentityCode.copy")}
-                    onClick={copyIdentityCode}
-                    testId="sync.panel.copy-identity"
-                  />
-                ) : null}
+      {hasCapability("memberSharing") && identityLoaded && (
+        // A `SettingRow` (myne-md/myne#885 visual pass): the actions sit in the
+        // control slot on the right, side by side, and the phrase entry the
+        // unlock needs is a dialog rather than 24 cells expanded under the row.
+        // The helper is the row's readout, so each state keeps its own testid
+        // on it.
+        <SettingRow
+          anchorId="sync.identity"
+          label={t("sync.panel.identity.label")}
+          helper={
+            !hasIdentity
+              ? t("sync.panel.identity.helper")
+              : identityUnlocked
+                ? t("sync.panel.identity.unlockedHelper")
+                : t("sync.panel.identity.lockedHelper")
+          }
+          {...(hasIdentity
+            ? {
+                helperTestId: identityUnlocked
+                  ? "sync.panel.identity-unlocked"
+                  : "sync.panel.identity-locked",
+              }
+            : {})}
+          control={
+            identityUnlocked ? null : (
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                {!hasIdentity && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIdentityOpen(true)}
+                    data-testid="sync.panel.add-identity"
+                  >
+                    {t("sync.panel.identity.cta")}
+                  </Button>
+                )}
+                {/* Derive the identity from an existing phrase without a server
+                    round trip; the add dialog can only recover with an
+                    endpoint, because it registers the person account. */}
+                <PersonIdentityUnlock
+                  open={identityUnlockOpen}
+                  onOpenChange={setIdentityUnlockOpen}
+                />
               </div>
-              <PersonIdentityUnlock
-                open={identityUnlockOpen}
-                onOpenChange={setIdentityUnlockOpen}
+            )
+          }
+        >
+          {/* A locked identity still shows its public code, with the copy chip
+              at the end of the box (myne-md/myne#818). */}
+          {hasIdentity && !identityUnlocked && identityCode ? (
+            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+              <Input
+                readOnly
+                mono
+                aria-label={t("sync.panel.identity.codeLabel")}
+                value={identityCode}
+                data-testid="sync.panel.identity-code"
+                style={{ flex: 1, minWidth: 0, userSelect: "all" }}
+                onFocus={(e) => e.target.select()}
               />
-            </>
-          )}
-        </div>
+              <IconButton
+                icon={
+                  identityCopyFeedback === "success"
+                    ? "check"
+                    : identityCopyFeedback === "error"
+                      ? "circle-x"
+                      : "copy"
+                }
+                label={t("personIdentityCode.copy")}
+                onClick={copyIdentityCode}
+                testId="sync.panel.copy-identity"
+              />
+            </div>
+          ) : null}
+        </SettingRow>
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.server" data-setting-row="true">
@@ -543,7 +566,71 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
           <p style={HELPER_STYLE}>{t("sync.panel.usage.helper")}</p>
         </div>
       )}
+      </SettingsSection>
 
+      {/* Whole-vault v0.1 → v0.2 migration (#420) - gated behind the
+          `vaultMigration` capability (present on desktop, absent on web: a web
+          client joins an already-current account and never migrates). The
+          dispatcher refuses `plugin:vault-migrate|vault_migrate` on web, so this
+          capability is what keeps the UI from offering a control the backend
+          rejects (check-web-capabilities.mjs).
+
+          **The gate is on the SECTION, not on the block inside it**, because the
+          section's heading and accent rule render unconditionally: a section
+          whose only child is this block drew a titled rule above nothing on a
+          v0.2 vault (nothing to offer, nothing pending) and on every web client. */}
+      {hasCapability("vaultMigration") && (migration?.offerable || migration?.pending) && (
+        <SettingsSection title={t("sync.panel.sections.server")}>
+        <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
+          <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
+          {/* The form only where there is something to migrate. On an
+              already-current vault it would ask for the 24-word recovery phrase
+              to perform a no-op that the backend refuses with `AlreadyMigrated`
+              - an offer the product cannot honour. */}
+          {migration?.offerable && (
+            <MigrateVaultForm
+              onMigrated={() => {
+                probeMigration();
+                onMigrated?.();
+              }}
+            />
+          )}
+          {/* §10.4.1 point 5 (myne-md/myne#430). Renders only while a `legacy/`
+              snapshot is staged, which is also why it sits BELOW the form: after
+              a migration the vault locks and the user re-unlocks, so this is the
+              surface they come back to, not one they see on the way out. */}
+          <SettleMigrationBlock
+            onSettled={(which) => {
+              probeMigration();
+              // ABORT only (myne-md/myne#461). `onMigrated` is the force-relock:
+              // it routes the shell to the Unlock screen, which is right after
+              // an abort, because that command restores the pre-migration root
+              // and the backend drops the slot with it. Confirm is not a re-key.
+              // It erases the staged `legacy/` snapshot and leaves the running
+              // slot untouched, so relocking on top of it showed a lock screen
+              // the backend never locked: the correct password then came back
+              // `VaultAlreadyUnlocked` forever and the only way out was
+              // restarting the app. Confirm re-probes and leaves the user where
+              // they are, which is what settling a migration should feel like.
+              if (which === "aborted") onMigrated?.();
+            }}
+          />
+        </div>
+        </SettingsSection>
+      )}
+      </SettingsTopicPanel>
+
+      {/* **Devices and members**: what is enrolled on this account, what may be
+          added, and who the vault is shared with. The two capability-gated
+          roster blocks sit here rather than in a topic of their own, for the
+          reason the identity block is gated at all: a roster needs a
+          person-identity carrier, and on a client without one a topic holding
+          only them would draw a tab whose body is empty. */}
+      <SettingsTopicPanel panelId="sync" topicId="devices">
+      {/* Two sections (myne-md/myne#885): the devices on this account (adding
+          one, the roster, the member each device is claimed by) against the
+          people the vault is shared with. */}
+      <SettingsSection title={t("sync.panel.sections.devices")}>
       {/* The beta-terms gate (operations#15). One of three doors that turn sync
           on, and the gate stands in front of each — a consent screen at one
           door is not a consent screen.
@@ -578,25 +665,6 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
           )}
         </div>
       )}
-      <BetaTermsConsent
-        open={termsOpen}
-        testId="sync.beta-terms"
-        onAccept={() => {
-          setTermsOpen(false);
-          void betaTerms.accept();
-        }}
-        // Declining closes the dialog and leaves the gate standing — the form
-        // was never rendered, so there is nothing to take back.
-        onCancel={() => setTermsOpen(false)}
-      />
-
-      <IdentitySetupDialog
-        open={identityOpen}
-        onClose={() => setIdentityOpen(false)}
-        onCreated={handleIdentityCreated}
-      />
-
-      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
 
       {/* What that form is replaced BY for a device that is already waiting
           (MYND-635). Stating the situation rather than offering an action,
@@ -653,12 +721,22 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
           VAULT (read from `vault.meta` under `root_key`), not of this device's
           account enrollment, so a vault can carry members before this device
           joins the account roster. */}
-      {hasCapability("memberSharing") ? (
-        <div style={BLOCK_STYLE} data-setting-anchor="sync.members" data-setting-row="true">
-          <span style={SECTION_TITLE_STYLE}>{t("sync.memberRoster.title")}</span>
+      </SettingsSection>
+
+      {/* Both member blocks share ONE capability and are gated together, which
+          is the absent-not-disabled rule: on the web client there is no
+          person-identity carrier, so neither renders.
+
+          **No outer section here** (myne-md/myne#885 visual pass). The roster
+          brings its own sections (identity, members, invitations), so wrapping
+          it in a `Members` section drew "Members" three times: the outer
+          heading, the block's own "Vault members" title, and the roster's inner
+          heading. Each block is a section of its own instead, at one level. */}
+      {hasCapability("memberSharing") && (
+        <>
+        <div data-setting-anchor="sync.members" data-setting-row="true">
           <MemberRosterPanel onDialogOpenChange={setRosterDialogOpen} />
         </div>
-      ) : null}
 
       {/* The vault's devices with the member each is CLAIMED by (myne-md/myne#852
           story 11). A separate block from the device list above and not a column
@@ -668,13 +746,20 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
           roster, for the same reason: on a client with no person-identity
           carrier there is no member to attribute a device to, and the store
           itself is group-tier sealed. */}
-      {hasCapability("memberSharing") ? (
+        <SettingsSection title={t("sync.deviceBindings.title")}>
         <div style={BLOCK_STYLE} data-setting-anchor="sync.device-bindings" data-setting-row="true">
-          <span style={SECTION_TITLE_STYLE}>{t("sync.deviceBindings.title")}</span>
           <DeviceAttributionPanel />
         </div>
-      ) : null}
+        </SettingsSection>
+        </>
+      )}
+      </SettingsTopicPanel>
 
+      {/* **Conflicts**: the two surfaces that exist because something went
+          wrong, and they are one story from two ends - a keep-both copy that
+          has not been reconciled, and one that has. Recovery sits with the
+          conflict list rather than earning a tab, which it could not fill. */}
+      <SettingsTopicPanel panelId="sync" topicId="conflicts">
       <div style={BLOCK_STYLE} data-setting-anchor="sync.conflicts" data-setting-row="true">
         <span style={SECTION_TITLE_STYLE}>
           {t("sync.panel.conflicts.label")}
@@ -698,50 +783,31 @@ export function SyncPanel({ onMigrated, onDialogOpenChange }: SyncPanelProps = {
         <p style={HELPER_STYLE}>{t("sync.panel.recovered.helper")}</p>
         <RecoveredNotes onRestored={refreshSidebar} />
       </div>
+      </SettingsTopicPanel>
 
-      {/* Whole-vault v0.1 → v0.2 migration (#420) — gated behind the
-          `vaultMigration` capability (present on desktop, absent on web: a web
-          client joins an already-current account and never migrates). The
-          dispatcher refuses `plugin:vault-migrate|vault_migrate` on web, so this
-          capability is what keeps the UI from offering a control the backend
-          rejects (check-web-capabilities.mjs). */}
-      {hasCapability("vaultMigration") && (migration?.offerable || migration?.pending) && (
-        <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
-          <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
-          {/* The form only where there is something to migrate. On an
-              already-current vault it would ask for the 24-word recovery phrase
-              to perform a no-op that the backend refuses with `AlreadyMigrated`
-              — an offer the product cannot honour. */}
-          {migration?.offerable && (
-            <MigrateVaultForm
-              onMigrated={() => {
-                probeMigration();
-                onMigrated?.();
-              }}
-            />
-          )}
-          {/* §10.4.1 point 5 (myne-md/myne#430). Renders only while a `legacy/`
-              snapshot is staged, which is also why it sits BELOW the form: after
-              a migration the vault locks and the user re-unlocks, so this is the
-              surface they come back to, not one they see on the way out. */}
-          <SettleMigrationBlock
-            onSettled={(which) => {
-              probeMigration();
-              // ABORT only (myne-md/myne#461). `onMigrated` is the force-relock:
-              // it routes the shell to the Unlock screen, which is right after
-              // an abort, because that command restores the pre-migration root
-              // and the backend drops the slot with it. Confirm is not a re-key.
-              // It erases the staged `legacy/` snapshot and leaves the running
-              // slot untouched, so relocking on top of it showed a lock screen
-              // the backend never locked: the correct password then came back
-              // `VaultAlreadyUnlocked` forever and the only way out was
-              // restarting the app. Confirm re-probes and leaves the user where
-              // they are, which is what settling a migration should feel like.
-              if (which === "aborted") onMigrated?.();
-            }}
-          />
-        </div>
-      )}
+      {/* The panel's child dialogs and its toast stay OUTSIDE the topic bodies,
+          so a dialog opened from one topic is not unmounted by moving to
+          another: its lifetime is the panel's, not the topic's. Nothing here
+          renders until it is opened, so the group adds no row to any topic. */}
+      <BetaTermsConsent
+        open={termsOpen}
+        testId="sync.beta-terms"
+        onAccept={() => {
+          setTermsOpen(false);
+          void betaTerms.accept();
+        }}
+        // Declining closes the dialog and leaves the gate standing - the form
+        // was never rendered, so there is nothing to take back.
+        onCancel={() => setTermsOpen(false)}
+      />
+
+      <IdentitySetupDialog
+        open={identityOpen}
+        onClose={() => setIdentityOpen(false)}
+        onCreated={handleIdentityCreated}
+      />
+
+      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
 
       <Toast
         message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}

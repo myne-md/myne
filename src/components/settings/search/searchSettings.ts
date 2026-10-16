@@ -26,13 +26,20 @@ export function panelLabelKey(panelId: SettingsIndexEntry["panelId"]): string {
  * `developerModeEnabled` gates the entries tagged `developerGated` in the
  * index (the AI settings, MYND-593) — a search for "AI" or "model" must not
  * navigate into a panel the rail itself would refuse to show.
+ *
+ * `memberVault` gates the entries tagged `memberVaultGated` (myne-md/myne#885):
+ * the shared-vault-unlock row renders only while a member vault is active, so a
+ * search must not send a single-account user to an anchor that is not there.
+ * Both runtime gates default closed, so a caller that has not resolved the value
+ * hides the entry rather than offering a setting that does not render.
  */
 export function searchSettings(
   query: string,
   t: Translate,
   developerModeEnabled: boolean,
+  memberVault = false,
 ): SettingsIndexEntry[] {
-  const candidates = visibleSettingsIndex(developerModeEnabled).map((entry) => ({
+  const candidates = visibleSettingsIndex(developerModeEnabled, memberVault).map((entry) => ({
     item: entry,
     haystacks: [
       t(entry.titleKey),

@@ -100,10 +100,28 @@ vi.mock("../../src/components/DeleteVaultConfirmForm", () => ({
 }));
 
 import { AccountPanel } from "../../src/components/settings/AccountPanel";
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
 
 const PREFS = { label: "" };
 
+/**
+ * Select one of the Account panel's topics, the way the strip does
+ * (myne-md/myne#885). The panel is mounted directly here rather than through
+ * `SettingsModal`, so the strip is not on screen, but the topic store still
+ * decides which body renders: an inactive topic's body is deliberately not
+ * mounted, and a row in one is therefore genuinely absent from the document.
+ */
+function selectTopic(id: "vault" | "danger") {
+  act(() => setActiveSettingsTopic("account", id));
+}
+
 beforeEach(() => {
+  // The topic store is module scope (which is what makes the selection survive a
+  // modal close), so a spec that left it on `danger` would decide the next one.
+  resetSettingsTopics();
   changePassword.mockReset().mockResolvedValue(undefined);
   deleteVault.mockReset().mockResolvedValue(undefined);
   setVaultLabel.mockReset().mockResolvedValue(undefined);
@@ -131,8 +149,12 @@ function renderPanel(overrides: Partial<Parameters<typeof AccountPanel>[0]> = {}
 
 describe("AccountPanel — idle view", () => {
   it("renders the change-password CTA + danger zone", async () => {
+    // One row per topic, from the test that has always asserted both exist: the
+    // vault topic is the default, so the CTA is there on the first render, and
+    // the danger topic's own control is asserted after selecting it.
     renderPanel();
     expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
+    selectTopic("danger");
     expect(screen.getByText("Delete vault…")).toBeTruthy();
     // The label loads from prefs on mount.
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
@@ -295,6 +317,7 @@ describe("AccountPanel — change password", () => {
 
 describe("AccountPanel — delete vault", () => {
   it("Delete vault… opens the confirm sub-view; Cancel returns to idle", () => {
+    selectTopic("danger");
     renderPanel();
     fireEvent.click(screen.getByText("Delete vault…"));
     expect(screen.getByTestId("dvcf")).toBeTruthy();
@@ -303,6 +326,7 @@ describe("AccountPanel — delete vault", () => {
   });
 
   it("success targets the vault it was given + fires onDeleteVaultSuccess", async () => {
+    selectTopic("danger");
     const props = renderPanel();
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
@@ -319,6 +343,7 @@ describe("AccountPanel — delete vault", () => {
       kind: "PartialDelete",
       detail: { remaining_count: 3 },
     });
+    selectTopic("danger");
     const props = renderPanel();
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
@@ -339,6 +364,7 @@ describe("AccountPanel — delete vault", () => {
   // panel used to pass `undefined`, which the backend read as "the active
   // vault" — resolved from a cache the quick-unlock path never stamped.
   it("refuses to delete when no vault id has resolved", async () => {
+    selectTopic("danger");
     const props = renderPanel({ vaultId: null });
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
@@ -350,6 +376,7 @@ describe("AccountPanel — delete vault", () => {
 
   it("bug-canary reject (VaultNotUnlocked) shows no post-fail banner, no success", async () => {
     deleteVault.mockRejectedValueOnce({ kind: "VaultNotUnlocked" });
+    selectTopic("danger");
     const props = renderPanel();
     fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {

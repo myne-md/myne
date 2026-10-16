@@ -58,6 +58,11 @@ import { ReminderSettings } from "@app/components/settings/ReminderSettings";
 import { RibbonCustomizeSettings } from "@app/components/settings/RibbonCustomizeSettings";
 import { SettingRow } from "@app/components/settings/SettingRow";
 import { SettingsSection } from "@app/components/settings/SettingsSection";
+import {
+  SettingsTabs,
+  SettingsTopicPanel,
+} from "@app/components/settings/SettingsTabs";
+import { AI_PANEL_TOPICS } from "@app/components/settings/settingsTopics";
 import { SettleMigrationBlock } from "@app/components/settings/SettleMigrationBlock";
 import { SpellSettings } from "@app/components/settings/SpellSettings";
 import { StartupOpenSettings } from "@app/components/settings/StartupOpenSettings";
@@ -270,24 +275,24 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "AiModelCatalogue",
     state: "default",
     description:
-      "The model catalogue: every artefact Myne's own origin can serve, whether or not it is installed, each with its size and the one action its state enables. Opened from the icon at the right of the Models heading, which is what stops fetching a model and assigning one from being two blocks in a row.",
-    tags: ["settings", "ai", "models", "catalogue", "download", "modal"],
+      "The model catalogue: every artefact Myne's own origin can serve, whether or not it is installed, each as a row of the same four columns (model, size, state, action). Inline in the AI panel's Models topic, next to the per-role assignment rows, which is what stops fetching a model and assigning one from being two blocks in a row.",
+    tags: ["settings", "ai", "models", "catalogue", "download", "table"],
     fixture: CATALOGUE_FIXTURE,
     render: () => (
-      <AiModelCatalogue
-        open
-        onClose={action("onClose")}
-        modelPaths={{
-          generation: null,
-          embedding:
-            "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors",
-          transcription: null,
-          tag: null,
-        }}
-        aiEnabled
-        onChanged={action("onChanged")}
-        onShowToast={action("onShowToast")}
-      />
+      <Frame>
+        <AiModelCatalogue
+          modelPaths={{
+            generation: null,
+            embedding:
+              "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors",
+            transcription: null,
+            tag: null,
+          }}
+          aiEnabled
+          onChanged={action("onChanged")}
+          onShowToast={action("onShowToast")}
+        />
+      </Frame>
     ),
   },
   {
@@ -835,17 +840,151 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    // The long-copy affordance (myne-md/myne#885), shown where it actually
+    // lives: on a row whose helper is one sentence and whose explanation is
+    // three paragraphs. It is LIVE here, so the copy is one hover or one Tab
+    // away rather than depicted; that is also what makes this story the place a
+    // reviewer reads the popover's measure and its placement against the row it
+    // belongs to.
+    id: "settings/helperdisclosure/default",
+    group: "settings",
+    surface: "HelperDisclosure",
+    state: "default",
+    parent: "SettingRow",
+    description:
+      "Helper Disclosure: the question mark beside a setting's title that holds the copy the row does not need to show, opened on hover, on focus or on press.",
+    tags: ["settings", "helperdisclosure", "helper", "disclosure", "tooltip", "default"],
+    docs: {
+      whenNotToUse:
+        "When the row's helper is already one sentence. A question mark that opens one line is an extra click to read the same thing, and the row loses the only cue that there is more to say.",
+      content:
+        "Sentence case, and the copy behind it is the row's own paragraph moved rather than rewritten. The trigger's own accessible name is fixed ('More about this setting') because the copy it opens is per row and a name derived from the first words of a paragraph reads badly as a control.",
+      related: ["SettingRow", "Tooltip"],
+    },
+    render: () => (
+      <Frame>
+        <SettingRow
+          label="Hide vault names on the lock screen"
+          // The destructive sentence stays on the row; the placeholder
+          // explanation, the residue caveat and the keychain context move
+          // behind the question mark. The story mirrors the shipped row rather
+          // than inventing a tidier split, so the arrangement under review is
+          // the one that ships.
+          helper="Turning it on destroys the keys that make the names stored here readable."
+          explanation={[
+            "On a device with a usable keychain the vault picker shows a vault's name once this device has unlocked it. With this on every vault shows a placeholder such as Vault 2 instead, and that number stays with the vault however the list reorders.",
+            "Turning it on destroys the keys that make the names stored here readable, so those names cannot be recovered on this device, and no further name is written while it stays on.",
+            "It cannot reach a copy taken earlier: a full-system backup, a disk image, or any other system-level copy of this disk made while names were showing carries both the stored names and their keys.",
+          ]}
+          testId="stories.helperdisclosure.row"
+          control={(helperId, explanationId) => (
+            <Switch
+              checked={false}
+              onChange={action("onChange")}
+              ariaLabel="Hide vault names on the lock screen"
+              ariaDescribedBy={
+                explanationId === undefined ? helperId : `${helperId} ${explanationId}`
+              }
+              testId="stories.helperdisclosure.switch"
+            />
+          )}
+        />
+      </Frame>
+    ),
+  },
+  {
+    // The one section treatment in the settings tree (myne-md/myne#885), shown
+    // the way a panel composes it: a titled group whose rule carries the accent,
+    // stacked twice so the boundary between one concern and the next is the
+    // thing on the stage rather than a single group in isolation.
     id: "settings/settingssection/default",
     group: "settings",
     surface: "SettingsSection",
     state: "default",
-    description: "Settings Section, a default state.",
-    tags: ["settings", "settingssection", "default"],
+    description:
+      "Settings Section: the titled group whose accent rule separates one concern from the next in every settings panel.",
+    tags: ["settings", "settingssection", "section", "divider", "default"],
     render: () => (
       <Frame>
-        <SettingsSection title="Section heading">
-          <span>Section body</span>
-        </SettingsSection>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-6)",
+            maxWidth: 520,
+          }}
+        >
+          <SettingsSection title="Text & display">
+            <SettingRow
+              label="Text size"
+              helper="Base size of the editor text. Headings scale with it."
+              control={
+                <Switch
+                  checked
+                  onChange={action("onChange")}
+                  ariaLabel="Text size"
+                  testId="stories.settingssection.size"
+                />
+              }
+            />
+          </SettingsSection>
+          <SettingsSection title="Editing">
+            <SettingRow
+              label="Vim keyboard mode"
+              helper="Use vim keys in the editor."
+              control={
+                <Switch
+                  checked={false}
+                  onChange={action("onChange")}
+                  ariaLabel="Vim keyboard mode"
+                  testId="stories.settingssection.vim"
+                />
+              }
+            />
+          </SettingsSection>
+        </div>
+      </Frame>
+    ),
+  },
+  {
+    // The in-panel topic strip (myne-md/myne#885). Composed the way the modal
+    // and a panel compose it - the strip above, the active topic's body below -
+    // because the strip alone would render `aria-controls` at nothing and the
+    // specimen would not be the surface a user meets.
+    id: "settings/settingstabs/default",
+    group: "settings",
+    surface: "SettingsTabs",
+    state: "default",
+    description:
+      "Settings Tabs: the in-panel topic strip and the active topic's own body beneath it.",
+    tags: ["settings", "settingstabs", "topics", "tabs", "default"],
+    render: () => (
+      <Frame>
+        <div
+          style={{
+            maxWidth: 640,
+            background: "var(--bg-2)",
+            border: "1px solid var(--line-1)",
+            borderRadius: "var(--radius-2)",
+            overflow: "hidden",
+          }}
+        >
+          <SettingsTabs panelId="ai" topics={AI_PANEL_TOPICS} />
+          <div style={{ padding: "var(--space-5)" }}>
+            <SettingsTopicPanel panelId="ai" topicId="answering">
+              <span>The Answering topic&apos;s own controls render here.</span>
+            </SettingsTopicPanel>
+            <SettingsTopicPanel panelId="ai" topicId="models">
+              <span>The Models topic&apos;s own controls render here.</span>
+            </SettingsTopicPanel>
+            <SettingsTopicPanel panelId="ai" topicId="limits">
+              <span>The Limits topic&apos;s own controls render here.</span>
+            </SettingsTopicPanel>
+            <SettingsTopicPanel panelId="ai" topicId="advanced">
+              <span>The Advanced topic&apos;s own controls render here.</span>
+            </SettingsTopicPanel>
+          </div>
+        </div>
       </Frame>
     ),
   },

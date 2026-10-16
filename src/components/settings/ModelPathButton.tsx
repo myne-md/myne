@@ -41,8 +41,15 @@ export function fileNameOf(path: string): string {
 }
 
 /** The path disclosure's own box: monospace, wrapping, selectable. A path is
- *  text to copy as often as it is a thing to click. */
+ *  text to copy as often as it is a thing to click.
+ *
+ *  A fixed `width`, because without one the box's width IS the path's length:
+ *  `overflowWrap: anywhere` only wraps inside a constrained box, so a model path
+ *  drew a popover most of the dialog wide (myne-md/myne#885 visual pass). The
+ *  anchored panel still clamps it to the viewport, and `width` rather than
+ *  `maxWidth` because the panel's own placement writes `maxWidth` after this. */
 export const PATH_PANEL_STYLE: CSSProperties = {
+  width: 320,
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
@@ -91,7 +98,7 @@ export function ModelPathButton(props: {
         open={open && path !== null}
         onClose={() => setOpen(false)}
         anchorRef={anchorRef}
-        minWidth={300}
+        minWidth={320}
         align="end"
         style={PATH_PANEL_STYLE}
         testId={props.panelTestId}

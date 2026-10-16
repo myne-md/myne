@@ -486,8 +486,12 @@ describe("AgentHubList: a 248px rail is what the row has to fit in", () => {
     // outgrows the rail truncates rather than bringing the sideways scroll
     // back.
     await rows();
+    // The testid is on the ScrollArea's wrapper; the scroller is its first
+    // child, and it is the box that scrolls.
     const list = screen.getByTestId("agent.hub-list");
-    expect(list.style.overflowX).toBe("hidden");
+    const scroller = list.firstElementChild as HTMLElement;
+    expect(scroller.className).toContain("myne-scrollarea");
+    expect(scroller.style.overflowX).toBe("hidden");
     expect(list.style.minWidth).toBe("0px");
   });
 });

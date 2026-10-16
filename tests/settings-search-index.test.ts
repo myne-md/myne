@@ -19,11 +19,13 @@ import {
   SETTINGS_SEARCH_INDEX,
   WRITABILITY_CONTROL,
   WRITABILITY_DEVICE_LOCAL,
+  visibleSettingsIndex,
 } from "../src/components/settings/search/settingsSearchIndex";
 import {
   searchSettings,
   panelLabelKey,
 } from "../src/components/settings/search/searchSettings";
+import { SETTINGS_PANEL_TOPICS } from "../src/components/settings/settingsTopics";
 
 // The rail panel taxonomy (mirrors SettingsModal.tsx PanelId). Kept local so the
 // coverage assertion has an independent list to check the registry against.
@@ -112,6 +114,16 @@ describe("settings search-index — integrity", () => {
     // i18n-key checks above cannot catch that. Scan the panel sources, excluding
     // the search/ subtree (it holds the registry itself, whose literals would
     // otherwise let a stale testid match its own declaration).
+    //
+    // **This is the CHEAP half and not the guard.** It is a substring test over
+    // a blob of every panel source, so it passes for a testid declared anywhere
+    // in the tree, which is how `storage.clipper` survived pointing at Storage
+    // while its only render site lived in Account (myne-md/myne#885). The guard
+    // that catches that class is the RENDER walk in
+    // `tests/components/settingsPanelTopics.test.tsx` (the four split panels and
+    // the six short ones) plus `AiPanel.test.tsx` and `EditorPanel.test.tsx`,
+    // which mount the panel an entry CLAIMS and assert its target is on screen.
+    // Kept because it is instant and still catches a testid deleted outright.
     const blob = readPanelSources(
       fileURLToPath(new URL("../src/components/settings", import.meta.url)),
     );
@@ -119,6 +131,35 @@ describe("settings search-index — integrity", () => {
       (e) => e.testid && !blob.includes(e.testid),
     ).map((e) => `${e.id} → ${e.testid ?? ""}`);
     expect(missing).toEqual([]);
+  });
+
+  it("names the topic of every entry whose panel renders a strip (myne-md/myne#885)", () => {
+    // The regression the topic field exists to prevent. An inactive topic's body
+    // is not mounted, so a hit that resolved to a panel and an anchor but NOT to
+    // the topic would leave the user at the top of a tab with no answer:
+    // `SettingsModal` switches the rail panel, finds no anchor, and stops. Both
+    // directions, because a topic that no roster carries is the same failure
+    // wearing a typo, and `topic` is a plain string to the type.
+    const missing: string[] = [];
+    const unknown: string[] = [];
+    for (const entry of SETTINGS_SEARCH_INDEX) {
+      const topics = SETTINGS_PANEL_TOPICS[entry.panelId];
+      if (topics === undefined) {
+        // No strip: a topic here would be stale the moment the panel gained
+        // one without the entry being re-read.
+        if (entry.topic !== undefined) {
+          unknown.push(`${entry.id} → topic ${entry.topic}, but ${entry.panelId} has no strip`);
+        }
+        continue;
+      }
+      if (entry.topic === undefined) {
+        missing.push(entry.id);
+      } else if (!topics.some((topic) => topic.id === entry.topic)) {
+        unknown.push(`${entry.id} → ${entry.topic} is in no ${entry.panelId} topic`);
+      }
+    }
+    expect(missing, "entries in a stripped panel with no topic").toEqual([]);
+    expect(unknown, "entries naming a topic nothing declares").toEqual([]);
   });
 });
 
@@ -146,7 +187,10 @@ describe("settings search-index — searchSettings behaviour", () => {
   });
 
   it("returns every entry for an empty query", () => {
-    expect(searchSettings("", t, true).length).toBe(SETTINGS_SEARCH_INDEX.length);
+    // Both runtime gates held OPEN (`developerModeEnabled`, `memberVault`), so
+    // "every entry" is about the scorer rather than about a gate this suite is
+    // not testing here. The member-vault gate has its own block below.
+    expect(searchSettings("", t, true, true).length).toBe(SETTINGS_SEARCH_INDEX.length);
   });
 });
 
@@ -231,13 +275,57 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
   });
 
   it("mode off does not hide anything that isn't developer-gated", () => {
-    const withGateOff = new Set(searchSettings("", t, false).map((e) => e.id));
-    const withGateOn = new Set(searchSettings("", t, true).map((e) => e.id));
+    // `memberVault` held open in both arms: this block is about the developer
+    // gate, and leaving the OTHER runtime gate closed would make an entry that
+    // is not developer-gated read as one the developer toggle hid.
+    const withGateOff = new Set(searchSettings("", t, false, true).map((e) => e.id));
+    const withGateOn = new Set(searchSettings("", t, true, true).map((e) => e.id));
     const nonGated = SETTINGS_SEARCH_INDEX.filter((e) => !e.developerGated);
     for (const e of nonGated) {
       expect(withGateOff.has(e.id), `${e.id} missing with gate off`).toBe(true);
       expect(withGateOn.has(e.id), `${e.id} missing with gate on`).toBe(true);
     }
+  });
+});
+
+// The member-vault gate (myne-md/myne#885). The shared-vault-unlock row renders
+// only while a B2B member vault is the ACTIVE vault (`MemberPasswordSettings`
+// returns `null` on any other vault), so an entry carrying only
+// `capability: memberSharing` still navigated to an anchor that was not
+// rendered on the ordinary desktop vault. The gate is a runtime per-vault fact,
+// the third axis beside the static capability descriptor and the developer
+// toggle, and this block proves both directions. The RENDER half lives in
+// `tests/components/memberPasswordSettings.test.tsx` (a member vault renders
+// the row, a single-account vault renders nothing), so offer and render agree.
+describe("settings search-index: member-vault gate (myne-md/myne#885)", () => {
+  const ENTRY_ID = "privacy.member-password";
+
+  it("the entry is tagged member-vault-gated and nothing else is", () => {
+    const gated = SETTINGS_SEARCH_INDEX.filter((e) => e.memberVaultGated).map((e) => e.id);
+    expect(gated).toEqual([ENTRY_ID]);
+  });
+
+  it("a member vault offers it, and a single-account vault does not", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === ENTRY_ID)!;
+    // The query is the entry's own ENGLISH title, which is what `t` resolves the
+    // key to: the sharpest query there is, because it is exactly the label the
+    // row renders. Developer mode is open, so the only gate that can hide it is
+    // this one, and the positive arm proves the query is not vacuous.
+    const query = t(entry.titleKey);
+    expect(query, "the fixture must resolve to a real label").not.toBe(entry.titleKey);
+    expect(searchSettings(query, t, true, true).map((r) => r.id)).toContain(ENTRY_ID);
+    expect(searchSettings(query, t, true, false).map((r) => r.id)).not.toContain(ENTRY_ID);
+    // An empty query (list-everything) follows the same gate.
+    expect(searchSettings("", t, true, true).map((e) => e.id)).toContain(ENTRY_ID);
+    expect(searchSettings("", t, true, false).map((e) => e.id)).not.toContain(ENTRY_ID);
+    expect(visibleSettingsIndex(true, true).map((e) => e.id)).toContain(ENTRY_ID);
+    expect(visibleSettingsIndex(true, false).map((e) => e.id)).not.toContain(ENTRY_ID);
+  });
+
+  it("the gate defaults closed, so an unresolved vault hides the entry", () => {
+    // The safe direction: a caller that has not resolved whether the active vault
+    // is shared must hide the entry rather than offer one that does not render.
+    expect(visibleSettingsIndex(true).map((e) => e.id)).not.toContain(ENTRY_ID);
   });
 });
 

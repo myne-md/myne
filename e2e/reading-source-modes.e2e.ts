@@ -27,6 +27,7 @@ import {
   dismissImporterOffer,
   openSettings,
   pickSelect,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
@@ -104,6 +105,9 @@ describeE2E("rsm2 default view mode persists in vault.prefs (reading-source-mode
 
         // Open Settings → Editor. The default is "live" (canonical default).
         await openSettings(s, "editor");
+        // The view-mode row lives in the Editor panel's `editing` topic since
+        // myne-md/myne#885, and only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "editing");
         // The row is a `Select` (#769); its trigger publishes the selected
         // value as `data-value`, so the assertion is locale-independent and
         // needs no menu open. One value replaces the radiogroup's pair of

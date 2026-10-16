@@ -27,6 +27,9 @@ import {
   type BindGroup,
 } from "../../commands/bindableCatalog";
 import { PANEL_ROOT_STYLE, HELPER_STYLE } from "./panel-styles";
+import { SettingsSection } from "./SettingsSection";
+import { Input } from "../primitives/Input";
+import { IconButton } from "../primitives/IconButton";
 import {
   hoverSurface,
   HOVER_TRANSITION,
@@ -46,28 +49,6 @@ const DESCRIPTORS: ConflictDescriptor[] = BINDABLE_COMMANDS.filter((c) => c.rebi
     phase: c.id === "nav.back" || c.id === "nav.forward" ? "capture" : "bubble",
   }),
 );
-
-const SEARCH_INPUT_STYLE: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "var(--space-2) var(--space-3)",
-  fontSize: "var(--text-base)",
-  fontFamily: "var(--font-sans)",
-  color: "var(--fg-1)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2, 6px)",
-  outline: "none",
-};
-
-const GROUP_HEADING_STYLE: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  color: "var(--fg-3)",
-  margin: "var(--space-4) 0 var(--space-2)",
-};
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -166,7 +147,6 @@ const CAPTURE_INPUT_STYLE: CSSProperties = {
   width: "140px",
 };
 const WARN_STYLE: CSSProperties = { fontSize: "var(--text-xs, 11px)", color: "var(--warn, #b45309)" };
-const RESET_ALL_STYLE: CSSProperties = { ...ICON_BTN_STYLE, color: "var(--fg-2)", alignSelf: "flex-start" };
 
 // Map each panel-local display group (a typed BindGroup identifier, also used as
 // a filter discriminator + data-group attribute) to its translation key. The
@@ -296,16 +276,34 @@ export function HotkeysPanel() {
       data-setting-anchor="hotkeys.shortcuts"
       data-setting-row="true"
     >
-      <p style={HELPER_STYLE}>{t("settings.hotkeys.helper")}</p>
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("settings.hotkeys.searchPlaceholder")}
-        aria-label={t("settings.hotkeys.searchAriaLabel")}
-        style={SEARCH_INPUT_STYLE}
-        data-testid="hotkeys.search"
-      />
+      {/* **The search field leads, the reset-all is an icon beside it, and the
+          description sits under them** (myne-md/myne#867, on the user's read).
+          The field is what a visitor to this panel uses first, and the
+          reset-all acts on the same list, so it belongs on the field's row as a
+          square bordered icon rather than a text button on a line of its own.
+          The confirm still appears before anything is reset. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("settings.hotkeys.searchPlaceholder")}
+            aria-label={t("settings.hotkeys.searchAriaLabel")}
+            data-testid="hotkeys.search"
+          />
+        </div>
+        <IconButton
+          icon="rotate-ccw"
+          label={t("settings.hotkeys.resetAll")}
+          tooltip
+          bordered
+          active={confirmResetAll}
+          testId="hotkeys.reset-all"
+          onClick={() => setConfirmResetAll(true)}
+        />
+      </div>
+      <p style={HELPER_STYLE} data-testid="hotkeys.helper">{t("settings.hotkeys.helper")}</p>
       {warning && (
         <span style={WARN_STYLE} data-testid="hotkeys.warning">
           {warning}
@@ -321,22 +319,22 @@ export function HotkeysPanel() {
             {t("settings.hotkeys.cancel")}
           </button>
         </span>
-      ) : (
-        <button
-          style={RESET_ALL_STYLE}
-          {...hoverSurface()}
-          data-testid="hotkeys.reset-all"
-          onClick={() => setConfirmResetAll(true)}
-        >
-          {t("settings.hotkeys.resetAll")}
-        </button>
-      )}
+      ) : null}
       {BIND_GROUPS.map((group: BindGroup) => {
         const rows = BINDABLE_COMMANDS.filter((c) => c.group === group && visible.has(c.id));
         if (rows.length === 0) return null;
         return (
-          <div key={group} data-testid="hotkeys.group" data-group={group}>
-            <h3 style={GROUP_HEADING_STYLE}>{t(GROUP_LABEL_KEY[group])}</h3>
+          // The per-group heading is `SettingsSection` rather than a private
+          // `GROUP_HEADING_STYLE` (myne-md/myne#885): this panel drew its own
+          // uppercase label with no rule, which was the second section idiom in
+          // the tree. The shared treatment gives the group the same seam as
+          // every other panel, and the accent rule is what makes the boundary
+          // findable while scrolling a long shortcut list.
+          <SettingsSection
+            key={group}
+            testId="hotkeys.group"
+            title={t(GROUP_LABEL_KEY[group])}
+          >
             {rows.map((cmd) => {
               const effective = effectiveChords(cmd.id, DEFAULTS, overrides);
               const overridden = overrides[cmd.id] !== undefined;
@@ -482,7 +480,7 @@ export function HotkeysPanel() {
                 </div>
               );
             })}
-          </div>
+          </SettingsSection>
         );
       })}
     </div>

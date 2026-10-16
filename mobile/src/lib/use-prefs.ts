@@ -24,6 +24,9 @@ export const DEFAULT_PREFS: PrefsView = {
   ai_provider: null,
   ai_provider_consent: null,
   ai_provider_model: null,
+  ai_excluded_folders: [],
+  chat_history_budget: null,
+  meeting_ai_prompt: null,
   // ENABLED, matching the Rust default (MYND-563/592; opt-out). An absent key
   // reads as on — the transcribe command re-reads it host-side, so this default
   // only affects UI visibility, never the gate.
@@ -35,6 +38,7 @@ export const DEFAULT_PREFS: PrefsView = {
   reminder_horizon_days: null,
   show_note_timestamps: true,
   attachment_compression_enabled: true,
+  attachment_ocr_enabled: true,
   spell_enabled: null,
   spell_languages: [],
   keymap: {},

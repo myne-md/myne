@@ -55,14 +55,24 @@ export function FolderNotesSettings() {
   return (
     <SettingRow
       label={t("settings.folderNotes.label")}
-      helper={t("settings.folderNotes.helper")}
+      testId="settings.folder-notes"
+      // 326 characters was the third-longest helper in the catalog
+      // (myne-md/myne#885). What the feature IS stays on the row; what happens
+      // when it is turned off, and that nothing changes on disk, moves behind
+      // the question mark unchanged.
+      helper={t("settings.folderNotes.inline")}
+      explanation={[t("settings.folderNotes.helper")]}
       error={error}
-      control={(helperId) => (
+      control={(helperId, explanationId) => (
         <Switch
           checked={enabled}
           onChange={(next) => void toggle(next)}
           ariaLabel={t("settings.folderNotes.label")}
-          ariaDescribedBy={helperId}
+          ariaDescribedBy={
+            explanationId === undefined
+              ? helperId
+              : `${helperId} ${explanationId}`
+          }
           testId="settings.folder-notes-toggle"
         />
       )}

@@ -37,6 +37,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
@@ -49,6 +50,8 @@ import { FolderGlyph } from "../../notes/components/FolderGlyph";
 import { FOLDER_ICON_NAMES } from "../../notes/folderIcons";
 import * as capabilities from "../../platform/capabilities";
 import { ConnectedExtensions } from "./ConnectedExtensions";
+import { SettingsTopicPanel } from "./SettingsTabs";
+import { SettingsSection } from "./SettingsSection";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -112,20 +115,9 @@ interface AccountPanelProps {
   onForceRelock?: (status: StageVaultStatus, reason?: SuspicionReason) => void;
 }
 
-const SECTION_HEADING_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-  textTransform: "uppercase",
-  letterSpacing: "var(--tracking-caps)",
-  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
-  margin: 0,
-};
-
-const DANGER_HEADING_STYLE: CSSProperties = {
-  ...SECTION_HEADING_STYLE,
-  color: "var(--danger)",
-};
-
+// The plain layout wrapper for a section that composes a component which draws
+// its own heading (`ConnectedExtensions`), so it needs no seam of its own. Every
+// other group in this panel goes through `SettingsSection`.
 const SECTION_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -148,15 +140,6 @@ const HELPER_TEXT_MUTED_STYLE: CSSProperties = {
 // VAULT LABEL section (MYND-205 task 6). Pinned to the Penpot spec rather
 // than the panel's semantic-token helpers so the eyebrow / input / Save button
 // match the rename-control frame exactly (Inter 11/600 eyebrow, 36px controls).
-const LABEL_EYEBROW_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  fontWeight: "var(--weight-semibold)",
-  letterSpacing: "var(--tracking-caps)",
-  textTransform: "uppercase",
-  color: "var(--ink-3)",
-  margin: 0,
-};
-
 const LABEL_HELPER_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   fontWeight: "var(--weight-regular)",
@@ -308,14 +291,6 @@ const ROOT_STYLE: CSSProperties = {
   width: "100%",
 };
 
-const DIVIDER_STYLE: CSSProperties = {
-  height: 1,
-  background: "var(--line-1)",
-  border: 0,
-  margin: 0,
-  alignSelf: "stretch",
-};
-
 type View = "idle" | "change-password" | "delete-vault";
 
 /**
@@ -465,6 +440,16 @@ export function AccountPanel({
     onInFlightChange?.(inFlight);
   }, [inFlight, onInFlightChange]);
 
+  // ── The two sub-views, each rendered INSIDE the topic that owns its CTA ────
+  //
+  // Before the split (myne-md/myne#885) each of these was an early `return`
+  // that replaced the whole panel. That cannot survive a topic strip: the strip
+  // is rendered by the Settings shell, outside this component, so a sub-view
+  // that took the body over would leave the tabs on screen and do nothing when
+  // one was clicked. Each form is therefore built here and rendered by the
+  // topic that owns the CTA which opens it, which keeps the tab click meaningful
+  // and keeps one form and the rows it replaces off the screen at the same time.
+  let passwordView: ReactNode = null;
   if (view === "change-password" && !memberVault) {
     const handleSubmit = (currentPassword: string, newPassword: string) => {
       setInFlight(true);
@@ -530,7 +515,7 @@ export function AccountPanel({
       })();
     };
 
-    return (
+    passwordView = (
       <PasswordChangeForm
         onSubmit={handleSubmit}
         onCancel={() => {
@@ -543,6 +528,7 @@ export function AccountPanel({
     );
   }
 
+  let deleteView: ReactNode = null;
   if (view === "delete-vault") {
     const handleDeleteSubmit = () => {
       setInFlight(true);
@@ -605,7 +591,7 @@ export function AccountPanel({
       })();
     };
 
-    return (
+    deleteView = (
       <DeleteVaultConfirmForm
         onSubmit={handleDeleteSubmit}
         onCancel={() => {
@@ -674,189 +660,233 @@ export function AccountPanel({
 
   return (
     <div style={ROOT_STYLE}>
-      {/* A member vault has no owner vault password to change: the backend has
-          no `root_key` for it and refuses with `VaultNotUnlocked`. The control is
-          hidden entirely and the member fast-unlock surface (Privacy) is pointed
-          at instead, rather than offering a button that silently does nothing
-          (myne-md/myne#858). */}
-      {memberVault ? (
-        <section style={SECTION_STYLE}>
-          <h3 style={SECTION_HEADING_STYLE}>
-            {t("settings.account.changePasswordHeading")}
-          </h3>
-          <p data-testid="settings.member-vault-notice" style={HELPER_TEXT_STYLE}>
-            {t("settings.account.memberVaultNotice")}
-          </p>
-        </section>
+      {/* **Vault**: what this vault is called, what it looks like, what can
+          reach it, and its password. The change-password CTA and the form it
+          opens are one topic body: the form REPLACES the rows beside it rather
+          than appearing under them, which is what it did when it took the whole
+          panel over.
+
+          Each topic's body keeps the indentation of the code it replaced, the
+          convention the AI panel set, so the diff is about which rows moved. */}
+      <SettingsTopicPanel panelId="account" topicId="vault">
+      {passwordView !== null ? (
+        passwordView
       ) : (
-        <section style={SECTION_STYLE}>
-          <h3 style={SECTION_HEADING_STYLE}>
-            {t("settings.account.changePasswordHeading")}
-          </h3>
-          <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
-          <div>
-            <Button
-              variant="primary"
-              data-testid="settings.change-password-cta"
-              onClick={() => setView("change-password")}
+        <>
+          {/* A member vault has no owner vault password to change: the backend has
+              no `root_key` for it and refuses with `VaultNotUnlocked`. The control is
+              hidden entirely and the member fast-unlock surface (Privacy) is pointed
+              at instead, rather than offering a button that silently does nothing
+              (myne-md/myne#858). */}
+          {memberVault ? (
+            <SettingsSection title={t("settings.account.changePasswordHeading")}>
+              <p data-testid="settings.member-vault-notice" style={HELPER_TEXT_STYLE}>
+                {t("settings.account.memberVaultNotice")}
+              </p>
+            </SettingsSection>
+          ) : (
+            <SettingsSection title={t("settings.account.changePasswordHeading")}>
+              <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
+              <div>
+                <Button
+                  variant="primary"
+                  data-testid="settings.change-password-cta"
+                  // Greyed while a write is in flight, which is the one state the
+                  // split newly makes reachable: the danger CTA below is now
+                  // clickable from its own topic while this form is open, and a
+                  // failed change reported into a form that is no longer the
+                  // topic on screen would lose its message.
+                  disabled={inFlight}
+                  onClick={() => setView("change-password")}
+                >
+                  {t("settings.account.changePasswordButton")}
+                </Button>
+              </div>
+            </SettingsSection>
+          )}
+
+          <SettingsSection title={t("settings.account.sections.identity")}>
+            <p style={LABEL_HELPER_STYLE}>{t("settings.account.vaultLabelHelper")}</p>
+            <div style={LABEL_INPUT_ROW_STYLE}>
+              <input
+                className="vault-label-input"
+                data-testid="settings.label-input"
+                type="text"
+                value={labelDraft}
+                placeholder={t("settings.account.vaultLabelPlaceholder")}
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={labelInFlight}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onFocus={() => setLabelFocused(true)}
+                onBlur={() => setLabelFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveLabel();
+                  }
+                }}
+                style={labelInputStyle(labelFocused)}
+              />
+              <button
+                type="button"
+                data-testid="settings.label-save"
+                onClick={handleSaveLabel}
+                disabled={labelSaveDisabled}
+                style={labelSaveButtonStyle(labelSaveDisabled)}
+              >
+                {t("settings.account.vaultLabelSave")}
+              </button>
+            </div>
+
+            {/*
+              Shown while a rename is pending, which is the moment the user can act
+              on it: unlock the vault on the other device, or decide what is sitting
+              on that lock screen is acceptable. `labelChanged` also covers CLEARING
+              the name, and that is the case this exists for -- someone emptying the
+              field to get a name off a screen would otherwise be told nothing about
+              the copy that stays.
+
+              The gate is deliberately NOT narrowed to "there was a saved label".
+              `savedLabel` is this vault's `vault.prefs.label`, which syncs; the
+              stored copy on another device does not, so a vault whose label was
+              cleared here can still be sitting under its old name over there. A
+              gate on `savedLabel !== ""` would go quiet in exactly that case. The
+              copy carries the breadth instead: it names what the other devices show
+              without asserting that it is a name.
+            */}
+            {labelChanged && (
+              <p
+                role="status"
+                data-testid="settings.label-rename-notice"
+                style={LABEL_RENAME_NOTICE_STYLE}
+              >
+                {t("settings.account.vaultLabelRenameNotice")}
+              </p>
+            )}
+
+            <p style={ICON_PICKER_LABEL_STYLE}>{t("settings.account.vaultIconLabel")}</p>
+            <div
+              role="radiogroup"
+              aria-label={t("settings.account.vaultIconLabel")}
+              data-testid="settings.icon-picker"
+              style={ICON_PICKER_GRID_STYLE}
             >
-              {t("settings.account.changePasswordButton")}
-            </Button>
-          </div>
-        </section>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={savedIcon === null}
+                aria-label={t("settings.account.vaultIconDefault")}
+                title={t("settings.account.vaultIconDefault")}
+                data-testid="settings.icon-option"
+                data-icon-name="default"
+                disabled={iconInFlight}
+                onClick={() => handleSelectIcon(null)}
+                {...iconTileHover(savedIcon === null, iconInFlight)}
+                style={iconPickerButtonStyle(savedIcon === null, iconInFlight)}
+              >
+                M
+              </button>
+              {FOLDER_ICON_NAMES.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="radio"
+                  aria-checked={savedIcon === name}
+                  aria-label={name}
+                  title={name}
+                  data-testid="settings.icon-option"
+                  data-icon-name={name}
+                  disabled={iconInFlight}
+                  onClick={() => handleSelectIcon(name)}
+                  {...iconTileHover(savedIcon === name, iconInFlight)}
+                  style={iconPickerButtonStyle(savedIcon === name, iconInFlight)}
+                >
+                  <FolderGlyph name={name} size={16} />
+                </button>
+              ))}
+            </div>
+          </SettingsSection>
+
+          {/* Browser clipper: absent on web (MYND-574 task 27). A page cannot be a
+              native-messaging host, so the extension talks to the desktop app or to
+              nothing - there is no degraded mode to offer. Omitted rather than
+              disabled: `decisions.md` 2026-07-26 makes that normative. */}
+          {capabilities.has("clipper") && (
+            <section style={SECTION_STYLE}>
+              <ConnectedExtensions />
+            </section>
+          )}
+        </>
       )}
+      </SettingsTopicPanel>
 
-      <section style={SECTION_STYLE}>
-        <h3 style={LABEL_EYEBROW_STYLE}>{t("settings.account.vaultLabelEyebrow")}</h3>
-        <p style={LABEL_HELPER_STYLE}>{t("settings.account.vaultLabelHelper")}</p>
-        <div style={LABEL_INPUT_ROW_STYLE}>
-          <input
-            className="vault-label-input"
-            data-testid="settings.label-input"
-            type="text"
-            value={labelDraft}
-            placeholder={t("settings.account.vaultLabelPlaceholder")}
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            disabled={labelInFlight}
-            onChange={(e) => setLabelDraft(e.target.value)}
-            onFocus={() => setLabelFocused(true)}
-            onBlur={() => setLabelFocused(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSaveLabel();
-              }
-            }}
-            style={labelInputStyle(labelFocused)}
-          />
-          <button
-            type="button"
-            data-testid="settings.label-save"
-            onClick={handleSaveLabel}
-            disabled={labelSaveDisabled}
-            style={labelSaveButtonStyle(labelSaveDisabled)}
+      {/* **Danger zone**: the one control here that destroys the vault, on its
+          own tab so a reader can reach it without scrolling past the icon
+          picker, and so it is not one keystroke from the rows a user opens
+          Account to change. The confirmation form replaces the section the same
+          way the password form replaces its rows, and the hairline that used to
+          separate this region from the one above travels with it. */}
+      <SettingsTopicPanel panelId="account" topicId="danger">
+      {deleteView !== null ? (
+        deleteView
+      ) : (
+        <>
+          {/* The danger zone, and what "danger" means here (MYND-574 task 72).
+              Where the local vault may be the only copy it is a destruction; where
+              it is a cache of a sync-held vault it is a sign-out that takes this
+              browser's copy with it. Same CTA, same testid, same command - different
+              promise, because the desktop promise would be false on the other
+              client in the direction that loses a user's trust rather than their
+              data.
+
+              The section composes the shared treatment (myne-md/myne#885) rather
+              than its own red heading and a bare `<hr>`: the hairline above it
+              used to be this panel's private divider. The heading keeps its red
+              through the treatment's one tone (`tone="danger"`), so the warning
+              reads at the heading again rather than being flattened into the
+              shared `--fg-3`, and the seam is still the same accent rule every
+              other section in the dialog draws. The `variant="danger"` button,
+              which is the thing that actually destroys something, and the helper
+              text carry the rest. */}
+          <SettingsSection
+            tone="danger"
+            title={
+              capabilities.has("localOnlyVault")
+                ? t("settings.account.dangerZoneHeading")
+                : t("settings.account.localEraseHeading")
+            }
           >
-            {t("settings.account.vaultLabelSave")}
-          </button>
-        </div>
-
-        {/*
-          Shown while a rename is pending, which is the moment the user can act
-          on it: unlock the vault on the other device, or decide what is sitting
-          on that lock screen is acceptable. `labelChanged` also covers CLEARING
-          the name, and that is the case this exists for -- someone emptying the
-          field to get a name off a screen would otherwise be told nothing about
-          the copy that stays.
-
-          The gate is deliberately NOT narrowed to "there was a saved label".
-          `savedLabel` is this vault's `vault.prefs.label`, which syncs; the
-          stored copy on another device does not, so a vault whose label was
-          cleared here can still be sitting under its old name over there. A
-          gate on `savedLabel !== ""` would go quiet in exactly that case. The
-          copy carries the breadth instead: it names what the other devices show
-          without asserting that it is a name.
-        */}
-        {labelChanged && (
-          <p
-            role="status"
-            data-testid="settings.label-rename-notice"
-            style={LABEL_RENAME_NOTICE_STYLE}
-          >
-            {t("settings.account.vaultLabelRenameNotice")}
-          </p>
-        )}
-
-        <p style={ICON_PICKER_LABEL_STYLE}>{t("settings.account.vaultIconLabel")}</p>
-        <div
-          role="radiogroup"
-          aria-label={t("settings.account.vaultIconLabel")}
-          data-testid="settings.icon-picker"
-          style={ICON_PICKER_GRID_STYLE}
-        >
-          <button
-            type="button"
-            role="radio"
-            aria-checked={savedIcon === null}
-            aria-label={t("settings.account.vaultIconDefault")}
-            title={t("settings.account.vaultIconDefault")}
-            data-testid="settings.icon-option"
-            data-icon-name="default"
-            disabled={iconInFlight}
-            onClick={() => handleSelectIcon(null)}
-            {...iconTileHover(savedIcon === null, iconInFlight)}
-            style={iconPickerButtonStyle(savedIcon === null, iconInFlight)}
-          >
-            M
-          </button>
-          {FOLDER_ICON_NAMES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="radio"
-              aria-checked={savedIcon === name}
-              aria-label={name}
-              title={name}
-              data-testid="settings.icon-option"
-              data-icon-name={name}
-              disabled={iconInFlight}
-              onClick={() => handleSelectIcon(name)}
-              {...iconTileHover(savedIcon === name, iconInFlight)}
-              style={iconPickerButtonStyle(savedIcon === name, iconInFlight)}
-            >
-              <FolderGlyph name={name} size={16} />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Browser clipper: absent on web (MYND-574 task 27). A page cannot be a
-          native-messaging host, so the extension talks to the desktop app or to
-          nothing — there is no degraded mode to offer. Omitted rather than
-          disabled: `decisions.md` 2026-07-26 makes that normative. */}
-      {capabilities.has("clipper") && (
-        <section style={SECTION_STYLE}>
-          <ConnectedExtensions />
-        </section>
+            <p style={HELPER_TEXT_MUTED_STYLE}>
+              {capabilities.has("localOnlyVault")
+                ? t("settings.account.dangerZoneHelper")
+                : t("settings.account.localEraseHelper")}
+            </p>
+            <div>
+              <Button
+                variant="danger"
+                data-testid="settings.delete-vault-cta"
+                // Same guard as the change-password CTA, and for the same
+                // reason: this section is now reachable from its own topic while
+                // the password form sits in the other one, and the form cannot
+                // show a failure reported after it stopped being rendered.
+                disabled={inFlight}
+                onClick={() => {
+                  setDeletePartialFail(null);
+                  setView("delete-vault");
+                }}
+              >
+                {capabilities.has("localOnlyVault")
+                  ? t("settings.account.deleteVaultButton")
+                  : t("settings.account.localEraseButton")}
+              </Button>
+            </div>
+          </SettingsSection>
+        </>
       )}
-
-      <hr style={DIVIDER_STYLE} aria-hidden="true" />
-
-      {/* The danger zone, and what "danger" means here (MYND-574 task 72).
-          Where the local vault may be the only copy it is a destruction; where
-          it is a cache of a sync-held vault it is a sign-out that takes this
-          browser's copy with it. Same CTA, same testid, same command — different
-          promise, because the desktop promise would be false on the other
-          client in the direction that loses a user's trust rather than their
-          data. */}
-      <section style={SECTION_STYLE}>
-        <h3 style={DANGER_HEADING_STYLE}>
-          {capabilities.has("localOnlyVault")
-            ? t("settings.account.dangerZoneHeading")
-            : t("settings.account.localEraseHeading")}
-        </h3>
-        <p style={HELPER_TEXT_MUTED_STYLE}>
-          {capabilities.has("localOnlyVault")
-            ? t("settings.account.dangerZoneHelper")
-            : t("settings.account.localEraseHelper")}
-        </p>
-        <div>
-          <Button
-            variant="danger"
-            data-testid="settings.delete-vault-cta"
-            onClick={() => {
-              setDeletePartialFail(null);
-              setView("delete-vault");
-            }}
-          >
-            {capabilities.has("localOnlyVault")
-              ? t("settings.account.deleteVaultButton")
-              : t("settings.account.localEraseButton")}
-          </Button>
-        </div>
-      </section>
+      </SettingsTopicPanel>
     </div>
   );
 }

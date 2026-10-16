@@ -45,6 +45,7 @@ import {
   createNote,
   dismissImporterOffer,
   openSettings,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
@@ -248,6 +249,11 @@ describeE2E("tc1 toolbar customize: hide/show follows + persists; pending rows p
         // Settings → Editor → Toolbar list. The 5 not-yet-renderable rows are
         // pinned hidden: visibly disabled, non-toggleable ("Coming soon").
         await openSettings(s, "editor");
+        // The toolbar customisation lives in the Editor panel's `editing` topic
+        // since myne-md/myne#885; only the active topic's body is mounted, so
+        // every re-open owes the topic (the strip remembers it for the session,
+        // which makes this a no-op after the first call).
+        await selectSettingsTopic(s, "editor", "editing");
         await s.byTestId("settings.toolbar-customize");
         for (const id of PENDING_IDS) {
           expect(
@@ -270,6 +276,7 @@ describeE2E("tc1 toolbar customize: hide/show follows + persists; pending rows p
         // fixed): the mount effect re-reads vault.prefs from disk, so the
         // hidden state must read back — not reset to the default.
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "editing");
         await expectHighlightToggleReadsBack(s, false);
 
         // Un-hide → the button is back on the next selection.
@@ -282,6 +289,7 @@ describeE2E("tc1 toolbar customize: hide/show follows + persists; pending rows p
         // set is now exactly the pinned pending ids — non-empty by the
         // resolveToolbarHidden contract, so it can't be mistaken for unset).
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "editing");
         await expectHighlightToggleReadsBack(s, true);
         await closeSettings(s);
       },
@@ -338,6 +346,7 @@ describeE2E("tc2 toolbar reorder follows the move buttons and persists (myne-md/
         ).toBeGreaterThan(2);
 
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "editing");
         await s.byTestId("settings.toolbar-customize");
         const listBefore = await customizeOrder(s);
         expect(listBefore.length).toBeGreaterThan(2);
@@ -384,6 +393,7 @@ describeE2E("tc2 toolbar reorder follows the move buttons and persists (myne-md/
         // Persistence: reopening Settings re-reads `vault.prefs` from disk, so
         // the new order has to come back rather than resetting to the default.
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "editing");
         await s.waitUntil(
           async () => {
             const now = await customizeOrder(s);

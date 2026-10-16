@@ -30,10 +30,13 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickNewItem,
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   enableAi,
+  excludeFolderFromAi,
+  nameNewNote,
   runPaletteAction,
   typeIntoEditor,
   unlockToEditor,
@@ -200,18 +203,72 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
   });
 });
 
+/** Right-click an element and pick a context-menu item by its `data-item-id`.
+ *  Local twin of the same helper in `folder-archive.e2e.ts` /
+ *  `folder-notes.e2e.ts`, which is where this shape lives in the suite. */
+async function contextMenuPick(
+  session: Session,
+  target: { rightClick(): Promise<void> },
+  itemId: string,
+): Promise<void> {
+  await target.rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
+}
+
+/** Create a folder via the sidebar's inline new-folder input. The trailing
+ *  `\uE007` (W3C Enter) commits the inline input, else `notes.folder-row` never
+ *  materializes. Same helper, and the same commit key, as
+ *  `ai-ux-surface.e2e.ts` and `folder-archive.e2e.ts` carry. */
+async function createFolder(s: Session, name: string): Promise<void> {
+  await clickNewItem(s, "notes.new-folder");
+  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
+  await s.byTestId("notes.folder-row");
+}
+
+/** Create a note INSIDE `folder` through the folder's own "New note here" item
+ *  and commit `title` through the inline-rename input. Creating the note OPENS
+ *  it in the focused pane, which is the fact `ac2` rests on (and the reason the
+ *  caller can wait for the right panel straight afterwards). Same helper as
+ *  `folder-archive.e2e.ts` / `folder-notes.e2e.ts`. */
+async function createNoteInFolder(
+  s: Session,
+  folder: { rightClick(): Promise<void> },
+  title: string,
+): Promise<void> {
+  await contextMenuPick(s, folder, "new-note");
+  await nameNewNote(s, title);
+}
+
 aiDescribe("ac2 the composer refuses a keystroke when there is nothing in scope", () => {
   // myne-md/myne#848. A new conversation now starts on the whole vault, so the
-  // only state with no scope at all is a vault the resolution empties: no notes,
-  // or every note inside an excluded folder. The host's own preview answers
-  // "zero" a step before `start_run` refuses with `EmptyGrant`, which is what
-  // lets the field refuse the KEYSTROKE rather than the send.
+  // only state with no scope at all is a vault the resolution empties.
+  //
+  // **"A vault with no notes" was the first version of that, and it cannot host
+  // this scenario.** With no notes the focused pane is in its new-tab state, so
+  // its active tab is `null` rather than a note, and the right panel that carries
+  // the chat surface is not mounted at all (`Editor.tsx`'s
+  // `ws.focusedLeaf.activeTab?.kind === "note"` gate): `ai.open-chat` writes its
+  // tab preference and nothing renders, which is how this scenario spent its whole
+  // life timing out on the composer. The state the scenario is about is still
+  // reachable with the editor chrome up, through the second route this comment
+  // always named, so the vault's only note now lives inside the only folder and
+  // that folder is excluded: the resolution is empty while the surface exists.
+  //
+  // The host's own preview answers "zero" a step before `start_run` refuses with
+  // `EmptyGrant`, which is what lets the field refuse the KEYSTROKE rather than
+  // the send. The clamp that empties it is
+  // `core/src/plugins/agent/scope.rs::resolve_grant`, applied on every grant arm.
   //
   // Asserted structurally (the outline attribute and the disabled field) rather
   // than on the copy: the sentence lives in the catalog and the component tests
   // pin its key, so an E2E assertion on English wording would be a second place
   // to update for a copy change.
-  it("disables the field and outlines the scope control on an empty vault", async () => {
+  it("disables the field and outlines the scope control when every note is excluded", async () => {
+    const FOLDER = "Private";
     let password = "";
     await scenario(
       "ac2-blocked-scope",
@@ -220,8 +277,24 @@ aiDescribe("ac2 the composer refuses a keystroke when there is nothing in scope"
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
-        // NO note is created, which is the precondition the scenario is about.
         await enableAi(s);
+        // **The vault's only note, inside a folder, and that folder excluded.**
+        // One note rather than none, because the note's own tab is what mounts the
+        // right panel; excluding the folder it lives in empties every scope the
+        // composer can be pointed at (the default here is the open note, and
+        // `resolve_grant` clamps the notes arm exactly as it clamps the vault one).
+        await createFolder(s, FOLDER);
+        await createNoteInFolder(
+          s,
+          await s.byTestId("notes.folder-row"),
+          "ac2notealfa7k2m9qx4w8e5rj0aa",
+        );
+        // The note creation opens the note in the focused pane, and that is what
+        // mounts the panel the chat surface lives in. Assert it here, so a future
+        // re-gating of the right panel fails by name instead of at the composer.
+        await s.waitForElement(testIdSelector("editor.right-panel-tabs"), { timeoutMs: 15_000 });
+        await excludeFolderFromAi(s, `${FOLDER}/`);
+
         await runPaletteAction(s, "ai.open-chat", "chat");
 
         await s.waitForElement(testIdSelector("ai.composer-input"), { timeoutMs: 15_000 });

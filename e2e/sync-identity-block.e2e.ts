@@ -23,6 +23,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
@@ -53,8 +54,8 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
         await app.session.byTestId("sync.panel.add-identity", { timeoutMs: 10_000 });
 
          // Unlock the identity through the block's own inline phrase entry
-         // (moved here from the member roster, myne-md/myne#831).
-         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+         // (moved here from the member roster, myne-md/myne#831). The block is on
+         // the Connection topic; the roster is on Devices (myne-md/myne#885).
          // The recovery-phrase grid is collapsed by default.
          await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
          for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
@@ -65,12 +66,16 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
           await (await app.session.byTestId(testId)).replaceText(word);
         }
         await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
-        await app.session.byTestId("member-roster.person-ready");
 
         // The block reflects the unlock through the shared store, without a
         // Settings reopen, and the Add CTA is gone.
         await app.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 10_000 });
         expect(await app.session.byTestIdAll("sync.panel.add-identity")).toHaveLength(0);
+
+        // And the roster, one topic over, sees the same unlocked person.
+        await selectSettingsTopic(app.session, "sync", "devices");
+        await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+        await app.session.byTestId("member-roster.person-ready");
 
         await closeSettings(app.session);
       },

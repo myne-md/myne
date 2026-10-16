@@ -198,7 +198,14 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
         >
           <div style={{ minWidth: 0 }}>
             <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
-            <div style={subtitle}>{t("settings.privacy.hideVaultNamesHelper")}</div>
+            {/* The critical sentence, and only it, on the row (myne-md/myne#885).
+                Desktop split this row's 776 characters across four paragraphs:
+                the destructive sentence stays beside the switch and the detail
+                moves behind the question mark. Mobile has no disclosure
+                primitive, so the same keys render as paragraphs below the row
+                rather than collapsed; the COPY is byte-identical, which is what
+                `tests/hide-vault-names.test.ts` pins across the two clients. */}
+            <div style={subtitle}>{t("settings.privacy.hideVaultNamesInline")}</div>
           </div>
           {/* `disabled` while the erase runs, NOT a dropped `onToggle`.
               Mobile's Switch renders `role="switch"` and `aria-checked` only
@@ -217,6 +224,9 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
         </div>
       </Group>
 
+      <p style={helper} data-testid="settings.hide-vault-names-helper">
+        {t("settings.privacy.hideVaultNamesHelper")}
+      </p>
       <p style={helper} data-testid="settings.hide-vault-names-erases">
         {t("settings.privacy.hideVaultNamesErases")}
       </p>

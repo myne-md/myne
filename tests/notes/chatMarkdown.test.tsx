@@ -171,12 +171,21 @@ describe("note mentions", () => {
     expect(onOpenNote).toHaveBeenCalledWith("n-pixel");
   });
 
-  it("links a wikilink whose target the vault holds, and shows the author's label", () => {
-    const { el, onOpenNote } = withMentions("see [[Pixel 10 Graphene OS|that note]]");
+  it("links a wikilink whose target the vault holds", () => {
+    const { el, onOpenNote } = withMentions("see [[Pixel 10 Graphene OS]]");
     const link = el.querySelector('[data-testid="ai.mention-link"]') as HTMLElement;
-    expect(link.textContent).toBe("that note");
+    expect(link.textContent).toBe("Pixel 10 Graphene OS");
     fireEvent.click(link);
     expect(onOpenNote).toHaveBeenCalledWith("n-pixel");
+  });
+
+  it("leaves an aliased wikilink plain, so a link never shows one name and opens another", () => {
+    // myne-md/myne#867 review, D3: model output reachable by prompt injection
+    // could otherwise write `[[Private/Bank|Summary of your trip]]`.
+    const { el, onOpenNote } = withMentions("see [[Pixel 10 Graphene OS|that note]]");
+    expect(el.querySelector('[data-testid="ai.mention-link"]')).toBeNull();
+    expect(el.textContent).toContain("that note");
+    expect(onOpenNote).not.toHaveBeenCalled();
   });
 
   it("leaves a wikilink the vault does not hold as its plain label", () => {

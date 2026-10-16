@@ -61,7 +61,7 @@ describe("the indicator's gutter", () => {
     // 8px, so content that reaches the end of its column has a bar across it,
     // which is what a right-aligned chat bubble did (myne-md/myne#848, on the
     // user's read). The scroller reserves the gutter as a margin, and the
-    // thumb's own geometry (`inset-inline-end: 2px` + `width: 6px`) adds up to
+    // thumb's own geometry (`inset-inline-end: 4px` + `width: 4px`) adds up to
     // the same number.
     renderArea();
     const scroller = screen.getByTestId("probe").firstElementChild as HTMLElement;

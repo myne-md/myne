@@ -24,7 +24,7 @@ import { closeSheet, vaultIconWrites } from "../helpers";
 
 async function openAccount(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Settings" }).first().click();
-  await page.getByText("Account", { exact: true }).click();
+  await page.getByTestId("settings.category-vault").click();
 }
 
 /** The app header's vault mark. `data-icon` is the resolved glyph name, or the

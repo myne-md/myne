@@ -32,7 +32,7 @@ import {
   createNote,
   dismissImporterOffer,
   enableDeveloperMode,
-  openSettings,
+  excludeFolderFromAi,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
@@ -175,33 +175,23 @@ describeE2E("aux2 the excluded-folders picker writes the list the AI honors", ()
         // this the `settings.tab-ai` click waits its full budget and throws, which
         // is exactly how `aux1` was failing before it gained the same line.
         await enableDeveloperMode(s);
+        // **And the modal it leaves open covers the sidebar.** `enableDeveloperMode`
+        // deliberately leaves Settings OPEN on About, so the create buttons behind
+        // its backdrop are in the DOM and not hit-testable: `createNote` below used
+        // to spend its whole budget on `waitUntil(element interactable + clicked)`
+        // with `notes.create` present the entire time, which is why this scenario
+        // never ran. Close it before driving anything in the sidebar.
+        await closeSettings(s);
         await createNote(s, "aux2notealfa7k2m9qx4w8e5rj0aa");
         await createFolder(s, "Private");
 
-        await openSettings(s, "ai");
-        await s.waitForElement(testIdSelector("settings.ai-panel"), { timeoutMs: 15_000 });
-
         // With a folder in the vault the picker is offered; with none it is
         // omitted rather than disabled (the omit-don't-disable posture), which is
-        // the state a fresh vault shows.
-        const picker = await s.byTestId("ai.excluded-folders-picker", {
-          timeoutMs: 15_000,
-        });
-        await picker.click();
-        const option = await s.waitForElement(
-          testIdSelector("ai.excluded-folders-picker-option", { "data-value": "Private/" }),
-          { timeoutMs: 10_000 },
-        );
-        await option.click();
-
-        // The box gained the line, which is what the user sees, and the line is
-        // the canonical trailing-slash form the store keeps.
-        const box = await s.byTestId("ai.excluded-folders");
-        await s.waitUntil(
-          async () => ((await box.attribute("value")) ?? "").includes("Private/") ? true : null,
-          { label: "the box carries the picked folder", timeoutMs: 10_000 },
-        );
-        await closeSettings(s);
+        // the state a fresh vault shows. The flow itself lives in
+        // `excludeFolderFromAi` (it opens Settings on the AI tab and closes it
+        // again), shared with `ai-chat.e2e.ts` ac2, so the two scenarios cannot
+        // describe the control differently.
+        await excludeFolderFromAi(s, "Private/");
       },
     );
   });

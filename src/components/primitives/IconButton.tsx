@@ -15,12 +15,16 @@
 // #772 lane 2c). Left as-is here on purpose: swapping it is a call-site
 // migration with its own issue, not a side effect of the CSS move.
 
+import type { Ref } from "react";
 import { Icon } from "./Icon";
 import { Tooltip } from "./Tooltip";
 import type { IconName } from "../../lib/icons";
 import { MIN_TARGET } from "./targetSize";
 
 interface IconButtonProps {
+  /** The button itself. React 19 passes `ref` as a prop, the same shape
+   *  `Button.tsx` and `Input.tsx` already declare. */
+  ref?: Ref<HTMLButtonElement>;
   icon: IconName;
   /** Accessible label — used for both `aria-label` and the hover `title`. */
   label: string;
@@ -43,6 +47,16 @@ interface IconButtonProps {
   /** Emits `aria-expanded`, for a control that opens a panel or menu. */
   expanded?: boolean;
   /**
+   * Mirror `label` into the native `title` (default true).
+   *
+   * `HelperDisclosure` is the one caller that passes `false`: its trigger opens
+   * its own popover on hover, so the OS chip arriving over that popover a
+   * second later is a second surface saying the same thing, which is the
+   * duplication the tooltip convention exists to remove. The `aria-label`
+   * never depends on this either way.
+   */
+  nativeTitle?: boolean;
+  /**
    * Show the label in a `<Tooltip>` rather than the native `title`
    * (myne-md/myne#775: ~1s delay, unstyled OS chip, clips at the window edge,
    * never appears on keyboard focus). Opt-in for now because wrapping every
@@ -53,6 +67,7 @@ interface IconButtonProps {
 }
 
 export function IconButton({
+  ref,
   icon,
   label,
   onClick,
@@ -62,10 +77,12 @@ export function IconButton({
   bordered = false,
   active,
   expanded,
+  nativeTitle = true,
   tooltip = false,
 }: IconButtonProps) {
   const button = (
     <button
+      ref={ref}
       type="button"
       className="myne-icon-btn"
       data-bordered={bordered ? "true" : undefined}
@@ -82,7 +99,7 @@ export function IconButton({
       // The native attribute stays only on the un-tooltipped path, and only
       // until the call sites convert; `check-tooltip-convention.mjs` records
       // this file as exempt with that reason.
-      title={tooltip ? undefined : label}
+      title={tooltip || !nativeTitle ? undefined : label}
     >
       <Icon name={icon} size={iconSize} />
     </button>

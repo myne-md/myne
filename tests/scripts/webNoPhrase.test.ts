@@ -19,7 +19,20 @@ function run(contents: string): { code: number; output: string } {
   mkdirSync(join(scratch, "web", "dist"), { recursive: true });
   writeFileSync(join(scratch, "web", "dist", "app.js"), contents, "utf8");
   try {
-    const output = execFileSync("node", [GUARD], { cwd: scratch, encoding: "utf8" });
+    // `stdio: "pipe"` rather than the default, and the reason is the one shape a
+    // green suite must not have: `execFileSync` writes a failed child's stderr
+    // straight through to the parent's stderr whenever no `stdio` option is given
+    // (`child_process.js`: `const inheritStderr = !options.stdio`), so the guard's
+    // finding here, which is a deliberately poisoned fixture rather than a real
+    // violation, printed inside a passing `pnpm test` run and read like one. With
+    // `stdio` set the write-through is skipped and the stderr is still captured
+    // into `failure.stderr` below, which is what the assertions read, so the
+    // assertion is unchanged rather than weakened.
+    const output = execFileSync("node", [GUARD], {
+      cwd: scratch,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
     return { code: 0, output };
   } catch (error) {
     const failure = error as { status: number; stdout: string; stderr: string };

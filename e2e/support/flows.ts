@@ -7,7 +7,7 @@
 
 import { expect } from "vitest";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
-import { KEY, activeTestId, pressKey } from "./keyboard";
+import { KEY, activeTestId, pressChord, pressKey } from "./keyboard";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -467,7 +467,29 @@ export async function openSettings(
   // ai-embeddings-persistence and transcription were all failing in CI on this
   // one line.
   if ((await session.byTestIdAll("settings.modal")).length === 0) {
-    await (await session.byTestId("editor.settings-cta")).click();
+    // The gear lives on the BOTTOM BAR, and the bar is removable: hiding every
+    // item from Settings → Appearance → Bottom bar takes the bar AND the gear
+    // with it (myne-md/myne#773). The keyboard route is the app's second entry
+    // point and the only one left in that state, so fall back to it rather than
+    // waiting the full budget for a control the user deliberately removed.
+    const [cta] = await session.byTestIdAll("editor.settings-cta");
+    if (cta !== undefined) {
+      await cta.click();
+    } else {
+      // `app.open-settings`'s default binding (`Mod-,`; Mod is Ctrl here). The
+      // chord needs focus somewhere the window listener hears, and the control
+      // that held it is the one just removed, so re-fire until the modal is up.
+      // The modal check runs FIRST because the binding is a toggle: a chord sent
+      // while Settings is open would close it again.
+      await session.waitUntil(
+        async () => {
+          if ((await session.byTestIdAll("settings.modal")).length > 0) return true;
+          await pressChord(session, KEY.CONTROL, ",");
+          return (await session.byTestIdAll("settings.modal")).length > 0 ? true : null;
+        },
+        { label: "Settings opened via the keyboard route", timeoutMs: 15_000 },
+      );
+    }
     await session.byTestId("settings.modal");
   }
   if (tab && tab !== "account") {
@@ -575,6 +597,9 @@ async function setSettingsSwitch(
     /** Waited for before the toggle, where the panel has a root of its own — it
      *  fails on the PANEL rather than on a toggle the panel never rendered. */
     panelTestId?: string;
+    /** An in-panel TOPIC to open first, for a panel whose controls are split into
+     *  topics (myne-md/myne#885). Omitted for the single-screen panels. */
+    topicId?: string;
     toggleTestId: string;
     enabled: boolean;
     label: string;
@@ -583,6 +608,9 @@ async function setSettingsSwitch(
   const want = opts.enabled ? "true" : "false";
   await openSettings(session, opts.tab);
   if (opts.panelTestId !== undefined) await session.byTestId(opts.panelTestId);
+  if (opts.topicId !== undefined) {
+    await selectSettingsTopic(session, opts.tab, opts.topicId);
+  }
   // Re-fetched on every read: the handle goes stale across a panel re-render.
   const checked = async () =>
     await (await session.byTestId(opts.toggleTestId)).attribute("aria-checked");
@@ -621,6 +649,11 @@ export async function setViewsEnabled(
 ): Promise<void> {
   await setSettingsSwitch(session, {
     tab: "editor",
+    // Views is a FEATURE switch, so it lives in the Editor panel's `features`
+    // topic since myne-md/myne#885. Only the active topic's body is mounted, so
+    // a caller that skipped this would burn its budget on a toggle that is not
+    // on screen.
+    topicId: "features",
     toggleTestId: "settings.views-enabled",
     enabled,
     label: "views_enabled",
@@ -729,6 +762,70 @@ export async function enableAi(session: Session): Promise<void> {
     enabled: true,
     label: "ai_enabled",
   });
+}
+
+/** Select an in-panel TOPIC in the Settings modal (myne-md/myne#885).
+ *
+ *  The strip is rendered by the shell above the selected panel, and only the
+ *  active topic's body is mounted, so a scenario that reaches a control in any
+ *  topic other than the panel's first has to open it first. A helper that WAITS
+ *  for a surface without OPENING it fails every scenario at the same line and
+ *  reads as a flake (`e2e/AGENTS.md`), so this clicks the tab and then waits for
+ *  the panel it controls, which makes the wait the assertion that opening worked.
+ *
+ *  Caller owes the modal being open on `panelId` (`openSettings(session, panelId)`). */
+export async function selectSettingsTopic(
+  session: Session,
+  panelId: SettingsTab,
+  topicId: string,
+): Promise<void> {
+  await clickByTestId(session, `settings.${panelId}-tab-${topicId}`, { timeoutMs: 15_000 });
+  await session.waitForElement(testIdSelector(`settings.${panelId}-topic-${topicId}`), {
+    timeoutMs: 15_000,
+  });
+}
+
+/** Add one folder to the AI panel's excluded-folders list through the picker,
+ *  leaving Settings closed (myne-md/myne#848).
+ *
+ *  **The picker, not the setter.** The textarea beside it stays the authority (a
+ *  pasted list still works, and an exclusion is a privacy control that must not
+ *  depend on a convenience), so a scenario that wrote the pref directly would
+ *  prove the clamp and nothing about the control a user has. This drives the
+ *  route the user takes, which is why it was extracted rather than repeated:
+ *  `ai-ux-surface.e2e.ts` aux2 is ABOUT this control and `ai-chat.e2e.ts` ac2
+ *  needs the state it produces.
+ *
+ *  **The box is the gate, and it is a write-landed gate.** Picking commits
+ *  inside the panel (`AiPanel.appendExcludedFolder` calls its own
+ *  `commitExcluded`), so the line appearing in the box and the pref landing are
+ *  the same event rather than two things that happen to follow each other.
+ *
+ *  `folderPath` is the canonical trailing-slash form the store keeps
+ *  (`Private/`), which is also what each option carries as its `data-value`.
+ *  Caller owes `enableAi` first: the control is disabled while AI is off. */
+export async function excludeFolderFromAi(
+  session: Session,
+  folderPath: string,
+): Promise<void> {
+  await openSettings(session, "ai");
+  await session.waitForElement(testIdSelector("settings.ai-panel"), { timeoutMs: 15_000 });
+  // The editor is a LIMIT, so it lives in the Limits topic since
+  // myne-md/myne#885.
+  await selectSettingsTopic(session, "ai", "limits");
+  const picker = await session.byTestId("ai.excluded-folders-picker", { timeoutMs: 15_000 });
+  await picker.click();
+  const option = await session.waitForElement(
+    testIdSelector("ai.excluded-folders-picker-option", { "data-value": folderPath }),
+    { timeoutMs: 10_000 },
+  );
+  await option.click();
+  const box = await session.byTestId("ai.excluded-folders");
+  await session.waitUntil(
+    async () => (((await box.attribute("value")) ?? "").includes(folderPath) ? true : null),
+    { label: `the excluded-folders box carries ${folderPath}`, timeoutMs: 10_000 },
+  );
+  await closeSettings(session);
 }
 
 /** Click the element carrying `testId`, RE-LOCATING it on every poll.
@@ -1027,6 +1124,9 @@ export async function setAutoTagEnabled(session: Session, enabled: boolean): Pro
   await setSettingsSwitch(session, {
     tab: "ai",
     panelTestId: "settings.ai-panel",
+    // The auto-tag switch is a section of the Models topic, beside the table
+    // that holds the tag role's own row (myne-md/myne#867).
+    topicId: "models",
     toggleTestId: "ai.auto-tag-toggle",
     enabled,
     label: "auto_tag_enabled",
@@ -1986,6 +2086,36 @@ export async function waitForSaved(session: Session): Promise<void> {
       (await (await session.byTestId("editor.save-status")).textContent()).includes("Saved·") ||
       null,
     { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
+  );
+}
+
+/**
+ * Wait until a banner's RENDERED text equals `expected` (full-literal equality),
+ * re-reading on every poll.
+ *
+ * **`byTestId` resolves the moment the element is in the DOM, and WebKit's
+ * `GET /text` can answer `""` for an element whose render tree has not caught
+ * up.** Measured on the picker-reached unlock: the error banner is present,
+ * `textContent` and `innerText` already carry the copy, and `/text` returns `""`
+ * on the first read and the copy ~1.5 s later. A one-shot `banner.text()`
+ * therefore fails on timing rather than on behaviour, and the failure reads
+ * exactly like a missing banner (`expected '' to be 'Wrong password…'`). Polling
+ * the read makes the wait the assertion: a banner that never carries the copy
+ * still fails, and the element is re-found each poll so a replaced node cannot
+ * leave a stale handle behind.
+ */
+export async function waitForBannerText(
+  session: Session,
+  testId: string,
+  expected: string,
+): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.findElements(testIdSelector(testId));
+      if (el === undefined) return null;
+      return (await el.text()) === expected ? true : null;
+    },
+    { label: `${testId} reads its full literal`, timeoutMs: 15_000 },
   );
 }
 

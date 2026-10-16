@@ -13,7 +13,7 @@
 // framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { mutationFrom } from "../../lib/prefs";
 import { useTranslation } from "react-i18next";
@@ -41,6 +41,8 @@ import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import { MemberPasswordSettings } from "./MemberPasswordSettings";
 import { RecoveryDrillRow } from "./RecoveryDrillRow";
 import { SettingRow } from "./SettingRow";
+import { SettingsTopicPanel } from "./SettingsTabs";
+import { SettingsSection } from "./SettingsSection";
 import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
@@ -255,12 +257,6 @@ function AutoLockRow({ seconds, onChange }: AutoLockRowProps) {
 // `scripts/check-twin-drift.mjs` can see the pair.
 
 /** The two bound sentences, stacked. Token-valued throughout. */
-const DISCLOSURE_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-1)",
-};
-
 function HideVaultNamesRow() {
   const { t } = useTranslation();
   const [hidden, setHidden] = useState(false);
@@ -333,22 +329,44 @@ function HideVaultNamesRow() {
       testId="settings.hide-vault-names"
       stateAttrs={{ "data-hidden": String(hidden), "data-keychain": keychain }}
       label={t("settings.privacy.hideVaultNamesLabel")}
-      helper={t("settings.privacy.hideVaultNamesHelper")}
-      control={(helperId) => (
+      // The critical sentence, and ONLY it (myne-md/myne#885). The row used to
+      // render 776 characters across four paragraphs under this label; the
+      // helper's own paragraph and the two that followed it move behind the
+      // question mark beside the label, unchanged, and this is the one sentence
+      // the row needs.
+      //
+      // **The sentence kept is the DESTRUCTIVE one**, and the choice is the
+      // point rather than a preference. The three moved paragraphs include the
+      // residue caveat and the placeholder explanation, which are qualifications;
+      // this one is the act. `hideVaultNamesRow.test.tsx` has held since #411
+      // that a bound on a destructive switch may not be hidden behind an
+      // interaction, and the move does not overturn that: the warning stays on
+      // the row, and what goes behind the question mark is the detail around it.
+      helper={t("settings.privacy.hideVaultNamesInline")}
+      // The moved paragraphs, verbatim: the same keys and the same English in a
+      // different slot, so nothing here went stale in translation.
+      explanation={[
+        t("settings.privacy.hideVaultNamesHelper"),
+        t("settings.privacy.hideVaultNamesErases"),
+        t("settings.privacy.hideVaultNamesResidue"),
+      ]}
+      control={(helperId, explanationId) => (
         <Switch
           checked={hidden}
           onChange={busy ? undefined : (next) => void toggle(next)}
           ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
-          ariaDescribedBy={helperId}
+          // Both descriptions: the sentence on the row and the copy behind the
+          // question mark. A screen reader reads the whole explanation without
+          // the disclosure ever being opened.
+          ariaDescribedBy={
+            explanationId === undefined
+              ? helperId
+              : `${helperId} ${explanationId}`
+          }
           testId="settings.hide-vault-names-toggle"
         />
       )}
     >
-      <div style={DISCLOSURE_STYLE} data-testid="settings.hide-vault-names-disclosure">
-        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesErases")}</p>
-        <p style={HELPER_STYLE}>{t("settings.privacy.hideVaultNamesResidue")}</p>
-      </div>
-
       {keychain === "unavailable" && (
         <p style={HELPER_STYLE} data-testid="settings.hide-vault-names-unavailable">
           {t("settings.privacy.hideVaultNamesUnavailable")}
@@ -437,6 +455,30 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
+      {/* **Access**: who or what can get at the notes. Three rows about a human
+          looking at this machine - what the screen shows, whether this device
+          may be captured, and whether the lock screen names the vault - plus the
+          terminal block below.
+
+          The terminal is here rather than in a topic of its own. It is the
+          panel's third concern on its own terms, but it is omitted whenever
+          Developer mode is off or `cliAccess` is absent, and the strip renders
+          the roster rather than the filtered set: a topic of its own would draw
+          a tab whose body is empty. `Access` is the question all four blocks
+          answer, so it is the topic that can always hold it. That is also why
+          the block moved up from the panel's tail, which is the row-order change
+          this grouping requires.
+
+          Each topic's body keeps the indentation of the code it replaced, the
+          convention the AI panel set, so the diff is about which rows moved
+          rather than about whitespace. */}
+      <SettingsTopicPanel panelId="privacy" topicId="access">
+      {/* Two sections (myne-md/myne#885 visual pass): the three rows about a
+          human looking at this machine, and the terminal block, which is its own
+          trust boundary. The terminal section is gated WITH its block, so on a
+          client or a vault where it is hidden the screen section is the topic's
+          only one and draws no heading (`SettingsSectionCounter`). */}
+      <SettingsSection title={t("settings.privacy.sections.screen")}>
       {/* Gated on the capability, because a page cannot stop a screenshot
           (myne-md/myne#556). `web/src/platform/capabilities.ts` has listed
           `screenCaptureProtection` in its ABSENT set all along; rendered
@@ -447,8 +489,8 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           `decisions.md` 2026-07-26 makes normative for an absent capability: a
           greyed control is an offer the platform cannot honour.
 
-          The row's own superseded/override states are a DIFFERENT question —
-          they say why a capability the client HAS is not governing right now —
+          The row's own superseded/override states are a DIFFERENT question -
+          they say why a capability the client HAS is not governing right now -
           so they do not stand in for this gate, and the override row below
           carrying the same `has()` is not this row's gate either. Reading that
           one as this one is how the gate came to be dropped in a merge. */}
@@ -502,24 +544,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           Gated on `lockedVaultNames` only, never on `developer_mode` (see the
           block comment above the row). On desktop that gate is always open. */}
       {has("lockedVaultNames") && <HideVaultNamesRow />}
-      <AutoLockRow
-        seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
-        onChange={(secs) => {
-          void setAutoLock(secs);
-        }}
-      />
-      <QuickUnlockSettings />
-      <MemberPasswordSettings />
-      {/* The recovery drill (myne-md/myne#468). In Privacy rather than Account
-          because what it protects is the ability to get back IN, which is the
-          same family as the auto-lock and quick-unlock rows it sits beside, and
-          because Account is where the vault's NAME and number live — a phrase
-          field there would read as another identifier to manage.
-
-          Ungated: it needs no capability the web client lacks (the command is
-          `myne-core`'s and the web dispatcher routes it), and it is not behind
-          Developer mode because a first-time user is exactly who it is for. */}
-      <RecoveryDrillRow />
+      </SettingsSection>
       {/* CLI terminal access (cli-thin-client task 12, MYND-490). Omitted where
           `cliAccess` is absent rather than greyed out: a browser tab cannot host
           a terminal's Unix socket, and the sidecar it would talk to is a file
@@ -527,15 +552,16 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           set" makes omission normative).
 
           Behind Developer mode as well (#181): the block opens the unlocked
-          vault to an EXTERNAL terminal process over the local command socket —
+          vault to an EXTERNAL terminal process over the local command socket -
           a separate trust boundary, and Myne does not vouch for what walks
           through it. That is the Developer group's whole membership test, so
           this belongs behind the same deliberate door as AI and Tor even
           though it keeps its home in Privacy. The gate HIDES, it does not
           disable: turning Developer mode back off leaves an enabled socket
-          serving, exactly as it leaves `ai_enabled` set — the off switch for
+          serving, exactly as it leaves `ai_enabled` set - the off switch for
           the feature is its own control. */}
       {prefs.developer_mode && has("cliAccess") && (
+        <SettingsSection title={t("settings.privacy.sections.terminal")}>
         <CliAccessSettings
           enabled={prefs.cli_enabled}
           excludedFolders={prefs.cli_excluded_folders}
@@ -557,7 +583,42 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
             void setCliRateLimitDisabled(next);
           }}
         />
+        </SettingsSection>
       )}
+      </SettingsTopicPanel>
+
+      {/* **Locking**: how the vault locks and how you get back in. The recovery
+          drill is here rather than in Account because what it protects is the
+          ability to get back IN, the same family as the auto-lock and
+          quick-unlock rows it sits beside. */}
+      <SettingsTopicPanel panelId="privacy" topicId="locking">
+      {/* Two sections (myne-md/myne#885): how the vault locks and reopens, and
+          the one control that checks you can still get back in. The second is
+          separated because it is a check rather than a setting, which is the
+          distinction the row's own comment already draws. */}
+      <SettingsSection title={t("settings.privacy.sections.locking")}>
+      <AutoLockRow
+        seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
+        onChange={(secs) => {
+          void setAutoLock(secs);
+        }}
+      />
+      <QuickUnlockSettings />
+      <MemberPasswordSettings />
+      </SettingsSection>
+      <SettingsSection title={t("settings.privacy.sections.recovery")}>
+      {/* The recovery drill (myne-md/myne#468). In Privacy rather than Account
+          because what it protects is the ability to get back IN, which is the
+          same family as the auto-lock and quick-unlock rows it sits beside, and
+          because Account is where the vault's NAME and number live - a phrase
+          field there would read as another identifier to manage.
+
+          Ungated: it needs no capability the web client lacks (the command is
+          `myne-core`'s and the web dispatcher routes it), and it is not behind
+          Developer mode because a first-time user is exactly who it is for. */}
+      <RecoveryDrillRow />
+      </SettingsSection>
+      </SettingsTopicPanel>
     </div>
   );
 }

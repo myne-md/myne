@@ -38,7 +38,7 @@
 // carry is therefore "a link only where the vault holds the target", not "no
 // links at all": a wikilink to something the vault does not hold, a folder
 // target and an alias all stay the plain label they were. The bound, and why the
-// candidate set is the vault's rather than the run's, is `decisions/ai/0678`.
+// candidate set is the vault's rather than the run's, is `decisions/ai/0690`.
 
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -182,12 +182,20 @@ function renderInline(tokens: readonly Inline[], ctx: MentionContext): ReactNode
           </span>
         );
       case "wikilink": {
-        // The note the TARGET names, rendered over the author's displayed
-        // label. A chat bubble used to render every wikilink as plain text, on
+        // The note the TARGET names, when the link shows that same name. A chat
+        // bubble used to render every wikilink as plain text, on
         // the reasoning that a model quoting `[[x]]` is quoting rather than
         // linking; myne-md/myne#867 supersedes that for a target the vault
         // actually holds, and leaves it standing for one it does not.
-        const uuid = wikilinkNote(tok.target, ctx);
+        //
+        // **An aliased wikilink stays plain text** (myne-md/myne#867 review,
+        // D3). `[[Private/Bank|Summary of your trip]]` would otherwise show one
+        // name and open another, and on a surface prompt injection can reach,
+        // a link whose visible text and destination disagree is exactly the
+        // exposure decision 0690 rules out. A link here names, in its own text,
+        // the note it opens; `noteMentions.ts`'s header states the same bound.
+        const aliased = tok.label !== tok.target;
+        const uuid = aliased ? undefined : wikilinkNote(tok.target, ctx);
         if (uuid === undefined || ctx.onOpenNote === undefined) {
           return <span key={i}>{tok.label}</span>;
         }

@@ -800,6 +800,134 @@ mod resolve_engine_tests {
         );
     }
 
+    /// A working local engine with a half-configured provider must report
+    /// generation as AVAILABLE, because it is (myne-md/myne#867 review).
+    ///
+    /// `remote_refusal` answers "why is the named provider not the arm that
+    /// answers", and `active()` falls back to the LOCAL arm for every one of its
+    /// causes. Taking the refusal first therefore reported `available: false`
+    /// for a vault whose generation demonstrably works, which is a report
+    /// contradicting the routing it reports on. The refusal is the better CAUSE
+    /// only where the local arm cannot serve either, which the next test pins.
+    #[test]
+    fn a_working_local_engine_keeps_generation_available_under_a_half_configured_provider() {
+        use commands::capability_report_from;
+        use state::{Backend, BackendClass, LocalInferenceState, PrefsSnapshot};
+
+        let vault = myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-0000000000bb")
+            .expect("id");
+        let state = LocalInferenceState::with_backends(
+            vec![
+                Backend::new(
+                    "in-process",
+                    BackendClass::InProcessLocal,
+                    std::sync::Arc::new(engine::StubEngine),
+                ),
+                Backend::new(
+                    "fake-remote",
+                    BackendClass::Remote,
+                    std::sync::Arc::new(engine::StubEngine),
+                ),
+            ],
+            "in-process",
+        )
+        .with_active_vault_reader(std::sync::Arc::new(move || Some(vault)));
+
+        // A provider IS named with a model chosen, and the one thing missing is
+        // consent. So `remote_refusal` is `Some(ConsentMissing)` while the local
+        // arm is the one that answers.
+        let prefs = protocol::PrefsView {
+            ai_enabled: true,
+            ai_provider: Some("openrouter".into()),
+            ai_provider_model: Some("some/model".into()),
+            ..protocol::PrefsView::default()
+        };
+        *state.snapshot_cell().write().expect("cell") = Some(PrefsSnapshot {
+            prefs,
+            vault_id: Some(vault),
+        });
+        assert_eq!(
+            state.remote_refusal(),
+            Some(error::EngineError::ConsentMissing),
+            "the fixture must actually reach the refusal, or it proves nothing"
+        );
+        assert_eq!(
+            state.active_class(),
+            BackendClass::InProcessLocal,
+            "the refusal must fall back to the local arm, or the case is not this one"
+        );
+
+        // No local model FILE, and the stub carries its own weights, so the local
+        // arm can serve: generation works.
+        let report = capability_report_from(&state, false, false, false, false);
+        assert!(
+            report.generation.available,
+            "a working local arm must keep generation available (cause: {:?})",
+            report.generation.cause
+        );
+    }
+
+    /// And where the local arm CANNOT serve either, the provider's refusal is the
+    /// cause to report: it names what the user can act on (accept the consent)
+    /// rather than the local arm's `no_model`, which is not why they cannot send.
+    #[test]
+    fn an_unserved_local_arm_reports_the_provider_refusal_as_the_cause() {
+        use commands::capability_report_from;
+        use state::{Backend, BackendClass, LocalInferenceState, PrefsSnapshot};
+
+        /// The `CandleEngine` shape: no weights of its own, so the disk decides.
+        struct DiskBacked;
+        impl engine::Engine for DiskBacked {
+            fn infer(&self, _p: &str) -> Result<String, error::EngineError> {
+                Ok("local".into())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, error::EngineError> {
+                Ok(vec![0.0])
+            }
+            fn tag_model_available(&self) -> bool {
+                true
+            }
+        }
+
+        let vault = myne_core::vault_id::VaultId::parse("018f0000-0000-7000-8000-0000000000cc")
+            .expect("id");
+        let state = LocalInferenceState::with_backends(
+            vec![
+                Backend::new(
+                    "in-process",
+                    BackendClass::InProcessLocal,
+                    std::sync::Arc::new(DiskBacked),
+                ),
+                Backend::new(
+                    "fake-remote",
+                    BackendClass::Remote,
+                    std::sync::Arc::new(engine::StubEngine),
+                ),
+            ],
+            "in-process",
+        )
+        .with_active_vault_reader(std::sync::Arc::new(move || Some(vault)));
+
+        let prefs = protocol::PrefsView {
+            ai_enabled: true,
+            ai_provider: Some("openrouter".into()),
+            ai_provider_model: Some("some/model".into()),
+            ..protocol::PrefsView::default()
+        };
+        *state.snapshot_cell().write().expect("cell") = Some(PrefsSnapshot {
+            prefs,
+            vault_id: Some(vault),
+        });
+
+        let report = capability_report_from(&state, false, false, false, false);
+        assert!(!report.generation.available);
+        assert_eq!(
+            report.generation.cause,
+            Some("consent_missing"),
+            "the cause must name the provider's missing consent, not the local arm"
+        );
+    }
+
     /// A missing model is `no_model`, not a bar — the two reasons a feature is
     /// unavailable must stay distinguishable, which is the whole reason the
     /// report carries a cause rather than a boolean.
