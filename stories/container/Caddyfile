@@ -85,12 +85,19 @@
 		# and `same-origin` is the tighter of the two.
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "same-origin"
-		# HSTS is deliberately NOT here. It is a property of the HTTPS origin and
-		# this container terminates no TLS — the edge does
-		# (`operations/deploy/caddy/design.myne.md.caddy`), and the header belongs
-		# where the certificate is. `app.example.com`'s container sets it because it
-		# also owns the TLS story for a self-hoster; a self-hoster running the
-		# catalogue is not a thing, so there is no such reason here.
+		# HSTS is set HERE rather than at the edge, which is the posture
+		# `web/container/Caddyfile` already takes and `check-web-container-headers.sh`
+		# already requires. The container is the authority on the WHOLE header set
+		# and `app.example.com.caddy` deliberately adds none, so the two cannot drift
+		# into "the edge is stricter about one header than the image it fronts" —
+		# the failure the neighbouring block records for X-Frame-Options. The edge
+		# terminates TLS; this header is forwarded through it and read by the
+		# browser over https. The catalogue's own first draft put HSTS at the edge
+		# on the reasoning that it is a TLS-origin property, and that reasoning is
+		# right about browsers and wrong about this deployment: it left the header
+		# set by nobody, since the edge imports no `(secure-headers)` snippet for
+		# the reason above.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 
 	# The entry document is never cached: it is how a reader picks up a rebuilt
