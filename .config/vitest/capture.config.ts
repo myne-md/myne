@@ -1,6 +1,6 @@
 // Vitest config for the user-guide screenshot CAPTURE pass.
 //
-// Separate from both `vitest.config.ts` (unit) and `vitest.e2e.config.ts`
+// Separate from both `vitest.config.ts` (unit) and `.config/vitest/e2e.config.ts`
 // (E2E suite). The capture pass rides the same tauri-driver harness but
 // is NOT a test — it produces PNGs for the guide-golive screenshot gate
 // (MYND-252). It lives under `e2e/capture/*.capture.ts` so `pnpm test:e2e`

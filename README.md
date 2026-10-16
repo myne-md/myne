@@ -75,6 +75,22 @@ myne/
 
 The desktop client lives at the repo root rather than under `apps/`. A one-child `apps/desktop/` would be needless nesting. The **web** and **mobile** clients live in-repo too (`web/`, `mobile/`), and for the same reason recorded in [`design-notes.md`](design-notes.md) (2026-07-26 for web, 2026-08-13 for mobile): each compiles the same `src/` tree, and a cross-repo split would mean publishing that tree as a versioned package, reintroducing exactly the drift the shared tree exists to prevent. The Rust crates named in [`Cargo.toml`](Cargo.toml)'s `members` list (the desktop core, `protocol/`, `core/`, `format/`, `decrypt/`, `cli/`, `tor-sidecar/`, the mobile crate and its plugins, and the wasm entry crates among them) are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile. `Cargo.toml`'s `members` list is the roster of record.
 
+### Why the repository root is file-heavy
+
+Almost every file at the root is there because a tool looks for it **by name**, not because nobody tidied up. Moving one is a silent breakage, so the list is deliberate — and it is worth reading before proposing a reorganisation:
+
+| Root file(s) | Why it cannot move |
+| --- | --- |
+| `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml` | the Cargo workspace root, the single auditable lockfile ([`LICENSING.md`](LICENSING.md)), and the two files `cargo` and `cargo-deny` discover at the workspace root |
+| `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` | the pnpm workspace root; `pnpm` resolves its members from here |
+| `index.html`, `pdf-export.html`, `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `tsconfig.node.json` | Vite's root is the current directory, so its HTML entry points must sit here; `vitest.config.ts` is discovered by name, which is what every bare `vitest run` in this tree depends on |
+| `tsconfig.tests.json` | the typecheck for the trees the shipped-code `tsconfig.json` deliberately excludes (`tests/`, `e2e/`, `e2e-web/`) |
+| `lefthook.yml`, `opencode.json`, `i18next.config.js` | git-hook, agent-harness and i18n-extractor configuration, each discovered by filename |
+| `flake.nix`, `flake.lock` | the Nix devshell; `nix develop` reads a flake from the repository root |
+| `README.md`, `LICENSE`, `LICENSING.md`, `SECURITY.md`, `AGENTS.md` | the files GitHub and contributor tooling render or look for at a root |
+| `PRODUCT.md`, `DESIGN.md`, `DESIGN.json` | the strategy and the visual system, read from the root by the design workflow and projected against [`docs/design/`](docs/design/) |
+| `.config/` | tool configuration that has **no** name-discovery constraint, which is why it is the one directory holding it: `nextest.toml` for `cargo-nextest`, and `vitest/` for the five test lanes that are not the default one |
+
 ## Development
 
 Pinned toolchains: Node ([`.nvmrc`](.nvmrc)), Rust ([`rust-toolchain.toml`](rust-toolchain.toml)). `pnpm` is the canonical package manager; do not bypass the pinning.

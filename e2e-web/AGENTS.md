@@ -184,7 +184,7 @@ knocking on a port nobody opened. One driver per band, or
 | `MYNE_WEB_E2E_BUNDLE_DIR` | bundle to serve; defaults to `web/dist` |
 | `MYNE_WEB_E2E_BROWSER` | `chrome` \| `firefox` \| `safari` (`safari`: macOS host only); defaults to `chrome` |
 | `MYNE_WEB_E2E_HEADED` | `1` runs the browser headed, for local debugging; headless otherwise (CI has no display) |
-| `MYNE_WEB_E2E_SHARDS` | parallel worker slots (default 2); read by both `vitest.web-e2e.config.ts` and the runner's driver count, from the same variable so they cannot disagree |
+| `MYNE_WEB_E2E_SHARDS` | parallel worker slots (default 2); read by both `.config/vitest/web-e2e.config.ts` and the runner's driver count, from the same variable so they cannot disagree |
 | `MYNE_WEB_E2E_QUARANTINE` | `1` runs ONLY `describeE2E.flaky` scenarios |
 
 ## Skipping is honest here, deliberately
@@ -233,7 +233,7 @@ settles any argument with this section):
   present while `liveCollabMultiUser` is absent. Single session, no server
   convergence, the real two-browser co-edit is a manual item).
 - **Runners and config**: `scripts/e2e-web-local.sh`, `scripts/e2e-web-one.sh`,
-  `vitest.web-e2e.config.ts`, `pnpm test:e2e:web`.
+  `.config/vitest/web-e2e.config.ts`, `pnpm test:e2e:web`.
 
 Still outstanding, and worth knowing before you plan work:
 

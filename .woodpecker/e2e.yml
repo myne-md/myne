@@ -317,7 +317,7 @@ steps:
   # since the case it exists for is precisely the one where `e2e` "passed".
   #
   # It depends on `e2e` and NOT on `e2e-quarantine`, which it never reads:
-  # `vitest.e2e.config.ts` writes the two lanes to separate report files and
+  # `.config/vitest/e2e.config.ts` writes the two lanes to separate report files and
   # this runs `--lane stable`. Waiting for the quarantine lane would put the
   # only blocking verdict in this workflow behind a whole second container.
   e2e-floor:
