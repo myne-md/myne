@@ -45,7 +45,7 @@ const V = {
   ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
-    "Ships; the clipper block is capability-gated AND its module is substituted, and vault delete is task 72's open decision.",
+    "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",
   ],
   "src/components/settings/AiPanel.tsx": [
     "adapted",
@@ -102,6 +102,10 @@ const V = {
   "src/components/settings/CliAccessSettings.tsx": [
     "adapted",
     "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher. The panel adds a second, independent gate on the `developer_mode` preference (#181), which changes nothing here — the capability gate already omits the block on every web build.",
+  ],
+  "src/components/settings/CliPanel.tsx": [
+    "adapted",
+    "Never rendered: the panel is a `developer`-group rail entry carrying `capability: \"cliAccess\"`, which is absent on web, so the rail drops it and nothing here ever mounts. It ships in the bundle (it is the composition root for the CLI block, one small file inside the settings chunk that does ship) and the block it renders carries the same capability gate. Moved out of PrivacyPanel by `decisions/ui/0678`; the web verdict is unchanged by the move, since the capability gate was already what kept the terminal surface off this client.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/HelperDisclosure.tsx": [
@@ -213,6 +217,10 @@ const V = {
   "src/components/settings/ToolbarCustomizeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/TypographySettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/ViewsSettings.tsx": ["ported", "Device-local Views feature toggle (localStorage, like the language picker); runs as written."],
+  "src/components/settings/VaultPanel.tsx": [
+    "adapted",
+    "Ships: label, icon, change password and the danger zone are all host-backed and all reachable in the browser. The danger-zone copy branches on `localOnlyVault` (absent on web), so the browser gets the sign-out-and-erase variant rather than the destroy-everywhere promise (task 72's decision), and the member-vault notice follows the vault kind the probe answers.",
+  ],
   "src/components/settings/VimModeSettings.tsx": [
     "ported",
     "Prefs-backed. Mounted only while `developer_mode` is on since #181 — the same condition on both clients, so still `ported` rather than `adapted`: nothing about the component differs here, only whether EditorPanel renders it.",
@@ -525,6 +533,10 @@ const V = {
   ],
   "src/hooks/useConflictMaterializer.ts": ["ported", "Keep-both conflict drain; the sync engine is shared."],
   "src/hooks/useDevices.ts": ["ported", "Device roster; the commands are dispatched (task 69)."],
+  "src/hooks/useMemberVault.ts": [
+    "typed-unsupported",
+    "Which account plane the active vault speaks for (myne-md/myne). `sync_member_vault_status` is a sync-plugin command and the web dispatcher answers it with a typed refusal (`Class::Unsupported`: a browser container joins an already-current account and holds one vault), so the hook resolves to its `unknown` state there and every gate it feeds renders neither side's arms. That is a capability refusal rather than a build-time substitution, which is why it is typed-unsupported rather than excluded; the surfaces it gates (`SyncPanel`, the usage block, the device panel) are all ported, so the file does reach served code.",
+  ],
   "src/hooks/useRoster.ts": [
     "typed-unsupported",
     "The B2B member commands are `Class::Unsupported` on web (`memberSharing` absent), and the only module that imports this hook is `MemberRosterPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file.",
@@ -577,7 +589,7 @@ const V = {
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
   "src/hooks/useUpdateAvailable.ts": [
     "adapted",
-    "Desktop self-update. Gated on the `selfUpdate` capability, which is absent on web, so the check never runs there and no banner mounts. The `plugin:update|*` commands are `Unsupported` on web (`web/wasm/src/capability.rs`), reached only through the platform seam.",
+    "Desktop self-update. Gated on the `selfUpdate` capability, which is absent on web, so the check never runs there and no notice mounts: the flow this hook now owns is mounted by `App.tsx` and gated on the editor stage, and the notice it drives renders nothing without an offer. The `plugin:update|*` commands are `Unsupported` on web (`web/wasm/src/capability.rs`), reached only through the platform seam.",
   ],
   "src/hooks/useTorState.ts": [
     "adapted",

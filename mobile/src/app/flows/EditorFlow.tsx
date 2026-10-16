@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
 import { copyText } from "@myne/clipboard";
@@ -446,7 +447,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       ],
       // `backwards` fill applies the opacity:0 first frame immediately, so there
       // is no one-frame flash of the fully-opaque new content before the fade.
-      { duration: 260, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)", fill: "backwards" },
+      { duration: motionDurationMs("--duration-slow"), easing: motionEasing("--ease-emphasized"), fill: "backwards" },
     );
   }, [tab]);
 
@@ -476,7 +477,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       ],
       // `backwards` fill = no flash of the fully-opaque incoming screen before
       // the slide starts (the "flash when coming back to the list" bug).
-      { duration: 340, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)", fill: "backwards" },
+      { duration: motionDurationMs("--duration-slower"), easing: motionEasing("--ease-emphasized"), fill: "backwards" },
     );
   }, [view]);
 
@@ -3353,7 +3354,20 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             grant={defaultGrantFor(editing?.id ?? lastNoteId)}
           />
         )}
-        {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
+        {tab === "files" && (
+          <AttachmentsSheet
+            variant="page"
+            onClose={() => setTab("notes")}
+            // Saving a transcript from the Files tab creates a note and opens
+            // it, so the action lands somewhere the user can see. `openFromList`
+            // flushes the in-progress buffer first (mobile has no autosave), so
+            // the switch cannot discard typed text.
+            onSavedNote={(id) => {
+              setTab("notes");
+              void openFromList(id);
+            }}
+          />
+        )}
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
@@ -4034,6 +4048,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             insertIntoEditor(text);
             setManageAttachments(false);
           }}
+          onSavedNote={(id) => {
+            // Saving a transcript from the in-editor sheet hands back the new
+            // note. `openFromList` rather than `openNote`: the editor may hold
+            // unsaved typing, and mobile has no autosave, so switching buffers
+            // without flushing first silently discards it.
+            setManageAttachments(false);
+            void openFromList(id);
+          }}
         />
       )}
 
@@ -4215,7 +4237,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // flex:1 nav pushes the settings footer to the bottom, where its
             // divider lines up with the editor FormatBar). Without it the block
             // wrapper let the sidebar shrink to ~60% content height.
-            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, display: "flex", overflow: "hidden", transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)" }}
+            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, display: "flex", overflow: "hidden", transition: "width var(--duration-slow) var(--ease-standard)" }}
           >
           <SidebarPane
             label={vaultDisplayLabel(prefs.label)}
@@ -4254,7 +4276,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 flexDirection: "column",
                 borderInlineEnd: panesCollapsed ? "none" : "1px solid var(--line-1)",
                 overflow: "hidden",
-                transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "width var(--duration-slow) var(--ease-standard)",
               }}
             >
               {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}

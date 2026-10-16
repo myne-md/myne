@@ -152,7 +152,8 @@ vi.mock("@tauri-apps/api/path", () => ({
 
 const { AppearancePanel } = await import("../../src/components/settings/AppearancePanel");
 const { PrivacyPanel } = await import("../../src/components/settings/PrivacyPanel");
-const { AccountPanel } = await import("../../src/components/settings/AccountPanel");const { renderSyncPanel } = await import("./_syncPanelHarness");
+const { VaultPanel } = await import("../../src/components/settings/VaultPanel");
+const { renderSyncPanel } = await import("./_syncPanelHarness");
 const { syncPanelCommandRouter } = await import("./_syncPanelHarness");
 // The panels no other walk covers (myne-md/myne#885). The union of this file,
 // `AiPanel.test.tsx` and `EditorPanel.test.tsx` is every rail panel.
@@ -209,7 +210,7 @@ function selectTopic(panelId: string, topicId: string) {
 
 /** The three panels that mount bare, plus the Sync panel behind its provider. */
 const PANELS: ReadonlyArray<{
-  panelId: "appearance" | "privacy" | "account" | "sync";
+  panelId: "appearance" | "privacy" | "vault" | "sync";
   mount: () => void;
 }> = [
   {
@@ -229,12 +230,12 @@ const PANELS: ReadonlyArray<{
     },
   },
   {
-    panelId: "account",
+    panelId: "vault",
     mount: () => {
       memberVaultFlag.value = false;
       invokeMock.mockImplementation(() => Promise.resolve(undefined));
       render(
-        <AccountPanel
+        <VaultPanel
           vaultId={VAULT_ID}
           onChangePasswordSuccess={vi.fn()}
           onDeleteVaultSuccess={vi.fn()}

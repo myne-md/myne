@@ -291,7 +291,7 @@ export function reexportedBindings(src) {
   return out;
 }
 
-/** A file's text with its import statements removed.
+/** A file's text with its import statements and its COMMENTS removed.
  *
  * **An import is not a call**, and matching one is how this guard passed while
  * the thing it checks was wrong. Verified by breaking it in BOTH directions:
@@ -300,10 +300,26 @@ export function reexportedBindings(src) {
  * rule says the second direction is the one nobody thinks to try, and this
  * guard proved it on itself before it ever gated anything.
  *
+ * **Neither is a comment.** Stripping imports alone left a weaker version of the
+ * same hole: a doc comment that names the binding counts as a caller, and a
+ * comment is weaker evidence than an import. Found while reviewing
+ * myne-md/myne#886, whose new `TranscriptSheet.tsx` names `readTranscript` in
+ * its header and calls it once: replacing the call with `Promise.resolve(null)`
+ * and leaving the import and the comment still printed `ok`, so deleting the
+ * binding's exemption from `scripts/ipc-binding-callers.json` rested on a green
+ * gate that a comment can satisfy. The name is kept for the test file's sake;
+ * what it removes is "anything that is not code".
+ *
  * `tsc --noUnusedLocals` would catch the plain case, but not a name used only in
  * a type position or inside code no branch reaches, so this cannot lean on it. */
 export function withoutImports(text) {
   return text
+    // Block comments first: they can contain `//`, which the line pass below
+    // would otherwise see as the start of a comment.
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    // `(^|[^:])` keeps a `https://` inside a string literal from being read as a
+    // comment, the same guard `check-token-adoption.mjs` uses for `#`.
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
     .replace(/^\s*import\s+type\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s[\s\S]*?from\s*["'][^"']+["'];?\s*$/gm, "")
     .replace(/^\s*import\s*["'][^"']+["'];?\s*$/gm, "");

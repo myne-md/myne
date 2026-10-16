@@ -23,6 +23,7 @@ import {
 } from "@app/components/settings/CustomizeList";
 import { AccountPanel } from "@app/components/settings/AccountPanel";
 import { AiModelCatalogue } from "@app/components/settings/AiModelCatalogue";
+import { VaultPanel } from "@app/components/settings/VaultPanel";
 import { AiOnboardingSurface } from "@app/components/settings/AiOnboardingSurface";
 import { AiPanel } from "@app/components/settings/AiPanel";
 import { ModelPathButton } from "@app/components/settings/ModelPathButton";
@@ -33,6 +34,7 @@ import { AttachmentCompressionSettings } from "@app/components/settings/Attachme
 import { AttachmentOcrSettings } from "@app/components/settings/AttachmentOcrSettings";
 import { AutomaticBackupBlock } from "@app/components/settings/AutomaticBackupBlock";
 import { CliAccessSettings } from "@app/components/settings/CliAccessSettings";
+import { CliPanel } from "@app/components/settings/CliPanel";
 import { ConnectedExtensions } from "@app/components/settings/ConnectedExtensions";
 import { ControlBlock } from "@app/components/settings/ControlBlock";
 import { CustomThemesSection } from "@app/components/settings/CustomThemesSection";
@@ -227,12 +229,32 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/vaultpanel/default",
+    group: "settings",
+    surface: "VaultPanel",
+    state: "default",
+    description: "Vault Panel, a default state.",
+    tags: ["settings", "vaultpanel", "default"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <VaultPanel
+          vaultId={FIXTURE_VAULT_ID}
+          onChangePasswordSuccess={action("onChangePasswordSuccess")}
+          onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
+        />
+      </Frame>
+    ),
+  },
+  {
     id: "settings/accountpanel/default",
     // A `role="switch"` whose value is unresolved: this story does not answer
     // the command that drives the toggle, so `checked` is not a boolean and
     // `aria-checked` is missing. The catalogue is showing a frame the app
     // passes through before its read resolves, never its resting state ,
     // answering the command in the fixture is the fix (myne-md/myne#845).
+    // The switch is the browser-clipper install toggle, which sits in the
+    // paired-extensions block, which is account-level and therefore here.
     a11y: "todo",
     group: "settings",
     surface: "AccountPanel",
@@ -242,11 +264,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
-        <AccountPanel
-          vaultId={FIXTURE_VAULT_ID}
-          onChangePasswordSuccess={action("onChangePasswordSuccess")}
-          onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
-        />
+        <AccountPanel vaultId={FIXTURE_VAULT_ID} />
       </Frame>
     ),
   },
@@ -447,6 +465,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           onSetExcludedFolders={action("onSetExcludedFolders")}
           onSetRateLimitDisabled={action("onSetRateLimitDisabled")}
         />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/clipanel/default",
+    group: "settings",
+    surface: "CliPanel",
+    state: "default",
+    description:
+      "Cli Panel, a default state. The props-driven CLI block inside its panel, which is where the terminal door, the folder exclusions and the rate-limit control live (decisions/ui/0678).",
+    tags: ["settings", "clipanel", "cli", "default"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <CliPanel />
       </Frame>
     ),
   },

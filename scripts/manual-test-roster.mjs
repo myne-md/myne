@@ -368,9 +368,12 @@ export const ROSTER = Object.freeze([
       "mobile/src/lib/transcribe.ts",
       "mobile/src-tauri/src/plugins/local_inference/",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
+      "mobile/src/app/flows/TranscriptSheet.tsx",
     ],
     clients: ["ios", "android"],
-    automatedBy: [],
+    automatedBy: [
+      "mobile/tests/flow-logic/voice/transcribe.flow.ts",
+    ],
     manual: [
       {
         see: "On the OLDEST iPhone model you support and on a mid-range Android phone, transcribe a 60-second recorded clip. Record wall-clock time, the battery percentage before and after, and whether the phone becomes noticeably hot. Confirm the app stays responsive (you can scroll the note) throughout and that segments appear progressively rather than all at once at the end.",
@@ -719,7 +722,8 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/platform/update.ts",
       "src/hooks/useUpdateAvailable.ts",
-      "src/components/UpdateBanner.tsx",
+      "src/components/update/UpdateNotice.tsx",
+      "src/screens/UpdatingScreen.tsx",
       "src/components/settings/AboutPanel.tsx",
       "src-tauri/src/update/",
       "src-tauri/src/plugins/update/",
@@ -728,8 +732,8 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/self-update.e2e.ts"],
     manual: [
       {
-        see: "On macOS, with a signed and notarized build installed and biometric quick-unlock enabled, let the app check for updates (or press Check for updates under Settings, About), open the update banner, press Restart to update, and confirm the app relaunches on the new version. Then confirm biometric quick-unlock still works, that the vault-label cache still shows the vault's name on the locked picker, and that Gatekeeper did not warn on the updated app. Repeat the update on Windows and on the Linux AppImage, confirming each replaces in place. Finally turn the automatic check off under About, relaunch, and confirm no request is made.",
-        whyNotAutomated: "The in-place bundle replacement and the keychain item's survival can only be observed on a signed build on real macOS hardware, and no CI lane builds a signed or notarized macOS app or holds a login keychain. Whether quick-unlock and the vault-label cache still work after the swap is a product-level outcome with no seam a test can drive.",
+        see: "On macOS, with a signed and notarized build installed and biometric quick-unlock enabled, let the app check for updates (or press Check for updates under Settings, About) and confirm the notice arrives at the bottom centre with the new version and its release notes, that it reduces to a pill after a few seconds, and that the pill reopens it. Press Update and restart, read the confirm, and confirm it names the vault lock and the restart. Confirm, and watch the full-window Updating Myne screen: the version resolves once, the app stays responsive, and it relaunches on the new version on its own. Then confirm the vault you were working in asked for its password again, that biometric quick-unlock still works, that the vault-label cache still shows the vault's name on the locked picker, and that Gatekeeper did not warn on the updated app. Repeat the update on Windows and on the Linux AppImage, confirming each replaces in place, and on one of them drive the failure path (deny the install, or cut the network mid download) and confirm the failed screen's Try again and Back to unlock both work. Finally turn the automatic check off under About, relaunch, and confirm no request is made.",
+        whyNotAutomated: "Reaching the offered state at all needs the check to answer, and the manifest endpoint is a build-time constant pointing at downloads.myne.md, whose reachability from the container is not guaranteed and whose live answer is whatever release is current, so no lane can reliably produce the notice. Past that, the in-place bundle replacement and the keychain item's survival can only be observed on a signed build on real macOS hardware, and no CI lane builds a signed or notarized macOS app or holds a login keychain. Whether quick-unlock and the vault-label cache still work after the swap is a product-level outcome with no seam a test can drive.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 25,
         tier: "core",
@@ -1312,6 +1316,7 @@ export const ROSTER = Object.freeze([
       "src-tauri/src/cli_bridge/socket.rs",
       "src-tauri/src/cli_bridge/mod.rs",
       "src-tauri/src/cli_bridge/path_shim.rs",
+      "src/components/settings/CliPanel.tsx",
       "src/components/settings/CliAccessSettings.tsx",
       "src/lib/cli-access.ts",
       "cli/src/status.rs",
@@ -1329,21 +1334,21 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On macOS, install the shipped bundle, unlock a vault, turn on Settings → Privacy → Terminal access behind Developer mode, then run `myne list` in Terminal and confirm it returns notes. Lock the vault and run it again: confirm the message says the vault is locked. Unlock, turn the toggle off, and run it a third time: confirm the message says terminal access is disabled in Settings. The three outcomes must read differently from each other.",
+        see: "On macOS, install the shipped bundle, unlock a vault, turn on Developer mode and then Settings → CLI → Terminal access, then run `myne list` in Terminal and confirm it returns notes. Lock the vault and run it again: confirm the message says the vault is locked. Unlock, turn the toggle off, and run it a third time: confirm the message says terminal access is disabled in Settings. The three outcomes must read differently from each other.",
         whyNotAutomated: "The six scenarios covering this run on Linux only (tauri-driver support is Linux-only by decision), and the socket path is resolved through dirs::data_dir(), which is ~/Library/Application Support on macOS versus ~/.local/share on Linux. That is a different resolution than any test has exercised.",
         clients: ["cli", "desktop-macos"],
         estimateMin: 12,
         tier: "standard",
       },
       {
-        see: "Install the real macOS bundle on a stock user account, open a fresh Terminal and type `myne --help`. Record whether it resolves. Then open Settings → Privacy → Terminal access and confirm the $PATH hint with its `export PATH=…` line appears exactly when the command did NOT resolve. Add the line to the shell profile, open a NEW terminal, and confirm `myne list` now answers against the unlocked app.",
+        see: "Install the real macOS bundle on a stock user account, open a fresh Terminal and type `myne --help`. Record whether it resolves. Then turn on Developer mode and open Settings → CLI → Terminal access, and confirm the $PATH hint with its `export PATH=…` line appears exactly when the command did NOT resolve. Add the line to the shell profile, open a NEW terminal, and confirm `myne list` now answers against the unlocked app.",
         whyNotAutomated: "cli-thin-client.e2e.ts spawns the sidecar by absolute path inside a Linux container; whether the shim directory is on a real user's $PATH is a per-OS, per-shell packaging fact: macOS commonly leaves ~/.local/bin off $PATH and Linux commonly does not, and CI builds with --no-bundle so no installed bundle exists in any lane.",
         clients: ["desktop-macos", "cli"],
         estimateMin: 8,
         tier: "standard",
       },
       {
-        see: "Install the Windows build, turn on Developer mode and open Settings → Privacy. Confirm the Terminal access block is either absent or states plainly that terminal access is unavailable on Windows. It must NOT present a toggle that appears to open a door, since the named-pipe bind is a documented unimplemented seam. Type `myne` in a new PowerShell and a new cmd window and record what happens.",
+        see: "Install the Windows build, turn on Developer mode and open Settings → CLI. Confirm the Terminal access row is either absent or states plainly that terminal access is unavailable on Windows. It must NOT present a toggle that appears to open a door, since the named-pipe bind is a documented unimplemented seam. Type `myne` in a new PowerShell and a new cmd window and record what happens.",
         whyNotAutomated: "Nothing runs on Windows at all, and the defect is a control that looks functional while binding nothing. Every code-side check passes it, because windows_pipe_name is a real tested pure function while the bind half does not exist.",
         clients: ["desktop-windows", "cli"],
         estimateMin: 6,
@@ -2714,7 +2719,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm no type-back challenge is asked for the identity phrase.",
+        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm the phrase is followed by a SEPARATE type-back step whose Done is gated on four matching words, and that while that challenge is unanswered Esc, a backdrop click and the close button all leave the dialog open. It must be the words, not a click, that finish the ceremony, because the identity already exists server-side by then and the phrase is shown once.",
         whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same device walk also observes HTTPS trust on the native WebView and host.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
@@ -2728,14 +2733,14 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "Invite this identity to a second vault, then on the phone accept it (myne-md/myne#851 tasks 14 and 15). Confirm the owner's identity code pastes into the accept step and that Inspect renders a fingerprint a person can read aloud and compare against the owner's own screen before ticking the compare. Confirm all 24 phrase cells accept the phrase and that the on-screen keyboard does not cover the cell you are typing into or the password field below the grid. Type a password under the floor and confirm the submit stays refused, then type one that meets it and confirm the accept lands on the NAME step rather than in the editor. Confirm that step offers no way out at all (no back chevron, and a blank or whitespace-only name leaves Save refused), that saving opens the vault, and that the vault then reopens from that password after the app is killed and relaunched rather than from the phrase. Finally, on the OWNER's device, open Settings, Sync, Members and confirm this member's chosen name renders beside their fingerprint, and that a second member invited to the same vault sees the same name.",
+        see: "Invite this identity to a second vault, then on the phone accept it (myne-md/myne#851 tasks 14 and 15). The accept is three screens now (myne-md/myne#871), each with a step counter, and the walk is the point: confirm the owner's identity code pastes into the FIRST step and that Inspect renders a fingerprint a person can read aloud and compare against the owner's own screen before ticking the compare, which is what releases Continue into the phrase step. Confirm that step 2 is the phrase and nothing else, that all 24 phrase cells accept the phrase, and that the on-screen keyboard does not cover the cell you are typing into. On the THIRD step (the device password) type one under the floor and confirm the submit stays refused, then type one that meets it and confirm the accept lands on the NAME step rather than in the editor. Confirm that step offers no way out at all (no back chevron, and a blank or whitespace-only name leaves Save refused), that saving opens the vault, and that the vault then reopens from that password after the app is killed and relaunched rather than from the phrase. Walk BACK from the password step to the phrase step and confirm the phrase you typed is still there rather than wiped. Finally, on the OWNER's device, open Settings, Sync, Members and confirm this member's chosen name renders beside their fingerprint, and that a second member invited to the same vault sees the same name.",
         whyNotAutomated: "The flow-logic tier (mobile/tests/flow-logic/sync/member-accept.flow.ts) drives this step order, the four arguments the accept forwards, the gate's refusal to continue unnamed and the error mapping, but it drives a mocked IPC, and the Members panel's own row rule is held by mobile/tests/components/SyncMembersPanel.test.tsx against a mocked roster. What it cannot hold: the accept's own work happens host-side, where Argon2id derives this device's vault.member-unlock credential and unseals the person wrap against the owner's sealed copy, so 'the vault reopens from that password' is a statement about real key material no mock performs; the name row is signed with this device's real person key and only reads back as VERIFIED on another member's device, which is the second device; the phrase grid and the password field sit under an on-screen keyboard whose height no harness here supplies; and the surface is WKWebView on iOS and Android System WebView, neither of which any harness in this tree drives.",
         clients: ["ios", "android"],
         estimateMin: 25,
         tier: "core",
       },
       {
-        see: "Add a vault this identity ALREADY belongs to onto a second phone, from the recovery phrase alone (myne-md/myne#852 task 7). Set the first phone down and leave it locked: nothing here may need it, and no fresh invite may be sent. On the second phone, open the identity door, enter the person's recovery phrase, and confirm the vault appears under \"Invites you have already claimed\" with its account number, and that opening it asks for the phrase and a password for THIS device and asks for no owner identity code and no name. After it lands, kill the app and reopen it, and confirm the vault opens from that password rather than from the phrase. Now the two negative halves, which are the reason this is a walk and not a reading: enter the phrase of a DIFFERENT identity and confirm nothing is installed and the message says the phrase is not the identity this vault was shared with; then, on a vault whose first device has NEVER been unlocked against this sync server since the vault was shared, confirm the second phone refuses to add it and says it could not confirm which owner the vault belongs to rather than adding it anyway. Finally, on the first phone, take a note on the second phone, edit it on the first, and confirm the version history attributes both revisions to the member rather than to a device.",
+        see: "Add a vault this identity ALREADY belongs to onto a second phone, from the recovery phrase alone (myne-md/myne#852 task 7). Set the first phone down and leave it locked: nothing here may need it, and no fresh invite may be sent. On the second phone, open the identity door, enter the person's recovery phrase, and confirm the vault appears under \"Invites you have already claimed\" with its account number, and that opening it asks for the phrase on the first of its two screens and a password for THIS device on the second (each with a step counter, myne-md/myne#871), and asks for no owner identity code and no name. After it lands, kill the app and reopen it, and confirm the vault opens from that password rather than from the phrase. Now the two negative halves, which are the reason this is a walk and not a reading: enter the phrase of a DIFFERENT identity and confirm nothing is installed and the message says the phrase is not the identity this vault was shared with; then, on a vault whose first device has NEVER been unlocked against this sync server since the vault was shared, confirm the second phone refuses to add it and says it could not confirm which owner the vault belongs to rather than adding it anyway. Finally, on the first phone, take a note on the second phone, edit it on the first, and confirm the version history attributes both revisions to the member rather than to a device.",
         whyNotAutomated: "The flow-logic tier (mobile/tests/flow-logic/sync/member-second-device.flow.ts) drives this step order, the four arguments the join forwards, the absence of an owner code, the refusal's own message and the fact that it is the JOIN and not the accept that ran, but it drives a mocked IPC with no device. What it cannot hold: the pass condition is a cross-device handoff over a real relay, where the second phone's trust anchor is a pin the FIRST phone wrote into a profile sealed under the person's own recovery phrase, so 'the owner was verified with the owner absent' is a statement about real key material and a real round trip no mock performs; the Argon2id derivation of this device's member-unlock credential is host-side; the phrase grid sits under an on-screen keyboard whose height no harness here supplies; and the surface is WKWebView on iOS and Android System WebView, neither of which any harness in this tree drives.",
         clients: ["ios", "android"],
         estimateMin: 25,
@@ -4889,7 +4894,7 @@ export const ROSTER = Object.freeze([
     title: "Vault label, icon and hiding vault names on the lock screen",
     paths: [
       "src/components/settings/PrivacyPanel.tsx",
-      "src/components/settings/AccountPanel.tsx",
+      "src/components/settings/VaultPanel.tsx",
       "src/lib/vault-label.ts",
       "src/lib/prefs.ts",
       "src/notes/folderIcons.ts",
@@ -5389,7 +5394,6 @@ export const ROSTER = Object.freeze([
       "src/components/settings/AccountPanel.tsx",
       "src/components/SettingsModal.tsx",
       "src/components/settings/ConnectedExtensions.tsx",
-      "src/lib/vault-delete.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
@@ -5410,7 +5414,31 @@ export const ROSTER = Object.freeze([
       "e2e/settings-tabs.e2e.ts",
     ],
     manual: [],
-    exemptionReason: "All three candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The danger-zone copy is a straight capability branch (AccountPanel.tsx, `capabilities.has(\"localOnlyVault\") ? … : …`) and ConnectedExtensions is capability-gated, so which key each build renders is a literal assertion on the mobile flow-logic tier and in e2e-web; and a part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking.",
+    exemptionReason: "Everything this panel renders is a machine-checkable claim. ConnectedExtensions is capability-gated and its list/revoke calls are asserted with mocks plus the clipper-install scenario, and the account grouping the panel renders is the same device-local record `e2e/account-grouping.e2e.ts` and the picker's manual item already cover (myne-md/myne#554 ruled the candidate items automatable). The vault-scoped controls this entry used to carry moved to `settings.panel.vault`.",
+  },
+  {
+    // The panel split out of Account: the vault's own label, icon, change
+    // password and danger zone. Machines judge these (see the exemptionReason),
+    // so it carries no manual item; the entry exists because the panel is a
+    // surface a release plan schedules against and the guard fails on a file in
+    // the denominator that no entry claims.
+    id: "settings.panel.vault",
+    title: "Vault panel",
+    paths: [
+      "src/components/settings/VaultPanel.tsx",
+      "src/lib/vault-delete.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+    automatedBy: [
+      "e2e/change-password.e2e.ts",
+      "e2e/vault-delete-targeting.e2e.ts",
+      "e2e/state-machine.e2e.ts",
+      "e2e/prefs.e2e.ts",
+      "e2e/keyboard-nav-working.e2e.ts",
+      "e2e-web/vault-delete.e2e.ts",
+    ],
+    manual: [],
+    exemptionReason: "Every control here is asserted by a scenario on this entry's automatedBy list, including the danger-zone copy branch and the web client's sign-out variant, and the part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking (myne-md/myne#554).",
   },
   {
     id: "settings.panel.ai",
@@ -7796,6 +7824,28 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "The foreground/background presence gate is an OS lifecycle event: iOS suspension and Android activity recreation decide whether the stream stays open, and the Playwright flow tier runs in desktop Chromium with mock IPC and produces neither transition. No CI lane builds for either platform.",
         clients: ["ios", "android"],
         estimateMin: 15,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
+    id: "ui.press-feedback",
+    title: "Press feedback: the app answers a tap, and both platforms answer the same way",
+    paths: [
+      "src/components/primitives/pressSurface.ts",
+      "src/components/primitives/interactiveSurface.ts",
+      "client-core/src/motion.ts",
+      "mobile/src/components/Button.tsx",
+      "mobile/src/styles/tokens.css",
+    ],
+    clients: ["ios", "android"],
+    manual: [
+      {
+        see: "On a real iPhone and a real Android phone, open a screen with buttons and rows (the vault picker, a note list, the Settings sheet) and press one of each. Confirm the control visibly deepens the instant your finger goes down rather than when it comes back up, and that the step looks the same size on both phones. Confirm the platform's own tap flash does NOT appear on top of it: no grey rectangle over the control, no ripple ring. Then make a control inert (start a save in flight, or open a screen whose action is disabled) and confirm pressing it produces no step at all. Finally turn the OS Reduce Motion setting on one phone and repeat: the step must still appear, instantly, because what reduced motion suppresses is the animation rather than the answer.",
+        whyNotAutomated: "Two facts, each blocked by something different, and the first is the one this item exists for. Whether a control CONFIRMS a tap is a perceptual judgement carrying a stated pass condition above: the failure shape is a press with no answer, which reads as a slow app rather than as a missed tap, and no assertion encodes a person's read of that. The platform tap flash is an OS and WebView paint property: iOS WKWebView and Android System WebView each draw their own, neither is the engine any lane in this tree drives, and no lane builds for either platform at all. What IS asserted is the primitive and the class layer it shares its value with (tests/components/pressSurface.test.ts, whose assertions are proved by injection), and the desktop screen tree through the shared Vitest suite; MOBILE's own screen tree has no such assertion, so this item is the only place the handset half is observed rather than claimed.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
         tier: "standard",
       },
     ],

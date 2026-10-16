@@ -41,8 +41,7 @@ import {
 } from "@myne/meeting-note";
 import { invoke } from "../platform/core";
 import { showToast } from "../components/ToastHost";
-import { patchTitleField } from "../dialect/surgery";
-import { noteCreate, noteRead, noteUpdate } from "./notes";
+import { noteRead, noteUpdate, createTitledNote } from "./notes";
 import { startTranscription } from "./transcribe";
 
 /** One sealed chunk that drained into the vault library, in capture order
@@ -199,17 +198,6 @@ async function writeMeetingNote(
   const name = i18n.t("editor.meeting.noteTitle", { date: localTimestamp(session.started_at) });
   const noteId = await createTitledNote(body, name);
   return { created: true, noteId };
-}
-
-/** Create a note from an explicit body + title, at the vault root. Mirrors the
- *  desktop `createNoteFromBody` tail (`src/notes/newNoteFromTemplate.ts`) and the
- *  mobile `daily.ts` twin, so a meeting note carries the same `title:` frontmatter
- *  the desktop meeting writes. `folder: null` puts it at the root, exactly where
- *  a blank note from the same context lands. */
-async function createTitledNote(body: string, name: string): Promise<string> {
-  let bytes: Uint8Array = new TextEncoder().encode(body);
-  bytes = patchTitleField(bytes, name);
-  return await noteCreate(new TextDecoder().decode(bytes), null);
 }
 
 /** Local `YYYY-MM-DD HH:MM` from a millisecond epoch (the session's start),

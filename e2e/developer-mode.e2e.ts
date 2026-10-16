@@ -21,13 +21,20 @@
 //         settings search surfaces the AI entry again, and the AI palette
 //         actions reappear.
 //
-//   dm2 — the SETTING-level half of the same gate (#181): the CLI-access block
-//         in Privacy and the Vim toggle in Editor are hidden while the mode is
-//         off even though their panels are not, and both come back with it.
-//         Distinct story from dm1: dm1 proves a whole rail GROUP appears and
-//         disappears, dm2 proves individual settings inside CORE panels do —
-//         the panels stay visible throughout, which is exactly what makes this
-//         a gate the rail filter cannot express.
+//   dm2 — the SETTING-level half of the same gate (#181): the Vim toggle in
+//         Editor is hidden while the mode is off even though its panel is not,
+//         and it comes back with the mode. Distinct story from dm1: dm1 proves
+//         a whole rail GROUP appears and disappears, dm2 proves an individual
+//         setting inside a CORE panel does — the panel stays visible
+//         throughout, which is exactly what makes this a gate the rail filter
+//         cannot express.
+//
+//         The CLI trio was dm2's other half until `decisions/ui/0678` moved it
+//         out of Privacy into a developer-group panel of its own, which is
+//         dm1's shape rather than dm2's. dm2 now asserts that move rather than
+//         assuming it: the rail entry and the block appear and disappear
+//         TOGETHER with the mode, so a future re-shuffle that left one of the
+//         two behind fails here.
 //
 //         What dm2 does NOT cover, because the proof lives where the machinery
 //         does: that hiding is not disabling. The CLI half is `cli6` (it needs
@@ -82,7 +89,10 @@ async function typeSearch(session: Session, text: string): Promise<void> {
  *  rows never carried the word "shell", so the ON half of this scenario asserted
  *  something the index could not produce. `"terminal"` is the token those three
  *  keyword strings actually share, and it appears in no other entry's title,
- *  description or keywords. */
+ *  description or keywords. The panel those rows now live in is a
+ *  developer-group rail entry (`decisions/ui/0678`), so a hit while the mode is
+ *  off is doubly wrong: the anchor is not rendered AND the panel is not in the
+ *  rail. */
 const CLI_ONLY_QUERY = "terminal";
 const VIM_ONLY_QUERY = "modal editing";
 
@@ -196,9 +206,9 @@ describeE2E("dm1 developer-mode gating: rail + search + palette (MYND-593)", () 
   });
 });
 
-describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)", () => {
+describeE2E("dm2 setting-level developer gating: vim toggle + the CLI panel (#181)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("hides the CLI block and the vim toggle inside panels that stay visible, and restores both", async () => {
+  it("hides the vim toggle inside a panel that stays visible, takes the CLI panel out of the rail, and restores both", async () => {
     let password = "";
     await scenario(
       "dm2-setting-level-gating",
@@ -209,22 +219,19 @@ describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)",
         await dismissImporterOffer(s);
 
         await openSettings(s, "privacy");
-        // The panel itself is present — that is the whole point of a
-        // setting-level gate, and it is what distinguishes this from dm1.
-        // Anchored on an ungated neighbour rather than a panel root, because
-        // PrivacyPanel's root carries no testid of its own. That neighbour is
-        // `settings.auto-lock-select`, which lives in the panel's `locking` topic
-        // since myne-md/myne#885, so the topic is opened for it. The CLI block's
-        // own topic is then opened explicitly below rather than left implicit:
-        // asserting the block is ABSENT while its topic is not mounted would pass
-        // for a reason that has nothing to do with the developer gate.
+        // Privacy itself is present — that is the whole point of a setting-level
+        // gate, and it is what distinguishes this from dm1. Anchored on an
+        // ungated neighbour rather than a panel root, because PrivacyPanel's
+        // root carries no testid of its own. That neighbour lives in Privacy's
+        // `locking` topic (myne-md/myne#885), so the topic is opened for it.
         await selectSettingsTopic(s, "privacy", "locking");
         await s.byTestId("settings.auto-lock-select");
-
-        await selectSettingsTopic(s, "privacy", "access");
+        // The CLI rows are NOT here any more: they moved into a panel of their
+        // own, so their absence from Privacy is structural rather than gated.
         expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
-        expect((await s.byTestIdAll("settings.cli-exclusions")).length).toBe(0);
-        expect((await s.byTestIdAll("settings.cli-rate-limit")).length).toBe(0);
+        // And that panel is not in the rail while the mode is off — the CLI's
+        // gate is the rail filter now, which is dm1's shape rather than dm2's.
+        expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
 
         await (await s.byTestId("settings.tab-editor")).click();
         await selectSettingsTopic(s, "editor", "editing");
@@ -235,9 +242,9 @@ describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)",
         // A result here would scroll to an anchor that was never rendered —
         // the exact failure `developerGated` exists to prevent.
         const cliOff = await searchResultIds(s, CLI_ONLY_QUERY);
-        expect(cliOff).not.toContain("privacy.cli-access");
-        expect(cliOff).not.toContain("privacy.cli-excluded-folders");
-        expect(cliOff).not.toContain("privacy.cli-rate-limit");
+        expect(cliOff).not.toContain("cli.access");
+        expect(cliOff).not.toContain("cli.excluded-folders");
+        expect(cliOff).not.toContain("cli.rate-limit");
         const vimOff = await searchResultIds(s, VIM_ONLY_QUERY);
         expect(vimOff).not.toContain("editor.vim-mode");
         await closeSettings(s);
@@ -252,11 +259,8 @@ describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)",
         // ── Mode ON ──
         await enableDeveloperMode(s);
 
-        await (await s.byTestId("settings.tab-privacy")).click();
-        // The CLI trio lives in Privacy's `access` topic (myne-md/myne#885), and
-        // the topic memory carries the selection from the mode-OFF half above;
-        // stated here so the ON half cannot pass on a stale selection.
-        await selectSettingsTopic(s, "privacy", "access");
+        // The whole CLI panel comes back, with its block inside it.
+        await (await s.byTestId("settings.tab-cli")).click();
         await s.byTestId("settings.cli-access");
         await s.byTestId("settings.cli-exclusions");
         await s.byTestId("settings.cli-rate-limit");
@@ -266,9 +270,9 @@ describeE2E("dm2 setting-level developer gating: CLI block + vim toggle (#181)",
         await s.byTestId("settings.vim-mode");
 
         const cliOn = await searchResultIds(s, CLI_ONLY_QUERY);
-        expect(cliOn).toContain("privacy.cli-access");
-        expect(cliOn).toContain("privacy.cli-excluded-folders");
-        expect(cliOn).toContain("privacy.cli-rate-limit");
+        expect(cliOn).toContain("cli.access");
+        expect(cliOn).toContain("cli.excluded-folders");
+        expect(cliOn).toContain("cli.rate-limit");
         const vimOn = await searchResultIds(s, VIM_ONLY_QUERY);
         expect(vimOn).toContain("editor.vim-mode");
         await closeSettings(s);

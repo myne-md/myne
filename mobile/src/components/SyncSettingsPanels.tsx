@@ -15,6 +15,7 @@ import { type CSSProperties, type ReactNode, useEffect, useId, useState } from "
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { SyncStatus } from "../lib/use-sync-status";
+import type { VaultId } from "../lib/stage";
 import {
   syncGetEndpoint,
   syncSetEndpoint,
@@ -27,6 +28,7 @@ import {
   type AccountStatusView,
 } from "../lib/sync";
 import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
+import { useMemberVault } from "../hooks/useMemberVault";
 import { formatBytes } from "../lib/util";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
@@ -206,6 +208,11 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
 
 export interface SyncHubPanelProps {
   status: SyncStatus | null;
+  /** The active vault's id, for ONE question: is this a MEMBER vault? It decides
+   *  whether the usage block describes the vault or the member's own account (see
+   *  `useMemberVault`). Optional so a caller with no vault in scope keeps the
+   *  pre-change behaviour. */
+  vaultId?: VaultId;
   /** Trigger an immediate sync (MYND-481). Result is reflected in `status`. */
   onSyncNow: () => void;
   /** True while a manual sync is in flight. */
@@ -217,11 +224,18 @@ export interface SyncHubPanelProps {
 }
 
 /** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
-export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers }: SyncHubPanelProps) {
+export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
   const [usage, setUsage] = useState<AccountStatusView | null>(null);
+  // On a member vault the projection is the member's own PERSON account: the
+  // device count is genuinely theirs and matches the roster, while the storage
+  // figure counts a namespace holding none of the shared vault's blobs, a true
+  // "0 B" above a vault full of notes. The section waits for the plane to be
+  // KNOWN rather than defaulting either way: `unknown` would otherwise print the
+  // owner's label over the member's numbers, or the reverse.
+  const plane = useMemberVault(vaultId);
   const view = statusView(status, t);
   // "Sync now" is only meaningful with an authed session to sync — a cycle while
   // disabled / not-enrolled / pending returns NotReady, so hide it there rather
@@ -294,22 +308,26 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
           (self-hosted or older): the whole section is omitted rather than shown
           as an error. `0` ceilings mean unlimited, so the value is the bare
           figure with no limit and no upsell. */}
-      {usage !== null && (
+      {usage !== null && plane !== "unknown" && (
         <>
-          <SectionLabel>{t("sync.panel.usage.label")}</SectionLabel>
+          <SectionLabel>
+            {t(plane === "member" ? "sync.panel.usage.memberLabel" : "sync.panel.usage.label")}
+          </SectionLabel>
           <Group>
-            <Row first testId="sync.usage-storage">
-              <span style={rowLabel}>{t("sync.usage.storage")}</span>
-              <span style={usageValue}>
-                {usage.quota_bytes === 0
-                  ? formatBytes(usage.stored_bytes)
-                  : t("sync.usage.ofTotal", {
-                      used: formatBytes(usage.stored_bytes),
-                      total: formatBytes(usage.quota_bytes),
-                    })}
-              </span>
-            </Row>
-            <Row testId="sync.usage-devices">
+            {plane === "owner" && (
+              <Row first testId="sync.usage-storage">
+                <span style={rowLabel}>{t("sync.usage.storage")}</span>
+                <span style={usageValue}>
+                  {usage.quota_bytes === 0
+                    ? formatBytes(usage.stored_bytes)
+                    : t("sync.usage.ofTotal", {
+                        used: formatBytes(usage.stored_bytes),
+                        total: formatBytes(usage.quota_bytes),
+                      })}
+                </span>
+              </Row>
+            )}
+            <Row first={plane === "member"} testId="sync.usage-devices">
               <span style={rowLabel}>{t("sync.usage.devices")}</span>
               <span style={usageValue}>
                 {usage.max_devices === 0
@@ -776,12 +794,16 @@ interface SasState {
 
 /** SY-06 devices list + inline SY-05 approve-then-verify SAS + SY-07 remove
  *  confirm (verbatim revocation copy). */
-export function SyncDevicesPanel() {
+export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
   const { prefs } = usePrefs();
   const names = prefs.device_names;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  // Which account plane this vault's device list describes — see `useMemberVault`.
+  // The gates below read the POSITIVE answers only: `"owner"` for the destructive
+  // arms, so an unresolved or failed probe renders neither of them.
+  const plane = useMemberVault(vaultId);
 
   // MYND-548 inline rename. One row at a time — the Rename buttons disable while
   // any row is open, so a stray tap cannot strand a half-typed edit.
@@ -810,7 +832,11 @@ export function SyncDevicesPanel() {
   const [sas, setSas] = useState<SasState | null>(null);
 
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
-  const retiredSelf = (devices ?? []).find((d) => d.is_current && d.retired);
+  // Not unless this is positively an OWNER vault: there the roster is the member's
+  // PERSON account, so a retired row means this device was removed from that
+  // ACCOUNT rather than from this vault, and the arm's copy is worded for the latter.
+  const retiredSelf =
+    plane === "owner" ? (devices ?? []).find((d) => d.is_current && d.retired) : undefined;
 
   // Approve-then-verify (SYNC-40): approve FIRST, then surface this device's
   // adopted-head fingerprint for the out-of-band eye-compare against the newcomer.
@@ -1012,17 +1038,25 @@ export function SyncDevicesPanel() {
           <p style={{ margin: 0, fontSize: 14, color: "var(--danger)" }}>
             {t("sync.settings.unauthenticated")}
           </p>
-          <div style={{ marginTop: 12 }}>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void resetLocal()}
-              style={primaryBtn(busy)}
-              data-testid="sync.reset-local"
-            >
-              {t("sync.devices.resetSyncOnThisDevice")}
-            </button>
-          </div>
+          {/* The remedy is NOT offered unless this is positively an OWNER vault:
+              the reset clears the token in the vault directory, which on a member
+              vault is the membership token the whole vault syncs on, and no UI
+              path restores it. `unknown` (no id, a failed probe, or the first
+              paint) is not an owner answer. The refusal itself is still reported —
+              a member whose person account refused them needs to know. */}
+          {plane === "owner" && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void resetLocal()}
+                style={primaryBtn(busy)}
+                data-testid="sync.reset-local"
+              >
+                {t("sync.devices.resetSyncOnThisDevice")}
+              </button>
+            </div>
+          )}
         </div>
       ) : error ? (
         <p style={{ ...HELP, marginTop: 10, color: "var(--danger)" }} data-testid="sync.device-error">
@@ -1186,7 +1220,7 @@ export function SyncDevicesPanel() {
                 </button>
               {d.is_current ? (
                 <span style={{ fontSize: 13, color: "var(--fg-3)" }}>{t("sync.settings.syncingHere")}</span>
-              ) : (
+              ) : plane === "owner" ? (
                 <button
                   type="button"
                   disabled={busy}
@@ -1205,7 +1239,7 @@ export function SyncDevicesPanel() {
                 >
                   {t("sync.devices.remove")}
                 </button>
-              )}
+              ) : null}
               </div>
             </Row>
           ))}
@@ -1227,12 +1261,14 @@ export function SyncDevicesPanel() {
  * primitives + tokens, never inline literals.
  *
  * Each row's identity follows the desktop list's ONE RULE (myne-md/myne#851 task 15,
- * `src/components/sync/MemberRosterPanel.tsx`): the you-badge on the caller's OWN row
- * and never their name, the VERIFIED name where the signed store holds one, the short
- * fingerprint otherwise, and a marker when a record exists that no signature backs.
- * Read-only here means no rename affordance, not a second rule: a member reads the same
- * three answers on a phone as on a computer, so "who is this" cannot depend on which
- * client happens to be open.
+ * `src/components/sync/MemberRosterPanel.tsx`): the VERIFIED name where the signed
+ * store holds one — the caller's OWN row included, with a "You" marker beside it so
+ * the owner sees the same name the other members do — the short fingerprint
+ * otherwise, and a marker when a record exists that no signature backs. An unnamed
+ * self row keeps the badge in the name slot, there being no name to show.
+ * Read-only here means no rename affordance, not a second rule: a member reads the
+ * same three answers on a phone as on a computer, so "who is this" cannot depend on
+ * which client happens to be open.
  */
 export function SyncMembersPanel() {
   const { t } = useTranslation();
@@ -1272,17 +1308,28 @@ export function SyncMembersPanel() {
           members.map((m, i) => (
             <Row key={m.fingerprint_hex} first={i === 0} testId="sync.members.row">
               <div style={MEMBERS_STACK}>
-                {/* The one rule, in the desktop list's arm ORDER: own row first, so a
-                    member reading its own entry sees the you-badge rather than the name
-                    it just wrote (which is also why "the name is in the list" is only
-                    observable from the other device). Then a VERIFIED name, then the
+                {/* The one rule, in the desktop list's arm ORDER: the caller's OWN
+                    row first, which now renders its VERIFIED name like every other
+                    row and adds a "You" marker beside it, so its owner sees what the
+                    other members see. An unnamed self row keeps the badge in the name
+                    slot — there is no name to show. Then a VERIFIED name, then the
                     fingerprint. `unverified` is a real third answer rather than a
-                    missing one: a record exists and nothing backs it, which is what the
-                    marker says, and the name it claimed is never rendered. */}
+                    missing one: a record exists and nothing backs it, which is what
+                    the marker says, and the name it
+                    claimed is never rendered. */}
                 {m.is_self ? (
-                  <span data-testid="sync.members.name" style={MEMBERS_VALUE}>
-                    {t("sync.memberRoster.youBadge")}
-                  </span>
+                  <>
+                    <span data-testid="sync.members.name" style={MEMBERS_VALUE}>
+                      {m.name_state === "verified"
+                        ? m.display_name
+                        : t("sync.memberRoster.youBadge")}
+                    </span>
+                    {m.name_state === "verified" ? (
+                      <span data-testid="sync.members.you" style={MEMBERS_MUTED}>
+                        {t("sync.memberRoster.youBadge")}
+                      </span>
+                    ) : null}
+                  </>
                 ) : m.name_state === "verified" ? (
                   <span data-testid="sync.members.name" style={MEMBERS_VALUE}>
                     {m.display_name}

@@ -295,13 +295,35 @@ describe("MemberRosterPanel layout", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.getByTestId("member-roster.name").textContent).toBe(
+      // The row renders its own VERIFIED name like any other, and the identity
+      // marker beside it is what says which row is the caller's.
+      expect(screen.getByTestId("member-roster.name").textContent).toBe("Untitled vault");
+      expect(screen.getByTestId("member-roster.you").textContent).toBe(
         "sync.memberRoster.youBadge",
       );
     } finally {
       cleanup();
       mockMembers = previous;
       mockAuthority = "owner";
+    }
+  });
+
+  // The unnamed half of the same rule: with no name to show, the badge itself is
+  // the name slot, and there is no second marker.
+  it("shows the you-badge in the name slot of an unnamed self row", () => {
+    const previous = mockMembers;
+    mockMembers = [
+      rowView({ fingerprint_hex: "aa".repeat(32), is_self: true, display_name: "", name_state: "absent" }),
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.getByTestId("member-roster.name").textContent).toBe(
+        "sync.memberRoster.youBadge",
+      );
+      expect(screen.queryByTestId("member-roster.you")).toBeNull();
+    } finally {
+      cleanup();
+      mockMembers = previous;
     }
   });
 
@@ -326,11 +348,16 @@ describe("MemberRosterPanel layout", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      // Exactly one "You": the member's own row, whose name slot the identity
-      // badge owns.
-      const names = screen.getAllByTestId("member-roster.name");
-      expect(names).toHaveLength(1);
-      expect(names[0].textContent).toBe("sync.memberRoster.youBadge");
+      // Exactly one "You" marker: the member's own row. The owner row is not the
+      // caller, so it carries none.
+      const youMarkers = screen.getAllByTestId("member-roster.you");
+      expect(youMarkers).toHaveLength(1);
+      expect(youMarkers[0].textContent).toBe("sync.memberRoster.youBadge");
+      // The caller's own row renders its verified name; the owner row shows no
+      // name at all (an absent record falls back to the fingerprint).
+      expect(screen.getByTestId("member-roster.you").closest("li")?.getAttribute("data-fingerprint")).toBe(
+        "aa".repeat(32).slice(0, 16),
+      );
       // The owner row still reads as the owner (role badge) and shows no name.
       const roles = screen.getAllByTestId("member-roster.role");
       expect(roles[0].textContent).toBe("sync.memberRoster.ownerBadge");

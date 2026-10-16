@@ -23,9 +23,9 @@ import {
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 /** One row of the menu: an actionable item or a section divider. */
 export type NoteActionMenuItem =
@@ -219,7 +219,7 @@ export function NoteActionsMenu({
         aria-label={label}
         title={label}
         data-testid="editor.note-actions-menu"
-        {...hoverSurface()}
+        {...interactiveSurface()}
         style={BUTTON_STYLE}
       >
         <Icon name="more-horizontal" size={16} />
@@ -277,10 +277,10 @@ export function NoteActionsMenu({
               );
             }
             // Built once per row so the row's own `onMouseEnter` can CALL it.
-            // Spreading `hoverSurface()` after a hand-written `onMouseEnter`
+            // Spreading `interactiveSurface()` after a hand-written `onMouseEnter`
             // silently replaces that handler, which is how the submenu stopped
             // opening on hover while every other symptom looked fine.
-            const hover = hoverSurface({
+            const hover = interactiveSurface({
               hoverBg: item.destructive ? "var(--warning-soft)" : "var(--paper-3)",
             });
             const row = (
@@ -395,7 +395,7 @@ export function NoteActionsMenu({
                           child.onSelect();
                           setOpen(false);
                         }}
-                        {...hoverSurface({ hoverBg: "var(--paper-3)" })}
+                        {...interactiveSurface({ hoverBg: "var(--paper-3)" })}
                         style={{ ...ITEM_STYLE, color: "var(--fg-1)" }}
                       >
                         <span

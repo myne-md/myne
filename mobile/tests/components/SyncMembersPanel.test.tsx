@@ -10,10 +10,9 @@
 // What is under test is the ONE RULE, in arm ORDER, over `name_state` and `is_self`
 // and never over `role`:
 //
-//   1. the caller's OWN row renders the you-badge and never their own name, even
-//      when the roster reports that name as verified (a member who has just
-//      written a name would otherwise be reading their own write back as if a
-//      second device had confirmed it);
+//   1. the caller's OWN row renders its verified name like any other, plus a "You"
+//      marker beside it so its owner sees what the other members see;
+//      an UNNAMED self row keeps the badge in the name slot, there being no name;
 //   2. a row whose name is backed by a signature renders that name;
 //   3. otherwise the SHORT fingerprint, plus a marker when a record exists that
 //      no signature backs, and the claimed name is never rendered.
@@ -127,21 +126,32 @@ describe("SyncMembersPanel row identity rule (myne-md/myne#851 task 15)", () => 
     expect(document.body.textContent).not.toContain("Ada");
   });
 
-  it("puts the you-badge on the caller's own row and never that row's own name", () => {
+  it("renders the caller's own verified name with a you marker beside it", () => {
     mockMembers = [
       row({
         fingerprint_hex: "aa".repeat(32),
         is_self: true,
-        // Verified by the store, and still not rendered: the badge wins, because
-        // reading your own just-written name back proves nothing about whether
-        // anyone else can see it.
+        // The row shows the name it wrote, so its owner sees what the other
+        // members see; the "You" marker is what still says which row is theirs
+        //.
         display_name: "Ada",
         name_state: "verified",
       }),
     ];
     render(<SyncMembersPanel />);
-    expect(screen.getByTestId("sync.members.name").textContent).toBe("sync.memberRoster.youBadge");
-    expect(document.body.textContent).not.toContain("Ada");
+    expect(screen.getByTestId("sync.members.name").textContent).toBe("Ada");
+    expect(screen.getByTestId("sync.members.you").textContent).toBe(
+      "sync.memberRoster.youBadge",
+    );
+  });
+
+  it("keeps the badge in the name slot of an unnamed self row, with no marker", () => {
+    mockMembers = [row({ fingerprint_hex: "aa".repeat(32), is_self: true })];
+    render(<SyncMembersPanel />);
+    expect(screen.getByTestId("sync.members.name").textContent).toBe(
+      "sync.memberRoster.youBadge",
+    );
+    expect(screen.queryByTestId("sync.members.you")).toBeNull();
   });
 
   it("marks another person's row You only when the backend says is_self", () => {
@@ -173,8 +183,8 @@ describe("SyncMembersPanel row identity rule (myne-md/myne#851 task 15)", () => 
 
   it("renders an owner's verified name on the owner's own row like any other name", () => {
     // The assertion that fails if the rule is replaced by the role: an owner who
-    // is also the caller is the row on which "badge instead of name" and "name"
-    // collide, and the badge is the correct arm.
+    // is also the caller is the row on which the name and the "You" marker meet,
+    // and the name must still render.
     mockMembers = [
       row({
         fingerprint_hex: "44".repeat(32),
@@ -185,7 +195,10 @@ describe("SyncMembersPanel row identity rule (myne-md/myne#851 task 15)", () => 
       }),
     ];
     render(<SyncMembersPanel />);
-    expect(screen.getByTestId("sync.members.name").textContent).toBe("sync.memberRoster.youBadge");
+    expect(screen.getByTestId("sync.members.name").textContent).toBe("Omer");
+    expect(screen.getByTestId("sync.members.you").textContent).toBe(
+      "sync.memberRoster.youBadge",
+    );
   });
 
   it("always renders the role badge, in every arm", () => {

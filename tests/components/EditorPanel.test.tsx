@@ -199,8 +199,8 @@ function openTopic(topicId: string): void {
   });
 }
 
-function mount(): void {
-  render(<EditorPanel />);
+function mount(focusAnchorId?: string): void {
+  render(<EditorPanel {...(focusAnchorId === undefined ? {} : { focusAnchorId })} />);
 }
 
 beforeEach(() => {
@@ -325,6 +325,23 @@ describe("every search entry lands in the topic it names", () => {
             ? null
             : document.querySelector(`[data-testid="${entry.testid}"]`);
         if (anchored !== null || byTestid !== null) found.add(entry.id);
+      }
+      // The periodic block shows ONE period at a time behind a switcher, and the
+      // settings search opens the right period by passing the hit's id as
+      // `focusAnchorId` before the shell looks for the anchor. So an entry for a
+      // period that is not the default one is checked the way the search reaches
+      // it: mounted with its own id as the focus target.
+      for (const entry of entries) {
+        if (found.has(entry.id) || !/^editor\.(daily|weekly|monthly)-notes-/.test(entry.id)) continue;
+        cleanup();
+        openTopic(topic.id);
+        mount(entry.id);
+        await act(async () => {
+          await Promise.resolve();
+        });
+        if (document.querySelector(`[data-setting-anchor="${entry.id}"]`) !== null) {
+          found.add(entry.id);
+        }
       }
       homes.set(topic.id, found);
     }

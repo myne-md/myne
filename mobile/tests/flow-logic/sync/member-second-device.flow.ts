@@ -88,8 +88,9 @@ async function openJoin(page: Page): Promise<void> {
   await expect(page.getByTestId("identity-flow.join-phrase")).toBeVisible();
 }
 
-/** Fill the 24 phrase cells. Cell 1 carries testid `…join-phrase` and the rest
- *  are `…join-phrase-cell-N`, the flow's own naming, not a positional gamble. */
+/** Fill the 24 phrase cells, which live on wizard step 1. Cell 1 carries testid
+ *  `…join-phrase` and the rest are `…join-phrase-cell-N`, the flow's own naming,
+ *  not a positional gamble. */
 async function typePhrase(page: Page): Promise<void> {
   for (let i = 0; i < PHRASE.length; i += 1) {
     const id = i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`;
@@ -97,9 +98,16 @@ async function typePhrase(page: Page): Promise<void> {
   }
 }
 
+/** Step 1 → step 2 (the password). Gated on all 24 cells being filled. */
+async function toJoinPasswordStep(page: Page): Promise<void> {
+  await page.getByTestId("identity-flow.join-continue").click();
+  await expect(page.getByTestId("identity-flow.join.password-input")).toBeVisible();
+}
+
 /** Fill the join form and submit it, without assuming what comes next. */
 async function submitJoin(page: Page): Promise<void> {
   await typePhrase(page);
+  await toJoinPasswordStep(page);
   await page.getByTestId("identity-flow.join.password-input").fill(PASSWORD);
   await page.getByTestId("identity-flow.join.confirm-input").fill(PASSWORD);
   await expect(page.getByTestId("identity-flow.join.submit")).toBeEnabled();
@@ -148,12 +156,20 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     // No owner code, and no fingerprint to compare: the owner is read from this
     // person's own sealed profile. The accept's controls being absent is the
     // assertion, because a join that re-asked for a code it cannot verify would
-    // still be a form a user could fill in.
-    await expect(page.getByTestId("identity-flow.accept-owner-code")).toHaveCount(0);
-    await expect(page.getByTestId("identity-flow.accept-inspect")).toHaveCount(0);
-    await expect(page.getByTestId("identity-flow.accept-owner-fingerprint")).toHaveCount(0);
+    // still be a form a user could fill in. Asserted on BOTH wizard steps, since
+    // the point is that the wizard never grows such a field as it advances.
+    const expectNoOwnerCode = async (): Promise<void> => {
+      await expect(page.getByTestId("identity-flow.accept-owner-code")).toHaveCount(0);
+    };
+    await expectNoOwnerCode();
 
-    await submitJoin(page);
+    await typePhrase(page);
+    await toJoinPasswordStep(page);
+    await expectNoOwnerCode();
+    await page.getByTestId("identity-flow.join.password-input").fill(PASSWORD);
+    await page.getByTestId("identity-flow.join.confirm-input").fill(PASSWORD);
+    await expect(page.getByTestId("identity-flow.join.submit")).toBeEnabled();
+    await page.getByTestId("identity-flow.join.submit").click();
 
     // The editor, and NOT a name step: this person already has a name for this
     // vault, and the accept's name gate is a gate on a FIRST membership, which
@@ -225,15 +241,46 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
       "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
     );
 
-    // Recoverable by reading rather than by re-filling: the form is still there, the
-    // phrase is still in its cells, and no name was asked for.
+    // Recoverable by reading rather than by re-filling: the form is still there, and
+    // the phrase is still in its cells one step back.
     await expect(page.getByTestId("identity-flow.join.submit")).toBeVisible();
     await expect(page.getByTestId("identity-flow.name-input")).toHaveCount(0);
     await expect(settingsControl(page)).toHaveCount(0);
 
     // The phrase survived the refusal, so the retry costs a password and not 24
     // words. Asserted on a cell rather than on the model, because the reset that
-    // would lose it is a render-path change and this is where it would show.
+    // would lose it is a render-path change and this is where it would show. The
+    // cells are on step 1, so the wizard has to be walked back to read them.
+    await page.getByTestId("identity-flow.join-step-back").click();
+    await expect(page.getByTestId("identity-flow.join-phrase")).toHaveValue(PHRASE[0]);
+    await expect(page.getByTestId("identity-flow.join-phrase-cell-24")).toHaveValue(PHRASE[23]);
+  });
+
+  test("the join wizard steps in order, and Back preserves the phrase", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      personStatus: ENROLLED,
+      personInvites: [CLAIMED_INVITE],
+    });
+    await openIdentity(page);
+    await openJoin(page);
+
+    // Step 1: the phrase grid, with the password form NOT present.
+    await expect(page.getByTestId("identity-flow.join-step")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.join-phrase")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.join.password-input")).toHaveCount(0);
+    await expect(page.getByTestId("identity-flow.join-continue")).toBeDisabled();
+
+    await typePhrase(page);
+    await expect(page.getByTestId("identity-flow.join-continue")).toBeEnabled();
+    await page.getByTestId("identity-flow.join-continue").click();
+
+    // Step 2: the password form, with the phrase grid NOT present.
+    await expect(page.getByTestId("identity-flow.join.password-input")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.join-phrase")).toHaveCount(0);
+
+    // Back to step 1: the phrase the user typed is still in its cells.
+    await page.getByTestId("identity-flow.join-step-back").click();
     await expect(page.getByTestId("identity-flow.join-phrase")).toHaveValue(PHRASE[0]);
     await expect(page.getByTestId("identity-flow.join-phrase-cell-24")).toHaveValue(PHRASE[23]);
   });
@@ -255,6 +302,7 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     await openIdentity(page);
     await openJoin(page);
     await typePhrase(page);
+    await toJoinPasswordStep(page);
 
     const submit = page.getByTestId("identity-flow.join.submit");
     // A phrase alone is not enough: it is the portable credential, and this step

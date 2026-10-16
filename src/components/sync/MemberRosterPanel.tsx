@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useRoster, type RosterMember } from "../../hooks/useRoster";
-import { startB2bMigration, inspectInviteCode } from "../../lib/invite";
+import { startB2bMigration } from "../../lib/invite";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -137,6 +137,15 @@ const LINK_STYLE: CSSProperties = {
 const WARNING_STYLE: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--warning)",
+};
+
+/** The identity marker beside a NAMED self row. The row renders its own display
+ *  name like every other row (you see your own name where others see it), and
+ *  this is what still says which row is yours. When the self row has no verified
+ *  name the name slot itself carries the badge, so this does not double it. */
+const YOU_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
 };
 
 /** The inline rename form on the caller's own row. It WRAPS rather than laying
@@ -543,7 +552,11 @@ export function MemberRosterPanel({
                     to suppress (myne#795 UI pass). A tampered record is never
                     rendered as a name; it is absent from the payload entirely,
                     since `partition_verified` drops it, so the marker says the
-                    record failed rather than showing what it claimed. */}
+                    record failed rather than showing what it claimed. The caller's
+                    OWN row is the one addition, and only in that it also carries a
+                    "You" marker: `is_self` decides it by identity, never by role
+                    (myne#859), and its name renders like anyone else's so its
+                    owner can see what the others see. */}
                 {nameEdit?.fingerprint === m.fingerprint_hex ? (
                   <NameEditor
                     draft={nameEdit.draft}
@@ -555,9 +568,23 @@ export function MemberRosterPanel({
                     onCancel={closeNameEditor}
                   />
                 ) : m.is_self ? (
-                  <span data-testid="member-roster.name" style={NAME_STYLE}>
-                    {t("sync.memberRoster.youBadge")}
-                  </span>
+                  /* The caller's OWN row follows the same name rule as every other
+                     (a verified name is rendered where there is one), and keeps a
+                     "You" marker beside it so identity survives. Only an UNNAMED
+                     self row still shows the badge in the name slot, because there
+                     is no name to show. */
+                  <>
+                    <span data-testid="member-roster.name" style={NAME_STYLE}>
+                      {m.name_state === "verified"
+                        ? m.display_name
+                        : t("sync.memberRoster.youBadge")}
+                    </span>
+                    {m.name_state === "verified" ? (
+                      <span data-testid="member-roster.you" style={YOU_STYLE}>
+                        {t("sync.memberRoster.youBadge")}
+                      </span>
+                    ) : null}
+                  </>
                 ) : m.name_state === "verified" ? (
                   <span data-testid="member-roster.name" style={NAME_STYLE}>
                     {m.display_name}
@@ -980,9 +1007,8 @@ function RemoveConfirmDialog({
   );
 }
 
-/** The invite form. The invitee's identity code is pasted; the SAS fingerprint
- *  it decodes to is shown and must be explicitly confirmed before the invite is
- *  sealed and relayed. The code carries public material only. */
+/** The invite form. The invitee's identity code is pasted and the invite is
+ *  sealed and relayed from it. The code carries public material only. */
 function InviteMemberModal({
   busy,
   onCancel,
@@ -994,9 +1020,6 @@ function InviteMemberModal({
 }) {
   const { t } = useTranslation();
   const [code, setCode] = useState("");
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [inspectError, setInspectError] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useFocusTrap(ref, { enabled: true });
   useEscapeToClose(onCancel);
@@ -1016,53 +1039,10 @@ function InviteMemberModal({
         value={code}
         onChange={(e) => {
           setCode(e.target.value);
-          // A changed code invalidates a previous compare.
-          setFingerprint(null);
-          setConfirmed(false);
-          setInspectError(false);
         }}
         rows={4}
         style={MULTILINE_STYLE}
       />
-      {fingerprint === null ? (
-        <Button
-          type="button"
-          data-testid="member-roster.inspect"
-          disabled={code.trim() === ""}
-          onClick={async () => {
-            try {
-              const view = await inspectInviteCode(code.trim());
-              setFingerprint(view.fingerprint_hex);
-              setInspectError(false);
-            } catch {
-              setInspectError(true);
-            }
-          }}
-        >
-          {t("sync.memberRoster.inspect")}
-        </Button>
-      ) : (
-        <div data-testid="member-roster.sas">
-          <p>{t("sync.memberRoster.sasHint")}</p>
-          <code data-testid="member-roster.sas-fingerprint" style={CODE_STYLE}>
-            {fingerprint}
-          </code>
-          <label style={{ display: "block" }}>
-            <input
-              type="checkbox"
-              data-testid="member-roster.sas-confirm"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            {t("sync.memberRoster.sasConfirm")}
-          </label>
-        </div>
-      )}
-      {inspectError ? (
-        <p data-testid="member-roster.inspect-error" style={ERROR_STYLE}>
-          {t("sync.memberRoster.inviteCodeInvalid")}
-        </p>
-      ) : null}
       <Button type="button" data-testid="member-roster.invite-cancel" onClick={onCancel}>
         {t("common.cancel")}
       </Button>
@@ -1070,7 +1050,7 @@ function InviteMemberModal({
         type="button"
         variant="primary"
         data-testid="member-roster.invite-confirm"
-        disabled={busy || fingerprint === null || !confirmed}
+        disabled={busy || code.trim() === ""}
         onClick={() => onSubmit({ recipientCode: code.trim() })}
       >
         {t("sync.memberRoster.invite")}

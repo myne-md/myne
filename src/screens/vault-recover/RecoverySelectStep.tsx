@@ -38,6 +38,7 @@ import i18n from "../../i18n";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { Input } from "../../components/primitives/Input";
+import { NEUTRAL_PRESS_BG, usePressSurface } from "../../components/primitives/pressSurface";
 import { Spinner } from "../../components/Spinner";
 import {
   listVaults,
@@ -115,7 +116,7 @@ const LIST_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
-function rowStyle(hovered: boolean): CSSProperties {
+function rowStyle(hovered: boolean, pressed: boolean): CSSProperties {
   return {
     display: "flex",
     flexDirection: "row",
@@ -126,7 +127,13 @@ function rowStyle(hovered: boolean): CSSProperties {
     boxSizing: "border-box",
     padding: "var(--space-3) var(--space-4)",
     borderRadius: "var(--radius-2)",
-    background: hovered ? "var(--bg-2)" : "var(--bg-1)",
+    // Press wins over hover, because it is the more specific fact and the row is
+    // by definition still hovered while it is being pressed.
+    background: pressed
+      ? NEUTRAL_PRESS_BG
+      : hovered
+        ? "var(--bg-2)"
+        : "var(--bg-1)",
     border: `1px solid ${hovered ? "var(--line-2)" : "var(--line-1)"}`,
     cursor: "pointer",
     textAlign: "start",
@@ -205,6 +212,7 @@ function VaultRow({
   onSelect: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const { pressed, handlers } = usePressSurface();
   const real = vault.label != null;
   return (
     <button
@@ -214,9 +222,10 @@ function VaultRow({
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
+      {...handlers}
       data-testid="recover.select-row"
       data-vault-id={vault.id}
-      style={rowStyle(hovered)}
+      style={rowStyle(hovered, pressed)}
     >
       <span style={ROW_LABEL_COL_STYLE}>
         <span style={rowLabelStyle(real)}>{label}</span>

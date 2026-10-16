@@ -32,7 +32,11 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MOBILE_DIR = join(ROOT, "mobile");
 const STORIES_PORT = 1423;
-const STORIES_STORY = "ai-panel/chat/default";
+// Overridable, because `docs/dev/ui-screenshots.md` tells a caller to "point
+// STORIES_STORY at it" and the constant was the only way to do that, which meant
+// editing this file to shoot any surface but the AI panel. The default is
+// unchanged, so the documented AI-panel invocation behaves exactly as before.
+const STORIES_STORY = process.env.STORIES_STORY ?? "ai-panel/chat/default";
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -137,7 +141,16 @@ const SHOT_SCRIPT = `const { chromium } = require(${JSON.stringify(join(MOBILE_D
   await page.goto("http://localhost:${STORIES_PORT}/#${STORIES_STORY}", { waitUntil: "networkidle" });
   await page.waitForSelector('[data-testid="stories.story"]', { timeout: 20000 });
   await page.waitForTimeout(800);
-  await page.locator('[data-testid="stories.story"]').screenshot({ path: process.env.SHOT_OUT });
+  if (process.env.SHOT_FULL_PAGE === "1") {
+    // For a surface that is position:fixed. The story element contributes no
+    // height to its own box, so clipping to it cuts such a surface out of the
+    // frame entirely; the whole stage is the only honest view of where it sits.
+    // (No backticks in this comment: the script this builds is ONE template
+    // literal, and a backtick ends it, which cost a run to rediscover.)
+    await page.screenshot({ path: process.env.SHOT_OUT });
+  } else {
+    await page.locator('[data-testid="stories.story"]').screenshot({ path: process.env.SHOT_OUT });
+  }
   if (errors.length > 0) throw new Error("PAGE ERRORS: " + errors.join(" | "));
   console.log("no page errors");
   await browser.close();

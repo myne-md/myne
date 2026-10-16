@@ -235,7 +235,7 @@ async function persistDeviceNameWithRetry(
   return false;
 }
 
-export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
+export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -250,8 +250,10 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   /** The un-enrol failed — the device is STILL enrolled, and the screen must
    *  say so instead of closing (docs/decisions/ui/0482). */
   const [abortFailed, setAbortFailed] = useState(false);
-  // Device-join via QR (MYND-466): the decoded QR held for the confirm step.
-  const [scanned, setScanned] = useState<JoinQrView | null>(null);
+  // Device-join via QR (MYND-466): the decoded QR held for the confirm step. The
+  // `account` arm only, because the confirm step exists to show an account number
+  // and the `member_vault` arm has none (`onMemberJoin` takes it instead).
+  const [scanned, setScanned] = useState<Extract<JoinQrView, { kind: "account" }> | null>(null);
 
   // MYND-548: this device's own name — the same hook the Settings enrollment panel
   // uses, so the two doors cannot drift.
@@ -349,6 +351,16 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       const view = await syncDecodeJoinQr(res.value);
       if (!view.fresh) {
         setError(t("join.qr.expired"));
+        return;
+      }
+      // One door, the code decides. A `member_vault` code names a shared vault this
+      // person is already a member of, being added to THIS device: there is no
+      // account number for the confirm step to show and the credential it needs is
+      // the identity phrase, not this vault's password. So it never reaches the
+      // confirm step — it hands the target back to the shell, which opens the
+      // identity flow's join wizard for that vault.
+      if (view.kind === "member_vault") {
+        onMemberJoin({ endpointUrl: view.endpoint_url, accountHashHex: view.account_hash_hex });
         return;
       }
       setScanned(view);
@@ -471,7 +483,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     return (
       <Screen style={{ alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
         <div data-testid="sync.join.pending" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ marginBottom: 22, animation: "myne-spinner-rotate 2.4s linear infinite" }}>
+          <svg className="myne-spinner" width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ marginBottom: 22 }}>
             <circle cx="28" cy="28" r="24" stroke="var(--line-1)" strokeWidth="2" />
             <path d="M28 4a24 24 0 0 1 24 24" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
           </svg>

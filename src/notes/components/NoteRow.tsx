@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { labelColorVar } from "../decorations";
 import type { TitleRecord } from "../loadNoteBatch";
 import { DRAWING_KIND_VALUE, TASK_KIND_VALUE } from "../../dialect";
+import { NEUTRAL_PRESS_BG, usePressSurface } from "../../components/primitives/pressSurface";
 import { uuidv7Ms } from "../sidebarState";
 import { Icon } from "../../components/primitives/Icon";
 import { StatusMark } from "../../components/Spinner";
@@ -403,6 +404,7 @@ export function NoteRow(props: NoteRowProps) {
   } = props;
 
   const [hovering, setHovering] = useState(false);
+  const { pressed, handlers } = usePressSurface();
   // Star shows when favorited (filled badge) or, when the toggle is wired,
   // on hover (hollow outline = "add to favorites"). Hidden during rename.
   const showStar =
@@ -502,7 +504,15 @@ export function NoteRow(props: NoteRowProps) {
     ...rowBaseStyle,
     ...(showTimestamps ? {} : rowCompactStyle),
     ...colorWash,
-    ...(highlighted ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
+    // Press outranks the selected and hover fills: it is the more specific fact,
+    // and the row is by definition still hovered while it is being pressed.
+    ...(pressed
+      ? { background: NEUTRAL_PRESS_BG }
+      : highlighted
+        ? rowSelectedStyle
+        : hovering
+          ? rowHoverStyle
+          : {}),
   };
 
   return (
@@ -515,6 +525,7 @@ export function NoteRow(props: NoteRowProps) {
       onAuxClick={handleAuxClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      {...handlers}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       data-testid="notes.row"
