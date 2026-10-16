@@ -48,8 +48,12 @@ export default defineConfig(async () => ({
     __BUILD_COMMIT__: JSON.stringify(buildCommit()),
     // The update channel this build follows (`stable` or `beta`). A build-time
     // input, like the other defines: the release sets `MYNE_UPDATE_CHANNEL=beta`
-    // for the beta flavor, and the updater's endpoint is configured to match
-    // (`src-tauri/tauri.conf.json`). Defaults to `stable`.
+    // for the beta flavor, and the updater's endpoint is resolved from the same
+    // variable in Rust (`src-tauri/src/update/mod.rs`, `Channel::from_env`).
+    // Nothing here needs to match a second config: `tauri.conf.json`
+    // deliberately carries no endpoint, because the plugin's own list would be
+    // overridden rather than merged. `scripts/check-update-channel.mjs` holds
+    // this define and the Rust table together. Defaults to `stable`.
     __UPDATE_CHANNEL__: JSON.stringify(process.env.MYNE_UPDATE_CHANNEL ?? "stable"),
   },
 
