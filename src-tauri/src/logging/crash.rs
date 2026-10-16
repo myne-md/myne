@@ -113,11 +113,19 @@ pub fn install(log_dir: PathBuf) {
 /// the registry prefix is dropped at `/.cargo/`.
 fn workspace_relative(file: &str, line: u32) -> String {
     let root = workspace_root();
+    let root = root.trim_end_matches(['/', '\\']);
     if !root.is_empty() {
-        if let Some(tail) = file.strip_prefix(root.trim_end_matches('/')) {
-            let tail = tail.trim_start_matches('/');
-            if !tail.is_empty() {
-                return format!("{tail}:{line}");
+        // The separator is part of the prefix, so a path under a SIBLING
+        // directory whose name begins with the root's name cannot strip to a
+        // location that does not exist: `/Users/x/myne-agents/…` against root
+        // `/Users/x/myne` used to come back as `-agents/…`, and this record's
+        // whole purpose is to name a greppable location (myne#860 review).
+        for separator in ['/', '\\'] {
+            let prefix = format!("{root}{separator}");
+            if let Some(tail) = file.strip_prefix(&prefix) {
+                if !tail.is_empty() {
+                    return format!("{tail}:{line}");
+                }
             }
         }
     }
@@ -168,7 +176,21 @@ fn write_record(log_dir: &Path, location: &str) -> std::io::Result<()> {
 /// absent: saying "there was a crash and the file is unreadable" is the honest
 /// answer, and hiding it would make the surface lie about the residue.
 pub fn read_state(log_dir: &Path) -> Option<CrashState> {
-    let raw = std::fs::read_to_string(log_dir.join(CRASH_FILE_NAME)).ok()?;
+    let raw = match std::fs::read_to_string(log_dir.join(CRASH_FILE_NAME)) {
+        Ok(raw) => raw,
+        // ABSENT is the only "no record" answer. A present-but-unreadable file
+        // is reported as present with an unknown date, which is the sentence
+        // above taken literally and is why `at_epoch_seconds` may be `0`. Folding
+        // it into `None` would hide a no-consent artefact from the surface AND
+        // from the report that would otherwise clear it, so its lifetime would
+        // be unbounded, which is the one thing a no-consent record may not be.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(_) => {
+            return Some(CrashState {
+                at_epoch_seconds: 0,
+            })
+        }
+    };
     let at_epoch_seconds = raw
         .lines()
         .find_map(|line| line.strip_prefix("# at_epoch_seconds: "))

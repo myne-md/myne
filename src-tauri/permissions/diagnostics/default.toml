@@ -15,7 +15,7 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the diagnostics plugin: the device-local diagnostic-log switch, and the log state, crash record, reveal and report-bundle commands later tasks of this feature add."
+description = "Default permission set for the diagnostics plugin: the device-local diagnostic-log switch, the log state, the crash record, the reveal action and the report-bundle commands."
 permissions = [
     "allow-diagnostic-log-enabled-get",
     "allow-diagnostic-log-enabled-set",

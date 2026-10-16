@@ -664,7 +664,7 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [],
     manual: [],
-    exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The fail-closed screen is forceable on both lanes (corrupt vault.meta on desktop; a header-less bundle server in the web lane, whose e2e-web/support/server.ts already takes securityHeaders() as a parameter), the diagnostics field allowlist is a pure tested module (src/lib/diagnostics.ts over src/lib/collect-diagnostics.ts), the pasteboard read-back is xclip on the xvfb runner, and \"a real number or an explicit unknown, never blank/zero/NaN\" is a rendered-string assertion. Owed: e2e/diagnostics-copy.e2e.ts and e2e-web/diagnostics-block.e2e.ts.",
+    exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The fail-closed screen is forceable on both lanes (corrupt vault.meta on desktop; a header-less bundle server in the web lane, whose e2e-web/support/server.ts already takes securityHeaders() as a parameter), the diagnostics field allowlist is a pure tested module (src/lib/diagnostics.ts over src/lib/collect-diagnostics.ts), the pasteboard read-back is xclip on the xvfb runner, and \"a real number or an explicit unknown, never blank/zero/NaN\" is a rendered-string assertion. Owed: e2e-web/diagnostics-block.e2e.ts; the desktop half, e2e/diagnostics-copy.e2e.ts, landed with myne-md/myne#860.",
   },
   {
     id: "app.language-and-i18n",

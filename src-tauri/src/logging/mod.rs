@@ -68,12 +68,15 @@ pub enum LogInitError {
 pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError> {
     // Fail closed on the flag: an unreadable or unresolvable config directory
     // answers "off", which is the state in which nothing is written.
-    let enabled = app
+    //
+    // The WRITTEN value is captured separately because the two questions differ
+    // at the erase below, and only there.
+    let written = app
         .path()
         .app_config_dir()
         .ok()
-        .map(|config| flag::read_flag(&flag::flag_path_in(&config)))
-        .unwrap_or(false);
+        .and_then(|config| flag::read_flag_written(&flag::flag_path_in(&config)));
+    let enabled = written.unwrap_or(false);
 
     let dir = match app.path().app_log_dir() {
         Ok(dir) => dir,
@@ -88,6 +91,27 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
     };
 
     let sink = Arc::new(LogSink::new(dir, enabled));
+
+    // Reconcile a withdrawal the toggle's own path did not finish (myne#860).
+    //
+    // The erase runs on the toggle, synchronously, and that is still the right
+    // place for it. What it cannot promise is completion: a kill between the
+    // flag write and the erase, or a partial failure, leaves plaintext at rest
+    // with the flag saying `false`, and NOTHING else in the process would ever
+    // look again, because the sink is built from the flag and the erase is the
+    // only sweep there is. So the boot path checks, and this is the one place
+    // the written-value distinction matters: a `None` (absent, unreadable or
+    // malformed) must never trigger a delete, or a read error becomes a
+    // destruction.
+    if written == Some(false) {
+        if let Err(e) = sink.erase_log_files() {
+            tracing::warn!(
+                event = "diagnostic_log_erase_incomplete",
+                io_error_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                "the diagnostic log could not be fully erased; the next start retries"
+            );
+        }
+    }
 
     // The panic hook is installed here, once, with the same directory the sink
     // writes into. It is the feature's ONE admitted exception to "the sink is

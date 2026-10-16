@@ -5,17 +5,22 @@
 //! need no Tauri runtime (`src-tauri/AGENTS.md` plugin pattern).
 //!
 //! SEVEN commands ship in total: the switch pair, the crash record pair, the
-//! reveal action, the manifest and the report writer. This file deliberately
-//! carries NO count in prose: it said "two commands today" and stayed that way
-//! while four more landed, which is the drift a number in prose always has. The
-//! roster that has to agree is `build.rs` and
-//! `permissions/diagnostics/default.toml`, and nothing verifies that they do.
+//! reveal action, the manifest and the report writer.
+//!
+//! Prose carries no count and no tense here on purpose: this doc said "two
+//! commands today" for as long as it took four more to land, which is the drift
+//! a number in prose always has. The roster that has to agree is `build.rs`'s
+//! `InlinedPlugin::commands` and `permissions/diagnostics/default.toml`, and
+//! **nothing verifies that they do**: the mobile client's lockstep is checked by
+//! `scripts/check-mobile-plugin-acl.mjs`, and the desktop equivalent is not
+//! covered, which is stated here rather than implied by a green tick.
 
 use super::flag::{self, DiagnosticLogFlagError};
 use super::report::{self, ReportManifest};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::logging::crash::{self, CrashState};
 use crate::logging::sink::LogSink;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, Runtime, State};
@@ -37,6 +42,15 @@ pub enum DiagnosticLogError {
         /// Closed-enum mapping of `std::io::Error::kind()`.
         io_error_kind: IoFailureKind,
     },
+    /// The report destination is unusable, or resolves inside the app data
+    /// directory (which holds `vaults/`).
+    ///
+    /// Its own arm rather than `Io { Other }` because it is a REFUSAL, not a
+    /// filesystem failure: the surface can say "that location is not allowed"
+    /// instead of "the write failed", and the distinction is what a page that
+    /// skipped the save dialog runs into.
+    #[error("the report destination is not usable")]
+    InvalidDestination,
 }
 
 fn flag_to_diagnostic(error: DiagnosticLogFlagError) -> DiagnosticLogError {
@@ -80,7 +94,9 @@ pub async fn diagnostic_log_enabled_get<R: Runtime>(
 /// **The flag is written first, and the order is deliberate.** If the erase then
 /// fails, the outcome is "off, with a residue the surface reports as an error",
 /// which fails toward the privacy-relevant direction. Erasing first would leave
-/// the toggle ON after a failed erase, which fails the other way.
+/// the toggle ON after a failed erase, which fails the other way. The residue is
+/// also what `crate::logging::init` reconciles on the next start, so a failure
+/// here is retried rather than merely reported.
 ///
 /// The crash record is deliberately not erased; see `crate::logging::crash`.
 ///
@@ -176,7 +192,8 @@ pub async fn report_manifest(
 /// included one, which is the bounded lifetime privacy asks of a no-consent
 /// artefact; a save that found no record clears nothing.
 #[tauri::command]
-pub async fn save_report(
+pub async fn save_report<R: Runtime>(
+    app: AppHandle<R>,
     sink: State<'_, Arc<LogSink>>,
     block: String,
     destination: String,
@@ -184,10 +201,53 @@ pub async fn save_report(
     let io = |e: std::io::Error| DiagnosticLogError::Io {
         io_error_kind: from_io_error_kind(e.kind()),
     };
-    let included_crash =
-        report::write_bundle(&block, &sink, &PathBuf::from(destination)).map_err(io)?;
+    let destination = PathBuf::from(destination);
+    validate_report_destination(&destination, app.path().app_data_dir().ok().as_deref())?;
+    let included_crash = report::write_bundle(&block, &sink, &destination).map_err(io)?;
     if included_crash {
         crash::clear(sink.dir()).map_err(io)?;
+    }
+    Ok(())
+}
+
+/// Reject a destination that is unusable, or that resolves inside `app_data`
+/// (which contains `vaults/`).
+///
+/// **The load-bearing half of the report write.** `destination` is
+/// WebView-supplied and the writer renames over an existing path, so without
+/// this check a page that skipped the save dialog could replace `vault.meta` or
+/// a `.myn` blob with the report bundle: the arbitrary-write primitive the
+/// vault tree is supposed to be immune to, reachable from the same window every
+/// pre-unlock screen renders in. A caller with page authority is not evidence
+/// that the user chose the path, which is the mistake the removed `fs` scope
+/// made and that `secret_export::validate_secret_destination` and
+/// `export::validate_destination` both re-validate against for this exact
+/// reason.
+///
+/// Pure and testable with a temp `app_data`, so the refusal is pinned by a test
+/// rather than by the dialog's good behaviour.
+fn validate_report_destination(
+    destination: &Path,
+    app_data: Option<&Path>,
+) -> Result<(), DiagnosticLogError> {
+    // Parent must exist and be a directory, which also excludes an
+    // empty or filename-less path.
+    if !myne_core::paths::parent_dir_ok(destination) {
+        return Err(DiagnosticLogError::InvalidDestination);
+    }
+    // Canonicalize the parent (resolving symlinks and `..`) BEFORE the
+    // containment test, or a path that reaches the vault tree through either
+    // would pass a lexical comparison.
+    let canon_parent = destination
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .ok_or(DiagnosticLogError::InvalidDestination)?;
+    if let Some(app_data) = app_data {
+        if let Ok(canon_app_data) = app_data.canonicalize() {
+            if canon_parent.starts_with(&canon_app_data) {
+                return Err(DiagnosticLogError::InvalidDestination);
+            }
+        }
     }
     Ok(())
 }
@@ -225,6 +285,65 @@ mod tests {
             DiagnosticLogError::Io {
                 io_error_kind: IoFailureKind::PermissionDenied
             }
+        );
+    }
+
+    #[test]
+    fn a_destination_inside_the_app_data_vault_tree_is_refused() {
+        // The arbitrary-write refusal. A page that skipped the save dialog can
+        // still call `save_report`, and the writer renames over an existing
+        // path, so this predicate is what stands between a compromised WebView
+        // and the user's notes. Mirrors
+        // `secret_export::rejects_a_destination_inside_the_app_data_vault_tree`.
+        let app_data = ScopedTempDir::new("diagnostics-refuse-app-data").expect("tempdir");
+        let vaults = app_data.path().join("vaults").join("abc");
+        std::fs::create_dir_all(&vaults).expect("vault tree");
+
+        let inside = vaults.join("vault.meta");
+        assert_eq!(
+            validate_report_destination(&inside, Some(app_data.path())),
+            Err(DiagnosticLogError::InvalidDestination),
+            "a destination inside app_data must be refused"
+        );
+
+        // A traversal that REACHES app_data has to be refused too, which is the
+        // half a lexical comparison misses. The parent is canonicalized first
+        // for exactly this case.
+        let through_dotdot = app_data
+            .path()
+            .join("..")
+            .join(app_data.path().file_name().expect("tempdir has a name"));
+        let reached = through_dotdot.join("vaults").join("abc").join("vault.meta");
+        assert_eq!(
+            validate_report_destination(&reached, Some(app_data.path())),
+            Err(DiagnosticLogError::InvalidDestination),
+            "a destination that reaches app_data through `..` must be refused"
+        );
+    }
+
+    #[test]
+    fn an_ordinary_user_destination_is_accepted() {
+        // The non-vacuity half: the refusal above has to be a refusal of THAT
+        // shape rather than of every path there is.
+        let user_dir = ScopedTempDir::new("diagnostics-accept-user-dir").expect("tempdir");
+        let elsewhere = ScopedTempDir::new("diagnostics-accept-app-data").expect("tempdir");
+        let destination = user_dir.path().join("myne-report.txt");
+
+        assert_eq!(
+            validate_report_destination(&destination, Some(elsewhere.path())),
+            Ok(()),
+            "a destination outside app_data is what the dialog hands us"
+        );
+    }
+
+    #[test]
+    fn a_destination_with_no_parent_directory_is_refused() {
+        let dir = ScopedTempDir::new("diagnostics-refuse-no-parent").expect("tempdir");
+        let missing = dir.path().join("gone").join("report.txt");
+
+        assert_eq!(
+            validate_report_destination(&missing, None),
+            Err(DiagnosticLogError::InvalidDestination)
         );
     }
 }

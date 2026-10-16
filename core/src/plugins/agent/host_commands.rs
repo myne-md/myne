@@ -128,14 +128,16 @@ pub(crate) fn parse_probe_threshold(json: &str) -> Result<ProbeThreshold, String
 /// than available on an unverified backend. The opposite default would let a
 /// broken record switch the gate off.
 pub fn probe_threshold() -> ProbeThreshold {
-    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|_reason| {
-        // The static `event` names the failure and the fallback below is the
-        // behaviour. The callee's reason is a `String`, so the only thing this
-        // site could do with it under the DENY-list discipline is classify it,
-        // and the classification is already the arm being taken
-        // (myne-md/myne#860 removed the `%reason` field here rather than
-        // trusting a `String` to stay a compile-time literal).
-        tracing::error!(event = "agent_probe_threshold_unreadable");
+    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|reason| {
+        // `%reason` is KEPT, and it is a recorded exception in
+        // `scripts/check-tracing-discipline.mjs`: the text comes from parsing
+        // `PROBE_THRESHOLD_JSON`, which is a compile-time `include_str!` of a
+        // checked-in constant four lines up, so it can only name a JSON key or
+        // a type mismatch and can never carry a path or user data. Dropping it
+        // cost the one classification this arm had, in a change whose whole
+        // point is that a failure should say what it was (myne#860 adversarial
+        // review).
+        tracing::error!(event = "agent_probe_threshold_unreadable", reason = %reason);
         ProbeThreshold {
             attempts: 1,
             required: u8::MAX,

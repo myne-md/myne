@@ -300,7 +300,7 @@ export function runSeamContract(subject: SeamSubject): void {
     // invisible and "same tree, only the seam differs" would be asserted
     // nowhere. The names are the operations the surface actually calls, so this
     // is a contract rather than a census.
-    it("diagnostics — the whole surface exists on both arms and reaches the transport", async () => {
+    it("diagnostics: the whole surface exists on both arms and reaches the transport", async () => {
       const names = [
         "diagnosticLogEnabledGet",
         "diagnosticLogEnabledSet",

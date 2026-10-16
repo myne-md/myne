@@ -63,18 +63,18 @@ describe("diagnostic-log bindings", () => {
     // The distinction matters: the hook renders both states as "off", but it
     // records the failure. A seam that swallowed the rejection would make the
     // surface unable to say it could not read the switch.
-    invokeMock.mockRejectedValue({ kind: "io", detail: { io_error_kind: "other" } });
+    invokeMock.mockRejectedValue({ kind: "Io", detail: { io_error_kind: "Other" } });
     await expect(diagnosticLogEnabledGet()).rejects.toEqual({
-      kind: "io",
-      detail: { io_error_kind: "other" },
+      kind: "Io",
+      detail: { io_error_kind: "Other" },
     });
   });
 
   it("lets a failed write reject so the switch stays where it was", async () => {
-    invokeMock.mockRejectedValue({ kind: "io", detail: { io_error_kind: "permission_denied" } });
+    invokeMock.mockRejectedValue({ kind: "Io", detail: { io_error_kind: "PermissionDenied" } });
     await expect(diagnosticLogEnabledSet(true)).rejects.toEqual({
-      kind: "io",
-      detail: { io_error_kind: "permission_denied" },
+      kind: "Io",
+      detail: { io_error_kind: "PermissionDenied" },
     });
   });
 });
