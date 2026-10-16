@@ -2294,7 +2294,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             12), and the destructive erase stays under Account rather than beside
             them, so a rename and an erase do not read as one group on a phone's
             single scroll. Desktop draws the danger zone as its own topic of the
-            Vault panel (decisions/ui/0679, 0691), where a topic strip already
+            Vault panel (decisions/ui/0679, 0693), where a topic strip already
             keeps the two apart; a phone's drill-down has no second level to do
             that with, which is why the two clients place it differently. */}
         {panel === "account" && (

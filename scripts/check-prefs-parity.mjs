@@ -26,8 +26,8 @@
 // Rust command: the §10.2 merge class, what each client does with it, and, for
 // every row that is not `both`, a written reason from `scripts/prefs-parity.json`.
 //
-// It closes with a second, smaller record: the desktop rail panels that have no
-// mobile counterpart (`DESKTOP_ONLY_PANELS`). A panel is a SURFACE rather than a
+// It closes with a second, smaller record: the desktop-only settings surfaces
+// that have no mobile counterpart (`DESKTOP_ONLY_PANELS`). A surface is not a
 // command, so the rows cannot carry that statement, and without it a later
 // parity audit re-derives "does mobile need a Files panel" from scratch.
 //
@@ -44,14 +44,29 @@
 // The remedy differs per state, so collapsing them into "surfaced / not
 // surfaced" would lose the distinction that matters.
 //
-// A fourth state is RECORDED rather than measured: `deliberately-absent`, for a
+// A fourth state is DECLARED rather than measured: `deliberately-absent`, for a
 // control that exists on a client and is deliberately not usable there (the
-// spell row on mobile, whose backend the client does not ship). The guard
-// cannot read intent out of the tree, so the reason record carries it, and it is
-// checked both ways: a deliberate absence whose client has stopped reaching the
-// command is stale, because the record then describes a control that is not
-// there. That state is why the verdict is not a boolean: `bound-no-caller`,
-// `never-bound` and `deliberately-absent` are three different remedies.
+// spell row on mobile, whose backend the client does not ship). The guard cannot
+// read intent out of the tree, so `DELIBERATELY_ABSENT_ON` in this file carries
+// it, beside `DESKTOP_ONLY_PANELS` and for the same reason: a decision the guard
+// holds must survive a fresh `--record`, and a decision kept in the record is
+// exactly what that re-baseline rewrites. It is checked both ways: a deliberate
+// absence whose client has stopped reaching the command is stale, because the
+// declaration then describes a control that is not there. That state is why the
+// verdict is not a boolean: `bound-no-caller`, `never-bound` and
+// `deliberately-absent` are three different remedies.
+//
+// # The recorded state, because the verdict collapses three remedies
+//
+// The verdict alone cannot tell a row that is one-sided for one reason from a
+// row that is one-sided for another, and it does not move when a `called`
+// binding decays to `bound-no-caller` while the other client was already not
+// reaching the command. So the record carries each row's MEASURED `desktop` and
+// `mobile` state as well, and `reasonsCheck` compares that state BOTH ways: a
+// recorded state whose row has moved fails naming the drift, and a one-sided row
+// with no recorded state fails as unrecorded. Without it, a desktop-only row
+// whose binding dies becomes `no-ui`, its reason still applies, the ratchet is
+// unmoved, and every other arm stays green over a live defect.
 //
 // The caller decision is IMPORTED from `check-ipc-binding-callers.mjs`, along
 // with the tree read, rather than restated: a second copy of "what counts as a
@@ -73,9 +88,12 @@
 // regression go away. The seed path is the one exception, and it does not
 // license anything either: a fresh `--record` fills every entry with
 // `PLACEHOLDER`, which the reason check rejects BY NAME, so a baseline written
-// blind fails the very next `--check` until a human replaces each one. That is
-// the `check-ipc-binding-callers.mjs` lesson mechanised: a guard whose writer
-// seeds a string its own reader accepts is green over a record that says nothing.
+// blind fails the very next `--check` until a human replaces each one. Its
+// one-sided set is taken with `DELIBERATELY_ABSENT_ON` applied, so a row whose
+// one-sidedness is a decision rather than a measurement is seeded too instead of
+// being silently dropped. That is the `check-ipc-binding-callers.mjs` lesson
+// mechanised: a guard whose writer seeds a string its own reader accepts is
+// green over a record that says nothing.
 //
 // # Why the projection lives under docs/dev/
 //
@@ -141,14 +159,15 @@ const RECORD = process.env.MYNE_PREFS_PARITY_RECORD
 export const COMMAND_FLOOR = 76;
 
 /**
- * The desktop rail panels that have no mobile counterpart, each with the reason
- * it stays desktop-only (myne-md/myne#880 task 12).
+ * The desktop-only settings surfaces that have no mobile counterpart, each with
+ * the reason it stays desktop-only (myne-md/myne#880 task 12).
  *
- * **A panel is a SURFACE, not a command**, which is why these are not rows in
- * the table above: the commands those panels own are already rows, and what the
- * rows cannot carry is the panel-level statement. Without it a later parity
- * audit re-derives "does mobile need a Files panel" from scratch, and the answer
- * is a decision rather than a measurement.
+ * **A surface is not a command**, which is why these are not rows in the table
+ * above: the commands those surfaces own are already rows, and what the rows
+ * cannot carry is the surface-level statement. Without it a later parity audit
+ * re-derives "does mobile need a Files panel" from scratch, and the answer is a
+ * decision rather than a measurement. Five entries are rail panels and one
+ * (`cli`) is a block inside a panel rather than a panel of its own.
  *
  * The six are the PRD's own list. `vault` is deliberately NOT here: desktop
  * keeps the vault-scoped controls inside Account's own topic, and mobile
@@ -159,7 +178,7 @@ export const COMMAND_FLOOR = 76;
  * (`src/components/SettingsModal.tsx`), so a renamed panel fails by name rather
  * than leaving a reason describing something that moved. `cli` carries a `home`
  * instead, because on desktop it is a BLOCK inside Privacy rather than a rail
- * panel (the 0691 entry records the terminal joining Privacy's `Access`); its
+ * panel (the 0693 entry records the terminal joining Privacy's `Access`); its
  * home file must exist, which is the same anti-rot check one level down.
  */
 export const DESKTOP_ONLY_PANELS = [
@@ -372,7 +391,7 @@ export function mappingProblems({ commands, classification }) {
 /** What one client does with one command, as MEASURED from the tree.
  *
  * `deliberately-absent` is not here: it is a decision rather than a
- * measurement, and `applyDeliberate` layers it on from the reason record. */
+ * measurement, and `applyDeliberate` layers it on from `DELIBERATELY_ABSENT_ON`. */
 export function clientState(bound, path, command, dead) {
   const name = bound.get(command);
   if (!name) return "never-bound";
@@ -412,6 +431,30 @@ export function classifyRows({ commands, classification, desktop, mobile, dead }
 /** The clients this guard knows, and the row field each one owns. */
 export const CLIENT_FIELDS = { desktop: "desktop", mobile: "mobile" };
 
+/**
+ * The deliberate absences this guard DECLARES, keyed by command.
+ *
+ * A deliberate absence is a decision rather than a measurement, so it cannot be
+ * read out of the tree. It lives here rather than in the reason record for the
+ * same reason `DESKTOP_ONLY_PANELS` does: the record is the one thing `--record`
+ * rewrites, and a fresh baseline that dropped the declaration would turn the row
+ * back into `both` while every other check stayed green. Keeping it in code
+ * makes it survive a re-baseline by construction.
+ *
+ * `set_spell_enabled` is the one entry. The spell control exists on mobile and is
+ * deliberately not usable there, because the client ships no spell backend at all
+ * (the host's `spell` slot is omitted, so no squiggle can ever be drawn) and the
+ * row is gated rather than live. Its measured state is `called` on both clients,
+ * which is why no measurement can carry the absence.
+ *
+ * A declaration for a command the roster does not carry, or for a client the
+ * command does not reach, fails in `reasonsCheck`, so the list is compared both
+ * ways rather than trusted.
+ */
+export const DELIBERATELY_ABSENT_ON = {
+  set_spell_enabled: ["mobile"],
+};
+
 /** A record entry's reason text, whichever shape it was written in. */
 export function entryReason(entry) {
   if (typeof entry === "string") return entry;
@@ -419,25 +462,17 @@ export function entryReason(entry) {
   return undefined;
 }
 
-/** The clients an entry marks as deliberately absent on. */
-export function entryDeliberateClients(entry) {
-  if (entry && typeof entry === "object" && Array.isArray(entry.deliberatelyAbsentOn)) {
-    return entry.deliberatelyAbsentOn;
-  }
-  return [];
-}
-
 /**
- * Layer the recorded deliberate absences onto the measured rows.
+ * Layer the declared deliberate absences onto the measured rows.
  *
- * Applied only where the measured state is `called`, so the record can never
+ * Applied only where the measured state is `called`, so a declaration can never
  * invent an absence for a command the client does not reach: that direction is
- * `deliberateProblems`' job to report, and silently ignoring it here would make
- * the override a place a stale entry could hide.
+ * `reasonsCheck`' job to report, and silently ignoring it here would make the
+ * declaration a place a stale entry could hide.
  */
-export function applyDeliberate(rows, reasons) {
+export function applyDeliberate(rows, marks = {}) {
   return rows.map((row) => {
-    const clients = entryDeliberateClients(reasons[row.command]);
+    const clients = marks[row.command] ?? [];
     if (clients.length === 0) return row;
     const out = { ...row };
     for (const client of clients) {
@@ -450,39 +485,59 @@ export function applyDeliberate(rows, reasons) {
 }
 
 /**
- * The both-directions verdict on the reason record.
+ * The both-directions verdict on the reason record and the recorded states.
  *
  * `missing` is a one-sided row nobody has written down; `stale` is a reason
  * whose command is no longer one-sided; `unreasoned` is an entry whose text is
  * empty, too short, or the `--record` placeholder. `redundantDeliberate` is a
- * deliberate-absence mark on a client that no longer reaches the command, which
- * is the same staleness one level down. All four fail.
+ * declared deliberate absence on a client that no longer reaches the command,
+ * which is the same staleness one level down. `stateChanged` is a row whose
+ * RECORDED measured state no longer matches the tree while the verdict stayed
+ * one-sided, and `stateUnrecorded` is a one-sided row with no recorded state:
+ * those two are the arm that catches a live defect the verdict cannot express.
+ * All of them fail.
  */
-export function reasonsCheck({ rows, reasons }) {
+export function reasonsCheck({ rows, reasons, states = {}, marks = {} }) {
   // The verdicts are computed with the deliberate absences APPLIED, because the
-  // record is what decides them: a command the record marks deliberately absent
-  // on a client is one-sided BECAUSE of that entry, and validating the record
-  // against the raw measurement would call the entry that created the row stale.
-  const applied = applyDeliberate(rows, reasons);
+  // declaration is what decides them: a command declared deliberately absent on
+  // a client is one-sided BECAUSE of that declaration, and validating the record
+  // against the raw measurement would call the row the declaration created stale.
+  const applied = applyDeliberate(rows, marks);
   const oneSided = applied.filter((r) => r.verdict !== "both").map((r) => r.command);
   const known = new Set(applied.map((r) => r.command));
   const recorded = Object.keys(reasons);
   const byCommand = new Map(rows.map((r) => [r.command, r]));
   const redundantDeliberate = [];
   const unknownClient = [];
-  for (const [command, entry] of Object.entries(reasons)) {
+  for (const [command, clients] of Object.entries(marks)) {
     const row = byCommand.get(command);
-    for (const client of entryDeliberateClients(entry)) {
+    for (const client of clients) {
       if (!(client in CLIENT_FIELDS)) {
         unknownClient.push(`${command} (${client})`);
         continue;
       }
       // Only a client that MEASURABLY reaches the command can be deliberately
-      // absent on it. Anywhere else the mark describes nothing.
+      // absent on it. Anywhere else the declaration describes nothing.
       if (!row || row[CLIENT_FIELDS[client]] !== "called") {
         redundantDeliberate.push(`${client}:${command}`);
       }
     }
+  }
+  // The recorded state, so a row whose verdict stayed one-sided but whose
+  // measurement moved is not silently accepted. `states[command]` is the
+  // signature the record carries; the signature now is read off the MEASURED row
+  // rather than the applied one, because the declaration is not a measurement.
+  const stateChanged = [];
+  const stateUnrecorded = [];
+  for (const command of oneSided) {
+    const row = byCommand.get(command);
+    const now = row ? `${row.desktop}|${row.mobile}` : "gone";
+    const was = states[command];
+    if (was === undefined) {
+      stateUnrecorded.push(command);
+      continue;
+    }
+    if (was !== now) stateChanged.push(`${command} (${was} -> ${now})`);
   }
   return {
     oneSided,
@@ -499,13 +554,20 @@ export function reasonsCheck({ rows, reasons }) {
     }),
     redundantDeliberate,
     unknownClient,
+    stateChanged,
+    stateUnrecorded,
   };
 }
 
-/** A reason that would break the generated table's own syntax. */
+/**
+ * A reason that would break the generated table's own syntax.
+ *
+ * A newline is the only character that can: `renderProjection` escapes pipes
+ * through `esc`, so a reason may legitimately contain one.
+ */
 export function badReasonText(reasons) {
   return Object.entries(reasons)
-    .filter(([, entry]) => typeof entryReason(entry) === "string" && /[|\n]/.test(entryReason(entry)))
+    .filter(([, entry]) => typeof entryReason(entry) === "string" && /\n/.test(entryReason(entry)))
     .map(([c]) => c);
 }
 
@@ -552,13 +614,16 @@ export function renderProjection(rows, reasons) {
     "reaches it; `bound-no-caller` means the binding exists and nothing calls it,",
     "which is a live defect rather than a gap; `never-bound` means the client does",
     "not wrap it at all; `deliberately-absent` means the control exists and is",
-    "deliberately not usable on that client, which the record states.",
+    "deliberately not usable on that client, which `DELIBERATELY_ABSENT_ON` in",
+    "`scripts/check-prefs-parity.mjs` declares.",
     "",
     "Every row that is not `both` carries a written reason in",
     "`scripts/prefs-parity.json`, and the guard compares that record BOTH ways: a",
     "one-sided command with no reason fails, and so does a reason whose command has",
-    "converged or left the roster. `--record` may only shrink the recorded set; it",
-    "refuses a grown one.",
+    "converged or left the roster. The record also carries each row's measured",
+    "`desktop` and `mobile` state, so a binding that stops being called is caught",
+    "even when the verdict does not move. `--record` may only shrink the recorded",
+    "set; it refuses a grown one.",
     "",
     "| Command | Class | Desktop | Mobile | Verdict | Reason |",
     "|---|---|---|---|---|---|",
@@ -572,18 +637,23 @@ export function renderProjection(rows, reasons) {
       `| \`${r.command}\` | ${r.class} | ${r.desktop} | ${r.mobile} | ${r.verdict} | ${esc(reason)} |`,
     );
   }
+  const count = (n, singular) => `${n} ${singular}${n === 1 ? "" : "s"}`;
+  const railPanels = DESKTOP_ONLY_PANELS.filter((p) => !p.home);
+  const panelBlocks = DESKTOP_ONLY_PANELS.filter((p) => p.home);
   lines.push(
     "",
     "## Panels deliberately absent on mobile",
     "",
-    "Six desktop rail panels have no mobile counterpart, so each is recorded here",
-    "as deliberately absent with the reason it stays. A later parity audit reads a",
-    "decision rather than re-deriving one. A panel is a SURFACE rather than a",
-    "command, which is why these are not rows above: the commands those panels",
-    "own are already rows, and this is the panel-level statement the rows cannot",
-    "carry. The record lives in `DESKTOP_ONLY_PANELS` in",
-    "`scripts/check-prefs-parity.mjs`, and each panel id is checked against",
-    "desktop's `PANELS_BASE`.",
+    `${count(DESKTOP_ONLY_PANELS.length, "desktop settings surface")} ` +
+      `${DESKTOP_ONLY_PANELS.length === 1 ? "has" : "have"} no mobile counterpart: ` +
+      `${count(railPanels.length, "rail panel")} and`,
+    `${count(panelBlocks.length, "block")} inside a panel. Each is recorded here as`,
+    "deliberately absent with the reason it stays. A later parity audit reads a",
+    "decision rather than re-deriving one. A surface is not a command, which is why",
+    "these are not rows above: the commands those surfaces own are already rows, and",
+    "this is the surface-level statement the rows cannot carry. The record lives in",
+    "`DESKTOP_ONLY_PANELS` in `scripts/check-prefs-parity.mjs`; each rail panel id is",
+    "checked against desktop's `PANELS_BASE` and each block's `home` file must exist.",
     "",
     "| Panel | Reason |",
     "|---|---|",
@@ -605,18 +675,26 @@ function readRecord() {
  * The one writer, so the seed path and the update path cannot drift in what
  * they preserve. Existing reasons survive by construction rather than by both
  * branches remembering to carry them; a command with no reason yet gets the
- * placeholder, which the reader rejects.
+ * placeholder, which the reader rejects. Each entry also carries the row's
+ * measured `desktop|mobile` state, so the guard can see a binding die without
+ * the verdict moving.
  */
-function writeRecord(existing, oneSided) {
+function writeRecord(existing, oneSided, states) {
   const reasons = {};
   for (const command of [...oneSided].sort()) {
     const kept = existing?.oneSided?.[command];
-    // The whole entry survives an update, not just its text: a deliberate
-    // absence recorded beside a reason is part of the record, and re-writing
-    // only the string would silently drop it.
+    // The whole entry survives an update, not just its text: a record entry is
+    // part of the record, and re-writing only the string would silently drop it.
     reasons[command] = kept ?? PLACEHOLDER;
   }
-  writeFileSync(RECORD, `${JSON.stringify({ $comment: SEED_COMMENT, oneSided: reasons }, null, 2)}\n`);
+  const recordedStates = {};
+  for (const command of Object.keys(reasons)) {
+    if (states[command]) recordedStates[command] = states[command];
+  }
+  writeFileSync(
+    RECORD,
+    `${JSON.stringify({ $comment: SEED_COMMENT, states: recordedStates, oneSided: reasons }, null, 2)}\n`,
+  );
 }
 
 const SEED_COMMENT = [
@@ -625,6 +703,12 @@ const SEED_COMMENT = [
   "reason says whether the gap is deliberate or a defect, and which remedy it",
   "needs. A reason whose command has converged fails as stale, and so does a",
   "one-sided command with no entry here: the record is compared BOTH ways.",
+  "",
+  "Every entry also carries its row's MEASURED `desktop|mobile` state in `states`,",
+  "and the guard compares that state BOTH ways: a row whose measured state moved",
+  "while its verdict stayed one-sided (a `called` binding that became",
+  "`bound-no-caller`, say) fails naming the drift, because the verdict alone",
+  "cannot tell the three remedies apart and would stay green over a live defect.",
   "",
   "A RATCHET: the set may shrink, never grow. `--record` REFUSES to write a grown",
   "set, so the command the failure message suggests cannot be used to make a",
@@ -670,6 +754,23 @@ function measure() {
   return { commands, classification, measured: rows };
 }
 
+/**
+ * The measured `desktop|mobile` signature of each named command, for the record.
+ *
+ * Reads the MEASURED rows, not the applied ones, because the record's state is
+ * the measurement: a `deliberately-absent` state is a declaration and is already
+ * held in `DELIBERATELY_ABSENT_ON`.
+ */
+function measuredStates(measured, commands) {
+  const byCommand = new Map(measured.map((r) => [r.command, r]));
+  const out = {};
+  for (const command of commands) {
+    const row = byCommand.get(command);
+    if (row) out[command] = `${row.desktop}|${row.mobile}`;
+  }
+  return out;
+}
+
 function main() {
   const wantsRecord = process.argv.includes("--record");
   const wantsEmit = process.argv.includes("--emit");
@@ -677,18 +778,23 @@ function main() {
   const { commands, classification, measured } = measure();
   const record = readRecord();
   const reasons = record?.oneSided ?? {};
+  const states = record?.states ?? {};
+  const marks = DELIBERATELY_ABSENT_ON;
   // The measured states are what the record is CHECKED against; the rows with
   // the deliberate absences applied are what the document renders and what the
   // ratchet counts.
-  const rows = applyDeliberate(measured, reasons);
+  const rows = applyDeliberate(measured, marks);
 
   if (wantsRecord) {
-    const now = reasonsCheck({ rows: measured, reasons }).oneSided;
+    const now = reasonsCheck({ rows: measured, reasons, marks }).oneSided;
+    const nowStates = measuredStates(measured, now);
     if (record === null) {
       // The seed path. It writes the placeholder into every entry, so the very
       // next --check fails until a human replaces them: a baseline written
-      // blind must not be a licence.
-      writeRecord(null, now);
+      // blind must not be a licence. Its one-sided set is taken with the
+      // declarations applied, so a row whose one-sidedness is a decision rather
+      // than a measurement is seeded rather than dropped.
+      writeRecord(null, now, nowStates);
       console.log(
         `prefs-parity: baseline written, ${now.length} one-sided command(s) of ` +
           `${rows.length}. Every entry carries the placeholder, so --check FAILS ` +
@@ -714,7 +820,7 @@ function main() {
       console.log("prefs-parity: nothing to lock in; the record already describes the tree.");
       return;
     }
-    writeRecord(record, now);
+    writeRecord(record, now, nowStates);
     console.log(
       `prefs-parity: locked in ${shrank.length} convergence(s); ${now.length} command(s) still one-sided.`,
     );
@@ -753,7 +859,7 @@ function main() {
     console.error("");
   }
 
-  const verdicts = reasonsCheck({ rows: measured, reasons });
+  const verdicts = reasonsCheck({ rows: measured, reasons, states, marks });
 
   if (verdicts.missing.length > 0) {
     failed = true;
@@ -791,9 +897,9 @@ function main() {
     );
     for (const c of verdicts.redundantDeliberate) console.error(`    ${c}`);
     console.error(
-      "\n  `deliberatelyAbsentOn` says a control exists on a client and is deliberately\n" +
+      "\n  `DELIBERATELY_ABSENT_ON` says a control exists on a client and is deliberately\n" +
         "  not usable there. Where the client does not reach the command at all, the\n" +
-        "  mark describes nothing and its remedy is the state itself.\n",
+        "  declaration describes nothing and its remedy is the state itself.\n",
     );
   }
 
@@ -802,6 +908,32 @@ function main() {
     console.error(
       `prefs-parity: ${verdicts.unknownClient.length} deliberate-absence mark(s) name an unknown\n` +
         `client (known: ${Object.keys(CLIENT_FIELDS).join(", ")}):\n    ${verdicts.unknownClient.join("\n    ")}\n`,
+    );
+  }
+
+  if (verdicts.stateUnrecorded.length > 0) {
+    failed = true;
+    console.error(
+      `prefs-parity: ${verdicts.stateUnrecorded.length} one-sided command(s) carry no recorded state:\n`,
+    );
+    for (const c of verdicts.stateUnrecorded) console.error(`    ${c}`);
+    console.error(
+      "\n  The record carries each row's measured desktop|mobile state so a `called`\n" +
+        "  binding that dies is caught even when the verdict does not move. Add it with\n" +
+        "  `node scripts/check-prefs-parity.mjs --record`.\n",
+    );
+  }
+
+  if (verdicts.stateChanged.length > 0) {
+    failed = true;
+    console.error(
+      `prefs-parity: ${verdicts.stateChanged.length} recorded state(s) no longer match the tree:\n`,
+    );
+    for (const c of verdicts.stateChanged) console.error(`    ${c}`);
+    console.error(
+      "\n  The verdict stayed one-sided, so the reason still applies, but the row's\n" +
+        "  measured state moved. A `called` binding that became `bound-no-caller` is a\n" +
+        "  live defect the verdict alone cannot express.\n",
     );
   }
 
@@ -819,8 +951,8 @@ function main() {
   if (badText.length > 0) {
     failed = true;
     console.error(
-      `prefs-parity: ${badText.length} reason(s) contain a pipe or a newline, which breaks\n` +
-        `the generated table:\n    ${badText.join("\n    ")}\n`,
+      `prefs-parity: ${badText.length} reason(s) contain a newline, which breaks the\n` +
+        `generated table:\n    ${badText.join("\n    ")}\n`,
     );
   }
 

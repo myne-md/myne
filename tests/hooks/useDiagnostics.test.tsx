@@ -132,3 +132,25 @@ describe("useDiagnostics — a failed crash-record read", () => {
     expect(result.current.crashReadFailed).toBe(true);
   });
 });
+
+describe("useDiagnostics — a manifest answer that is not a manifest", () => {
+  it("folds a host that RESOLVES undefined to unknown rather than trusting it", async () => {
+    // `invoke<T>` is an unchecked cast, so a host answering `undefined` rather
+    // than `null` put `undefined` into a state whose type says
+    // `ReportManifest | null`. The panel's `=== null` guard let it through to
+    // `.log_files` and crashed the WHOLE About panel, which is how a settings
+    // walk over every panel found it (the walk's IPC stub resolves anything it
+    // was not told about).
+    h.reportManifest.mockResolvedValueOnce(undefined);
+    const { result } = await mount();
+    expect(result.current.manifest).toBeNull();
+  });
+
+  it("still accepts a real manifest", async () => {
+    // The non-vacuity half: the fold above must not turn every answer into null.
+    const manifest = { log_files: 2, total_bytes: 512, crash_at_epoch_seconds: null };
+    h.reportManifest.mockResolvedValueOnce(manifest);
+    const { result } = await mount();
+    expect(result.current.manifest).toEqual(manifest);
+  });
+});

@@ -192,7 +192,7 @@ function renderInline(tokens: readonly Inline[], ctx: MentionContext): ReactNode
         // D3). `[[Private/Bank|Summary of your trip]]` would otherwise show one
         // name and open another, and on a surface prompt injection can reach,
         // a link whose visible text and destination disagree is exactly the
-        // exposure decision 0690 rules out. A link here names, in its own text,
+        // exposure decision 0692 rules out. A link here names, in its own text,
         // the note it opens; `noteMentions.ts`'s header states the same bound.
         const aliased = tok.label !== tok.target;
         const uuid = aliased ? undefined : wikilinkNote(tok.target, ctx);

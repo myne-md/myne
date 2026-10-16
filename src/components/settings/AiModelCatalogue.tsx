@@ -173,7 +173,7 @@ export const ROW_COMPACT_STYLE: CSSProperties = {
 export const HEADER_ROW_STYLE: CSSProperties = {
   ...ROW_STYLE,
   padding: "var(--space-1) 0",
-  borderBottom: "1px solid var(--line-2)",
+  borderBottom: "1px solid var(--line-1)",
 };
 
 export const HEADER_CELL_STYLE: CSSProperties = {

@@ -481,8 +481,14 @@ pub(crate) async fn flush_live_session_to_dir(
                 index_live_note(index.hooks, index.state, &vault_id, note_id_str, &markdown).await;
             }
             None => {
+                // No `note_id` FIELD. It is on `src-tauri/AGENTS.md`'s DENY list
+                // (a per-note vault-stable correlation tag), and this level
+                // reaches the desktop's opt-in log file, which the user is
+                // invited to attach to a public issue. The message already says
+                // what happened, which is the actionable half a report needs
+                // (myne#892 review).
                 tracing::warn!(
-                    note_id = note_id_str,
+                    event = "live_flush_body_unreadable",
                     "live flush wrote a document whose body could not be read; search doc removed"
                 );
                 index.hooks.search_remove(note_id_str);

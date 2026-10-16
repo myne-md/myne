@@ -95,8 +95,15 @@ export function buildMentionTargets(
   for (const note of notes) {
     const path = notePath(note);
     add(path, note.noteUuid);
-    // The form a model actually writes: it names a note, not a file.
-    add(path.replace(/\.md$/, ""), note.noteUuid);
+    // The form a model actually writes: it names a note, not a file. SKIPPED when
+    // the note has no title, because `notePath` then renders `<folder>/.md` and
+    // the stripped form is a bare FOLDER path: a mention of that folder in prose
+    // (`...under Projects/`) or a folder wikilink (`[[Projects/]]`, whose label
+    // equals its target so the alias guard does not refuse it) would open an
+    // untitled note the user never named, which is the wrong-note click this
+    // exact-match rule exists to prevent (myne#892 review).
+    const withoutExtension = path.replace(/\.md$/, "");
+    if (!withoutExtension.endsWith("/")) add(withoutExtension, note.noteUuid);
     if (note.title !== null) add(note.title, note.noteUuid);
   }
   return [...byText.entries()]

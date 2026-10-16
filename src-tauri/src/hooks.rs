@@ -141,8 +141,21 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
             };
             // Always reconcile the live index: an empty set removes the docs of
             // any attachment this save un-embedded.
-            if let Some(s) = app.try_state::<crate::search::SearchIndexState>() {
-                s.set_note_attachments(&note_id, &atts);
+            //
+            // **Re-checked HERE, immediately before the write.** The peek inside
+            // `note_attachment_docs` is at its ENTRY, and three awaits (the
+            // `vault.meta` read, the KEK derive, the cache walk) sit between it
+            // and this line. A check followed by awaits before the write is not a
+            // guard: the lock path wipes the search index before clearing live
+            // sessions, so a lock landing inside that window would re-insert the
+            // note's attachment titles and extracted text into the index the lock
+            // had just zeroized, and it stays resident until the next unlock
+            // (myne#892 review). This is the same peek the hook already makes, so
+            // it nests no guard and cannot deadlock.
+            if state.peek_unlocked_shared_singleton_key().await.is_some() {
+                if let Some(s) = app.try_state::<crate::search::SearchIndexState>() {
+                    s.set_note_attachments(&note_id, &atts);
+                }
             }
         })
     }
