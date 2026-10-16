@@ -811,6 +811,40 @@ steps:
       # by an empty build too.
       - node scripts/check-stories-public-bundle.mjs
 
+  # ─── Story catalogue container: headers + the served variant ──────────────
+  # The expensive half of the catalogue's two questions, deliberately narrow-
+  # globbed like `web-container-check` below: a docker build on every UI change
+  # would cost minutes to answer a question that only moves when the CONTAINER
+  # changes. The always-on half is `stories-build` above, which runs on
+  # `*code-paths` and is what a change to the shared trees actually needs.
+  stories-container-check:
+    image: docker:cli
+    when:
+      - path:
+          include:
+            - 'stories/**'
+            - 'scripts/check-stories-container-headers.sh'
+            - 'scripts/check-stories-public-bundle.mjs'
+        status: [success, failure]
+    depends_on:
+      - name: stories-build
+        optional: true
+    environment:
+      # Same reason as `web-container-check`: the check runs INSIDE this step
+      # container, whose 127.0.0.1 is its own netns, so a probe reached over a
+      # published host port answers nothing. Handing the script the step's own
+      # docker network lets it reach the probe by name. Must equal the agent's
+      # WOODPECKER_BACKEND_DOCKER_NETWORK.
+      MYNE_STORIES_TEST_NETWORK: woodpecker-workflows
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      # Asserts the EFFECTS of the image rather than its configuration: the
+      # header set, that `/healthz` answers its own body rather than the page,
+      # that an unknown path is a 404, and that the bundle it actually serves is
+      # the public variant.
+      - ./scripts/check-stories-container-headers.sh
+
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.
   # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
