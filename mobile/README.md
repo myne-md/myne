@@ -14,8 +14,9 @@ This client is **in this repository**, at `mobile/`, since 2026-08-13. The pnpm
 package is still named `myne-mobile`; the directory is not. All three clients live
 here now: the desktop client and the canonical specifications at the repository
 root, the browser client at `web/`, and this one. The server, website, ops,
-clipper, themes and branding remain companion repositories under
-[`myne-md`](https://github.com/myne-md), each with its own `AGENTS.md`.
+clipper, themes, branding and the adversarial test range remain companion
+repositories under [`myne-md`](https://github.com/myne-md), each with its own
+`AGENTS.md`.
 
 The protocol, threat model and on-disk format are defined once in
 [`docs/`](../docs) and shared by every client. Read those before touching
