@@ -643,17 +643,10 @@ fn validate_destination(
     destination: &Path,
     forbidden_roots: &[PathBuf],
 ) -> Result<(), VaultExportError> {
-    if !parent_dir_ok(destination) {
-        tracing::error!(
-            stage = "dest_check",
-            error_kind = "InvalidDestination",
-            "vault_export destination parent missing or not a directory"
-        );
-        return Err(VaultExportError::InvalidDestination);
-    }
-    let Some(parent) = destination.parent() else {
-        return Err(VaultExportError::InvalidDestination);
-    };
+    // A pre-existing destination at the tree name is its own refusal, and it is
+    // checked before the containment test so a name clash is reported as such.
+    // The parent necessarily exists when the destination does, so this cannot
+    // mask a missing-parent refusal.
     if destination.symlink_metadata().is_ok() {
         tracing::error!(
             stage = "dest_check",
@@ -662,28 +655,33 @@ fn validate_destination(
         );
         return Err(VaultExportError::DestinationAlreadyExists);
     }
-    let canon_parent = parent.canonicalize()?;
-    for root in forbidden_roots {
-        let Ok(canon_root) = root.canonicalize() else {
-            continue;
-        };
-        if canon_parent.starts_with(&canon_root) {
+    // The parent + containment contract, once, in `myne-format`'s `dest_guard`.
+    // Every resolved root is `Ok` here: this walk's forbidden roots are the app
+    // data dir and the open vault's roots, all of which the caller resolved. A
+    // root that cannot be canonicalized for a reason other than `NotFound` now
+    // REFUSES rather than skipping the comparison, which this predicate used to
+    // do (a guard that disables itself in the one state where it is needed).
+    let roots: Vec<crate::dest_guard::ResolvedRoot> =
+        forbidden_roots.iter().cloned().map(Ok).collect();
+    match crate::dest_guard::containment_refused(destination, &roots) {
+        Ok(()) => Ok(()),
+        Err(crate::dest_guard::ContainmentRefusal::InsideRoot) => {
             tracing::error!(
                 stage = "dest_check",
                 error_kind = "DestinationNotAllowed",
                 "vault_export destination is inside the app data dir / a vault root"
             );
-            return Err(VaultExportError::DestinationNotAllowed);
+            Err(VaultExportError::DestinationNotAllowed)
+        }
+        Err(_) => {
+            tracing::error!(
+                stage = "dest_check",
+                error_kind = "InvalidDestination",
+                "vault_export destination parent missing or not a directory"
+            );
+            Err(VaultExportError::InvalidDestination)
         }
     }
-    Ok(())
-}
-
-/// The destination's parent must be non-empty and an existing directory.
-fn parent_dir_ok(path: &Path) -> bool {
-    path.parent()
-        .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
-        .is_some()
 }
 
 /// `<dest>.staging-<pid>` sibling (same directory ⇒ same filesystem ⇒ atomic

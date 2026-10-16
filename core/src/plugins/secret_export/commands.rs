@@ -26,23 +26,23 @@ use zeroize::Zeroizing;
 /// (TB6), so without the containment check a compromised WebView could bypass
 /// the save dialog and overwrite `vault.meta` / `.myn` blobs — the exact
 /// arbitrary-write the removed fs scope allowed. Mirrors
-/// `export::validate_destination`; pure + testable with a temp `app_data`.
+/// `export::validate_destination`; the predicate itself is shared
+/// (`myne_format::dest_guard`), so this is no longer a third copy.
+///
+/// **It fails CLOSED.** The first version wrapped the containment half in
+/// `if let Ok(canon_app_data) = app_data.canonicalize()` with no `else`, so a
+/// root that could not be canonicalized read as "nothing to compare against"
+/// and the guard vanished in the one state where it is still needed. Any
+/// refusal now maps to the same `InvalidDestination` the caller already
+/// handles — the user sees "pick another location", which is the right advice
+/// in every one of those states.
 fn validate_secret_destination(dest: &Path, app_data: &Path) -> Result<(), SecretExportError> {
-    // Parent must exist + be a directory (also excludes an empty/filename-less path).
-    if !crate::paths::parent_dir_ok(dest) {
-        return Err(SecretExportError::InvalidDestination);
-    }
-    // Canonicalize the parent (resolve symlinks + `..`) before the containment test.
-    let canon_parent = dest
-        .parent()
-        .and_then(|p| p.canonicalize().ok())
-        .ok_or(SecretExportError::InvalidDestination)?;
-    if let Ok(canon_app_data) = app_data.canonicalize() {
-        if canon_parent.starts_with(&canon_app_data) {
-            return Err(SecretExportError::InvalidDestination);
-        }
-    }
-    Ok(())
+    // `app_data` arrives already resolved (the host maps its resolution failure
+    // to `Err` before this point), so the only unresolved-root case is a
+    // canonicalize failure, which the helper refuses.
+    let roots = [Ok(app_data.to_path_buf())];
+    myne_format::dest_guard::containment_refused(dest, &roots)
+        .map_err(|_| SecretExportError::InvalidDestination)
 }
 
 /// Write the secret `contents` to the user-chosen `path` returned by the save
@@ -138,6 +138,31 @@ mod tests {
             validate_secret_destination(&dest, app_data.path()),
             Err(SecretExportError::InvalidDestination)
         );
+    }
+
+    #[test]
+    fn an_unresolvable_app_data_root_refuses_rather_than_skipping() {
+        // The fail-open half this predicate used to have: the containment test
+        // sat behind `if let Ok(canon_app_data) = app_data.canonicalize()` with no
+        // `else`, so a root that could not be canonicalized read as "nothing to
+        // compare against" and the write went through with only the
+        // parent-directory rule left. A path running THROUGH a regular file is
+        // the portable way to construct a non-`NotFound` canonicalize failure
+        // (ENOTDIR); a root that simply does not exist is deliberately skipped,
+        // which is asserted at the shared predicate.
+        let out = ScopedTempDir::new("secret-export-unresolvable-out").expect("tempdir");
+        let broken = ScopedTempDir::new("secret-export-unresolvable").expect("tempdir");
+        let regular_file = broken.path().join("not-a-directory");
+        std::fs::write(&regular_file, b"file").expect("seed");
+        let unresolvable_app_data = regular_file.join("subdir");
+        let dest = out.path().join("kit.txt");
+
+        assert_eq!(
+            validate_secret_destination(&dest, &unresolvable_app_data),
+            Err(SecretExportError::InvalidDestination),
+            "a root that cannot be canonicalized must refuse, not skip"
+        );
+        assert!(!dest.exists(), "nothing may be written");
     }
 
     #[test]

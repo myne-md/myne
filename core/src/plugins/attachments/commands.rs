@@ -2305,7 +2305,23 @@ pub async fn attachment_export_from_host(
 ) -> Result<(), AttachmentExportError> {
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
         .map_err(AttachmentExportError::from)?;
-    attachment_export_with_dir(io, &dir, state, &id, PathBuf::from(destination), overwrite).await
+    // The guarded roots: the whole app-data tree — which covers a SIBLING
+    // vault's blobs, a target this vault's own root does not — plus this vault's
+    // root. An `app_data_dir` resolution failure is passed through as an
+    // unresolved root rather than dropped, because the containment predicate
+    // refuses that state instead of skipping the comparison.
+    let guarded_roots: Vec<crate::paths::ResolvedRoot> =
+        vec![host.app_data_dir().map_err(|_| ()), Ok(dir.clone())];
+    attachment_export_with_dir(
+        io,
+        &dir,
+        &guarded_roots,
+        state,
+        &id,
+        PathBuf::from(destination),
+        overwrite,
+    )
+    .await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2336,6 +2352,7 @@ pub async fn attachment_export<R: Runtime>(
 pub(crate) async fn attachment_export_with_dir(
     io: &dyn VaultIo,
     vault_dir: &Path,
+    guarded_roots: &[crate::paths::ResolvedRoot],
     state: &VaultRuntimeState,
     id: &str,
     destination: PathBuf,
@@ -2345,12 +2362,25 @@ pub(crate) async fn attachment_export_with_dir(
     //     a bug-canary — the UI only exports ids it rendered.
     let id_bytes = hex_decode_id(id).ok_or(AttachmentExportError::InvalidId)?;
 
-    // (1b) Destination sanity (export-suite parity, mirrors
+    // (1b) Destination sanity (export-suite parity with
     //      `vault_export::validate_destination`): the parent must exist and be
-    //      a directory, and the destination must not itself be an existing
-    //      directory. Reject a malformed target cleanly rather than surfacing a
-    //      raw filesystem error deep in the write.
-    if !crate::paths::parent_dir_ok(&destination) || destination.is_dir() {
+    //      a directory, the destination must not itself be an existing
+    //      directory, and it must resolve outside every guarded root. Reject a
+    //      malformed or hostile target cleanly rather than surfacing a raw
+    //      filesystem error deep in the write.
+    //
+    //      The containment half was MISSING here while this comment claimed
+    //      parity: `destination` is WebView-supplied and the writer renames
+    //      over an existing path, so a page that skipped the save dialog could
+    //      overwrite `vault.meta` — in this vault or a sibling one — with
+    //      attachment bytes (TB6, the same arbitrary-write the removed fs scope
+    //      allowed). It is the ONE shared predicate now
+    //      (`myne_format::dest_guard`), not a fourth copy.
+    if destination.is_dir() {
+        tracing::debug!(stage = "dest_check", error_kind = "InvalidDestination");
+        return Err(AttachmentExportError::InvalidDestination);
+    }
+    if crate::paths::containment_refused(&destination, guarded_roots).is_err() {
         tracing::debug!(stage = "dest_check", error_kind = "InvalidDestination");
         return Err(AttachmentExportError::InvalidDestination);
     }
@@ -2759,7 +2789,20 @@ mod tests {
         destination: PathBuf,
         overwrite: bool,
     ) -> Result<(), AttachmentExportError> {
-        super::attachment_export_with_dir(io(), vault_dir, state, id, destination, overwrite).await
+        // The vault's own root as the single guarded root: enough for every
+        // assertion the suite makes, and the app-data root the host command adds
+        // only widens the refusal.
+        let roots = [Ok(vault_dir.to_path_buf())];
+        super::attachment_export_with_dir(
+            io(),
+            vault_dir,
+            &roots,
+            state,
+            id,
+            destination,
+            overwrite,
+        )
+        .await
     }
 
     async fn rewrite_catalog_dropping_unused(
@@ -3029,6 +3072,47 @@ mod tests {
                 result,
                 Err(AttachmentExportError::InvalidDestination)
             ));
+        });
+    }
+
+    #[test]
+    fn export_rejects_a_destination_inside_a_guarded_root() {
+        // The containment half, which this command did not have while its own
+        // comment claimed export-suite parity. The destination is
+        // WebView-supplied and the writer renames over an existing path, so
+        // without this a page that skipped the save dialog could overwrite
+        // `vault.meta` with attachment bytes.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"bytes".to_vec(),
+                    filename: Some("f.bin".to_string()),
+                },
+            )
+            .await
+            .expect("import");
+            let before = std::fs::read(tmp.path().join("vault.meta")).expect("meta on disk");
+
+            let result = attachment_export_with_dir(
+                tmp.path(),
+                &state,
+                &imported.id,
+                tmp.path().join("vault.meta"),
+                true,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(AttachmentExportError::InvalidDestination)
+            ));
+            assert_eq!(
+                std::fs::read(tmp.path().join("vault.meta")).expect("meta still on disk"),
+                before,
+                "the refused destination must be untouched"
+            );
         });
     }
 
