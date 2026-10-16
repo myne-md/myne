@@ -23,6 +23,13 @@ export default defineConfig({
     // test that mounts `App` throws on a free variable the moment either path
     // runs, which is why the shell had no test at all until now.
     __STORIES_BRANCH__: JSON.stringify("test"),
+    // The shell's two leak-free guards read this too (`STORIES_PUBLIC=1` in
+    // `stories/vite.config.ts`). `false` because every test mounts the DEFAULT
+    // shell: the public variant is a different build with a different rendering,
+    // and `scripts/check-stories-public-bundle.mjs` is what asserts it — on the
+    // artefact, where the property actually lives. Leaving this undefined is the
+    // same free-variable failure the comment above records, one global later.
+    __STORIES_PUBLIC__: JSON.stringify(false),
     // `AboutPanel` reads all three compile-time globals during render. Without
     // this one the smoke check died on `settings/aboutpanel/default` with
     // `ReferenceError: __UPDATE_CHANNEL__ is not defined`. The same gap the
