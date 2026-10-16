@@ -356,6 +356,17 @@ export type Capability =
    */
   | "plainFile"
   /**
+   * The opt-in device-local diagnostic log and its bug-report surface
+   * (myne-md/myne#860). Absent on web by platform fact: the web build installs
+   * NO `tracing` subscriber and compiles every event below `warn` out of the
+   * bundle (`design-notes/ops/0366`), so there is no log to write, no
+   * platform log directory to resolve and no folder to reveal. The logging
+   * half of the surface is omitted here rather than greyed. Copying the
+   * diagnostics block is NOT behind this capability: it works everywhere and
+   * is the web client's half of the feature.
+   */
+  | "diagnosticLog"
+  /**
    * In-app desktop self-update (check for, and install, a signed update).
    *
    * Desktop-only by construction: `tauri-plugin-updater` has no browser target,
@@ -450,6 +461,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   memberSharing: true,
   detachedWindows: true,
   plainFile: true,
+  diagnosticLog: true,
   selfUpdate: true,
   liveCollabPeerPresence: true,
   liveCollabAwarenessCursors: true,

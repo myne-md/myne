@@ -39,6 +39,8 @@ import { PairingDialog } from "./components/PairingDialog";
 import { ScreenCaptureEscape } from "./components/ScreenCaptureEscape";
 import { SkipToContent } from "./components/SkipToContent";
 import { Toaster } from "./components/toast/Toaster";
+import { UpdateNotice } from "./components/update/UpdateNotice";
+import { UpdatingScreen } from "./screens/UpdatingScreen";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
 import { resetPersonIdentityState, setPersonIdentityState } from "./components/sync/personIdentityState";
 import { has } from "./platform/capabilities";
@@ -54,6 +56,7 @@ import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
 import { applyAccent, readAccent } from "./lib/accentColor";
 import { useStageRoute } from "./lib/routing";
+import { useUpdateAvailable } from "./hooks/useUpdateAvailable";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
 import { detachedNoteId as readDetachedNoteId } from "./lib/detachedWindow";
@@ -162,7 +165,10 @@ function App() {
   // already holds a person account, show the identity home instead of Welcome.
   // Probe-only state; a failed probe leaves `false` (the pre-B2B Welcome path).
   const [personEnrolled, setPersonEnrolled] = useState(false);
-  const [personIdHex, setPersonIdHex] = useState<string | null>(null);
+  // `person_id_hex` is read off the same probe and deliberately NOT kept: the
+  // identity home used to print it above the invite code, which is an unlabeled
+  // 32-byte blob a user can neither read nor act on (myne-md/myne#869). The
+  // public material that IS actionable is `identity_code`.
   const [identityCode, setIdentityCode] = useState<string | null>(null);
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
@@ -231,7 +237,6 @@ function App() {
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
       setPersonEnrolled(person.enrolled);
-      setPersonIdHex(person.person_id_hex);
       setIdentityCode(person.identity_code);
       setPersonIdentityState({
         ready: person.identity_unlocked,
@@ -547,13 +552,61 @@ function App() {
     };
   }, [stageName, plainScreen]);
 
+  // Desktop self-update (myne-md/myne#870). Mounted HERE rather than in the
+  // editor because the flow outlives the editor: the confirm locks the vault,
+  // which moves the Stage off `editor`, and the install's own state has to
+  // survive that.
+  //
+  // `enabled` gates the CHECK, and it is `editor` alone. The flow's own state
+  // (`phase`, `view`) is `useState` and survives the move to `updating` on its
+  // own, so naming that stage here would be an inert clause a reader has to
+  // reason about for nothing.
+  //
+  // What this gate does NOT reproduce is the three fail-closed takeovers
+  // `Editor.tsx` returns instead of its chrome (`StorageLost`, `DeviceRevoked`,
+  // the invalid-state guard): those are Editor-internal, so a check can start
+  // while one is on screen, where the banner's own mount could not. Destination,
+  // payload, cadence and the device-local toggle are unchanged, and
+  // `docs/threat-model.md` §7 records the ordinary case ("ten seconds after the
+  // editor mounts"), which is what the stage gate is keyed to.
+  // The stage as of this render, for the one callback that has to read it
+  // synchronously: `onUpdateLocked` computes the transition itself so it can
+  // report a refusal rather than assume it landed.
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
+  const onUpdateLocked = useCallback(() => {
+    const prev = stageRef.current;
+    if (prev === null) return false;
+    const next = transition(prev, { type: "editor.update-start" });
+    // The transition table refuses this pair from anything but `editor`, and the
+    // refusal is reported rather than swallowed: something else left `editor`
+    // during the flush (an idle lock, a vault switch), so there is no updating
+    // screen to put an install on and the flow must not start one.
+    if (next.name !== "updating") return false;
+    setStage(next);
+    return true;
+  }, []);
+  const update = useUpdateAvailable({
+    enabled: !plainScreen && stage?.name === "editor",
+    onLocked: onUpdateLocked,
+  });
+
   // Stage ↔ address bar (MYND-574 task 64). On desktop every call inside is a
   // seam no-op — a window has no back button and opens where the boot probe
   // says, never where a URL says. On web this is what makes back/forward stay
   // inside the app and a note view survive a reload. `src/lib/routing.ts` holds
   // the rules (what pushes, what only replaces, and why a back press is never
   // allowed to un-unlock a vault).
-  useStageRoute(stage?.name ?? null, reprobe);
+  //
+  // `updating` is deliberately handed `null` rather than added to `RouteName`:
+  // it is desktop-only (the `selfUpdate` capability is what reaches it), the
+  // process is about to be replaced, and a name no client can boot into does
+  // not belong in the web client's addressable set. `null` is the hook's
+  // "nothing to record" input, so the address bar is simply left alone.
+  useStageRoute(
+    stage?.name === "updating" ? null : (stage?.name ?? null),
+    reprobe,
+  );
 
   if (stage === null) {
     // Loading shim — vault_status probe in flight (~ms on warm disk).
@@ -693,7 +746,6 @@ function App() {
         if (personEnrolled) {
           return (
             <IdentityHome
-              personIdHex={personIdHex}
               identityCode={identityCode}
               onCreateVault={() => dispatch({ type: "create-vault.start" })}
               onAccepted={() => void reprobe()}
@@ -867,6 +919,21 @@ function App() {
             onJoinDevice={() => setJoinOpen(true)}
           />
         );
+      case "updating":
+        // The install is running or has failed. `version` is never null here:
+        // the stage's only inbound edge is the notice's confirm, which exists
+        // only once the check has reported one.
+        return (
+          <UpdatingScreen
+            phase={update.phase === "failed" ? "failed" : "working"}
+            version={update.version ?? ""}
+            onRetry={update.retry}
+            // Reprobe-based exit (myne-md/myne#870): the vault was locked before
+            // the install, so boot routing answers `unlock` on its own and there
+            // is no second action to keep in step.
+            onBackToUnlock={reprobe}
+          />
+        );
       case "restore-backup":
         // Pre-unlock-class restore flow (MYND-56). Exit (cancel AND done)
         // is reprobe-based — boot routing decides the return surface, so a
@@ -962,6 +1029,24 @@ function App() {
           which is most of what the clipboard audit found. Above the stage switch,
           those surfaces have somewhere to render. */}
       <Toaster />
+      {/* The desktop update notice (myne-md/myne#870). Gated on the editor
+          stage rather than mounted by it, for the reason the `useUpdateAvailable`
+          call above gives, and it renders nothing once the offer is dismissed or
+          the client cannot self-update. */}
+      {stage.name === "editor" && !plainScreen && update.view !== null && (
+        <UpdateNotice
+          view={update.view}
+          version={update.version ?? ""}
+          notes={update.notes}
+          working={update.working}
+          blocked={update.blocked}
+          onRequestUpdate={update.request}
+          onConfirm={update.confirm}
+          onCancel={update.cancel}
+          onLater={update.later}
+          onReopen={update.reopen}
+        />
+      )}
       <PairingDialog />
       {/* The `myne://open-file` confirmation. Nothing opens until Confirm, and
           the path it shows is the host-resolved canonical one; gate-off links

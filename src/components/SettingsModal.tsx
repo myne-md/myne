@@ -41,9 +41,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "./primitives/hoverSurface";
+import { interactiveSurface } from "./primitives/interactiveSurface";
 import type { IconName } from "../lib/icons";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useOverlayInert } from "../hooks/useOverlayInert";
@@ -747,6 +747,7 @@ export function SettingsModal({
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     sync: (
       <SyncPanel
+        vaultId={vaultId}
         onMigrated={() => onForceRelock?.({ kind: "Exists" })}
         onDialogOpenChange={setChildDialogOpen}
       />
@@ -799,7 +800,7 @@ export function SettingsModal({
             data-testid="settings.close"
             onClick={onClose}
             disabled={childInFlight}
-            {...hoverSurface({ disabled: childInFlight })}
+            {...interactiveSurface({ disabled: childInFlight })}
             style={{
               ...CLOSE_BUTTON_STYLE,
               cursor: childInFlight ? "default" : "pointer",
@@ -859,7 +860,7 @@ export function SettingsModal({
                     aria-selected={isSelected}
                     aria-controls={`settings-panel-${panel.id}`}
                     tabIndex={isSelected ? 0 : -1}
-                    {...hoverSurface({
+                    {...interactiveSurface({
                       restBg: isSelected ? "var(--paper-3)" : "transparent",
                       // A selected tab already reads as current; hover only needs
                       // to answer "is this row live?" for the unselected ones.

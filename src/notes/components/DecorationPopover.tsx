@@ -24,9 +24,9 @@ import { LABEL_SLOTS, labelSlotName, labelColorVar } from "../decorations";
 import { FOLDER_ICON_NAMES } from "../folderIcons";
 import { FolderGlyph } from "./FolderGlyph";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 const POPOVER_STYLE: CSSProperties = {
   position: "fixed",
@@ -193,7 +193,7 @@ export function DecorationPopover({
           aria-label={t("notes.decoration.noColor")}
           aria-pressed={color === null}
           data-color-slot="none"
-          {...hoverSurface()}
+          {...interactiveSurface()}
           style={{
             ...SWATCH_BUTTON_BASE,
             borderColor: color === null ? "var(--accent)" : "var(--line-2)",
@@ -210,7 +210,7 @@ export function DecorationPopover({
             aria-label={labelSlotName(slot)}
             aria-pressed={color === slot}
             data-color-slot={slot}
-            {...hoverSurface()}
+            {...interactiveSurface()}
             style={{
               ...SWATCH_BUTTON_BASE,
               borderColor: color === slot ? "var(--accent)" : "transparent",
@@ -240,7 +240,7 @@ export function DecorationPopover({
               aria-label={t("notes.decoration.defaultFolderIcon")}
               aria-pressed={icon.value === null}
               data-icon-name="default"
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={{
                 ...ICON_BUTTON_BASE,
                 borderColor:
@@ -258,7 +258,7 @@ export function DecorationPopover({
                 aria-label={name}
                 aria-pressed={icon.value === name}
                 data-icon-name={name}
-                {...hoverSurface()}
+                {...interactiveSurface()}
                 style={{
                   ...ICON_BUTTON_BASE,
                   color: "var(--fg-2)",

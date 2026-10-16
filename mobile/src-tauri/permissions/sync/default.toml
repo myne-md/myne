@@ -35,7 +35,6 @@ permissions = [
     "allow-sync-person-list-invites",
     "allow-sync-person-lock",
     "allow-sync-person-create-invite",
-    "allow-sync-person-inspect-invite-code",
     "allow-sync-list-vault-invites",
     "allow-sync-person-accept-invite",
     "allow-sync-member-join-vault",
@@ -126,11 +125,6 @@ commands.allow = ["sync_person_lock"]
 identifier = "allow-sync-person-create-invite"
 description = "Allow invoking sync:sync_person_create_invite (B2B invite by person identity code: decode the invitee's public halves, seal the invite locally, bind the owner person to the vault once, and POST the sealed frame to the relay with the owner's per-vault token)."
 commands.allow = ["sync_person_create_invite"]
-
-[[permission]]
-identifier = "allow-sync-person-inspect-invite-code"
-description = "Allow invoking sync:sync_person_inspect_invite_code (pure: parse a pasted person identity code and return the person id + SAS fingerprint for the out-of-band compare; no vault, no network)."
-commands.allow = ["sync_person_inspect_invite_code"]
 
 [[permission]]
 identifier = "allow-sync-list-vault-invites"

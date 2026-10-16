@@ -179,6 +179,38 @@ interface StepCounterProps {
 }
 
 /**
+ * The segments-only half of a step counter: one bar per step, filled up to
+ * this one.
+ *
+ * `aria-hidden` because it is the at-a-glance half; the sentence beside it is
+ * what a screen reader gets. Extracted for the identity wizards
+ * (`src/components/sync/InviteWizard.tsx`), whose steps are not vault-creation
+ * steps and so cannot go through `StepCounter`, which resolves its position
+ * from `stepOrder.ts` and hard-codes `vaultCreation.stepIndicator`. Only the
+ * bar is shared; each flow keeps its own sentence, spelled statically, because
+ * `check-i18n.mjs` proves a key exists by scanning for a static `t("literal")`
+ * and a key passed as a prop would be invisible to it.
+ */
+export function StepProgress({ n, total }: { n: number; total: number }) {
+  return (
+    <div aria-hidden="true" style={{ display: "flex", gap: "var(--space-1)" }}>
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          data-filled={i < n ? "true" : "false"}
+          style={{
+            flex: 1,
+            height: 3,
+            borderRadius: "var(--radius-pill)",
+            background: i < n ? "var(--accent)" : "var(--line-2)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
  * Where the user is in vault creation: one segment per numbered step, filled up
  * to this one, over the `Step N of M: <label>` line.
  *
@@ -199,20 +231,7 @@ export function StepCounter({ step, label, testId }: StepCounterProps) {
       data-testid={testId}
       style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}
     >
-      <div aria-hidden="true" style={{ display: "flex", gap: "var(--space-1)" }}>
-        {Array.from({ length: total }, (_, i) => (
-          <div
-            key={i}
-            data-filled={i < n ? "true" : "false"}
-            style={{
-              flex: 1,
-              height: 3,
-              borderRadius: "var(--radius-pill)",
-              background: i < n ? "var(--accent)" : "var(--line-2)",
-            }}
-          />
-        ))}
-      </div>
+      <StepProgress n={n} total={total} />
       <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
         {t("vaultCreation.stepIndicator", { n, total, label })}
       </div>

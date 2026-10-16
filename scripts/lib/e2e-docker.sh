@@ -149,3 +149,22 @@ E2E_CARGO_JOBS=""
 if [[ -n "${CARGO_BUILD_JOBS:-}" ]]; then
   E2E_CARGO_JOBS="CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS"
 fi
+
+# The intra-crate half of the same problem, and on this tree it is the half that
+# bites. `CARGO_BUILD_JOBS` caps how many CRATES build at once; it says nothing
+# about how many codegen units ONE crate splits itself into, and no
+# `[profile.release]` overrides rustc's default, so `myne_desktop_lib` compiles
+# at 16 units — one `rustc` process holding 16 `opt-level=3` units' peak at once.
+#
+# Measured on a 16 GB host with a Docker VM already running unrelated containers
+# (11.66 GB, ~3.7 GB of it in use): `CARGO_BUILD_JOBS=2` and then `=1` each ended
+# in the same `… myne_desktop_lib … (signal: 9, SIGKILL)`, because the peak is
+# inside one process rather than across processes. Capping the units is what
+# lowers it.
+#
+# Opt-in, same reasoning as the cap above: unset on the host, the command line is
+# byte-identical to what it was.
+E2E_CARGO_CODEGEN_UNITS=""
+if [[ -n "${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-}" ]]; then
+  E2E_CARGO_CODEGEN_UNITS="CARGO_PROFILE_RELEASE_CODEGEN_UNITS=$CARGO_PROFILE_RELEASE_CODEGEN_UNITS"
+fi

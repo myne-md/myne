@@ -551,6 +551,17 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // no OS file ingress, no handler registration and no device-local vault
     // state to be independent of. All of its commands share this class.
     ("plain-file", Class::Unsupported),
+    // myne-md/myne#860: the opt-in device-local diagnostic log and the
+    // bug-report surface. `Unsupported` rather than `Pending`, the same call
+    // `plain-file` makes one line up: the bound issue's own scope sentence
+    // keeps only "copying the same block to the clipboard", and
+    // `design-notes/ops/0690` records the same boundary, and no port could
+    // make the logging half meaningful,
+    // because the web build installs NO subscriber and compiles every event
+    // below `warn` out of the bundle (`design-notes/ops/0366`). There is no
+    // log for it to write, no folder to reveal and no platform log directory
+    // to resolve. All of its commands share this class.
+    ("diagnostics", Class::Unsupported),
     ("quick-unlock", Class::Pending), // task 40 (the PIN path only; see PER_COMMAND)
     // Dispatched by the arm in `dispatch.rs` (tasks 41 + 88). Listed in
     // DISPATCHED below rather than defaulted here.
@@ -720,10 +731,6 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_person_lock", Class::Unsupported),
     ("plugin:sync|sync_start_b2b_migration", Class::Unsupported),
     ("plugin:sync|sync_person_create_invite", Class::Unsupported),
-    (
-        "plugin:sync|sync_person_inspect_invite_code",
-        Class::Unsupported,
-    ),
     ("plugin:sync|sync_list_roster", Class::Unsupported),
     ("plugin:sync|sync_remove_member", Class::Unsupported),
     // The member display-name store (`vault.member-names`, `MYO5`;

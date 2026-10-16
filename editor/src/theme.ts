@@ -1050,7 +1050,7 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-3, #888)",
     cursor: "grab",
     opacity: "0",
-    transition: "opacity 0.1s ease, color 0.1s ease",
+    transition: "opacity var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1086,7 +1086,7 @@ export const myneTheme = EditorView.theme({
     lineHeight: "1",
     padding: "0",
     opacity: "0",
-    transition: "opacity 0.1s ease, color 0.1s ease",
+    transition: "opacity var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
   },
   ".cm-table-del::before": { content: '"\\00d7"' }, // ×
   ".cm-table-del:hover": { color: "var(--extended-color-red-600, #c0392b)" },
@@ -1113,7 +1113,7 @@ export const myneTheme = EditorView.theme({
     fontSize: "15px",
     lineHeight: "1",
     opacity: "0",
-    transition: "opacity 0.1s ease, background 0.1s ease, color 0.1s ease",
+    transition: "opacity var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
   },
   ".cm-table-add-col::before, .cm-table-add-row::before": { content: '"+"' },
   ".cm-table-add-col": { gridArea: "addcol", width: "18px", borderRadius: "0 4px 4px 0" },
@@ -1783,7 +1783,7 @@ export const myneTheme = EditorView.theme({
     opacity: "0",
     background: "var(--fg-3)",
     borderRadius: "999px",
-    transition: "opacity 120ms ease",
+    transition: "opacity var(--duration-fast) var(--ease-standard)",
     // Above the image so the pointer lands on the handle rather than on the
     // lightbox click target underneath it.
     zIndex: "2",

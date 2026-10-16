@@ -22,7 +22,7 @@
     "legitimate growth, not a regression cover. The third is myne-md/myne#768:",
     "`src/lib/personAccount.ts::mobile/src/lib/personAccount.ts`. Desktop's wrapper",
     "is async and carries AcceptedInviteView; mobile's is a sync port of the same",
-    "six `sync_person_*` commands plus inspectInviteCode and PersonStatusView, so",
+    "six `sync_person_*` commands plus PersonStatusView, so",
     "the two genuinely differ past comments while the command names are one answer.",
     "The fourth is myne-md/myne#851 task 15, and it DOES grow the set by one pair:",
     "`src/lib/memberNames.ts::mobile/src/lib/memberNames.ts`. Both sides are new",

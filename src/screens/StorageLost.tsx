@@ -47,7 +47,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
-  ctaHover,
+  ctaInteraction,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { has } from "../platform/capabilities";
@@ -160,7 +160,7 @@ export function StorageLost({ kind, unsyncedTitles, onReDownload, onLock }: Stor
               type="button"
               onClick={onReDownload}
               style={CTA_STYLE}
-              {...ctaHover(false)}
+              {...ctaInteraction(false)}
               data-testid="storage-lost.redownload-cta"
             >
               {t("storageLost.reDownloadCta")}
@@ -171,7 +171,7 @@ export function StorageLost({ kind, unsyncedTitles, onReDownload, onLock }: Stor
             type="button"
             onClick={onLock}
             style={CTA_STYLE}
-            {...ctaHover(false)}
+            {...ctaInteraction(false)}
             data-testid="storage-lost.lock-cta"
           >
             {t("storageLost.lockCta")}

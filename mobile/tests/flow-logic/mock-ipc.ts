@@ -100,10 +100,26 @@ export interface MockConfig {
   /** `sync_person_list_invites`: the pending-invite roster the identity home
    *  renders. One row is what puts an `Open` control on screen at all. */
   personInvites?: Array<{ invite_id_hex: string; vault_account_hash_hex: string; claimed: boolean }>;
-  /** What the owner's out-of-band code decodes to (`sync_person_inspect_invite_code`),
-   *  which is the fingerprint the member compares against a channel of their own. */
-  inviteOwner?: { person_id_hex: string; fingerprint_hex: string };
-  inviteInspectError?: { kind: string };
+  /** `sync_person_setup` outcome — the identity-only setup behind the gate's
+   *  create and recover doors. `phrase: null` in the RESULT is what tells the flow
+   *  it recovered (the backend returns a phrase only when it generated one), so a
+   *  spec driving the recover door sets it to `null` deliberately.
+   *
+   *  ABSENT IS A REFUSAL, not a benign default, and the refusal is the kind the
+   *  real backend gives a device with no endpoint configured. A stub that
+   *  "succeeded" here would hand a spec a session nobody configured and make the
+   *  gate look like it worked for a reason that is this file's invention; the
+   *  neighbour `sync_list_roster` refuses by default for the same reason. */
+  personSetupResult?: {
+    phrase: string | null;
+    fingerprint_hex: string;
+    person_id_hex: string;
+    identity_code: string;
+    approved: boolean;
+  };
+  /** `sync_person_setup` refusal, e.g. `{ kind: "BadRequest" }` for the
+   *  non-distinguishing wrong-phrase arm. */
+  personSetupError?: { kind: string };
   /** `sync_person_accept_invite` refusal. Absent = the accept lands, and the mock
    *  then reports the accepted vault from `vault_list`, which is what makes the
    *  re-probe reach the editor. */
@@ -142,12 +158,25 @@ export interface MockConfig {
    *  unless the flow says why. Distinct from `qrDecodeError`, which is a bad
    *  PAYLOAD from a scanner that worked. */
   qrScanError?: { kind: string };
-  /** `sync_decode_join_qr` outcome. */
-  qrDecode?: {
-    endpoint_url: string;
-    account_number: string;
-    fresh: boolean;
-  };
+  /** `sync_decode_join_qr` outcome, tagged by `kind` exactly as Rust's
+   *  `JoinQrView` is. `account` is the owner's device-join — the account number is
+   *  what the confirm step shows and the password is what it asks for.
+   *  `member_vault` names a shared vault this person is already a member of, being
+   *  added to THIS device: there is no account number to show, and the flow hands
+   *  the target to the identity join wizard instead (myne-md/myne). */
+  qrDecode?:
+    | {
+        kind: "account";
+        endpoint_url: string;
+        account_number: string;
+        fresh: boolean;
+      }
+    | {
+        kind: "member_vault";
+        endpoint_url: string;
+        account_hash_hex: string;
+        fresh: boolean;
+      };
   qrDecodeError?: { kind: string };
   /** Boot to the Unlock screen (one `Exists` vault, `Empty` slot) instead of
    *  straight to the editor — for the quick-unlock / password unlock flows. */
@@ -348,6 +377,19 @@ export interface MockConfig {
    *  resolves with that transcript; `"not_ready"` / `"failed"` → rejects with
    *  that serialized `EngineError` kind. Defaults to resolving a canned string. */
   transcribe?: { text: string } | { error: "not_ready" | "too_long" | "failed" };
+  /** What `plugin:local-inference|read_transcript` answers (myne-md/myne#886):
+   *  the already-cached transcript the reader opens on, or `null` for none (the
+   *  default). A cached value puts the sheet straight into its `done` state,
+   *  which is the "read before running" path desktop calls View transcription. */
+  readTranscript?: string | null;
+  /** Segments the mock pushes through the `onSegment` channel before it
+   *  resolves (myne-md/myne#886). The real engine emits one per phrase, so this
+   *  is what lets a spec observe the running preview and the phrase-joined final
+   *  text rather than only the resolved string. */
+  transcribeSegments?: string[];
+  /** Hold the transcribe resolution for this long. The mock is otherwise
+   *  instantaneous, which makes the running state unobservable. */
+  transcribeDelayMs?: number;
   /** Whether the device-local `myne.aiOnboardingSeen` flag is set before boot.
    *  Defaults to `true`, so the first-run `AiOnboardingSheet` stays closed and
    *  its full-viewport scrim cannot swallow the clicks of every editor-mounted
@@ -1429,7 +1471,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // not-ready / failed UI branches are exercised. The streaming `onSegment`
       // channel is ignored here — the TranscribeRow renders from the resolved
       // `done` promise, so a canned final transcript is enough for flow logic.
-      "plugin:local-inference|transcribe": () => {
+      "plugin:local-inference|transcribe": async (args) => {
         const c = config.transcribe;
         if (c && "error" in c) {
           // The real `EngineError` variant names, not the normalized kinds: the
@@ -1443,9 +1485,24 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
                 : "TranscriptionFailed";
           throw { kind };
         }
+        // Stream first, then hold, then resolve — the order the real run takes,
+        // so the running state is observable when `transcribeDelayMs` is set.
+        const channel = args?.onSegment as { onmessage?: (s: string) => void } | undefined;
+        for (const seg of config.transcribeSegments ?? []) channel?.onmessage?.(seg);
+        if (config.transcribeDelayMs !== undefined) {
+          await new Promise((resolve) => setTimeout(resolve, config.transcribeDelayMs));
+        }
         return c && "text" in c ? c.text : "the quick brown fox";
       },
-      "plugin:local-inference|read_transcript": () => null,
+      "plugin:local-inference|read_transcript": () => config.readTranscript ?? null,
+      // Clipboard (myne-md/myne#886): the copy action goes through the native
+      // sensitive-pasteboard seam. Recorded rather than merely resolved so a spec
+      // can assert WHAT was copied, which is the whole point of the action.
+      "plugin:sensitive-clipboard|write_text": (args) => {
+        const w = window as unknown as { __clipboardWrites?: string[] };
+        (w.__clipboardWrites ??= []).push(String(args.value ?? ""));
+        return null;
+      },
       // ── Quick-unlock surface (per-test configurable) ──
       "plugin:quick-unlock|quick_unlock_status": () => quickUnlock,
       "plugin:quick-unlock|quick_unlock_setup_biometric": () => {
@@ -1686,12 +1743,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           sealed_keypair_present: false,
         },
       "plugin:sync|sync_person_list_invites": () => config.personInvites ?? [],
-      "plugin:sync|sync_person_inspect_invite_code": (args) => {
-        // Recorded so a spec can assert the code the form forwarded rather than
-        // merely that the fingerprint appeared.
-        (window as unknown as { __inspectArgs?: unknown }).__inspectArgs = args;
-        if (config.inviteInspectError) throw config.inviteInspectError;
-        return config.inviteOwner ?? { person_id_hex: "owner-person", fingerprint_hex: "c0ffee01" };
+      "plugin:sync|sync_person_setup": (args) => {
+        // The identity-only setup, and the ONE command behind both of the gate's
+        // doors. `phrase: null` generates a new identity and returns the phrase
+        // once; a phrase recovers an existing one. The argument is recorded under
+        // its own global because that is the whole question this tier can answer
+        // about the gate: WHICH door the phone came through. A gate with only the
+        // create arm passes `null` and looks identical on screen.
+        (window as unknown as { __personSetupArgs?: unknown }).__personSetupArgs = args;
+        if (config.personSetupError) throw config.personSetupError;
+        if (!config.personSetupResult) throw { kind: "NotConfigured" };
+        return config.personSetupResult;
       },
       "plugin:sync|sync_person_accept_invite": (args) => {
         // The four arguments, in order, are the accept's contract (task 14): the
@@ -1767,6 +1829,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.qrDecodeError) throw config.qrDecodeError;
         return (
           config.qrDecode ?? {
+            kind: "account",
             endpoint_url: "https://sync.example.com",
             account_number: "4K7P9RH2JR3T8XW6VZ0A",
             fresh: true,

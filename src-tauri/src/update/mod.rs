@@ -35,8 +35,20 @@ pub mod prefs;
 pub enum UpdateStatus {
     /// The running version is current; nothing is offered.
     UpToDate,
-    /// A newer version is available. It was verified by the updater (signature
-    /// and version gate) before this value was produced.
+    /// A newer version is available. The VERSION GATE and the version
+    /// comparator ran, and the artifact this offer names is signature-verified
+    /// when the install fetches it.
+    ///
+    /// What is deliberately NOT claimed: that the manifest this value came from
+    /// is itself signature-verified here. `tauri-plugin-updater` verifies the
+    /// artifact's minisign signature inside `download_and_install`, against the
+    /// offline release key pinned in the build, and its `check()` reaches no
+    /// signature path at all. So `version` and `notes` are transport-trusted
+    /// (TLS to `downloads.myne.md`), which is why `notes` is displayed as plain
+    /// text with no link and no input beside it. An earlier revision of this
+    /// comment said the value "was verified by the updater (signature and
+    /// version gate)", which was false for the check path and is why the
+    /// sentence is spelled out here.
     Available {
         /// The offered version, as the manifest named it.
         version: String,

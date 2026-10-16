@@ -370,6 +370,14 @@
       "transcribeFailed": "Transcription failed. Please try again.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
       "transcribeStarted": "Transcribing…",
+      "transcriptCopy": "Copy",
+      "transcriptCopied": "Transcript copied.",
+      "transcriptCopyFailed": "Couldn't copy the transcript.",
+      "transcriptEmpty": "No speech was found in this recording.",
+      "transcriptNoteTitle": "{{name}} (transcript)",
+      "transcriptSave": "Save as note",
+      "transcriptSaved": "Transcript saved as a note.",
+      "transcriptSaveFailed": "Couldn't save the transcript as a note.",
       "transcriptionModalClose": "Close transcription",
       "transcriptionModalTitle": "Transcription",
       "typeFilter": {
@@ -1493,6 +1501,7 @@
       "addListItem": "Add item…",
       "addListItemAriaLabel": "Add item to {{key}}",
       "addProperty": "+ Add property",
+      "managedField": "Myne writes this field",
       "propertiesLabel": "Properties",
       "removeListItemAriaLabel": "Remove {{item}}",
       "titleAriaLabel": "Note title",
@@ -2975,6 +2984,30 @@
       "changelogLabel": "Changelog",
       "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
+      "diagnosticLogHelper": "Writes a plaintext log on this device, and only this device. It records what Myne is doing: never your note text, never a note title, never a file path. Myne caps its size and drops the oldest entries first, and turning this back off deletes the log. Nothing is ever sent anywhere; you decide what to share.",
+      "diagnosticLogLabel": "Diagnostic logging",
+      "diagnosticLogError": "Myne could not change that setting.",
+      "diagnosticLogReadError": "Myne could not read the diagnostic logging setting, so it is shown as off.",
+      "diagnosticBlockLabel": "Report details",
+      "diagnosticBlockHelper": "Exactly what Copy puts on your clipboard. Nothing is sent anywhere; you decide what to share.",
+      "diagnosticCopy": "Copy diagnostics",
+      "diagnosticCopyDone": "Diagnostics copied",
+      "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
+      "crashRecordLabel": "Crash record",
+      "crashRecordHelper": "Myne recorded a crash on {{date}}. It holds the file and line, the version and your platform, and nothing else. Delete it whenever you like.",
+      "crashRecordClear": "Delete",
+      "diagnosticFilesLabel": "Report file",
+      "diagnosticFilesHelper_one": "One file would contain this block plus {{count}} log file, {{size}} in total. Nothing is sent anywhere; you choose where it goes.",
+      "diagnosticFilesHelper_other": "One file would contain this block plus {{count}} log files, {{size}} in total. Nothing is sent anywhere; you choose where it goes.",
+      "diagnosticFilesUnknown": "Myne has not read the log yet.",
+      "crashRecordDateUnknown": "an unknown date",
+      "diagnosticReveal": "Reveal logs folder",
+      "diagnosticSave": "Save report as file…",
+      "diagnosticSaveDone": "Report saved",
+      "diagnosticSaveFailed": "Myne could not save the report.",
+      "diagnosticRevealFailed": "Myne could not open the log folder.",
+      "crashRecordClearFailed": "Myne could not delete the crash record.",
+      "crashRecordReadFailed": "Myne could not read the crash record, so it cannot say whether one exists.",
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
       "legalPrivacy": "Privacy policy",
@@ -3828,6 +3861,7 @@
       "optionSource": "Source"
     },
     "strength": {
+      "tooWeak": "Too weak",
       "weak": "Weak",
       "fair": "Fair",
       "good": "Good",
@@ -3918,6 +3952,7 @@
         "update": "update upgrade check for updates new version release download",
         "changePassword": "change password passphrase credentials update reset",
         "changelog": "changelog release notes what is new history",
+        "diagnosticLog": "diagnostic log logging debug troubleshooting crash report bug report support",
         "cliAccess": "cli terminal access command line shell myne command console",
         "cliExcludedFolders": "cli excluded folders terminal exclude hide command line private",
         "cliRateLimit": "cli rate limit terminal speed throttle bulk pace commands per minute",
@@ -4018,12 +4053,34 @@
     "unsyncedOverflow_other": "…and {{count}} more."
   },
   "update": {
-    "banner": {
+    "notice": {
       "available": "Myne {{version}} is available.",
-      "failed": "Couldn't install the update. Try again.",
-      "installing": "Downloading the update…",
+      "consequence": "Updating locks your vault and restarts Myne. Your open notes are saved first.",
+      "flushFailed": "Myne could not save every open note, so the update did not start. Try again in a moment.",
+      "stageFailed": "Myne could not start the update because the app had already left the vault. Unlock it and try again.",
+      "lockFailed": "Myne could not lock your vault, so the update did not start.",
+      "primary": "Update and restart",
       "later": "Later",
-      "restart": "Restart to update"
+      "confirmTitle": "Update and restart Myne?",
+      "confirmBody": "Your vault will be locked and Myne will restart. Downloading and installing can take a few minutes on a slow connection.",
+      "confirmPrimary": "Lock vault and update",
+      "cancel": "Cancel",
+      "pill": "Update available"
+    },
+    "updating": {
+      "eyebrow": "Updating",
+      "heading": "Updating Myne",
+      "version": "Version {{version}}",
+      "caption": "Downloading and installing the new version.",
+      "hint": "Myne restarts on its own when this finishes. Leave the window open."
+    },
+    "failed": {
+      "eyebrow": "Update did not finish",
+      "heading": "The update did not finish",
+      "caption": "Myne {{version}} is still running and your notes are untouched.",
+      "hint": "Trying again starts the download over.",
+      "retry": "Try again",
+      "back": "Back to unlock"
     }
   },
   "sync": {
@@ -4089,6 +4146,18 @@
       "notConfigured": "Configure a sync server first, then make a QR.",
       "scanWithApp": "Scan with the iOS app",
       "title": "Add a device with a QR"
+    },
+    "memberJoinQr": {
+      "error": "Couldn’t make the code.",
+      "noAccount": "This vault’s account isn’t recorded on this device yet. Open the vault once, then try again.",
+      "hint": "This code carries your server’s address and this vault’s id. It never carries your recovery phrase or your password.",
+      "notAMember": "This vault isn’t a shared vault you’re a member of, so there’s no code to show.",
+      "notConfigured": "Configure a sync server first, then make the code.",
+      "scanWithApp": "Scan with Myne on your other device",
+      "stepIdentity": "On your other device, open Myne and choose “I already have an identity”.",
+      "stepJoin": "This shared vault will be waiting in your invitations. Open it to join.",
+      "stepPhrase": "Enter your 24-word recovery phrase there.",
+      "title": "Add your own device"
     },
     "devices": {
       "approve": "Approve",
@@ -4270,7 +4339,9 @@
       },
       "usage": {
         "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
-        "label": "Storage and devices"
+        "label": "Storage and devices",
+        "memberHelper": "How many devices are signed in to your account.",
+        "memberLabel": "Devices"
       }
     },
     "reconcile": {
@@ -4395,10 +4466,6 @@
       "personError": "That phrase did not open a member identity.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
       "inviteCodeLabel": "Member identity code",
-      "inspect": "Check fingerprint",
-      "sasHint": "Read this fingerprint to the person you are inviting, or have them read it to you. It must match on both sides before you continue.",
-      "sasConfirm": "I confirmed this fingerprint with the person out of band",
-      "inviteCodeInvalid": "That is not a valid member identity code.",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
       "removeFailed": "The member could not be removed.",
@@ -5044,14 +5111,28 @@
       "cta": "Create identity",
       "working": "Creating…"
     },
+    "recover": {
+      "open": "I already have an identity",
+      "title": "Recover your identity",
+      "lead": "Enter the 24 words of your identity recovery phrase to bring that identity onto this device. It is a different phrase from any vault recovery phrase.",
+      "submit": "Recover identity",
+      "working": "Recovering…",
+      "failed": "Could not recover an identity on this device. Check the 24 words and try again."
+    },
     "phrase": {
       "title": "Save your identity phrase",
       "warning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity. It is a different phrase from any vault recovery phrase.",
       "reveal": "Reveal",
-      "typebackLead": "To confirm you saved it, type these four words from the phrase above.",
+      "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
       "continue": "Continue"
+    },
+    "typeback": {
+      "title": "Confirm your phrase"
+    },
+    "joinFromQr": {
+      "notFound": "This code names a vault that isn’t in your invitations on this device. Ask the vault owner to send the invitation to this identity again."
     },
     "home": {
       "title": "Your identity",
@@ -5077,8 +5158,11 @@
     "heldIntro": "This device already holds an identity. Recover it with its 24-word phrase below.",
     "intro": "An identity lets people address an invite to you before you own any vault. It creates no vault and stores no notes.",
     "pending": "This device is waiting for another device on the account to approve it.",
+    "phraseTitle": "Save your identity phrase",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
-    "typeBackLead": "To confirm you saved it, type these four words from the phrase above.",
+    "phraseContinue": "Continue",
+    "confirmTitle": "Confirm your phrase",
+    "typeBackLead": "Enter these four words from the identity phrase you just saved.",
     "typeBackMismatch": "That does not match word #{{pos}}.",
     "typeBackWordAtPosition": "Word #{{pos}}",
     "recoverCta": "Recover an identity",
@@ -5106,22 +5190,26 @@
     "invitesLoading": "Checking for invitations…",
     "noInvites": "No invitations yet.",
     "subtitle": "You have an identity on this device, so people can invite you to a vault. You do not need to create one to be invited.",
+    "stepIndicator": "Step {{n}} of {{total}} · {{label}}",
+    "stepVerifyOwner": "Verify the owner",
+    "stepRecoveryPhrase": "Recovery phrase",
+    "stepDevicePassword": "Device password",
+    "phraseHeading": "Enter your recovery phrase",
+    "passwordHeading": "Password for this device",
     "accept": "Accept",
+    "acceptHeading": "Accept this invitation",
     "acceptHint": "Paste the owner’s identity code (they share it when they invite you).",
     "acceptOwnerCodeLabel": "Owner identity code",
-    "acceptInspect": "Check fingerprint",
-    "acceptSasHint": "Read this fingerprint to the vault owner, or have them read it to you. It must match on both sides before you continue.",
-    "acceptConfirm": "I confirmed this fingerprint with the owner out of band",
     "acceptSubmit": "Accept and unlock",
     "acceptPhraseLabel": "Your recovery phrase",
+    "acceptPhraseHint": "Enter the 24 words of your recovery phrase. It is yours, not the vault owner’s.",
     "acceptPasswordNote": "Choose a password for this device. It is separate from the vault owner’s password and from your recovery phrase: it unlocks this vault on this device, and your phrase remains the portable way back in.",
     "acceptError": "The invite could not be accepted.",
-    "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner's identity code (they share it when they invite you) and compare the fingerprint on both sides.",
+    "acceptErrorBadRequest": "The invite could not be verified. Paste the vault owner’s identity code (they share it when they invite you).",
     "acceptErrorNotFound": "This invitation is no longer available. It may already have been used or withdrawn. Ask the owner to send a new invite.",
     "acceptErrorNotEnrolled": "This device is not the identity this invitation was addressed to. Open the identity the invite was sent to, then accept.",
     "acceptErrorTransport": "Could not reach the sync server. Check your connection and try again.",
     "acceptErrorUnauthenticated": "Your identity is not signed in on this device. Unlock your identity and try again.",
-    "acceptInvalid": "That is not a valid owner identity code.",
     "claimedHeading": "Invites you have already claimed",
     "claimedHint": "Add one to this device with your recovery phrase. If the vault owner has since removed you from the vault, it cannot be added here.",
     "join": "Add to this device",

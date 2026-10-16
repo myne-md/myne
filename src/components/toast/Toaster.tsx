@@ -4,7 +4,7 @@
 // behind it — scaled down and nudged up — the way Sonner/Vercel stack. All
 // toasts share one fixed width, so the stack is visually uniform.
 //
-// Mounted exactly ONCE (Editor.tsx). Every toast — React-surface (via the
+// Mounted exactly ONCE (App.tsx). Every toast — React-surface (via the
 // headless <Toast> bridge) or the editor's imperative showAttachmentToast (via
 // the registered sink) — flows through here, so they all look and stack alike.
 

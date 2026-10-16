@@ -32,7 +32,7 @@ afterEach(cleanup);
 
 describe("SyncUsageBlock", () => {
   it("renders figures and a meter when a ceiling is set", () => {
-    render(<SyncUsageBlock status={status()} />);
+    render(<SyncUsageBlock showStorage status={status()} />);
 
     expect(screen.getByTestId("sync.usage")).toBeTruthy();
     expect(screen.getByTestId("sync.usage-storage").textContent).toContain("3 GiB");
@@ -47,7 +47,7 @@ describe("SyncUsageBlock", () => {
 
   it("renders NO meter when the storage ceiling is unlimited (0)", () => {
     // The self-hosted / free-beta state: usage is real, the ceiling is absent.
-    render(<SyncUsageBlock status={status({ quota_bytes: 0 })} />);
+    render(<SyncUsageBlock showStorage status={status({ quota_bytes: 0 })} />);
 
     expect(screen.queryByTestId("sync.usage-meter")).toBeNull();
     // The figure is still shown — only the "of <total>" comparison disappears.
@@ -56,7 +56,7 @@ describe("SyncUsageBlock", () => {
   });
 
   it("shows a bare device count when the device cap is unlimited (0)", () => {
-    render(<SyncUsageBlock status={status({ max_devices: 0 })} />);
+    render(<SyncUsageBlock showStorage status={status({ max_devices: 0 })} />);
 
     const devices = screen.getByTestId("sync.usage-devices").textContent ?? "";
     expect(devices).toContain("2");
@@ -65,18 +65,21 @@ describe("SyncUsageBlock", () => {
   });
 
   it("omits the frozen badge by default and renders it when frozen", () => {
-    const { unmount } = render(<SyncUsageBlock status={status()} />);
+    const { unmount } = render(<SyncUsageBlock showStorage status={status()} />);
     expect(screen.queryByTestId("sync.usage-frozen")).toBeNull();
     unmount();
 
-    render(<SyncUsageBlock status={status({ frozen: true })} />);
+    render(<SyncUsageBlock showStorage status={status({ frozen: true })} />);
     expect(screen.getByTestId("sync.usage-frozen")).toBeTruthy();
   });
 
   it("clamps the meter when usage exceeds the ceiling", () => {
     // An over-quota account must not render a >100% bar.
     render(
-      <SyncUsageBlock status={status({ stored_bytes: 12 * GIB, quota_bytes: 10 * GIB })} />,
+      <SyncUsageBlock
+        showStorage
+        status={status({ stored_bytes: 12 * GIB, quota_bytes: 10 * GIB })}
+      />,
     );
     const fill = screen.getByTestId("sync.usage-meter").firstElementChild as HTMLElement;
     expect(fill.style.width).toBe("100%");

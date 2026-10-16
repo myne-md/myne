@@ -444,7 +444,14 @@ const CSS = `
   -webkit-user-select: none;
 }
 .cm-fm-properties input,
-.cm-fm-properties textarea {
+.cm-fm-properties textarea,
+/* The read-only managed rows are spans, not inputs, so the re-enable has to
+   name them or a folder path or an updated: stamp cannot be selected or copied.
+   They are the only representation of those bytes in the interface, so losing
+   selection there would be a real loss beside the intended edit removal
+   (myne-md/myne#872). */
+.cm-fm-properties-key-static,
+.cm-fm-properties-value-static {
   user-select: text;
   -webkit-user-select: text;
 }
@@ -540,6 +547,34 @@ const CSS = `
 }
 .cm-fm-properties-value[data-property-type="number"] {
   font-variant-numeric: tabular-nums;
+}
+
+/* A Myne-managed field the app owns: the same geometry as the inputs beside it
+   so the grid does not jog, without the hover and focus affordances that
+   promise an edit. The cursor stays default rather than text, since there is no
+   caret to place. (myne-md/myne#872) */
+.cm-fm-properties-key-static,
+.cm-fm-properties-value-static {
+  font-size: 0.929em;
+  font-family: var(--font-sans);
+  padding: var(--space-1) 6px;
+  border-radius: var(--radius-1, 3px);
+  cursor: default;
+}
+.cm-fm-properties-key-static {
+  /* A managed key reads as a label rather than as a value: the same muted
+     step the icon column uses. */
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-fm-properties-value-static {
+  /* The value keeps the editable rows' ink: the state is app state, but it is
+     still what the user came to read. */
+  color: var(--fg-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The checkbox row: a real control rather than the word true in a text box. */
@@ -742,10 +777,16 @@ const CSS = `
   /* The row is display: contents, so its three cells are grid items directly.
      The key spans nothing new; the value moves under it, skipping the icon
      column so it lines up with the key rather than with the icon. */
-  .cm-fm-properties-key {
+  .cm-fm-properties-key,
+  .cm-fm-properties-key-static {
     grid-column: 2;
   }
+  /* The read-only spans are cells of the same grid and must move with the
+     inputs they stand in for; without them a managed row auto-places into the
+     24px icon column and the panel scrambles at phone width, on nearly every
+     note, because updated: is a read-only row (myne-md/myne#872). */
   .cm-fm-properties-value,
+  .cm-fm-properties-value-static,
   .cm-fm-properties-tags {
     grid-column: 2;
   }

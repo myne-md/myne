@@ -31,7 +31,7 @@ cd "$(dirname "$0")/.."
 IMAGE="${MYNE_WEB_IMAGE:-myne-web-headers-test}"
 PORT=18098
 SYNC_ORIGIN="https://sync.example.org"
-# In CI this script runs INSIDE the web-docker-build step container, whose
+# In CI this script runs INSIDE the web-container-check step container, whose
 # 127.0.0.1 is its own netns — a published host port is unreachable from it
 # ("the container never answered"). When MYNE_WEB_TEST_NETWORK is set, attach
 # the probe container to that same docker network instead and reach it by name

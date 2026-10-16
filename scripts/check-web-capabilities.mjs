@@ -56,6 +56,10 @@ const CAPABILITY_BACKING = {
   // Desktop self-update: the whole `update` plugin, absent on web by platform
   // fact (`tauri-plugin-updater` has no browser target).
   selfUpdate: ["update"],
+  // myne-md/myne#860. The whole `diagnostics` plugin: the web build installs
+  // no `tracing` subscriber at all (`design-notes/ops/0366`), so every one
+  // of its commands presupposes a log that cannot exist there.
+  diagnosticLog: ["diagnostics"],
   // No ported command surface: the watch queue is drained by native code, and
   // `captures` is gated out of the wasm build at the module level.
   watchCapture: [],
@@ -255,7 +259,6 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_member_unlock_status",
     "plugin:sync|sync_person_clear_member_unlock",
     "plugin:sync|sync_person_create_invite",
-    "plugin:sync|sync_person_inspect_invite_code",
     "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_list_roster",
     "plugin:sync|sync_remove_member",

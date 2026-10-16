@@ -81,7 +81,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
-  ctaHover,
+  ctaInteraction,
   ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { AuthHeading, AuthShell } from "./AuthShell";
@@ -100,6 +100,7 @@ import type { VaultSummary } from "../types/vault-summary";
 import { memberVaultStatus } from "../lib/personAccount";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
+import { failClosedCode } from "../lib/global-failure";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -678,6 +679,7 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "corrupted-vault" }}
+        code={failClosedCode("corrupted-vault")}
         onCtaClick={() => void failClosedExit()}
         ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
         onRestoreBackup={onRestoreBackup}
@@ -688,6 +690,7 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "io-error", ioKind: initialStatus.ioKind }}
+        code={failClosedCode("io-error")}
         onCtaClick={() => void failClosedExit()}
         ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
       />
@@ -700,6 +703,7 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "corrupted-vault" }}
+        code={failClosedCode("corrupted-vault")}
         onCtaClick={() => void failClosedExit()}
         ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
         onRestoreBackup={onRestoreBackup}
@@ -726,7 +730,7 @@ export function Unlock({
           type="button"
           onClick={onResumeRecovery}
           style={ctaStyle(false)}
-          {...ctaHover(false)}
+          {...ctaInteraction(false)}
           data-testid="unlock.resume-cta"
         >
           <span>{t("unlock.continue")}</span>
