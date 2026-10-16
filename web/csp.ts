@@ -163,6 +163,22 @@ export function buildCsp(config: CspConfig): string {
 }
 
 /**
+ * The cross-origin isolation pair, named so that there is ONE declaration of it.
+ *
+ * `web/vite.config.ts`'s dev server sends these two and nothing else from the set
+ * below, because they are the two `web/src/environment-gate.ts` probes at boot. It
+ * imports this constant rather than repeating the strings, for the reason
+ * `e2e-web/AGENTS.md` records about the bundle server: a copy would drift, and it
+ * would drift in the one direction that matters, towards a lane looser than
+ * production. A dev server whose pair no longer matched the container's would
+ * reproduce an isolation posture nobody ships, and nothing would say so.
+ */
+export const ISOLATION_HEADERS: Record<string, string> = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
+
+/**
  * The complete header set the container serves.
  *
  * Kept together with the CSP because they are one security posture, not a
@@ -186,8 +202,7 @@ export function securityHeaders(config: CspConfig): Record<string, string> {
     "Content-Security-Policy": buildCsp(config),
     // Cross-origin isolation. Costs "no third-party origins", which is already
     // committed; buys `SharedArrayBuffer` and precise timers.
-    "Cross-Origin-Opener-Policy": "same-origin",
-    "Cross-Origin-Embedder-Policy": "require-corp",
+    ...ISOLATION_HEADERS,
     "Cross-Origin-Resource-Policy": "same-origin",
     // Two years, subdomains included, preload-eligible: the bundle origin is
     // the one place a MITM is fatal (a MITM on the sync origin sees only

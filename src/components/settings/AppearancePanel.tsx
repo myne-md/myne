@@ -31,7 +31,8 @@ import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
 import { Button } from "../primitives/Button";
 import { Icon } from "../primitives/Icon";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { Switch } from "../primitives/Switch";
 import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import {
@@ -333,7 +334,7 @@ function AccentColorRow({ onDialogOpenChange }: { onDialogOpenChange?: (open: bo
               aria-label={t("settings.appearance.accentReset")}
               title={t("settings.appearance.accentReset")}
               data-testid="settings.accent-reset"
-              {...hoverSurface()}
+              {...interactiveSurface()}
               style={{
                 display: "flex",
                 alignItems: "center",

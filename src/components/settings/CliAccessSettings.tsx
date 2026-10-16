@@ -1,20 +1,31 @@
-// Settings → Privacy → Terminal access (cli-thin-client task 12, MYND-490).
+// Settings → CLI → Terminal access (cli-thin-client task 12, MYND-490).
 //
 // The user-facing surface of the CLI door: the default-off toggle, the folder
 // exclusion list, the rate-limit removal control, and a last-access line.
 //
-// # Privacy is its home, and that was the open question
+// # This is a block, and `CliPanel` is its panel
 //
-// The task called the panel placement open and the PRD recommended Privacy.
-// Privacy it is: this is an ACCESS GATE onto already-decrypted notes, which is
-// the same shape as screen-capture protection and auto-lock sitting beside it.
-// It is deliberately NOT Account, where "Connected extensions" lives — that
-// block pairs a separately-distributed application across a trust boundary
-// (TB10), whereas the `myne` sidecar ships inside this bundle, built from the
-// same workspace and the same Cargo.lock, and is never paired with anything.
-// (Not "under this bundle's own signature", which this comment said until
-// 2026-08-25: the desktop bundle carries no signature any OS checks. See
-// docs/threat-model.md TB12 and design-notes/security/0534.)
+// Placement was the open question the PRD left, and the answer moved. It was
+// Privacy, on the grounds that this is an ACCESS GATE onto already-decrypted
+// notes (the same shape as screen-capture protection and auto-lock beside it),
+// and the PRD's recommendation; `decisions/ui/0678` supersedes that, and the
+// block now renders inside the CLI panel in the developer group. The reason is
+// that the CLI is a client rather than one toggle: the CLI's own surface grows,
+// and a block inside Privacy is a home every later CLI row lands in by gravity.
+// Nothing about who can reach these rows changed, and `CliPanel`'s header
+// states why.
+//
+// What stays here is the block itself, props-driven and layout-free, so the
+// catalogue can render it against fixture props without a live prefs store
+// (the `PrivacyPanel`-and-its-rows split, one level down).
+//
+// It is still not the Account panel's shape: "Connected extensions" pairs a
+// separately-distributed application across a trust boundary (TB10), whereas
+// the `myne` sidecar ships inside this bundle, built from the same workspace
+// and the same `Cargo.lock`, and is never paired with anything. (Not "under
+// this bundle's own signature", which this comment said until 2026-08-25: the
+// desktop bundle carries no signature any OS checks. See docs/threat-model.md
+// TB12 and design-notes/security/0534.)
 //
 // # The copy is the load-bearing part
 //
@@ -188,16 +199,16 @@ export function CliAccessSettings({
   // cost.
   const seededFromRef = useRef<string[]>(excludedFolders);
   // Re-seed when the stored set changes under us, unless the user has started
-  // typing. The first-render seed above is sound here (unlike the AI twin's,
-  // because `PrivacyPanel` mounts this behind `prefs.developer_mode`, which is
-  // false until the disk read lands), but CONVERGENCE was missing: after a
-  // budget refusal or a failed write, `usePrefs.writeExcludedFolders` re-reads
-  // disk and the cache holds truth, while this textarea went on rendering the
-  // entry that was refused. The user was told once by a toast and then shown,
-  // for the rest of the session, a folder listed as excluded from the CLI that
-  // the CLI can read. That is fail-OPEN on an egress control, and it is the same
-  // fix `AiPanel` got for the same reason: `docs/threat-model.md` A17's
-  // mitigation is this list, and the CLI one is its untested sibling.
+  // typing. The first-render seed above is sound here as it is in `AiPanel`
+  // (a pane that mounts only once its panel is on screen, so the props are real
+  // by then), but CONVERGENCE was missing: after a budget refusal or a failed
+  // write, `usePrefs.writeExcludedFolders` re-reads disk and the cache holds
+  // truth, while this textarea went on rendering the entry that was refused.
+  // The user was told once by a toast and then shown, for the rest of the
+  // session, a folder listed as excluded from the CLI that the CLI can read.
+  // That is fail-OPEN on an egress control, and it is the same fix `AiPanel`
+  // got for the same reason: `docs/threat-model.md` A17's mitigation is this
+  // list, and the CLI one is its untested sibling.
   const excludedTouchedRef = useRef(false);
   useEffect(() => {
     if (excludedTouchedRef.current) return;
@@ -248,7 +259,7 @@ export function CliAccessSettings({
   return (
     <>
       <SettingRow
-        anchorId="privacy.cli-access"
+        anchorId="cli.access"
         testId="settings.cli-access"
         stateAttrs={{ "data-enabled": String(enabled) }}
         label={t("settings.cliAccess.label")}
@@ -305,7 +316,7 @@ export function CliAccessSettings({
           greying them out would force the reverse — open wide, then narrow. */}
       <div
         style={BLOCK_STYLE}
-        data-setting-anchor="privacy.cli-excluded-folders"
+        data-setting-anchor="cli.excluded-folders"
         data-setting-row="true"
         data-testid="settings.cli-exclusions"
         // A COUNT, never the names: this attribute exists so an E2E scenario can
@@ -340,7 +351,7 @@ export function CliAccessSettings({
       </div>
 
       <SettingRow
-        anchorId="privacy.cli-rate-limit"
+        anchorId="cli.rate-limit"
         testId="settings.cli-rate-limit"
         // `null` (unset) and `false` both mean "the limit applies", which is why
         // this reflects the tri-state as the same boolean the Switch shows

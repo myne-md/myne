@@ -22,6 +22,8 @@
 #     clipper only talks to instance A
 #
 # Usage: pnpm dev:two   (or: bash scripts/dev-two-desktop.sh)
+# Reset: pnpm dev:two:reset   (wipes both instances' data + the sync store; run
+#        it only while this script is NOT running)
 #
 # It ALSO builds and starts a LOCAL myne-server on http://127.0.0.1:8787 (override
 # with MYNE_DEV_SYNC_PORT) and seeds that endpoint + the beta-terms acceptance
@@ -57,6 +59,13 @@ pnpm sidecar
 # needs. A fixed loopback port (overridable with MYNE_DEV_SYNC_PORT) so both
 # instances share it, and a stable data dir under `.opencode/` (ignored) so the
 # accounts and vaults survive a restart.
+#
+# `MYNE_STORAGE_BACKEND=fs` is set alongside the path because the server's default
+# is `mem` (`myne-server/internal/httpapi/config.go`): with `mem` the accounts and
+# vaults live in RAM, the directory below stays empty, and the restart promised in
+# the sentence above loses the account with nothing said. `pnpm web:local`
+# (`scripts/dev-web.sh`) sets both as well and shares this store, so the two
+# commands cannot disagree about whether it is on disk.
 # ---------------------------------------------------------------------------
 SYNC_PORT="${MYNE_DEV_SYNC_PORT:-8787}"
 SYNC_ENDPOINT="http://127.0.0.1:${SYNC_PORT}"
@@ -77,7 +86,8 @@ fi
 if [ -n "$SERVER_BIN" ]; then
   mkdir -p "$SYNC_STORE"
   echo "==> starting the local sync server on $SYNC_ENDPOINT (store: $SYNC_STORE)"
-  MYNE_SERVER_ADDR="127.0.0.1:${SYNC_PORT}" MYNE_STORAGE_PATH="$SYNC_STORE" \
+  MYNE_SERVER_ADDR="127.0.0.1:${SYNC_PORT}" MYNE_STORAGE_BACKEND=fs \
+    MYNE_STORAGE_PATH="$SYNC_STORE" \
     "$SERVER_BIN" &
   PIDS+=("$!")
   for _ in $(seq 1 40); do

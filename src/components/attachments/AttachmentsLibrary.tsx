@@ -64,7 +64,8 @@ import { Skeleton } from "../primitives/Skeleton";
 import { VISUALLY_HIDDEN as visuallyHidden } from "../primitives/visuallyHidden";
 import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
-import { hoverSurface, HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
+import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitives/interactiveSurface";
 import type { IconName } from "../../lib/icons";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 import { UsedInNotesPopover } from "./UsedInNotesPopover";
@@ -837,7 +838,7 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
                     setQuery("");
                     searchInputRef.current?.focus();
                   }}
-                  {...hoverSurface()}
+                  {...interactiveSurface()}
                   style={SEARCH_CLEAR_STYLE}
                 >
                   <Icon name="x" size={14} />
@@ -1021,6 +1022,29 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
  * background like the secondary Button. Shows the icon for the view it would
  * switch TO (grid icon while in list, list icon while in grid).
  */
+/** The grid/list view toggle: hover deepens BOTH the fill and the border so the
+ *  hover reads on a near-black surface (`--bg-1` to `--bg-3` alone was
+ *  imperceptible), and a press confirms the click. The fill half is
+ *  `interactiveSurface`; the border change chains onto its handlers rather than
+ *  spreading around them. */
+function viewToggleSurface(): InteractiveSurfaceHandlers {
+  const surface = interactiveSurface({
+    restBg: "var(--bg-1)",
+    hoverBg: "var(--bg-3)",
+  });
+  return {
+    ...surface,
+    onMouseEnter: (e) => {
+      surface.onMouseEnter?.(e);
+      e.currentTarget.style.borderColor = "var(--line-3)";
+    },
+    onMouseLeave: (e) => {
+      surface.onMouseLeave?.(e);
+      e.currentTarget.style.borderColor = "var(--line-2)";
+    },
+  };
+}
+
 function ViewToggleButton({
   view,
   onToggle,
@@ -1040,16 +1064,7 @@ function ViewToggleButton({
       aria-label={label}
       title={label}
       style={VIEW_TOGGLE_STYLE}
-      onMouseEnter={(e) => {
-        // Deepen BOTH the fill and the border so the hover reads on a near-black
-        // surface (--bg-1 → --paper-2 alone was imperceptible).
-        e.currentTarget.style.background = "var(--bg-3)";
-        e.currentTarget.style.borderColor = "var(--line-3)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--bg-1)";
-        e.currentTarget.style.borderColor = "var(--line-2)";
-      }}
+      {...viewToggleSurface()}
     >
       <Icon name={view === "grid" ? "list" : "layout-grid"} size={16} />
     </button>
@@ -1084,6 +1099,32 @@ const TOOLBAR_BUTTON_STYLE: CSSProperties = {
     "background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
 };
 
+/** A right-cluster toolbar action: hover deepens the fill and tints the glyph
+ *  (`hoverColor`, e.g. `--danger` for Import), and a press confirms the click.
+ *  `disabled` drops both halves, which is what the hand-written version's early
+ *  return did. */
+function toolbarActionSurface(
+  disabled: boolean,
+  hoverColor: string,
+): InteractiveSurfaceHandlers {
+  const surface = interactiveSurface({
+    restBg: "var(--bg-1)",
+    hoverBg: "var(--bg-3)",
+    disabled,
+  });
+  return {
+    ...surface,
+    onMouseEnter: (e) => {
+      surface.onMouseEnter?.(e);
+      e.currentTarget.style.color = hoverColor;
+    },
+    onMouseLeave: (e) => {
+      surface.onMouseLeave?.(e);
+      e.currentTarget.style.color = "var(--fg-1)";
+    },
+  };
+}
+
 function ToolbarActionButton({
   icon,
   label,
@@ -1117,25 +1158,17 @@ function ToolbarActionButton({
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.6 : 1,
       }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        e.currentTarget.style.background = "var(--bg-3)";
-        e.currentTarget.style.color = hoverColor;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--bg-1)";
-        e.currentTarget.style.color = "var(--fg-1)";
-      }}
+      {...toolbarActionSurface(disabled === true, hoverColor)}
     >
       {spinning ? (
-        // The span carries the rotation so the reduced-motion exemption
-        // (`data-motion="essential"`) applies — a frozen spinner reads as hung.
+        // The rotation comes from the shared `.myne-spinner` class, which the
+        // reduced-motion block already names, so a frozen spinner cannot happen
+        // here; the span keeps `data-motion="essential"` as well because it is
+        // the same statement and costs nothing.
         <span
           data-motion="essential"
-          style={{
-            display: "inline-flex",
-            animation: "myne-spinner-rotate 800ms linear infinite",
-          }}
+          className="myne-spinner"
+          style={{ display: "inline-flex" }}
         >
           <Icon name="loader-circle" size={14} />
         </span>
@@ -1426,7 +1459,7 @@ function UsedInNotes({
           e.stopPropagation();
           onToggle();
         }}
-        {...hoverSurface({ disabled: n === 0 })}
+        {...interactiveSurface({ disabled: n === 0 })}
         style={{
           background: "transparent",
           border: 0,
@@ -1592,7 +1625,7 @@ function AttachmentActionMenu({
           data-testid={`attachments.action-${item.id}`}
           // hoverSurface deepens only the background; the Delete item keeps its
           // `--danger` text colour set below.
-          {...hoverSurface({ disabled: item.disabled })}
+          {...interactiveSurface({ disabled: item.disabled })}
           style={{
             ...MENU_ITEM_STYLE,
             color: item.disabled
@@ -1735,12 +1768,7 @@ function ItemMenu({
           e.stopPropagation();
           onToggle();
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--paper-3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
-        }}
+        {...interactiveSurface({ hoverBg: "var(--paper-3)", disabled: open })}
       >
         <Icon name="more-vertical" size={16} />
       </button>
@@ -1787,7 +1815,7 @@ function ThumbnailWithPreview({
   const previewable = kind === "image" || kind === "pdf";
   return (
     <div
-      {...hoverSurface({ disabled: !previewable })}
+      {...interactiveSurface({ disabled: !previewable })}
       style={{
         ...THUMB_HOVER_WRAP_STYLE,
         cursor: previewable ? "pointer" : "default",
@@ -2062,7 +2090,7 @@ function AttachmentListRow({
         e.preventDefault();
         onOpenActionMenu({ x: e.clientX, y: e.clientY });
       }}
-      {...hoverSurface()}
+      {...interactiveSurface()}
     >
       <div
         style={{

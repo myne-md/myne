@@ -81,7 +81,7 @@ textarea,
    reclaim editor width). The opacity transition is zeroed by the reduced-motion
    rule below, so reduced-motion users get an instant, non-animated toggle. */
 [data-editor-chrome] {
-  transition: opacity 200ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 [data-focus-active="true"] [data-editor-chrome] {
   opacity: 0;
@@ -95,7 +95,7 @@ textarea,
    it is invisible in normal mode and only marks the active line here). */
 [data-focus-dim="true"] .cm-line {
   opacity: 0.4;
-  transition: opacity 200ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 [data-focus-dim="true"] .cm-line.cm-activeLine {
   opacity: 1;
@@ -394,4 +394,58 @@ a:focus-visible,
 }
 .bidi-isolate {
   unicode-bidi: isolate;
+}
+
+/* =========================================================================
+   The shared button, sized for touch, and the platform tap flash
+   ========================================================================= */
+
+/* iOS paints its own grey tap flash and Android its own tint over any control it
+   decides is tappable. Two consequences, both bad: the same button reads
+   differently on the two platforms, and both flashes compete with the app's own
+   press treatment, which is the confirmation the user is actually meant to see.
+
+   Scoped to `.myne-btn` rather than to `*`, deliberately. The correct rule is
+   "suppress the platform's flash wherever the app gives its own answer", and the
+   only control that reliably does today is the shared button, whose `:active`
+   rule is in `@myne/client-core/components.css`. Suppressing it everywhere would
+   take the flash away from every mobile row that has no press treatment yet and
+   leave it with nothing at all, which is a net loss of feedback rather than a
+   de-duplication of it. A control that gains an app press later joins this
+   selector. */
+.myne-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* `@myne/client-core/components.css` owns `.myne-btn`: appearance, hover, press,
+   focus and the disabled state, identical to desktop. Mobile overrides GEOMETRY
+   only, plus the two variant values where this client deliberately differs. The
+   overrides sit here rather than in the component so a change to what a button IS
+   stays in the shared layer. */
+.myne-btn {
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  gap: var(--space-2);
+  /* The shared layer leaves the label's alignment to the caller, which is right
+     for a content-width desktop button and wrong here, where full width is the
+     default: without this every mobile button draws its label at the inline-start
+     edge. The hand-written base this replaced carried it. */
+  justify-content: center;
+}
+
+.myne-btn[data-variant="ghost"] {
+  min-height: 48px;
+  /* Mobile has always drawn the ghost label in the primary ink rather than the
+     shared layer's `--fg-2`: the ghost is the least prominent variant and on a
+     phone it is often the only action on screen. */
+  color: var(--fg-1);
+}
+
+/* Mobile's secondary sits on the page rather than on a raised surface, so it
+   stays transparent where desktop's carries `--bg-1`. That is a layout
+   difference (a full-width button on a phone), not a palette one. */
+.myne-btn[data-variant="secondary"] {
+  background: transparent;
 }

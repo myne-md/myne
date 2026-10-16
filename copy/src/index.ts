@@ -399,3 +399,22 @@ export const CONSENT_DIRECT_CONNECTION =
  *  the user guide states in the same words. */
 export const CONSENT_EXCLUDED_FOLDERS =
   "Notes in excluded folders are closed to new reads: the AI will not open, search, or suggest from them, and nothing is sent on their behalf. The list lives under Settings, AI, Excluded folders; empty, it excludes nothing, and it is the same list the command-line client uses. Text already saved in a conversation stays as it is and keeps seeding new runs.";
+
+/** Transcript-fallibility honesty note (voice-to-text MYND-552, SYNC-V8).
+ *
+ *  A load-bearing, threat-model-bounded framing shown beneath the read-only
+ *  transcript expander: the transcript comes from a SMALL on-device speech model
+ *  and MAY BE WRONG. It must NOT imply cloud-grade accuracy, and it must NOT
+ *  claim model-runtime isolation ("sandbox"), per `threat-model.md` §7. That is
+ *  the same discipline as `AI_CHAT_HONESTY_NOTE`.
+ *
+ *  HERE rather than desktop-local, because BOTH clients render it: desktop's
+ *  `TranscriptionModal` and mobile's `TranscriptSheet` show the same sentence
+ *  beside the same kind of text, and a hand-copy "kept identical by hand" is
+ *  exactly the distinction SYNC-42 exists to make. Moved in myne-md/myne#886;
+ *  the wording is unchanged, so the E2E/Vitest literal pins (SYNC-8) hold and
+ *  this is a relocation rather than a copy edit.
+ *
+ *  Rendered verbatim in every locale (never i18n'd). */
+export const AI_TRANSCRIPT_HONESTY_NOTE =
+  "This transcript was made by a small model running on your device and may be wrong — check it against the audio.";

@@ -74,16 +74,16 @@ async function configurePin(s: Session): Promise<void> {
 }
 
 /**
- * Settings -> Account -> Delete vault, typed confirmation, submit.
+ * Settings -> Vault -> Delete vault, typed confirmation, submit.
  *
  * Stops at the click: what happens next is the assertion each scenario makes
  * for itself, and a helper that waited for a particular next screen would be
  * asserting the routing rather than the erase.
  */
 async function eraseFromSettings(s: Session): Promise<void> {
-  await openSettings(s, "account");
-  // The erase CTA is Account's `danger` topic since myne-md/myne#885.
-  await selectSettingsTopic(s, "account", "danger");
+  await openSettings(s, "vault");
+  // The erase CTA is the Vault panel's `danger` topic (myne-md/myne#885).
+  await selectSettingsTopic(s, "vault", "danger");
   await (await s.byTestId("settings.delete-vault-cta")).click();
   const confirm = await s.byTestId("delete-vault.confirm-input", { timeoutMs: 10_000 });
   await confirm.sendKeys("DELETE");

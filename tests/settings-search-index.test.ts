@@ -31,10 +31,12 @@ import { SETTINGS_PANEL_TOPICS } from "../src/components/settings/settingsTopics
 // coverage assertion has an independent list to check the registry against.
 const PANEL_IDS = [
   "account",
+  "vault",
   "privacy",
   "sync",
   "ai",
   "network",
+  "cli",
   "editor",
   "files",
   "transcription",
@@ -201,7 +203,7 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     // Both members of the rail's Developer group (SettingsModal's PANELS_BASE).
     // An untagged entry would let search navigate into a panel the rail itself
     // refuses to show while Developer mode is off.
-    const DEVELOPER_PANELS = ["ai", "network"];
+    const DEVELOPER_PANELS = ["ai", "network", "cli"];
     for (const e of SETTINGS_SEARCH_INDEX) {
       if (DEVELOPER_PANELS.includes(e.panelId)) {
         expect(e.developerGated, `entry ${e.id}`).toBe(true);
@@ -225,27 +227,34 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     for (const id of AI_IDS) expect(allIds).toContain(id);
   });
 
-  // #181: the CLI trio and the vim toggle are developer-gated while living in
-  // `core` panels — the first entries of that shape. Their controls are hidden
-  // by a panel-internal render condition rather than by the rail dropping a
-  // whole panel, so a missed tag here would leave search scrolling to an anchor
-  // that was never rendered: the exact failure `developerGated` exists to stop.
-  const CORE_PANEL_GATED_IDS = [
-    "privacy.cli-access",
-    "privacy.cli-excluded-folders",
-    "privacy.cli-rate-limit",
-    "editor.vim-mode",
+  // #181: the vim toggle is developer-gated while living in a `core` panel —
+  // hidden by a panel-internal render condition rather than by the rail
+  // dropping the whole panel. A missed tag there leaves search scrolling to an
+  // anchor that was never rendered, the exact failure `developerGated` exists
+  // to stop, so it is asserted separately from the developer-group entries.
+  //
+  // The CLI trio was the other entry of that shape until `decisions/ui/0678`
+  // moved it into the CLI panel, which sits IN the developer group. It keeps
+  // the tag one level up: `searchSettings` reads this index, not the rail, so
+  // without it a mode-off search offers three results in a panel the rail is
+  // not showing.
+  const SETTING_LEVEL_GATED_IDS = ["editor.vim-mode"];
+  const CLI_PANEL_GATED_IDS = [
+    "cli.access",
+    "cli.excluded-folders",
+    "cli.rate-limit",
   ];
+  const DEVELOPER_GATED_IDS = [...SETTING_LEVEL_GATED_IDS, ...CLI_PANEL_GATED_IDS];
 
-  it("tags the CLI and vim entries as developer-gated without moving them out of their panels", () => {
-    for (const id of CORE_PANEL_GATED_IDS) {
+  it("tags the vim entry as developer-gated inside the core panel it renders in", () => {
+    for (const id of SETTING_LEVEL_GATED_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id);
       expect(entry, `entry ${id}`).toBeDefined();
       expect(entry!.developerGated, `entry ${id}`).toBe(true);
       // Still owned by the core panel its control renders in — gating is
       // orthogonal to the rail group, and the whole point of #181's approach
       // is that each setting keeps its topical home.
-      expect(["privacy", "editor"]).toContain(entry!.panelId);
+      expect(entry!.panelId).toBe("editor");
     }
   });
 
@@ -253,25 +262,29 @@ describe("settings search-index — developer-mode gate (MYND-593)", () => {
     // Two independent axes (`settingsSearchIndex.ts` docstring): a static
     // per-build capability descriptor and a runtime user toggle. Dropping the
     // capability half would make the entries searchable on web, where the
-    // block is absent by platform fact rather than by preference.
-    for (const id of CORE_PANEL_GATED_IDS.filter((i) => i.startsWith("privacy.cli"))) {
-      expect(SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!.capability).toBe("cliAccess");
+    // panel is absent by platform fact rather than by preference; dropping the
+    // developer half would make them searchable while the rail group is gone.
+    for (const id of CLI_PANEL_GATED_IDS) {
+      const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
+      expect(entry.capability, `entry ${id}`).toBe("cliAccess");
+      expect(entry.developerGated, `entry ${id}`).toBe(true);
+      expect(entry.panelId, `entry ${id}`).toBe("cli");
     }
   });
 
   it("mode off: the CLI and vim entries are absent from every search, even by exact title", () => {
-    for (const id of CORE_PANEL_GATED_IDS) {
+    for (const id of DEVELOPER_GATED_IDS) {
       const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
       const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
       expect(found, `search for ${id}`).not.toContain(id);
     }
     const allIds = searchSettings("", t, false).map((e) => e.id);
-    for (const id of CORE_PANEL_GATED_IDS) expect(allIds).not.toContain(id);
+    for (const id of DEVELOPER_GATED_IDS) expect(allIds).not.toContain(id);
   });
 
   it("mode on: the CLI and vim entries are found again", () => {
     const allIds = searchSettings("", t, true).map((e) => e.id);
-    for (const id of CORE_PANEL_GATED_IDS) expect(allIds).toContain(id);
+    for (const id of DEVELOPER_GATED_IDS) expect(allIds).toContain(id);
   });
 
   it("mode off does not hide anything that isn't developer-gated", () => {
@@ -340,9 +353,9 @@ const AGENT_CONTROL_IDS = [
   "privacy.screen-capture",
   "privacy.screen-capture-override",
   "privacy.auto-lock",
-  "privacy.cli-access",
-  "privacy.cli-excluded-folders",
-  "privacy.cli-rate-limit",
+  "cli.access",
+  "cli.excluded-folders",
+  "cli.rate-limit",
   "ai.enable",
   "ai.excluded-folders",
   "ai.provider",

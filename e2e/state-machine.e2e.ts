@@ -333,11 +333,11 @@ describeE2E("post-delete routing (Settings → Account delete)", () => {
   const PASSWORD_C = "e2e-delete-routing-c-pw";
 
   async function deleteOpenVaultFromSettings(session: Session): Promise<void> {
-    // Settings → Account → Danger zone → typed-DELETE gate → Submit.
-    await openSettings(session, "account");
-    // The erase CTA is Account's `danger` topic since myne-md/myne#885; only
-    // the active topic's body is mounted.
-    await selectSettingsTopic(session, "account", "danger");
+    // Settings → Vault → Danger zone → typed-DELETE gate → Submit.
+    await openSettings(session, "vault");
+    // The erase CTA is the Vault panel's `danger` topic (myne-md/myne#885);
+    // only the active topic's body is mounted.
+    await selectSettingsTopic(session, "vault", "danger");
     await (await session.byTestId("settings.delete-vault-cta")).click();
     const confirmInput = await session.byTestId("delete-vault.confirm-input", {
       timeoutMs: 10_000,

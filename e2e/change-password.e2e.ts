@@ -34,9 +34,9 @@ import { testIdSelector, type Session } from "./support/webdriver";
 // equality here is what pins it against a silent collapse.
 const WRONG_CURRENT_BANNER = "Wrong current password or vault file is corrupted.";
 
-/** Open Settings → Account → "Change password" and wait for the form. */
+/** Open Settings → Vault → "Change password" and wait for the form. */
 async function openChangePasswordForm(session: Session): Promise<void> {
-  await openSettings(session);
+  await openSettings(session, "vault");
   await (await session.byTestId("settings.change-password-cta")).click();
   await session.byTestId("change-password.submit");
 }

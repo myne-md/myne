@@ -249,18 +249,20 @@ async function waitToggleReflects(session: Session, expected: "true" | "false"):
   );
 }
 
-/** Settings → Developer mode → Privacy → flip Terminal access on, then close
+/** Settings → Developer mode → CLI → flip Terminal access on, then close
  *  Settings. Leaves the caller to wait on the door itself: the toggle's
  *  reflected attribute is optimistic (see `CliAccessSettings.tsx`), so it
  *  proves the click landed, never that `vault.prefs` was written.
  *
- *  Developer mode first (#181): the Terminal-access block is hidden while the
- *  mode is off, so the block is not merely unclicked here — it is not in the
- *  DOM. `enableDeveloperMode` leaves Settings open on About, hence the rail
- *  click rather than a second `openSettings`. */
+ *  Developer mode first (#181): the CLI panel is a `developer`-group rail
+ *  entry, dropped by the rail filter while the mode is off, so the door is not
+ *  merely unclicked here — its panel is not in the rail and its block is not in
+ *  the DOM (`decisions/ui/0678`; it was a block inside Privacy before that).
+ *  `enableDeveloperMode` leaves Settings open on About, hence the rail click
+ *  rather than a second `openSettings`. */
 async function enableCliAccess(session: Session): Promise<void> {
   await enableDeveloperMode(session);
-  await (await session.byTestId("settings.tab-privacy")).click();
+  await (await session.byTestId("settings.tab-cli")).click();
   await session.byTestId("settings.cli-access");
   await (await session.byTestId("settings.cli-access-toggle")).click();
   await waitToggleReflects(session, "true");
@@ -507,7 +509,7 @@ describeE2E("cli5 an excluded folder is absent from every CLI answer (MYND-490)"
 
         // Exclude the folder through the real textarea. It commits on blur, so
         // Tab out of the field rather than reaching for the DOM.
-        await openSettings(s, "privacy");
+        await openSettings(s, "cli");
         const textarea = await s.byTestId("settings.cli-excluded-folders");
         await textarea.replaceText(EXCLUDED_FOLDER);
         await pressKey(s, KEY.TAB);
@@ -560,9 +562,9 @@ describeE2E("cli5 an excluded folder is absent from every CLI answer (MYND-490)"
   });
 });
 
-describeE2E("cli6 hiding the Terminal-access control does not close the door (#181)", () => {
+describeE2E("cli6 hiding the CLI panel does not close the door (#181)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("turning Developer mode back off removes the block but leaves the socket serving", async () => {
+  it("turning Developer mode back off removes the panel but leaves the socket serving", async () => {
     let password = "";
     await scenario(
       "cli6-hidden-not-disabled",
@@ -587,7 +589,10 @@ describeE2E("cli6 hiding the Terminal-access control does not close the door (#1
         await openSettings(s, "about");
         await disableDeveloperModeInSettings(s);
 
-        // The control is gone from Privacy…
+        // The panel is gone from the rail — the whole entry, not a block inside
+        // a panel that stays visible, which is what this was while the block
+        // lived in Privacy. Anchored on a core tab that must still be there, so
+        // the absence cannot pass on a Settings modal that never opened.
         await (await s.byTestId("settings.tab-privacy")).click();
         // Privacy renders an in-panel topic strip since myne-md/myne#885, and
         // only the ACTIVE topic's body is mounted. `settings.auto-lock-select`
@@ -595,12 +600,7 @@ describeE2E("cli6 hiding the Terminal-access control does not close the door (#1
         // to name that topic first.
         await selectSettingsTopic(s, "privacy", "locking");
         await s.byTestId("settings.auto-lock-select");
-        // The terminal-access block asserted absent below lives in `access`, so
-        // the probe has to come back to it: asserting on `access` while
-        // `locking` is active would pass for the wrong reason, because a
-        // control in an unmounted topic is absent whatever Developer mode says.
-        await selectSettingsTopic(s, "privacy", "access");
-        await s.byTestId("settings.screen-capture");
+        expect((await s.byTestIdAll("settings.tab-cli")).length).toBe(0);
         expect((await s.byTestIdAll("settings.cli-access")).length).toBe(0);
         await closeSettings(s);
 

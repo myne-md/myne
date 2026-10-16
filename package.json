@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "vite",
     "dev:two": "bash scripts/dev-two-desktop.sh",
+    "dev:two:reset": "bash scripts/dev-two-reset.sh",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "web:dev": "vite --config web/vite.config.ts",
+    "web:local": "bash scripts/dev-web.sh",
     "web:build": "tsc -p web/tsconfig.json && vite build --config web/vite.config.ts && node scripts/emit-web-version.mjs",
     "web:preview": "vite preview --config web/vite.config.ts",
     "stories": "vite --config stories/vite.config.ts",

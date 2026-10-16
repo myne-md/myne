@@ -1626,14 +1626,33 @@ runner(
         },
       );
 
-      // ---- Frame: account (label + icon + actions) ----
+      // ---- Frame: account (the grouping: name, vaults, extensions) ----
+      // The Account panel is the account grouping (`decisions/ui/0679`): the
+      // account name, the vaults it groups on this device, and the extension
+      // pairing block the connected-extensions frame below covers in detail.
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
-        "The Account settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
+        "The Account settings panel showing the account name, the vaults grouped under it, and the browser-extension pairing controls.",
         async () => {
           await (await s.byTestId("settings.tab-account")).click();
+          await s.byTestId("settings.account-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: vault (label + icon + actions) ----
+      // The controls captured here moved out of the Account panel into the
+      // Vault panel, and the website now carries a `vault` article of its own,
+      // so the frame name and the slug below follow it.
+      await frame(
+        s,
+        "vault-panel",
+        "settings-and-privacy/vault",
+        "The Vault settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
+        async () => {
+          await (await s.byTestId("settings.tab-vault")).click();
           await s.byTestId("settings.icon-picker", { timeoutMs: 6000 });
           await settle(s, 400);
         },
@@ -1662,16 +1681,16 @@ runner(
         },
       );
 
-      // ---- Frame: change password (the Change password form, Account tab) ----
-      // AccountPanel: settings.change-password-cta reveals PasswordChangeForm
+      // ---- Frame: change password (the Change password form, Vault panel) ----
+      // VaultPanel: settings.change-password-cta reveals PasswordChangeForm
       // (change-password.submit). Cancel back to idle — never submit.
       await frame(
         s,
         "change-password",
         "settings-and-privacy/change-your-password",
-        "The Change password form in Account settings, with fields for the current password, the new password, and confirmation.",
+        "The Change password form in Vault settings, with fields for the current password, the new password, and confirmation.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-vault")).click();
           await (await s.byTestId("settings.change-password-cta")).click();
           await s.byTestId("change-password.submit", { timeoutMs: 6000 });
           await settle(s, 400);
@@ -1681,17 +1700,19 @@ runner(
         await (await s.byTestId("change-password.cancel")).click();
       });
 
-      // ---- Frame: delete a vault (the confirm form, Account tab) ----
-      // AccountPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
+      // ---- Frame: delete a vault (the confirm form, Vault panel) ----
+      // VaultPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
       // (delete-vault.confirm-input). Submit is gated on the typed phrase, so
       // capturing the empty form + cancelling never deletes anything.
       await frame(
         s,
         "delete-a-vault",
         "settings-and-privacy/delete-a-vault",
-        "The delete-vault confirmation form in Account settings, which requires typing a confirmation phrase before the vault is erased.",
+        "The delete-vault confirmation form in Vault settings, which requires typing a confirmation phrase before the vault is erased.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-vault")).click();
+          // The erase is the Vault panel's `danger` topic (myne-md/myne#885).
+          await (await s.byTestId("settings.vault-tab-danger")).click();
           await (await s.byTestId("settings.delete-vault-cta")).click();
           await s.byTestId("delete-vault.confirm-input", { timeoutMs: 6000 });
           await settle(s, 400);

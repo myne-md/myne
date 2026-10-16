@@ -9,7 +9,11 @@ interface PasswordStrengthProps {
 }
 
 // i18n key suffix per score — resolved at render time via t() (never frozen at
-// module scope) so a language switch re-renders the strength label.
+// module scope) so a language switch re-renders the strength label. The
+// namespace is `settings.strength` (shared with the mobile meter), and the key
+// is dynamic by necessity, which is why the render test
+// (`tests/components/passwordStrength.test.tsx`) is the guard that keeps it
+// honest: `check-i18n.mjs` only sees static `t("…")` keys.
 const SCORE_LABEL_KEY: Record<ZxcvbnScore, string> = {
   0: "tooWeak",
   1: "tooWeak",
@@ -44,7 +48,7 @@ export function PasswordStrength({
   const { t } = useTranslation();
   const filled = SEGMENT_COUNT[score];
   const color = SCORE_COLOR[score];
-  const label = t(`password.strength.${SCORE_LABEL_KEY[score]}`);
+  const label = t(`settings.strength.${SCORE_LABEL_KEY[score]}`);
   const feedback = warning || suggestion;
   const feedbackColor = warning ? "var(--danger)" : "var(--fg-3)";
 

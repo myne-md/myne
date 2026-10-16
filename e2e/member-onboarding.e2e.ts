@@ -4,9 +4,8 @@
 // # What no other tier can prove
 //
 // The accept path is the ONE place where three credentials meet: the owner's
-// out-of-band identity code (read back through a SAS fingerprint the invitee
-// confirms), the member's OWN recovery phrase (which is also their person
-// identity, so it is typed for two different reasons), and a password the
+// out-of-band identity code, the member's OWN recovery phrase (which is also their
+// person identity, so it is typed for two different reasons), and a password the
 // member sets for THIS device. Each of the three is unit-tested. What is not is
 // that they compose in the real app, over the real relay, and land the member in
 // the editor rather than on an unlock screen.
@@ -22,20 +21,21 @@
 //   takeover rather than a dismissible prompt, which is why the only way out of
 //   this scenario's gate is to name itself.
 //
-// # Two devices, because a member's own row never shows their name
+// # Two devices, and what each one can and cannot show
 //
-// `MemberRosterPanel` renders the caller's OWN row as the you-badge and never as
-// their display name, so "the name appears in the member list" is observable
-// only on the OTHER side of the sync. The rename and clear affordances are the
-// mirror image: they render on the caller's own row only (`m.is_self && shared`,
-// the family being `NTV6`-only, so a member vault always has the group tier).
-// Neither half is assertable on one device, so the fleet is two devices plus one
-// ephemeral server.
+// `MemberRosterPanel` renders the caller's OWN row with its display name (a "You"
+// marker beside it), so "the name appears in the member list" can now be observed on
+// the writing device as well as on the other side of the sync — but the two devices
+// are still needed, because what the OWNER's list shows is what proves the name
+// crossed the sync. The rename and clear affordances likewise render on the caller's
+// own row only (`m.is_self && shared`, the family being `NTV6`-only, so a member vault
+// always has the group tier). Neither half is assertable on one device, so the fleet
+// is two devices plus one ephemeral server.
 //
-// `member-roster.name` renders the you-badge through the SAME testid on the
-// caller's own row, so every assertion below counts rows carrying a name rather
-// than testing for presence: exactly ONE row may carry it, and it can never be
-// the caller's own.
+// `member-roster.name` renders a row's name or, on an UNNAMED self row, the you-badge
+// through the same testid, so an assertion about the member's own name reads it from
+// that testid and a count of rows carrying someone else's name still discriminates.
+// The "You" marker on a named self row is a separate testid (`member-roster.you`).
 //
 // # The member's phrase is a fixed vector, not one read off the DOM
 //
@@ -101,9 +101,9 @@ if (!ready) {
 
 const describeCanary = ready ? describe : describe.skip;
 
-/** Every rendered `member-roster.name`. The caller's own row renders the you-badge
- *  through the SAME testid, so the COUNT of rows carrying a given name is the
- *  discriminator; a presence test would not be. */
+/** Every rendered `member-roster.name`. A row renders its display name there, and
+ *  an UNNAMED self row renders the you-badge through the same testid; a COUNT of
+ *  rows carrying a given name is therefore still the discriminator. */
 async function renderedNames(session: Session): Promise<string[]> {
   const cells = await session.byTestIdAll("member-roster.name");
   return Promise.all(cells.map(async (cell) => (await cell.text()).trim()));
@@ -233,11 +233,12 @@ describeCanary("MO-1 member onboarding (myne-md/myne#851)", () => {
         MEMBER_NAME,
         "the name the gate saved reaches the owner's list",
       );
-      // Non-vacuity, both halves. The owner's own row is on that same list and it
-      // renders the you-badge, so the row above is the member's and not the owner
-      // reading its own name back; and the member's own row, read from the member's
-      // device, carries no name at all, which is exactly why the count above and not a
-      // presence test is the discriminator.
+      // Non-vacuity, both halves. The owner's own row is on that same list and the
+      // owner never named themselves in this scenario, so it renders the you-badge
+      // rather than `MEMBER_NAME`; and the member's own row, read from the member's
+      // device, carries the name it wrote (the self row now renders the verified
+      // name), which is why the count above and not a presence test is
+      // the discriminator.
       expect(
         await owner.session.byTestIdAll("member-roster.row"),
         "the owner's list holds both people",
@@ -245,8 +246,8 @@ describeCanary("MO-1 member onboarding (myne-md/myne#851)", () => {
       await openOwnRoster(member);
       expect(
         await renderedNames(member.session),
-        "the member's own row is the you-badge, never their own name",
-      ).not.toContain(MEMBER_NAME);
+        "the member's own row shows the name it wrote, marked You",
+      ).toContain(MEMBER_NAME);
       await closeSettings(member.session);
     });
   });

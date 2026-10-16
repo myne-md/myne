@@ -23,6 +23,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Icon } from "../../components/primitives/Icon";
+import { usePressSurface } from "../../components/primitives/pressSurface";
 
 export type ContextMenuItem = {
   /** Stable id; used as React key and for test queries. */
@@ -184,6 +185,9 @@ export function ContextMenu({
     top: y,
   });
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // One press hook for the whole menu: rows share the single `hoverId`, so the
+  // pressed row is identified by the same key rather than by a second variable.
+  const { isPressed, pressBg, handlersFor } = usePressSurface();
   // The open submenu's parent id, plus where to put it. Deliberately NOT
   // derived from `hoverId`: leaving the parent row is how the pointer REACHES
   // the submenu, so a hover-derived one would unmount itself on the way. It
@@ -404,15 +408,18 @@ export function ContextMenu({
       )}
       {visibleItems.map((item, i) => {
         const isHovering = hoverId === item.id;
+        const isPressing = isPressed(item.id);
         const baseStyle = item.destructive
           ? ITEM_STYLE_DESTRUCTIVE
           : ITEM_STYLE_BASE;
         const hoverBg = item.destructive
           ? "var(--warning-soft)"
           : "var(--paper-3)";
-        const style: CSSProperties = isHovering
-          ? { ...baseStyle, background: hoverBg }
-          : baseStyle;
+        const style: CSSProperties = isPressing
+          ? { ...baseStyle, background: pressBg }
+          : isHovering
+            ? { ...baseStyle, background: hoverBg }
+            : baseStyle;
         // Divider before an item that opens a new logical group.
         const showDivider = i > 0 && item.group !== visibleItems[i - 1]?.group;
         return (
@@ -430,6 +437,7 @@ export function ContextMenu({
             data-item-id={item.id}
             data-checked={item.checked === undefined ? undefined : String(item.checked)}
             style={style}
+            {...handlersFor(item.id)}
             onMouseEnter={(e) => {
               setHoverId(item.id);
               // Hovering ANY row settles the submenu question: a parent opens

@@ -441,6 +441,7 @@ export async function lockAndReunlock(session: Session, password: string): Promi
  *  opens on Account). */
 export type SettingsTab =
   | "account"
+  | "vault"
   | "privacy"
   | "sync"
   | "editor"
@@ -450,6 +451,7 @@ export type SettingsTab =
   | "storage"
   | "ai"
   | "network"
+  | "cli"
   | "transcription"
   | "about";
 
@@ -1701,33 +1703,42 @@ export async function createNote(session: Session, title: string): Promise<void>
   await waitForSaved(session).catch(() => {});
 }
 
-/** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676).
+/** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676,
+ * myne-md/myne#683).
  *
- * Two load races, both measured on the trash-empty dialog and both silent:
- * the trap places the focus ring asynchronously after mount (pressing into an
- * unfocused dialog is a no-op that reads as a dead surface), and a key
- * opener's keyup can outrun the dialog's listener attach (guard 4 then eats
- * the first press: its keydown arrives unreleased, its keyup merely arms).
- * Wait for the ring — the dialog's own contract — press, and press once more
- * iff the dialog is still up after a grace period: the same recovery a user
- * performs when the first press visibly does nothing. Never presses blind
- * twice, so a slow confirm can never eat a double.
+ * ONE press, behind the precondition the dialog's own keyboard contract names:
+ * the focus ring must be on the confirm button, because Enter follows the ring
+ * and a press into an unfocused dialog is silently a no-op. A first press that
+ * does not confirm is then a FAILURE to report, not something to paper over.
+ *
+ * It used to press a second time after a 5 s grace, described as "the same
+ * recovery a user performs when the first press visibly does nothing". That
+ * retry was hiding a real defect rather than covering a race. The dialog armed
+ * itself with a 16 ms window measured from the moment its arming effect ran, and
+ * a press landing inside the window was refused on a dialog whose ring was on
+ * the confirm button with every other guard reading correct; the retry worked
+ * only because it was no longer inside the window (`sinceMount` 14 ms, then
+ * 8137 ms, in the instrumented run on #683). The window is gone: the guard now
+ * compares the key event's own timestamp against the instant the dialog entered
+ * the document, and both are registered in the commit that makes it visible. So
+ * the ring wait below stays, because "Enter did nothing" and "Enter had nothing
+ * to follow" are different failures, and the second press goes.
+ *
+ * Guard 4 is NOT exercised by this helper's callers, and saying so is the point:
+ * `openedByKey` is false on both paths, because et1 reaches the palette row
+ * through `runPaletteAction`'s click (`viaKey: false`) and nc5's keyboard
+ * soft-trash renders the modal with no `openedByKey` at all. The dialog they
+ * drive therefore has guard 4 released from the first frame. The commit-phase
+ * registration this branch made is what keeps guard 4 intact for a real
+ * key-opened dialog, and that path (the palette row activated with Enter) is
+ * driven by no scenario. The jsdom test "refuses a held Enter that opened the
+ * dialog" pins the rule; nothing in this lane pins the timing.
  */
 export async function confirmDeleteWithEnter(session: Session): Promise<void> {
   await session.byTestId("delete-confirm.confirm");
   await waitForDeleteRing(session);
   await pressKey(session, KEY.ENTER);
-  try {
-    await session.waitForGone(testIdSelector("delete-confirm.confirm"), { timeoutMs: 5_000 });
-  } catch {
-    // Re-verify the ring before recovering: focus may have left between the
-    // first check and the press (remount under load drops it to body), in
-    // which case a blind second press is another no-op. If the ring is gone
-    // for good, this fails naming it.
-    await waitForDeleteRing(session);
-    await pressKey(session, KEY.ENTER);
-    await session.waitForGone(testIdSelector("delete-confirm.confirm"));
-  }
+  await session.waitForGone(testIdSelector("delete-confirm.confirm"));
 }
 
 /** The delete-confirm focus ring: the precondition every Enter press on the

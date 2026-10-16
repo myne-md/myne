@@ -95,14 +95,34 @@ export function syncJoinAccount(
 // ── Device-join via QR (MYND-466) ────────────────────────────────────────────
 
 /** Mirrors Rust `JoinQrView` — the decoded, validated device-join QR for the
- *  confirm screen. Carries no secret (the account# is an identity; SYNC-47). */
-export interface JoinQrView {
-  endpoint_url: string;
-  /** Canonical 20-char account number (format for display with `formatAccountNumberInput`). */
-  account_number: string;
-  /** False when the QR is past its ephemeral TTL (reject → re-scan). */
-  fresh: boolean;
-}
+ *  confirm screen. Carries no secret (the account# is an identity; SYNC-47).
+ *
+ *  Tagged by `kind`, because the two targets lead to different credentials and
+ *  different next steps, and the scanner must not have to guess which:
+ *
+ *  - `account` — the owner's device-join: the account number is prefilled and the
+ *    user is asked for the vault password (`syncJoinAccount`).
+ *  - `member_vault` — a shared vault this person is already a member of, being
+ *    added to THIS device: the vault's account hash is prefilled and the user is
+ *    asked for their 24-word recovery phrase, through the identity flow's join
+ *    wizard (myne-md/myne).
+ */
+export type JoinQrView =
+  | {
+      kind: "account";
+      endpoint_url: string;
+      /** Canonical 20-char account number (format for display with `formatAccountNumberInput`). */
+      account_number: string;
+      /** False when the QR is past its ephemeral TTL (reject → re-scan). */
+      fresh: boolean;
+    }
+  | {
+      kind: "member_vault";
+      endpoint_url: string;
+      /** The vault's `account_number_hash`, 32 lowercase hex. Not a secret. */
+      account_hash_hex: string;
+      fresh: boolean;
+    };
 
 /** Decode a scanned device-join QR string into its confirm-screen view. Rejects a
  *  non-Myne / newer-version / malformed / bad-account payload (typed `kind`). */

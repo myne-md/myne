@@ -1,4 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
@@ -1834,7 +1835,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     el.style.transition = "none";
     el.style.height = `${from}px`;
     void el.offsetHeight; // force reflow so the next height change transitions
-    el.style.transition = "height 280ms cubic-bezier(0.22, 0.61, 0.36, 1)";
+    el.style.transition = "height var(--duration-slow) var(--ease-emphasized)";
     el.style.height = `${target}px`;
     // Once settled, drop back to auto so intra-panel content changes aren't
     // clipped (a taller panel stays capped + scrolls, so leave it explicit).
@@ -1852,7 +1853,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           { opacity: 0, transform: `translateX(${enter}px)` },
           { opacity: 1, transform: "translateX(0)" },
         ],
-        { duration: 200, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+        { duration: motionDurationMs("--duration-base"), easing: motionEasing("--ease-emphasized") },
       );
     }
   }, [panel]);
@@ -1969,10 +1970,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     try {
       if (HAS_TAURI) await setVaultLabel(label.length > 0 ? label : null);
       setDraft((d) => ({ ...d, label: label.length > 0 ? label : null }));
-      setToast(t("settings.account.renamedToast"));
+      setToast(t("settings.vault.renamedToast"));
       setPanel("vault");
     } catch {
-      setToast(t("settings.account.renameError"));
+      setToast(t("settings.vault.renameError"));
     }
   }
 
@@ -2074,15 +2075,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     const nw = newPw;
     const cf = confirmPw;
     if (nw.length < 12) {
-      setPwError(t("settings.account.changePasswordError.weakNewPassword"));
+      setPwError(t("settings.vault.changePasswordError.weakNewPassword"));
       return;
     }
     if (nw !== cf) {
-      setPwError(t("settings.account.newPasswordMismatch"));
+      setPwError(t("settings.vault.newPasswordMismatch"));
       return;
     }
     if (nw === cur) {
-      setPwError(t("settings.account.samePassword"));
+      setPwError(t("settings.vault.samePassword"));
       return;
     }
     setPwBusy(true);
@@ -2090,7 +2091,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) await changePassword(cur, nw);
       wipeRef.current();
       setPwBusy(false);
-      setToast(t("settings.account.passwordChangedToast"));
+      setToast(t("settings.vault.passwordChangedToast"));
       setPanel("vault");
     } catch (raw) {
       const e = raw as VaultChangePasswordError;
@@ -2102,13 +2103,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           setPwError("Wrong current password or vault file is corrupted.");
           break;
         case "WeakNewPassword":
-          setPwError(t("settings.account.changePasswordError.weakNewPassword"));
+          setPwError(t("settings.vault.changePasswordError.weakNewPassword"));
           break;
         case "SamePasswordRejected":
-          setPwError(t("settings.account.samePassword"));
+          setPwError(t("settings.vault.samePassword"));
           break;
         case "InvalidVaultMeta":
-          setPwError(t("settings.account.vaultUnreadable"));
+          setPwError(t("settings.vault.vaultUnreadable"));
           break;
         case "IoError":
           setPwError(ioBanner(e.detail.io_error_kind));
@@ -2120,7 +2121,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           onLock();
           return;
         default:
-          setPwError(t("settings.account.genericChangeError"));
+          setPwError(t("settings.vault.genericChangeError"));
       }
       setPwBusy(false);
     }
@@ -2288,14 +2289,17 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           </>
         )}
 
-        {/* Account holds the vault's one irreversible action, matching desktop,
-            whose Account panel owns the danger topic. The vault-scoped controls
-            themselves moved to their own `vault` category (myne-md/myne#880 task
-            12); the destructive erase stays under Account rather than beside
-            them, so the two do not read as one group. */}
+        {/* Account holds the vault's one irreversible action. The vault-scoped
+            controls moved to their own `vault` category (myne-md/myne#880 task
+            12), and the destructive erase stays under Account rather than beside
+            them, so a rename and an erase do not read as one group on a phone's
+            single scroll. Desktop draws the danger zone as its own topic of the
+            Vault panel (decisions/ui/0679, 0691), where a topic strip already
+            keeps the two apart; a phone's drill-down has no second level to do
+            that with, which is why the two clients place it differently. */}
         {panel === "account" && (
           <div style={PANEL_STACK}>
-            <SectionLabel>{t("settings.account.dangerZoneHeading")}</SectionLabel>
+            <SectionLabel>{t("settings.vault.dangerZoneHeading")}</SectionLabel>
             <button
               onClick={() => setPanel("delete-vault")}
               data-testid="settings.account.delete-vault"
@@ -2358,10 +2362,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 with instant read-back, unlike the rename above it, which needs a
                 field, a keyboard and an explicit save. Same control as desktop's
                 Account panel, so the two settings screens stay diff-able. */}
-            <FieldLabel mt={18}>{t("settings.account.vaultIconLabel")}</FieldLabel>
+            <FieldLabel mt={18}>{t("settings.vault.vaultIconLabel")}</FieldLabel>
             <div
               role="radiogroup"
-              aria-label={t("settings.account.vaultIconLabel")}
+              aria-label={t("settings.vault.vaultIconLabel")}
               data-testid="settings.icon-picker"
               style={ICON_GRID_STYLE}
             >
@@ -2369,7 +2373,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 type="button"
                 role="radio"
                 aria-checked={eff.icon === null}
-                aria-label={t("settings.account.vaultIconDefault")}
+                aria-label={t("settings.vault.vaultIconDefault")}
                 data-testid="settings.icon-option"
                 data-icon-name="default"
                 onClick={() => selectIcon(null)}
@@ -2824,6 +2828,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
         {panel === "sync" && (
           <SyncHubPanel
             status={syncStatus}
+            vaultId={vaultId}
             onSyncNow={syncNow}
             syncing={syncBusy}
             onOpenEndpoint={() => setPanel("sync-endpoint")}
@@ -2837,7 +2842,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
         {panel === "sync-enroll" && <SyncEnrollPanel onEnrolled={() => setPanel("sync")} />}
 
-        {panel === "sync-devices" && <SyncDevicesPanel />}
+        {panel === "sync-devices" && <SyncDevicesPanel vaultId={vaultId} />}
 
         {panel === "sync-members" && <SyncMembersPanel />}
 
@@ -2901,10 +2906,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <FieldLabel mt={4}>{t("settings.panelTitle.vaultName")}</FieldLabel>
             <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={vaultDisplayLabel(null)} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              {t("settings.account.renameHelper")}
+              {t("settings.vault.renameHelper")}
             </div>
             <div style={{ marginTop: 18 }}>
-              <Button onClick={submitRename}>{t("settings.account.vaultLabelSave")}</Button>
+              <Button onClick={submitRename}>{t("settings.vault.vaultLabelSave")}</Button>
             </div>
           </div>
         )}
@@ -3005,20 +3010,20 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <FieldLabel mt={pwError ? 10 : 4}>{t("settings.changePassword.currentLabel")}</FieldLabel>
             <SheetInput type="password" value={currentPw} onChange={setCurrentPw} autoFocus placeholder={t("settings.changePassword.currentLabel")} />
             <FieldLabel mt={16}>{t("settings.changePassword.newLabel")}</FieldLabel>
-            <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.account.newPasswordPlaceholder")} />
+            <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.vault.newPasswordPlaceholder")} />
             {newPw.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <StrengthMeter level={strengthLevel(newPw.length)} />
               </div>
             )}
             <FieldLabel mt={16}>{t("settings.changePassword.confirmLabel")}</FieldLabel>
-            <SheetInput type="password" value={confirmPw} onChange={setConfirmPw} placeholder={t("settings.account.reenterNewPassword")} />
+            <SheetInput type="password" value={confirmPw} onChange={setConfirmPw} placeholder={t("settings.vault.reenterNewPassword")} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              {t("settings.account.changePasswordFootnote")}
+              {t("settings.vault.changePasswordFootnote")}
             </div>
             <div style={{ marginTop: 18 }}>
               <Button onClick={submitChangePassword} disabled={pwBusy}>
-                {pwBusy ? t("settings.account.changing") : t("settings.changePassword.title")}
+                {pwBusy ? t("settings.vault.changing") : t("settings.changePassword.title")}
               </Button>
             </div>
           </div>

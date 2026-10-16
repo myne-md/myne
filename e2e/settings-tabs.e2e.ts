@@ -244,19 +244,19 @@ describeE2E("st1 settings in-panel topic tabs (myne-md/myne#885)", () => {
         expect(await mountedTopics(s, "settings.ai-topic-")).toEqual(["settings.ai-topic-models"]);
 
         // ── A SECOND split panel, so the strip is not proven on AI alone ──────
-        // Account's `danger` topic is the reason that panel was split at all: it
+        // The Vault panel's `danger` topic is the reason that panel was split at all: it
         // holds the irreversible erase, and the split's whole job is to give it a
         // destination instead of a scroll past the icon picker. The claim here is
         // the same one the AI segment makes, on a panel whose topics come from a
         // different roster entry and whose bodies replace each other rather than
         // scroll.
-        await (await s.byTestId("settings.tab-account")).click();
-        await s.byTestId("settings.account-tabs", { timeoutMs: 15_000 });
+        await (await s.byTestId("settings.tab-vault")).click();
+        await s.byTestId("settings.vault-tabs", { timeoutMs: 15_000 });
         expect(
-          await (await s.byTestId("settings.account-tab-vault")).attribute("aria-selected"),
+          await (await s.byTestId("settings.vault-tab-vault")).attribute("aria-selected"),
         ).toBe("true");
-        expect(await mountedTopics(s, "settings.account-topic-")).toEqual([
-          "settings.account-topic-vault",
+        expect(await mountedTopics(s, "settings.vault-topic-")).toEqual([
+          "settings.vault-topic-vault",
         ]);
         // The vault topic's own control is on screen and the danger topic's is
         // not, which is the "exactly one home" half rather than the selection
@@ -265,16 +265,16 @@ describeE2E("st1 settings in-panel topic tabs (myne-md/myne#885)", () => {
         expect((await s.byTestIdAll("settings.delete-vault-cta")).length).toBe(0);
 
         assertStripSharesTheSearchRow(
-          await stripAndSearchRow(s, "settings.account-tabs"),
-          "Account",
+          await stripAndSearchRow(s, "settings.vault-tabs"),
+          "Vault",
         );
 
-        await (await s.byTestId("settings.account-tab-danger")).click();
-        await s.waitForElement(testIdSelector("settings.account-topic-danger"), {
+        await (await s.byTestId("settings.vault-tab-danger")).click();
+        await s.waitForElement(testIdSelector("settings.vault-topic-danger"), {
           timeoutMs: 10_000,
         });
-        expect(await mountedTopics(s, "settings.account-topic-")).toEqual([
-          "settings.account-topic-danger",
+        expect(await mountedTopics(s, "settings.vault-topic-")).toEqual([
+          "settings.vault-topic-danger",
         ]);
         // The erase CTA is reachable from its own topic, and the vault topic is
         // gone rather than merely scrolled away.
@@ -289,7 +289,7 @@ describeE2E("st1 settings in-panel topic tabs (myne-md/myne#885)", () => {
         await s.waitForElement(testIdSelector("settings.files-panel"), { timeoutMs: 15_000 });
         expect((await s.byTestIdAll("settings.files-tabs")).length).toBe(0);
         expect((await s.byTestIdAll("settings.ai-tabs")).length).toBe(0);
-        expect((await s.byTestIdAll("settings.account-tabs")).length).toBe(0);
+        expect((await s.byTestIdAll("settings.vault-tabs")).length).toBe(0);
 
         await closeSettings(s);
       },

@@ -61,7 +61,7 @@ export type SettingsTopicId =
   // The Privacy panel.
   | "access"
   | "locking"
-  // The Account panel.
+  // The Vault panel.
   | "vault"
   | "danger"
   // The Sync panel.
@@ -145,16 +145,9 @@ export const APPEARANCE_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
  * The Privacy panel's topics: what can see the notes, and how the vault locks
  * and unlocks.
  *
- * Two topics, not three, and the reason is the terminal access block. It is the
- * panel's third concern on its own terms, but it is omitted whenever Developer
- * mode is off or the `cliAccess` capability is absent, so a topic of its own
- * would render an EMPTY tab on the clients and the sessions that do not have
- * it. It belongs here instead: `Access` is the topic of everything that answers
- * "who or what can get at my notes", and the terminal is one more answer to
- * that question beside the screen-capture and lock-screen rows. That also fixes
- * the topic's order: the terminal block moves up from the panel's tail to sit
- * with the rows it belongs with, which is the row-order change the grouping
- * requires.
+ * The terminal access block used to sit in `Access` as a third answer to "who
+ * or what can get at my notes". It is its own developer-group panel now
+ * (`CliPanel`, `decisions/ui/0678`), so `Access` holds the screen rows alone.
  *
  * `Locking` is the family the panel's own comments already describe: the
  * recovery drill is here rather than in Account because what it protects is the
@@ -162,46 +155,40 @@ export const APPEARANCE_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
  *
  * **`Access` carries `liveOn`, and it is the one topic in the tree that needs
  * it.** Every row in its body is capability-gated: the per-vault screen-capture
- * switch and its device-local override row on `screenCaptureProtection`, the
- * lock-screen-name row on `lockedVaultNames`, and the terminal block on
- * `cliAccess`. The web client has all three absent, so the topic would render an
- * `Access` tab whose body is one section title and nothing else, which is the
- * empty tab the rule below refuses. Where none of the three is present the topic
- * is dropped and `Privacy` falls to the single `locking` concern, so the strip
- * renders nothing and the panel is one screen. Desktop keeps both topics.
+ * switch and its device-local override row on `screenCaptureProtection`, and
+ * the lock-screen-name row on `lockedVaultNames`. The web client has both
+ * absent, so the topic would render an `Access` tab whose body is one section
+ * title and nothing else, which is the empty tab the rule below refuses. Where
+ * neither is present the topic is dropped and `Privacy` falls to the single
+ * `locking` concern, so the strip renders nothing and the panel is one screen.
  */
 export const PRIVACY_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
   {
     id: "access",
     labelKey: "settings.privacy.topics.access",
-    liveOn: ["screenCaptureProtection", "lockedVaultNames", "cliAccess"],
+    liveOn: ["screenCaptureProtection", "lockedVaultNames"],
   },
   { id: "locking", labelKey: "settings.privacy.topics.locking" },
 ];
 
 /**
- * The Account panel's two topics: the vault itself, and the one control that
+ * The Vault panel's two topics: the vault itself, and the one control that
  * destroys it.
  *
- * **This is the smallest split in the feature and the one worth stating.** The
- * panel is long in lines and thin in search entries (four) because its volume is
- * in two full-panel sub-views rather than in a long scroll. A topic per concern
- * would therefore need a topic whose only member is the browser-clipper block,
- * which is capability-gated and would render an EMPTY tab on the web client. So
- * the boundary drawn is the one place where a reader genuinely needs a
- * destination rather than a scroll: the irreversible erase, separated from the
- * name, the icon, the password and the connected apps that a user opens Account
- * to change.
+ * Vault is the panel `decisions/ui/0679` split out of Account (the label, the
+ * icon, the password and the danger zone); these two topics are the split this
+ * branch had drawn inside Account, carried to the panel those rows now live in.
+ * The boundary is the one place a reader genuinely needs a destination rather
+ * than a scroll: the irreversible erase, separated from the rows a user opens
+ * the panel to change.
  *
- * The danger CTA and its confirmation form are one topic, and the same holds
- * for the change-password CTA and `PasswordChangeForm`: the forms REPLACE the
- * panel's body (the two early returns in `AccountPanel`), so they are rendered
- * inside the topic that owns the CTA rather than beside it. Mounting both would
- * put a form and the rows it replaces on screen at once.
+ * The password and erase forms REPLACE the panel's body (the two early returns
+ * in `VaultPanel`), so a form never renders beside the rows it replaces,
+ * whichever topic is selected.
  */
-export const ACCOUNT_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
-  { id: "vault", labelKey: "settings.account.topics.vault" },
-  { id: "danger", labelKey: "settings.account.topics.danger" },
+export const VAULT_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
+  { id: "vault", labelKey: "settings.vault.topics.vault" },
+  { id: "danger", labelKey: "settings.vault.topics.danger" },
 ];
 
 /**
@@ -315,7 +302,7 @@ export const SETTINGS_PANEL_TOPICS: Partial<
   ai: AI_PANEL_TOPICS,
   appearance: APPEARANCE_PANEL_TOPICS,
   privacy: PRIVACY_PANEL_TOPICS,
-  account: ACCOUNT_PANEL_TOPICS,
+  vault: VAULT_PANEL_TOPICS,
   sync: SYNC_PANEL_TOPICS,
   editor: EDITOR_PANEL_TOPICS,
 };
