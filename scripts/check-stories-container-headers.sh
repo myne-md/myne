@@ -81,12 +81,15 @@ require() {
   fi
 }
 
-# The set that carries this origin's posture. HSTS is deliberately NOT here and
-# is set at the TLS edge instead (`myne-ops/deploy/caddy/design.myne.md.caddy`):
-# HSTS is a property of the HTTPS origin, and this container terminates no TLS.
+# The set that carries this origin's posture, and it is the container's job to
+# send all of it: `design.myne.md.caddy` deliberately adds no header, the same
+# posture `app.myne.md.caddy` takes, so "the edge is stricter about one header
+# than the image it fronts" cannot happen. That includes HSTS even though the
+# edge terminates TLS — the sibling container sets it too.
 require "Content-Security-Policy"
 require "Cross-Origin-Opener-Policy"
 require "Cross-Origin-Resource-Policy"
+require "Strict-Transport-Security"
 require "X-Content-Type-Options"
 require "X-Frame-Options"
 require "Referrer-Policy"
