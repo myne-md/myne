@@ -246,7 +246,7 @@ finding is either fixed here or recorded with the reason it is not.
   `AboutPanel` reads during render. Selecting `settings/aboutpanel/default`
   threw `ReferenceError`, and with no boundary in the shell it unmounted every
   story at once. The third global is now defined in both the catalogue's Vite
-  config and `vitest.stories.config.ts` (whose smoke check hit the same throw),
+  config and `.config/vitest/stories.config.ts` (whose smoke check hit the same throw),
   and `stories/src/ErrorBoundary.tsx` wraps each story so one failure renders a
   message in place of that story instead of taking the rail down with it.
 - **Three modal backdrops bypassed the scrim token.** `CommandPalette`,

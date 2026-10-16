@@ -72,6 +72,6 @@ exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
   $E2E_CARGO_HOME_CHOWN && $E2E_FIX_PERMS && su e2e -s /bin/bash -c '
     $E2E_ENV &&
     cd /work &&
-    xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${SPEC}.e2e.ts ${EXTRA}
+    xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config .config/vitest/e2e.config.ts e2e/${SPEC}.e2e.ts ${EXTRA}
   '
 "

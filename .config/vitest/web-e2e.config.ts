@@ -5,7 +5,7 @@
 //
 // * `vitest.config.ts` — the hermetic unit/component suite (`tests/**`). No
 //   browser, no binary, must stay fast.
-// * `vitest.e2e.config.ts` — the desktop lane: the production Tauri binary
+// * `.config/vitest/e2e.config.ts` — the desktop lane: the production Tauri binary
 //   through tauri-driver. Linux-only, Argon2id-sized timeouts.
 // * **this one** — the built web bundle in a real browser, served by the
 //   harness's own server with the PRODUCTION security headers.
@@ -19,7 +19,9 @@
 // Run via `pnpm test:e2e:web`.
 
 import { defineConfig } from "vitest/config";
-import { harnessEnv, harnessSupport } from "./e2e-web/support/harness";
+// Resolved against THIS FILE's directory, not the repo root: a config that moved
+// away from the root owes its own relative imports a re-count of `../`.
+import { harnessEnv, harnessSupport } from "../../e2e-web/support/harness";
 
 // The reason is printed HERE, from the main process, and that is a fix rather
 // than a preference. `support/scenario.ts` already warns at import time — but it

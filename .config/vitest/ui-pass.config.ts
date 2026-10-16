@@ -1,6 +1,6 @@
 // Vitest config for the UI-pass screenshot CAPTURE pass (myne-md/myne#772).
 //
-// A fourth config beside `vitest.capture.config.ts` rather than a flag on it,
+// A fourth config beside `.config/vitest/capture.config.ts` rather than a flag on it,
 // and for the reason that file's own header gives: the capture include glob
 // is what keeps `pnpm test:e2e` from picking these up, so two capture passes
 // that must be runnable independently need two globs. The guide pass builds a
