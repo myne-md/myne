@@ -1,6 +1,7 @@
 import React from "react";
 
 import { FailClosedError } from "./FailClosedError";
+import { failClosedCode } from "../lib/global-failure";
 
 interface RootErrorBoundaryState {
   failed: boolean;
@@ -36,6 +37,12 @@ export class RootErrorBoundary extends React.Component<
       return (
         <FailClosedError
           reason={{ kind: "invalid-state" }}
+          // The card's own closed reason, so the Copy-diagnostics affordance
+          // carries a bounded code (myne-md/myne#860). A constant, never the
+          // caught error's message: the class doc's no-logging rule still holds,
+          // because the block copies an allowlist of scalars and not the
+          // payload.
+          code={failClosedCode("invalid-state")}
           onCtaClick={() => {
             window.location.reload();
           }}

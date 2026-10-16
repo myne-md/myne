@@ -298,6 +298,15 @@
   is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
   it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
   proving one scenario. Invocations: `docs/dev/e2e.md`.
+- **From a `myne` WORKTREE, the harness needs the companion checked out beside
+  it or it dies before the build.** Every scenario's sync side cross-compiles
+  `myne-server` for linux, and a worktree carries no companions: the run fails at
+  `e2e-local.sh: line 61: cd: myne-server: No such file or directory`, which reads
+  like a broken script rather than a missing symlink. Symlink the shared
+  checkout's copy in (`ln -s /path/to/myne/myne-server <worktree>/myne-server`,
+  the same arrangement `reference/worktrees.md` describes for `myne-agents`) and
+  re-run. It is gitignored, so it changes no repo, and the cross-compile's
+  artefacts land in that checkout's own gitignored `target/`.
 - **This suite is not a merge gate and has not been one since
   myne-md/myne#579.** It lives in `.woodpecker/e2e.yml`, a workflow that runs
   only on a manual trigger carrying `RUN_E2E=true`, and the release runbook owns
