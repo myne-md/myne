@@ -94,19 +94,35 @@ function wire(): void {
   });
 }
 
-/** Let the ten-second check delay elapse, then wait for the offer it starts. */
+/**
+ * Drain the pending microtasks until the notice's chain of awaits has run, and
+ * do it WITHOUT touching the wall clock.
+ *
+ * **Why not `findBy`/`waitFor`, which is what this used to do.** Those poll on a
+ * TIMER and their budget is real milliseconds, so under `pnpm test` (about a
+ * thousand files across parallel workers) a 5 s budget is a hope rather than a
+ * guarantee: this file failed roughly one run in three, on two different tests,
+ * each time at a wait whose budget had run out rather than at an assertion. The
+ * chain the notice runs is a FIXED number of awaits, so draining it is
+ * deterministic and load-independent.
+ */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 25; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+}
+
+/** Let the ten-second check delay elapse, then drain until the offer arrives. */
 async function offerArrives(): Promise<void> {
-  await screen.findByTestId("stub.editor");
+  await settle();
   expect(screen.queryByTestId("update.notice")).toBeNull();
   await act(async () => {
-    vi.advanceTimersByTime(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
   });
-  // A real WAIT rather than one `act` drain, and with a budget the full suite
-  // cannot starve. The check is a chain of three awaits; under `pnpm test` (938
-  // files across parallel workers) the default 1s `findBy` timeout is not enough,
-  // which is why this file passed in isolation and failed in the suite twice, on
-  // two different tests, both times at a `findBy` the worker had not reached yet.
-  await screen.findByTestId("update.notice", {}, { timeout: 5_000 });
+  await settle();
+  expect(screen.getByTestId("update.notice")).toBeTruthy();
 }
 
 beforeEach(() => {
@@ -133,11 +149,11 @@ describe("the notice, wired through App", () => {
   it("does not mount on a client without the selfUpdate capability", async () => {
     caps.absent = ["selfUpdate"];
     render(<App />);
-    await screen.findByTestId("stub.editor");
+    await settle();
     await act(async () => {
-      vi.advanceTimersByTime(10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
     });
-    await act(async () => {});
+    await settle();
 
     expect(screen.queryByTestId("update.notice")).toBeNull();
     expect(update.check).not.toHaveBeenCalled();
@@ -151,15 +167,15 @@ describe("the notice, wired through App", () => {
     // in the component test: a wrong `onReopen` binding would otherwise ship a
     // pill that does nothing, with every other test green.
     await act(async () => {
-      vi.advanceTimersByTime(8_000);
+      await vi.advanceTimersByTimeAsync(8_000);
     });
+    await settle();
     expect(screen.getByTestId("update.notice-pill")).toBeTruthy();
     expect(screen.queryByTestId("update.notice")).toBeNull();
 
     fireEvent.click(screen.getByTestId("update.notice-pill"));
-    expect(
-      await screen.findByTestId("update.notice", {}, { timeout: 5_000 }),
-    ).toBeTruthy();
+    await settle();
+    expect(screen.getByTestId("update.notice")).toBeTruthy();
     expect(screen.queryByTestId("update.notice-pill")).toBeNull();
   });
 });
@@ -171,12 +187,9 @@ describe("the updating stage, wired through App", () => {
 
     fireEvent.click(screen.getByTestId("update.notice-primary"));
     fireEvent.click(screen.getByTestId("update.notice-confirm-primary"));
-    await act(async () => {});
-    await act(async () => {});
+    await settle();
 
-    expect(
-      await screen.findByTestId("update.updating", {}, { timeout: 5_000 }),
-    ).toBeTruthy();
+    expect(screen.getByTestId("update.updating")).toBeTruthy();
     expect(screen.queryByTestId("stub.editor")).toBeNull();
     expect(screen.queryByTestId("update.notice")).toBeNull();
     // The order the whole flow rests on: the panes are flushed and the vault is
@@ -196,9 +209,8 @@ describe("the updating stage, wired through App", () => {
 
     // The stage must NOT move: the updating screen is unreachable without a
     // lock, so the confirm is the only surface left to say what happened.
-    expect(
-      await screen.findByTestId("update.notice-blocked", {}, { timeout: 5_000 }),
-    ).toBeTruthy();
+    await settle();
+    expect(screen.getByTestId("update.notice-blocked")).toBeTruthy();
     expect(screen.getByTestId("stub.editor")).toBeTruthy();
     expect(screen.getByTestId("update.notice-confirm")).toBeTruthy();
     expect(update.install).not.toHaveBeenCalled();
