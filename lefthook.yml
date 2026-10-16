@@ -260,6 +260,21 @@ pre-commit:
       glob: "{mobile/**,scripts/check-ios-extensions.mjs}"
       run: node scripts/check-ios-extensions.mjs
 
+    fdroid-metadata:
+      # The F-Droid store metadata against the Android build it describes.
+      # Three hand-written artefacts have to agree by arithmetic and nothing else
+      # compares them: `mobile/src-tauri/tauri.conf.json`'s version, the four
+      # build blocks in `mobile/fdroid/md.myne.mobile.yml`, and the four
+      # `changelogs/<versionCode>.txt` names. Bump the version and nothing breaks
+      # that any compiler or test can see — the store page just goes blank, and
+      # four blocks sharing one versionCode drops three architectures because a
+      # client installs only the highest code it can run.
+      #
+      # `fastlane/**` is in the glob and is not under `mobile/`, which is the
+      # whole reason this cannot ride on an existing mobile guard.
+      glob: "{fastlane/**,mobile/fdroid/**,mobile/src-tauri/tauri.conf.json,mobile/package.json,scripts/check-fdroid-metadata.mjs}"
+      run: node scripts/check-fdroid-metadata.mjs
+
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
       # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a

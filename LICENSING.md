@@ -125,3 +125,15 @@ pre-existing drift, not something the 2026-08-09 provider work introduced; the
 resource-gating mechanism that would make the original sentence true is owed by
 myne-md/myne#190.
 (`docs/decisions.md` 2026-07-31.)
+
+## Store listing graphics
+
+`fastlane/metadata/android/en-US/images/` holds the Android store listing's icon
+and screenshots for the F-Droid submission. They are the Myne Marks and branding
+renders, generated in the `myne-branding` companion repo, whose
+[`TRADEMARK.md`](https://github.com/myne-md/myne-branding) records that the marks
+are **not** covered by AGPL-3.0 or by that repo's CC-BY-4.0, and that using them
+inside the Myne project's own channels needs no permission. They are listing
+metadata rather than shipped bytes: the icon inside the `.apk` comes from
+`mobile/src-tauri/icons/`, and nothing in this directory is compiled into a
+release.
