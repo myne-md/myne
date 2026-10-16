@@ -130,18 +130,6 @@ export function personJoinVault(
   });
 }
 
-/** Property of an invite code the invitee compares out of band. */
-export interface InviteCodeView {
-  person_id_hex: string;
-  fingerprint_hex: string;
-}
-
-export function inspectInviteCode(code: string): Promise<InviteCodeView> {
-  return invoke<InviteCodeView>("plugin:sync|sync_person_inspect_invite_code", {
-    code,
-  });
-}
-
 /** Whether this vault is a member vault (unlocked by the person phrase). */
 export function memberVaultStatus(vaultId: string): Promise<boolean> {
   return invoke<boolean>("plugin:sync|sync_member_vault_status", { vaultId });

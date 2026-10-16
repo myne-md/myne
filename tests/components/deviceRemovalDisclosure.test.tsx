@@ -58,7 +58,7 @@ function roster() {
 }
 
 function Harness() {
-  return <DeviceManagementPanel hook={useDevices()} />;
+  return <DeviceManagementPanel hook={useDevices()} plane="owner" />;
 }
 
 beforeEach(() => {

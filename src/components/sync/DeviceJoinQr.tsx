@@ -2,12 +2,17 @@
 // scans to join. Penpot skipped per the owner directive (same as
 // DeviceManagementPanel); built against design tokens.
 //
-// Option 1 (prompt-to-paste): the account# is an AS9 bearer token Myne never
-// persists (account-number.md §8), so the user pastes it here to make the QR.
-// The QR carries {server_url, account#}, NEVER the password (SYNC-47);
-// the scanning phone still enters its own password. Ephemeral: regenerated before
-// the backend TTL lapses so a photographed code can't be reused later (live
-// co-presence — the basis for the scan replacing the cert eye-compare, SYNC-26).
+// TWO VARIANTS, one implementation (myne-md/myne). `account` is the owner's, and
+// it needs the account number pasted in: the account# is an AS9 bearer token Myne
+// never persists (account-number.md §8), so the user pastes it here to make the
+// QR. `member` is a member's own second device, and it takes no input at all —
+// the payload is built from the ACTIVE session (server address + this vault's
+// account hash), and the other device is asked for the 24-word phrase there.
+//
+// The QR carries no secret in either variant, and the scanner supplies its own
+// credential: SYNC-47. Ephemeral: regenerated before the backend TTL lapses so a
+// photographed code can't be reused later (live co-presence — the basis for the
+// scan replacing the cert eye-compare, SYNC-26).
 
 import {
   useCallback,
@@ -20,7 +25,9 @@ import { useTranslation } from "react-i18next";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import {
   generateDeviceJoinQr,
+  generateMemberJoinQr,
   deviceJoinQrErrorMessage,
+  memberJoinQrErrorMessage,
 } from "../../lib/deviceJoinQr";
 import { svgToObjectUrl } from "../../lib/noteImageCard";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -111,8 +118,41 @@ const ERROR: CSSProperties = {
 // is always fresh (and scannable) while the panel is open.
 const REFRESH_BUFFER_SECS = 15;
 
-export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {}) {
+/** The member variant's three steps, as real list content rather than one
+ *  paragraph: this is the ONLY place the member's own-device path is explained,
+ *  and a reader has to be able to follow it one line at a time. */
+const STEPS: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+  margin: 0,
+  paddingInlineStart: "var(--space-4)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+  lineHeight: "var(--leading-normal)",
+};
+
+/**
+ * Which join this block produces.
+ *
+ * `account` — the owner's device-join: the account number is pasted in (it is an
+ * AS9 bearer token Myne never persists, so the user supplies it) and the scanning
+ * device proves `{account# + password}`.
+ *
+ * `member` — a member's own second device: no input, because the payload is built
+ * from the active session, and the scanning device proves the 24-word phrase.
+ */
+export type DeviceJoinQrVariant = "account" | "member";
+
+export function DeviceJoinQr({
+  showTitle = true,
+  variant = "account",
+}: {
+  showTitle?: boolean;
+  variant?: DeviceJoinQrVariant;
+} = {}) {
   const { t } = useTranslation();
+  const isMember = variant === "member";
   const [account, setAccount] = useState("");
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +171,11 @@ export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {})
       setBusy(true);
       setError(null);
       try {
-        const res = await generateDeviceJoinQr(accountNumber);
+        // The member payload takes no argument: the vault is resolved from the
+        // active session backend-side, so this call cannot name another vault.
+        const res = isMember
+          ? await generateMemberJoinQr()
+          : await generateDeviceJoinQr(accountNumber);
         setSvg(res.svg);
         clearTimer();
         const delay =
@@ -141,16 +185,34 @@ export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {})
       } catch (e) {
         setSvg(null);
         clearTimer();
-        setError(deviceJoinQrErrorMessage(e));
+        setError(
+          isMember ? memberJoinQrErrorMessage(e) : deviceJoinQrErrorMessage(e),
+        );
       } finally {
         setBusy(false);
       }
     },
-    [],
+    [isMember],
   );
 
   // Cancel any pending refresh on unmount.
   useEffect(() => clearTimer, []);
+
+  // The member variant has nothing to paste — that IS the variant — so it mints
+  // its code on mount. Latched through a ref rather than through `busy`/`svg`,
+  // because StrictMode double-invokes an effect at MOUNT (`src/AGENTS.md`): both
+  // invocations read the same mount-time values, so a state guard cannot see the
+  // first call and the backend would be asked twice. The latch is the shape the
+  // identity flow's the fromQr effect uses for the same reason.
+  const mintedOnce = useRef(false);
+  useEffect(() => {
+    if (!isMember || mintedOnce.current) return;
+    mintedOnce.current = true;
+    void generate("");
+    // `generate` carries the variant, and the mint is deliberately keyed on the
+    // mount alone: the refresh timer owns every later mint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMember]);
 
   const onInput = (raw: string) => {
     setAccount(formatAccountNumberInput(raw));
@@ -177,54 +239,101 @@ export function DeviceJoinQr({ showTitle = true }: { showTitle?: boolean } = {})
   }, [svg]);
 
   return (
-    <div style={ROOT} data-testid="sync.device-join-qr">
+    <div
+      style={ROOT}
+      data-testid={isMember ? "sync.member-join-qr" : "sync.device-join-qr"}
+    >
       {/* The dialog supplies the title (myne-md/myne#831); the inline block
           keeps its own heading. */}
-      {showTitle ? <div style={LABEL}>{t("sync.deviceJoinQr.title")}</div> : null}
-      <div style={HINT}>{t("sync.deviceJoinQr.hint")}</div>
-      <label style={LABEL} htmlFor="device-join-qr-account">
-        {t("sync.deviceJoinQr.accountLabel")}
-      </label>
-      <div style={INPUT_ROW}>
-        <input
-          id="device-join-qr-account"
-          style={INPUT}
-          value={account}
-          onChange={(e) => onInput(e.target.value)}
-          placeholder={t("sync.deviceJoinQr.accountPlaceholder")}
-          autoComplete="off"
-          spellCheck={false}
-          data-testid="sync.device-join-qr.account-input"
-        />
-        <button
-          type="button"
-          style={{
-            ...BTN,
-            opacity: canGenerate ? 1 : 0.5,
-            cursor: canGenerate ? "pointer" : "default",
-          }}
-          disabled={!canGenerate}
-          {...interactiveSurface({
-            restBg: "var(--bg-2)",
-            hoverBg: "var(--paper-3)",
-            disabled: !canGenerate,
-          })}
-          onClick={() => void generate(account.trim())}
-          data-testid="sync.device-join-qr.generate"
-        >
-          {t("sync.deviceJoinQr.generate")}
-        </button>
+      {showTitle ? (
+        <div style={LABEL}>
+          {t(isMember ? "sync.memberJoinQr.title" : "sync.deviceJoinQr.title")}
+        </div>
+      ) : null}
+      <div style={HINT}>
+        {t(isMember ? "sync.memberJoinQr.hint" : "sync.deviceJoinQr.hint")}
       </div>
+      {isMember ? (
+        // The path the code shortcuts, spelled out: a member's second device
+        // cannot be added by typing an account number and a vault password,
+        // because a member holds neither.
+        <ol style={STEPS} data-testid="sync.member-join-qr.steps">
+          <li>{t("sync.memberJoinQr.stepIdentity")}</li>
+          <li>{t("sync.memberJoinQr.stepPhrase")}</li>
+          <li>{t("sync.memberJoinQr.stepJoin")}</li>
+        </ol>
+      ) : (
+        <>
+          <label style={LABEL} htmlFor="device-join-qr-account">
+            {t("sync.deviceJoinQr.accountLabel")}
+          </label>
+          <div style={INPUT_ROW}>
+            <input
+              id="device-join-qr-account"
+              style={INPUT}
+              value={account}
+              onChange={(e) => onInput(e.target.value)}
+              placeholder={t("sync.deviceJoinQr.accountPlaceholder")}
+              autoComplete="off"
+              spellCheck={false}
+              data-testid="sync.device-join-qr.account-input"
+            />
+            <button
+              type="button"
+              style={{
+                ...BTN,
+                opacity: canGenerate ? 1 : 0.5,
+                cursor: canGenerate ? "pointer" : "default",
+              }}
+              disabled={!canGenerate}
+              {...interactiveSurface({
+                restBg: "var(--bg-2)",
+                hoverBg: "var(--paper-3)",
+                disabled: !canGenerate,
+              })}
+              onClick={() => void generate(account.trim())}
+              data-testid="sync.device-join-qr.generate"
+            >
+              {t("sync.deviceJoinQr.generate")}
+            </button>
+          </div>
+        </>
+      )}
       {error && (
-        <div style={ERROR} data-testid="sync.device-join-qr.error">
+        <div
+          style={ERROR}
+          data-testid={
+            isMember ? "sync.member-join-qr.error" : "sync.device-join-qr.error"
+          }
+        >
           {error}
         </div>
       )}
       {svg && (
-        <div style={QR_WRAP} data-testid="sync.device-join-qr.image">
-          <img style={QR_IMG} src={imgSrc} alt={t("sync.deviceJoinQr.title")} />
-          <div style={SCAN_LABEL} data-testid="sync.device-join-qr.scan-label">
-            {t("sync.deviceJoinQr.scanWithApp")}
+        <div
+          style={QR_WRAP}
+          data-testid={
+            isMember ? "sync.member-join-qr.image" : "sync.device-join-qr.image"
+          }
+        >
+          <img
+            style={QR_IMG}
+            src={imgSrc}
+            alt={t(isMember ? "sync.memberJoinQr.title" : "sync.deviceJoinQr.title")}
+          />
+          <div
+            style={SCAN_LABEL}
+            data-testid={
+              isMember
+                ? "sync.member-join-qr.scan-label"
+                : "sync.device-join-qr.scan-label"
+            }
+          >
+            {t(
+              isMember
+                ? "sync.memberJoinQr.scanWithApp"
+                : "sync.deviceJoinQr.scanWithApp",
+            )}
           </div>
         </div>
       )}

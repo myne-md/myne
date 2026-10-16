@@ -15,6 +15,7 @@
 import type { ComponentProps } from "react";
 import { render } from "@testing-library/react";
 import { SyncPanel } from "../../src/components/settings/SyncPanel";
+import type { AccountStatus } from "../../src/hooks/useAccountStatus";
 import { SidebarStateProvider } from "../../src/notes/sidebarState";
 
 /** `usePrefs` consumers crash on a bare `undefined`; answer prefs-shaped. */
@@ -39,6 +40,16 @@ export interface SyncPanelRoute {
     readonly pending: boolean;
     readonly can_abort?: boolean;
   };
+  /**
+   * What `sync_member_vault_status` reports — "is the ACTIVE vault one this
+   * person joined rather than owns?" (myne-md/myne). Defaults to `false`, which is
+   * the owner answer and the pre-change behaviour: the panel then offers the
+   * owner's account-number QR and shows the storage row.
+   */
+  readonly memberVault?: boolean;
+  /** What `sync_account_status` reports. `null` (the default) hides the whole
+   *  usage block, which is what a server without the route answers. */
+  readonly usage?: AccountStatus | null;
 }
 
 /**
@@ -55,6 +66,8 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     betaTermsAccepted = true,
     person,
     migration = { offerable: false, pending: false },
+    memberVault = false,
+    usage = null,
   } = route;
   return async (cmd: string): Promise<unknown> => {
     if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
@@ -92,10 +105,14 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     if (cmd === "plugin:device-binding|device_bindings_list")
       return { rows: [], unverified_device_ids: [] };
     if (cmd === "plugin:sync|sync_status") return { state: syncState };
+    // The member-vault probe (myne-md/myne). It gates which account-plane
+    // affordances the panel offers, so a spec that varies it is varying the one
+    // fact both the QR icon and the usage block read.
+    if (cmd === "plugin:sync|sync_member_vault_status") return memberVault;
     if (cmd === "plugin:sync|sync_beta_terms_accepted") return betaTermsAccepted;
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
     if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: null };
-    if (cmd === "plugin:sync|sync_account_status") return null;
+    if (cmd === "plugin:sync|sync_account_status") return usage;
     if (cmd === "plugin:sync|sync_pending_conflicts") return [];
     if (cmd === "plugin:sync|sync_list_quarantine") return [];
     if (cmd === "plugin:notes|note_list") return [];
@@ -104,11 +121,17 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
 }
 
 /** `SyncPanel` reads the selected note through the sidebar context (its conflict
- *  view links to one), so the panel cannot mount bare. */
+ *  view links to one), so the panel cannot mount bare.
+ *
+ *  A `vaultId` is supplied by default because the member-vault probe is an effect
+ *  keyed on it: a panel mounted without one never asks the question at all
+ *  (`useMemberVault`), so a spec that varies `memberVault` would be varying a read
+ *  its own mount skips. Passing it here keeps that read exercised in every spec,
+ *  the owner answer being the router's default. */
 export function renderSyncPanel(props: ComponentProps<typeof SyncPanel> = {}) {
   return render(
     <SidebarStateProvider>
-      <SyncPanel {...props} />
+      <SyncPanel vaultId="v-harness-active" {...props} />
     </SidebarStateProvider>,
   );
 }

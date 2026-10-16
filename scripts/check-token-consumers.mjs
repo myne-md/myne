@@ -95,7 +95,7 @@ export function consumedTokens(files, read = (p) => readFileSync(p, "utf8")) {
  */
 export const THEME_ONLY = Object.freeze({
   "--duration-slower":
-    "the longest step, same reason; the shipped UI tops out at --duration-base",
+    "the longest step; nothing in the shipped tree reaches it, while --duration-slow is read by the update notice's entrance",
 });
 
 /**

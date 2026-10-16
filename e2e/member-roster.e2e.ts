@@ -93,7 +93,7 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     );
   });
 
-  it("the invite form takes an identity code and gates the post on a confirmed SAS compare", async () => {
+  it("the invite form takes an identity code and offers to post it", async () => {
     // Vault-count precondition: 1.
     let fixture!: SeededVault;
     await scenario(
@@ -150,16 +150,12 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           MEMBER_FIXTURE.member_mldsa_vk_hex,
         ].join(":");
         await (await app.session.byTestId("member-roster.invite-code")).replaceText(code);
-        // Inspect derives the SAS fingerprint locally (pure; no server needed).
-        await (await app.session.byTestId("member-roster.inspect")).click();
-        await app.session.byTestId("member-roster.sas-fingerprint");
-        // The post is gated on an explicit confirm.
+        // The local half is what this scenario pins: the code is accepted and the
+        // post is offered. Submitting would post to the sealed relay, which needs
+        // an enrolled vault + server; the two-device accept and removal flows are
+        // owed (manual-test roster).
         const submit = await app.session.byTestId("member-roster.invite-confirm");
-        expect(await submit.attribute("disabled")).not.toBeNull();
-        await (await app.session.byTestId("member-roster.sas-confirm")).click();
-        // Submitting would post to the sealed relay, which needs an enrolled
-        // vault + server; this scenario pins the local form and the SAS gate. The
-        // two-device accept and removal flows are owed (manual-test roster).
+        expect(await submit.attribute("disabled")).toBeNull();
         await (await app.session.byTestId("member-roster.invite-cancel")).click();
         await closeSettings(app.session);
       },

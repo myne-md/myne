@@ -40,7 +40,9 @@ import { useDevices } from "../../src/hooks/useDevices";
 // the tests exercise: it owns the hook so `invoke` mocking still drives the
 // full roster→render path end-to-end.
 function Harness() {
-  return <DeviceManagementPanel hook={useDevices()} />;
+  // The owner's panel: the shape every pre-existing assertion in this file was
+  // written against, now stated explicitly because `plane` has no default.
+  return <DeviceManagementPanel hook={useDevices()} plane="owner" />;
 }
 
 /** Make the roster load reject with a given non-secret error kind. */
@@ -160,6 +162,86 @@ describe("DeviceManagementPanel — loading", () => {
     });
     render(<Harness />);
     await waitFor(() => expect(screen.queryByText("Loading…")).toBeTruthy());
+  });
+});
+
+// ── the member vault (myne-md/myne, 2026-10-16) ─────────────────────────────
+//
+// On a member vault the roster is the member's own PERSON account's, resolved
+// backend-side (`account_plane_from_host`). Two affordances must be absent, and
+// both are honesty obligations rather than cosmetics:
+//
+//  - `Remove device` would revoke that device's PERSON sign-in while leaving its
+//    access to this vault standing (a member's vault access is a binding only the
+//    OWNER can revoke), so `REMOVE_DEVICE_DISCLOSURE`'s "sync stops" would be a
+//    lie;
+//  - `Reset sync on this device` clears the token in the VAULT directory, which on
+//    a member vault is the membership token the whole vault syncs on — and no UI
+//    path restores it. It must not be reachable even from a refusal, which is
+//    exactly the arm that used to offer it.
+describe("DeviceManagementPanel — a member vault", () => {
+  const ROSTER = [
+    { device_id_hex: "aa00", approved: true, retired: false, is_current: true },
+    { device_id_hex: "bb11", approved: true, retired: false, is_current: false },
+  ];
+
+  function MemberHarness() {
+    return <DeviceManagementPanel hook={useDevices()} plane="member" />;
+  }
+
+  /** The plane the panel could not establish: no vault id, a probe still in
+   *  flight, or a failed read. The destructive arms must be absent here too, and
+   *  this is the case the first version of the gate got wrong — it defaulted to
+   *  the owner shape, which is the one that renders the reset. */
+  function UnknownPlaneHarness() {
+    return <DeviceManagementPanel hook={useDevices()} plane="unknown" />;
+  }
+
+  it("lists the member's own devices without a Remove action", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_list_devices") return ROSTER;
+      if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
+      return undefined;
+    });
+    render(<MemberHarness />);
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("sync.device-row")).toHaveLength(2),
+    );
+    // The other device is listed…
+    expect(screen.getAllByTestId("sync.device-code").length).toBe(2);
+    // …and it carries the verify affordance but no Remove, on either row.
+    expect(screen.getAllByTestId("sync.verify-device")).toHaveLength(1);
+    expect(screen.queryByTestId("sync.remove-device")).toBeNull();
+  });
+
+  it("never offers the local reset, not even on the refusal that used to show it", async () => {
+    listRejects("Unauthenticated");
+    render(<MemberHarness />);
+
+    // The failure is still REPORTED — silence would leave the user guessing…
+    await waitFor(() => expect(screen.queryByTestId("sync.device-error")).toBeTruthy());
+    // …but the destructive remedy is not on offer.
+    expect(screen.queryByTestId("sync.reset-local")).toBeNull();
+  });
+
+  it("offers no reset while the plane is still unknown, which is not an owner answer", async () => {
+    listRejects("Unauthenticated");
+    render(<UnknownPlaneHarness />);
+
+    await waitFor(() => expect(screen.queryByTestId("sync.device-error")).toBeTruthy());
+    expect(
+      screen.queryByTestId("sync.reset-local"),
+      "an unresolved plane must not hand back the destructive reset",
+    ).toBeNull();
+  });
+
+  it("keeps the reset on an owner vault, so the gate is not vacuously green", async () => {
+    // The positive control for the two tests above: the same refusal on the
+    // owner's panel still shows the button.
+    listRejects("Unauthenticated");
+    render(<Harness />);
+    await waitFor(() => expect(screen.queryByTestId("sync.reset-local")).toBeTruthy());
   });
 });
 

@@ -183,11 +183,6 @@ export async function sendInvite(owner: AppSession, memberCode: string): Promise
   await (await owner.session.byTestId("member-roster.share-confirm-cta")).click();
   await owner.session.byTestId("member-roster.invite-modal");
   await (await owner.session.byTestId("member-roster.invite-code")).replaceText(memberCode);
-  // Inspect derives the SAS fingerprint locally, so it needs no server.
-  await (await owner.session.byTestId("member-roster.inspect")).click();
-  await owner.session.byTestId("member-roster.sas-fingerprint");
-  // The post is gated on an explicit confirm.
-  await (await owner.session.byTestId("member-roster.sas-confirm")).click();
   await (await owner.session.byTestId("member-roster.invite-confirm")).click();
   await owner.session.byTestId("member-roster.invitation-row", { timeoutMs: 60_000 });
   await closeSettings(owner.session);
@@ -216,13 +211,9 @@ export async function acceptInvite(
   await (await member.session.byTestId("identity-home.accept-open")).click();
   await member.session.byTestId("identity-home.accept-form");
   await (await member.session.byTestId("identity-home.accept-owner-code")).replaceText(ownerCode);
-  await (await member.session.byTestId("identity-home.accept-inspect")).click();
-  await member.session.byTestId("identity-home.accept-sas");
-  // The out-of-band compare comes BEFORE the phrase is typed: it is the last point at
-  // which the invitee can still refuse, and the owner step is gated on it. The three
-  // collects are three screens now (myne-md/myne#871), and only the current step's
-  // Continue exists, so one testid walks both gates.
-  await (await member.session.byTestId("identity-home.accept-confirm")).click();
+  // The owner's code releases the owner step, and the phrase is typed next. The
+  // three collects are three screens now (myne-md/myne#871), and only the current
+  // step's Continue exists, so one testid walks both gates.
   await (await member.session.byTestId("identity-home.accept-continue")).click();
   await member.session.byTestId("identity-home.accept-phrase-grid");
   await typePhrase(

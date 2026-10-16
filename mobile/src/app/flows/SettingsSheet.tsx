@@ -2681,6 +2681,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
         {panel === "sync" && (
           <SyncHubPanel
             status={syncStatus}
+            vaultId={vaultId}
             onSyncNow={syncNow}
             syncing={syncBusy}
             onOpenEndpoint={() => setPanel("sync-endpoint")}
@@ -2694,7 +2695,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
         {panel === "sync-enroll" && <SyncEnrollPanel onEnrolled={() => setPanel("sync")} />}
 
-        {panel === "sync-devices" && <SyncDevicesPanel />}
+        {panel === "sync-devices" && <SyncDevicesPanel vaultId={vaultId} />}
 
         {panel === "sync-members" && <SyncMembersPanel />}
 

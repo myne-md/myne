@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
-const inspectInviteCode = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -35,7 +34,6 @@ vi.mock("../../src/lib/personAccount", () => ({
 }));
 
 vi.mock("../../src/lib/invite", () => ({
-  inspectInviteCode,
   personLock,
   listRoster,
 }));
@@ -64,7 +62,6 @@ beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
-  inspectInviteCode.mockReset();
   listRoster.mockReset();
   setMyMemberName.mockReset();
 });
@@ -104,11 +101,12 @@ describe("IdentityHome accept path", () => {
     );
     const open = await screen.findByTestId("identity-home.accept-open");
     fireEvent.click(open);
-    // The accept opens on its OWNER step: the code, the fingerprint check and
-    // nothing else. The member phrase is a step of its own below.
+    // The accept opens on its OWNER step: the owner's identity code and nothing
+    // else. The member phrase is a step of its own below, and there is no
+    // out-of-band fingerprint compare to perform on this step.
     expect(await screen.findByTestId("identity-home.accept-step")).toBeTruthy();
     expect(screen.getByTestId("identity-home.accept-owner-code")).toBeTruthy();
-    expect(screen.getByTestId("identity-home.accept-inspect")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.accept-inspect")).toBeNull();
     expect(screen.queryByTestId("identity-home.accept-phrase-grid")).toBeNull();
   });
 
@@ -120,7 +118,6 @@ describe("IdentityHome accept path", () => {
     personListInvites.mockResolvedValue([
       { invite_id_hex: "aa", vault_account_hash_hex: "bb", claimed: false },
     ]);
-    inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
         identityCode="code"
@@ -131,28 +128,24 @@ describe("IdentityHome accept path", () => {
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
 
-    // Step 1's Continue is gated on the out-of-band confirmation, not on the
-    // code merely being non-empty.
+    // Step 1's Continue is gated on the owner's code being present.
     const firstContinue = () => screen.getByTestId("identity-home.accept-continue") as HTMLButtonElement;
     expect(firstContinue().disabled).toBe(true);
     fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
-    await screen.findByTestId("identity-home.accept-sas");
-    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
     expect(firstContinue().disabled).toBe(false);
 
     fireEvent.click(firstContinue());
     expect(await screen.findByTestId("identity-home.accept-phrase-grid")).toBeTruthy();
 
-    // Back from the phrase returns to the owner step with its fingerprint still
-    // confirmed, so the walk is not a re-entry of the out-of-band material.
+    // Back from the phrase returns to the owner step with its code still in the
+    // box, so the walk is not a re-entry of the out-of-band material.
     fireEvent.click(screen.getByTestId("identity-home.accept-back"));
     expect(await screen.findByTestId("identity-home.accept-owner-code")).toBeTruthy();
-    expect(screen.getByTestId("identity-home.accept-owner-fingerprint").textContent).toBe(
-      "55".repeat(32),
-    );
+    expect(
+      (screen.getByTestId("identity-home.accept-owner-code") as HTMLTextAreaElement).value,
+    ).toBe(OWNER_CODE);
     fireEvent.click(screen.getByTestId("identity-home.accept-continue"));
 
     // The phrase step's Continue is gated on all 24 words.
@@ -336,7 +329,6 @@ describe("IdentityHome accept requires a device password", () => {
   /** Open the form and satisfy everything EXCEPT the password. */
   async function readyExceptPassword(): Promise<void> {
     personListInvites.mockResolvedValue([INVITE]);
-    inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
         identityCode="code"
@@ -349,9 +341,6 @@ describe("IdentityHome accept requires a device password", () => {
     fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
-    await screen.findByTestId("identity-home.accept-sas");
-    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
     continueAccept();
     await screen.findByTestId("identity-home.accept-phrase-grid");
     fillPhrase();
@@ -442,7 +431,6 @@ describe("IdentityHome accept requires a device password", () => {
   it("passes the password to the command beside the phrase", async () => {
     const onAccepted = vi.fn();
     personListInvites.mockResolvedValue([INVITE]);
-    inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     render(
       <IdentityHome
         identityCode="code"
@@ -455,9 +443,6 @@ describe("IdentityHome accept requires a device password", () => {
     fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
-    await screen.findByTestId("identity-home.accept-sas");
-    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
     continueAccept();
     await screen.findByTestId("identity-home.accept-phrase-grid");
     fillPhrase();
@@ -495,7 +480,6 @@ describe("IdentityHome accept reaches the name gate", () => {
 
   async function accept(onAccepted: () => void): Promise<void> {
     personListInvites.mockResolvedValue([INVITE]);
-    inspectInviteCode.mockResolvedValue({ fingerprint_hex: "55".repeat(32) });
     personAcceptInvite.mockResolvedValue({});
     render(
       <IdentityHome
@@ -509,9 +493,6 @@ describe("IdentityHome accept reaches the name gate", () => {
     fireEvent.change(screen.getByTestId("identity-home.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    fireEvent.click(screen.getByTestId("identity-home.accept-inspect"));
-    await screen.findByTestId("identity-home.accept-sas");
-    fireEvent.click(screen.getByTestId("identity-home.accept-confirm"));
     continueAccept();
     await screen.findByTestId("identity-home.accept-phrase-grid");
     for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {

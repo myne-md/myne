@@ -340,8 +340,14 @@ export function AboutPanel() {
   };
 
   // A manual check that finds an update must offer the install, not just the
-  // sentence: with the automatic check off, the banner never runs, so this is the
-  // only reachable affordance. Same command the banner's button calls.
+  // sentence: with the automatic check off, the notice's check never runs, so this
+  // is the only reachable affordance.
+  //
+  // This is the SECOND install door, and it is deliberately not the notice's flow
+  // (myne-md/myne#870): it flushes and installs without locking the vault, so it
+  // has no confirm, no `updating` Stage and no failure surface. The notice's
+  // confirm is the path that locks first, and unifying the two is a product
+  // decision recorded in `docs/decisions/ui/0686` rather than taken here.
   const [installing, setInstalling] = useState(false);
   const runUpdateInstall = () => {
     setInstalling(true);
