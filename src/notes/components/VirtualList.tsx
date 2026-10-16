@@ -77,12 +77,21 @@ export type VirtualListProps<T> = {
    *  `"auto"` so a wide column set scrolls horizontally with its Name column
    *  pinned (`position:sticky; left:0`) to this scroll container. */
   overflowX?: "hidden" | "auto";
+  /** Draw the app's own `ScrollArea` indicator instead of the native bar: it
+   *  shows on hover, focus and scroll only, where the native bar follows the OS
+   *  setting and never hides on a Mac set to always show scroll bars
+   *  (myne-md/myne#867, on the user's read for the sidebar tree). Opt-in, so the
+   *  saved views keep their native bars, and the table's horizontal scroll in
+   *  particular, which the primitive does not draw. Ignored when `overflowX` is
+   *  `"auto"`, for that reason. */
+  overlayScrollbar?: boolean;
 };
 
 const DEFAULT_ESTIMATED_HEIGHT = 52;
 const DEFAULT_BUFFER = 5;
 
 import { useDragAutoScroll } from "./useDragAutoScroll";
+import { ScrollArea } from "../../components/primitives/ScrollArea";
 
 export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   const {
@@ -93,6 +102,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     buffer = DEFAULT_BUFFER,
     heightResetToken,
     overflowX = "hidden",
+    overlayScrollbar = false,
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -278,6 +288,52 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     position: "relative",
   };
 
+  const content = (
+    <>
+      <div style={{ height: topSpacer }} aria-hidden="true" />
+      {visibleSlice.map(({ item, index, key }) => (
+        <div
+          key={key}
+          ref={setRowRef(key)}
+          data-vrow-key={key}
+        >
+          {renderItem(item, index)}
+        </div>
+      ))}
+      <div style={{ height: bottomSpacer }} aria-hidden="true" />
+    </>
+  );
+
+  if (overlayScrollbar && overflowX === "hidden") {
+    // The primitive's scroller IS the virtualizer's container: `containerRef`
+    // is handed in, so the scroll listener, the viewport ResizeObserver and the
+    // drag auto-scroll all read the element that actually scrolls. The drag
+    // handlers sit on a wrapper because drag events bubble from the scroller.
+    return (
+      <div
+        style={{ height: "100%", display: "flex", minHeight: 0 }}
+        onDragOver={autoScroll.onDragOver}
+        onDragLeave={autoScroll.stop}
+        onDrop={autoScroll.stop}
+      >
+        {/* ONE wrapper around the rows, with `watchSubtree={false}`: the
+            visible slice changes on every scroll frame, and a subtree observer
+            re-observed every row each frame. The wrapper's height IS the list's
+            total (the two spacers plus the slice), so the indicator still
+            hears every change in it through the wrapper's ResizeObserver
+            (myne-md/myne#867 review, D7). */}
+        <ScrollArea
+          scrollerRef={containerRef}
+          style={{ flex: "1 1 auto", minWidth: 0 }}
+          contentStyle={{ position: "relative" }}
+          watchSubtree={false}
+        >
+          <div data-vlist-content="">{content}</div>
+        </ScrollArea>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -290,17 +346,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
       onDragLeave={autoScroll.stop}
       onDrop={autoScroll.stop}
     >
-      <div style={{ height: topSpacer }} aria-hidden="true" />
-      {visibleSlice.map(({ item, index, key }) => (
-        <div
-          key={key}
-          ref={setRowRef(key)}
-          data-vrow-key={key}
-        >
-          {renderItem(item, index)}
-        </div>
-      ))}
-      <div style={{ height: bottomSpacer }} aria-hidden="true" />
+      {content}
     </div>
   );
 }

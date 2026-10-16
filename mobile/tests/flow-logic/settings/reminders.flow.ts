@@ -18,9 +18,10 @@ import { installMockIpc } from "../mock-ipc";
 /** Settings → Privacy, where the reminder block lives (a block, not a rail entry). */
 async function openPrivacy(page: import("@playwright/test").Page): Promise<void> {
   await page.getByRole("button", { name: "Settings" }).first().click();
-  // The rail row is labelled `settings.panelTitle.privacy` = "Privacy & security",
-  // not "Privacy" — an exact-text match on the short form never resolves.
-  await page.getByText("Privacy & security", { exact: true }).click();
+  // The rail row is labelled `settings.shell.panels.privacy` = "Privacy"
+  // (myne-md/myne#880 task 12 aligned the mobile category to the desktop panel
+  // name; it used to read "Privacy & security").
+  await page.getByText("Privacy", { exact: true }).click();
 }
 
 test.describe("mobile task-reminder settings", () => {

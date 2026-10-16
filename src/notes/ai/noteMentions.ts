@@ -75,9 +75,22 @@ export function buildMentionTargets(
   notes: readonly ResolverNote[],
 ): MentionTarget[] {
   const byText = new Map<string, string>();
+  // **A name two notes share names neither** (myne-md/myne#867 review, D7).
+  // `A/Meeting.md` and `B/Meeting.md` both offer the bare title `Meeting`, and
+  // keeping whichever came first in the resolver list made the link open a
+  // note chosen by list order: a guess, which is the one thing this module
+  // refuses. Such a text is dropped and stays plain; each note is still
+  // reachable by its full path, which only one of them can have.
+  const ambiguous = new Set<string>();
   const add = (text: string, noteUuid: string) => {
-    if (text === "" || byText.has(text)) return;
-    byText.set(text, noteUuid);
+    if (text === "" || ambiguous.has(text)) return;
+    const prior = byText.get(text);
+    if (prior === undefined) {
+      byText.set(text, noteUuid);
+    } else if (prior !== noteUuid) {
+      byText.delete(text);
+      ambiguous.add(text);
+    }
   };
   for (const note of notes) {
     const path = notePath(note);
@@ -89,6 +102,39 @@ export function buildMentionTargets(
   return [...byText.entries()]
     .map(([text, noteUuid]) => ({ text, noteUuid }))
     .sort((a, b) => b.text.length - a.text.length);
+}
+
+/**
+ * The targets grouped by first character, longest first within each group.
+ *
+ * `linkifyMentions` runs on every render of a streaming bubble, once per token,
+ * and trying every target at every word boundary made that cost the text
+ * length times the vault's note count (myne-md/myne#867 review, D7). Grouping
+ * by the first character leaves only the candidates that can match at a
+ * position. Cached per targets array, which callers already memoise, so the
+ * grouping is built once per vault change rather than once per token.
+ */
+const BY_FIRST_CHAR = new WeakMap<
+  readonly MentionTarget[],
+  Map<string, MentionTarget[]>
+>();
+
+function targetsByFirstChar(
+  targets: readonly MentionTarget[],
+): Map<string, MentionTarget[]> {
+  const cached = BY_FIRST_CHAR.get(targets);
+  if (cached !== undefined) return cached;
+  const grouped = new Map<string, MentionTarget[]>();
+  // `targets` is longest-first, and pushing in that order keeps each group so.
+  for (const target of targets) {
+    const first = target.text[0];
+    if (first === undefined) continue;
+    const group = grouped.get(first);
+    if (group === undefined) grouped.set(first, [target]);
+    else group.push(target);
+  }
+  BY_FIRST_CHAR.set(targets, grouped);
+  return grouped;
 }
 
 /**
@@ -109,11 +155,13 @@ export function linkifyMentions(
     plain = "";
   };
 
+  const grouped = targetsByFirstChar(targets);
   let i = 0;
   outer: while (i < text.length) {
     const leftOk = i === 0 || !NAME_CHAR.test(text[i - 1]);
-    if (leftOk) {
-      for (const target of targets) {
+    const candidates = leftOk ? grouped.get(text[i]) : undefined;
+    if (candidates !== undefined) {
+      for (const target of candidates) {
         if (!text.startsWith(target.text, i)) continue;
         const end = i + target.text.length;
         if (end < text.length && NAME_CHAR.test(text[end])) {

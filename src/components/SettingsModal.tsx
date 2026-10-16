@@ -62,6 +62,12 @@ import {
   SettingsCompactContext,
   useSettingsCompactObserver,
 } from "./settings/settingsCompact";
+import {
+  SettingsTabs,
+  setActiveSettingsTopic,
+  useActiveSettingsTopic,
+} from "./settings/SettingsTabs";
+import { livePanelTopics } from "./settings/settingsTopics";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import * as capabilities from "../platform/capabilities";
@@ -76,6 +82,7 @@ import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
 import { SyncPanel } from "./settings/SyncPanel";
 import { usePrefs } from "../hooks/usePrefs";
+import { memberVaultStatus } from "../lib/personAccount";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
 /**
@@ -407,7 +414,7 @@ const RAIL_GROUP_HEADER_STYLE: CSSProperties = {
 const CONTENT_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  background: "var(--bg-2)",
+  minHeight: 0,
   padding: "var(--space-5) var(--space-6)",
   overflow: "auto",
   display: "flex",
@@ -416,6 +423,20 @@ const CONTENT_STYLE: CSSProperties = {
   // it reads as a deliberate column rather than hugging the left edge with a
   // huge empty gap on a wide screen (#206).
   justifyContent: "center",
+};
+
+// The content column: the in-panel topic strip (when the selected panel has one)
+// above the scrolling pane. Split out of `CONTENT_STYLE` by myne-md/myne#885 so
+// the strip can be the column's FIRST ROW - outside the scroll container, which
+// is what keeps it in place while the panel scrolls and puts its bottom hairline
+// on the line the rail's search row already draws.
+const CONTENT_COLUMN_STYLE: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  background: "var(--bg-2)",
 };
 
 // Width cap for the panel content inside the full-window modal. Centred in the
@@ -444,6 +465,31 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
+  // Whether the ACTIVE VAULT is a B2B member vault (myne-md/myne#885). The
+  // settings search runs against the static registry, so it cannot see that the
+  // shared-vault-unlock row renders only on a member vault. This is the runtime
+  // per-vault fact the `memberVaultGated` gate needs, resolved once per open
+  // rather than by mounting a panel to look. `false` while unresolved and on any
+  // failure, which HIDES the entry: a hidden setting is a smaller failure than
+  // one the user is sent to and cannot find.
+  const [memberVault, setMemberVault] = useState(false);
+  useEffect(() => {
+    if (!open || vaultId === null) {
+      setMemberVault(false);
+      return;
+    }
+    let alive = true;
+    void memberVaultStatus(vaultId)
+      .then((isMember) => {
+        if (alive) setMemberVault(isMember === true);
+      })
+      .catch(() => {
+        if (alive) setMemberVault(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, vaultId]);
   // The rail roster, re-filtered whenever Developer mode flips (About panel,
   // task 6) so the group appears/disappears immediately per the PRD's "no
   // restart, no confirmation dialog" requirement — no separate effect needed,
@@ -495,8 +541,25 @@ export function SettingsModal({
   useEffect(() => {
     if (!open || initialAnchor === undefined) return;
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === initialAnchor);
-    if (entry !== undefined) setPendingScroll(entry);
+    if (entry !== undefined) {
+      // Same topic step a picked result takes, for the same reason: an anchor
+      // inside a topic that is not the active one is not mounted, so landing on
+      // it also means selecting the topic that owns it.
+      if (entry.topic !== undefined) {
+        setActiveSettingsTopic(entry.panelId, entry.topic);
+      }
+      setPendingScroll(entry);
+    }
   }, [open, initialAnchor]);
+  // A topic change starts the new topic at the top, the way a rail change does
+  // (#206): a strip that swapped the body under a scroll position the user had
+  // scrolled would land them mid-way through the topic they just picked. This
+  // runs BEFORE the pending-scroll effect below, so a search jump still ends on
+  // its anchor - that scroll is scheduled on the next frame, after this reset.
+  const activeTopic = useActiveSettingsTopic(selected, livePanelTopics(selected));
+  useEffect(() => {
+    if (contentRef.current !== null) contentRef.current.scrollTop = 0;
+  }, [activeTopic, selected]);
   const searching = query.trim() !== "";
   // Order the matches into the SAME panel-clustered sequence the results list
   // renders (group-then-flatten). The scorer (fuzzyFilter, via searchSettings)
@@ -507,9 +570,13 @@ export function SettingsModal({
   const results = useMemo(
     () =>
       searching
-        ? flattenGroups(groupResultsByPanel(searchSettings(query, t, prefs.developer_mode)))
+        ? flattenGroups(
+            groupResultsByPanel(
+              searchSettings(query, t, prefs.developer_mode, memberVault),
+            ),
+          )
         : [],
-    [searching, query, t, prefs.developer_mode],
+    [searching, query, t, prefs.developer_mode, memberVault],
   );
   // Keyboard-highlighted result (arrow keys move it; Enter opens it). Reset to
   // the top whenever the query changes so the highlight never points past the
@@ -642,9 +709,15 @@ export function SettingsModal({
 
   // Selecting a result jumps to the owning panel, clears the query (so the
   // content pane returns to the panel view), and arms the scroll+flash of the
-  // target setting for after the panel mounts.
+  // target setting for after the panel mounts. **It also selects the topic the
+  // entry lives in** (myne-md/myne#885 task 5): an inactive topic's body is not
+  // mounted, so without this the anchor is not in the document at all and the
+  // jump degrades to a panel switch with no answer on screen.
   const handleSelectResult = useCallback((entry: SettingsIndexEntry) => {
     setSelected(entry.panelId);
+    if (entry.topic !== undefined) {
+      setActiveSettingsTopic(entry.panelId, entry.topic);
+    }
     setPendingScroll(entry);
     setQuery("");
   }, []);
@@ -831,6 +904,12 @@ export function SettingsModal({
                     }}
                     type="button"
                     role="tab"
+                    // The content pane's `aria-labelledby` has pointed at this id
+                    // since the rail landed; nothing set it, so the pane was
+                    // announced unlabelled. Set here rather than left dangling
+                    // beside the topic panel's own (correct) wiring one level
+                    // down (myne-md/myne#885).
+                    id={`settings-panel-${panel.id}-tab`}
                     data-testid={`settings.tab-${panel.id}`}
                     aria-selected={isSelected}
                     aria-controls={`settings-panel-${panel.id}`}
@@ -864,27 +943,39 @@ export function SettingsModal({
             </nav>
           </div>
 
-          <div
-            ref={contentRef}
-            role="tabpanel"
-            id={`settings-panel-${selected}`}
-            aria-labelledby={`settings-panel-${selected}-tab`}
-            style={CONTENT_STYLE}
-          >
-            <div style={CONTENT_INNER_STYLE}>
-              <SettingsCompactContext.Provider value={compact}>
-                {searching ? (
-                  <SettingsSearchResults
-                    results={results}
-                    query={query}
-                    activeId={activeId}
-                    onSelect={handleSelectResult}
-                  />
-                ) : (
-                  panelContent[selected]
-                )}
-              </SettingsCompactContext.Provider>
-            </div>
+          <div style={CONTENT_COLUMN_STYLE}>
+            <SettingsCompactContext.Provider value={compact}>
+              {/* The in-panel topic strip (myne-md/myne#885). It renders nothing
+                  for a panel with fewer than two topics, which is how a short
+                  panel stays a single screen, and nothing while a search query
+                  owns the pane (the results list is not a topic of any panel). */}
+              {searching ? null : (
+                <SettingsTabs
+                  panelId={selected}
+                  topics={livePanelTopics(selected)}
+                />
+              )}
+              <div
+                ref={contentRef}
+                role="tabpanel"
+                id={`settings-panel-${selected}`}
+                aria-labelledby={`settings-panel-${selected}-tab`}
+                style={CONTENT_STYLE}
+              >
+                <div style={CONTENT_INNER_STYLE}>
+                  {searching ? (
+                    <SettingsSearchResults
+                      results={results}
+                      query={query}
+                      activeId={activeId}
+                      onSelect={handleSelectResult}
+                    />
+                  ) : (
+                    panelContent[selected]
+                  )}
+                </div>
+              </div>
+            </SettingsCompactContext.Provider>
           </div>
         </div>
       </div>

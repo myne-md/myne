@@ -40,8 +40,21 @@ use protocol::{
     decode_crdt_note_blob, encode_crdt_note_blob, CannotDecryptCrdtNote, ProtocolError,
 };
 
-/// A sealed-but-unwritten durable blob and the heads it carries: `(blob, heads)`.
-pub type SealedFlush = (Vec<u8>, Vec<String>);
+/// A sealed-but-unwritten durable blob, the heads it carries, and the body text
+/// it was sealed from: `(blob, heads, markdown)`.
+///
+/// **The text travels WITH the blob, and that is the point of the third field.**
+/// The flush feeds the live indexes the body it just wrote, and reading that body
+/// in a second lock acquisition (which is what the flush used to do, after the
+/// disk write) let another thread merge a change in between, so the indexed body
+/// need not be the body that reached disk. Captured here, under the same
+/// acquisition as the seal, the two cannot disagree.
+///
+/// The text is `None` when the document's body could not be read. The blob is
+/// still written in that case, because refusing the flush would make the user's
+/// edits impossible to persist, and the caller removes the note's search doc
+/// rather than leaving the index describing an older body.
+pub type SealedFlush = (Vec<u8>, Vec<String>, Option<String>);
 
 /// The `(vault_id, note_id)` a session is keyed by (`SYNC-34`). A session belongs
 /// to one note in one vault; opening the same pair again attaches rather than
@@ -434,6 +447,12 @@ impl LiveSession {
     }
 
     /// The document's current body text (the whole note, frontmatter included).
+    ///
+    /// `seal_for_flush` reads this under the SAME acquisition as the seal, so the
+    /// body it hands the caller is the body the sealed blob holds. Reading it in a
+    /// second acquisition after the disk write was the shape that let another
+    /// thread merge a change in between, and it is why `SealedFlush` carries the
+    /// text rather than the flush re-reading it (myne-md/myne#867 review).
     fn current_text(&self) -> Result<String, crate::plugins::live::apply_local::ApplyLocalError> {
         let text = crate::plugins::notes::crdt::note_text_id(&self.doc)
             .map_err(|_| crate::plugins::live::apply_local::ApplyLocalError::Malformed)?;
@@ -478,9 +497,15 @@ impl LiveSession {
         if heads == self.last_durable_heads {
             return Ok(None);
         }
+        // The body text is read in THIS acquisition, beside the seal, and travels
+        // with it. A read that fails here does NOT fail the flush: the blob is the
+        // user's edit and losing it is worse than an unindexed note. It travels as
+        // `None` instead, and the caller drops the note's search doc so the index
+        // never describes a different document than the one on disk.
+        let markdown = self.current_text().ok();
         let save = self.doc.save();
         let blob = encode_crdt_note_blob(items_key, items_key_id, &self.note_uuid, &save)?;
-        Ok(Some((blob, heads)))
+        Ok(Some((blob, heads, markdown)))
     }
 
     /// Record `heads` as durable after a successful write.
@@ -504,7 +529,7 @@ impl LiveSession {
         items_key: &[u8; 32],
         items_key_id: &[u8; 16],
     ) -> Result<(), LiveSessionError> {
-        if let Some((blob, heads)) = self.seal_for_flush(items_key, items_key_id)? {
+        if let Some((blob, heads, _markdown)) = self.seal_for_flush(items_key, items_key_id)? {
             io.write(&self.note_path(notes_dir), &blob, WriteOpts::default())
                 .await
                 .map_err(|_| LiveSessionError::Io)?;

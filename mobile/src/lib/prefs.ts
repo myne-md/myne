@@ -199,6 +199,20 @@ export interface PrefsView {
    */
   attachment_compression_enabled: boolean;
   /**
+   * Whether attachment text extraction may read images and scanned PDFs
+   * (image OCR, MYND-441). **Defaults to `true`**, omitted from the encrypted
+   * blob when true, so a vault predating the field reads as enabled. Turning it
+   * off stops the background extraction worker but never deletes cached results.
+   *
+   * **DEVICE-LOCAL** (`sync-protocol.md` §10.2), deliberately unlike the
+   * compression switch above it: this is a per-device compute budget, and OCR
+   * runs in-process on the phone that imports the image, so the device paying
+   * the cost owns the switch. Reached this client's mirror when the row that
+   * writes it did (myne-md/myne#880); the import path already read the pref to
+   * select its extractor, so the phone obeyed a value it could not set.
+   */
+  attachment_ocr_enabled: boolean;
+  /**
    * The AI beta opt-in for THIS device (myne-md/myne#456). Device-local, and
    * after that issue removed `developer_mode` from the request-time gate it is
    * the only device-local switch on the remote path besides the consent below,
@@ -237,6 +251,52 @@ export interface PrefsView {
    * chose is a bill nobody chose.
    */
   ai_provider_model: string | null;
+  /**
+   * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
+   * MYND-408, SYNC-14), canonical trailing-slash form. Same encoding as
+   * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
+   * defaulted to `[]`.
+   *
+   * **An EGRESS CONTROL rather than a preference**, which is why
+   * `sync-protocol.md` §10.2 classifies it `SetUnion { folded: true,
+   * removals_propagate: false }`: an exclusion present on ANY device survives
+   * every merge, so the union can only ever fail closed. The core honours it
+   * (`hooks.ai_policy_changed`), and `src/lib/aiExcludedFolders.ts` is the
+   * frontend mirror of the Rust `folder_matches_excluded`, so a note gated on
+   * one path is gated on the other.
+   *
+   * Reached this client's mirror when the row that writes it did
+   * (myne-md/myne#880): the phone already ENFORCED the list and reported its
+   * count, and could not author it. Write via
+   * {@link mutateAiExcludedFolders}, which takes verbs rather than a whole set.
+   */
+  ai_excluded_folders: string[];
+  /**
+   * Characters of chat history an agent run may be seeded with
+   * (myne-md/myne#617), or `null` for the host's default.
+   *
+   * **DEVICE-LOCAL**: it bounds how much of THIS machine's plaintext one run
+   * sends to a provider, multiplied by the loop's iteration ceiling, so a laptop
+   * on a metered connection and a desktop on a fast one legitimately disagree.
+   * A value that synced would let one device widen another's off-device volume
+   * without anyone at that device choosing it.
+   *
+   * The host CLAMPS the write (`MAX_HISTORY_BUDGET` in the Rust history
+   * module), so the stored value can be lower than the one sent. Reached this
+   * client's mirror when the row that writes it did (myne-md/myne#880); the
+   * phone already applied an inherited default it could not change.
+   */
+  chat_history_budget: number | null;
+  /**
+   * The instruction the meeting AI pass uses to turn a transcript into sections
+   * (meeting-ai), or `null` for the built-in default.
+   *
+   * **SHARED / scalar last-write-wins**: it is vault content, so it reaches the
+   * account's other devices. Reached this client's mirror when the row that
+   * writes it did (myne-md/myne#880), which matters most here because the phone
+   * is where meeting capture actually happens.
+   */
+  meeting_ai_prompt: string | null;
   /*
    * There is deliberately NO `ai_provider_key` here, and the absence is the
    * point. `prefs_read` serializes the whole host-side `PrefsView`, so a key in
@@ -401,13 +461,13 @@ export interface PrefsView {
    * Absent in vaults that configured no period → the Rust decoder defaults it
    * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
    *
-   * **Read-only on mobile**, deliberately: there is a `setPeriodicNoteSetting`
-   * binding, an IPC command and an ACL row on desktop and none of the three
-   * here, because mobile ships no periodic-notes settings panel. A grant for a
-   * command the WebView never sends would widen the reachable surface for
-   * nothing. The map arrives by sync, configured on a computer, and mobile
-   * resolves periods from it. Add the write half in the same change as the
-   * panel, not before it.
+   * **Read and written on mobile since myne-md/myne#880.** It used to be
+   * read-only here, deliberately: the write half was withheld because mobile
+   * shipped no periodic-notes settings panel, and a grant for a command the
+   * WebView never sends would widen the reachable surface for nothing. The panel
+   * landed (`mobile/src/components/PeriodicNotesBlock.tsx`) and the wrapper,
+   * `setPeriodicNoteSetting`, arrived with it, which is the order the paragraph
+   * that stood here asked for.
    */
   periodic_notes: Record<string, string>;
   /**
@@ -1152,6 +1212,117 @@ export async function setCustomTheme(customTheme: string | null): Promise<void> 
 }
 
 /**
+ * Persist the full colour-group rule list (graph-connection-ux-polish, reached
+ * mobile in myne-md/myne#880), a **WHOLE-LIST replace**, not a per-group
+ * upsert/delete.
+ *
+ * Order is rule precedence (first match wins), so unlike {@link setViewOrder}
+ * there is no separate order field to reconcile: the caller passes the complete
+ * desired sequence and the backend preserves it verbatim. A per-group merge
+ * would be wrong in both directions: it could not express a reorder, and a
+ * concurrent desktop edit to a different group would be silently lost rather
+ * than last-writer-wins.
+ *
+ * Disk-first, no native side-effect; the 64 KiB `vault.prefs` cap fails the
+ * write BEFORE touching disk, leaving the prior rules intact. A rejected promise
+ * means the write failed and the caller's optimistic UI must revert.
+ *
+ * Twin of `src/lib/prefs.ts::setColorGroups`.
+ */
+export async function setColorGroups(groups: ColorGroup[]): Promise<void> {
+  await writePref("plugin:prefs|set_color_groups", { groups });
+}
+
+/**
+ * Add to and remove from the `ai_excluded_folders` set (local-ai epic,
+ * ai-ux-surface MYND-408, SYNC-14): the folders AI never reads or indexes.
+ * Reached mobile in myne-md/myne#880.
+ *
+ * **Takes VERBS, not the whole set**, and that is a correctness requirement
+ * rather than a style: the sync stamper derives removals from `before \ after`,
+ * so a caller holding a stale view would claim a deletion it never made and
+ * travel it to every device. The wrapper took the whole desired set until
+ * myne-md/myne#613; `mutationFrom` below is how a caller derives the verbs from
+ * its OWN before and after, so an entry it never saw is claimed by neither.
+ *
+ * Returns how many additions the reserved byte budget refused, which is what
+ * makes a refusal reportable instead of silent.
+ *
+ * §10.2 classifies this field `SetUnion { folded: true, removals_propagate:
+ * false }`, deliberately unlike its neighbours: it is an EGRESS CONTROL, so its
+ * union is monotone and a removal is never inherited from a peer. A client
+ * cannot change that from here, and must not try.
+ *
+ * Twin of `src/lib/prefs.ts::mutateAiExcludedFolders`.
+ */
+export async function mutateAiExcludedFolders(mutation: SetMutation): Promise<number> {
+  return await writePref<number>("plugin:prefs|set_ai_excluded_folders", { mutation });
+}
+
+/**
+ * Characters of chat history an agent run may be seeded with (myne-md/myne#617),
+ * or `null` to restore the host's default. Reached mobile in
+ * myne-md/myne#880.
+ *
+ * **DEVICE-LOCAL**, unlike its neighbours in the AI cluster: it bounds how much
+ * of this machine's plaintext one run sends to a provider, multiplied by the
+ * loop's iteration ceiling, so a laptop on a metered connection and a desktop on
+ * a fast one legitimately disagree. A value that synced would let one device
+ * widen another's off-device volume without anyone at that device choosing it.
+ *
+ * **The value is CLAMPED host-side, and this wrapper deliberately does not clamp
+ * it.** The bound is what limits the plaintext a run can send, so it has to hold
+ * for every path that reaches the command rather than for the one that happened
+ * to render a control. A second clamp here would read as the control and hide
+ * the day the real one stopped working. The row renders `max` from the SHARED
+ * {@link CHAT_HISTORY_BUDGET_MAX}, which `tests/lib/chatHistoryBudget.test.ts`
+ * holds to the Rust clamp, so the two cannot drift silently.
+ *
+ * Twin of `src/lib/prefs.ts::setChatHistoryBudget`.
+ */
+export async function setChatHistoryBudget(budget: number | null): Promise<void> {
+  await writePref("plugin:prefs|set_chat_history_budget", { budget });
+}
+
+/**
+ * Whether attachment text extraction may read images and scanned PDFs (image
+ * OCR, MYND-441). Reached mobile in myne-md/myne#880, and the remedy here is a
+ * control rather than a feature: OCR already RUNS in-process on this device
+ * (`mobile/src-tauri/src/plugins/attachments/import_mobile.rs` injects the shared
+ * `extract_image_only` into the import path), so the device paying the compute
+ * cost had no way to turn it off.
+ *
+ * **DEVICE-LOCAL** (`sync-protocol.md` §10.2): per-device compute budget, so a
+ * desktop toggle cannot reach a phone. **Defaults to `true`**, and turning it off
+ * stops the extraction worker but never deletes cached results.
+ *
+ * An unreadable prefs blob reads as ON in the import path, matching desktop: a
+ * prefs read failure must not silently disable a search feature.
+ *
+ * Twin of `src/lib/prefs.ts::setAttachmentOcrEnabled`.
+ */
+export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
+  await writePref("plugin:prefs|set_attachment_ocr_enabled", { enabled });
+}
+
+/**
+ * Replace the meeting AI prompt, or pass `null` to restore the built-in default
+ * (meeting-ai). Reached mobile in myne-md/myne#880, which matters more here than
+ * elsewhere: the phone is where meeting capture actually happens, so the device
+ * that records the meeting could not author the instruction that processes it.
+ *
+ * An all-whitespace value is treated as a clear host-side, and a value longer
+ * than 4000 bytes is refused. **SHARED / scalar last-write-wins**, so it reaches
+ * the account's other devices; the value is user text stored in the encrypted
+ * `vault.prefs`.
+ *
+ * Twin of `src/lib/prefs.ts::setMeetingAiPrompt`.
+ */
+export async function setMeetingAiPrompt(prompt: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_meeting_ai_prompt", { prompt });
+}
+
+/**
  * Set the daily-notes date-format string (MYND-191), e.g. `YYYY-MM-DD`. The
  * backend atomic-writes vault.prefs disk-first with no native side-effect; a
  * rejected promise means the disk write failed. Non-load-bearing.
@@ -1177,6 +1348,40 @@ export async function setDailyFolder(folder: string): Promise<void> {
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
   await writePref("plugin:prefs|set_daily_template", { templateId });
+}
+
+/** The three things one period configures (myne#177). Twin of the desktop
+ *  `PeriodSetting`, and the backend refuses a setting outside the three. */
+export type PeriodSetting = "folder" | "format" | "template";
+
+/**
+ * Set (or clear) one weekly/monthly periodic-note setting (myne#177).
+ *
+ * The `periodic_notes` map is keyed `<period>.<setting>`, flat so the Phase 2
+ * field clock is per SETTING: a folder edit on one device and a template edit on
+ * another, to the same period in the same round, both survive. Pass
+ * `value = null` to clear the entry; the backend removes the key, which the
+ * merge represents as a stamped absence rather than as "never had it".
+ *
+ * A `folder` value is also registered as a deliberate folder backend-side, so
+ * the folder shows in the sidebar before its first note exists.
+ *
+ * **Landed with the panel, which is the order the `periodic_notes` field
+ * comment asked for.** That comment said the write half was deliberately absent
+ * because mobile shipped no periodic-notes settings panel, and that a grant for
+ * a command the WebView never sends would widen the reachable surface for
+ * nothing. The panel landed in `mobile/src/components/PeriodicNotesBlock.tsx`
+ * (myne-md/myne#880), so the wrapper, the ACL row and the surface arrive
+ * together.
+ *
+ * Twin of `src/lib/prefs.ts::setPeriodicNoteSetting`.
+ */
+export async function setPeriodicNoteSetting(
+  period: string,
+  setting: PeriodSetting,
+  value: string | null,
+): Promise<void> {
+  await writePref("plugin:prefs|set_periodic_note_setting", { period, setting, value });
 }
 
 /**

@@ -119,4 +119,24 @@ describe("HotkeysPanel — interactive rebind", () => {
     expect(setKeymapBinding).toHaveBeenCalledWith("graph.show", null);
     expect(setKeymapBinding).toHaveBeenCalledWith("note.new-tab", null);
   });
+
+  it("leads with the search field, the reset-all icon beside it, then the description", () => {
+    // myne-md/myne#867, on the user's read: the field and its reset share one
+    // row, and the description reads under them.
+    render(<HotkeysPanel />);
+    const search = screen.getByTestId("hotkeys.search");
+    const reset = screen.getByTestId("hotkeys.reset-all");
+    // The row is the field wrapper's parent; the icon may sit inside its
+    // tooltip's wrapper, so containment rather than a direct parent.
+    const row = search.parentElement?.parentElement as HTMLElement;
+    expect(row.contains(reset)).toBe(true);
+    expect(row.contains(screen.getByTestId("hotkeys.helper"))).toBe(false);
+    // Icon only: the name is the accessible label, not visible text.
+    expect(reset.getAttribute("aria-label")).toBeTruthy();
+    expect(reset.textContent).toBe("");
+    const helper = screen.getByTestId("hotkeys.helper");
+    expect(
+      search.compareDocumentPosition(helper) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });

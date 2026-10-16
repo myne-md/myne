@@ -32,6 +32,7 @@ import {
   openSettings,
   pickSelect,
   selectOptionValues,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import {
@@ -40,9 +41,11 @@ import {
 } from "../src/lib/load-bearing-copy";
 import type { Session } from "./support/webdriver";
 
-/** Settings → Editor, scrolled to the reminder block. */
+/** Settings → Editor, with the Writing topic open (the reminder rows live there
+ *  since myne-md/myne#885, and only the active topic's body is mounted). */
 async function openReminderSettings(s: Session): Promise<void> {
   await openSettings(s, "editor");
+  await selectSettingsTopic(s, "editor", "writing");
   await s.byTestId("settings.reminders");
 }
 

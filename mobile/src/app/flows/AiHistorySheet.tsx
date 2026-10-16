@@ -281,34 +281,23 @@ export function AiHistorySheet({
           <h2 id="ai-history-title" data-testid="ai.history-title" style={TITLE}>
             {t("editor.chrome.rightPanel.aiChat.historyTitle")}
           </h2>
-          {/* **The hub's copy, not this sheet's own** (myne-md/myne#867).
-              Three states rendered three hand-written sentences here while the
+          {/* **`EmptyState`, carrying the hub's copy** (myne-md/myne#867). Three
+              states used to render three hand-written sentences here while the
               hub's rail rendered the same three facts in its own words: the two
               surfaces list the same conversations over the same store, so a
               reader who saw both read two vocabularies for one thing. The hub
-              owns the copy and this sheet renders it.
+              owns the copy and this sheet renders it, and the component is the
+              app's zero state rather than a second one with the same words.
 
-              **Not on `EmptyState`, and that is a deviation worth stating.**
-              `aiChat.historyError` stays in the catalog for the two transcript
-              banners that still render it (`ConversationSurface`, mobile
-              `AiChatFlow`), so only the empty and loading keys left.
+              `EmptyState` moved to `@myne/client-core` in this same change (it
+              was desktop-only while its stylesheet was already shared), which is
+              what lets the phone render it. `aiChat.historyError` stays in the
+              catalog for the two transcript banners that still render it
+              (`ConversationSurface`, mobile `AiChatFlow`); the empty and loading
+              keys are the hub's now.
 
-              The desktop hub renders these on the shared zero-state primitive;
-              mobile has no such primitive (`mobile/src/components/` has none),
-              so the phone gets the same WORDS and the same three distinct
-              states without the same component. The styles it would use are
-              already shared (`myne-empty` lives in `client-core`), so the
-              follow-up is extracting the component into `client-core` beside
-              its stylesheet, which is a change with its own roster and its own
-              story rather than a line in this one. */}
-          {/* **`EmptyState` now, not three hand-written sentences**
-              (myne-md/myne#867). The component moved to `@myne/client-core` in
-              this same change (it was desktop-only while its stylesheet was
-              already shared), so the phone renders the app's zero state with the
-              hub's copy rather than a second one with the same words.
-
-              The glyph is a NODE because each client owns its icon registry:
-              the names below are this client's (`alert-triangle`,
+              The glyph is a NODE because each client owns its icon registry: the
+              names below are this client's (`alert-triangle`,
               `message-square`), not the desktop's. Loading has no glyph at all,
               which is what "defer to the skeleton convention" looks like when
               the phone has no skeleton for a sheet. */}

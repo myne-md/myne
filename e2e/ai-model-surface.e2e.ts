@@ -4,11 +4,12 @@
 // == WHAT THIS PROVES, AND WHAT IT DOES NOT ==
 // Three scenarios over the REAL panel on the `local-inference-stub` build:
 //
-//   aims1: the catalogue is reached from the Models heading's own button, and
-//           it lists every model Myne's own origin serves, with its size and
-//           its state. The Models block under that heading carries one
-//           assignment row per role, INCLUDING the tag role, which had no row
-//           at all before this change: it was reachable only by downloading it.
+//   aims1: the catalogue is INLINE in the Models topic (myne-md/myne#885 moved it
+//           out of the modal myne-md/myne#867 opened from the Models heading),
+//           and it lists every model Myne's own origin serves, with its size and
+//           its state. The Models block carries one assignment row per role,
+//           INCLUDING the tag role, which had no row at all before this change:
+//           it was reachable only by downloading it.
 //   aims2: the row's **Download button is wired**. Pressing it sends the real
 //           command to the host, and what is asserted is the request the host
 //           made, counted by the pinned fixture origin. An unwired button
@@ -41,6 +42,7 @@ import {
   enableAi,
   ipcOk,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { startFakeModelOrigin } from "./support/model-fixture-origin";
@@ -63,8 +65,9 @@ const NOT_INSTALLED = "Not installed";
 /** The transport-failure sentence, by value, same reasoning. */
 const DOWNLOAD_FAILED = "The download did not finish.";
 
-/** Open the AI panel, take the beta opt-in, and open the catalogue from the
- *  Models heading's button.
+/** Open the AI panel, take the beta opt-in, and land on the Models topic, where
+ *  the catalogue table is (myne-md/myne#885: it is inline, so there is no modal
+ *  to open and no button to press).
  *
  *  **The panel has to be REOPENED after `enableAi`, and the first version of this
  *  helper did not do it.** `enableAi` chains `enableDeveloperMode` then
@@ -78,8 +81,9 @@ async function openCatalogue(s: Session): Promise<void> {
   await enableAi(s);
   await openSettings(s, "ai");
   await s.byTestId("settings.ai-panel");
-  const button = await s.byTestId("ai.catalogue-button", { timeoutMs: 15_000 });
-  await button.click();
+  // The catalogue and the three assignment rows this file drives live in the
+  // Models topic; the tag row moved to Tagging.
+  await selectSettingsTopic(s, "ai", "models");
   await s.waitUntil(async () => (await s.byTestIdAll("ai.catalogue")).at(0) ?? null, {
     label: "the download catalogue",
     timeoutMs: 15_000,
@@ -109,7 +113,7 @@ async function installFixture(s: Session, downloadId: string): Promise<string> {
 }
 
 aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
-  it("aims1 opens the catalogue from the Models heading, and every role has a row", async () => {
+  it("aims1 every role has a row, and the catalogue is listed inline in the Models topic", async () => {
     let password = "";
     await scenario(
       "aims1-catalogue-and-roles",
@@ -118,7 +122,34 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
-        await openCatalogue(s);
+
+        await enableAi(s);
+        await openSettings(s, "ai");
+        await s.byTestId("settings.ai-panel");
+        await selectSettingsTopic(s, "ai", "models");
+
+        // The Models table's four role rows, by their own controls. The tag row
+        // is the one myne-md/myne#867 added; without it the tag model was
+        // reachable only by downloading it, and a user with their own file had
+        // no way to point Myne at it.
+        for (const role of ["", "-embedding", "-transcription"]) {
+          await s.byTestId(`ai.model-choose${role}`);
+        }
+        // The tag role is the fourth row of the same table since the Tagging
+        // topic folded into Models (myne-md/myne#867).
+        await s.byTestId("ai.model-choose-tag");
+
+        // **The catalogue, INLINE in the Models topic.** There is no button to
+        // press and no modal: it is in the same topic as the assignment rows,
+        // which is what the requester asked for ("list the models the way the
+        // other model rows are listed"). Asserted in both directions, so a
+        // catalogue that went back behind a press fails here.
+        await selectSettingsTopic(s, "ai", "models");
+        await s.waitUntil(async () => (await s.byTestIdAll("ai.catalogue")).at(0) ?? null, {
+          label: "the download catalogue, inline in the Models topic",
+          timeoutMs: 15_000,
+        });
+        expect((await s.byTestIdAll("ai.catalogue-button")).length).toBe(0);
 
         // **Both artefacts, whether or not either is installed**, which is the
         // point of a catalogue over a "download" block: what Myne offers cannot
@@ -128,15 +159,6 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
           expect(await row.textContent()).not.toBe("");
           expect(await rowState(s, artifact)).toBe(NOT_INSTALLED);
         }
-
-        // The Models block's four assignment rows, by their own controls. The
-        // tag row is the one this change added; without it the tag model was
-        // reachable only by downloading it, and a user with their own file had
-        // no way to point Myne at it.
-        for (const role of ["", "-embedding", "-transcription", "-tag"]) {
-          await s.byTestId(`ai.model-choose${role}`);
-        }
-        await s.byTestId("ai.model-choose-tag");
       },
     );
   });
@@ -220,9 +242,21 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
 
           await openCatalogue(s);
           expect(await rowState(s, "embedding-e5-small")).toBe(INSTALLED);
-          // The provenance is the PATH, the one fact the panel can always make.
+          // **The provenance is the PATH, and it is behind the row's own press.**
+          // `ai.model-provenance-<artifact>` is the ICON BUTTON, so its own text is
+          // empty by construction; the path renders in the anchored panel the press
+          // opens, and the panel only exists while it is open. The first version
+          // asserted non-empty text on the button and failed at 45 s on the one
+          // assertion in this file that could not pass, which is what running a
+          // scenario once is for.
           const provenance = await s.byTestId("ai.model-provenance-embedding-e5-small");
-          expect(await provenance.textContent()).not.toBe("");
+          await (await provenance.click(), s.waitUntil(
+            async () =>
+              (await s.byTestIdAll("ai.model-provenance-panel-embedding-e5-small")).at(0) ?? null,
+            { label: "the provenance panel", timeoutMs: 15_000 },
+          ));
+          const shown = await s.byTestId("ai.model-provenance-panel-embedding-e5-small-path");
+          expect((await shown.textContent()).trim()).toBe(installed);
 
           const remove = await s.byTestId("ai.remove-button-embedding-e5-small");
           await remove.click();

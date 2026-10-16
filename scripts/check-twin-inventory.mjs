@@ -721,7 +721,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The vault.prefs write surface. protocol.md 9.5.2 enumerates the field roster normatively, so both clients are answering one specified question. Desktop routes every write through a writePref chokepoint that bumps the prefs nonce; mobile has 47 write literals and no chokepoint. myne-md/myne#477, and myne-md/myne#486 for the eight setters that never bump.",
+      "The vault.prefs write surface. protocol.md 9.5.2 enumerates the field roster normatively, so both clients are answering one specified question. Both clients route every write through their own `writePref` chokepoint that bumps the prefs nonce: mobile's landed in myne-md/myne#486, and `scripts/check-prefs-nonce.mjs` names both trees in PREFS_MODULES. The earlier claim here that mobile has 47 write literals and no chokepoint described a defect that no longer exists, which is why myne-md/myne#477 is closed. What remains is two homes for one roster rather than a divergence in how a write is made: the two files bind different command counts, and which commands each client surfaces is the settings-parity question `scripts/check-prefs-parity.mjs` measures into docs/dev/settings-parity.md.",
   },
   {
     a: "src/lib/quick-unlock.ts",
@@ -1450,7 +1450,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1095 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1223 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
     a: "src/lib/agent-run.ts",

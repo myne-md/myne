@@ -826,12 +826,15 @@
 
 .myne-scrollarea-thumb {
   position: absolute;
-  /* 2 + 6 = `--space-2`, the gutter `.myne-scrollarea` reserves as a margin, so
+  /* 4 + 4 = `--space-2`, the gutter `.myne-scrollarea` reserves as a margin, so
      the indicator never covers content (myne-md/myne#848). Two literals rather
      than one token because they are this element's own geometry; the sum is
-     what a token describes, and it is asserted in the primitive's spec. */
-  inset-inline-end: 2px;
-  width: 6px;
+     what a token describes, and it is asserted in the primitive's spec.
+     Four pixels wide rather than six (myne-md/myne#867, on the user's read:
+     "the visible bar is too thick"); the inset grows by what the width lost, so
+     the sum and the gutter are unchanged. */
+  inset-inline-end: 4px;
+  width: 4px;
   border-radius: var(--radius-2);
   background: var(--line-3);
   opacity: 0;

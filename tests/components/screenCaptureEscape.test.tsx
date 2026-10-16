@@ -392,11 +392,15 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     capabilityPresent = false;
     try {
       stub({});
-      render(<PrivacyPanel />);
-      // The panel MOUNTED, waited on positively through a row it always renders.
-      // Without it "the screen-capture row is absent" is also what an unmounted
-      // panel looks like, and the assertion would pass on a render that threw.
-      await waitFor(() => expect(screen.queryByTestId("settings.auto-lock-select")).not.toBeNull());
+      const { container } = render(<PrivacyPanel />);
+      // The panel MOUNTED, checked positively. The probe is the panel's own
+      // root rather than a row, and myne-md/myne#885 is why: every row in this
+      // topic is capability-gated, and the row the panel always renders
+      // (auto-lock) moved into the OTHER topic, where selecting it would unmount
+      // the very topic asserted absent below. A row-based probe that unmounts
+      // its subject is the trap this comment exists for, so the probe is the
+      // root the panel returns, and a panel that rendered nothing fails here.
+      expect(container.firstElementChild).not.toBeNull();
       expect(screen.queryByTestId("settings.screen-capture")).toBeNull();
       expect(screen.queryByTestId("settings.screen-capture-toggle")).toBeNull();
     } finally {

@@ -42,6 +42,7 @@ import {
   dismissImporterOfferIfPresent,
   openSettings,
   pageSeatInvoke,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -73,6 +74,9 @@ async function openRecoveredRow(s: Session, fileName: string): Promise<void> {
   await dismissImporterOfferIfPresent(s);
   await openSettings(s, "sync");
   await s.byTestId("settings.sync-panel");
+  // The recovered-notes list is Sync's `conflicts` topic since
+  // myne-md/myne#885; only the active topic's body is mounted.
+  await selectSettingsTopic(s, "sync", "conflicts");
   await s.waitForElement(
     testIdSelector("sync.recovered-row", { "data-file-name": fileName }),
   );

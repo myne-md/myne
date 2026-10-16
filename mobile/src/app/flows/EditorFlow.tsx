@@ -3884,6 +3884,15 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             vaultHeadings={vaultHeadings}
             vaultBlockAnchors={vaultBlockAnchors}
             drawingIo={drawingIo}
+            // myne-md/myne#880: the sheet wrote `editor_line_numbers` and
+            // nothing on this client read it, so the toggle confirmed a choice
+            // the editor never applied. The shared `<CMEditor>` already accepts
+            // the prop and desktop threads it from `PaneView`; this call site
+            // simply omitted it. `=== true` rather than a truthy read, because
+            // the pref is `boolean | null` (unset reads as `null`) and the
+            // prop's own default is `false`: desktop compares the same way, so
+            // an unset pref means off on both clients.
+            lineNumbers={prefs.editor_line_numbers === true}
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure - a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.

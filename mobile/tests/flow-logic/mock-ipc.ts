@@ -389,6 +389,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       reminder_horizon_days: null,
       show_note_timestamps: true,
       attachment_compression_enabled: true,
+      // MYND-441 / myne-md/myne#880: device-local, defaults ON so an absent key
+      // reads as enabled.
+      attachment_ocr_enabled: true,
       spell_enabled: null,
       spell_languages: [],
       keymap: {},
@@ -458,6 +461,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       ai_enabled: false,
       ai_provider: null,
       ai_provider_model: null,
+      ai_excluded_folders: [],
+      chat_history_budget: null,
+      meeting_ai_prompt: null,
       ai_provider_consent: null,
     };
 
@@ -547,6 +553,27 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     let dateFormat: string | null = (config.prefs?.date_format as string | null | undefined) ?? null;
     let timeFormat: string | null = (config.prefs?.time_format as string | null | undefined) ?? null;
     let timezone: string | null = (config.prefs?.timezone as string | null | undefined) ?? null;
+    // Periodic notes (myne-md/myne#880). Stateful like every other store here:
+    // a folder typed through the UI is only meaningful if it survives into the
+    // next `prefs_read`, which is what makes a reopen assertion see disk truth
+    // rather than the field's own re-seeded draft.
+    let dailyFolder: string | null = (config.prefs?.daily_folder as string | null | undefined) ?? null;
+    let dailyDateFormat: string | null =
+      (config.prefs?.daily_date_format as string | null | undefined) ?? null;
+    let dailyTemplate: string | null =
+      (config.prefs?.daily_template as string | null | undefined) ?? null;
+    let chatHistoryBudget: number | null =
+      (config.prefs?.chat_history_budget as number | null | undefined) ?? null;
+    let attachmentOcrEnabled: boolean =
+      (config.prefs?.attachment_ocr_enabled as boolean | undefined) ?? true;
+    let meetingAiPrompt: string | null =
+      (config.prefs?.meeting_ai_prompt as string | null | undefined) ?? null;
+    let aiExcludedFolders: string[] = [
+      ...((config.prefs?.ai_excluded_folders as string[] | undefined) ?? []),
+    ];
+    let periodicNotes: Record<string, string> = {
+      ...((config.prefs?.periodic_notes as Record<string, string> | undefined) ?? {}),
+    };
     // STATEFUL vault icon (vault-icons). Same argument as custom_theme above,
     // with one extra reason: the catch-all at the bottom of this table resolves
     // an UNMOCKED command to `[]`, so without a real handler + store a picker
@@ -776,6 +803,16 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         ai_enabled: aiEnabled,
         ai_provider: aiProvider,
         ai_provider_consent: aiConsent,
+        // Periodic notes (myne-md/myne#880), spread AFTER `config.prefs` for the
+        // same reason every other stateful field above is.
+        daily_folder: dailyFolder,
+        daily_date_format: dailyDateFormat,
+        daily_template: dailyTemplate,
+        periodic_notes: { ...periodicNotes },
+        ai_excluded_folders: [...aiExcludedFolders],
+        chat_history_budget: chatHistoryBudget,
+        attachment_ocr_enabled: attachmentOcrEnabled,
+        meeting_ai_prompt: meetingAiPrompt,
       }),
       // Format-bar layout setters (MYND-555): record the write AND mutate the
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
@@ -805,6 +842,92 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__timezoneWrites ??= []).push(v);
         if (config.timezoneWriteFails) throw { kind: "Io", detail: { io_error_kind: "Other" } };
         timezone = v;
+        return null;
+      },
+      // ── Attachment OCR (MYND-441, switchable on mobile in myne-md/myne#880) ─
+      // Record AND mutate, so a spec can assert the command fired and that the
+      // value survives into the next `prefs_read`. DEVICE-LOCAL.
+      "plugin:prefs|set_attachment_ocr_enabled": (args) => {
+        const v = (args.enabled ?? true) as boolean;
+        const w = window as unknown as { __attachmentOcrWrites?: boolean[] };
+        (w.__attachmentOcrWrites ??= []).push(v);
+        attachmentOcrEnabled = v;
+        return null;
+      },
+      // ── AI limits (myne-md/myne#617 + meeting-ai, mobile in myne-md/myne#880) ─
+      // Record AND mutate, so a spec can assert both that the command fired and
+      // that the value survives into the next `prefs_read`.
+      "plugin:prefs|set_chat_history_budget": (args) => {
+        const v = (args.budget ?? null) as number | null;
+        const w = window as unknown as { __chatBudgetWrites?: (number | null)[] };
+        (w.__chatBudgetWrites ??= []).push(v);
+        chatHistoryBudget = v;
+        return null;
+      },
+      "plugin:prefs|set_meeting_ai_prompt": (args) => {
+        const v = (args.prompt ?? null) as string | null;
+        const w = window as unknown as { __meetingPromptWrites?: (string | null)[] };
+        (w.__meetingPromptWrites ??= []).push(v);
+        meetingAiPrompt = v;
+        return null;
+      },
+      // ── AI excluded folders (MYND-408, mobile in myne-md/myne#880) ─────
+      // A set-union MUTATION, not a whole-set write: `add` / `remove` are
+      // applied to the store, so a spec can assert that a concurrent entry the
+      // caller never saw survives. The Rust codec folds + dedups; mirroring the
+      // apply (rather than the canonicalization) is enough for the assertions
+      // this tier makes.
+      "plugin:prefs|set_ai_excluded_folders": (args) => {
+        const mutation = (args.mutation ?? {}) as { add?: string[]; remove?: string[] };
+        const w = window as unknown as { __aiExcludedWrites?: unknown[] };
+        (w.__aiExcludedWrites ??= []).push(mutation);
+        for (const f of mutation.remove ?? []) {
+          aiExcludedFolders = aiExcludedFolders.filter((e) => e !== f);
+        }
+        for (const f of mutation.add ?? []) {
+          if (!aiExcludedFolders.includes(f)) aiExcludedFolders = [...aiExcludedFolders, f];
+        }
+        return 0;
+      },
+      // ── Periodic notes (myne#177, mobile in myne-md/myne#880) ───────────
+      // Record AND mutate, like the date/time trio above: a handler that only
+      // records lets a spec pass while the field renders the old value, and the
+      // payload SHAPES differ per command, so recording them separately is what
+      // makes a routing assertion (daily field vs periodic map) possible at all.
+      "plugin:prefs|set_daily_folder": (args) => {
+        const v = (args.folder ?? "") as string;
+        const w = window as unknown as { __dailyFolderWrites?: string[] };
+        (w.__dailyFolderWrites ??= []).push(v);
+        dailyFolder = v;
+        return null;
+      },
+      "plugin:prefs|set_daily_date_format": (args) => {
+        const v = (args.format ?? "") as string;
+        const w = window as unknown as { __dailyFormatWrites?: string[] };
+        (w.__dailyFormatWrites ??= []).push(v);
+        dailyDateFormat = v;
+        return null;
+      },
+      "plugin:prefs|set_daily_template": (args) => {
+        const v = (args.templateId ?? null) as string | null;
+        const w = window as unknown as { __dailyTemplateWrites?: (string | null)[] };
+        (w.__dailyTemplateWrites ??= []).push(v);
+        dailyTemplate = v;
+        return null;
+      },
+      // One `<period>.<setting>` entry. `null` REMOVES the key, which the real
+      // backend represents as a stamped absence rather than as "never had it";
+      // mirroring the removal (rather than storing a null) is what lets a spec
+      // assert the clear.
+      "plugin:prefs|set_periodic_note_setting": (args) => {
+        const period = String(args.period ?? "");
+        const setting = String(args.setting ?? "");
+        const value = (args.value ?? null) as string | null;
+        const w = window as unknown as { __periodicNoteWrites?: { period: string; setting: string; value: string | null }[] };
+        (w.__periodicNoteWrites ??= []).push({ period, setting, value });
+        const key = `${period}.${setting}`;
+        if (value === null) delete periodicNotes[key];
+        else periodicNotes[key] = value;
         return null;
       },
       // ── Task reminders (MYND-619) ──────────────────────────────────────

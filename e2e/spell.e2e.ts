@@ -28,6 +28,7 @@ import {
   editorText,
   openSettings,
   reopenNoteAfterReload,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -193,6 +194,9 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
         // live-updates the open editor (setSpellConfig window event), so the
         // squiggle clears without a reload.
         await openSettings(s, "editor");
+        // The spell controls live in the Editor panel's `writing` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "writing");
         const toggle = await s.byTestId("settings.spell-check");
         if ((await toggle.attribute("aria-checked")) !== "true") {
           throw new Error("spell toggle did not start On (default-on, SYNC-15)");
@@ -209,6 +213,7 @@ describeE2E("SP-4 settings toggle gates squiggles + persists (MYND-267)", () => 
 
         // The toggle itself reads back Off (mount effect reads the pref).
         await openSettings(s, "editor");
+        await selectSettingsTopic(s, "editor", "writing");
         await s.waitUntil(
           async () =>
             (await (await s.byTestId("settings.spell-check")).attribute("aria-checked")) ===

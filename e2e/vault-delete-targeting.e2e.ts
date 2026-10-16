@@ -37,6 +37,7 @@ import {
   enterRecoveryPhrase,
   openSettings,
   selectPickerRow,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { seedVaults, type SeededVault } from "./support/fixtures";
@@ -62,6 +63,9 @@ function vaultDir(appDataDir: string, vaultId: string): string {
  */
 async function configurePin(s: Session): Promise<void> {
   await openSettings(s, "privacy");
+  // Quick-unlock lives in Privacy's `locking` topic since myne-md/myne#885;
+  // only the active topic's body is mounted.
+  await selectSettingsTopic(s, "privacy", "locking");
   await (await s.byTestId("settings.quick-unlock-toggle")).click();
   await (await s.byTestId("settings.quick-unlock-pin-input")).replaceText(PIN);
   await (await s.byTestId("settings.quick-unlock-setup-pin")).click();
@@ -78,6 +82,8 @@ async function configurePin(s: Session): Promise<void> {
  */
 async function eraseFromSettings(s: Session): Promise<void> {
   await openSettings(s, "account");
+  // The erase CTA is Account's `danger` topic since myne-md/myne#885.
+  await selectSettingsTopic(s, "account", "danger");
   await (await s.byTestId("settings.delete-vault-cta")).click();
   const confirm = await s.byTestId("delete-vault.confirm-input", { timeoutMs: 10_000 });
   await confirm.sendKeys("DELETE");

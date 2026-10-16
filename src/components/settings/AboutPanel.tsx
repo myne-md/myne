@@ -40,6 +40,7 @@ import { Button } from "../primitives/Button";
 import { MyneMark } from "../primitives/MyneMark";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
+import { SettingsSection } from "./SettingsSection";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
@@ -268,23 +269,53 @@ export function AboutPanel() {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      <Block>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-          <MyneMark size={44} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
-            <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+      {/* Four sections (myne-md/myne#885). The build-commit block moves up to sit
+          with the version and the build channel, so "what am I running" is one
+          group and the update machinery is another; the only order the grouping
+          changed is that block, which used to sit between the two. */}
+      <SettingsSection title={t("settings.about.sections.version")}>
+        <Block>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+            <MyneMark size={44} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <h3 style={VERSION_TITLE_STYLE}>Myne {__APP_VERSION__}</h3>
+              <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
+            </div>
           </div>
-        </div>
-      </Block>
+        </Block>
 
-      <Block data-setting-anchor="about.build-channel" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
-        <p style={VALUE_STYLE}>{buildChannelLabel}</p>
-      </Block>
+        <Block data-setting-anchor="about.build-channel" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
+          <p style={VALUE_STYLE}>{buildChannelLabel}</p>
+        </Block>
+
+        <Block>
+          <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
+          {/* Served build first, compile-time define second. On web the commit is
+              a property of the SERVED bundle, not of whoever built it: the web
+              config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
+              build environment (myne-md/myne#458), and `version.json` carries the
+              real commit (the document this panel already fetches for the hash).
+              Desktop answers `null` from the seam by construction and renders the
+              define, which is the identity of the installer that was run.
+              Sliced because `version.json` holds the full 40-hex SHA while the
+              desktop define is `--short=9`; `"unknown"` survives the slice. */}
+          <p style={VALUE_STYLE} data-testid="about.build-commit">
+            {(served?.commit ?? __BUILD_COMMIT__).slice(0, 9)}
+          </p>
+          {served !== null && (
+            <p
+              style={{ ...VALUE_STYLE, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}
+              data-testid="about.bundle-hash"
+            >
+              {served.bundleHash}
+            </p>
+          )}
+        </Block>
+      </SettingsSection>
 
       {has("selfUpdate") && (
-        <>
+        <SettingsSection title={t("settings.about.sections.updates")}>
           <Block data-setting-anchor="about.update-channel" data-setting-row="true">
             <span style={LABEL_STYLE}>{t("settings.about.updateChannelLabel")}</span>
             <p style={VALUE_STYLE} data-testid="about.update-channel">
@@ -292,21 +323,30 @@ export function AboutPanel() {
             </p>
           </Block>
 
-          <Block data-setting-anchor="about.update" data-setting-row="true">
-            <span style={LABEL_STYLE}>{t("settings.about.updateLabel")}</span>
-            <div>
+          {/* A `SettingRow` like its neighbours (myne-md/myne#885 visual pass):
+              the button in the control slot on the right, the short status line
+              inline, and the long verification paragraph behind the question
+              mark, where the settings panels keep the rest of what a row has to
+              say. The status line stays inline because it IS the readout. */}
+          <SettingRow
+            anchorId="about.update"
+            testId="about.update-row"
+            label={t("settings.about.updateLabel")}
+            helper={updateStatusText}
+            helperTestId="about.update-status"
+            explanation={[t("settings.about.updateHelper")]}
+            control={(_helperId, explanationId) => (
               <Button
                 variant="secondary"
                 onClick={runUpdateCheck}
                 disabled={check.kind === "checking"}
                 data-testid="about.update-check"
+                aria-describedby={explanationId}
               >
                 {t("settings.about.updateCheckButton")}
               </Button>
-            </div>
-            <p style={HELPER_STYLE} data-testid="about.update-status">
-              {updateStatusText}
-            </p>
+            )}
+          >
             {check.kind === "status" && check.status.kind === "available" && (
               <div>
                 <Button
@@ -319,8 +359,7 @@ export function AboutPanel() {
                 </Button>
               </div>
             )}
-            <p style={HELPER_STYLE}>{t("settings.about.updateHelper")}</p>
-          </Block>
+          </SettingRow>
 
           {autoCheck !== null && (
             <SettingRow
@@ -337,117 +376,108 @@ export function AboutPanel() {
               )}
             />
           )}
-        </>
+        </SettingsSection>
       )}
 
-      <Block>
-        <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
-        {/* Served build first, compile-time define second. On web the commit is
-            a property of the SERVED bundle, not of whoever built it: the web
-            config pins `__BUILD_COMMIT__` so the bundle takes nothing from its
-            build environment (myne-md/myne#458), and `version.json` carries the
-            real commit — the document this panel already fetches for the hash.
-            Desktop answers `null` from the seam by construction and renders the
-            define, which is the identity of the installer that was run.
-            Sliced because `version.json` holds the full 40-hex SHA while the
-            desktop define is `--short=9`; `"unknown"` survives the slice. */}
-        <p style={VALUE_STYLE} data-testid="about.build-commit">
-          {(served?.commit ?? __BUILD_COMMIT__).slice(0, 9)}
-        </p>
-        {served !== null && (
-          <p
-            style={{ ...VALUE_STYLE, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}
-            data-testid="about.bundle-hash"
+      <SettingsSection title={t("settings.about.sections.legal")}>
+        <Block data-setting-anchor="about.threat-model" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
+          <button
+            type="button"
+            onClick={handleThreatModelClick}
+            {...linkHover}
+            style={LINK_STYLE}
           >
-            {served.bundleHash}
-          </p>
-        )}
-      </Block>
+            myne.md/threat-model
+            <span aria-hidden="true">↗</span>
+          </button>
+          <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
+        </Block>
 
-      <Block data-setting-anchor="about.threat-model" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.threatModelLabel")}</span>
-        <button
-          type="button"
-          onClick={handleThreatModelClick}
-          {...linkHover}
-          style={LINK_STYLE}
-        >
-          myne.md/threat-model
-          <span aria-hidden="true">↗</span>
-        </button>
-        <p style={HELPER_STYLE}>{t("settings.about.threatModelHelper")}</p>
-      </Block>
-
-      <Block data-setting-anchor="about.legal" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.legalLabel")}</span>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: "var(--space-1)",
-          }}
-        >
-          {LEGAL_LINKS.map(({ doc, labelKey, testId }) => (
-            <button
-              key={doc}
-              type="button"
-              onClick={() => {
-                handleLegalClick(doc, i18n.language);
-              }}
-              {...linkHover}
-              style={LINK_STYLE}
-              data-testid={testId}
-            >
-              {t(labelKey)}
-              <span aria-hidden="true">↗</span>
-            </button>
-          ))}
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.about.legalHelper")}</p>
-      </Block>
-
-      <Block data-setting-anchor="about.license" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
-        <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
-      </Block>
-
-      {/* Rendered unconditionally (#181). It used to be hidden wherever the
-          rail's Developer GROUP would have no capability-eligible member —
-          `capabilities.has("localAi")`, i.e. never shown on web. That test
-          stopped describing the gate the moment Developer mode also began
-          hiding individual settings inside core panels: the Vim toggle exists
-          on every client, so on web the old guard removed the only control
-          that could reveal it and left the setting permanently unreachable
-          (`developer_mode` is device-local, so it cannot arrive by sync
-          either). An empty Developer group is now just an empty group — the
-          rail already derives its own divider from that — and is no longer a
-          reason to withhold the switch. */}
-      <SettingRow
-        label={t("settings.about.developerModeLabel")}
-        helper={t("settings.about.developerModeHelper")}
-        control={(helperId) => (
-          <Switch
-            checked={prefs.developer_mode}
-            onChange={(next) => {
-              void setDeveloperMode(next);
+        <Block data-setting-anchor="about.legal" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.legalLabel")}</span>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "var(--space-1)",
             }}
-            ariaLabel={t("settings.about.developerModeLabel")}
-            ariaDescribedBy={helperId}
-            testId="about.developer-mode-toggle"
-          />
-        )}
-      />
+          >
+            {LEGAL_LINKS.map(({ doc, labelKey, testId }) => (
+              <button
+                key={doc}
+                type="button"
+                onClick={() => {
+                  handleLegalClick(doc, i18n.language);
+                }}
+                {...linkHover}
+                style={LINK_STYLE}
+                data-testid={testId}
+              >
+                {t(labelKey)}
+                <span aria-hidden="true">↗</span>
+              </button>
+            ))}
+          </div>
+          <p style={HELPER_STYLE}>{t("settings.about.legalHelper")}</p>
+        </Block>
 
-      <Block data-setting-anchor="about.changelog" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
-        <div>
-          <Button variant="secondary" disabled>
-            {t("settings.about.changelogButton")}
-          </Button>
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
-      </Block>
+        <Block data-setting-anchor="about.license" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.licenseLabel")}</span>
+          <p style={LICENSE_BODY_STYLE}>{t("settings.about.licenseBody")}</p>
+        </Block>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.about.sections.developer")}>
+        {/* Rendered unconditionally (#181). It used to be hidden wherever the
+            rail's Developer GROUP would have no capability-eligible member:
+            `capabilities.has("localAi")`, i.e. never shown on web. That test
+            stopped describing the gate the moment Developer mode also began
+            hiding individual settings inside core panels: the Vim toggle exists
+            on every client, so on web the old guard removed the only control
+            that could reveal it and left the setting permanently unreachable
+            (`developer_mode` is device-local, so it cannot arrive by sync
+            either). An empty Developer group is now just an empty group (the
+            rail already derives its own divider from that) and is no longer a
+            reason to withhold the switch. */}
+        <SettingRow
+          label={t("settings.about.developerModeLabel")}
+          testId="about.developer-mode"
+          // 287 characters under a switch that does one thing (myne-md/myne#885).
+          // The row keeps what the mode IS; the rest, including the two things a
+          // reader actually wants to know before flipping it (that turning it off
+          // changes nothing already switched on, and where to switch that off),
+          // moves behind the question mark unchanged.
+          helper={t("settings.about.developerModeInline")}
+          explanation={[t("settings.about.developerModeHelper")]}
+          control={(helperId, explanationId) => (
+            <Switch
+              checked={prefs.developer_mode}
+              onChange={(next) => {
+                void setDeveloperMode(next);
+              }}
+              ariaLabel={t("settings.about.developerModeLabel")}
+              ariaDescribedBy={
+                explanationId === undefined
+                  ? helperId
+                  : `${helperId} ${explanationId}`
+              }
+              testId="about.developer-mode-toggle"
+            />
+          )}
+        />
+
+        <Block data-setting-anchor="about.changelog" data-setting-row="true">
+          <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
+          <div>
+            <Button variant="secondary" disabled>
+              {t("settings.about.changelogButton")}
+            </Button>
+          </div>
+          <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
+        </Block>
+      </SettingsSection>
     </div>
   );
 }

@@ -217,12 +217,18 @@ describe("the Privacy row states its bounds without being asked", () => {
       .toBe("settings.privacy.hideVaultNamesResidue");
   });
 
-  it("carries exactly the desktop row's eight locale keys, and invents none", () => {
+  it("carries exactly the desktop row's nine locale keys, and invents none", () => {
     // Byte-identical copy across the two clients is the point: they must not
     // come to disagree about what is private. A mobile-only shortened key would
     // be exactly how that starts, and the two bounds are the ones that would be
-    // shortened first. (The feature's ninth key belongs to the desktop settings
-    // SEARCH index, which mobile has no analogue of.)
+    // shortened first.
+    //
+    // The count moved 8 -> 9 with myne-md/myne#885, which split the row's copy:
+    // the destructive sentence became `hideVaultNamesInline` on the row and the
+    // rest moved behind the desktop's question mark. The desktop's panel now
+    // names nine of these keys and mobile names the same nine, which is what the
+    // equality below checks. (The feature's search-index key lives in
+    // `settingsSearchIndex.ts`, not in the panel, so the regex never sees it.)
     const mobile = read("../src/components/HideVaultNamesBlock.tsx");
     const desktop = read("../../src/components/settings/PrivacyPanel.tsx");
     const keys = (s: string) =>
@@ -231,7 +237,7 @@ describe("the Privacy row states its bounds without being asked", () => {
           [...s.matchAll(/t\("(settings\.privacy\.hideVaultNames[A-Za-z]*)"\)/g)].map((m) => m[1]),
         ),
       ].sort();
-    expect(keys(mobile)).toHaveLength(8);
+    expect(keys(mobile)).toHaveLength(9);
     expect(keys(mobile)).toEqual(keys(desktop));
   });
 

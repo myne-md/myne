@@ -5,6 +5,7 @@ import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
 import { remindersReachTheOs } from "../../lib/reminders";
+import { spellCheckingAvailable } from "../../lib/spellSupport";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
 import {
   SyncHubPanel,
@@ -15,6 +16,11 @@ import {
 } from "../../components";
 import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { HideVaultNamesBlock, MemberUnlockBlock, RecoveryDrillBlock } from "../../components";
+import { PeriodicNotesBlock } from "../../components";
+import { ColorGroupsBlock } from "../../components";
+import { AiExcludedFoldersBlock } from "../../components";
+import { AiLimitsBlock } from "../../components";
+import { AttachmentOcrBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
 import { MemorySection } from "./MemorySection";
 import { applyTheme } from "../../formfactor/theme";
@@ -797,13 +803,20 @@ function CustomThemesBlock({
   );
 }
 
-/** A settings toggle row (title + optional subtitle + iOS switch). */
+/** A settings toggle row (title + optional subtitle + iOS switch).
+ *
+ * `disabled` exists for the rows whose control is real but whose backend this
+ * client does not ship (myne-md/myne#880). It disables the SWITCH rather than
+ * the row, so the title and the helper sentence stay readable: the point of
+ * gating rather than hiding is that the absence is stated, and a row a reader
+ * cannot read states nothing. */
 function ToggleRow({
   title,
   subtitle,
   on,
   onToggle,
   first = false,
+  disabled = false,
   testId,
 }: {
   title: string;
@@ -811,6 +824,7 @@ function ToggleRow({
   on: boolean;
   onToggle: () => void;
   first?: boolean;
+  disabled?: boolean;
   testId?: string;
 }) {
   return (
@@ -829,7 +843,7 @@ function ToggleRow({
         <div style={{ fontSize: 16, color: "var(--fg-1)" }}>{title}</div>
         {subtitle && <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
       </div>
-      <Switch on={on} onToggle={onToggle} />
+      <Switch on={on} onToggle={onToggle} disabled={disabled} />
     </div>
   );
 }
@@ -849,6 +863,13 @@ const CAT_GLYPH: Record<string, ReactNode> = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="3.4" />
       <path d="M5.5 19c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" />
+    </svg>
+  ),
+  vault: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4.5" width="16" height="15" rx="2" />
+      <circle cx="11" cy="12" r="3" />
+      <path d="M11 9V7.8M11 16.2V15M8 12H6.8M15.2 12H14" />
     </svg>
   ),
   appearance: (
@@ -1013,6 +1034,14 @@ function AiPanel({
           normative for a capability a platform lacks. */}
       {prefs.ai_enabled && (
         <>
+          {/* **Deliberately NOT the desktop's "Choose provider" / "On this
+              device" wording** (myne-md/myne#867 review, D6). The desktop
+              chooser offers a local arm as its first option, so its default
+              reads "On this device"; this client has no local answering arm
+              (`AiScopeSheet.tsx` `ProviderArm` is `none | remote`), so every
+              option here IS a remote service and "None" is the true name of the
+              default. Same synced pref, two honest labels for two different
+              sets of choices. */}
           <SectionLabel>{t("settings.ai.groupAnswering")}</SectionLabel>
           <SectionLabel>{t("settings.ai.providerLabel")}</SectionLabel>
           <Group>
@@ -1229,6 +1258,12 @@ export type Panel =
   | "root"
   // category detail panels
   | "account"
+  // The vault-scoped group, its own root category since myne-md/myne#880: name,
+  // icon, change password and quick unlock all act on the VAULT, and desktop
+  // groups them the same way (Account's own `vault` topic). Mobile's drill-down
+  // stack cannot carry a heading inside Account without a second scroll region,
+  // so the group is a category a reader can land on (docs/decisions/ui/0692).
+  | "vault"
   | "appearance"
   | "editor"
   | "privacy"
@@ -1402,17 +1437,18 @@ function IconBtn({
 const PANEL_PARENT: Record<Panel, Panel> = {
   root: "root",
   account: "root",
+  vault: "root",
   appearance: "root",
   editor: "root",
   privacy: "root",
   data: "root",
   ai: "root",
   about: "root",
-  rename: "account",
-  "change-password": "account",
-  "quick-unlock": "privacy",
+  rename: "vault",
+  "change-password": "vault",
+  "quick-unlock": "vault",
   "format-bar": "editor",
-  "delete-vault": "root",
+  "delete-vault": "account",
   sync: "root",
   "sync-endpoint": "sync",
   "sync-enroll": "sync",
@@ -1426,6 +1462,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
 const PANEL_DEPTH: Record<Panel, number> = {
   root: 0,
   account: 1,
+  vault: 1,
   appearance: 1,
   editor: 1,
   privacy: 1,
@@ -1446,14 +1483,25 @@ const PANEL_DEPTH: Record<Panel, number> = {
 };
 
 /** i18n key per panel for the sheet header title (resolved with `t()` at the
- *  render site — never call `t()` at module scope). */
+ *  render site, never call `t()` at module scope).
+ *
+ * **The category titles come from ONE namespace, `settings.shell.panels.*`, the
+ *  same keys desktop's rail uses** (myne-md/myne#880 task 12). Mobile used to mix
+ *  the shell namespace with a private `settings.panelTitle.*` one, so the same
+ *  panel could be called two things. The nested ACTION panels keep their own
+ *  keys deliberately: they are not categories, and each names an operation
+ *  ("Vault name", "Change password", "Approve device") rather than a place, so
+ *  there is no desktop counterpart to share a name with. `settings.panelTitle.*`
+ *  therefore survives for exactly those, which is the one namespace split that
+ *  is written down rather than removed. */
 const PANEL_TITLE: Record<Panel, string> = {
   root: "settings.shell.title",
   account: "settings.shell.panels.account",
+  vault: "settings.shell.panels.vault",
   appearance: "settings.shell.panels.appearance",
   editor: "settings.shell.panels.editor",
-  privacy: "settings.panelTitle.privacy",
-  data: "settings.panelTitle.data",
+  privacy: "settings.shell.panels.privacy",
+  data: "settings.shell.panels.data",
   ai: "settings.shell.panels.ai",
   about: "settings.shell.panels.about",
   rename: "settings.panelTitle.vaultName",
@@ -1622,6 +1670,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   const hiddenHomeTiles = useHiddenHomeTiles();
   const [draft, setDraft] = useState<Partial<PrefsView>>({});
   const eff: PrefsView = { ...prefs, ...draft };
+  // Whether the editor on this device can underline anything at all
+  // (myne-md/myne#880). Read once per render so the row's gate and its helper
+  // sentence cannot disagree; the predicate's own module says why.
+  const spellAvailable = spellCheckingAvailable();
 
   // ---- AI (myne-md/myne#456) ------------------------------------------------
   //
@@ -1918,7 +1970,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) await setVaultLabel(label.length > 0 ? label : null);
       setDraft((d) => ({ ...d, label: label.length > 0 ? label : null }));
       setToast(t("settings.account.renamedToast"));
-      setPanel("account");
+      setPanel("vault");
     } catch {
       setToast(t("settings.account.renameError"));
     }
@@ -1945,7 +1997,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       setPinConfirm("");
       refreshQuStatus();
       setToast(t("settings.quickUnlock.pinOnToast"));
-      setPanel("privacy");
+      setPanel("vault");
     } catch (e) {
       const kind = (e as { kind?: string })?.kind;
       setPinError(
@@ -1966,7 +2018,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) await quickUnlockDisable();
       refreshQuStatus();
       setToast(t("settings.quickUnlock.turnedOffToast"));
-      setPanel("privacy");
+      setPanel("vault");
     } catch {
       setToast(t("settings.quickUnlock.turnOffError"));
     } finally {
@@ -2039,7 +2091,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       wipeRef.current();
       setPwBusy(false);
       setToast(t("settings.account.passwordChangedToast"));
-      setPanel("account");
+      setPanel("vault");
     } catch (raw) {
       const e = raw as VaultChangePasswordError;
       switch (e.kind) {
@@ -2170,16 +2222,34 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           <>
             <SectionLabel mt={6}>{t("settings.sectionOptions")}</SectionLabel>
             <Group>
-              <CategoryRow first glyph="account" label={t("settings.shell.panels.account")} value={vaultDisplayLabel(eff.label)} onClick={() => setPanel("account")} />
-              <CategoryRow glyph="appearance" label={t("settings.shell.panels.appearance")} onClick={() => setPanel("appearance")} />
-              <CategoryRow glyph="editor" label={t("settings.shell.panels.editor")} onClick={() => setPanel("editor")} />
+              {/* Category ORDER and NAMES mirror the desktop rail (myne-md/myne#880
+                  task 12): the shared categories run in the desktop's order
+                  (account, privacy, sync, editor, appearance, about, and ai last,
+                  where desktop keeps it in the developer group), and each uses the
+                  desktop panel's own `settings.shell.panels.*` key. Two categories
+                  are mobile-only and carry their own names: `vault` is the
+                  vault-scoped group desktop keeps inside Account, promoted to a
+                  root category because a phone's drill-down stack has no second
+                  scroll region to put a heading in, and `data` is the export and
+                  attachment surface with no desktop counterpart. */}
+              <CategoryRow first glyph="account" label={t("settings.shell.panels.account")} onClick={() => setPanel("account")} />
+              <CategoryRow
+                glyph="vault"
+                label={t("settings.shell.panels.vault")}
+                value={vaultDisplayLabel(eff.label)}
+                testId="settings.category-vault"
+                onClick={() => setPanel("vault")}
+              />
               <CategoryRow
                 glyph="privacy"
-                label={t("settings.panelTitle.privacy")}
-                value={quStatus?.configured && quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : undefined}
+                label={t("settings.shell.panels.privacy")}
                 onClick={() => setPanel("privacy")}
               />
-              <CategoryRow glyph="data" label={t("settings.panelTitle.data")} onClick={() => setPanel("data")} />
+              <CategoryRow glyph="sync" label={t("settings.shell.panels.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
+              <CategoryRow glyph="editor" label={t("settings.shell.panels.editor")} onClick={() => setPanel("editor")} />
+              <CategoryRow glyph="appearance" label={t("settings.shell.panels.appearance")} onClick={() => setPanel("appearance")} />
+              <CategoryRow glyph="data" label={t("settings.shell.panels.data")} onClick={() => setPanel("data")} />
+              <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value={__APP_VERSION__} onClick={() => setPanel("about")} />
               {/* Value column carries the CURRENT state rather than a badge:
                   "Off" is the shipped default and the honest thing to show, and
                   a named provider tells the user where their notes would go
@@ -2191,8 +2261,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 testId="settings.category-ai"
                 onClick={() => setPanel("ai")}
               />
-              <CategoryRow glyph="sync" label={t("settings.shell.panels.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
-              <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value={__APP_VERSION__} onClick={() => setPanel("about")} />
             </Group>
 
             <button
@@ -2214,9 +2282,23 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               {t("commands.actions.lockVault.label")}
             </button>
 
+            <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
+              {t("settings.footerTagline")}
+            </div>
+          </>
+        )}
+
+        {/* Account holds the vault's one irreversible action, matching desktop,
+            whose Account panel owns the danger topic. The vault-scoped controls
+            themselves moved to their own `vault` category (myne-md/myne#880 task
+            12); the destructive erase stays under Account rather than beside
+            them, so the two do not read as one group. */}
+        {panel === "account" && (
+          <div style={PANEL_STACK}>
             <SectionLabel>{t("settings.account.dangerZoneHeading")}</SectionLabel>
             <button
               onClick={() => setPanel("delete-vault")}
+              data-testid="settings.account.delete-vault"
               style={{
                 width: "100%",
                 height: 48,
@@ -2232,14 +2314,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             >
               {t("settings.deleteVault.heading")}
             </button>
-
-            <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
-              {t("settings.footerTagline")}
-            </div>
-          </>
+          </div>
         )}
 
-        {panel === "account" && (
+        {panel === "vault" && (
           <div style={{ marginTop: 4 }}>
             <Group>
               <Row
@@ -2259,11 +2337,25 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 <span style={rowLabel}>{t("settings.changePassword.title")}</span>
                 <RowChevron />
               </Row>
+              <Row onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={rowLabel}>{t("settings.quickUnlock.title")}</span>
+                  <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
+                    {isAndroid ? t("settings.privacy.quickUnlockSubtitleAndroid") : t("settings.privacy.quickUnlockSubtitle", { method: biometric })}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 15, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-value">
+                    {quStatus?.configured ? (quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : biometric) : t("settings.archive.off")}
+                  </span>
+                  <RowChevron />
+                </div>
+              </Row>
             </Group>
 
             {/* Vault icon (vault-icons) — the switcher/header glyph. Inline
                 rather than a drill-down panel: it is a one-tap terminal choice
-                with instant read-back, unlike the rename below it, which needs a
+                with instant read-back, unlike the rename above it, which needs a
                 field, a keyboard and an explicit save. Same control as desktop's
                 Account panel, so the two settings screens stay diff-able. */}
             <FieldLabel mt={18}>{t("settings.account.vaultIconLabel")}</FieldLabel>
@@ -2395,6 +2487,12 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 onToggle={() => setHomeTileHidden("views", !hiddenHomeTiles.has("views"))}
               />
             </Group>
+            {/* Graph colour groups (myne-md/myne#727, writable on mobile since
+                myne-md/myne#880). The graph already READ `color_groups` here and
+                the groups could only be authored on a computer, so the colours
+                the phone drew were decoration it could not edit. */}
+            <SectionLabel mt={22}>{t("notes.graph.colorGroups.heading")}</SectionLabel>
+            <ColorGroupsBlock groups={eff.color_groups} onToast={setToast} />
           </div>
         )}
 
@@ -2408,9 +2506,19 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               onPick={(v) => writeDraftPref("editor_default_view_mode", v, () => setEditorDefaultViewMode(v))}
             />
             <Group>
+              {/* myne-md/myne#880: gated, not hidden. `spell_enabled` was
+                  written here and read by nothing on this client, because
+                  `editor-host.ts` installs no `spell` slot and no squiggle can
+                  be drawn. The row stays so the absence is STATED rather than
+                  silent: the switch is disabled and the helper sentence names
+                  the reason, and both read the one predicate in
+                  `lib/spellSupport`. */}
               <ToggleRow
                 first
+                testId="settings.spell-row"
                 title={t("settings.spell.label")}
+                subtitle={t(spellAvailable ? "settings.spell.helper" : "settings.spell.mobileUnavailable")}
+                disabled={!spellAvailable}
                 on={eff.spell_enabled ?? true}
                 onToggle={() => writeDraftPref("spell_enabled", !(eff.spell_enabled ?? true), () => setSpellEnabled(!(eff.spell_enabled ?? true)))}
               />
@@ -2460,6 +2568,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 <RowChevron />
               </Row>
             </Group>
+            {/* Periodic notes (myne#177, reached mobile in myne-md/myne#880).
+                In the Editor panel, matching the desktop, where the same block
+                lives in `EditorPanel`. Before this the phone resolved a daily,
+                weekly or monthly note's folder, title format and template out of
+                `vault.prefs` and could author none of them, so it filed its notes
+                by a configuration only a computer could set. */}
+            <SectionLabel mt={22}>{t("settings.dailyNotes.blockLabel")}</SectionLabel>
+            <PeriodicNotesBlock prefs={eff} onToast={setToast} />
           </div>
         )}
 
@@ -2519,22 +2635,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
               value={eff.auto_lock_seconds ?? 300}
               onPick={(v) => writeDraftPref("auto_lock_seconds", v, () => setAutoLockTimeout(v))}
             />
-            <Group>
-              <Row first onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={rowLabel}>{t("settings.quickUnlock.title")}</span>
-                  <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                    {isAndroid ? t("settings.privacy.quickUnlockSubtitleAndroid") : t("settings.privacy.quickUnlockSubtitle", { method: biometric })}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 15, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-value">
-                    {quStatus?.configured ? (quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : biometric) : t("settings.archive.off")}
-                  </span>
-                  <RowChevron />
-                </div>
-              </Row>
-            </Group>
+            {/* Quick unlock moved to the `vault` category (myne-md/myne#880 task
+                12): it is a vault-scoped control like the password beside it, and
+                desktop groups it the same way. It is not duplicated here. */}
             {/* Reminders live here rather than in a rail entry of their own:
                 the rail is governance-locked, and what this block has to say —
                 that reminder times leave the encrypted vault, and how precisely
@@ -2586,6 +2689,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 {exporting ? <Spinner size={18} /> : <RowChevron />}
               </Row>
             </Group>
+            {/* Attachment image OCR (MYND-441, switchable on this client since
+                myne-md/myne#880). DEVICE-LOCAL: OCR runs in-process on the phone
+                that imports the image, so the device paying the compute cost owns
+                the switch, and the import path already reads the pref to select
+                the extractor. In this panel rather than under AI: OCR is search
+                correctness, not an AI feature. */}
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <AttachmentOcrBlock enabled={eff.attachment_ocr_enabled} />
+            </div>
           </div>
         )}
 
@@ -2648,6 +2760,27 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             onLoadModels={loadAiModels}
             onRevoke={revokeAiProvider}
             onToast={(message) => setToast(message)}
+          />
+        )}
+
+        {/* The AI egress control (myne-md/myne#880). Below the provider rows
+            rather than above them: it bounds what any of them may read, so it
+            reads as the limit on the choices above rather than as a gate in
+            front of them. This client already ENFORCED this list and reported
+            its count; it could not author it. */}
+        {panel === "ai" && (
+          <AiExcludedFoldersBlock folders={eff.ai_excluded_folders} onToast={setToast} />
+        )}
+
+        {/* AI limits (myne-md/myne#617 and meeting-ai, reached mobile in
+            myne-md/myne#880): the device-local chat-history budget the shared
+            core already enforced, and the shared meeting prompt for the device
+            that actually captures meetings. */}
+        {panel === "ai" && (
+          <AiLimitsBlock
+            budget={eff.chat_history_budget}
+            meetingPrompt={eff.meeting_ai_prompt}
+            onToast={setToast}
           />
         )}
 

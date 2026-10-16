@@ -29,6 +29,8 @@ const {
   listProviderModels,
   aiProviderHasKey,
   listFolderPaths,
+  startModelDownload,
+  cancelModelDownloadFor,
 } = vi.hoisted(() => ({
   openUrl: vi.fn(() => Promise.resolve()),
   revealItemInDir: vi.fn(() => Promise.resolve()),
@@ -48,11 +50,23 @@ const {
   listProviderModels: vi.fn((): Promise<ProviderModel[]> => Promise.resolve([])),
   aiProviderHasKey: vi.fn((): Promise<boolean> => Promise.resolve(false)),
   listFolderPaths: vi.fn((): Promise<{ path: string; label: string }[]> => Promise.resolve([])),
+  startModelDownload: vi.fn((_artifact: string) => Promise.resolve()),
+  cancelModelDownloadFor: vi.fn((_artifact: string) => {}),
 }));
 vi.mock("../../src/notes/listFolderPaths", () => ({ listFolderPaths }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl, revealItemInDir }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openFileDialog }));
+// Partial, and the split is the point: the real `useModelDownload` reads the
+// module-scope store, so the catalogue rows behave as they do in production,
+// while the two COMMANDS are stubbed so a test can assert the wiring without
+// reaching IPC. `AiModelCatalogue.test.tsx` drives the store itself, with a
+// controllable state map.
+vi.mock("../../src/lib/ai-download-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/ai-download-store")>()),
+  startModelDownload,
+  cancelModelDownloadFor,
+}));
 // Only the IPC-crossing wrappers are stubbed. `endpointRejectionOf` is a pure
 // narrower over the host's wire shape, and stubbing it would leave the thing
 // most likely to be wrong — the shape of the error the panel reads — untested.
@@ -155,11 +169,37 @@ vi.mock("react-i18next", () => ({
 import { AiPanel } from "../../src/components/settings/AiPanel";
 import { SETTINGS_SEARCH_INDEX } from "../../src/components/settings/search/settingsSearchIndex";
 import {
+  AI_PANEL_TOPICS,
+  type SettingsTopicId,
+} from "../../src/components/settings/settingsTopics";
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
+import {
   AI_TRUST_INVARIANT,
   aiTrustHeadline,
 } from "../../src/lib/load-bearing-copy";
 
+/**
+ * Point the AI panel at `topic` before rendering it.
+ *
+ * The panel shows ONE topic at a time (myne-md/myne#885): an inactive topic's
+ * body is not mounted, so a test that reaches a control in another topic has to
+ * select that topic first, exactly as a user does. It writes through the same
+ * module-scope store the strip writes through, so a test cannot drift from the
+ * real navigation path, and it is called BEFORE `render` because a store write
+ * with a mounted subscriber would be a state update outside `act()`.
+ */
+function selectAiTopic(topic: SettingsTopicId): void {
+  setActiveSettingsTopic("ai", topic);
+}
+
 beforeEach(() => {
+  // Every test starts on the panel's first topic. The active topic is session
+  // memory in a module-scope store (that IS the feature), so without this a
+  // topic selected by one test would leak into the next.
+  resetSettingsTopics();
   aiEnabled = true;
   autoTagEnabled = false;
   aiProvider = null;
@@ -181,11 +221,15 @@ beforeEach(() => {
   loadAiEndpoint.mockResolvedValue(null);
   saveAiEndpoint.mockClear();
   saveAiEndpoint.mockImplementation((u: string, _m: string) => Promise.resolve(u || null));
+  startModelDownload.mockClear();
+  startModelDownload.mockImplementation(() => Promise.resolve());
+  cancelModelDownloadFor.mockClear();
 });
 afterEach(() => cleanup());
 
 describe("AiPanel — models section (Option A: side-load + recommended browser links)", () => {
   it("renders BOTH role pickers (generation + embedding) and the models section", () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     expect(screen.getByTestId("ai.models-section")).toBeTruthy();
     // Generation picker (the original testids, preserved).
@@ -269,26 +313,19 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     );
   });
 
-  it("separates its categories with a rule, not a bold label", () => {
-    // The group headings were the panel's title style one step DOWN, which made
-    // a heading smaller than the row labels it grouped and left nothing marking
-    // where one category ended and the next began, so scrolling this panel read
-    // as one flat list (myne-md/myne#848). The rule is the claim.
+  it("carries no in-body group heading, because the groups are the topic tabs", () => {
+    // The four group headings this panel used to draw (a rule plus a title one
+    // step up from the rows it grouped, myne-md/myne#848) are the topic labels in
+    // the strip the modal renders above the panel since myne-md/myne#885. An
+    // `h4` left behind would only repeat the tab the user just clicked, and it
+    // would also be a second section treatment in a tree that is meant to have
+    // exactly one (`SettingsSection`). The retired headings are named so the
+    // assertion fails by NAME if one comes back, rather than only by count.
     render(<AiPanel />);
-    const groups = screen.getAllByRole("heading", { level: 4 });
-    // Four since myne-md/myne#867: the auto-tag switch and the meeting prompt
-    // used to have a heading each, and a heading per control is what made the
-    // panel read as five flat lists.
-    expect(groups.length).toBe(4);
-    for (const group of groups) {
-      // The Models heading is the one whose rule lives on a ROW, because that
-      // row also carries the catalogue button and the hairline has to reach
-      // past the heading to the control it introduces (myne-md/myne#867). The
-      // claim is unchanged: every group opens with a rule, not a bold label.
-      const rule =
-        group.style.borderTop || (group.parentElement?.style.borderTop ?? "");
-      expect(rule, "a category with no rule above it").toContain("var(--line-1)");
-      expect(group.style.fontSize).toContain("var(--text-base)");
+    const panel = screen.getByTestId("settings.ai-panel");
+    expect(screen.queryAllByRole("heading", { level: 4 })).toEqual([]);
+    for (const retired of ["groupAutoTag", "groupVoice", "groupWriting", "groupPrivacy"]) {
+      expect(panel.textContent).not.toContain(`settings.ai.${retired}`);
     }
   });
 
@@ -296,6 +333,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     // An unstyled `<textarea>` falls back to the WebView's white default, which
     // is what made this the one control in the panel that did not come from the
     // tokens (myne-md/myne#848).
+    selectAiTopic("advanced");
     render(<AiPanel />);
     const box = screen.getByTestId("ai.meeting-prompt-input");
     expect(box.style.background).toContain("var(--paper-2)");
@@ -303,6 +341,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
   });
 
   it("opens the recommended GENERATION model in the browser (not a Myne fetch)", () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.model-recommend-generation"));
     expect(openUrl).toHaveBeenCalledTimes(1);
@@ -311,6 +350,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
   });
 
   it("opens the recommended EMBEDDING model in the browser", () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.model-recommend-embedding"));
     expect(openUrl).toHaveBeenCalledTimes(1);
@@ -319,6 +359,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
 
   it("side-loads a picked file per role and never triggers a network download", async () => {
     openFileDialog.mockResolvedValueOnce("/Users/me/models/qwen.gguf");
+    selectAiTopic("models");
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.model-choose"));
     // The choose path persists via saveModelPath (device-local), NOT a download.
@@ -330,6 +371,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
 
   it("disables the pickers when AI is off", () => {
     aiEnabled = false;
+    selectAiTopic("models");
     render(<AiPanel />);
     expect((screen.getByTestId("ai.model-choose") as HTMLButtonElement).disabled).toBe(true);
     expect(
@@ -345,6 +387,7 @@ describe("AiPanel — auto-tag toggle (MYND-651)", () => {
   // get right is that it reads and writes the right pref, and that the co-gate
   // on `ai_enabled` holds.
   it("renders off by default and persists an ON flip", () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     const toggle = screen.getByTestId("ai.auto-tag-toggle");
     expect(toggle.getAttribute("aria-checked")).toBe("false");
@@ -355,6 +398,7 @@ describe("AiPanel — auto-tag toggle (MYND-651)", () => {
 
   it("reflects the persisted value when it is already on", () => {
     autoTagEnabled = true;
+    selectAiTopic("models");
     render(<AiPanel />);
     expect(screen.getByTestId("ai.auto-tag-toggle").getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByTestId("ai.auto-tag-toggle"));
@@ -363,6 +407,7 @@ describe("AiPanel — auto-tag toggle (MYND-651)", () => {
 
   it("is non-interactive while the AI beta is off (co-gate, not a second switch)", () => {
     aiEnabled = false;
+    selectAiTopic("models");
     render(<AiPanel />);
     const toggle = screen.getByTestId("ai.auto-tag-toggle") as HTMLButtonElement;
     expect(toggle.disabled).toBe(true);
@@ -378,6 +423,7 @@ describe("AiPanel — auto-tag on a build with no bundled tag model (MYND-651)",
   // with no surface anywhere saying why — the panel has to say it.
   it("disables the switch and states the reason once the probe answers", async () => {
     tagModelAvailable.mockResolvedValue(false);
+    selectAiTopic("models");
     render(<AiPanel />);
 
     // Before the probe resolves the switch must NOT flash through a disabled
@@ -397,12 +443,14 @@ describe("AiPanel — auto-tag on a build with no bundled tag model (MYND-651)",
   it("probes independently of the AI beta switch, so turning AI on is not a surprise", async () => {
     aiEnabled = false;
     tagModelAvailable.mockResolvedValue(false);
+    selectAiTopic("models");
     render(<AiPanel />);
     await screen.findByTestId("ai.auto-tag-unavailable");
     expect(tagModelAvailable).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the switch offerable when a tag model does ship", async () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     await waitFor(() => expect(tagModelAvailable).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -847,11 +895,13 @@ describe("the chat-history budget control", () => {
   });
 
   it("has an accessible name, since SettingRow renders its label as a span", () => {
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     expect(input()).toBeTruthy();
   });
 
   it("stores a number the user typed", async () => {
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     fireEvent.change(input(), { target: { value: "500" } });
     fireEvent.blur(input());
@@ -860,6 +910,7 @@ describe("the chat-history budget control", () => {
 
   it("clears the override when the field is genuinely empty", async () => {
     chatHistoryBudget = 500;
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     fireEvent.change(input(), { target: { value: "" } });
     fireEvent.blur(input());
@@ -871,6 +922,7 @@ describe("the chat-history budget control", () => {
     // `validity.badInput` is what tells the two apart. A user who select-alls,
     // mistypes and tabs away must not have their bound silently reset.
     chatHistoryBudget = 500;
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     const el = input() as HTMLInputElement;
     Object.defineProperty(el, "validity", {
@@ -884,6 +936,7 @@ describe("the chat-history budget control", () => {
   });
 
   it("rejects a negative number rather than coercing it", async () => {
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     fireEvent.change(input(), { target: { value: "-5" } });
     fireEvent.blur(input());
@@ -892,6 +945,7 @@ describe("the chat-history budget control", () => {
 
   it("is disabled when AI is off, like every other control in this panel", () => {
     aiEnabled = false;
+    selectAiTopic("limits");
     render(<AiPanel onShowToast={() => {}} />);
     expect((input() as HTMLInputElement).disabled).toBe(true);
     aiEnabled = true;
@@ -919,6 +973,7 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
   });
 
   it("shows the stored set once it arrives, not the empty first render", async () => {
+    selectAiTopic("limits");
     const { rerender } = render(<AiPanel />);
     // The read lands AFTER the first render, which is what `usePrefs` does.
     aiExcludedFolders = ["Private/", "Money/"];
@@ -930,6 +985,7 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
   });
 
   it("a removal reaches the write as a removal", async () => {
+    selectAiTopic("limits");
     const { rerender } = render(<AiPanel />);
     aiExcludedFolders = ["Private/", "Money/"];
     rerender(<AiPanel />);
@@ -951,6 +1007,7 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
   it("does not clobber an edit that started before the read landed", async () => {
     // Why the re-seed is guarded rather than unconditional: a user who began
     // typing into the empty box must not have it replaced under them.
+    selectAiTopic("limits");
     const { rerender } = render(<AiPanel />);
     const box = (await screen.findByTestId(
       "ai.excluded-folders",
@@ -965,25 +1022,45 @@ describe("AiPanel: the excluded-folders editor after the prefs read lands", () =
 });
 
 // myne-md/myne#848 grouped the panel by INTENT; myne-md/myne#867 took that from
-// five headings to four, because three of the five were a heading per control.
-// The excluded-folders box gained a picker, and an installed model stopped
-// offering a download.
+// five headings to four, because three of the five were a heading per control;
+// myne-md/myne#885 turned the four into TOPICS, one of which the tag role's own
+// model row earned on its own. The excluded-folders box gained a picker, and an
+// installed model stopped offering a download.
 describe("AiPanel: grouped by intent", () => {
-  it("renders the four intent headings, in order", () => {
+  it("shows exactly one topic's body at a time, and every topic has one", () => {
+    // Only the active topic is mounted, which is the mechanism the search's
+    // landing depends on (an anchor inside an inactive topic is not in the
+    // document) and what makes a topic reachable without scrolling past the
+    // others. Asserted as a full cross product, so a body that rendered under
+    // two topics or none fails by name.
+    for (const active of AI_PANEL_TOPICS) {
+      resetSettingsTopics();
+      setActiveSettingsTopic("ai", active.id);
+      const { unmount } = render(<AiPanel />);
+      const panel = screen.getByTestId("settings.ai-panel");
+      for (const other of AI_PANEL_TOPICS) {
+        const body = panel.querySelector(`[data-testid="settings.ai-topic-${other.id}"]`);
+        if (other.id === active.id) {
+          expect(body, `the active topic ${other.id} must render`).not.toBeNull();
+        } else {
+          expect(body, `inactive topic ${other.id} must not be mounted`).toBeNull();
+        }
+      }
+      unmount();
+    }
+  });
+
+  it("puts the trust card and then the master switch first in the Answering topic", () => {
+    // The card says what turning AI on means, so it is read before the switch
+    // (myne-md/myne#885 visual pass). Compared on the testids OUTSIDE the card,
+    // because the card's own children carry testids of their own.
     render(<AiPanel />);
-    const headings = screen
-      .getAllByRole("heading", { level: 4 })
-      .map((h) => h.textContent);
-    // Asserted as a SEQUENCE because the order is the design: a user reads down
-    // the panel and meets "who answers" before "which file", and the auto-tag
-    // switch and the meeting prompt sit under Advanced rather than each under a
-    // heading of its own.
-    expect(headings).toEqual([
-      "settings.ai.groupAnswering",
-      "settings.ai.groupModels",
-      "settings.ai.groupLimits",
-      "settings.ai.groupAdvanced",
-    ]);
+    const body = screen.getByTestId("settings.ai-topic-answering");
+    const banner = screen.getByTestId("ai.trust-banner");
+    const order = [...body.querySelectorAll("[data-testid]")]
+      .filter((el) => el === banner || !banner.contains(el))
+      .map((el) => el.getAttribute("data-testid"));
+    expect(order.slice(0, 2)).toEqual(["ai.trust-banner", "ai.enable-toggle"]);
   });
 });
 
@@ -1000,6 +1077,7 @@ describe("AiPanel: the excluded-folders picker", () => {
 
   it("appends the picked folder to the box and commits it", async () => {
     listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    selectAiTopic("limits");
     render(<AiPanel />);
     const picker = await screen.findByTestId("ai.excluded-folders-picker");
     // Precondition: the box starts empty, so what follows is the picker's doing.
@@ -1021,6 +1099,7 @@ describe("AiPanel: the excluded-folders picker", () => {
 
   it("keeps the box as the authority: a typed line still works", async () => {
     listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    selectAiTopic("limits");
     render(<AiPanel />);
     const box = await screen.findByTestId("ai.excluded-folders");
     fireEvent.change(box, { target: { value: "Typed/By/Hand/" } });
@@ -1031,17 +1110,70 @@ describe("AiPanel: the excluded-folders picker", () => {
       ]),
     );
   });
+
+  it("sits in the Excluded folders row's control slot, on the label's own line", async () => {
+    // **The requester's own geometry, asserted as DOM shape rather than
+    // eyeballed** (myne-md/myne#885): "I want this dropdown aligned with the
+    // `Excluded folders` heading, at the far right". jsdom lays nothing out, so
+    // the "same line" half is carried by the STRUCTURE `SettingRow` guarantees:
+    // the label and the control slot are the two children of one flex row, the
+    // control slot is the second (so it is the right-hand cell of a
+    // `space-between` row), and the picker is inside it rather than a sibling of
+    // the textarea below. The visual half is the AI panel's manual-test roster
+    // entry, which names the mechanism jsdom cannot supply.
+    listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    selectAiTopic("limits");
+    render(<AiPanel />);
+    const picker = await screen.findByTestId("ai.excluded-folders-picker");
+    const row = screen.getByTestId("settings.ai-panel").querySelector(
+      '[data-setting-anchor="ai.excluded-folders"]',
+    );
+    expect(row, "the excluded-folders anchor must be on the row").not.toBeNull();
+    expect(row!.getAttribute("data-setting-row")).toBe("true");
+    const line = row!.firstElementChild as HTMLElement;
+    expect(line.children[0]?.textContent).toBe("settings.ai.excludedLabel");
+    const slot = line.children[1] as HTMLElement;
+    expect(slot, "the row is label then control slot").toBe(line.lastElementChild);
+    expect(slot.contains(picker), "the picker is in the control slot").toBe(true);
+    // The shared dropdown chrome, which is the other half of "it does not look
+    // like our other dropdowns": `.myne-select-trigger` is what `Select` and
+    // `SearchableSelect` share.
+    expect(picker.className).toContain("myne-select-trigger");
+    // And the textarea is NOT on that line: it is a child of the row, below it.
+    const box = screen.getByTestId("ai.excluded-folders");
+    expect(line.contains(box)).toBe(false);
+    expect(row!.contains(box)).toBe(true);
+  });
+
+  it("shows the last pick on its trigger rather than staying on the placeholder", async () => {
+    // `selected={[]}` made the trigger read "Pick a folder…" even after a pick,
+    // which is the same class of defect as a control that does not look like its
+    // siblings (myne-md/myne#885).
+    listFolderPaths.mockResolvedValue([{ path: "Private/", label: "Private" }]);
+    selectAiTopic("limits");
+    render(<AiPanel />);
+    const picker = await screen.findByTestId("ai.excluded-folders-picker");
+    expect(picker.textContent).toBe("settings.ai.excludedPickPlaceholder");
+    fireEvent.click(picker);
+    fireEvent.click(
+      screen
+        .getAllByTestId("ai.excluded-folders-picker-option")
+        .find((o) => o.getAttribute("data-value") === "Private/")!,
+    );
+    expect(screen.getByTestId("ai.excluded-folders-picker").textContent).toBe("Private");
+  });
 });
 
 describe("AiPanel: an installed model in the catalogue", () => {
-  // The artefact rows moved into the catalogue modal (myne-md/myne#867), so both
-  // tests here open it first. What they assert did not change.
+  // The catalogue is an inline table in the Models topic since myne-md/myne#885,
+  // so these tests select the topic and read the table; there is no modal to
+  // open and no button to press first. What they assert did not change.
   it("offers no download action, and states which file it is using", async () => {
     loadModelPath.mockImplementation((role?: string) =>
       Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
     );
+    selectAiTopic("models");
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
     await waitFor(() =>
       expect(screen.queryByTestId("ai.model-provenance-embedding-e5-small")).not.toBeNull(),
     );
@@ -1066,8 +1198,8 @@ describe("AiPanel: an installed model in the catalogue", () => {
     loadModelPath.mockImplementation((role?: string) =>
       Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
     );
+    selectAiTopic("models");
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
     const button = await screen.findByTestId("ai.model-provenance-embedding-e5-small");
     expect(screen.queryByTestId("ai.model-provenance-panel-embedding-e5-small")).toBeNull();
     fireEvent.click(button);
@@ -1083,122 +1215,160 @@ describe("AiPanel: an installed model in the catalogue", () => {
   });
 });
 
-describe("AiPanel: the panel's grouping (myne-md/myne#867)", () => {
-  /** The panel's DOM order as tokens: every group heading, plus the controls
-   *  whose position the regrouping is about. Reading the RENDERED tree rather
-   *  than the source is the point: a panel whose JSX sits in the old sequence
-   *  and is composed into a new one has the same source order and a different
-   *  screen. */
-  function structureOrder(): string[] {
-    const panel = screen.getByTestId("settings.ai-panel");
-    const wanted = new Set([
+describe("AiPanel: the panel's grouping (myne-md/myne#867, topics since #885)", () => {
+  /** The AI panel's own topic ids.
+   *
+   *  Deliberately NOT `SettingsTopicId`: that union covers every topic in the
+   *  tree, so annotating the table with it would demand an entry for Appearance's
+   *  and Privacy's topics too. The exhaustiveness worth keeping is "every AI
+   *  topic is listed", which is what this names, and the test below holds it to
+   *  the roster so the two cannot drift. */
+  type AiTopicId = "answering" | "models" | "limits" | "advanced";
+
+  /** Which controls a topic must contain, asserted one topic at a time on the
+   *  RENDERED tree. A panel whose JSX sits in the old sequence and is composed
+   *  into a new one has the same source order and a different screen, and since
+   *  myne-md/myne#885 a control's topic is what decides whether it is on screen
+   *  at all. */
+  const MEMBERSHIP: Record<AiTopicId, string[]> = {
+    answering: [
       "ai.enable-toggle",
       "ai.trust-banner",
       "ai.endpoint-section",
       "ai.provider-section",
+    ],
+    // Tagging folded into Models (myne-md/myne#867): the switch is a section
+    // of this topic and the tag role is a row of the hand-picked table.
+    models: [
+      "ai.catalogue",
       "ai.models-section",
-      "ai.catalogue-button",
-      "ai.excluded-folders",
+      "ai.sideload-disclosure",
       "ai.auto-tag-toggle",
-      "ai.meeting-prompt",
-      "ai.history-budget-input",
-    ]);
-    const out: string[] = [];
-    for (const el of panel.querySelectorAll("h4, [data-testid]")) {
-      if (el.tagName === "H4") {
-        out.push(`heading:${el.textContent}`);
-        continue;
+      "ai.model-choose-tag",
+    ],
+    limits: ["ai.excluded-folders", "ai.history-budget-input"],
+    advanced: ["ai.meeting-prompt"],
+  };
+
+  it("lists every topic the AI panel actually declares", () => {
+    expect(Object.keys(MEMBERSHIP).sort()).toEqual(
+      AI_PANEL_TOPICS.map((topic) => topic.id).sort(),
+    );
+  });
+
+  it("files every setting's row under the topic that asks its question", () => {
+    for (const [topic, testids] of Object.entries(MEMBERSHIP)) {
+      resetSettingsTopics();
+      setActiveSettingsTopic("ai", topic as SettingsTopicId);
+      const { unmount } = render(<AiPanel />);
+      const panel = screen.getByTestId("settings.ai-panel");
+      for (const testid of testids) {
+        expect(
+          panel.querySelector(`[data-testid="${testid}"]`),
+          `${topic} must hold ${testid}`,
+        ).not.toBeNull();
       }
-      const id = el.getAttribute("data-testid") ?? "";
-      if (wanted.has(id)) out.push(id);
-    }
-    return out;
-  }
-
-  const headings = (order: string[]) => order.filter((t) => t.startsWith("heading:"));
-
-  it("puts the master switch and the trust card above every group heading", () => {
-    render(<AiPanel />);
-    expect(structureOrder().slice(0, 2)).toEqual(["ai.enable-toggle", "ai.trust-banner"]);
-  });
-
-  it("files each block under the group that asks its question", () => {
-    render(<AiPanel />);
-    const order = structureOrder();
-    const at = (token: string) => order.indexOf(token);
-    // Answering holds both ways of pointing Myne at something that answers.
-    for (const token of ["ai.endpoint-section", "ai.provider-section"]) {
-      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupAnswering"));
-      expect(at(token)).toBeLessThan(at("heading:settings.ai.groupModels"));
-    }
-    // Models owns the assignment rows and the catalogue, and it comes AFTER
-    // Answering rather than before it.
-    for (const token of ["ai.models-section", "ai.catalogue-button"]) {
-      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupModels"));
-      expect(at(token)).toBeLessThan(at("heading:settings.ai.groupLimits"));
-    }
-    // The excluded-folders editor is a LIMIT, not a group of its own.
-    expect(at("ai.excluded-folders")).toBeGreaterThan(at("heading:settings.ai.groupLimits"));
-    expect(at("ai.excluded-folders")).toBeLessThan(at("heading:settings.ai.groupAdvanced"));
-    // The two controls that used to own a heading each now sit under Advanced,
-    // which is what takes five headings down to four.
-    for (const token of [
-      "ai.auto-tag-toggle",
-      "ai.meeting-prompt",
-      "ai.history-budget-input",
-    ]) {
-      expect(at(token)).toBeGreaterThan(at("heading:settings.ai.groupAdvanced"));
+      unmount();
     }
   });
 
-  it("renders every AI entry's search target, so no hit scrolls to nothing", () => {
+  it("keeps the tag role's row and the switch that uses it together in Models", () => {
+    // Tagging folded into Models (myne-md/myne#867, on the user's read: "put
+    // tagging inside models"): the tag role is the fourth row of the
+    // hand-picked table, and the switch is a section of the same topic.
+    selectAiTopic("models");
+    render(<AiPanel />);
+    expect(screen.getByTestId("ai.model-select-tag")).toBeTruthy();
+    expect(screen.getByTestId("ai.auto-tag-toggle")).toBeTruthy();
+    for (const id of ["ai.model-select", "ai.model-select-embedding", "ai.model-select-transcription"]) {
+      expect(screen.getByTestId(id)).toBeTruthy();
+    }
+  });
+
+  it("renders every AI entry's search target once its topic is selected", () => {
     // A registry `id` IS the `data-setting-anchor` a search hit scrolls to and
-    // flashes, with `testid` as the fallback. Nothing else checks that: the
-    // drift guard reads panel SOURCE text and only for registered `testid`s, so
-    // an entry whose anchor never renders passes it (myne-md/myne#867 closed
-    // exactly one of those, `ai.memory`).
-    render(<AiPanel />);
-    const panel = screen.getByTestId("settings.ai-panel");
-    const missing: string[] = [];
+    // flashes, with `testid` as the fallback. Since myne-md/myne#885 the target
+    // also has to be in the ACTIVE topic: an anchor inside an inactive one is not
+    // in the document, so this walks each entry through the topic it names. It
+    // therefore fails on a wrong `topic` field as well as on a missing anchor,
+    // which is the shape the settings search's landing depends on.
     for (const entry of SETTINGS_SEARCH_INDEX) {
       if (entry.panelId !== "ai") continue;
+      expect(entry.topic, `entry ${entry.id} must name its topic`).toBeDefined();
+      resetSettingsTopics();
+      setActiveSettingsTopic("ai", entry.topic as SettingsTopicId);
+      const { unmount } = render(<AiPanel />);
+      const panel = screen.getByTestId("settings.ai-panel");
       const anchored = panel.querySelector(`[data-setting-anchor="${entry.id}"]`);
       const byTestid =
         entry.testid === undefined
           ? null
           : panel.querySelector(`[data-testid="${entry.testid}"]`);
-      if (anchored === null && byTestid === null) missing.push(entry.id);
+      expect(
+        anchored ?? byTestid,
+        `entry ${entry.id} (topic ${String(entry.topic)})`,
+      ).not.toBeNull();
+      unmount();
     }
-    expect(missing).toEqual([]);
   });
 
-  it("retires the headings whose contents moved", () => {
-    render(<AiPanel />);
-    const found = headings(structureOrder());
-    for (const retired of ["groupAutoTag", "groupVoice", "groupWriting", "groupPrivacy"]) {
-      expect(found).not.toContain(`heading:settings.ai.${retired}`);
+  it("still renders every AI entry's search target with a remote provider named", () => {
+    // myne-md/myne#867 review, D7: the local runtime block renders only while no
+    // service is named, so with one named the walk is what proves each entry
+    // still has something to land on (the endpoint entry falls back to the
+    // provider block).
+    aiProvider = "openrouter";
+    // A registry `id` IS the `data-setting-anchor` a search hit scrolls to and
+    // flashes, with `testid` as the fallback. Since myne-md/myne#885 the target
+    // also has to be in the ACTIVE topic: an anchor inside an inactive one is not
+    // in the document, so this walks each entry through the topic it names. It
+    // therefore fails on a wrong `topic` field as well as on a missing anchor,
+    // which is the shape the settings search's landing depends on.
+    for (const entry of SETTINGS_SEARCH_INDEX) {
+      if (entry.panelId !== "ai") continue;
+      expect(entry.topic, `entry ${entry.id} must name its topic`).toBeDefined();
+      resetSettingsTopics();
+      setActiveSettingsTopic("ai", entry.topic as SettingsTopicId);
+      const { unmount } = render(<AiPanel />);
+      const panel = screen.getByTestId("settings.ai-panel");
+      const anchored = panel.querySelector(`[data-setting-anchor="${entry.id}"]`);
+      const byTestid =
+        entry.testid === undefined
+          ? null
+          : panel.querySelector(`[data-testid="${entry.testid}"]`);
+      expect(
+        anchored ?? byTestid,
+        `entry ${entry.id} (topic ${String(entry.topic)})`,
+      ).not.toBeNull();
+      unmount();
     }
   });
 });
 
-describe("AiPanel: the model catalogue (myne-md/myne#867)", () => {
-  it("opens from the icon beside the Models heading, and carries no inline section", () => {
+describe("AiPanel: the model catalogue (myne-md/myne#867, inline since #885)", () => {
+  it("renders in the Models topic with no modal and no button to open one", () => {
+    selectAiTopic("models");
     render(<AiPanel />);
     // The panel's own download section is gone: fetching a model and assigning
-    // one used to be two blocks answering the same question.
+    // one used to be two blocks answering the same question. So is the modal and
+    // the icon that opened it (myne-md/myne#885): the list is in front of the
+    // user rather than behind a press.
     expect(screen.queryByTestId("ai.downloads-section")).toBeNull();
-    expect(screen.queryByTestId("ai.catalogue")).toBeNull();
-    const button = screen.getByTestId("ai.catalogue-button");
-    fireEvent.click(button);
-    expect(screen.getByTestId("ai.catalogue")).toBeTruthy();
+    expect(screen.queryByTestId("ai.catalogue-button")).toBeNull();
+    const catalogue = screen.getByTestId("ai.catalogue");
+    expect(catalogue.getAttribute("data-setting-anchor")).toBe("ai.downloads");
+    // Not a dialog: the surface it replaced was `role="dialog"` through
+    // `ModalShell`, and this is the assertion that would pass on the old shape.
+    expect(catalogue.getAttribute("role")).toBeNull();
+    expect(catalogue.closest('[role="dialog"]')).toBeNull();
   });
 
   it("lists every artefact, installed or not, with the action its state enables", async () => {
+    selectAiTopic("models");
     loadModelPath.mockImplementation((role?: string) =>
       Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
     );
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
     // Installed: Remove and no Download. A Download button beside an installed
     // model reads as "this is not installed" on the row saying that it is.
     await waitFor(() =>
@@ -1217,11 +1387,36 @@ describe("AiPanel: the model catalogue (myne-md/myne#867)", () => {
     );
   });
 
-  it("keeps the catalogue's testid contract distinct from the assignment rows", () => {
-    // Two surfaces now render a model row, and a shared testid would let one
-    // stand in for the other in every scenario that reaches either.
+  it("keeps a started download in flight across a topic change and back", () => {
+    // The state machine is not in this component: `ai-download-store.ts` is
+    // module scope, and the panel mounts only the active topic's body, so
+    // switching topics UNMOUNTS the table. Driving the real store here (this
+    // file mocks `invoke`, not the store) is what makes this the assertion about
+    // a transfer surviving navigation rather than about a variable.
+    selectAiTopic("models");
+    const { unmount } = render(<AiPanel />);
+    fireEvent.click(screen.getByTestId("ai.download-button-tag"));
+    expect(startModelDownload).toHaveBeenCalledWith("tag");
+    unmount();
+
+    selectAiTopic("limits");
+    const elsewhere = render(<AiPanel />);
+    expect(screen.queryByTestId("ai.download-row-tag")).toBeNull();
+    elsewhere.unmount();
+
+    selectAiTopic("models");
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.catalogue-button"));
+    // Back on Models, the row is there again with its own action; the transfer
+    // it started was never cancelled by the unmount.
+    expect(screen.getByTestId("ai.download-row-tag")).toBeTruthy();
+    expect(cancelModelDownloadFor).not.toHaveBeenCalled();
+  });
+
+  it("keeps the catalogue's testid contract distinct from the assignment rows", () => {
+    // Two surfaces render a model row, and a shared testid would let one stand
+    // in for the other in every scenario that reaches either.
+    selectAiTopic("models");
+    render(<AiPanel />);
     for (const artifact of ["embedding-e5-small", "tag"]) {
       expect(screen.getByTestId(`ai.download-row-${artifact}`)).toBeTruthy();
       expect(screen.getByTestId(`ai.download-state-${artifact}`)).toBeTruthy();
@@ -1235,33 +1430,45 @@ describe("AiPanel: the assignment rows (myne-md/myne#867)", () => {
   it("gives every role a row, tag included", () => {
     // The tag role is a real `ModelRole` with a real side-loadable file, and it
     // was the ONE role with no row: reachable only by downloading it, which is
-    // what made the block read as if a model were missing from it.
-    render(<AiPanel />);
+    // what made the block read as if a model were missing from it. Since
+    // myne-md/myne#867 every role, tag included, is a row of one table in the
+    // Models topic.
+    //
     // Listed rather than built from a role suffix: the generation row carries
     // the original bare testids (`ai.model-select`, `ai.model-choose`) because
     // scenarios already reach them, while its recommend link is named like the
     // other three. Deriving the ids would hide that, which is the kind of
     // tidying that silently breaks a scenario.
-    for (const id of [
-      "ai.model-select",
-      "ai.model-choose",
-      "ai.model-recommend-generation",
-      "ai.model-select-embedding",
-      "ai.model-choose-embedding",
-      "ai.model-recommend-embedding",
-      "ai.model-select-transcription",
-      "ai.model-choose-transcription",
-      "ai.model-recommend-transcription",
-      "ai.model-select-tag",
-      "ai.model-choose-tag",
-      "ai.model-recommend-tag",
-    ]) {
-      expect(screen.getByTestId(id)).toBeTruthy();
+    const idsByTopic: Record<string, string[]> = {
+      models: [
+        "ai.model-select",
+        "ai.model-choose",
+        "ai.model-recommend-generation",
+        "ai.model-select-embedding",
+        "ai.model-choose-embedding",
+        "ai.model-recommend-embedding",
+        "ai.model-select-transcription",
+        "ai.model-choose-transcription",
+        "ai.model-recommend-transcription",
+        "ai.model-select-tag",
+        "ai.model-choose-tag",
+        "ai.model-recommend-tag",
+      ],
+    };
+    for (const [topic, ids] of Object.entries(idsByTopic)) {
+      resetSettingsTopics();
+      setActiveSettingsTopic("ai", topic as SettingsTopicId);
+      const { unmount } = render(<AiPanel />);
+      for (const id of ids) {
+        expect(screen.getByTestId(id), `${topic} must hold ${id}`).toBeTruthy();
+      }
+      unmount();
     }
   });
 
   it("assigns the tag file the same way as any other role", async () => {
     openFileDialog.mockResolvedValueOnce("/models/qwen-tag.gguf");
+    selectAiTopic("models");
     render(<AiPanel />);
     fireEvent.click(screen.getByTestId("ai.model-choose-tag"));
     await waitFor(() =>
@@ -1277,6 +1484,7 @@ describe("AiPanel: the assignment rows (myne-md/myne#867)", () => {
     saveModelPath.mockRejectedValueOnce(new Error("InsideVaultTree"));
     openFileDialog.mockResolvedValueOnce("/vault/notes/model.gguf");
     const onShowToast = vi.fn();
+    selectAiTopic("models");
     render(<AiPanel onShowToast={onShowToast} />);
     fireEvent.click(screen.getByTestId("ai.model-choose-tag"));
     await waitFor(() =>
@@ -1292,8 +1500,148 @@ describe("AiPanel: the assignment rows (myne-md/myne#867)", () => {
         role === "tag" ? "/Users/me/Library/Application Support/md.myne.desktop/models/qwen-tag.gguf" : null,
       ),
     );
+    selectAiTopic("models");
     render(<AiPanel />);
     const shown = await screen.findByTestId("ai.model-select-tag");
     expect(shown.textContent).toBe("qwen-tag.gguf");
+  });
+});
+
+// The provider choice comes first and decides what follows (myne-md/myne#867,
+// on the user's read: "after the switch I pick the provider, local model or
+// remote, and then I see the settings for what I picked").
+describe("AiPanel: the provider choice decides the rows under it", () => {
+  it("shows the local runtime and no remote rows while nothing is named", async () => {
+    aiProvider = null;
+    render(<AiPanel />);
+    await waitFor(() => expect(screen.getByTestId("ai.endpoint-section")).toBeTruthy());
+    expect(screen.queryByTestId("ai.provider-remote-section")).toBeNull();
+    expect(screen.queryByTestId("ai.provider-key-input")).toBeNull();
+  });
+
+  it("shows the key and model rows and hides the local runtime once a service is named", async () => {
+    aiProvider = "openrouter";
+    render(<AiPanel />);
+    await waitFor(() => expect(screen.getByTestId("ai.provider-remote-section")).toBeTruthy());
+    expect(screen.getByTestId("ai.provider-key-input")).toBeTruthy();
+    expect(screen.queryByTestId("ai.endpoint-section")).toBeNull();
+  });
+
+  it("states the stored model in a dropdown that stays locked until the list is loaded", async () => {
+    aiProvider = "openrouter";
+    aiProviderModel = "deepseek/deepseek-v4.1-flash";
+    render(<AiPanel />);
+    const current = await screen.findByTestId("ai.provider-model-current");
+    expect(current.textContent).toContain("deepseek/deepseek-v4.1-flash");
+    expect((current as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId("ai.provider-model-select")).toBeNull();
+    aiProviderModel = null;
+  });
+});
+
+// myne-md/myne#867, the last layout pass on the user's read.
+describe("AiPanel: the Models table and the Advanced sections", () => {
+  it("draws the hand-picked models as a table in the catalogue's columns", () => {
+    selectAiTopic("models");
+    render(<AiPanel />);
+    const row = screen.getByTestId("ai.model-choose-tag-row");
+    const table = row.parentElement as HTMLElement;
+    expect(table.style.gridTemplateColumns).toBe("minmax(0, 2fr) minmax(0, 1fr) minmax(max-content, 1fr)");
+    for (const child of Array.from(table.children) as HTMLElement[]) {
+      expect(child.style.gridTemplateColumns).toBe("subgrid");
+    }
+    // Four roles, four rows, plus the header.
+    expect(table.children).toHaveLength(5);
+  });
+
+  it("marks each state with a glyph: a cross while no file is chosen", () => {
+    selectAiTopic("models");
+    render(<AiPanel />);
+    const state = screen.getByTestId("ai.model-select-tag");
+    expect(state.textContent).toBe("settings.ai.modelNone");
+    const wrapper = state.parentElement as HTMLElement;
+    expect(wrapper.getAttribute("data-state")).toBe("missing");
+    expect(wrapper.querySelector("svg")).not.toBeNull();
+  });
+
+  it("splits Advanced into Preferences and Memory, the voice preferences under Preferences", async () => {
+    selectAiTopic("advanced");
+    render(<AiPanel />);
+    const sections = await waitFor(() => {
+      const found = Array.from(document.querySelectorAll("section"));
+      if (found.length < 2) throw new Error("sections not mounted yet");
+      return found;
+    });
+    const preferences = sections.find(
+      (el) => el.getAttribute("aria-label") === "settings.ai.sections.preferences",
+    ) as HTMLElement;
+    const memory = sections.find(
+      (el) => el.getAttribute("aria-label") === "settings.ai.sections.memory",
+    ) as HTMLElement;
+    expect(preferences.querySelector('[data-testid="ai.meeting-prompt-input"]')).not.toBeNull();
+    expect(
+      preferences.querySelector('[data-testid="settings.memory.personality-input"]'),
+    ).not.toBeNull();
+    expect(memory.querySelector('[data-testid="settings.memory-section"]')).not.toBeNull();
+    expect(memory.querySelector('[data-testid="settings.memory.personality-input"]')).toBeNull();
+  });
+
+  it("keeps the meeting prompt in Preferences while AI is off, with no Memory", () => {
+    aiEnabled = false;
+    selectAiTopic("advanced");
+    render(<AiPanel />);
+    const labels = Array.from(document.querySelectorAll("section")).map((el) =>
+      el.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual(["settings.ai.sections.preferences"]);
+    expect(screen.getByTestId("ai.meeting-prompt-input")).toBeTruthy();
+  });
+});
+
+// myne-md/myne#867, on the user's read: "the save and reset buttons look nothing
+// alike". Both are now the same control: a square bordered icon on the row.
+describe("AiPanel: Preferences rows carry one kind of action", () => {
+  it("draws the meeting reset and the voice save as bordered icon buttons", async () => {
+    selectAiTopic("advanced");
+    render(<AiPanel />);
+    const reset = screen.getByTestId("ai.meeting-prompt-reset");
+    const save = await screen.findByTestId("settings.memory.personality-save");
+    for (const button of [reset, save]) {
+      expect(button.getAttribute("data-bordered")).toBe("true");
+      expect(button.textContent).toBe("");
+      expect(button.getAttribute("aria-label")).toBeTruthy();
+    }
+  });
+});
+
+// myne-md/myne#867, on the user's read: "move tagging to the top of Models".
+describe("AiPanel: Tagging leads the Models topic", () => {
+  it("renders the Tagging section before the two model tables", () => {
+    selectAiTopic("models");
+    render(<AiPanel />);
+    const labels = Array.from(document.querySelectorAll("section")).map((el) =>
+      el.getAttribute("aria-label"),
+    );
+    expect(labels[0]).toBe("settings.ai.groupTagging");
+    expect(labels).toContain("settings.ai.sections.catalogue");
+    expect(labels).toContain("settings.ai.sections.outsourced");
+  });
+});
+
+// myne-md/myne#867 review, D6: four "Choose file…" buttons need their row.
+describe("AiPanel: each hand-picked model row names its role to assistive tech", () => {
+  it("describes every Choose button by its own role and file requirement", () => {
+    selectAiTopic("models");
+    render(<AiPanel />);
+    for (const id of ["ai.model-choose", "ai.model-choose-embedding", "ai.model-choose-transcription", "ai.model-choose-tag"]) {
+      const button = screen.getByTestId(id);
+      const ids = (button.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean);
+      expect(ids).toHaveLength(2);
+      const text = ids.map((x) => document.getElementById(x)?.textContent ?? "").join(" ");
+      const row = screen.getByTestId(`${id}-row`);
+      // Both described elements live in THIS row, so the description is the row's.
+      for (const x of ids) expect(row.contains(document.getElementById(x))).toBe(true);
+      expect(text.trim()).not.toBe("");
+    }
   });
 });

@@ -2171,6 +2171,8 @@
         "heading": "Color groups",
         "moveDown": "Move rule down",
         "moveUp": "Move rule up",
+        "mobileEmptyBody": "Color groups colour the graph by tag or folder, and they are authored on a computer. This phone uses them but cannot create one yet, because a new group needs a filter.",
+        "mobileSharedNotice": "Color groups are shared: an edit here replaces the whole list on your other devices, and a list edited on a computer arrives here.",
         "namePlaceholder": "Untitled rule",
         "newRuleTitle": "New color group"
       },
@@ -2995,6 +2997,7 @@
     }
   },
   "settings": {
+    "helperDisclosureLabel": "More about this setting",
     "about": {
       "buildChannelDevelopment": "Development build",
       "buildLabel": "Build",
@@ -3003,6 +3006,7 @@
       "changelogButton": "View changelog…",
       "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
       "changelogLabel": "Changelog",
+      "developerModeInline": "Shows the settings Myne keeps out of the way by default.",
       "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
       "legalLabel": "Legal",
@@ -3031,7 +3035,13 @@
       "updateLabel": "Updates",
       "updateUpToDate": "You're on the latest version.",
       "version": "Version",
-      "dev": "Dev"
+      "dev": "Dev",
+      "sections": {
+        "version": "Version",
+        "updates": "Staying up to date",
+        "legal": "Legal and licensing",
+        "developer": "Developer"
+      }
     },
     "account": {
       "changePasswordButton": "Change password",
@@ -3072,7 +3082,14 @@
       "newPasswordPlaceholder": "At least 12 characters",
       "reenterNewPassword": "Re-enter new password",
       "changePasswordFootnote": "This invalidates quick-unlock. Your recovery phrase is unchanged.",
-      "changing": "Changing…"
+      "changing": "Changing…",
+      "topics": {
+        "vault": "Vault",
+        "danger": "Danger zone"
+      },
+      "sections": {
+        "identity": "Vault identity"
+      }
     },
     "appearance": {
       "accentHelper": "Pick the accent color used across the app. This device only.",
@@ -3110,7 +3127,17 @@
       "themeLabel": "Theme",
       "themeOptionAria": "{{label}} theme",
       "themeSaveError": "Couldn't save theme. Please try again.",
-      "timestampsSaveError": "Couldn't save preference. Please try again."
+      "timestampsSaveError": "Couldn't save preference. Please try again.",
+      "topics": {
+        "display": "Display",
+        "notes": "Note list",
+        "interface": "Interface"
+      },
+      "sections": {
+        "theme": "Theme and accent",
+        "sidebar": "In the sidebar",
+        "customisation": "Customisation"
+      }
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
@@ -3134,12 +3161,14 @@
     "attachmentOcr": {
       "label": "Search inside images and scanned documents",
       "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
+      "mobileDeviceLocal": "This one is per device: it decides what this phone indexes, so your other devices keep their own choice.",
       "errorSaveSetting": "Could not save this setting.",
       "processing_one": "Reading 1 attachment…",
       "processing_other": "Reading {{count}} attachments…"
     },
     "folderNotes": {
       "label": "Folder notes",
+      "inline": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it.",
       "helper": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it. Off by default. Turning it off hides the buttons that create folder notes and shows any you already have as ordinary notes; it changes nothing on disk, so turning it back on restores them exactly.",
       "errorSaveSetting": "Could not save this setting."
     },
@@ -3198,6 +3227,7 @@
     "cliAccess": {
       "label": "Terminal access",
       "helperOff": "Off. The `myne` command can't read or change anything in this vault.",
+      "inlineOn": "Any program running under your account can read, search and create notes through it.",
       "helperOn": "On while this vault is unlocked. Any program running under your account can read, search and create notes through it. Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
       "lastUsedNever": "Not used since this vault was unlocked.",
       "lastUsedJustNow": "Last used just now.",
@@ -3258,6 +3288,7 @@
     },
     "dailyNotes": {
       "blankTemplate": "Blank (no template)",
+      "blockLabel": "Periodic notes",
       "folderSearchEmpty": "No folders match.",
       "folderSearchPlaceholder": "Search folders…",
       "searchEmpty": "No templates match.",
@@ -3275,6 +3306,10 @@
       "periodTemplateLabel": "Template",
       "periodTemplateHelper": "Pick a template to start each {{period}} note from, or leave blank for an empty note titled with the date.",
       "collisionWarning": "{{first}} and {{second}} notes resolve to the same note, because they share a folder and produce the same title. Both commands will open it.",
+      "mobilePeriodAriaLabel": "Note period",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Save",
+      "mobileSharedNotice": "These settings are shared: an edit here reaches your other devices, and the same value set on a computer arrives here.",
       "weekStartNote": "Weeks start on Monday (ISO 8601), so the first days of January can belong to the previous year's last week, and the last days of December to the next year's first.",
       "periodFolderSaveError": "Couldn't save the {{period}} folder. Please try again.",
       "periodFormatSaveError": "Couldn't save the {{period}} title format. Please try again.",
@@ -3336,6 +3371,10 @@
         "searchEmpty": "No notes found.",
         "searchPlaceholder": "Search notes…",
         "untitledNote": "Untitled"
+      },
+      "sections": {
+        "notes": "Notes and folders",
+        "attachments": "Attachments"
       }
     },
     "focusMode": {
@@ -3455,11 +3494,15 @@
     },
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "historyBudgetInline": "How much of the recent conversation each request carries, in characters.",
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
+      "historyBudgetMaxNotice": "The most you can enter is {{max}} characters; anything larger is reduced to that.",
+      "historyBudgetDeviceLocal": "This one is per device: it bounds what this phone sends, so your other devices keep their own.",
       "meetingPromptHelper": "The instruction the meeting AI pass uses to turn a transcript into sections. Leave it empty for the built-in default. It replaces the default output format, so if you set it, ask for the sections you want yourself.",
       "meetingPromptLabel": "Meeting summary prompt",
       "meetingPromptReset": "Reset to default",
+      "meetingPromptShared": "This one is shared: an edit here reaches your other devices, and a prompt edited on a computer arrives here.",
       "autoTagLabel": "Suggest tags automatically",
       "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
       "consent": {
@@ -3476,18 +3519,27 @@
         "excludedLabel": "Excluded folders"
       },
       "disclosureToggle": "How does this work?",
-      "enableHelper": "Runs a model you provide. Where it runs, and whether your notes leave this device, both depend on the provider you name below. Experimental, off by default.",
+      "enableHelper": "Turns on every AI feature. Where a model runs, and whether your notes leave this device, both depend on the provider you choose below. Experimental, off by default.",
       "groupAnswering": "Answering",
+      "groupGeneral": "General",
       "groupModels": "Models",
       "groupLimits": "Limits",
       "groupAdvanced": "Advanced",
-      "enableLabel": "Enable local AI",
-      "excludedHelper": "Notes in these folders are never read or indexed by AI. Empty means the AI can see everything; this is the same list the command-line client honors. One folder path per line.",
+      "groupTagging": "Tagging",
+      "enableLabel": "Enable AI features",
+      "excludedHelper": "Notes in these folders are never read or indexed by AI. Empty means the AI can see everything. One folder path per line.",
       "excludedLabel": "Excluded folders",
       "excludedPickLabel": "Add a folder to leave out",
       "excludedPickPlaceholder": "Pick a folder…",
       "excludedPlaceholder": "Private/\nJournal/",
-      "endpointHelper": "If you already run a model runtime on this computer, point Myne at it instead of picking model files. Leave this empty to use the files above.",
+      "excludedFoldersHelper": "Notes in these folders are never read or indexed by AI. This is the same list your other devices use.",
+      "excludedFoldersEmpty": "Nothing is excluded yet, so AI can read every folder in this vault.",
+      "excludedFoldersAdd": "Add",
+      "excludedFoldersAddLabel": "Folder to exclude from AI",
+      "excludedFoldersRemove": "Remove",
+      "excludedFoldersRemoveLabel": "Stop excluding {{folder}} from AI",
+      "excludedFoldersMonotoneNotice": "An exclusion added on any of your devices stays until you remove it everywhere: removals here do not travel, so a folder your other devices still exclude will come back on the next sync.",
+      "endpointHelper": "If you already run a model runtime on this computer, point Myne at it instead of picking model files. Leave this empty to use the model files set in Models.",
       "endpointLabel": "Local model runtime",
       "endpointModelHelper": "Myne does not pick a model for you. Until you name one, the address above is saved but unused.",
       "endpointModelLabel": "Model to use there",
@@ -3529,10 +3581,12 @@
       "modelShowLocation": "Show the location of {{name}}",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
       "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Assign the file each role uses. Use the button at the right of this heading to download a model from Myne's own origin, or open a link to get one in your browser and pick it here. A model runs on your device; if you have named a provider instead, that provider answers.",
+      "modelsHelper": "Assign the file each role uses when it comes from somewhere other than the verified list above: open a link to get one in your browser, then pick it here. A model runs on your device; if you have named a provider instead, that provider answers.",
       "downloadsLabel": "Download models",
       "catalogueOpen": "Download a model",
       "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
+      "catalogueColModel": "Model",
+      "catalogueColState": "State",
       "downloadEmbeddingSize": "Multilingual model, about 449 MB.",
       "downloadTagLabel": "Tag model: automatic tag suggestions",
       "downloadTagSize": "Small local model, about 337 MB.",
@@ -3547,6 +3601,9 @@
       "downloadFailed": "The download did not finish.",
       "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
       "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
+      "providerInline": "Your notes leave this device once a service is named.",
+      "providerChooseHelper": "A model can run on this device, or Myne can send a request to a service you name. Your notes leave this device when it does. \"On this device\" is the default and means no service is contacted at all.",
+      "providerChooseLabel": "Choose provider",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
       "providerKeySave": "Save this key",
@@ -3578,12 +3635,21 @@
       "mobileApproveLabel": "Approve sending on this phone",
       "mobileApproveHelper": "The provider and its key came from another device. Nothing is sent from this phone until you read what it will send and approve it here.",
       "providerNone": "None",
+      "providerOnDevice": "On this device",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
-      "modelsLabel": "Models",
+      "modelsLabel": "Outsourced models",
       "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
       "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
       "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
-      "title": "AI"
+      "title": "AI",
+      "sections": {
+        "catalogue": "Verified downloadable models",
+        "outsourced": "Outsourced models",
+      "preferences": "Preferences",
+      "memory": "Memory",
+        "excluded": "What AI can read",
+        "history": "Chat history"
+      }
     },
     "memory": {
       "heading": "What the assistant remembers",
@@ -3635,6 +3701,7 @@
       "residualPayment": "If you pay for hosted sync, the payment and your account can still be linked to you. Tor changes where the connection comes from, not the billing trail.",
       "residualScope": "On desktop this covers your sync traffic and your remote AI provider requests. Mobile has no Tor routing yet, so its provider requests go direct. Nothing else on this device goes through Tor.",
       "residualsToggle": "What this doesn't hide",
+      "torInline": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider.",
       "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with (and, on desktop, which AI provider you reach) from your network and your internet provider. They can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
       "torLabel": "Route sync and desktop AI through Tor"
     },
@@ -3662,6 +3729,7 @@
       "autoLockSearchEmpty": "No durations match.",
       "autoLockSearchPlaceholder": "Search durations…",
       "hideVaultNamesLabel": "Hide vault names on the lock screen",
+      "hideVaultNamesInline": "Turning it on destroys the keys that make the names stored here readable.",
       "hideVaultNamesHelper": "On a device with a usable keychain the vault picker shows a vault's name once this device has unlocked it. With this on every vault shows a placeholder such as Vault 2 instead, and that number stays with the vault however the list reorders.",
       "hideVaultNamesErases": "Turning it on destroys the keys that make the names stored here readable, so those names cannot be recovered on this device, and no further name is written while it stays on.",
       "hideVaultNamesResidue": "It cannot reach a copy taken earlier: a full-system backup, a disk image, or any other system-level copy of this disk made while names were showing carries both the stored names and their keys.",
@@ -3693,7 +3761,17 @@
       "recoveryDrillHelper": "Type the 24 words you wrote down. Myne checks whether they still open this vault and tells you nothing else — the words are never shown here.",
       "recoveryDrillLabel": "Check your recovery phrase",
       "recoveryDrillPassed": "These words open this vault. Keep them where you found them.",
-      "recoveryDrillPlaceholder": "The 24 words, in order, separated by spaces"
+      "recoveryDrillPlaceholder": "The 24 words, in order, separated by spaces",
+      "topics": {
+        "access": "Access",
+        "locking": "Locking"
+      },
+      "sections": {
+        "screen": "Screen protection",
+        "terminal": "Command line tools",
+        "locking": "Locking and unlocking",
+        "recovery": "Recovery"
+      }
     },
     "quickUnlock": {
       "errorBiometricAuthFailed": "Touch ID couldn't be set up. Make sure a fingerprint is enrolled in System Settings, or use a PIN instead.",
@@ -3773,6 +3851,7 @@
         "account": "Account",
         "ai": "AI",
         "appearance": "Appearance",
+        "data": "Data",
         "editor": "Editor",
         "files": "Files",
         "transcription": "Transcription",
@@ -3780,7 +3859,8 @@
         "network": "Network",
         "privacy": "Privacy",
         "storage": "Storage",
-        "sync": "Sync"
+        "sync": "Sync",
+        "vault": "Vault"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"
@@ -3796,6 +3876,7 @@
       "languagesPlaceholder": "Select languages…",
       "languagesSearchEmpty": "No languages match.",
       "languagesSearchPlaceholder": "Search languages…",
+      "mobileUnavailable": "Spell check is not available on this phone yet: there is no dictionary on this device, so the editor here cannot underline anything. Turn it on from your computer instead.",
       "off": "Off",
       "on": "On"
     },
@@ -3816,7 +3897,12 @@
       "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser. There is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
       "webLocationLabel": "Where your notes are stored",
       "pathUnavailable": "Path unavailable",
-      "restoreBackup": "Restore from backup…"
+      "restoreBackup": "Restore from backup…",
+      "sections": {
+        "location": "Where the vault lives",
+        "backup": "Backup and restore",
+        "transfer": "Import and export"
+      }
     },
     "typography": {
       "contentWidthHelper": "Maximum width of the editing column. Full lets text span the pane.",
@@ -3879,12 +3965,20 @@
         "features": "Features",
         "tasks": "Tasks"
       },
+      "topics": {
+        "periodic": "Periodic notes"
+      },
       "preview": {
         "heading": "The quick brown fox",
         "bullet1": "Pack my box with five dozen liquor jugs",
         "bullet2": "How vexingly quick daft zebras jump",
         "spellCaption": "Spell-check",
-        "spellSample": "mispelled"
+        "spellSample": "mispelled",
+        "dateTime": "Date and time",
+        "toolbar": "Toolbar",
+        "task": "Tasks",
+        "taskSampleOpen": "Send the quarterly report",
+        "taskSampleDone": "Book the venue"
       },
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
@@ -3918,7 +4012,7 @@
         "aiProviderModel": "model catalogue list which model llama qwen gpt choose model remote provider",
         "aiEnable": "local ai on off enable disable machine learning",
         "aiExcluded": "excluded folders ignore ai privacy exclude",
-        "aiModels": "models gguf download text embedding llm",
+        "aiModels": "models gguf download text embedding llm catalogue",
         "aiMemory": "memory remembered facts assistant learns personality voice preferences",
         "archive": "archive archiving hide restore notes",
         "autoBackup": "automatic backups schedule frequency retention folder",
@@ -4001,6 +4095,7 @@
       "time24": "24-hour",
       "time12": "12-hour",
       "zoneLabel": "Time zone",
+      "zoneInline": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open.",
       "zoneHelper": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open. Leave empty to follow this device. The choice settles per device: no other device overwrites it, so an override can put this device on a different day from your others. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
@@ -4284,6 +4379,16 @@
       "usage": {
         "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
         "label": "Storage and devices"
+      },
+      "topics": {
+        "connection": "Connection",
+        "devices": "Devices and members",
+        "conflicts": "Conflicts"
+      },
+      "sections": {
+        "account": "Account",
+        "server": "Server",
+        "devices": "Enrolled devices"
       }
     },
     "reconcile": {
