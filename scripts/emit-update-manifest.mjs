@@ -17,6 +17,20 @@
 //
 // Usage:
 //   node scripts/emit-update-manifest.mjs --channel stable --descriptor desc.json --out latest.json
+//   node scripts/emit-update-manifest.mjs --channel both --descriptor desc.json
+//
+// `--channel both` writes `latest.json` AND `latest-beta.json` with the same
+// bytes, and it is what a normal release uses. The invariant it encodes is
+// `decisions/clients/0702`: every version published on the stable channel is
+// published on the beta channel too, so a beta install is never left behind by
+// a release the maintainer sent to one channel only. That is not a hypothetical
+// failure: it is what happened to v0.10.0, where the beta document stayed on
+// the previous version and a beta install reported "you are up to date" while a
+// newer release sat on stable. A beta manifest AHEAD of stable (a prerelease)
+// is the explicit exception, and it is written by naming `--channel beta`.
+//
+// The file name half of that pairing is `manifestFilename`, which
+// `scripts/check-update-channel.mjs` compares against the Rust channel table.
 //
 // Descriptor shape:
 //   {
@@ -41,6 +55,35 @@ export function manifestFilename(channel) {
   if (channel === "stable") return "latest.json";
   if (channel === "beta") return "latest-beta.json";
   throw new Error(`unknown channel: ${channel} (expected "stable" or "beta")`);
+}
+
+/**
+ * Every channel a release publishes, in publish order.
+ *
+ * `--channel both` writes all of them from one descriptor, which is how
+ * `decisions/clients/0702` is enforced on the publishing side rather than
+ * remembered.
+ */
+export const CHANNELS = ["stable", "beta"];
+
+/**
+ * The file names `--channel <channel>` writes.
+ *
+ * `--out` names a single file, so it cannot mean anything for `both`: throwing
+ * here rather than ignoring the flag is the difference between a release that
+ * published both documents and one that silently published, say, `latest.json`
+ * twice.
+ */
+export function outputNames(channel, out) {
+  if (channel === "both") {
+    if (out !== undefined) {
+      throw new Error(
+        "channel `both` writes every channel's file name, so it cannot be combined with --out",
+      );
+    }
+    return CHANNELS.map(manifestFilename);
+  }
+  return [out ?? manifestFilename(channel)];
 }
 
 /** `OS-ARCH`, the key `tauri-plugin-updater` matches a platform against. */
@@ -96,17 +139,30 @@ function main(argv) {
     if (key) args[key] = argv[i + 1];
   }
   const channel = args.channel ?? "stable";
-  const outName = args.out ?? manifestFilename(channel);
   if (!args.descriptor) {
     console.error("emit-update-manifest: --descriptor <path> is required");
     process.exit(2);
   }
   const descriptor = JSON.parse(readFileSync(args.descriptor, "utf8"));
   const manifest = buildManifest(descriptor);
-  writeFileSync(outName, JSON.stringify(manifest, null, 2) + "\n");
+  const platformCount = Object.keys(manifest.platforms).length;
+
+  let names;
+  try {
+    names = outputNames(channel, args.out);
+  } catch (error) {
+    console.error(`emit-update-manifest: ${error.message}`);
+    process.exit(2);
+  }
+  for (const name of names) writeManifest(manifest, name);
   console.log(
-    `emit-update-manifest: wrote ${outName} (${channel}, ${Object.keys(manifest.platforms).length} platform(s))`,
+    `emit-update-manifest: wrote ${names.join(" and ")} (${channel}, ${platformCount} platform(s))`,
   );
+}
+
+/** Write one manifest document, always with a trailing newline. */
+function writeManifest(manifest, outName) {
+  writeFileSync(outName, JSON.stringify(manifest, null, 2) + "\n");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

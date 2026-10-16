@@ -608,6 +608,15 @@ steps:
       # push/manual, so on pull_request the stated lock ran green and empty.
       # This one runs on every PR.
       - node scripts/check-embed-layout-drift.mjs
+      # The update channel (one endpoint, one variable name, one manifest file
+      # name per channel). The config's `plugins.updater.endpoints` list is
+      # REPLACED rather than merged by the updater the plugin builds, so a value
+      # there is silently ignored while the file reads as the source of truth;
+      # and each channel's manifest file name is written in Rust and in the
+      # emitter, so moving one stops the channel updating with every other gate
+      # green. The published half is by hand (`check-published-manifests.mjs`,
+      # named in the release runbook), because it needs the network.
+      - node scripts/check-update-channel.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.

@@ -23,24 +23,22 @@ use crate::update::{UpdateCheckError, UpdateStatus};
 use tauri::{AppHandle, Manager, Runtime, Url};
 use tauri_plugin_updater::{Updater, UpdaterExt};
 
-/// The manifest endpoint for the channel this build was COMPILED for.
-///
-/// `MYNE_UPDATE_CHANNEL=beta` at build time (the release sets it for the beta
-/// flavour, together with the matching Vite define) points at the beta manifest;
-/// anything else, unset included, is stable. It is a compile-time value on
-/// purpose: the channel the About panel SHOWS (`__UPDATE_CHANNEL__`) and the
-/// manifest the client FETCHES cannot then disagree, which a config-only
-/// endpoint plus a display-only define allowed.
-fn channel_endpoint() -> &'static str {
-    match option_env!("MYNE_UPDATE_CHANNEL") {
-        Some("beta") => "https://downloads.myne.md/releases/latest-beta.json",
-        _ => "https://downloads.myne.md/releases/latest.json",
-    }
-}
-
 /// Build the updater pinned to this build's channel endpoint.
+///
+/// The endpoint comes from `crate::update::Channel` and from nowhere else.
+/// `UpdaterBuilder::endpoints` REPLACES the plugin's configured list rather
+/// than merging with it (`tauri-plugin-updater`'s `UpdaterBuilder::build` reads
+/// `self.endpoints.unwrap_or_else(|| config.endpoints.clone())`), so
+/// `tauri.conf.json` deliberately carries no endpoint: a list there would be a
+/// second source of truth that is silently overridden, and
+/// `scripts/check-update-channel.mjs` fails if one is added back.
+///
+/// The channel that picks this endpoint is also what the About panel shows
+/// (`__UPDATE_CHANNEL__`) and what the log header names. One compile-time
+/// resolution, three readers.
 fn updater_for<R: Runtime>(app: &AppHandle<R>) -> Result<Updater, UpdateCheckError> {
-    let endpoint = Url::parse(channel_endpoint()).map_err(|_| UpdateCheckError::Other)?;
+    let endpoint = Url::parse(&crate::update::Channel::from_env().endpoint())
+        .map_err(|_| UpdateCheckError::Other)?;
     app.updater_builder()
         .endpoints(vec![endpoint])
         .map_err(|_| UpdateCheckError::Unsupported)?

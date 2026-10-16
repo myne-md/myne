@@ -399,6 +399,22 @@ pre-commit:
       glob: "{dialect/src/embedLayout.ts,core/src/export_naming.rs,scripts/check-embed-layout-drift.mjs}"
       run: node scripts/check-embed-layout-drift.mjs
 
+    update-channel:
+      # The update channel is chosen by MYNE_UPDATE_CHANNEL and used to be named
+      # in four places that could disagree, one of which did nothing at all:
+      # `plugins.updater.endpoints` is REPLACED, not merged, by the updater the
+      # plugin builds, so a value there was silently ignored while a reader
+      # believed the reverse. The other half is that each channel's manifest
+      # file name is written in Rust AND in the emitter that produces the
+      # document, so moving one stops the channel updating with every gate
+      # green. `check-update-channel.mjs` holds the config, the Rust table, the
+      # Vite define and the About label together. It is offline and static; the
+      # PUBLISHED half (both manifests reachable, beta never behind stable) is
+      # `scripts/check-published-manifests.mjs`, which needs the network and
+      # runs by hand from the release runbook.
+      glob: "{src-tauri/tauri.conf.json,src-tauri/src/update/mod.rs,vite.config.ts,vitest.config.ts,src/components/settings/AboutPanel.tsx,scripts/emit-update-manifest.mjs,scripts/check-update-channel.mjs}"
+      run: node scripts/check-update-channel.mjs
+
     token-adoption:
       glob: "{src,editor/src}/**/*.{ts,tsx,css}"
       # myne#394: a hardcoded visual value in an inline style is unreachable to

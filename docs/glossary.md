@@ -3879,15 +3879,15 @@ Used in: `docs/design/README.md` (Iconography), `src/components/Spinner.tsx`, `s
 
 ### **update channel** &nbsp; 📦 *Product*
 
-Which release line a desktop client's [self-update](#self-update) follows: `stable` (default) or `beta`. Baked at build time (`MYNE_UPDATE_CHANNEL`), not chosen in-app, so there is no runtime switcher and no downgrade path. The **update manifest** is the static signed document the channel points at: a version, notes, and per-platform artifact URLs and signatures, in the shape `tauri-plugin-updater` expects. Both manifests live on `downloads.myne.md` (`latest.json`, `latest-beta.json`) and both are signed with the same offline release key; both are published by hand (`decisions/clients/0651`).
+Which release line a desktop client's [self-update](#self-update) follows: `stable` (default) or `beta`. Baked at build time (`MYNE_UPDATE_CHANNEL`), not chosen in-app, so there is no runtime switcher and no downgrade path. The **update manifest** is the static signed document the channel points at: a version, notes, and per-platform artifact URLs and signatures, in the shape `tauri-plugin-updater` expects. Both manifests live on `downloads.myne.md` (`latest.json`, `latest-beta.json`) and both are signed with the same offline release key; both are published by hand (`decisions/clients/0651`), from **one** descriptor, so every version published to stable is published to beta too and the beta document is never older than the stable one (`decisions/clients/0702`). Two consequences of the build-time choice are worth knowing together: a beta build replaces the stable install rather than sitting beside it, and the anti-rollback gate means that device cannot move back to an older stable (`decisions/clients/0701`).
 
-Used in: `threat-model.md` TB7, `decisions/clients/0651`
+Used in: `threat-model.md` TB7, `decisions/clients/0651`, `decisions/clients/0701`, `decisions/clients/0702`
 
 ### **update manifest** &nbsp; 📦 *Product*
 
-The static document a desktop client's [update channel](#update-channel) points at: a version, optional notes and publication date, and per-platform artifact URLs with their signatures, in the shape `tauri-plugin-updater` reads. The signatures cover each downloaded artifact, not the manifest, so a substituted manifest cannot forge an install (the artifact signature and the version gate hold); what it can do is withhold an offer or alter the notes the client reads over TLS. Both manifests (`latest.json`, `latest-beta.json`) live on `downloads.myne.md`.
+The static document a desktop client's [update channel](#update-channel) points at: a version, optional notes and publication date, and per-platform artifact URLs with their signatures, in the shape `tauri-plugin-updater` reads. The signatures cover each downloaded artifact, not the manifest, so a substituted manifest cannot forge an install (the artifact signature and the version gate hold); what it can do is withhold an offer or alter the notes the client reads over TLS. Both manifests (`latest.json`, `latest-beta.json`) live on `downloads.myne.md` and are written together from one descriptor; `scripts/check-published-manifests.mjs` reads both and fails when the beta document is older than the stable one.
 
-Used in: `threat-model.md` TB7; `scripts/emit-update-manifest.mjs`
+Used in: `threat-model.md` TB7; `scripts/emit-update-manifest.mjs`, `scripts/check-published-manifests.mjs`
 
 ### **UUIDv4** &nbsp; 📋 *Protocol*
 
