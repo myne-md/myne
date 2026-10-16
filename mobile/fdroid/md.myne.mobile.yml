@@ -116,9 +116,16 @@ Builds:
       - cargo tauri android build --apk --split-per-abi --target armv7
     # The revision form, which fdroidserver installs through sdkmanager itself
     # (`common.auto_install_ndk`), so it need not already exist on the
-    # buildserver. This is the revision `mobile/docs/dev/device-matrix.md` pins
-    # for the dev loop, which is the point: the same NDK on both sides.
-    ndk: 29.0.13846066
+    # buildserver. 29.0.14206865 is r29 FINAL: its own source.properties says
+    # `Pkg.ReleaseName = r29`, and it is the revision a local
+    # `mobile/scripts/fdroid-build.sh --abi arm64` has already built with.
+    #
+    # Deliberately NOT the 29.0.13846066 that `mobile/docs/dev/device-matrix.md`
+    # used to name: sdkmanager resolves that one to
+    # `android-ndk-r29-beta3-linux.zip`, so it was a BETA of r29, and the
+    # inclusion policy restricts pre-release toolchains. It is also part of the
+    # build's identity, since the NDK's clang is what links the shipped `.so`.
+    ndk: 29.0.14206865
 
   # arm64-v8a. versionCode 100002.
   - versionName: 0.10.0
@@ -160,7 +167,7 @@ Builds:
       - pnpm install --frozen-lockfile
       - cd mobile
       - cargo tauri android build --apk --split-per-abi --target aarch64
-    ndk: 29.0.13846066
+    ndk: 29.0.14206865
 
   # x86 (emulator and some tablets). versionCode 100003.
   - versionName: 0.10.0
@@ -202,7 +209,7 @@ Builds:
       - pnpm install --frozen-lockfile
       - cd mobile
       - cargo tauri android build --apk --split-per-abi --target i686
-    ndk: 29.0.13846066
+    ndk: 29.0.14206865
 
   # x86_64 (emulator). versionCode 100004.
   - versionName: 0.10.0
@@ -244,4 +251,4 @@ Builds:
       - pnpm install --frozen-lockfile
       - cd mobile
       - cargo tauri android build --apk --split-per-abi --target x86_64
-    ndk: 29.0.13846066
+    ndk: 29.0.14206865
