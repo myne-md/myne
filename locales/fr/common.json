@@ -3020,9 +3020,6 @@
       "legalLabel": "Mentions légales",
       "legalHelper": "S'ouvre sur myne.md dans votre navigateur. En allemand lorsque l'interface est en allemand.",
       "legalPrivacy": "Politique de confidentialité",
-      "legalTerms": "Conditions de la bêta",
-      "legalNotice": "Signaler un contenu illicite",
-      "legalLawEnforcement": "Demandes des autorités judiciaires",
       "licenseBody": "Pré-alpha · docs CC-BY-4.0 · code applicatif AGPL-3.0 à la sortie de la phase 1.",
       "licenseLabel": "Licence",
       "tagline": "Pré-alpha · client de bureau de la phase 1",
@@ -4081,10 +4078,6 @@
       "intro": "La synchronisation envoie vos notes, chiffrées, vers un serveur. Quatre choses méritent d'être connues avant.",
       "whatThisIsLabel": "De quoi il s'agit",
       "dataLossLabel": "Si vous perdez les deux secrets",
-      "whatHappensNextLabel": "À la fin de la bêta",
-      "whatWeCanSeeLabel": "Ce que nous pouvons voir",
-      "readFull": "Lire les conditions complètes",
-      "review": "Examiner les conditions de la bêta",
       "accept": "J'ai compris, activer la synchronisation"
     },
     "materialising": "Téléchargement de vos notes : {{done}} sur {{total}}. Vous pouvez commencer à travailler ; le reste apparaîtra au fur et à mesure.",
@@ -4206,8 +4199,7 @@
       "tlsHelp": "Saisissez la même URL de serveur sur chaque appareil. Un serveur auto-hébergé a besoin d'un certificat HTTPS de confiance.",
       "tlsFailure": "Impossible de vérifier le certificat HTTPS du serveur. Vérifiez l'adresse du serveur, le certificat et sa validité.",
       "inviteLabel": "Code d'invitation (uniquement si ce serveur en demande un)",
-      "invitePlaceholder": "Le code que l'opérateur du serveur vous a donné",
-      "changeInviteCode": "Modifier le code d'invitation"
+      "invitePlaceholder": "Le code que l'opérateur du serveur vous a donné"
     },
     "enroll": {
       "accountNumberLabel": "Numéro de compte",
@@ -5457,18 +5449,10 @@
   "firstRun": {
     "server": {
       "heading": "Choisir un serveur de synchronisation",
-      "chooseHeading": "Où vos notes doivent-elles se synchroniser ?",
-      "chooseIntro": "Myne a besoin d'un serveur pour héberger vos notes chiffrées et pour vous joindre pour les invitations. Utilisez le service Myne Sync, ou pointez cet appareil vers un serveur que vous exploitez vous-même. Dans les deux cas, vos notes restent chiffrées sur cet appareil avant de le quitter ; le serveur ne stocke que du texte chiffré.",
-      "myneSyncHint": "Le serveur exploité par Myne. Son certificat HTTPS est vérifié automatiquement.",
       "intro": "Myne a besoin d'un serveur pour héberger vos notes chiffrées et pour vous joindre pour les invitations. Vos notes restent chiffrées sur cet appareil avant de le quitter ; le serveur ne stocke que du texte chiffré.",
       "notConfigured": "Saisissez une adresse de serveur ci-dessus et appuyez sur Se connecter pour continuer.",
       "back": "Retour",
-      "continue": "Continuer",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Votre propre serveur",
-      "selfHostedHint": "Un serveur de synchronisation que vous exploitez. Vous saisirez son adresse à l'écran suivant.",
-      "connectAction": "Se connecter",
-      "setUpAction": "Configurer"
+      "continue": "Continuer"
     }
   },
   "identityFlow": {
@@ -5483,8 +5467,6 @@
       "title": "Choisir un serveur de synchronisation",
       "lead": "Vos notes restent chiffrées sur cet appareil avant de le quitter. Le serveur ne stocke que du texte chiffré.",
       "urlLabel": "Adresse du serveur",
-      "useMyneSync": "Utiliser Myne Sync",
-      "selfHostedHint": "Ou saisissez l'adresse d'un serveur que vous exploitez vous-même.",
       "connect": "Se connecter",
       "connecting": "Connexion…"
     },

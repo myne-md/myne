@@ -2909,9 +2909,6 @@
       "legalLabel": "Juridisk",
       "legalHelper": "Åbner på myne.md i din browser. Tysk, hvor grænsefladen er tysk.",
       "legalPrivacy": "Privatlivspolitik",
-      "legalTerms": "Betavilkår",
-      "legalNotice": "Anmeld ulovligt indhold",
-      "legalLawEnforcement": "Anmodninger fra myndigheder",
       "licenseBody": "Pre-alfa · CC-BY-4.0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alfa · Fase 1 desktopklient",
@@ -3954,10 +3951,6 @@
       "intro": "Synkronisering sender dine noter krypteret til en server. Fire ting er værd at vide først.",
       "whatThisIsLabel": "Hvad det er",
       "dataLossLabel": "Hvis du mister begge hemmeligheder",
-      "whatHappensNextLabel": "Når betaen slutter",
-      "whatWeCanSeeLabel": "Hvad vi kan se",
-      "readFull": "Læs de fulde vilkår",
-      "review": "Gennemgå betavilkårene",
       "accept": "Jeg forstår, slå synkronisering til"
     },
     "materialising": "Henter dine noter: {{done}} af {{total}}. Du kan godt gå i gang; resten dukker op, efterhånden som de ankommer.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Indtast den samme server-URL på hver enhed. En selvhostet server kræver et betroet HTTPS-certifikat.",
       "tlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen, certifikatet og dets gyldighed.",
       "inviteLabel": "Invitationskode (kun hvis denne server beder om en)",
-      "invitePlaceholder": "Den kode, serverens operatør gav dig",
-      "changeInviteCode": "Ændr invitationskode"
+      "invitePlaceholder": "Den kode, serverens operatør gav dig"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Vælg en synkroniseringsserver",
-      "chooseHeading": "Hvor skal dine noter synkroniseres?",
-      "chooseIntro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Brug Myne Sync-tjenesten, eller peg denne enhed mod en server, du selv driver. Uanset hvad forbliver dine noter krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
-      "myneSyncHint": "Den Myne-drevne server. Dens HTTPS-certifikat tjekkes automatisk.",
       "intro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Dine noter forbliver krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
       "notConfigured": "Indtast en serveradresse ovenfor, og tryk på Opret forbindelse for at fortsætte.",
       "back": "Tilbage",
-      "continue": "Fortsæt",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Din egen server",
-      "selfHostedHint": "En synkroniseringsserver, du selv driver. Du indtaster dens adresse på næste skærm.",
-      "connectAction": "Opret forbindelse",
-      "setUpAction": "Opsæt"
+      "continue": "Fortsæt"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Vælg en synkroniseringsserver",
       "lead": "Dine noter forbliver krypteret på denne enhed, før de forlader den. Serveren gemmer kun ciphertext.",
       "urlLabel": "Serveradresse",
-      "useMyneSync": "Brug Myne Sync",
-      "selfHostedHint": "Eller indtast adressen på en server, du selv driver.",
       "connect": "Opret forbindelse",
       "connecting": "Opretter forbindelse…"
     },

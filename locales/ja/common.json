@@ -2909,9 +2909,6 @@
       "legalLabel": "法的情報",
       "legalHelper": "ブラウザで myne.md を開きます。インターフェースがドイツ語のときはドイツ語で表示されます。",
       "legalPrivacy": "プライバシーポリシー",
-      "legalTerms": "ベータ版利用規約",
-      "legalNotice": "違法コンテンツの報告",
-      "legalLawEnforcement": "捜査機関からの要請",
       "licenseBody": "プレアルファ · ドキュメントはCC-BY-4.0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
       "licenseLabel": "ライセンス",
       "tagline": "プレアルファ · フェーズ1デスクトップクライアント",
@@ -3954,10 +3951,6 @@
       "intro": "同期はノートを暗号化してサーバーに送信します。まず知っておきたいことが4つあります。",
       "whatThisIsLabel": "これは何か",
       "dataLossLabel": "秘密情報を両方とも失った場合",
-      "whatHappensNextLabel": "ベータ版が終了したら",
-      "whatWeCanSeeLabel": "私たちに見えるもの",
-      "readFull": "利用規約の全文を読む",
-      "review": "ベータ版利用規約を確認",
       "accept": "理解しました。同期をオンにする"
     },
     "materialising": "ノートをダウンロード中：{{total}}件中{{done}}件。作業を始められます。残りは届き次第表示されます。",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "すべてのデバイスで同じサーバーURLを入力してください。セルフホストのサーバーには信頼されたHTTPS証明書が必要です。",
       "tlsFailure": "サーバーのHTTPS証明書を検証できませんでした。サーバーアドレス、証明書、その有効性を確認してください。",
       "inviteLabel": "招待コード（このサーバーが求める場合のみ）",
-      "invitePlaceholder": "サーバーの運用者から渡されたコード",
-      "changeInviteCode": "招待コードを変更"
+      "invitePlaceholder": "サーバーの運用者から渡されたコード"
     },
     "enroll": {
       "accountNumberLabel": "アカウント番号",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "同期サーバーを選択",
-      "chooseHeading": "ノートをどこに同期しますか？",
-      "chooseIntro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。Myne Syncサービスを使うか、このデバイスを自分で運用するサーバーに向けてください。どちらの場合も、ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
-      "myneSyncHint": "Myneが運営するサーバーです。HTTPS証明書は自動で確認されます。",
       "intro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
       "notConfigured": "上のサーバーアドレスを入力し、接続を押して続けてください。",
       "back": "戻る",
-      "continue": "続ける",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "自分のサーバー",
-      "selfHostedHint": "自分で運用する同期サーバーです。次の画面でアドレスを入力します。",
-      "connectAction": "接続",
-      "setUpAction": "設定"
+      "continue": "続ける"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "同期サーバーを選択",
       "lead": "ノートはこのデバイスを離れる前に暗号化されます。サーバーが保存するのは暗号文だけです。",
       "urlLabel": "サーバーアドレス",
-      "useMyneSync": "Myne Syncを使用",
-      "selfHostedHint": "または、自分で運用するサーバーのアドレスを入力してください。",
       "connect": "接続",
       "connecting": "接続中…"
     },

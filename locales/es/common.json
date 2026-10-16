@@ -3020,9 +3020,6 @@
       "legalLabel": "Legal",
       "legalHelper": "Se abre en myne.md en tu navegador. En alemán cuando la interfaz está en alemán.",
       "legalPrivacy": "Política de privacidad",
-      "legalTerms": "Términos de la beta",
-      "legalNotice": "Denunciar contenido ilegal",
-      "legalLawEnforcement": "Solicitudes de las autoridades",
       "licenseBody": "Pre-alfa · Documentación CC-BY-4.0 · Código de la aplicación AGPL-3.0 en la versión de la Fase 1.",
       "licenseLabel": "Licencia",
       "tagline": "Pre-alfa · Cliente de escritorio de la Fase 1",
@@ -4081,10 +4078,6 @@
       "intro": "La sincronización envía tus notas, cifradas, a un servidor. Conviene saber cuatro cosas antes.",
       "whatThisIsLabel": "Qué es esto",
       "dataLossLabel": "Si pierdes los dos secretos",
-      "whatHappensNextLabel": "Cuando termine la beta",
-      "whatWeCanSeeLabel": "Qué podemos ver",
-      "readFull": "Leer los términos completos",
-      "review": "Revisar los términos de la beta",
       "accept": "Lo entiendo, activar la sincronización"
     },
     "materialising": "Descargando tus notas: {{done}} de {{total}}. Puedes empezar a trabajar; el resto aparecerá a medida que vayan llegando.",
@@ -4206,8 +4199,7 @@
       "tlsHelp": "Introduce la misma URL de servidor en todos los dispositivos. Un servidor autoalojado necesita un certificado HTTPS de confianza.",
       "tlsFailure": "No se pudo verificar el certificado HTTPS del servidor. Comprueba la dirección del servidor, el certificado y su validez.",
       "inviteLabel": "Código de invitación (solo si este servidor lo pide)",
-      "invitePlaceholder": "El código que te dio quien administra el servidor",
-      "changeInviteCode": "Cambiar el código de invitación"
+      "invitePlaceholder": "El código que te dio quien administra el servidor"
     },
     "enroll": {
       "accountNumberLabel": "Número de cuenta",
@@ -5457,18 +5449,10 @@
   "firstRun": {
     "server": {
       "heading": "Elige un servidor de sincronización",
-      "chooseHeading": "¿Dónde deben sincronizarse tus notas?",
-      "chooseIntro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Usa el servicio Myne Sync, o apunta este dispositivo a un servidor que ejecutes tú mismo. En cualquier caso, tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
-      "myneSyncHint": "El servidor operado por Myne. Su certificado HTTPS se comprueba automáticamente.",
       "intro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
       "notConfigured": "Introduce una dirección de servidor arriba y pulsa Conectar para continuar.",
       "back": "Atrás",
-      "continue": "Continuar",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Tu propio servidor",
-      "selfHostedHint": "Un servidor de sincronización que ejecutas tú. Introducirás su dirección en la pantalla siguiente.",
-      "connectAction": "Conectar",
-      "setUpAction": "Configurar"
+      "continue": "Continuar"
     }
   },
   "identityFlow": {
@@ -5483,8 +5467,6 @@
       "title": "Elige un servidor de sincronización",
       "lead": "Tus notas permanecen cifradas en este dispositivo antes de salir de él. El servidor solo almacena texto cifrado.",
       "urlLabel": "Dirección del servidor",
-      "useMyneSync": "Usar Myne Sync",
-      "selfHostedHint": "O introduce la dirección de un servidor que ejecutes tú mismo.",
       "connect": "Conectar",
       "connecting": "Conectando…"
     },

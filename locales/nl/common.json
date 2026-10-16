@@ -2909,9 +2909,6 @@
       "legalLabel": "Juridisch",
       "legalHelper": "Opent op myne.md in je browser. Duits waar de interface Duits is.",
       "legalPrivacy": "Privacybeleid",
-      "legalTerms": "Bètavoorwaarden",
-      "legalNotice": "Illegale inhoud melden",
-      "legalLawEnforcement": "Verzoeken van opsporingsinstanties",
       "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
@@ -3954,10 +3951,6 @@
       "intro": "Synchronisatie stuurt je notities versleuteld naar een server. Vier dingen zijn eerst goed om te weten.",
       "whatThisIsLabel": "Wat dit is",
       "dataLossLabel": "Als je beide geheimen kwijtraakt",
-      "whatHappensNextLabel": "Als de bèta eindigt",
-      "whatWeCanSeeLabel": "Wat wij kunnen zien",
-      "readFull": "Lees de volledige voorwaarden",
-      "review": "Bètavoorwaarden bekijken",
       "accept": "Ik begrijp het, synchronisatie aanzetten"
     },
     "materialising": "Je notities worden gedownload: {{done}} van {{total}}. Je kunt al beginnen; de rest verschijnt zodra die binnenkomt.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Voer op elk apparaat dezelfde server-URL in. Een zelfgehoste server heeft een vertrouwd HTTPS-certificaat nodig.",
       "tlsFailure": "Kon het HTTPS-certificaat van de server niet verifiëren. Controleer het serveradres, het certificaat en de geldigheid ervan.",
       "inviteLabel": "Uitnodigingscode (alleen als deze server er een vraagt)",
-      "invitePlaceholder": "De code die de beheerder van de server je gaf",
-      "changeInviteCode": "Uitnodigingscode wijzigen"
+      "invitePlaceholder": "De code die de beheerder van de server je gaf"
     },
     "enroll": {
       "accountNumberLabel": "Accountnummer",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Kies een synchronisatieserver",
-      "chooseHeading": "Waar moeten je notities synchroniseren?",
-      "chooseIntro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Gebruik de Myne Sync-dienst, of wijs dit apparaat naar een server die je zelf draait. Hoe dan ook blijven je notities op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
-      "myneSyncHint": "De server die Myne beheert. Het HTTPS-certificaat ervan wordt automatisch gecontroleerd.",
       "intro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Je notities blijven op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
       "notConfigured": "Voer hierboven een serveradres in en druk op Verbinden om door te gaan.",
       "back": "Terug",
-      "continue": "Doorgaan",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Je eigen server",
-      "selfHostedHint": "Een synchronisatieserver die je zelf draait. Je voert het adres op het volgende scherm in.",
-      "connectAction": "Verbinden",
-      "setUpAction": "Instellen"
+      "continue": "Doorgaan"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Kies een synchronisatieserver",
       "lead": "Je notities blijven op dit apparaat versleuteld voordat ze het verlaten. De server bewaart alleen ciphertext.",
       "urlLabel": "Serveradres",
-      "useMyneSync": "Myne Sync gebruiken",
-      "selfHostedHint": "Of voer het adres in van een server die je zelf draait.",
       "connect": "Verbinden",
       "connecting": "Verbinden…"
     },

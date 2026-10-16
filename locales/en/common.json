@@ -3023,9 +3023,6 @@
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
       "legalPrivacy": "Privacy policy",
-      "legalTerms": "Beta terms",
-      "legalNotice": "Report illegal content",
-      "legalLawEnforcement": "Law enforcement requests",
       "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
       "licenseLabel": "License",
       "tagline": "Pre-alpha · Phase 1 desktop client",
@@ -3681,8 +3678,8 @@
       "sections": {
         "catalogue": "Verified downloadable models",
         "outsourced": "Outsourced models",
-      "preferences": "Preferences",
-      "memory": "Memory",
+        "preferences": "Preferences",
+        "memory": "Memory",
         "excluded": "What AI can read",
         "history": "Chat history"
       }
@@ -4200,10 +4197,9 @@
       "intro": "Sync sends your notes, encrypted, to a server. Four things are worth knowing first.",
       "whatThisIsLabel": "What this is",
       "dataLossLabel": "If you lose both secrets",
-      "whatHappensNextLabel": "When the beta ends",
-      "whatWeCanSeeLabel": "What we can see",
-      "readFull": "Read the full terms",
-      "review": "Review the beta terms",
+      "whatHappensNextLabel": "If the server goes away",
+      "whatWeCanSeeLabel": "What the server's operator can see",
+      "review": "Review what sync means",
       "accept": "I understand, turn on sync"
     },
     "materialising": "Downloading your notes: {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
@@ -4342,8 +4338,7 @@
       "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
       "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
       "inviteLabel": "Invite code (only if this server asks for one)",
-      "invitePlaceholder": "The code the server’s operator gave you",
-      "changeInviteCode": "Change invite code"
+      "invitePlaceholder": "The code the server’s operator gave you"
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -5190,18 +5185,10 @@
   "firstRun": {
     "server": {
       "heading": "Choose a sync server",
-      "chooseHeading": "Where should your notes sync?",
-      "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
-      "continue": "Continue",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Your own server",
-      "selfHostedHint": "A sync server you run. You enter its address on the next screen.",
-      "connectAction": "Connect",
-      "setUpAction": "Set up"
+      "continue": "Continue"
     }
   },
   "identityFlow": {
@@ -5216,8 +5203,6 @@
       "title": "Choose a sync server",
       "lead": "Your notes stay encrypted on this device before they leave it. The server only stores ciphertext.",
       "urlLabel": "Server address",
-      "useMyneSync": "Use Myne Sync",
-      "selfHostedHint": "Or enter the address of a server you run yourself.",
       "connect": "Connect",
       "connecting": "Connecting…"
     },

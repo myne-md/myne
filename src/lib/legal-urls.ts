@@ -49,8 +49,18 @@ export function legalUrl(doc: LegalDoc, locale: string): string {
  * them, with their label key and test id.
  *
  * Shared rather than declared per client so the desktop, the web client and
- * mobile show the same four documents in the same order under the same test
+ * mobile show the same documents in the same order under the same test
  * ids — a second copy is how one client quietly ends up offering three.
+ *
+ * **One document, as of 2026-10-16, and that is a deliberate reduction.** The
+ * list used to carry four: this one, the beta terms, the DSA notice route and
+ * the law-enforcement page. The last three describe a service Myne was offering
+ * to the public, and Myne offers none (`design-notes/sync/0696`), so a client
+ * linking them from Settings was pointing readers at documents about an
+ * offering that no longer exists. The pages themselves are kept and still
+ * build; the website unlinks and noindexes them in the same change. `legalUrl`
+ * can still produce all of them, because the beta-terms dialog still opens the
+ * terms text.
  *
  * **The Impressum is deliberately not in this list.** `legalUrl` can produce
  * it and the page exists, but nothing links it until its address is filled in
@@ -64,11 +74,4 @@ export const LEGAL_LINKS: ReadonlyArray<{
   testId: string;
 }> = [
   { doc: "privacy", labelKey: "settings.about.legalPrivacy", testId: "about.legal-privacy" },
-  { doc: "terms", labelKey: "settings.about.legalTerms", testId: "about.legal-terms" },
-  { doc: "notice", labelKey: "settings.about.legalNotice", testId: "about.legal-notice" },
-  {
-    doc: "lawEnforcement",
-    labelKey: "settings.about.legalLawEnforcement",
-    testId: "about.legal-law-enforcement",
-  },
 ];

@@ -712,6 +712,41 @@ pre-commit:
       glob: "*.{mjs,json,yml}"
       run: node scripts/check-server-env-roster.mjs
 
+    selfhost-bundle-drift:
+      # The self-host bundle is three files that must agree: the runnable compose in
+      # `operations/bundle/`, the annotated `.env` example beside it, and the user guide's copy
+      # of the compose (`myne-website`). Nothing compared them.
+      #
+      # WRITTEN BECAUSE THE DRIFT WAS LIVE, and the severity is why it is a failure and not a
+      # warning: `bundle.env.example` documented 14 `kind: server` knobs that
+      # `bundle/docker-compose.yml` never forwarded into the container. Compose reads `.env` to
+      # interpolate `${...}` in the compose file; it does NOT inject the file into the
+      # container's environment. An operator who set `MYNE_INVITE_CODE` there, restarted, and
+      # believed new-account registration was closed had done nothing at all, and neither file
+      # said so. The compose now forwards every documented knob, and this rule holds it there.
+      #
+      # The trigger caveat from `server-env-roster` above applies unchanged: the inputs live in
+      # two OTHER git repositories, so this fires on an unrelated edit here and nothing fires
+      # when a companion breaks it. It is a local periodic check, not a gate on the change.
+      glob: "*.{md,mjs,yml,yaml,json}"
+      run: node scripts/check-selfhost-bundle-drift.mjs
+
+    referenced-digests:
+      # Every `ghcr.io` pin this project hands a self-hoster must RESOLVE, and the server image
+      # must resolve to a manifest list carrying amd64 AND arm64. A transposed hex digit is
+      # invisible in review and fails at an operator's `docker compose up`; a single-platform
+      # tag fails only on arm64 hardware, where nothing on the amd64 path notices. Both were
+      # found in the shipped tree while writing this: `:0.8.0` is one amd64 manifest, and two
+      # files claimed a `v0.9.0` tag that does not exist.
+      #
+      # THE ONE GUARD HERE THAT NEEDS THE NETWORK, which is exactly why it is pre-commit and
+      # NOT CI: a network dependency in a pipeline gate makes a red pipeline mean "GitHub was
+      # slow". The release-time gate is `operations/scripts/check-image-multiarch.sh`, wired into
+      # the release checklist and run by the publish script. Offline, this prints COULD NOT
+      # REACH and says its closing line is not a verdict rather than reporting a pass.
+      glob: "*.{md,mjs,yml,yaml,json,example,toml}"
+      run: node scripts/check-referenced-digests.mjs
+
     npm-license-mirror:
       # myne#527: the npm allowlist in check-npm-licenses.mjs claims, in a
       # comment, to mirror deny.toml's [licenses].allow — and it had already

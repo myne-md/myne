@@ -338,7 +338,7 @@ function JoinFromDevice() {
 
         <UpperLabel style={{ marginTop: 18 }}>Server URL</UpperLabel>
         <div style={{ display: "flex", alignItems: "center", height: 50, border: "1px solid var(--line-2)", borderRadius: 6, background: "var(--bg-1)", padding: "0 14px" }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg-1)" }}>sync.myne.md</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg-1)" }}>sync.example</span>
         </div>
 
         <UpperLabel style={{ marginTop: 16 }}>Account number</UpperLabel>

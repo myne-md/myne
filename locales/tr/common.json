@@ -2909,9 +2909,6 @@
       "legalLabel": "Yasal",
       "legalHelper": "Tarayıcınızda myne.md üzerinde açılır. Arayüz Almancaysa metin de Almanca olur.",
       "legalPrivacy": "Gizlilik politikası",
-      "legalTerms": "Beta koşulları",
-      "legalNotice": "Yasa dışı içerik bildir",
-      "legalLawEnforcement": "Kolluk talepleri",
       "licenseBody": "Pre-alpha · CC-BY-4.0 belgeler · Faz 1 sürümünde AGPL-3.0 uygulama kodu.",
       "licenseLabel": "Lisans",
       "tagline": "Pre-alpha · Faz 1 masaüstü istemcisi",
@@ -3954,10 +3951,6 @@
       "intro": "Eşitleme, notlarınızı şifreli olarak bir sunucuya gönderir. Önce bilmeye değer dört şey var.",
       "whatThisIsLabel": "Bu nedir",
       "dataLossLabel": "İki sırrınızı da kaybederseniz",
-      "whatHappensNextLabel": "Beta sona erdiğinde",
-      "whatWeCanSeeLabel": "Neleri görebiliriz",
-      "readFull": "Koşulların tamamını okuyun",
-      "review": "Beta koşullarını gözden geçir",
       "accept": "Anlıyorum, eşitlemeyi aç"
     },
     "materialising": "Notlarınız indiriliyor: {{done}} / {{total}}. Çalışmaya başlayabilirsiniz; kalanlar geldikçe görünecek.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Her cihaza aynı sunucu URL'sini girin. Kendi barındırdığınız bir sunucu, güvenilen bir HTTPS sertifikası gerektirir.",
       "tlsFailure": "Sunucunun HTTPS sertifikası doğrulanamadı. Sunucu adresini, sertifikayı ve geçerliliğini kontrol edin.",
       "inviteLabel": "Davet kodu (yalnızca bu sunucu bir tane istiyorsa)",
-      "invitePlaceholder": "Sunucu işletmecisinin size verdiği kod",
-      "changeInviteCode": "Davet kodunu değiştir"
+      "invitePlaceholder": "Sunucu işletmecisinin size verdiği kod"
     },
     "enroll": {
       "accountNumberLabel": "Hesap numarası",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Bir eşitleme sunucusu seçin",
-      "chooseHeading": "Notlarınız nereye eşitlensin?",
-      "chooseIntro": "Myne'in şifreli notlarınızı tutması ve davetler için size ulaşması adına bir sunucuya ihtiyacı var. Myne Sync hizmetini kullanın ya da bu cihazı kendi çalıştırdığınız bir sunucuya yönlendirin. Her iki durumda da notlarınız bu cihazdan çıkmadan önce şifrelenmiş kalır; sunucu yalnızca şifreli metni saklar.",
-      "myneSyncHint": "Myne tarafından işletilen sunucu. HTTPS sertifikası otomatik olarak kontrol edilir.",
       "intro": "Myne'in şifreli notlarınızı tutması ve davetler için size ulaşması adına bir sunucuya ihtiyacı var. Notlarınız bu cihazdan çıkmadan önce bu cihazda şifrelenmiş kalır; sunucu yalnızca şifreli metni saklar.",
       "notConfigured": "Devam etmek için yukarıya bir sunucu adresi girip Bağlan'a basın.",
       "back": "Geri",
-      "continue": "Devam et",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Kendi sunucunuz",
-      "selfHostedHint": "Kendi çalıştırdığınız bir eşitleme sunucusu. Adresini sonraki ekranda gireceksiniz.",
-      "connectAction": "Bağlan",
-      "setUpAction": "Kur"
+      "continue": "Devam et"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Bir eşitleme sunucusu seçin",
       "lead": "Notlarınız bu cihazdan çıkmadan önce bu cihazda şifrelenmiş kalır. Sunucu yalnızca şifreli metni saklar.",
       "urlLabel": "Sunucu adresi",
-      "useMyneSync": "Myne Sync kullan",
-      "selfHostedHint": "Ya da kendi çalıştırdığınız bir sunucunun adresini girin.",
       "connect": "Bağlan",
       "connecting": "Bağlanıyor…"
     },

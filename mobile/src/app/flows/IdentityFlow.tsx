@@ -43,7 +43,6 @@ import {
 import { syncSetEndpoint, syncGetEndpoint, listRoster } from "../../lib/sync";
 import { setMyMemberName, memberNameErrorKey } from "../../lib/memberNames";
 import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
-import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
 import type { IdentityFlowProps } from "./types";
@@ -581,20 +580,6 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     }
   }, [serverUrl, inviteCode, t]);
 
-  // The hosted door uses the same public-CA and hostname verification.
-  const connectHosted = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await syncSetEndpoint(HOSTED_SYNC_ORIGIN, inviteCode.trim());
-      setStep("create");
-    } catch (e) {
-      setError(serverConnectError(e, t));
-    } finally {
-      setBusy(false);
-    }
-  }, [inviteCode, t]);
-
   // Forget a held identity this device cannot open with a fresh phrase, so a
   // create can proceed (myne-md/myne#780).
   const forgetHeld = useCallback(async () => {
@@ -1093,17 +1078,6 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.server.title")}</Title>
         <Lead>{t("identityFlow.server.lead")}</Lead>
-        <div style={{ marginTop: "var(--space-5)" }}>
-          <Button
-            variant="secondary"
-            onClick={() => void connectHosted()}
-            disabled={busy}
-            data-testid="identity-flow.server-myne-sync"
-          >
-            {t("identityFlow.server.useMyneSync")}
-          </Button>
-        </div>
-        <div style={{ ...HINT_STYLE, marginTop: "var(--space-4)" }}>{t("identityFlow.server.selfHostedHint")}</div>
         <div style={{ marginTop: "var(--space-4)" }}>
           <FieldLabel>{t("identityFlow.server.urlLabel")}</FieldLabel>
           <MonoField

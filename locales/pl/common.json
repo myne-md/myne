@@ -3131,9 +3131,6 @@
       "legalLabel": "Informacje prawne",
       "legalHelper": "Otwiera się na myne.md w Twojej przeglądarce. Po niemiecku, gdy interfejs jest po niemiecku.",
       "legalPrivacy": "Polityka prywatności",
-      "legalTerms": "Warunki bety",
-      "legalNotice": "Zgłoś nielegalne treści",
-      "legalLawEnforcement": "Wnioski organów ścigania",
       "licenseBody": "Pre-alfa · dokumentacja CC-BY-4.0 · kod aplikacji AGPL-3.0 w wydaniu Fazy 1.",
       "licenseLabel": "Licencja",
       "tagline": "Pre-alfa · klient desktopowy Fazy 1",
@@ -4208,10 +4205,6 @@
       "intro": "Synchronizacja wysyła Twoje notatki w postaci zaszyfrowanej na serwer. Warto najpierw poznać cztery rzeczy.",
       "whatThisIsLabel": "Czym to jest",
       "dataLossLabel": "Jeśli utracisz oba sekrety",
-      "whatHappensNextLabel": "Gdy beta się skończy",
-      "whatWeCanSeeLabel": "Co widzimy my",
-      "readFull": "Przeczytaj pełne warunki",
-      "review": "Przejrzyj warunki bety",
       "accept": "Rozumiem, włącz synchronizację"
     },
     "materialising": "Pobieranie Twoich notatek: {{done}} z {{total}}. Możesz już zacząć pracę; reszta pojawi się, gdy dotrze.",
@@ -4335,8 +4328,7 @@
       "tlsHelp": "Wprowadź ten sam adres serwera na każdym urządzeniu. Serwer hostowany samodzielnie wymaga zaufanego certyfikatu HTTPS.",
       "tlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera, certyfikat i jego ważność.",
       "inviteLabel": "Kod zaproszenia (tylko jeśli ten serwer go wymaga)",
-      "invitePlaceholder": "Kod, który przekazał Ci operator serwera",
-      "changeInviteCode": "Zmień kod zaproszenia"
+      "invitePlaceholder": "Kod, który przekazał Ci operator serwera"
     },
     "enroll": {
       "accountNumberLabel": "Numer konta",
@@ -5604,18 +5596,10 @@
   "firstRun": {
     "server": {
       "heading": "Wybierz serwer synchronizacji",
-      "chooseHeading": "Gdzie mają synchronizować się Twoje notatki?",
-      "chooseIntro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Użyj usługi Myne Sync albo wskaż temu urządzeniu serwer, który sam prowadzisz. Tak czy inaczej Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
-      "myneSyncHint": "Serwer prowadzony przez Myne. Jego certyfikat HTTPS jest sprawdzany automatycznie.",
       "intro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
       "notConfigured": "Wprowadź powyżej adres serwera i naciśnij Połącz, aby kontynuować.",
       "back": "Wstecz",
-      "continue": "Kontynuuj",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Twój własny serwer",
-      "selfHostedHint": "Serwer synchronizacji, który sam prowadzisz. Jego adres podasz na następnym ekranie.",
-      "connectAction": "Połącz",
-      "setUpAction": "Skonfiguruj"
+      "continue": "Kontynuuj"
     }
   },
   "identityFlow": {
@@ -5630,8 +5614,6 @@
       "title": "Wybierz serwer synchronizacji",
       "lead": "Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą. Serwer przechowuje wyłącznie szyfrogram.",
       "urlLabel": "Adres serwera",
-      "useMyneSync": "Użyj Myne Sync",
-      "selfHostedHint": "Albo wprowadź adres serwera, który sam prowadzisz.",
       "connect": "Połącz",
       "connecting": "Łączenie…"
     },

@@ -147,11 +147,15 @@ export const DEVICE_REVOKED_DISCLOSURE =
 export const LOCAL_ERASE_DISCLOSURE =
   "This erases Myne's copy of your vault from this browser only. Your account and everything already synced stay on the server, and signing in here again brings them back. It is not an account deletion and not a remote wipe. Anything this browser has not synced yet is lost for good.";
 
-// The beta terms, as the app states them (operations#15). The published text is
-// at https://myne.md/terms and this is not a substitute for it — it is the four
-// clauses a person must actually have read before sync starts carrying their
-// notes to a server, phrased so that reading only these four leaves them with an
-// accurate picture rather than a flattering one.
+// What turning sync on means, as the app states it (operations#15). These four
+// clauses are what a person must actually have read before sync starts carrying
+// their notes to a server, phrased so that reading only these four leaves them
+// with an accurate picture rather than a flattering one.
+//
+// The published text this used to defer to (https://myne.md/terms) is no longer
+// linked from the dialog and no longer governs anything: it is the beta terms of
+// a service Myne closed (`design-notes/sync/0696`), so the clauses can no
+// longer be a summary of it. They stand on their own.
 //
 // Load-bearing for the same reason the consent copy above is: each clause is a
 // bounded claim, and a translation that softened "cannot be recovered" into
@@ -167,24 +171,40 @@ export const LOCAL_ERASE_DISCLOSURE =
 
 /** The version of the four clauses below. Compared, never ranked: any change
  *  re-asks, in either direction. Stored device-local by
- *  `core/src/plugins/sync/legal_consent.rs`. */
-export const BETA_TERMS_VERSION = "1";
+ *  `core/src/plugins/sync/legal_consent.rs`.
+ *
+ *  **v2, 2026-10-16:** three clauses were reworded when Myne stopped offering a
+ *  sync service (`design-notes/sync/0696`). The old text described Myne as the
+ *  provider ("Myne's sync is a free beta", the end-of-beta guarantee, the
+ *  moderation reality); the new text describes what sync is on whatever server
+ *  the reader names, which is the only thing left for the dialog to be about.
+ *  `BETA_TERMS_DATA_LOSS` is unchanged, because it was never about a provider. */
+export const BETA_TERMS_VERSION = "2";
 
-/** What the service is, and what it is not. */
+/** What sync is, and what it is not. Reworded in v2: this clause used to call
+ *  Myne the provider of a free beta, which stopped being true. */
 export const BETA_TERMS_WHAT_THIS_IS =
-  "Myne's sync is a free beta. It takes no payment, carries no warranty and makes no uptime promise — software this young breaks, and a bug can lose data.";
+  "Sync stores your notes on a server you choose. They leave this device encrypted and stay that way there: the server holds ciphertext and no key, so it cannot read them, and neither can Myne, which runs no server for you. Software this young still breaks, and a bug can lose data.";
 
-/** The clause the architecture makes necessary, and the one most terms omit. */
+/** The clause the architecture makes necessary, and the one most terms omit.
+ *  Unchanged in v2: it was never about a provider. */
 export const BETA_TERMS_DATA_LOSS =
   "If you lose your password and your recovery phrase, your notes cannot be recovered — not by you and not by us. There is no reset, because a reset would mean we held a key to your notes.";
 
-/** The anti-Skiff clause: what happens when the beta ends, and if it shuts. */
+/** What a server going away costs. Reworded in v2: this clause was the
+ *  anti-Skiff end-of-beta guarantee ("when the beta ends your account keeps
+ *  working"), and there is no beta and no account of ours to guarantee. What
+ *  survives it is the property that made the guarantee unnecessary. */
 export const BETA_TERMS_WHAT_HAPPENS_NEXT =
-  "When the beta ends your account keeps working. If a paid tier ever exists it will be a choice, not a gate in front of notes you already have. If we ever shut the service down you get at least 90 days' notice, with export working the whole time.";
+  "Your notes live on your devices, so a server going away is not data loss: each device holds a complete vault on its own. You lose sync until you point it at another server and push again, and the only copy that goes is the one on the server.";
 
-/** The moderation reality, which is also the DSA Art. 14 transparency line. */
+/** What the operator of the server sees and can do. Reworded in v2: this clause
+ *  was the moderation reality of Myne's own service, and it is now about
+ *  whoever runs the server the reader named. Same bound as the old one: it
+ *  claims only the metadata the protocol exposes and the policy-level actions
+ *  an operator can take (`docs/threat-model.md` §7, `self-host-policy.md` §7). */
 export const BETA_TERMS_WHAT_WE_CAN_SEE =
-  "We cannot read what you store, so we cannot screen it and do not try. On a substantiated report we can act on an account — freeze it or delete it — but never on a single note, because we cannot tell them apart.";
+  "Whoever runs that server can refuse to serve you, keep a copy of something you deleted until their own retention window passes, and see that an account synced, when, and roughly how much. None of that lets them read a note, because to them a note is ciphertext.";
 
 /* ---- AI provider names (myne-md/myne#456) ----------------------------------
  *

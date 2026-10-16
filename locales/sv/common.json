@@ -2909,9 +2909,6 @@
       "legalLabel": "Juridik",
       "legalHelper": "Öppnas på myne.md i din webbläsare. På tyska där gränssnittet är på tyska.",
       "legalPrivacy": "Integritetspolicy",
-      "legalTerms": "Betavillkor",
-      "legalNotice": "Anmäl olagligt innehåll",
-      "legalLawEnforcement": "Förfrågningar från brottsbekämpande myndigheter",
       "licenseBody": "Pre-alpha · CC-BY-4.0-dokument · AGPL-3.0 för programkoden vid fas 1-lansering.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alpha · Fas 1 skrivbordsklient",
@@ -3954,10 +3951,6 @@
       "intro": "Synkronisering skickar dina anteckningar, krypterade, till en server. Fyra saker är värda att veta först.",
       "whatThisIsLabel": "Vad det här är",
       "dataLossLabel": "Om du förlorar båda hemligheterna",
-      "whatHappensNextLabel": "När betan tar slut",
-      "whatWeCanSeeLabel": "Vad vi kan se",
-      "readFull": "Läs de fullständiga villkoren",
-      "review": "Granska betavillkoren",
       "accept": "Jag förstår, slå på synkronisering"
     },
     "materialising": "Hämtar dina anteckningar: {{done}} av {{total}}. Du kan börja arbeta; resten dyker upp allteftersom de kommer in.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Ange samma server-URL på varje enhet. En egenhostad server behöver ett betrott HTTPS-certifikat.",
       "tlsFailure": "Det gick inte att verifiera serverns HTTPS-certifikat. Kontrollera serveradressen, certifikatet och dess giltighet.",
       "inviteLabel": "Inbjudningskod (endast om servern begär en)",
-      "invitePlaceholder": "Koden som serverns operatör gav dig",
-      "changeInviteCode": "Ändra inbjudningskod"
+      "invitePlaceholder": "Koden som serverns operatör gav dig"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Välj en synkserver",
-      "chooseHeading": "Var ska dina anteckningar synkroniseras?",
-      "chooseIntro": "Myne behöver en server för att lagra dina krypterade anteckningar och för att nå dig med inbjudningar. Använd tjänsten Myne Sync, eller peka den här enheten mot en server du kör själv. Hur du än gör förblir dina anteckningar krypterade på den här enheten innan de lämnar den; servern lagrar bara chiffertext.",
-      "myneSyncHint": "Servern som drivs av Myne. Dess HTTPS-certifikat kontrolleras automatiskt.",
       "intro": "Myne behöver en server för att lagra dina krypterade anteckningar och för att nå dig med inbjudningar. Dina anteckningar förblir krypterade på den här enheten innan de lämnar den; servern lagrar bara chiffertext.",
       "notConfigured": "Ange en serveradress ovan och tryck på Anslut för att fortsätta.",
       "back": "Tillbaka",
-      "continue": "Fortsätt",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Din egen server",
-      "selfHostedHint": "En synkserver du kör själv. Du anger dess adress på nästa skärm.",
-      "connectAction": "Anslut",
-      "setUpAction": "Ställ in"
+      "continue": "Fortsätt"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Välj en synkserver",
       "lead": "Dina anteckningar förblir krypterade på den här enheten innan de lämnar den. Servern lagrar bara chiffertext.",
       "urlLabel": "Serveradress",
-      "useMyneSync": "Använd Myne Sync",
-      "selfHostedHint": "Eller ange adressen till en server du kör själv.",
       "connect": "Anslut",
       "connecting": "Ansluter…"
     },

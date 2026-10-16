@@ -488,7 +488,7 @@ function Settings() {
               </div>
             }
           />
-          <GroupRow left={<span style={rowLabel}>Relay</span>} right={<span style={{ fontSize: 16, color: "var(--fg-3)" }}>sync.myne.md</span>} />
+          <GroupRow left={<span style={rowLabel}>Relay</span>} right={<span style={{ fontSize: 16, color: "var(--fg-3)" }}>sync.example</span>} />
         </Card>
 
         <GroupLabel style={{ padding: "18px 4px 8px" }}>Appearance</GroupLabel>

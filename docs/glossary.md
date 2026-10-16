@@ -1292,7 +1292,7 @@ Used in: `threat-model.md` §7; `spec/protocol.md` §3.3 (forward-compat note)
 
 ### **free tier** &nbsp; 📦 *Product*
 
-The permanent no-cost tier of [hosted sync](#hosted-sync): 250 MB storage / 3 devices per account, full protocol, full speed — differentiation from [Myne Sync](#myne-sync) is quantitative only (storage + device count), never speed, features, or guarantees (`decisions.md` 2026-07-13). Its existence revises the `server-protocol.md` §5.3 Sybil posture: a permanent free anonymous registration surface is accepted, bounded by the small quota, the device cap, and the registered-account ceiling — the payment gate remains the primary Sybil resistance for *meaningful* storage. Abandoned free accounts are never reclaimed: doing so would require persisting a new behavioral marker, and the zero-new-observation principle wins over the (bounded, accepted) dead-account storage cost.
+The permanent no-cost tier of [hosted sync](#hosted-sync): 250 MB storage / 3 devices per account, full protocol, full speed — differentiation from [Myne Sync](#myne-sync) is quantitative only (storage + device count), never speed, features, or guarantees (`decisions.md` 2026-07-13). A server-side policy, not a Myne product surface: Myne offers no hosted sync (`decisions/sync/0696`). Its existence revises the `server-protocol.md` §5.3 Sybil posture: a permanent free anonymous registration surface is accepted, bounded by the small quota, the device cap, and the registered-account ceiling — the payment gate remains the primary Sybil resistance for *meaningful* storage. Abandoned free accounts are never reclaimed: doing so would require persisting a new behavioral marker, and the zero-new-observation principle wins over the (bounded, accepted) dead-account storage cost.
 
 Used in: `decisions.md` 2026-07-13
 
@@ -1523,9 +1523,9 @@ Used in: `spec/markdown-dialect.md` §3.2, §5, §7, §8
 
 ### **hosted sync** &nbsp; 📦 *Product*
 
-The convenience-paid tier in Myne's freemium model. Myne-operated zero-knowledge sync server (Phase 2+); identical protocol-level guarantees to a self-hosted instance. Status in v0.1: not yet shipped.
+A sync server operated by somebody other than the person whose notes it holds, as distinct from [self-host](#self-host). "Hosted" names an operator, never a security property: `TB5` puts hosted and self-hosted at the same trust boundary. **Myne offers none**, as of `decisions/sync/0696` (superseding `decisions/ui/0616`): the first-run server step presents only a URL field, the app names no server, and the `HOSTED_SYNC_ORIGIN` constant is gone from both native clients. The paid-tier machinery the entries below describe is server-side and open source, so any operator may use it; it is a capability of the server, not a Myne product surface.
 
-Used in: `vision.md`, `decisions.md`
+Used in: `vision.md`, `decisions/` 0696
 
 ### **hide vault names** &nbsp; 📦 *Product*
 
@@ -2180,9 +2180,9 @@ The markdown dialect Myne v0.1 reads and writes: **GFM (GitHub-Flavored Markdown
 
 ### **Myne Sync** &nbsp; 📦 *Product*
 
-The commercial name of the [hosted sync](#hosted-sync) paid plan — deliberately a **single** plan: 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13; price points are business-sensitive and live outside this repo). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder.
+The name of the [hosted sync](#hosted-sync) paid plan: deliberately a **single** plan, 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13; price points are business-sensitive and live outside this repo). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder. **Historical as of 2026-10-16**: the name is no longer a surface in any client, because Myne offers no sync service (`decisions/sync/0696`). The plan's server-side machinery ships and is available to any operator.
 
-Used in: `decisions.md` 2026-07-13
+Used in: `decisions.md` 2026-07-13; `decisions/sync/0696`
 
 ### **Myne-managed canonical frontmatter field** &nbsp; 📋 *Protocol*
 
@@ -2265,7 +2265,7 @@ Reference: RFC 9807.
 
 ### **operator console** &nbsp; 📦 *Product*
 
-The hosted-sync admin surface (`decisions.md` 2026-07-13; **built 2026-07-15, MYND-506**): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions; disabled by default) plus a `myne-server admin` CLI (thin client). Its browser counterpart is the [operator panel](#operator-panel), on a separate listener over the same projection; the two are independent and neither requires the other. Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, policy fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Shipped enforcement: `list`/`show`/`stats` + `freeze`/`unfreeze`/`set-quota`/`set-max-devices`/`delete` (`plan_id`/`paid_until` reserved for MYND-430 billing). Open-source and shipped to self-hosters like every other component; hosted gets no proprietary tooling. The client-facing counterpart is the authed, token-derived [account status endpoint](#account-status-endpoint). Enforcement state persists in the [account policy store](#account-policy-store).
+The hosted-sync admin surface (`decisions.md` 2026-07-13; **built 2026-07-15, MYND-506**): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions; disabled by default) plus a `myne-server admin` CLI (thin client). Its browser counterpart is the [operator panel](#operator-panel), on a separate listener over the same projection; the two are independent and neither requires the other. Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, policy fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Shipped enforcement: `list`/`show`/`stats` + `freeze`/`unfreeze`/`set-quota`/`set-max-devices`/`delete` (`plan_id`/`paid_until` reserved for MYND-430 billing). Open-source and shipped to every operator; there is no other tier that gets different tooling. The client-facing counterpart is the authed, token-derived [account status endpoint](#account-status-endpoint). Enforcement state persists in the [account policy store](#account-policy-store).
 
 Used in: `decisions.md` 2026-07-13, 2026-07-15
 
@@ -2277,7 +2277,7 @@ The browser surface of the [operator console](#operator-console) (`myne-md/myne#
 
 **Its only access control is a `Host` allowlist** (`MYNE_ADMIN_PANEL_HOSTS`; empty means loopback names). Read-only removes the state-changing cross-origin surface, not the read one: a rebound hostname is **same-origin to the hostile page**, and browsers send no `Origin` on a GET, so neither the same-origin policy nor an origin check survives a rebind. The listener also **serves plain HTTP and terminates no TLS**, so a non-loopback bind puts the roster on the wire in the clear, and the bind address is not validated (one startup warning, no refusal). The **hash is the selector for the pre-auth `GET /vault.meta` route**, which returns each account's offline cracking target, so the roster is a list of credentials and the panel is a third **A16**-shaped local ingress.
 
-Network-bindable at an operator-chosen address, **never the public edge**, and not validated: a non-loopback bind prints one startup warning naming the resolved address and is not refused, because the same knob on `/metrics` has legitimate non-loopback uses. It can render the account hash, stored bytes, device count, frozen state and the quota/device-ceiling overrides, plus the deployment totals. It **cannot render an account number because none exists on the server** (AS9: the raw number never crosses the wire, the server holds `SHA-256(canonical_form)[:16]`). That is not the same as saying the roster is harmless: the hash is the pre-auth `GET /vault.meta` selector, so it is worth what the account number is worth. Wears the default Myne palette with system fonts; a custom theme cannot apply, and the reason is **ownership**, not encryption (one theme blob per vault, a multi-tenant server, and a B2B vault has an owner plus members, so there is no single theme to read). Ships to every operator including self-hosters; **hosted gets no proprietary tooling**, and whether anything panel-shaped is reachable from the hosted origin is an open `operations` decision.
+Network-bindable at an operator-chosen address, **never the public edge**, and not validated: a non-loopback bind prints one startup warning naming the resolved address and is not refused, because the same knob on `/metrics` has legitimate non-loopback uses. It can render the account hash, stored bytes, device count, frozen state and the quota/device-ceiling overrides, plus the deployment totals. It **cannot render an account number because none exists on the server** (AS9: the raw number never crosses the wire, the server holds `SHA-256(canonical_form)[:16]`). That is not the same as saying the roster is harmless: the hash is the pre-auth `GET /vault.meta` selector, so it is worth what the account number is worth. Wears the default Myne palette with system fonts; a custom theme cannot apply, and the reason is **ownership**, not encryption (one theme blob per vault, a multi-tenant server, and a B2B vault has an owner plus members, so there is no single theme to read). Ships to every operator; **there is no Myne-run origin to expose it on**, since Myne offers no sync service (`decisions/sync/0696`).
 
 Used in: `decisions.md` 2026-07-13, 2026-09-28; `spec/server-protocol.md` §7.0b
 
@@ -2582,7 +2582,7 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
-Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: **P1** = single-user desktop, plus the self-hostable sync server (which moved into Phase 1, `vision.md`, 2026-07-18); **P2** = the *managed hosted* account and paid tier on top of that server; **P3** = mobile clients and the desktop-**browser** client; **P4** = the remaining sharing maturity and the plugin API. **Real-time collaboration was pulled out of P4 and ships in the next release** (`decisions/sync/0655`). The older "P2 = sync server + optional web client" reading is superseded on both halves: the server shipped in P1, and the web client is a P3 desktop-browser client with a deliberately narrower capability set, not an "optional" variant of the desktop one.
+Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: **P1** = single-user desktop, plus the self-hostable sync server (which moved into Phase 1, `vision.md`, 2026-07-18); **P2** = the *managed hosted* account and paid tier on top of that server, **withdrawn rather than deferred** (2026-10-16, `decisions/sync/0696`), so nothing occupies that slot now; **P3** = mobile clients and the desktop-**browser** client; **P4** = the remaining sharing maturity and the plugin API. **Real-time collaboration was pulled out of P4 and ships in the next release** (`decisions/sync/0655`). The older "P2 = sync server + optional web client" reading is superseded on both halves: the server shipped in P1, and the web client is a P3 desktop-browser client with a deliberately narrower capability set, not an "optional" variant of the desktop one.
 
 Used in: `vision.md`, `decisions.md`
 
@@ -2749,13 +2749,13 @@ Used in: `lefthook.yml` (every `myne-md` repo); root `AGENTS.md`; `scripts/hooks
 
 ### **per-account quota** &nbsp; 📦 *Product*
 
-The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). Phase 2.
+The Phase 2 hosted-sync storage ceiling: per-account aggregate **deduplicated** ciphertext bytes (AS17 — one stored blob is counted once, not once per referencing note). Keyed on the account, never on identity beyond `account_number_hash`; a self-host operator sets their own ceiling (the protocol exposes the counter, the operator sets policy — TB5). Distinct from the [per-account rate-limit](#per-account-rate-limit) (bytes-at-rest vs request-frequency). A server-side policy knob rather than a Myne product surface: Myne operates no hosted tier (`decisions/sync/0696`).
 
 Used in: `spec/server-protocol.md` §5
 
 ### **per-account rate-limit** &nbsp; 📦 *Product*
 
-The Phase 2 abuse bound: a per-account **token-bucket keyed on `account_number_hash`**, **never on IP** (C4 / AS14 — the server keeps no persistent IP log; TLS sees the connection IP transiently and discards it). Abuse mitigation is therefore designed in around per-account counters from the start, not retrofitted as IP bans. Bounds the damage a Sybil/abusive account can do; primary Sybil resistance on hosted is the payment-gate (the payment system is MYND-430). Phase 2.
+The Phase 2 abuse bound: a per-account **token-bucket keyed on `account_number_hash`**, **never on IP** (C4 / AS14 — the server keeps no persistent IP log; TLS sees the connection IP transiently and discards it). Abuse mitigation is therefore designed in around per-account counters from the start, not retrofitted as IP bans. Bounds the damage a Sybil/abusive account can do; the primary Sybil resistance on a paid operator's tier is the payment-gate (the payment system is MYND-430). A server-side policy knob rather than a Myne product surface: Myne operates no hosted tier (`decisions/sync/0696`).
 
 Used in: `spec/server-protocol.md` §5
 
@@ -2830,7 +2830,7 @@ Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
 ### **read-only grace** &nbsp; 📦 *Product*
 
-The hosted-sync expiry ladder (`decisions.md` 2026-07-13): when a paid term lapses (or usage exceeds the tier ceiling after a downgrade), push is refused (402-class error) while **pull stays fully open for 90 days** — the user can always take their data out. At the end of grace the server-side vault ciphertext is deleted **atomically**: the server cannot see inside a vault, so selective/partial deletion is structurally meaningless — the server copy either stays whole or goes entirely. The account record (SCRAM verifier + device registry) is kept, and because Myne is local-first the deletion is not data loss — devices hold the plaintext and can re-push within the free tier or after renewal.
+The expiry ladder an operator may configure (`decisions.md` 2026-07-13): when a paid term lapses (or usage exceeds the tier ceiling after a downgrade), push is refused (402-class error) while **pull stays fully open for 90 days**, the user can always take their data out. At the end of grace the server-side vault ciphertext is deleted **atomically**: the server cannot see inside a vault, so selective/partial deletion is structurally meaningless, the server copy either stays whole or goes entirely. The account record (SCRAM verifier + device registry) is kept, and because Myne is local-first the deletion is not data loss: devices hold the plaintext and can re-push within the free tier or after renewal. A server-side policy rather than a Myne product surface, since Myne operates no hosted tier (`decisions/sync/0696`).
 
 Used in: `decisions.md` 2026-07-13
 

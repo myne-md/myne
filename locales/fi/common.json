@@ -2909,9 +2909,6 @@
       "legalLabel": "Juridiset tiedot",
       "legalHelper": "Avautuu osoitteessa myne.md selaimessasi. Saksaksi siellä, missä käyttöliittymä on saksankielinen.",
       "legalPrivacy": "Tietosuojaseloste",
-      "legalTerms": "Beetan käyttöehdot",
-      "legalNotice": "Ilmoita laittomasta sisällöstä",
-      "legalLawEnforcement": "Viranomaispyynnöt",
       "licenseBody": "Esialfa · CC-BY-4.0-asiakirjat · AGPL-3.0-sovelluskoodi vaiheen 1 julkaisussa.",
       "licenseLabel": "Lisenssi",
       "tagline": "Esialfa · Vaiheen 1 työpöytäsovellus",
@@ -3954,10 +3951,6 @@
       "intro": "Synkronointi lähettää muistiinpanosi salattuina palvelimelle. Neljä asiaa kannattaa tietää ensin.",
       "whatThisIsLabel": "Mistä on kyse",
       "dataLossLabel": "Jos menetät molemmat salaisuudet",
-      "whatHappensNextLabel": "Kun beeta päättyy",
-      "whatWeCanSeeLabel": "Mitä me näemme",
-      "readFull": "Lue käyttöehdot kokonaan",
-      "review": "Tarkista beetan käyttöehdot",
       "accept": "Ymmärrän, ota synkronointi käyttöön"
     },
     "materialising": "Ladataan muistiinpanojasi: {{done}} / {{total}}. Voit aloittaa työskentelyn; loput ilmestyvät sitä mukaa kuin ne saapuvat.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Syötä sama palvelimen URL jokaisella laitteella. Itse ylläpidetty palvelin tarvitsee luotetun HTTPS-varmenteen.",
       "tlsFailure": "Palvelimen HTTPS-varmennetta ei voitu varmistaa. Tarkista palvelimen osoite, varmenne ja sen voimassaolo.",
       "inviteLabel": "Kutsukoodi (vain jos tämä palvelin vaatii sellaisen)",
-      "invitePlaceholder": "Koodi, jonka palvelimen ylläpitäjä antoi sinulle",
-      "changeInviteCode": "Vaihda kutsukoodi"
+      "invitePlaceholder": "Koodi, jonka palvelimen ylläpitäjä antoi sinulle"
     },
     "enroll": {
       "accountNumberLabel": "Tilinumero",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Valitse synkronointipalvelin",
-      "chooseHeading": "Minne muistiinpanosi synkronoidaan?",
-      "chooseIntro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Käytä Myne Sync -palvelua tai osoita tämä laite itse ylläpitämääsi palvelimeen. Kummassakin tapauksessa muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
-      "myneSyncHint": "Mynen ylläpitämä palvelin. Sen HTTPS-varmenne tarkistetaan automaattisesti.",
       "intro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
       "notConfigured": "Syötä palvelimen osoite ylle ja paina Yhdistä jatkaaksesi.",
       "back": "Takaisin",
-      "continue": "Jatka",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Oma palvelimesi",
-      "selfHostedHint": "Itse ylläpitämäsi synkronointipalvelin. Syötät sen osoitteen seuraavalla näytöllä.",
-      "connectAction": "Yhdistä",
-      "setUpAction": "Määritä"
+      "continue": "Jatka"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Valitse synkronointipalvelin",
       "lead": "Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät. Palvelin tallentaa vain salatekstiä.",
       "urlLabel": "Palvelimen osoite",
-      "useMyneSync": "Käytä Myne Synciä",
-      "selfHostedHint": "Tai syötä itse ylläpitämäsi palvelimen osoite.",
       "connect": "Yhdistä",
       "connecting": "Yhdistetään…"
     },

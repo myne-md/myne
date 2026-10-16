@@ -2909,9 +2909,6 @@
       "legalLabel": "Rechtliches",
       "legalHelper": "Öffnet myne.md in Ihrem Browser. Auf Deutsch, wenn die Oberfläche auf Deutsch ist.",
       "legalPrivacy": "Datenschutzerklärung",
-      "legalTerms": "Beta-Bedingungen",
-      "legalNotice": "Illegale Inhalte melden",
-      "legalLawEnforcement": "Anfragen von Strafverfolgungsbehörden",
       "licenseBody": "Pre-Alpha · CC-BY-4.0-Dokumentation · AGPL-3.0-Anwendungscode mit dem Phase-1-Release.",
       "licenseLabel": "Lizenz",
       "tagline": "Pre-Alpha · Phase-1-Desktop-Client",
@@ -3954,10 +3951,6 @@
       "intro": "Sync sendet Ihre Notizen verschlüsselt an einen Server. Vier Dinge sollten Sie vorher wissen.",
       "whatThisIsLabel": "Worum es geht",
       "dataLossLabel": "Wenn Sie beide Geheimnisse verlieren",
-      "whatHappensNextLabel": "Wenn die Beta endet",
-      "whatWeCanSeeLabel": "Was wir sehen können",
-      "readFull": "Vollständige Bedingungen lesen",
-      "review": "Beta-Bedingungen prüfen",
       "accept": "Verstanden, Sync aktivieren"
     },
     "materialising": "Ihre Notizen werden heruntergeladen: {{done}} von {{total}}. Sie können bereits arbeiten; der Rest erscheint, sobald er eintrifft.",
@@ -4077,8 +4070,7 @@
       "tlsHelp": "Geben Sie auf jedem Gerät dieselbe Server-URL ein. Ein selbst gehosteter Server braucht ein vertrauenswürdiges HTTPS-Zertifikat.",
       "tlsFailure": "Das HTTPS-Zertifikat des Servers konnte nicht verifiziert werden. Prüfen Sie die Serveradresse, das Zertifikat und seine Gültigkeit.",
       "inviteLabel": "Einladungscode (nur falls dieser Server einen verlangt)",
-      "invitePlaceholder": "Der Code, den Ihnen der Betreiber des Servers gegeben hat",
-      "changeInviteCode": "Einladungscode ändern"
+      "invitePlaceholder": "Der Code, den Ihnen der Betreiber des Servers gegeben hat"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -5310,18 +5302,10 @@
   "firstRun": {
     "server": {
       "heading": "Einen Sync-Server wählen",
-      "chooseHeading": "Wohin sollen Ihre Notizen synchronisieren?",
-      "chooseIntro": "Myne braucht einen Server, um Ihre verschlüsselten Notizen zu halten und Sie für Einladungen zu erreichen. Verwenden Sie den Myne-Sync-Dienst oder verweisen Sie dieses Gerät auf einen Server, den Sie selbst betreiben. So oder so bleiben Ihre Notizen auf diesem Gerät verschlüsselt, bevor sie es verlassen; der Server speichert nur Geheimtext.",
-      "myneSyncHint": "Der von Myne betriebene Server. Sein HTTPS-Zertifikat wird automatisch geprüft.",
       "intro": "Myne braucht einen Server, um Ihre verschlüsselten Notizen zu halten und Sie für Einladungen zu erreichen. Ihre Notizen bleiben auf diesem Gerät verschlüsselt, bevor sie es verlassen; der Server speichert nur Geheimtext.",
       "notConfigured": "Geben Sie oben eine Serveradresse ein und drücken Sie Verbinden, um fortzufahren.",
       "back": "Zurück",
-      "continue": "Weiter",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Ihr eigener Server",
-      "selfHostedHint": "Ein Sync-Server, den Sie betreiben. Seine Adresse geben Sie im nächsten Bildschirm ein.",
-      "connectAction": "Verbinden",
-      "setUpAction": "Einrichten"
+      "continue": "Weiter"
     }
   },
   "identityFlow": {
@@ -5336,8 +5320,6 @@
       "title": "Einen Sync-Server wählen",
       "lead": "Ihre Notizen bleiben auf diesem Gerät verschlüsselt, bevor sie es verlassen. Der Server speichert nur Geheimtext.",
       "urlLabel": "Serveradresse",
-      "useMyneSync": "Myne Sync verwenden",
-      "selfHostedHint": "Oder geben Sie die Adresse eines Servers ein, den Sie selbst betreiben.",
       "connect": "Verbinden",
       "connecting": "Verbindung wird hergestellt…"
     },
