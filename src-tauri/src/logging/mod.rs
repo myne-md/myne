@@ -103,21 +103,15 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
     // the written-value distinction matters: a `None` (absent, unreadable or
     // malformed) must never trigger a delete, or a read error becomes a
     // destruction.
-    if written == Some(false) {
-        if let Err(e) = sink.erase_log_files() {
-            tracing::warn!(
-                event = "diagnostic_log_erase_incomplete",
-                io_error_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
-                "the diagnostic log could not be fully erased; the next start retries"
-            );
-        }
-    }
-
-    // The erase's OUTCOME is carried past `install` deliberately: the erase has
-    // to run before the subscriber exists (it is part of preparing this boot),
-    // and a `tracing::warn!` emitted there would have no subscriber and be
-    // dropped, leaving a partial erasure (the one residue the reconcile exists to
-    // clear) unobservable in the log, on stdout and in the UI (myne#860 review).
+    //
+    // The erase runs BEFORE the subscriber exists, so its OUTCOME is carried
+    // past `install` and reported after it: an inline `tracing::warn!` here
+    // would have no subscriber on a normal boot and be dropped, leaving a
+    // partial erasure (the one residue the reconcile exists to clear)
+    // unobservable in the log, on stdout and in the UI. One sweep, one report:
+    // an earlier revision of this fix added the carried path WITHOUT removing the
+    // inline one, so the boot erased twice and the pre-install warning still went
+    // nowhere (myne#860 review).
     let reconcile_error = if written == Some(false) {
         sink.erase_log_files().err()
     } else {
@@ -166,7 +160,11 @@ pub const FILE_TARGETS: &[&str] = &[
     // only six directories: the day a `myne-*` crate is linked into this binary,
     // its `info`+ records would land in the file the user is invited to publish
     // with the guard reporting ok over a root it never read (myne#860 review).
-    // Every crate this binary actually links is named explicitly below.
+    // What is listed here is what the file layer ADMITS, and that is the whole
+    // claim: a crate the binary links but which is not listed (`theme_validator`,
+    // and this binary's own `myne_desktop` target) is outside both this filter
+    // and `scripts/check-tracing-discipline.mjs`'s roots, so a `tracing::info!`
+    // added there would reach stdout only and no guard would notice.
     "myne::",        // `myne::ai`, `myne::agent`
     "vault_migrate", // src-tauri's eager boot migration
     // The crates, by the name rustc uses for their default target.

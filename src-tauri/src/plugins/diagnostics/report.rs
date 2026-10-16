@@ -108,7 +108,7 @@ pub fn manifest(sink: &LogSink) -> ReportManifest {
 /// the save); a file that cannot be read is named as unreadable rather than
 /// silently dropped, because a report that quietly omits half the log is worse
 /// than one that says which half it lost.
-pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, bool) {
+pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, Option<Vec<u8>>) {
     let mut out = String::new();
     out.push_str("# myne diagnostic report\n");
     out.push_str(&format!(
@@ -143,7 +143,7 @@ pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, bool) {
     // is present but cannot be read, so deriving this from presence would tell
     // the surface the crash was captured and then delete the only copy, while
     // the bundle itself admitted it could not read it (myne#860 review).
-    let included_crash = crash_body.is_some();
+    let captured_crash = crash_body.clone().map(String::into_bytes);
     out.push_str("\n## crash record\n\n");
     match (crash_present, crash_body) {
         (_, Some(body)) => out.push_str(&body),
@@ -151,7 +151,7 @@ pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, bool) {
         (false, None) => out.push_str("(none)\n"),
     }
 
-    (out.into_bytes(), included_crash)
+    (out.into_bytes(), captured_crash)
 }
 
 /// Write the bundle to `destination`, returning whether it included the record.
@@ -160,10 +160,21 @@ pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, bool) {
 /// is a user-chosen path, so the fixed `<target>.tmp` name of `atomic_write` is
 /// unsafe there, and the report is plaintext diagnostics, so owner-only is the
 /// right default until the user decides to send it.
-pub fn write_bundle(block: &str, sink: &LogSink, destination: &Path) -> std::io::Result<bool> {
-    let (bytes, included_crash) = build_bundle(block, sink);
+/// Write the bundle to `destination`, returning the crash record's BYTES when
+/// they are in it, and `None` when there was no record or it could not be read.
+///
+/// Bytes rather than a boolean so the caller can clear the record only if the
+/// one on disk is still the one it captured: a panic landing between this read
+/// and that delete would otherwise be destroyed without ever being captured
+/// (myne#860 review).
+pub fn write_bundle(
+    block: &str,
+    sink: &LogSink,
+    destination: &Path,
+) -> std::io::Result<Option<Vec<u8>>> {
+    let (bytes, captured_crash) = build_bundle(block, sink);
     crate::atomic_write::atomic_write_unclobbered_private(destination, &bytes, true)?;
-    Ok(included_crash)
+    Ok(captured_crash)
 }
 
 #[cfg(test)]
@@ -196,7 +207,7 @@ mod tests {
         let dir = ScopedTempDir::new("report-bundle").expect("tempdir");
         let sink = sink_with_log_lines(dir.path());
 
-        let (bytes, included_crash) = build_bundle("version: 0.10.0\nchannel: Stable", &sink);
+        let (bytes, captured) = build_bundle("version: 0.10.0\nchannel: Stable", &sink);
         let bundle = String::from_utf8(bytes).expect("utf8");
 
         assert!(bundle.starts_with("# myne diagnostic report\n"));
@@ -209,7 +220,10 @@ mod tests {
         );
         assert!(bundle.contains("## crash record"));
         assert!(bundle.contains("(none)"));
-        assert!(!included_crash, "nothing to clear when there was no record");
+        assert!(
+            captured.is_none(),
+            "nothing to clear when there was no record"
+        );
     }
 
     #[test]
@@ -232,11 +246,11 @@ mod tests {
             "the record must still be VISIBLE, which is why the surface keeps offering Delete"
         );
 
-        let (bytes, included_crash) = build_bundle("version: 0.10.0", &sink);
+        let (bytes, captured) = build_bundle("version: 0.10.0", &sink);
         let bundle = String::from_utf8(bytes).expect("utf8");
 
         assert!(
-            !included_crash,
+            captured.is_none(),
             "an unreadable record is not in the bundle, so the save must not clear it"
         );
         assert!(bundle.contains("(the crash record could not be read)"));
@@ -258,11 +272,11 @@ mod tests {
         )
         .expect("seed record");
 
-        let (bytes, included_crash) = build_bundle("version: 0.10.0", &sink);
+        let (bytes, captured) = build_bundle("version: 0.10.0", &sink);
         let bundle = String::from_utf8(bytes).expect("utf8");
 
         assert!(
-            included_crash,
+            captured.is_some(),
             "the command clears the record on this answer"
         );
         assert!(bundle.contains("# location: src-tauri/src/lib.rs:1"));
@@ -273,11 +287,11 @@ mod tests {
         let dir = ScopedTempDir::new("report-bundle-nolog").expect("tempdir");
         let sink = LogSink::new(dir.path().to_path_buf(), false);
 
-        let (bytes, included_crash) = build_bundle("version: 0.10.0", &sink);
+        let (bytes, captured) = build_bundle("version: 0.10.0", &sink);
         let bundle = String::from_utf8(bytes).expect("utf8");
 
         assert!(bundle.contains("## log\n\n(no log was written"));
-        assert!(!included_crash);
+        assert!(captured.is_none());
     }
 
     #[test]
@@ -288,7 +302,7 @@ mod tests {
 
         let included = write_bundle("version: 0.10.0", &sink, &destination).expect("write");
 
-        assert!(!included);
+        assert!(included.is_none());
         let body = std::fs::read_to_string(&destination).expect("read back");
         assert!(body.contains("## diagnostics block"));
         #[cfg(unix)]

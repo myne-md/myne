@@ -113,8 +113,9 @@ export async function reportManifest(): Promise<ReportManifest> {
  * The destination comes from the OS save dialog, and the host re-validates it
  * anyway: a page that skipped the dialog can call this directly, and the writer
  * renames over an existing path, so the host refuses any destination that
- * resolves inside the app data directory (which holds `vaults/`). That is the
- * same refusal `secret_export` and `export` make, and it is why a page-supplied
+ * resolves inside the stores this feature owns: the app data directory (which
+ * holds `vaults/`), the log directory and the config directory. That is the same
+ * refusal `secret_export` and `export` make, and it is why a page-supplied
  * path is admissible here at all rather than trusted. The host owns everything
  * else, including every log byte.
  */

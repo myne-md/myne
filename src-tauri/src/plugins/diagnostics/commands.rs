@@ -42,8 +42,9 @@ pub enum DiagnosticLogError {
         /// Closed-enum mapping of `std::io::Error::kind()`.
         io_error_kind: IoFailureKind,
     },
-    /// The report destination is unusable, or resolves inside the app data
-    /// directory (which holds `vaults/`).
+    /// The report destination is unusable, or resolves inside one of the stores
+    /// this feature owns: the app data directory (which holds `vaults/`), the
+    /// log directory and the config directory.
     ///
     /// Its own arm rather than `Io { Other }` because it is a REFUSAL, not a
     /// filesystem failure: the surface can say "that location is not allowed"
@@ -201,24 +202,70 @@ pub async fn save_report<R: Runtime>(
     let io = |e: std::io::Error| DiagnosticLogError::Io {
         io_error_kind: from_io_error_kind(e.kind()),
     };
-    // Every host-resolved store this feature owns, not only the vault tree:
-    // `app_log_dir` and `app_config_dir` are different directories from
-    // `app_data_dir` on macOS and Windows, so a destination inside the log
-    // directory passes a vault-only check and then overwrites the live log or
-    // the crash record, and one inside the config directory overwrites the flag
-    // (myne#860 review).
-    let guarded: Vec<Result<PathBuf, ()>> = vec![
-        app.path().app_data_dir().map_err(|_| ()),
-        app.path().app_log_dir().map_err(|_| ()),
-        app.path().app_config_dir().map_err(|_| ()),
-    ];
     let destination = PathBuf::from(destination);
-    validate_report_destination(&destination, &guarded)?;
-    let included_crash = report::write_bundle(&block, &sink, &destination).map_err(io)?;
-    if included_crash {
-        crash::clear(sink.dir()).map_err(io)?;
+    validate_report_destination(&destination, &guarded_stores(&app))?;
+    let captured = report::write_bundle(&block, &sink, &destination).map_err(io)?;
+    if let Some(captured) = captured {
+        // Clear only when the record on disk is STILL the one whose bytes went
+        // into the bundle. A panic landing between the read and this line would
+        // otherwise be deleted having never been captured, which is the same
+        // "the capture act must not be the deletion act" rule the boolean this
+        // replaced was introduced for (myne#860 review).
+        let still_the_captured_one =
+            std::fs::read_to_string(sink.dir().join(crash::CRASH_FILE_NAME))
+                .map(|now| now.as_bytes() == captured.as_slice())
+                .unwrap_or(false);
+        if still_the_captured_one {
+            crash::clear(sink.dir()).map_err(io)?;
+        }
     }
     Ok(())
+}
+
+/// The host-resolved stores a report may never be written into.
+///
+/// **A named roster rather than an inline vector**, because the list is what
+/// decides the refusal and an earlier revision built it at the call site, where
+/// nothing tied it to anything: dropping one entry kept every test green
+/// (myne#860 review). The log directory is a separate tree on EVERY platform, so
+/// a destination inside it would overwrite the live log or the crash record; the
+/// config directory is a separate tree from the data directory on Linux and the
+/// SAME one on macOS and Windows, so it is the entry that guards the switch file
+/// on Linux and is harmless elsewhere.
+///
+/// The same shape `ExportDir` uses on mobile and for the same reason: `resolve`
+/// is an exhaustive match, so a variant cannot lack a resolver (E0004), and
+/// [`GuardedStore::ALL`] is the hand-written roster a test can hold, which a type
+/// cannot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GuardedStore {
+    AppData,
+    Log,
+    Config,
+}
+
+impl GuardedStore {
+    /// The roster, and the order the refusal walks it in.
+    const ALL: [GuardedStore; 3] = [Self::AppData, Self::Log, Self::Config];
+
+    /// The directory, or `Err` when the host cannot resolve it. An unresolved
+    /// store is a refusal at the caller, never a skipped comparison.
+    fn resolve<R: Runtime>(self, app: &AppHandle<R>) -> Result<PathBuf, ()> {
+        let resolved = match self {
+            Self::AppData => app.path().app_data_dir(),
+            Self::Log => app.path().app_log_dir(),
+            Self::Config => app.path().app_config_dir(),
+        };
+        resolved.map_err(|_| ())
+    }
+}
+
+/// Every guarded store, in roster order.
+fn guarded_stores<R: Runtime>(app: &AppHandle<R>) -> Vec<Result<PathBuf, ()>> {
+    GuardedStore::ALL
+        .iter()
+        .map(|store| store.resolve(app))
+        .collect()
 }
 
 /// Reject a destination that is unusable, or that resolves inside any of the
@@ -263,9 +310,18 @@ fn validate_report_destination(
         let root = root
             .as_ref()
             .map_err(|_| DiagnosticLogError::InvalidDestination)?;
-        let canon_root = root
-            .canonicalize()
-            .map_err(|_| DiagnosticLogError::InvalidDestination)?;
+        let canon_root = match root.canonicalize() {
+            Ok(canon) => canon,
+            // A root that does NOT EXIST cannot be a component prefix of a
+            // parent that did canonicalize, so refusing here buys no protection
+            // and costs the whole feature: `app_log_dir` is created lazily, so
+            // on a fresh profile with logging off it is absent and every save
+            // would be refused in the default configuration. Any OTHER failure
+            // still refuses, because a comparison that cannot be made must not
+            // pass (myne#860 review).
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => return Err(DiagnosticLogError::InvalidDestination),
+        };
         if canon_parent.starts_with(&canon_root) {
             return Err(DiagnosticLogError::InvalidDestination);
         }
@@ -310,6 +366,19 @@ mod tests {
     }
 
     #[test]
+    fn the_guarded_roster_names_every_store_this_feature_writes() {
+        // The roster is what decides the refusal, and a dropped entry is a real
+        // gap that nothing else in the repository notices: the log directory is a
+        // separate tree on every platform, and the config directory is the only
+        // thing guarding the switch file on Linux. `resolve` above is an
+        // exhaustive match, so a variant cannot lack a resolver; this asserts the
+        // ROSTER, which a type cannot hold (myne#860 review).
+        assert_eq!(GuardedStore::ALL.len(), 3);
+        assert!(GuardedStore::ALL.contains(&GuardedStore::Log));
+        assert!(GuardedStore::ALL.contains(&GuardedStore::Config));
+    }
+
+    #[test]
     fn a_destination_inside_the_app_data_vault_tree_is_refused() {
         // The arbitrary-write refusal. A page that skipped the save dialog can
         // still call `save_report`, and the writer renames over an existing
@@ -346,12 +415,12 @@ mod tests {
     #[test]
     fn a_destination_inside_the_log_or_config_directory_is_refused() {
         // The stores this feature OWNS are guarded too, and they are the half a
-        // vault-only check misses: `app_log_dir` and `app_config_dir` are
-        // different directories from `app_data_dir` on macOS and Windows, so a
-        // destination of `<log dir>/crash.log` used to pass the check and then
-        // overwrite the crash record, and one of
-        // `<config dir>/diagnostic-log.json` overwrote the switch itself
-        // (myne#860 review).
+        // vault-only check misses. The log directory is a separate tree on every
+        // platform, so a destination of `<log dir>/crash.log` used to pass the
+        // check and then overwrite the crash record; the config directory is
+        // separate from the data directory on Linux and the same one on macOS and
+        // Windows, so `<config dir>/diagnostic-log.json` overwrote the switch on
+        // the platform where the two differ (myne#860 review).
         let app_data = ScopedTempDir::new("diagnostics-refuse-app-data-2").expect("tempdir");
         let log_dir = ScopedTempDir::new("diagnostics-refuse-log-dir").expect("tempdir");
         let config_dir = ScopedTempDir::new("diagnostics-refuse-config-dir").expect("tempdir");
@@ -393,20 +462,38 @@ mod tests {
     }
 
     #[test]
-    fn a_guarded_root_that_cannot_be_canonicalized_refuses() {
-        // The same direction one step later: a root that does not exist cannot
-        // be compared against, and a comparison that cannot be made must not
-        // pass.
-        let user_dir = ScopedTempDir::new("diagnostics-refuse-uncanonical").expect("tempdir");
+    fn a_guarded_root_that_does_not_exist_yet_is_skipped() {
+        // The fresh-install case, and the reason a missing root is SKIPPED rather
+        // than refused. The log directory is created lazily, by the first log
+        // write, so on a default profile with logging off it does not exist. A
+        // root that does not exist cannot be a component prefix of a parent that
+        // did canonicalize, so refusing here bought no protection and broke the
+        // feature outright: every save was refused in the DEFAULT configuration
+        // (myne#860 review).
+        let user_dir = ScopedTempDir::new("diagnostics-accept-missing-root").expect("tempdir");
         let missing_root = user_dir.path().join("not-created");
-        let elsewhere = ScopedTempDir::new("diagnostics-refuse-uncanonical-out").expect("tempdir");
+        let output_dir = ScopedTempDir::new("diagnostics-accept-missing-out").expect("tempdir");
 
         assert_eq!(
             validate_report_destination(
-                &elsewhere.path().join("myne-report.txt"),
+                &output_dir.path().join("myne-report.txt"),
                 &[Ok(missing_root)]
             ),
-            Err(DiagnosticLogError::InvalidDestination)
+            Ok(()),
+            "a root that does not exist yet must not refuse the write"
+        );
+
+        // And an EXISTING root is still compared. A canonicalize failure that is
+        // not `NotFound` (a permission error, an I/O error) refuses, which is the
+        // direction the test above cannot construct portably; what IS constructible
+        // is the resolved-and-present case, so it is asserted here so the loop is
+        // not vacuous.
+        let present_root = ScopedTempDir::new("diagnostics-refuse-present").expect("tempdir");
+        let inside = present_root.path().join("myne-report.txt");
+        assert_eq!(
+            validate_report_destination(&inside, &[Ok(present_root.path().to_path_buf())]),
+            Err(DiagnosticLogError::InvalidDestination),
+            "a root that IS there must still be compared"
         );
     }
 

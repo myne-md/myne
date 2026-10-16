@@ -249,8 +249,10 @@ mod tests {
         let dir = ScopedTempDir::new("diagnostic-log-flag-foreign").expect("tempdir");
         let path = flag_path_in(dir.path());
         std::fs::write(&path, br#"{"other": true}"#).expect("seed foreign");
-        // `enabled` is `#[serde(default)]`, so a valid object without the key
-        // reads as off rather than as an error.
+        // The parse FAILS on the missing field, because `enabled` is required
+        // rather than `#[serde(default)]`, and `read_flag` folds that error to
+        // `false`. That is what keeps a document which names no choice away from
+        // `read_flag_written`'s `Some(false)`, and so away from the boot erase.
         assert!(!read_flag(&path));
     }
 
