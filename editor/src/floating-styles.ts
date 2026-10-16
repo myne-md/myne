@@ -993,6 +993,140 @@ const CSS = `
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Docked sheet shell (myne-md/myne#884). The task-field sheet and the typeahead
+   pickers share it: a full-width surface pinned to the bottom of the VISIBLE
+   viewport, over the scrim the caller supplies. The visible height arrives as
+   --cm-visible-h, written inline by floating/viewport.ts, so the only decision
+   made here is what FRACTION of it the sheet may take before its body scrolls. */
+.cm-docked-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* Written inline on creation. Stated so a host that never measures still paints
+     at the right edge rather than at the top. */
+  bottom: 0;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--cm-visible-h, 100vh) * 0.9);
+  /* Content width rather than full bleed: on a tablet an edge-to-edge sheet reads
+     as a stretched phone. Below this the sheet is simply full width. */
+  max-width: 720px;
+  margin-inline: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bg-1, #fbfaf7);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-bottom: none;
+  /* A SHARED token, not a client one: this stylesheet compiles for every client,
+     and the three sheets the mobile client already ships all use the shared
+     radius step (myne-md/myne#884 review). */
+  border-top-left-radius: var(--radius-3, 10px);
+  border-top-right-radius: var(--radius-3, 10px);
+  box-shadow: var(--shadow-3);
+  color: var(--fg-1, #23221e);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--text-sm);
+}
+.cm-docked-sheet-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex: none;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-bottom: 1px solid var(--line-1, #e3e2dd);
+}
+.cm-docked-sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--fg-1, #23221e);
+}
+.cm-docked-sheet-back,
+.cm-docked-sheet-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-2, 6px);
+  background: transparent;
+  color: var(--fg-2, #4a4943);
+  font-family: inherit;
+  font-size: var(--text-lg, 1.125rem);
+  line-height: 1;
+  cursor: pointer;
+}
+.cm-docked-sheet-back:hover,
+.cm-docked-sheet-close:hover {
+  background: var(--paper-2, #eceae4);
+  color: var(--fg-1, #23221e);
+}
+.cm-docked-sheet-back:focus-visible,
+.cm-docked-sheet-close:focus-visible {
+  outline: 2px solid var(--accent, #2c4a7a);
+  outline-offset: 1px;
+}
+.cm-docked-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3, 12px);
+}
+/* A SIBLING of the body, never a child of it. A commit control inside a scroller
+   scrolls away, and on a phone with the keyboard up that is the dead end this
+   shell exists to remove. An EMPTY one paints nothing: the task-field wizard's
+   first step is a list of fields with no action to pin yet, and a hairline-topped
+   blank bar under it reads as a broken surface rather than as a step. */
+.cm-docked-sheet-actions:empty {
+  display: none;
+}
+.cm-docked-sheet-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-top: 1px solid var(--line-1, #e3e2dd);
+}
+/* The sheet's own controls on a coarse pointer. Sized here rather than from a
+   client-only token because this stylesheet compiles for every client; see the
+   matching block in task-surfaces.css for the controls inside the body. */
+@media (pointer: coarse) {
+  .cm-docked-sheet-back,
+  .cm-docked-sheet-close {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* The docked typeahead pickers (myne-md/myne#884, task 5): the slash menu, the
+   [[ wikilink picker and the {{ template-token menu, each as the list inside the
+   shell above. An anchored picker carries its own popover chrome on
+   .cm-slash-menu; docked it must NOT, because the sheet around it already
+   supplies the surface, the border and the scroll. So only the stack is declared
+   here, and the rows keep the classes they have in both presentations. */
+.cm-docked-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+/* Thumb-sized rows on a coarse pointer, the same 44px target the sheet's own
+   controls take one block up. */
+@media (pointer: coarse) {
+  .cm-docked-picker-list .cm-slash-menu-row {
+    min-height: 44px;
+  }
+}
 `;
 
 export function ensureFloatingStyles(): void {

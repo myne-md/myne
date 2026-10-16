@@ -177,6 +177,22 @@ export interface EditorPrefs {
   spell_languages: string[];
 }
 
+/** How a host wants the editor's OWN floating surfaces presented.
+ *
+ *  TWO values, and the distinction is PLACEMENT rather than capability:
+ *
+ *    - `"anchored"`: the surface appears beside the thing it belongs to, over
+ *      the text, the way a desktop popover does;
+ *    - `"docked"`: it slides up from the bottom edge, takes the full width and
+ *      sits on the modal scrim, the way a phone bottom sheet does.
+ *
+ *  Both render the same controls and write through the same code path. What
+ *  differs is where the surface sits, how wide it is, and whether it follows the
+ *  VISIBLE viewport (so a software keyboard cannot cover its actions) rather than
+ *  the layout viewport.
+ */
+export type FloatingSurfacePresentation = "anchored" | "docked";
+
 export interface EditorHost {
   /** i18n lookup (react-i18next `t`, bound). */
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -442,6 +458,27 @@ export interface EditorHost {
     remove: (noteId: string | null) => void;
   };
 
+  /** OPTIONAL, how this host wants the editor's own floating surfaces presented.
+   *  Absent means {@link FloatingSurfacePresentation} `"anchored"`.
+   *
+   *  **A declaration, not a probe.** The alternative considered was a media query
+   *  inside this package, and it is wrong twice over: a coarse pointer is true on
+   *  a touch laptop, where the anchored popover is the right answer, and the
+   *  shared package would be guessing at a decision the client owns. A client that
+   *  wants sheets says so; a client that says nothing keeps what it has.
+   *
+   *  **Named for the CLASS rather than for its first consumer.** Four
+   *  editor-owned surfaces share it today: the task-field editor (which a client
+   *  reaches from the `+`, a field chip, and the four task-field slash commands)
+   *  and the three typeahead pickers. Naming it after task fields would mean a
+   *  rename across three clients the first time another surface wanted it.
+   *
+   *  Desktop and web both OMIT it, which is why their popovers are unchanged.
+   *  `tests/platform/editor-host-capabilities.test.ts` pins that omission, so
+   *  giving either of them sheets is a visible edit rather than a quiet one.
+   */
+  floatingSurface?: FloatingSurfacePresentation;
+
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -459,6 +496,18 @@ export function getHost(): EditorHost {
     throw new Error("@myne/editor: setEditorHost() was not called before the editor mounted.");
   }
   return current;
+}
+
+/**
+ * The presentation this host wants for editor-owned floating surfaces.
+ *
+ * The ONE place the absence of {@link EditorHost.floatingSurface} becomes an
+ * answer. A call site writing `getHost().floatingSurface ?? "anchored"` would read
+ * the same today and drift the day a third value or a different default appears,
+ * and there is more than one call site.
+ */
+export function floatingSurfacePresentation(): FloatingSurfacePresentation {
+  return getHost().floatingSurface ?? "anchored";
 }
 
 /**

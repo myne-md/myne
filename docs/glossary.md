@@ -3573,7 +3573,19 @@ The mobile placement of the **note-scoped** [task panel](#task-panel) (MYND-620)
 
 It is the phone's answer to the desktop's permanently-visible side panel — there is no room beside an editor on a phone, so the same information arrives on request, through the sheet mechanism attachments, snapshots, templates, settings and the view editor already use. In the expanded layout the same list is a sidebar tab instead, because a larger screen can show tasks *beside* a note rather than instead of it.
 
+**It is not a [docked surface](#docked-surface).** Both are bottom sheets on a phone and the two names must not be merged: this one is a **list of rows** (the vault's tasks, narrowed to one note), while a docked surface is an **authoring surface** (the task-field editor and the typeahead pickers) which the same desktop component shows as a popover anchored beside its trigger. Myne's prose therefore keeps "task sheet" for this placement alone, and the authoring surface is named by its fields; the docked shell's own test ids still spell `editor.task-field-sheet`, which is a container's name rather than this term.
+
 Used in: `decisions.md` 2026-07-28; MYND-620
+
+### **docked surface** &nbsp; 📦 *Product*
+
+An editor-owned floating surface presented as a **bottom sheet**: full width, pinned above the bottom edge of the *visible* viewport, over the shared `--scrim`, because the installed client **declared** it. Its twin is the **anchored popover**, the same component beside the caret or the control that opened it.
+
+**Which one a client gets is a declaration, never a device sniff.** `EditorHost.floatingSurface` carries `"anchored" | "docked"`, its **absence means anchored**, and the mobile client is the only one that declares the sheet; desktop and web omit the member, which their own test pins by name. The signal lives on the host because the package cannot tell a phone from a touch laptop, and a coarse-pointer query answers the wrong question for the second one (`decisions/editor/0691`).
+
+Three things are load-bearing rather than cosmetic. The sheet's height and its bottom offset come from `visualViewport` rather than from `100vh` or `bottom: 0`, because on iOS the layout viewport does not shrink for the software keyboard, so a sheet pinned to the layout viewport's bottom edge sits *behind* it with its Save button. Its commit controls are a **sibling** of the scrolling body, so they cannot scroll out of reach. And the typeahead pickers loaded into it are **not modal**: the editor keeps the focus and the user keeps typing to narrow the list, which a focus trap would end.
+
+Used in: `decisions/editor/0691`; myne-md/myne#884
 
 ### **two-line task row** &nbsp; 📦 *Product*
 
