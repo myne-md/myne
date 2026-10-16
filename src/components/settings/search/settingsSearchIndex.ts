@@ -953,6 +953,24 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "selfUpdate",
   },
   {
+    id: "about.diagnostic-log",
+    // Refused, and the reason is the whole point: this switch decides whether a
+    // plaintext log is written to the user's disk at all, which is a consent
+    // control rather than a preference. No setting intent resolves to it, so the
+    // agent is not given it (myne-md/myne#860).
+    agentWritability: {
+      verdict: "refused",
+      reason:
+        "consent control: it decides whether a plaintext log is written to disk, not how the app behaves, so it is not an agent-settable setting",
+    },
+    panelId: "about",
+    titleKey: "settings.about.diagnosticLogLabel",
+    descriptionKey: "settings.about.diagnosticLogHelper",
+    keywordsKey: "settings.search.keywords.diagnosticLog",
+    testid: "about.diagnostic-log-toggle",
+    capability: "diagnosticLog",
+  },
+  {
     id: "about.changelog",
     agentWritability: WRITABILITY_NONE,
     panelId: "about",

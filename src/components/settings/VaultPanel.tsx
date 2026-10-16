@@ -49,9 +49,11 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
+import { interactiveSurface } from "../primitives/interactiveSurface";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
@@ -288,24 +290,39 @@ function iconPickerButtonStyle(
   };
 }
 
-/** Hover-feedback handlers for an icon-picker tile — deepen its fill + border on
- *  pointer-over so the grid reads as pickable. No-op for the selected tile (it
- *  already carries the accent look) or a disabled grid. */
+/** Hover and press feedback for an icon-picker tile: deepen its fill and its
+ *  border on pointer-over so the grid reads as pickable, and step the fill
+ *  further on press so a click is confirmed. No-op for the selected tile (it
+ *  already carries the accent look) or a disabled grid.
+ *
+ *  The fill half comes from `interactiveSurface`, which owns the press step, and
+ *  the border change is chained on top of the handlers it returns rather than
+ *  spread around them: spreading a helper carrying event props AFTER a
+ *  hand-written handler silently replaces it (`src/AGENTS.md`). */
 function iconTileHover(
   selected: boolean,
   disabled: boolean,
 ): {
   onMouseEnter?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
   onMouseLeave?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  onPointerDown?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerLeave?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
 } {
   if (selected || disabled) return {};
+  const surface = interactiveSurface({
+    restBg: "var(--paper)",
+    hoverBg: "var(--paper-2)",
+  });
   return {
+    ...surface,
     onMouseEnter: (e) => {
-      e.currentTarget.style.background = "var(--paper-2)";
+      surface.onMouseEnter?.(e);
       e.currentTarget.style.borderColor = "var(--line-3)";
     },
     onMouseLeave: (e) => {
-      e.currentTarget.style.background = "var(--paper)";
+      surface.onMouseLeave?.(e);
       e.currentTarget.style.borderColor = "var(--line-2)";
     },
   };

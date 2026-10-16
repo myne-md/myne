@@ -42,9 +42,9 @@ import { changedLineCount, diffWithSegments, type DiffLine } from "../../dialect
 import { DiffView } from "./DiffView";
 import { formatRelativeTime } from "./relativeTime";
 import {
-  hoverSurface,
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
+import { interactiveSurface } from "../../components/primitives/interactiveSurface";
 
 const PANEL_STYLE: CSSProperties = {
   width: 720,
@@ -491,7 +491,7 @@ export function SnapshotsPanel({
                     <button
                       key={s.snapshot_uuid}
                       type="button"
-                      {...hoverSurface({
+                      {...interactiveSurface({
                         restBg: isSel ? "var(--accent-soft)" : "transparent",
                         hoverBg: isSel ? "var(--accent-soft)" : "var(--bg-3)",
                       })}
@@ -564,7 +564,7 @@ export function SnapshotsPanel({
                       </span>
                       <button
                         type="button"
-                        {...hoverSurface({
+                        {...interactiveSurface({
                           restBg: "var(--paper-2)",
                           hoverBg: "var(--paper-3)",
                         })}
@@ -609,7 +609,7 @@ export function SnapshotsPanel({
           {status !== null && <span style={STATUS_STYLE}>{status}</span>}
           <button
             type="button"
-            {...hoverSurface({
+            {...interactiveSurface({
               restBg: "var(--paper-2)",
               hoverBg: "var(--paper-3)",
             })}
@@ -721,7 +721,7 @@ function RestoreConfirm({
           <button
             ref={cancelRef}
             type="button"
-            {...hoverSurface({
+            {...interactiveSurface({
               restBg: "var(--paper-2)",
               hoverBg: "var(--paper-3)",
             })}
@@ -733,7 +733,7 @@ function RestoreConfirm({
           </button>
           <button
             type="button"
-            {...hoverSurface({
+            {...interactiveSurface({
               restBg: "var(--paper-2)",
               hoverBg: "var(--paper-3)",
             })}

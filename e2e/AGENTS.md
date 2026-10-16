@@ -298,6 +298,15 @@
   is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
   it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
   proving one scenario. Invocations: `docs/dev/e2e.md`.
+- **From a `myne` WORKTREE, the harness needs the companion checked out beside
+  it or it dies before the build.** Every scenario's sync side cross-compiles
+  `myne-server` for linux, and a worktree carries no companions: the run fails at
+  `e2e-local.sh: line 61: cd: myne-server: No such file or directory`, which reads
+  like a broken script rather than a missing symlink. Symlink the shared
+  checkout's copy in (`ln -s /path/to/myne/myne-server <worktree>/myne-server`,
+  the same arrangement `reference/worktrees.md` describes for `myne-agents`) and
+  re-run. It is gitignored, so it changes no repo, and the cross-compile's
+  artefacts land in that checkout's own gitignored `target/`.
 - **This suite is not a merge gate and has not been one since
   myne-md/myne#579.** It lives in `.woodpecker/e2e.yml`, a workflow that runs
   only on a manual trigger carrying `RUN_E2E=true`, and the release runbook owns
@@ -472,6 +481,20 @@
   are indistinguishable from the page and only a `catalog_list` from the page
   seat separates them. A probe has to enumerate the states the RENDERER can be
   in, not the ones the test author was thinking about.
+- **A retry written into a helper is a diagnosis nobody has made yet, and it can
+  hide a product defect for weeks.** `confirmDeleteWithEnter` grew a second press
+  after a 5 s grace, described honestly as "the recovery a user performs when the
+  first press visibly does nothing". It was not covering a harness race: the
+  dialog in front of it was refusing the first press because its Enter guard was
+  a 16 ms window that opened when React ran the arming EFFECT rather than when
+  the dialog appeared, and this harness's own press sequence is 10 to 14 ms long
+  (myne-md/myne#683; the instrumented reading is in `docs/decisions/ui/0685`).
+  The retry worked because it was 8 s later, so every scenario using the helper
+  went green and the defect reached users instead. The question to ask of a retry
+  is which single press it is rescuing, and why that press failed; when the
+  answer is "the product refused it", the fix is the product. `nc7` is the same
+  defect WITHOUT the rescue, which is why it read as 1 run in 4 for six weeks
+  while its twins read as flake.
 - **Hunt flake with `MYNE_E2E_RETRIES=0`**, which all three runners now take
   (`e2e-one.sh`, `e2e-batch.sh`, `e2e-local.sh`), along with
   `MYNE_E2E_QUARANTINE=1` and `MYNE_E2E_AI=1`. None of them did until

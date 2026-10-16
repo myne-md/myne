@@ -56,6 +56,7 @@ import { Icon } from "../components/primitives/Icon";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
 import { AuthHeading, AuthShell } from "./AuthShell";
 import { HOVER_TRANSITION } from "../components/primitives/hoverSurface";
+import { NEUTRAL_PRESS_BG, usePressSurface } from "../components/primitives/pressSurface";
 import { Button } from "../components/primitives/Button";
 import { Spinner } from "../components/Spinner";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
@@ -223,7 +224,7 @@ const LIST_STYLE: CSSProperties = {
  * a 60px row in a scrolling list would appear to breathe as the pointer moved
  * down it. The colour changes; the geometry does not.
  */
-function rowStyle(hovered: boolean): CSSProperties {
+function rowStyle(hovered: boolean, pressed: boolean): CSSProperties {
   return {
     display: "flex",
     flexDirection: "row",
@@ -234,7 +235,13 @@ function rowStyle(hovered: boolean): CSSProperties {
     boxSizing: "border-box",
     padding: "var(--space-3) var(--space-4)",
     borderRadius: "var(--radius-2)",
-    background: hovered ? "var(--accent-soft)" : "var(--paper)",
+    // Press outranks hover: the row is by definition still hovered while it is
+    // being pressed, and a press is the more specific fact.
+    background: pressed
+      ? NEUTRAL_PRESS_BG
+      : hovered
+        ? "var(--accent-soft)"
+        : "var(--paper)",
     border: `1px solid ${hovered ? "var(--accent)" : "var(--line-1)"}`,
     cursor: "pointer",
     textAlign: "start",
@@ -501,6 +508,10 @@ function VaultRow({
   rowRef: (vaultId: VaultId, el: HTMLButtonElement | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  // The fill is computed from state, so the press fact is folded into it rather
+  // than mutating the style: a DOM mutation would be erased by the next render.
+  // `usePressSurface` carries the same value the class layer uses.
+  const { pressed, handlers } = usePressSurface();
   const real = vault.label != null;
   return (
     <button
@@ -525,9 +536,10 @@ function VaultRow({
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
+      {...handlers}
       data-testid="picker.vault-row"
       data-vault-id={vault.id}
-      style={rowStyle(hovered)}
+      style={rowStyle(hovered, pressed)}
     >
       <span style={ROW_LEFT_STYLE}>
         <span style={LABEL_COL_STYLE}>

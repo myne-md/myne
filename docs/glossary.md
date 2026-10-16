@@ -78,6 +78,24 @@ no record and no grouping, and vaults keep working standalone.
 
 Used in: `spec/protocol.md` §9.3.1, `spec/sync-protocol.md` §10.3
 
+### **account plane** &nbsp; 📦 *Product* (myne-md/myne)
+
+Which ACCOUNT a client's account-level surfaces speak for, resolved per the ACTIVE session. On an
+owner vault that account is the **vault account** (its `account_number_hash` is the vault's public id
+and its per-device token — the one in the vault directory — authorizes both the sync routes and
+`/auth/*`). On a **member vault** it is the member's own **person account**,
+authenticated by the device-scoped person token in `person-auth.json`, because the credential in a
+member vault's directory is a `(person, vault)` **membership token**, which `server-protocol.md` §3.1
+accepts on the sync routes (`/sync/*`, `/account/status`) and not on `/auth/devices` — it is bound to
+a binding and carries no device id. The device roster and the storage/devices projection therefore
+describe the member's own devices rather than the vault's, which is also why `Remove device` cannot
+mean "cut that device off this vault" there (only the vault's owner can revoke a binding).
+Implemented once in `core/src/plugins/sync/devices.rs::account_plane_from_host`; the sync plane is
+deliberately NOT switched, because a person device token on `/sync/*` resolves to the person
+account's namespace rather than the vault's.
+
+Used in: `docs/decisions/sync/0688`
+
 ### **account record** &nbsp; 📦 *Product*
 
 The device-local half of the account/vault split: a sealed record holding the account id, the member
@@ -732,6 +750,14 @@ A class of data structures that allow concurrent edits across multiple replicas 
 
 Used in: `vision.md`; `decisions.md` 2026-08-09, `decisions/sync/0655`
 
+### **crash record** &nbsp; 📦 *Product*
+
+The one artefact the desktop leaves behind when the process panics, even while diagnostic logging is switched OFF (myne-md/myne#860). It holds the **compiled-in source path and line**, the version and the platform, and nothing else: no panic message and no payload, because a panic message is arbitrary text from arbitrary code (an `expect("failed to decode note {id}")` carries a note id, an `unwrap` on a parse carries the bytes that failed to parse), and the surface it reaches is one the user is invited to send on. It lives in its own file in the same directory as the [diagnostic log](#diagnostic-log), is **bounded to one file** that the next crash overwrites rather than appends to, and is shown on the About surface with its date so its existence is never hidden. It is deleted by an explicit action or by a report that included it. It is the feature's ONE admitted exception to "the file sink is inert while the toggle is off", and it qualifies because it is **host code rather than a `tracing` call site**, so no emitted event can reach it. Same reasoning, and the same payload discipline, as `decisions/ops/0366`'s panic hook for the web build.
+
+Used in: `decisions/ops/0690`, `decisions/ops/0366`, `src-tauri/src/logging/crash.rs`, `threat-model.md` §7
+
+
+
 ### **credential phishing** &nbsp; ⚠️ *Threat*
 
 *(Aliases: phrase phishing, lookalike origin. Myne-divergent: no, but what makes it reachable here is Myne-specific.)*
@@ -910,9 +936,16 @@ Used in: `spec/server-protocol.md` §3.1, §4 (MYND-425)
 
 ### **device-join QR** &nbsp; 📋 *Protocol*
 
-A QR the trusted desktop displays and a phone scans to add itself to an account (MYND-466), in place of manually typing the [account_number](#account_number). A scanner-only, versioned (`MYQR`) frame carrying only non-secret material (`{server_url, account#, generated_at}`) and **never** a password or recovery phrase (SYNC-47). The wire format keeps a fourth slot that held a cert pin; it is emitted empty since `decisions/sync/0620` and still decoded, so a QR an older desktop produced reads. Ephemeral (≈3-min TTL) to enforce live co-presence. The scan is the out-of-band channel for the [device-approval gate](#device-approval-gate)'s [bootstrap-fingerprint](#bootstrap-fingerprint) SAS, which runs post-approval; it says nothing about the server's certificate, which every client verifies against public CA roots ([in-transit encryption](#in-transit-encryption)). The account number is supplied by a one-time user paste on the desktop (it is a bearer token, [AS9](#account_number), never persisted at rest; `spec/account-number.md` §8). `MYQR` lives outside the `protocol` crate (no ciphertext → not a major-version event). iOS-only for v1 (Android: MYND-465).
+A QR the trusted desktop displays and a phone scans to add itself to an account (MYND-466), in place of manually typing the [account_number](#account_number). A scanner-only frame carrying only non-secret material and **never** a password or recovery phrase (SYNC-47). Ephemeral (≈3-min TTL) to enforce live co-presence. The scan is the out-of-band channel for the [device-approval gate](#device-approval-gate)'s [bootstrap-fingerprint](#bootstrap-fingerprint) SAS, which runs post-approval; it says nothing about the server's certificate, which every client verifies against public CA roots ([in-transit encryption](#in-transit-encryption)). `MYQR` lives outside the `protocol` crate (no ciphertext → not a major-version event). iOS-only for v1 (Android: MYND-465).
 
-Used in: `decisions.md` 2026-07-19; `threat-model.md` §7
+**Two target kinds since `MYQR2`** (`decisions/protocol/0689`), tagged by a one-character field:
+
+- `a` — the vault **account**, in canonical Crockford form: the owner's device-join. The account number is supplied by a one-time user paste on the desktop (it is a bearer token, [AS9](#account_number), never persisted at rest; `spec/account-number.md` §8), and the scanning device proves `{account# + password}`.
+- `m` — a **shared vault**, named by its 32-lowercase-hex [account_number_hash](#account_number_hash): a [member vault](#member vault key store)'s own second device. A member holds neither the display-form account number nor the vault password, so the scanner proves its 24-word recovery phrase instead, self-approves, and fetches the vault's keys from the group package the owner already pushed. The payload carries `{endpoint_url, account_hash}` and nothing else.
+
+The v2 layout also keeps a version of the two carried fields that a reader must know: a v2 scanner decodes a v1 payload (older desktop, account kind), while a v1 scanner refuses a v2 payload as an unknown version and is told to update. Both kinds are produced by the DESKTOP only, which is unchanged from MYND-466 (the `qrcode` crate stays off the mobile build), and both are scanned by a phone.
+
+Used in: `decisions.md` 2026-07-19; `decisions/protocol/0689`; `threat-model.md` §7
 
 ### **device key** &nbsp; 🗝️ *Key/identifier*
 
@@ -967,6 +1000,14 @@ Used in: `spec/protocol.md` §9.30; `decisions/protocol/0669`, `0670`
 The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
 
 Used in: `stories/README.md`; `decisions/ui/0653`
+
+### **diagnostic log** &nbsp; 📦 *Product*
+
+An **opt-in, device-local plaintext log** for the desktop client, OFF by default, written only while the user has switched it on (myne-md/myne#860). It exists so a bug report can say what the app was doing instead of only what the user saw. **Its content claim is machine-checked**: `scripts/check-tracing-discipline.mjs` fails the build if a `%` Display formatter reaches `info` or above, which are the only levels the file layer records (it carries its own fixed `LevelFilter::INFO` and ignores `RUST_LOG` entirely, so a `debug!` value cannot reach disk by any configuration), or if a value is interpolated into a message. No note text, note id, title, filename, filesystem path, account number or hash, key material, salt or nonce is written. **Its footprint is a number, not a proportionality**: size-based rotation with a retained-file count and a hard total ceiling, oldest dropped first. Files are created `0600` at create time inside a `0700` directory under the platform log directory, which on macOS and Windows is outside the backed-up app-data directory and on Linux is not (the §7 bullet states that rather than claiming uniformity). **Turning the toggle off erases the log in the same action** and does not erase the [crash record](#crash-record). The controlling switch is a device-local plaintext file rather than a `vault.prefs` field, because the sink is installed at process startup, before any vault unlocks.
+
+Used in: `decisions/ops/0690`, `src/platform/diagnostics.ts`, `src-tauri/src/logging/`, `threat-model.md` §7
+
+
 
 ### **domain separation** &nbsp; 📋 *Protocol*
 
@@ -1394,9 +1435,9 @@ Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`;
 
 ### **invite code** &nbsp; 📦 *Product*
 
-A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0625`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
+A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0627`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
 
-Used in: `docs/decisions/sync/0625-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
+Used in: `docs/decisions/sync/0627-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
 
 ### **invite relay** &nbsp; 📦 *Product*
 
@@ -2367,6 +2408,12 @@ The addressable, recoverable person that Myne's first run is now rooted at (myne
 
 Used in: `docs/decisions/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
 
+### **identity ceremony** &nbsp; 📦 *Product*
+
+The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0682`). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the identity is already registered server-side by the time the phrase renders, and the phrase is shown once, so Esc, a backdrop click and the close control are all withheld until the four words match. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
+
+Used in: `src/components/IdentitySetupDialog.tsx`, `mobile/src/app/flows/IdentityFlow.tsx`, `decisions/ui/0682`
+
 ### **identity-first first run** &nbsp; 📦 *Product*
 
 The zero-vault first-run shape on desktop and mobile in which the person identity is offered before a vault (`decisions/ui/0615`, myne-md/myne#768). It forks between creating an identity and starting with a local vault; the identity arm runs a sync-server step, creates the identity, and lands on the identity home from which a bound vault is created or a pending invite accepted. The identity step is skippable, and a skipped user owns an identity-less vault and can add an identity later from Settings. The web client has no identity-first first run, because identity setup is unsupported there and the browser first run stays at account bootstrap.
@@ -2440,9 +2487,12 @@ generation clause of `decisions/protocol/0592` (deterministic derivation,
 `decisions/protocol/0604`, absorbing myne-md/myne#713). Vault-independent (NOT
 `root_key`-derived; `SubkeyRole::ALL` untouched), so one identity spans many
 vaults. The canonical fingerprint (SHA-256 over the domain-prefixed
-`"myne.person-fingerprint v1|"` public halves) is the [SAS](#bootstrap-fingerprint)
-value the invite flow compares. Distinct from a [device_id](#device_id-vv-actor):
-a person is who they are regardless of which devices they hold.
+`"myne.person-fingerprint v1|"` public halves) is the canonical per-person
+identifier: the recipient value bound into the per-recipient `itemsKey` wrap AAD
+and the value a roster row is keyed by. The invite flow performs no out-of-band
+compare of it (`decisions/protocol/0687`). Distinct from a
+[device_id](#device_id-vv-actor): a person is who they are regardless of which
+devices they hold.
 
 Used in: `docs/decisions/protocol/0592`; `myne-md/myne#698`.
 
@@ -3531,11 +3581,11 @@ Used in: `decisions.md` 2026-07-28; MYND-620
 
 An editor-owned floating surface presented as a **bottom sheet**: full width, pinned above the bottom edge of the *visible* viewport, over the shared `--scrim`, because the installed client **declared** it. Its twin is the **anchored popover**, the same component beside the caret or the control that opened it.
 
-**Which one a client gets is a declaration, never a device sniff.** `EditorHost.floatingSurface` carries `"anchored" | "docked"`, its **absence means anchored**, and the mobile client is the only one that declares the sheet; desktop and web omit the member, which their own test pins by name. The signal lives on the host because the package cannot tell a phone from a touch laptop, and a coarse-pointer query answers the wrong question for the second one (`decisions/editor/0687`).
+**Which one a client gets is a declaration, never a device sniff.** `EditorHost.floatingSurface` carries `"anchored" | "docked"`, its **absence means anchored**, and the mobile client is the only one that declares the sheet; desktop and web omit the member, which their own test pins by name. The signal lives on the host because the package cannot tell a phone from a touch laptop, and a coarse-pointer query answers the wrong question for the second one (`decisions/editor/0691`).
 
 Three things are load-bearing rather than cosmetic. The sheet's height and its bottom offset come from `visualViewport` rather than from `100vh` or `bottom: 0`, because on iOS the layout viewport does not shrink for the software keyboard, so a sheet pinned to the layout viewport's bottom edge sits *behind* it with its Save button. Its commit controls are a **sibling** of the scrolling body, so they cannot scroll out of reach. And the typeahead pickers loaded into it are **not modal**: the editor keeps the focus and the user keeps typing to narrow the list, which a focus trap would end.
 
-Used in: `decisions/editor/0687`; myne-md/myne#884
+Used in: `decisions/editor/0691`; myne-md/myne#884
 
 ### **two-line task row** &nbsp; 📦 *Product*
 

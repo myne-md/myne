@@ -19,7 +19,8 @@
 // (App.tsx `onBack`), the same as PasswordStep's Back — so a fresh mount
 // (empty acknowledgements) on re-entry is correct.
 
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -93,13 +94,27 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
       <StepCard variant="rows">
         {STATEMENTS.map((s, i) => {
           const isExpanded = !!expanded[s.id];
+          // The curve follows the direction, as `DisclosureWrapper` in NoteList
+          // does: `--ease-out` leads an entrance, `--ease-standard` an exit.
+          // One curve for both would make the closing motion start slow, which
+          // is the phase the eye is already watching.
+          const whyEasing = isExpanded
+            ? "var(--ease-out)"
+            : "var(--ease-standard)";
           return (
             <div
               key={s.id}
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "var(--space-2)",
+                // Explicit child margins instead of a flex `gap`: a collapsing
+                // body stays MOUNTED for the length of its exit transition,
+                // and a zero-height flex item still claims both gaps, so the
+                // acknowledgement label would snap up 8px when the node
+                // finally unmounts. With the spacing inside the clipped box
+                // (see WhyDisclosure) a collapsing body occupies exactly the
+                // space of an absent one.
+                gap: 0,
                 padding: "var(--space-4) 0",
                 borderBottom:
                   i === STATEMENTS.length - 1 ? undefined : "1px solid var(--line-1)",
@@ -146,15 +161,28 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                   }}
                 >
                   {t("vaultCreation.briefing.why")}
-                  <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={14} />
+                  <Icon
+                    name="chevron-down"
+                    size={14}
+                    style={{
+                      // One glyph turned over in place (myne-md/myne#868):
+                      // swapping chevron-up/chevron-down remounts the node,
+                      // and a remount cannot animate.
+                      transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: `transform var(--duration-base) ${whyEasing}`,
+                    }}
+                  />
                 </button>
               </div>
 
-              {isExpanded && (
+              <WhyDisclosure open={isExpanded}>
                 <div
                   data-testid="create.briefing-why-text"
                   data-ack-id={s.id}
                   style={{
+                    // The gap this replaces lives INSIDE the clipped box, so
+                    // it collapses with the body instead of outliving it.
+                    marginTop: "var(--space-2)",
                     fontSize: "var(--text-sm)",
                     lineHeight: 1.6,
                     color: "var(--fg-2)",
@@ -162,13 +190,14 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
                 >
                   {s.why}
                 </div>
-              )}
+              </WhyDisclosure>
 
               <label
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-2)",
+                  marginTop: "var(--space-2)",
                   cursor: "pointer",
                   fontSize: "var(--text-sm)",
                   lineHeight: 1.5,
@@ -212,5 +241,99 @@ export function BriefingStep({ onBack, onContinue }: BriefingStepProps) {
         </Button>
       </div>
     </StepLayout>
+  );
+}
+
+/**
+ * How long a collapsing body stays mounted after `open` flips false: one
+ * `--duration-base` transition (180ms) plus the same 60ms slack
+ * `TREE_ANIM_TOTAL_MS` (NoteList) takes, so the node is unmounted only once
+ * the motion has fully settled. The issue that specifies this mechanism names a
+ * local constant here, mirroring `TREE_ANIM_TOTAL_MS` rather than reading the
+ * token back.
+ */
+const WHY_SETTLE_MS = 240;
+
+/**
+ * The animated "Why?" body (myne-md/myne#868).
+ *
+ * Both ends move. Opening mounts the body at the collapsed `0fr` state and
+ * flips to `1fr` on the next frame; a collapse plays the same transition back
+ * and only THEN drops the node, so a resting row leaves the DOM exactly as it
+ * did before this change. That contract is pinned by this component's test and
+ * by the `MYND-114` E2E scenario, neither of which moves with it. The mechanic
+ * mirrors `DisclosureWrapper` in NoteList: `grid-template-rows` 1fr<->0fr plus
+ * an opacity fade, both on `--duration-base`. The curve is per direction, as
+ * there: `--ease-out` opens, `--ease-standard` closes. `height` is never
+ * transitioned. The inner box carries `min-height: 0` + `overflow: hidden`, so
+ * the collapsed track actually clips its content rather than leaving it painted.
+ *
+ * Reduced motion resolves both ends instantly, via the same optional-`?`
+ * `matchMedia` check NoteList's folder toggle makes, and both arms are covered
+ * by a test that stubs `matchMedia` (jsdom does not provide one, so the
+ * animated path is what an unstubbed run measures).
+ */
+function WhyDisclosure({ open, children }: { open: boolean; children: ReactNode }) {
+  // `mounted` = the node is in the DOM; `shown` = its animated (open) value.
+  // Both start at `open` because this only ever mounts collapsed.
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(open);
+
+  useLayoutEffect(() => {
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+    if (open) {
+      // Already open, which is the mount run whose initial state matches.
+      // Nothing to animate, and flipping would play an entrance nobody asked
+      // for.
+      if (shown) return;
+      setMounted(true);
+      if (reduce) {
+        setShown(true);
+        return;
+      }
+      // The body mounts at the collapsed value (`shown` is still false), then
+      // flips on the next frame so the property change has a value to
+      // transition FROM.
+      const frame = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    // A row that was never opened has nothing mounted to animate out.
+    if (!mounted) return;
+    setShown(false);
+    if (reduce) {
+      setMounted(false);
+      return;
+    }
+    const timer = setTimeout(() => setMounted(false), WHY_SETTLE_MS);
+    return () => clearTimeout(timer);
+    // Deliberately `[open]` alone: this effect reacts to an `open` CHANGE, so
+    // the `shown`/`mounted` reads above are the committed values at that
+    // moment. Reacting to them as well would re-enter on this effect's own
+    // updates and cancel the frame/timer it just scheduled.
+  }, [open]);
+
+  if (!mounted) return null;
+  // Read in the SAME commit as the value that changes, so the browser sees the
+  // matching curve alongside the `0fr`/`1fr` flip.
+  const easing = shown ? "var(--ease-out)" : "var(--ease-standard)";
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: shown ? "1fr" : "0fr",
+        // Bound the implicit column to the card: without it the column grows
+        // to the paragraph's max-content and the long copy overflows the row.
+        gridTemplateColumns: "minmax(0, 1fr)",
+        minWidth: 0,
+        opacity: shown ? 1 : 0,
+        transition: `grid-template-rows var(--duration-base) ${easing}, opacity var(--duration-base) ${easing}`,
+      }}
+    >
+      <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>{children}</div>
+    </div>
   );
 }

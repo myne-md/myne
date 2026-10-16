@@ -42,7 +42,6 @@ const personStatus = vi.hoisted(() => vi.fn());
 const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
-const inspectInviteCode = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
@@ -54,7 +53,6 @@ vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personLock,
   personAcceptInvite,
-  inspectInviteCode,
 }));
 vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
@@ -97,11 +95,17 @@ function localeValue(key: string): unknown {
 
 /** Every key the copy spec below asserts against, so the catalog claim is one list. */
 const ACCEPT_COPY_KEYS = [
+  "identityHome.stepIndicator",
+  "identityHome.stepVerifyOwner",
+  "identityHome.stepRecoveryPhrase",
+  "identityHome.stepDevicePassword",
+  "identityHome.acceptHeading",
   "identityHome.acceptHint",
   "identityHome.acceptOwnerCodeLabel",
-  "identityHome.acceptInspect",
-  "identityHome.acceptSasHint",
+  "identityHome.phraseHeading",
+  "identityHome.acceptPhraseHint",
   "identityHome.acceptPhraseLabel",
+  "identityHome.passwordHeading",
   "identityHome.acceptPasswordNote",
   "password.createForm.passwordLabel",
   "password.createForm.confirmLabel",
@@ -129,7 +133,6 @@ const PHRASE = [
 
 const INVITE_ID = "invite-id-hex";
 const OWNER_CODE = "MYNE-PERSON-1:aa:bb:cc:dd";
-const OWNER_FINGERPRINT = "c0ffee01";
 const PASSWORD = "Correct-Horse-9-Battery";
 /** What the name step is given. A display name is a label, not a credential:
  *  SYNC-13 covers phrases and passwords, which are compared below by projected
@@ -168,10 +171,6 @@ beforeEach(() => {
   });
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
-  inspectInviteCode.mockReset().mockResolvedValue({
-    person_id_hex: "owner-person",
-    fingerprint_hex: OWNER_FINGERPRINT,
-  });
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
   // Default: an accepted member whose row carries no name yet, which is the state
   // the step exists for. `namedRoster()` below is the other answer.
@@ -216,15 +215,27 @@ function typePhrase(): void {
   });
 }
 
-/** Everything except the phrase: the owner code, the fingerprint compare and the
- *  out-of-band confirmation. */
-async function verifyOwner(): Promise<void> {
+/** Fill the owner's identity code on wizard step 1, which releases Continue. */
+async function fillOwnerCode(): Promise<void> {
   fireEvent.change(screen.getByTestId("identity-flow.accept-owner-code"), {
     target: { value: OWNER_CODE },
   });
-  fireEvent.click(screen.getByTestId("identity-flow.accept-inspect"));
-  await screen.findByTestId("identity-flow.accept-owner-fingerprint");
-  fireEvent.click(screen.getByTestId("identity-flow.accept-confirm"));
+}
+
+/** The Continue control, which shares one testid across wizard steps 1 and 2
+ *  (only one is mounted at a time). */
+function continueButton(): HTMLButtonElement {
+  return screen.getByTestId("identity-flow.accept-continue") as HTMLButtonElement;
+}
+
+/** Step 1 → step 2 (the phrase). Gated on the owner's code being present. */
+function toPhraseStep(): void {
+  fireEvent.click(continueButton());
+}
+
+/** Step 2 → step 3 (the password). Gated on all 24 cells being filled. */
+function toPasswordStep(): void {
+  fireEvent.click(continueButton());
 }
 
 function setPassword(value: string, confirm = value): void {
@@ -249,10 +260,12 @@ async function typeName(name: string): Promise<void> {
   fireEvent.click(screen.getByTestId("identity-flow.name.save"));
 }
 
-/** Drive the whole accept step to the name step it now lands on. */
+/** Drive the whole accept wizard to the name step it now lands on. */
 async function acceptToNameStep(): Promise<void> {
-  await verifyOwner();
+  await fillOwnerCode();
+  toPhraseStep();
   typePhrase();
+  toPasswordStep();
   setPassword(PASSWORD);
   fireEvent.click(submit());
   await screen.findByTestId("identity-flow.name-input");
@@ -264,22 +277,81 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     // The step is the form; the invite row is behind it.
     expect(screen.getByTestId("identity-flow.accept-owner-code")).toBeTruthy();
     expect(screen.queryByTestId("identity-flow.invite-row")).toBeNull();
+    // The wizard's first step: its counter is on screen and the phrase grid is not.
+    expect(screen.getByTestId("identity-flow.accept-step")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.accept-phrase")).toBeNull();
+    expect(screen.queryByTestId("identity-flow.accept.password-input")).toBeNull();
+  });
+
+  it("walks the steps in order, and Back preserves what the last one collected", async () => {
+    await openAccept();
+
+    // Step 1: the owner check, and NOT the phrase grid or the password.
+    expect(screen.queryByTestId("identity-flow.accept-phrase")).toBeNull();
+    expect(screen.queryByTestId("identity-flow.accept.password-input")).toBeNull();
+
+    const segmentFill = (): (string | null)[] =>
+      Array.from(
+        screen.getByTestId("identity-flow.accept-step").querySelectorAll("[data-filled]"),
+      ).map((el) => el.getAttribute("data-filled"));
+
+    // Three steps, one segment filled.
+    expect(segmentFill()).toEqual(["true", "false", "false"]);
+
+    // Step 1's Continue is the gate on the owner's code: blocked until it is
+    // present.
+    expect(continueButton().disabled).toBe(true);
+    await fillOwnerCode();
+    expect(continueButton().disabled).toBe(false);
+    toPhraseStep();
+
+    // Step 2: the phrase grid, and NOT the password.
+    expect(screen.getByTestId("identity-flow.accept-phrase")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.accept.password-input")).toBeNull();
+    expect(segmentFill()).toEqual(["true", "true", "false"]);
+    // 24 empty cells: Continue is blocked.
+    expect(continueButton().disabled).toBe(true);
+    typePhrase();
+    expect(continueButton().disabled).toBe(false);
+    toPasswordStep();
+
+    // Step 3: the password form, and NOT the phrase grid.
+    expect(screen.getByTestId("identity-flow.accept.password-input")).toBeTruthy();
+    expect(screen.queryByTestId("identity-flow.accept-phrase")).toBeNull();
+    expect(segmentFill()).toEqual(["true", "true", "true"]);
+
+    // Back, twice, and step 1 still carries what it collected: the owner's code,
+    // which keeps Continue unlocked.
+    fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
+    fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
+    expect(
+      (screen.getByTestId("identity-flow.accept-owner-code") as HTMLTextAreaElement).value,
+    ).toBe(OWNER_CODE);
+    expect(continueButton().disabled).toBe(false);
   });
 
   it("accepts with the invite id, the owner code, the phrase and the password", async () => {
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
 
-    // Nothing collected: blocked.
-    expect(submit().disabled).toBe(true);
+    // Nothing collected: step 1's gate is shut.
+    expect(continueButton().disabled).toBe(true);
 
-    await verifyOwner();
-    // Fingerprint confirmed, phrase still empty: blocked.
-    expect(submit().disabled).toBe(true);
+    await fillOwnerCode();
+    // Fingerprint confirmed: step 1 opens, but the submit is not reachable yet.
+    expect(continueButton().disabled).toBe(false);
+    toPhraseStep();
+
+    // Phrase step, nothing typed: blocked.
+    expect(continueButton().disabled).toBe(true);
 
     typePhrase();
-    // Phrase complete, no password: blocked. The credential is REQUIRED, not
-    // offered (myne-md/myne#851 task 7), so a member vault is never materialized
+    // Phrase complete, so the step opens; the final submit is behind the password.
+    expect(continueButton().disabled).toBe(false);
+    toPasswordStep();
+
+    // No password: blocked. The credential is REQUIRED, not offered
+    // (myne-md/myne#851 task 7), so a member vault is never materialized
     // without one.
     expect(submit().disabled).toBe(true);
 
@@ -307,8 +379,10 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
 
   it("keeps the credential behind the project's floor", async () => {
     await openAccept();
-    await verifyOwner();
+    await fillOwnerCode();
+    toPhraseStep();
     typePhrase();
+    toPasswordStep();
 
     setPassword("short-9");
     expect(submit().disabled).toBe(true);
@@ -322,63 +396,66 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(submit().disabled).toBe(false);
   });
 
-  it("will not inspect without a code, and surfaces an unusable one", async () => {
+  it("gates the owner step on the owner's code being present", async () => {
     await openAccept();
-    const inspect = screen.getByTestId("identity-flow.accept-inspect") as HTMLButtonElement;
-    expect(inspect.disabled).toBe(true);
+    expect(continueButton().disabled).toBe(true);
 
     fireEvent.change(screen.getByTestId("identity-flow.accept-owner-code"), {
       target: { value: OWNER_CODE },
     });
-    expect(inspect.disabled).toBe(false);
-
-    inspectInviteCode.mockRejectedValueOnce(new Error("nope"));
-    fireEvent.click(inspect);
-    expect(await screen.findByTestId("identity-flow.accept-error")).toBeTruthy();
-    // No fingerprint was shown, so nothing can be confirmed against a lie.
-    expect(screen.queryByTestId("identity-flow.accept-owner-fingerprint")).toBeNull();
+    expect(continueButton().disabled).toBe(false);
   });
 
   it("maps a refused accept to the desktop's own message", async () => {
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
+    toPhraseStep();
     typePhrase();
+    toPasswordStep();
     setPassword(PASSWORD);
 
     personAcceptInvite.mockRejectedValueOnce({ kind: "NotEnrolled" });
     fireEvent.click(submit());
 
+    // The refusal belongs to the step that produced it (the password step), so its
+    // banner is there, and the step change clears it.
     const banner = await screen.findByTestId("identity-flow.accept-error");
     expect(banner.textContent).toBe("identityHome.acceptErrorNotEnrolled");
     expect(onAccepted).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("identity-flow.accept-step-back"));
+    expect(screen.queryByTestId("identity-flow.accept-error")).toBeNull();
   });
 
   it("renders the desktop's copy, key for key", async () => {
     await openAccept();
 
+    // Step 1: the owner check.
+    expect(screen.getByTestId("identity-flow.accept-step").textContent).toBe(
+      "identityHome.stepIndicator",
+    );
+    expect(screen.getByText("identityHome.acceptHeading")).toBeTruthy();
     expect(screen.getByTestId("identity-flow.accept-hint").textContent).toBe(
       "identityHome.acceptHint",
     );
     expect(
       screen.getByTestId("identity-flow.accept-owner-code").getAttribute("aria-label"),
     ).toBe("identityHome.acceptOwnerCodeLabel");
-    expect(screen.getByTestId("identity-flow.accept-inspect").textContent).toBe(
-      "identityHome.acceptInspect",
-    );
 
-    await verifyOwner();
-    expect(screen.getByTestId("identity-flow.accept-sas-hint").textContent).toBe(
-      "identityHome.acceptSasHint",
-    );
-    // `MonoBox` renders a readOnly `<input>`, so the fingerprint is its value
-    // rather than its text content.
-    expect(
-      (screen.getByTestId("identity-flow.accept-owner-fingerprint") as HTMLInputElement).value,
-    ).toBe(OWNER_FINGERPRINT);
+    await fillOwnerCode();
+    toPhraseStep();
+
+    // Step 2: the phrase.
+    expect(screen.getByText("identityHome.phraseHeading")).toBeTruthy();
+    expect(screen.getByText("identityHome.acceptPhraseHint")).toBeTruthy();
     expect(screen.getByTestId("identity-flow.accept-phrase-label").textContent).toBe(
       "identityHome.acceptPhraseLabel",
     );
+    typePhrase();
+    toPasswordStep();
+
+    // Step 3: the password.
+    expect(screen.getByText("identityHome.passwordHeading")).toBeTruthy();
     expect(screen.getByTestId("identity-flow.accept-password-note").textContent).toBe(
       "identityHome.acceptPasswordNote",
     );
@@ -437,8 +514,10 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     namedRoster();
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
+    toPhraseStep();
     typePhrase();
+    toPasswordStep();
     setPassword(PASSWORD);
     fireEvent.click(submit());
 
@@ -458,8 +537,10 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     listRoster.mockRejectedValue(new Error("no session"));
     const onAccepted = vi.fn();
     await openAccept(onAccepted);
-    await verifyOwner();
+    await fillOwnerCode();
+    toPhraseStep();
     typePhrase();
+    toPasswordStep();
     setPassword(PASSWORD);
     fireEvent.click(submit());
 

@@ -19,7 +19,9 @@ import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 
 interface ControlBlockProps {
   label: string;
-  helper: string;
+  /** Explanatory line under the control. Omit for a block whose own content
+   *  already says what it is. */
+  helper?: string;
   control: ReactNode;
   /** Settings-search scroll target (MYND-536) — the registry `id`. */
   anchorId?: string;
@@ -38,7 +40,7 @@ export function ControlBlock({
     <div style={BLOCK_STYLE} data-setting-row="true" data-setting-anchor={anchorId} data-testid={testId}>
       <span style={LABEL_STYLE}>{label}</span>
       {control}
-      <p style={HELPER_STYLE}>{helper}</p>
+      {helper !== undefined && <p style={HELPER_STYLE}>{helper}</p>}
     </div>
   );
 }

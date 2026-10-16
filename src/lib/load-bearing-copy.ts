@@ -272,6 +272,12 @@ export {
   BETA_TERMS_DATA_LOSS,
   BETA_TERMS_WHAT_HAPPENS_NEXT,
   BETA_TERMS_WHAT_WE_CAN_SEE,
+  // Transcript fallibility (voice-to-text MYND-552). Moved here from a
+  // desktop-local constant in myne-md/myne#886, when the mobile client grew the
+  // same transcript surface and needed the same sentence: one literal, two
+  // clients, renderer-identical by construction. The wording did not change, so
+  // the SYNC-8 literal pins hold.
+  AI_TRANSCRIPT_HONESTY_NOTE,
 } from "@myne/copy";
 // Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
 // clip lands at the vault ROOT (SYNC-15) and the user keeps working — the
@@ -521,15 +527,7 @@ export function aiChatHonestyNote(provider: string | null): string {
   return `Answers come from a model at ${provider}, which Myne does not run, and may be wrong. Check the notes it cites.`;
 }
 
-/** Transcript-fallibility honesty note (voice-to-text MYND-552, SYNC-V8). A
- *  load-bearing, threat-model-bounded framing shown beneath the read-only
- *  transcript expander: the transcript comes from a SMALL on-device speech model
- *  and MAY BE WRONG. It must NOT imply cloud-grade accuracy, and — per
- *  `threat-model.md` §7 — must NOT claim model-runtime isolation ("sandbox"), the
- *  same discipline as `AI_CHAT_HONESTY_NOTE`. The trust affordance itself reuses
- *  `aiTrustHeadline` / `aiTrustDisclosure` verbatim — this note is only the
- *  accuracy counterweight. E2E/Vitest pin the exact wording by full-literal
- *  equality (SYNC-8); changing it is a `decisions.md` event, not a copy edit.
- *  Rendered verbatim in every locale (never i18n'd). */
-export const AI_TRANSCRIPT_HONESTY_NOTE =
-  "This transcript was made by a small model running on your device and may be wrong — check it against the audio.";
+// `AI_TRANSCRIPT_HONESTY_NOTE` moved to `@myne/copy` in myne-md/myne#886 (see the
+// re-export block above) when the mobile client grew the same transcript surface.
+// Rendered verbatim in every locale (never i18n'd); changing the wording is a
+// `decisions.md` event, not a copy edit.

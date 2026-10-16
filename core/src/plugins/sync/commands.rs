@@ -50,16 +50,37 @@ pub async fn sync_get_endpoint<R: Runtime>(
 }
 
 /// The decoded, validated view of a scanned device-join QR — everything the mobile
-/// confirm screen needs before the user enters their password (MYND-466, Option 1).
+/// confirm screen needs before the user enters their credential (MYND-466, Option 1).
+///
+/// Internally tagged by `kind`, because the two targets lead to different
+/// credentials and different next steps: an `account` code is the owner's
+/// `{account# + password}` join, a `member_vault` one is the member's own
+/// second-device join with the 24-word phrase (myne-md/myne). One flat struct
+/// with an optional field per kind would put that choice in the caller's hands.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct JoinQrView {
-    /// Endpoint URL the QR carried (prefills the join form / endpoint set).
-    pub endpoint_url: String,
-    /// Canonical account number the QR carried (the UI formats it for display).
-    pub account_number: String,
-    /// Whether the QR is still fresh (within the ephemeral TTL). A stale QR is
-    /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
-    pub fresh: bool,
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum JoinQrView {
+    /// The vault ACCOUNT: the owner's device-join flow.
+    Account {
+        /// Endpoint URL the QR carried (prefills the join form / endpoint set).
+        endpoint_url: String,
+        /// Canonical account number the QR carried (the UI formats it for display).
+        account_number: String,
+        /// Whether the QR is still fresh (within the ephemeral TTL). A stale QR is
+        /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
+        fresh: bool,
+    },
+    /// A shared vault, joined by a MEMBER's own second device.
+    MemberVault {
+        /// Endpoint URL the QR carried.
+        endpoint_url: String,
+        /// The vault's `account_number_hash`, 32 lowercase hex. The scanner uses it
+        /// to find the invite row this vault appears as; it is not a secret (it is
+        /// the vault's public id and the namespace its blobs live under).
+        account_hash_hex: String,
+        /// See [`JoinQrView::Account::fresh`].
+        fresh: bool,
+    },
 }
 
 /// Pure decode → view mapping (host-testable; the command supplies `now_unix`).
@@ -67,13 +88,21 @@ fn decode_join_qr_view(
     scanned: &str,
     now_unix: u64,
 ) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
-    use super::qr_join::{QrJoinPayload, QR_JOIN_TTL_SECS};
+    use super::qr_join::{QrJoinPayload, QrJoinTarget, QR_JOIN_TTL_SECS};
     let payload = QrJoinPayload::decode(scanned.trim())?;
     let fresh = payload.is_fresh(now_unix, QR_JOIN_TTL_SECS);
-    Ok(JoinQrView {
-        endpoint_url: payload.endpoint_url,
-        account_number: payload.account_number,
-        fresh,
+    let endpoint_url = payload.endpoint_url;
+    Ok(match payload.target {
+        QrJoinTarget::Account { account_number } => JoinQrView::Account {
+            endpoint_url,
+            account_number,
+            fresh,
+        },
+        QrJoinTarget::MemberVault { account_hash_hex } => JoinQrView::MemberVault {
+            endpoint_url,
+            account_hash_hex,
+            fresh,
+        },
     })
 }
 
@@ -654,6 +683,12 @@ pub async fn start_b2b_migration_from_host(
         .clone_person_identity()
         .await
         .ok_or(SyncDeviceError::NotEnrolled)?;
+    // The owner's own `person_id_hash`, recorded on the owner's roster row so the
+    // member list can resolve the owner's chosen name on every device.
+    let owner_person_id = state
+        .clone_person_id()
+        .await
+        .ok_or(SyncDeviceError::NotEnrolled)?;
 
     // The whole-blob `vault.meta` rewrite is a lifecycle mutation: hold the
     // permit across the migration so a concurrent `change_password` cannot land
@@ -684,6 +719,7 @@ pub async fn start_b2b_migration_from_host(
         &root_key,
         &items_key,
         &owner,
+        &owner_person_id,
         owner_display_name,
     )
     .await
@@ -926,36 +962,6 @@ pub async fn invite_member_from_host(
     })
 }
 
-/// The invitee's addressable id + their SAS fingerprint, decoded from a pasted
-/// person identity code (task 11). Returned by
-/// [`sync_person_inspect_invite_code`] so the owner can run the out-of-band SAS
-/// compare BEFORE the invite is sealed and relayed.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct InviteCodeView {
-    pub person_id_hex: String,
-    /// The person's fingerprint (the SAS value), lowercase hex.
-    pub fingerprint_hex: String,
-}
-
-/// **Inspect a pasted person identity code** (B2B, myne-md/myne#711 task 11).
-/// Pure: parses the code and derives the fingerprint, no vault and no network.
-#[tauri::command]
-pub fn sync_person_inspect_invite_code(
-    recipient_code: String,
-) -> Result<InviteCodeView, SyncDeviceError> {
-    inspect_invite_code(&recipient_code)
-}
-
-/// The pure body of [`sync_person_inspect_invite_code`].
-pub fn inspect_invite_code(recipient_code: &str) -> Result<InviteCodeView, SyncDeviceError> {
-    let code = super::invite::decode_person_identity_code(recipient_code)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
-    Ok(InviteCodeView {
-        person_id_hex: crate::account::person_identity::hex_lower(&code.person_id),
-        fingerprint_hex: crate::account::person_identity::hex_lower(code.public.fingerprint()),
-    })
-}
-
 /// **Create and relay an invite from a pasted person identity code** (B2B,
 /// myne-md/myne#711 task 11). This is the owner-side wire: decode the invitee's
 /// public halves from the out-of-band code, seal the invite locally (the same
@@ -1132,12 +1138,23 @@ async fn write_ntv6_invite(
         continuity: pi::GroupKeyContinuity::Current,
         transition_hex: None,
     });
-    let new_roster = pi::GroupRosterPayload {
+    let owner_fingerprint_hex = roster.owner_fingerprint_hex;
+    let mut new_roster = pi::GroupRosterPayload {
         account_number_hash_hex: crate::account::person_identity::hex_lower(&account_number_hash),
         group_key_epoch: epoch,
-        owner_fingerprint_hex: roster.owner_fingerprint_hex,
+        owner_fingerprint_hex: owner_fingerprint_hex.clone(),
         members,
     };
+    // Heal an old vault's owner row on this write: a vault migrated
+    // before the owner row carried a person id has no way to resolve the owner's
+    // chosen name, and an invite is the next owner-signed roster write.
+    if let Some(person_id) = state.clone_person_id().await {
+        super::roster::backfill_owner_person_id(
+            &mut new_roster,
+            &owner_fingerprint_hex,
+            &person_id,
+        );
+    }
     let signed = pi::sign_group_roster(owner, &new_roster, &mut rng)
         .map_err(|_| SyncDeviceError::BadRequest)?;
     let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
@@ -1328,11 +1345,20 @@ pub async fn sync_list_roster<R: Runtime>(
     // made an invited member read the owner's row as themselves
     // (myne-md/myne#859). `None` when no person identity is installed, in which
     // case no row is marked; roles and fingerprints still render.
-    let local_fingerprint_hex = state
-        .inner()
-        .clone_person_identity()
-        .await
+    //
+    // The person ID is the second thing the roster needs from the local identity:
+    // a vault migrated before the owner row carried one still resolves the
+    // CALLER'S OWN name, whose store row is keyed by person id while the roster
+    // row has none.
+    let local_identity = state.inner().clone_person_identity().await;
+    let local_fingerprint_hex = local_identity
+        .as_ref()
         .map(|identity| crate::account::person_identity::hex_lower(identity.fingerprint()));
+    let local_person_id_hex = state
+        .inner()
+        .clone_person_id()
+        .await
+        .map(|id| crate::account::person_identity::hex_lower(&id));
 
     let root = crate::paths::active_vault_root_from_base(
         &host
@@ -1431,6 +1457,19 @@ pub async fn sync_list_roster<R: Runtime>(
                         Some((id.to_ascii_lowercase(), public))
                     })
                     .collect();
+                let mut publics = publics;
+                // The caller's OWN public half, keyed by their person id. A vault
+                // migrated before the owner row carried a person id has no entry
+                // for the owner here, so the owner's name record — keyed by the
+                // session person id — would verify against nothing and read as
+                // "absent" on the very device that wrote it.
+                if let (Some(id), Some(identity)) =
+                    (local_person_id_hex.as_deref(), local_identity.as_ref())
+                {
+                    publics
+                        .entry(id.to_string())
+                        .or_insert_with(|| identity.public_half());
+                }
                 protocol::partition_verified(
                     &map,
                     |id| publics.get(&id.to_ascii_lowercase()).cloned(),
@@ -1448,27 +1487,42 @@ pub async fn sync_list_roster<R: Runtime>(
             }
         };
 
+        let epoch = roster.group_key_epoch;
+        let mut views: Vec<RosterMemberView> = roster
+            .members
+            .into_iter()
+            .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
+            .map(|m| {
+                // A Live row whose person id the signed roster does not carry (a
+                // vault migrated before it did) still resolves on the device that
+                // owns the identity: the caller's OWN row can be matched by
+                // fingerprint, and the local person id is the one its name record
+                // is keyed by. Any OTHER row stays `absent`, which is honest —
+                // this device cannot prove a stranger's person id.
+                let effective_id = effective_person_id_hex(
+                    m.person_id_hex.as_deref(),
+                    &m.fingerprint_hex,
+                    local_fingerprint_hex.as_deref(),
+                    local_person_id_hex.as_deref(),
+                );
+                let (display_name, name_state) = resolve_member_name(
+                    effective_id.as_deref(),
+                    &verified_names,
+                    &unverified_names,
+                );
+                RosterMemberView::from_group_member(
+                    m,
+                    local_fingerprint_hex.as_deref(),
+                    display_name,
+                    name_state,
+                )
+            })
+            .collect();
+        sort_owner_first(&mut views);
         return Ok(RosterListView {
-            members: roster
-                .members
-                .into_iter()
-                .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
-                .map(|m| {
-                    let (display_name, name_state) = resolve_member_name(
-                        m.person_id_hex.as_deref(),
-                        &verified_names,
-                        &unverified_names,
-                    );
-                    RosterMemberView::from_group_member(
-                        m,
-                        local_fingerprint_hex.as_deref(),
-                        display_name,
-                        name_state,
-                    )
-                })
-                .collect(),
+            members: views,
             authority,
-            group_key_epoch: Some(roster.group_key_epoch),
+            group_key_epoch: Some(epoch),
         });
     }
 
@@ -1490,15 +1544,41 @@ pub async fn sync_list_roster<R: Runtime>(
         None => super::roster::RosterMap::new(),
     };
 
+    let mut views: Vec<RosterMemberView> = roster
+        .into_values()
+        .filter(|m| !m.deleted)
+        .map(|m| RosterMemberView::from_entry(m, local_fingerprint_hex.as_deref()))
+        .collect();
+    // The legacy roster is a map, so its iteration order is arbitrary. Sort it
+    // deterministically AND owner-first, matching the `NTV6` arm's display order.
+    views.sort_by(|a, b| {
+        (
+            a.role != super::roster::RosterRole::Owner,
+            &a.fingerprint_hex,
+        )
+            .cmp(&(
+                b.role != super::roster::RosterRole::Owner,
+                &b.fingerprint_hex,
+            ))
+    });
+
     Ok(RosterListView {
-        members: roster
-            .into_values()
-            .filter(|m| !m.deleted)
-            .map(|m| RosterMemberView::from_entry(m, local_fingerprint_hex.as_deref()))
-            .collect(),
+        members: views,
         authority,
         group_key_epoch: None,
     })
+}
+
+/// Put the OWNER's row first and leave everyone else in the order the caller
+/// collected them (a stable sort), which for a `NTV6` roster is the signed
+/// roster's own canonical, fingerprint-sorted order.
+///
+/// Display order only: the SIGNED roster must stay fingerprint-sorted, because
+/// that is what makes one semantic roster have one signed byte representation
+/// (`validate_group_roster`), so the reordering belongs here rather than in the
+/// payload.
+fn sort_owner_first(views: &mut [RosterMemberView]) {
+    views.sort_by_key(|v| v.role != super::roster::RosterRole::Owner);
 }
 
 /// The roster listing plus the caller's vault authority, so the UI gates
@@ -1625,6 +1705,31 @@ impl RosterMemberView {
             continuity: None,
             transition_hex: e.transition_hex,
         }
+    }
+}
+
+/// The person id a roster row resolves its name against.
+///
+/// The row's own when the signed roster carries one. Otherwise, for the
+/// CALLER'S OWN row only, the session's person id: a vault migrated before the
+/// owner row carried a person id still has the owner's name record keyed by that
+/// id on the very device that wrote it. Any other row answers `None`,
+/// which is honest — this device cannot prove a stranger's person id, and
+/// guessing one would risk rendering a name the row's own signature does not back.
+fn effective_person_id_hex(
+    row_person_id_hex: Option<&str>,
+    row_fingerprint_hex: &str,
+    local_fingerprint_hex: Option<&str>,
+    local_person_id_hex: Option<&str>,
+) -> Option<String> {
+    if let Some(id) = row_person_id_hex {
+        return Some(id.to_string());
+    }
+    let is_self = matches!(local_fingerprint_hex, Some(f) if f == row_fingerprint_hex);
+    if is_self {
+        local_person_id_hex.map(str::to_string)
+    } else {
+        None
     }
 }
 
@@ -2193,9 +2298,56 @@ mod tests {
             .encode()
             .unwrap();
         let view = decode_join_qr_view(&encoded, 1_050).expect("decode");
-        assert_eq!(view.endpoint_url, "https://sync.example.org");
-        assert_eq!(view.account_number, acct);
-        assert!(view.fresh);
+        match view {
+            JoinQrView::Account {
+                endpoint_url,
+                account_number,
+                fresh,
+            } => {
+                assert_eq!(endpoint_url, "https://sync.example.org");
+                assert_eq!(account_number, acct);
+                assert!(fresh);
+            }
+            other => panic!("an account payload must decode as the account kind: {other:?}"),
+        }
+    }
+
+    /// The member target, end to end through the view the WebView receives: the
+    /// vault is named by its account hash and the endpoint travels with it, which
+    /// is the whole contribution of the member QR (the phrase is still typed).
+    #[test]
+    fn decode_join_qr_view_carries_a_member_target() {
+        use super::super::qr_join::QrJoinPayload;
+        let hash = "ab".repeat(16);
+        let encoded = QrJoinPayload::member_vault("https://sync.example.org", &hash, 1_000)
+            .unwrap()
+            .encode()
+            .unwrap();
+        match decode_join_qr_view(&encoded, 1_050).expect("decode") {
+            JoinQrView::MemberVault {
+                endpoint_url,
+                account_hash_hex,
+                fresh,
+            } => {
+                assert_eq!(endpoint_url, "https://sync.example.org");
+                assert_eq!(account_hash_hex, hash);
+                assert!(fresh);
+            }
+            other => panic!("a member payload must decode as the member kind: {other:?}"),
+        }
+    }
+
+    /// A v1 (older desktop) QR reaches the scanner as the ACCOUNT kind, not as a
+    /// member one — the legacy layout has no kind byte, and reading it as anything
+    /// else would send the user to the phrase wizard for an owner join.
+    #[test]
+    fn decode_join_qr_view_reads_a_legacy_payload_as_an_account_target() {
+        let acct = qr_account();
+        let v1 = format!("MYQR1|https://s.example|{acct}|-|1000");
+        match decode_join_qr_view(&v1, 1_050).expect("decode") {
+            JoinQrView::Account { account_number, .. } => assert_eq!(account_number, acct),
+            other => panic!("a v1 payload must decode as the account kind: {other:?}"),
+        }
     }
 
     #[test]
@@ -2207,7 +2359,7 @@ mod tests {
             .encode()
             .unwrap();
         let view = decode_join_qr_view(&encoded, 1_000 + QR_JOIN_TTL_SECS + 999).expect("decode");
-        assert!(!view.fresh);
+        assert!(matches!(view, JoinQrView::Account { fresh: false, .. }));
     }
 
     #[test]
@@ -3018,6 +3170,86 @@ mod tests {
         );
     }
 
+    /// The name a row resolves against is its OWN person id, except on the
+    /// caller's own row of a vault whose roster carries none: there the session
+    /// person id stands in, which is what lets the owner see the name they just
+    /// wrote.
+    #[test]
+    fn a_self_row_without_a_person_id_falls_back_to_the_session_id() {
+        let self_fp = "aa".repeat(32);
+        let other_fp = "bb".repeat(32);
+        let local_id = "ab".repeat(16);
+        // A row carrying its own id is used verbatim, case preserved.
+        assert_eq!(
+            super::effective_person_id_hex(
+                Some("CD".repeat(16).as_str()),
+                &other_fp,
+                Some(&self_fp),
+                Some(&local_id),
+            ),
+            Some("CD".repeat(16))
+        );
+        // The caller's own row falls back to the session id.
+        assert_eq!(
+            super::effective_person_id_hex(None, &self_fp, Some(&self_fp), Some(&local_id)),
+            Some(local_id.clone())
+        );
+        // Nobody else's does: this device cannot prove a stranger's person id, and
+        // guessing one would risk a name that row's own signature does not back.
+        assert_eq!(
+            super::effective_person_id_hex(None, &other_fp, Some(&self_fp), Some(&local_id)),
+            None
+        );
+        // No local identity installed: nothing to fall back to.
+        assert_eq!(
+            super::effective_person_id_hex(None, &self_fp, None, None),
+            None
+        );
+    }
+
+    /// The member list leads with the OWNER wherever the fingerprint sort put
+    /// them, and leaves everyone else in the caller's order.
+    #[test]
+    fn the_roster_view_leads_with_the_owner_and_keeps_the_rest_in_order() {
+        use crate::plugins::sync::roster::RosterRole;
+        let mk = |seed: u8, role: RosterRole| {
+            let mut view = super::RosterMemberView::from_group_member(
+                group_row(&name_pair(seed), None, "Owner"),
+                None,
+                String::new(),
+                "absent",
+            );
+            view.role = role;
+            view
+        };
+        // Deliberately NOT owner-first: `from_group_member` preserves whatever the
+        // signed roster's fingerprint sort produced.
+        let (a, b, c) = ("11".repeat(32), "22".repeat(32), "33".repeat(32));
+        let mut views = vec![
+            {
+                let mut v = mk(0x11, RosterRole::Member);
+                v.fingerprint_hex = a.clone();
+                v
+            },
+            {
+                let mut v = mk(0x22, RosterRole::Owner);
+                v.fingerprint_hex = b.clone();
+                v
+            },
+            {
+                let mut v = mk(0x33, RosterRole::Member);
+                v.fingerprint_hex = c.clone();
+                v
+            },
+        ];
+        super::sort_owner_first(&mut views);
+        assert_eq!(views[0].role, RosterRole::Owner);
+        assert_eq!(views[0].fingerprint_hex, b);
+        // The others keep their order relative to each other.
+        assert_eq!(views[1].fingerprint_hex, a);
+        assert_eq!(views[2].fingerprint_hex, c);
+    }
+
     // ── Explicit owner-approved NTV5 → NTV6 migration (myne-md/myne#712) ─────
 
     use crate::plugins::vault_unlock::state::UnlockedVault;
@@ -3115,7 +3347,9 @@ mod tests {
                     ),
                 )
                 .await;
-            state.set_person_identity(migration_owner_pair()).await;
+            state
+                .set_person_identity_and_id(migration_owner_pair(), [0x42u8; 16])
+                .await;
 
             let err = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
                 .await
@@ -3133,7 +3367,9 @@ mod tests {
             let state = VaultRuntimeState::default();
             let (id, bytes) = seed_ntv5_owner_vault(&dir.path().join("data"));
             unlock_owner(&state, id, &bytes).await;
-            state.set_person_identity(migration_owner_pair()).await;
+            state
+                .set_person_identity_and_id(migration_owner_pair(), [0x42u8; 16])
+                .await;
 
             let view = start_b2b_migration_from_host(&host, &state, &StdVaultIo, "Owner")
                 .await
