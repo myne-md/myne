@@ -114,7 +114,7 @@ The theme dropdown offers the three built-in palettes (light, dark, amoled),
 applied as `data-theme` on the document element, the same mechanism the clients
 use, and the theme is part of the URL contract like every other view control.
 
-A **shipped** theme (the ten in `myne-themes`) is deliberately not offered yet.
+A **shipped** theme (the ones in `myne-themes`) is deliberately not offered yet.
 It needs a **committed snapshot** plus a guard that compares the snapshot to the
 companion's index when the companion is present and reports what it could not
 check when it is absent, because a build-time read of a companion repository

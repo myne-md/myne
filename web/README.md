@@ -103,7 +103,7 @@ this file stays a contributor's map of the target, not an operator runbook
 
 ## State
 
-Implemented and deployed. Every module under `src/platform/` is a real web
+Implemented. Every module under `src/platform/` is a real web
 implementation — the wasm Worker, OPFS persistence, browser dialogs, downloads
 — and the target has its own CI lane. `web-build` typechecks and bundles, then
 runs the seam contract against this implementation plus the artefact greps, the
@@ -129,11 +129,13 @@ scheme, so a vault is held under a Web Locks lease and a second tab **reports**
 rather than takes over (`src/vault-lock.ts`).
 
 **Narrower than the native clients, by decision and in the artefact.** Account
-and vault creation are absent, and nothing that generates or accepts the 24-word
-recovery phrase is in the bundle: those modules are substituted away at build
-time by the same resolver that substitutes the seam (`src/screens/`), and
-`scripts/check-web-no-phrase.mjs` greps the built output to keep it that way.
-Sync is required — there is no offline-first first run. `decisions.md`
-2026-07-26 is the normative record of that capability set, and
-[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
-served-code delivery channel costs relative to a signed desktop build.
+and vault creation ship, and so does phrase-based recovery: the phrase may be
+generated, displayed and typed in served code (`decisions.md` 2026-08-15, entry
+0514, which supersedes the 2026-07-26 capability set). What does **not** ship is
+the phrase as a **device-enrolment** credential: the enrolment grid is
+substituted away at build time by the same resolver that substitutes the seam
+(`src/screens/`), and `scripts/check-web-no-phrase.mjs` greps the built output to
+keep it out. Sync is required — there is no offline-first first run. Also absent:
+quick-unlock and backup import/export. [`docs/threat-model.md`](../docs/threat-model.md)
+A15 / TB11 states what the served-code delivery channel costs relative to a
+signed desktop build.
