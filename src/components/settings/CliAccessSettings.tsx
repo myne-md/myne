@@ -263,17 +263,28 @@ export function CliAccessSettings({
         testId="settings.cli-access"
         stateAttrs={{ "data-enabled": String(enabled) }}
         label={t("settings.cliAccess.label")}
+        // The ON state carried 307 characters under the label, on a security
+        // surface (myne-md/myne#885). The warning that survives on the row is
+        // the one that matters: any program under this account can read and
+        // write. The OFF helper is 68 characters and is already one sentence, so
+        // it stays exactly as it was and the row shows no question mark in that
+        // state.
         helper={
           enabled
-            ? t("settings.cliAccess.helperOn")
+            ? t("settings.cliAccess.inlineOn")
             : t("settings.cliAccess.helperOff")
         }
-        control={(helperId) => (
+        explanation={enabled ? [t("settings.cliAccess.helperOn")] : undefined}
+        control={(helperId, explanationId) => (
           <Switch
             checked={enabled}
             onChange={onSetEnabled}
             ariaLabel={t("settings.cliAccess.label")}
-            ariaDescribedBy={helperId}
+            ariaDescribedBy={
+              explanationId === undefined
+                ? helperId
+                : `${helperId} ${explanationId}`
+            }
             testId="settings.cli-access-toggle"
           />
         )}

@@ -13,9 +13,20 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "../../primitives/Icon";
 
 // A slim block at the top of the rail; a hairline separates it from the tabs.
+//
+// **Its height is pinned to `--space-7`, and that is a shared contract rather
+// than a measurement** (myne-md/myne#885): the in-panel topic strip in the
+// content column is the SAME height by construction (`SettingsTabs` pins its band
+// to this same token), so the two rows' bottom hairlines land on one line and the
+// strip reads as part of the chrome. Both rows centre their control rather than
+// padding to it, because a content-derived height would let a font metric move one
+// row and not the other, which is a drift nothing would report.
 const ROW_STYLE: CSSProperties = {
   flex: "0 0 auto",
-  padding: "var(--space-3) var(--space-3) var(--space-2)",
+  height: "var(--space-7)",
+  display: "flex",
+  alignItems: "center",
+  padding: "0 var(--space-3)",
   borderBottom: "1px solid var(--line-1)",
   background: "transparent",
 };
@@ -75,7 +86,7 @@ export const SettingsSearch = forwardRef<HTMLInputElement, SettingsSearchProps>(
     const { t } = useTranslation();
     const [focused, setFocused] = useState(false);
     return (
-      <div style={ROW_STYLE}>
+      <div style={ROW_STYLE} data-testid="settings.search-row">
         <div style={focused ? { ...FIELD_STYLE, ...FIELD_FOCUS_STYLE } : FIELD_STYLE}>
           <Icon name="search" size={14} />
           <input

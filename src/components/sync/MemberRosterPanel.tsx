@@ -337,6 +337,34 @@ export function MemberRosterPanel({
     </Button>
   );
 
+
+  // The invite action, built once and placed in ONE of two spots: inside the
+  // members zero state while the list is empty, centred under its sentence, and
+  // below the list once it has rows (myne-md/myne#867, on the user's read: "put
+  // the invite button under the zero state's description, centred"). The zero
+  // state already says "invite someone", so the button belongs with that
+  // sentence rather than floating under the box.
+  const inviteButton = (
+    <Button
+      type="button"
+      variant="primary"
+      data-testid="member-roster.invite-button"
+      disabled={!personReady || inviting}
+      onClick={() => {
+        // An `NTV5` vault gains the group tier on its first invite, which
+        // is PERMANENT. Say so BEFORE the form, rather than letting the
+        // user submit and infer it from a hidden retry (myne-md/myne#783).
+        if (!shared) {
+          setShareConfirmOpen(true);
+          return;
+        }
+        setInviteOpen(true);
+      }}
+    >
+      {t("sync.memberRoster.invite")}
+    </Button>
+  );
+
   return (
     <div data-testid="member-roster" style={ROOT_STYLE}>
       {/* The inviting identity: the person this device invites as, shown once
@@ -502,6 +530,7 @@ export function MemberRosterPanel({
           size="sm"
           title={t("sync.memberRoster.emptyTitle")}
           body={t("sync.memberRoster.empty")}
+          {...(authority === "owner" ? { action: inviteButton } : {})}
           testId="member-roster.empty"
         />
       ) : (
@@ -667,7 +696,9 @@ export function MemberRosterPanel({
 
       {/* Invite: owner-only. A member is never shown an admin control they
           cannot use (the backend refuses with `NotOwner`). Left-aligned at its
-          natural width rather than stretched across the panel. */}
+          natural width rather than stretched across the panel. With no members
+          the button lives inside the zero state instead (`inviteButton`), so
+          only the invite result line can render here. */}
       {authority === "owner" ? (
         <div
           style={{
@@ -677,24 +708,7 @@ export function MemberRosterPanel({
             gap: "var(--space-2)",
           }}
         >
-          <Button
-            type="button"
-            variant="primary"
-            data-testid="member-roster.invite-button"
-            disabled={!personReady || inviting}
-            onClick={() => {
-              // An `NTV5` vault gains the group tier on its first invite, which
-              // is PERMANENT. Say so BEFORE the form, rather than letting the
-              // user submit and infer it from a hidden retry (myne-md/myne#783).
-              if (!shared) {
-                setShareConfirmOpen(true);
-                return;
-              }
-              setInviteOpen(true);
-            }}
-          >
-            {t("sync.memberRoster.invite")}
-          </Button>
+          {members.length > 0 ? inviteButton : null}
           {lastInvite ? (
             <p data-testid="member-roster.invite-result" style={CODE_STYLE}>
               {t("sync.memberRoster.inviteReady", {
@@ -716,9 +730,17 @@ export function MemberRosterPanel({
           testId="member-roster.invitations-section"
         >
           {vaultInvites.length === 0 ? (
-            <p data-testid="member-roster.invitations-empty" style={HELPER_STYLE}>
-              {t("sync.memberRoster.noInvitations")}
-            </p>
+            // The app's one zero state, like the members list above it
+            // (myne-md/myne#885 visual pass): the two sections are one story, and
+            // a bare line under a section whose sibling draws `EmptyState` read as
+            // an unstyled leftover.
+            <EmptyState
+              variant="firstRun"
+              icon="share-2"
+              size="sm"
+              title={t("sync.memberRoster.noInvitations")}
+              testId="member-roster.invitations-empty"
+            />
           ) : (
             <ul data-testid="member-roster.invitations" style={LIST_STYLE}>
               {vaultInvites.map((inv) => (

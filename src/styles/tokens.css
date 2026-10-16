@@ -516,9 +516,17 @@ a:focus-visible,
   from { opacity: 0; transform: translateY(8px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* A settings topic's body, on a topic change (myne-md/myne#885). Small on
+   purpose: the strip's underline already says where you went, so the body only
+   has to arrive rather than cut. */
+@keyframes settings-topic-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   [data-testid="settings.modal"],
-  [data-testid="settings.modal"] > * { animation: none !important; }
+  [data-testid="settings.modal"] > *,
+  [data-testid="settings.modal"] [role="tabpanel"] { animation: none !important; }
 }
 
 /* Attachments library entrance (MYND-170 polish) — the full-pane view used to

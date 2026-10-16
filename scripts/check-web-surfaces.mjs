@@ -51,6 +51,14 @@ const V = {
     "adapted",
     "Never mounted: the `ai` rail entry is filtered out where `localAi` is absent (task 27), so the panel is unreachable rather than empty. Unchanged by the remote-provider controls (myne#415): they live inside this same panel, so they inherit the same rail filter and reach the browser no more than the rest of it does.",
   ],
+  "src/components/settings/AiModelCatalogue.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this table is unreachable. Its host calls are the `local-inference` download bindings (that whole plugin is classified absent-on-web in `web/wasm/src/capability.rs`) plus the model-store reads, so there is nothing here that would need a web substitution even if it were reachable. Moved out of AiPanel.tsx by myne#867 and out of its `ModalShell` by myne#885; the verdict is unchanged in kind, because it is reachable from exactly one place and that place is the panel.",
+  ],
+  "src/components/settings/ModelPathButton.tsx": [
+    "adapted",
+    "Rendered only by AiPanel.tsx and AiModelCatalogue.tsx, so it inherits the panel's rail filter exactly: where `localAi` is absent neither caller is mounted and this control is unreachable. Its only host call is `revealItemInDir` on the opener plugin, behind a button that is disabled without a resolved path, so there is nothing here that would need a web substitution even if it were reachable. Extracted from AiPanel.tsx by myne#867 to give the panel and the catalogue one copy.",
+  ],
   "src/components/settings/AiOnboardingSurface.tsx": [
     "adapted",
     "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0628). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
@@ -100,6 +108,10 @@ const V = {
     "Never rendered: the panel is a `developer`-group rail entry carrying `capability: \"cliAccess\"`, which is absent on web, so the rail drops it and nothing here ever mounts. It ships in the bundle (it is the composition root for the CLI block, one small file inside the settings chunk that does ship) and the block it renders carries the same capability gate. Moved out of PrivacyPanel by `decisions/ui/0678`; the web verdict is unchanged by the move, since the capability gate was already what kept the terminal surface off this client.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
+  "src/components/settings/HelperDisclosure.tsx": [
+    "ported",
+    "The question mark beside a setting's title and the popover it opens (myne-md/myne#885). No host call of any kind: it renders the copy the row's own panel already passed it, and the only outside contact is `IconButton`. It is mounted wherever a `SettingRow` carries an `explanation`, so it is reachable on web exactly where the rows that use it are.",
+  ],
   "src/components/settings/SettingRow.tsx": [
     "ported",
     "Layout primitive — the canonical label-left / control-right settings row. Presentational: it composes panel-styles and renders its caller's control, with no host call and no capability of its own.",
@@ -145,7 +157,7 @@ const V = {
   ],
   "src/components/settings/PrivacyPanel.tsx": [
     "adapted",
-    "Ships; the device-local screen-capture OVERRIDE row, the quick-unlock block and the hide-vault-names row are capability-gated, and all three are filtered from search. The per-vault screen-capture toggle beside the override is deliberately NOT gated, and this verdict claimed for a long time that it was: it is a `vault.prefs` field a user may read and set on a client where the native call does nothing, while the override writes a device-local file whose only purpose is suppressing a call that client never makes. The hide-vault-names row is gated on `lockedVaultNames` (myne-md/myne#411): a browser origin holds exactly one container, so the locked picker the setting governs never renders there, and there is no OS keychain to seal its store. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
+    "Ships; the per-vault screen-capture toggle, the device-local screen-capture OVERRIDE row, the quick-unlock block and the hide-vault-names row are capability-gated, and all four are filtered from search. The toggle is gated on `screenCaptureProtection` because a page cannot stop a screenshot (myne-md/myne#556): rendered ungated, a web user turns it on and is told their screen is protected by something with no way to protect it, and `decisions.md` 2026-07-26 makes omission, not a greyed control, normative for an absent capability. Its search entry carries the same capability (myne-md/myne#885), since an untagged entry offered a web hit that landed on no row. The hide-vault-names row is gated on `lockedVaultNames` (myne-md/myne#411): a browser origin holds exactly one container, so the locked picker the setting governs never renders there, and there is no OS keychain to seal its store. The CLI block carries a `developer_mode` gate on top of its capability gate (#181); on web the capability half already decides it.",
   ],
   "src/components/settings/QuickUnlockSettings.tsx": [
     "adapted",
@@ -178,6 +190,14 @@ const V = {
   "src/components/settings/SettingsSection.tsx": [
     "ported",
     "The settings-panel section wrapper (MYND-624). Presentational — a heading plus its children, no host call and no capability of its own, so it carries whatever its contents already carry.",
+  ],
+  "src/components/settings/SettingsTabs.tsx": [
+    "ported",
+    "Myne-md/myne#885. The in-panel topic strip and the session-scoped store behind it: presentational plus module memory, no host call and no capability of its own. It renders inside `SettingsModal`, which the web client mounts from the same shared tree, and the panel it splits decides reachability, so the strip carries whatever its panel already carries (the `ai` panel's rail filter, on web).",
+  ],
+  "src/components/settings/settingsTopics.ts": [
+    "ported",
+    "Myne-md/myne#885. The topic roster as DATA: an id and an i18n label key per topic, imported by the strip, the panel and the search index. It renders nothing, calls no host, and holds no capability.",
   ],
   "src/components/settings/SpellSettings.tsx": [
     "adapted",

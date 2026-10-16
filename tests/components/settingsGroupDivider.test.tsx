@@ -92,6 +92,21 @@ function mount() {
 }
 
 /**
+ * The rail's own nav element.
+ *
+ * Scoped rather than `screen.getByRole("tablist")` because that query is now
+ * ambiguous: since myne-md/myne#885 a settings panel with topics renders its own
+ * `role="tablist"` inside the content column, so a bare query finds two and
+ * throws. The rail is the one that is a `<nav>`, and a missing rail has to fail
+ * by name rather than as a null dereference.
+ */
+function railNav(): HTMLElement {
+  const nav = document.querySelector("nav[role='tablist']");
+  expect(nav, "the settings rail is not in the document").not.toBeNull();
+  return nav as HTMLElement;
+}
+
+/**
  * The rail, read in DOM order as a flat list of `header` and `tab` entries.
  *
  * Reading ORDER rather than mere presence is what lets the invariant below be
@@ -99,7 +114,7 @@ function mount() {
  * headers and panels would pass on a rail that rendered the heading last.
  */
 function railSequence(): Array<{ kind: "header" | "tab"; id: string }> {
-  const nav = screen.getByRole("tablist");
+  const nav = railNav();
   return Array.from(nav.querySelectorAll("[data-testid]")).map((el) => {
     const id = el.getAttribute("data-testid")!;
     return { kind: id === GROUP_HEADER ? ("header" as const) : ("tab" as const), id };

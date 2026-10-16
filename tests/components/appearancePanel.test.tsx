@@ -42,10 +42,27 @@ vi.mock("../../src/components/settings/CustomThemesSection", () => ({
 }));
 
 import { AppearancePanel } from "../../src/components/settings/AppearancePanel";
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
 
 const BASE = { theme: null, custom_theme: null, show_note_timestamps: true };
 
+/**
+ * Select an Appearance topic, the way the strip does (myne-md/myne#885). The
+ * panel is mounted directly rather than through `SettingsModal`, so no strip is
+ * on screen, but the topic store still decides which body renders: an inactive
+ * topic's body is deliberately not mounted.
+ */
+function selectTopic(id: "display" | "notes" | "interface") {
+  act(() => setActiveSettingsTopic("appearance", id));
+}
+
 beforeEach(() => {
+  // Module-scope by design (it is what makes the choice survive a modal close),
+  // so a spec that left it on `interface` would decide the next one.
+  resetSettingsTopics();
   prefsRead.mockReset().mockResolvedValue({ ...BASE });
   setTheme.mockReset().mockResolvedValue(undefined);
   setCustomTheme.mockReset().mockResolvedValue(undefined);
@@ -158,6 +175,7 @@ describe("AppearancePanel — theme segmented control", () => {
 
 describe("AppearancePanel — graph settings pointer row (MYND-604)", () => {
   it("renders the row with its i18n label, helper and action", async () => {
+    selectTopic("interface");
     render(<AppearancePanel onOpenGraph={() => {}} />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
     expect(screen.getByText("Graph appearance")).toBeTruthy();
@@ -170,6 +188,7 @@ describe("AppearancePanel — graph settings pointer row (MYND-604)", () => {
   });
 
   it("clicking the action opens the graph", async () => {
+    selectTopic("interface");
     const onOpenGraph = vi.fn();
     render(<AppearancePanel onOpenGraph={onOpenGraph} />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
@@ -178,6 +197,7 @@ describe("AppearancePanel — graph settings pointer row (MYND-604)", () => {
   });
 
   it("disables the action when no handler is supplied", async () => {
+    selectTopic("interface");
     render(<AppearancePanel />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
     expect(
@@ -188,6 +208,7 @@ describe("AppearancePanel — graph settings pointer row (MYND-604)", () => {
 
 describe("AppearancePanel — show edit times toggle", () => {
   it("optimistically flips then persists the new value", async () => {
+    selectTopic("notes");
     render(<AppearancePanel />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
     const toggle = screen.getByTestId("settings.note-timestamps-toggle");
@@ -199,6 +220,7 @@ describe("AppearancePanel — show edit times toggle", () => {
 
   it("reverts + shows an error when the timestamp write fails", async () => {
     setShowNoteTimestamps.mockRejectedValueOnce(new Error("io"));
+    selectTopic("notes");
     render(<AppearancePanel />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
     const toggle = screen.getByTestId("settings.note-timestamps-toggle");

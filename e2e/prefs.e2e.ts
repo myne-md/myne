@@ -27,6 +27,7 @@ import {
   openSettings,
   pickSelect,
   selectPickerRow,
+  selectSettingsTopic,
   switchToVault,
   unlockToEditor,
 } from "./support/flows";
@@ -105,6 +106,9 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
         // dropdown: open the trigger, click the 900s option, then confirm the
         // trigger summarises the choice by its label.
         await (await s.byTestId("settings.tab-privacy")).click();
+        // Auto-lock lives in Privacy's `locking` topic since myne-md/myne#885;
+        // only the active topic's body is mounted.
+        await selectSettingsTopic(s, "privacy", "locking");
         await (await s.byTestId("settings.auto-lock-select")).click();
         await (
           await s.waitForElement(
@@ -135,6 +139,9 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
           { label: "theme segment reads back dark" },
         );
         await (await s.byTestId("settings.tab-privacy")).click();
+        // The reload above reset the strip's session memory with the page, so
+        // the topic is opened again here (myne-md/myne#885).
+        await selectSettingsTopic(s, "privacy", "locking");
         await s.waitUntil(
           async () =>
             (await (await s.byTestId("settings.auto-lock-select")).textContent()).includes(
@@ -206,8 +213,10 @@ describeE2E("pf4 sidebar note-timestamp visibility round-trip (sidebar-note-time
         await s.byTestId("notes.row-subtitle");
 
         // Appearance → toggle "Show edit times" OFF. The setter bumps the prefs
-        // nonce so the sidebar (its own usePrefs instance) re-reads live.
+        // nonce so the sidebar (its own usePrefs instance) re-reads live. The
+        // toggle lives in Appearance's `notes` topic since myne-md/myne#885.
         await openSettings(s, "appearance");
+        await selectSettingsTopic(s, "appearance", "notes");
         const toggle = await s.byTestId("settings.note-timestamps-toggle");
         if ((await toggle.attribute("aria-checked")) !== "true") {
           throw new Error("note-timestamps toggle did not start ON (default true)");
@@ -235,6 +244,9 @@ describeE2E("pf4 sidebar note-timestamp visibility round-trip (sidebar-note-time
 
         // The toggle itself reads back OFF from disk (mount effect — poll).
         await openSettings(s, "appearance");
+        // The reload above reset the strip's session memory with the page, so
+        // the topic is opened again here (myne-md/myne#885).
+        await selectSettingsTopic(s, "appearance", "notes");
         await s.waitUntil(
           async () =>
             (await (await s.byTestId("settings.note-timestamps-toggle")).attribute(

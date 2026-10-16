@@ -217,6 +217,8 @@ export const NOT_A_SURFACE = Object.freeze({
   "src/components/settings/browser-icons.tsx":
     "Icon set used by the connected-extensions panel; renders no surface of its own.",
   "src/components/settings/ControlBlock.tsx": "Layout primitive every panel composes; it has no settings of its own.",
+  "src/components/settings/settingsTopics.ts":
+    "Myne-md/myne#885. The in-panel topic roster as DATA: one id and one i18n label key per topic, imported by the strip, the panels and the settings search index. It renders nothing, so there is no state of it for a human to look at, and what its values DO produce is covered by the AI panel entry that claims the strip and the panels rendering from it.",
   "src/components/settings/AiOnboardingSurface.tsx":
     "A modal the AI-onboarding entry already drives rather than a screen of its own: it has no route and no independent entry point, and its visible states (the three feature cards, skip, and each download state) are the subject of the `ai.model-download-onboarding` roster entry, which owns the manual verdict for this surface.",
 });

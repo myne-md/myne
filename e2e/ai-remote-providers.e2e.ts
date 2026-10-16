@@ -252,12 +252,13 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           //    renders the value back ──
           const keyField = await s.byTestId("ai.provider-key-input");
           await keyField.replaceText("sk-e2e-fixture-key");
-          // Enter, not a click on the surrounding block. `commitKey` fires on
-          // blur OR on Enter, and clicking the section `div` does not blur the
-          // input — a plain container is not focusable, so focus never moves
-          // and no blur event is dispatched. The first run of this scenario
-          // timed out here for exactly that reason; the component's own
-          // `onKeyDown` path is the one a user actually takes.
+          // Enter, which is one of the two acts that store a key. **It used to
+          // be the ONLY one available here and blur was the other**, which is
+          // what myne-md/myne#867 removed: a field that commits when it loses
+          // focus stores a key the user never confirmed. The two acts now are
+          // Enter and the confirm control beside the field
+          // (`ai.provider-key-save`), and this scenario drives the keyboard
+          // one because that is the path a paste-then-Enter takes.
           await pressKey(s, KEY.ENTER);
           await s.waitUntil(
             async () => {

@@ -36,11 +36,18 @@ const BUTTON_SIZE = 28;
 const ICON_SIZE = 17;
 
 /**
- * The shell spans the full row height so the rail's surface and its inner
- * divider line can start BELOW the traffic-light strip rather than running up
- * through it (the `STRIP_HEIGHT` spacer mirrors the left sidebar's own
- * clearance row). Obsidian's ribbon does the same: the window controls sit in a
- * title strip above the rail, not on top of it.
+ * The shell spans the full row height and carries the rail's surface, so the
+ * column's ground is continuous from the top of the window: the traffic-light
+ * strip above the icons is the same `--bg-2` as the rest of the rail, and the
+ * `STRIP_HEIGHT` clearance row mirrors the left sidebar's own (the pane beside
+ * it paints its clearance row the same way, by not painting it at all).
+ *
+ * **The DIVIDER still starts below the strip**, which is the Obsidian detail
+ * worth keeping: the window controls sit in a title strip above the rail's
+ * icons, and the hairline between the rail and the sidebar begins where the
+ * icons do. Painting the surface and starting the divider are two different
+ * questions, and the first one used to be answered wrongly. See
+ * `RAIL_SHELL_STYLE` for the band that produced.
  */
 const RAIL_SHELL_STYLE: CSSProperties = {
   position: "relative",
@@ -50,7 +57,24 @@ const RAIL_SHELL_STYLE: CSSProperties = {
   minHeight: 0,
   display: "flex",
   flexDirection: "column",
+  // **The REGION ROOT paints the column's ground, not the scroller below it**
+  // (myne-md/myne#867). The fill used to sit on `RAIL_BODY_STYLE`, which starts
+  // BELOW the title-strip clearance row. So the strip region of this column was
+  // painted by nothing at all and the app root's `--bg-1` showed through it: a
+  // hard-edged band at the top-left corner, `#fbfbfa` against the rail's own
+  // `#f4f4f2` in the light theme and `#121210` against `#1a1a17` in the dark
+  // one, invisible only on AMOLED where both resolve to black. Reported on both
+  // themes, which is why it is fixed here rather than as a light-theme quirk.
+  //
+  // This is also how the sibling `SidebarPane` does it: the pane's outer box
+  // carries `--paper-2` for its whole height and the column's own clearance row
+  // stays transparent. Two adjacent columns of the same chrome, two different
+  // arrangements, and the one that leaves a gap is the one that paints low.
+  background: "var(--bg-2)",
 };
+/** The scroller. Deliberately paints NOTHING: the region root above owns the
+ *  column's ground, so this can never leave a strip of it uncovered, which is
+ *  exactly what it did while the fill lived here (see `RAIL_SHELL_STYLE`). */
 const RAIL_BODY_STYLE: CSSProperties = {
   flex: 1,
   minHeight: 0,
@@ -62,7 +86,6 @@ const RAIL_BODY_STYLE: CSSProperties = {
   paddingBottom: "var(--space-1)",
   overflowY: "auto",
   overflowX: "hidden",
-  background: "var(--bg-2)",
 };
 /** One rail item: a relative, full-width flex centre so the drop indicator can
  *  be an absolutely-positioned, square accent line rather than an inset shadow

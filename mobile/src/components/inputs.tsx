@@ -586,6 +586,7 @@ export function TextField({
   autoComplete = "off",
   dir,
   onEnter,
+  onBlur,
   onPaste,
   style,
   inputStyle,
@@ -617,6 +618,8 @@ export function TextField({
    *  showed the word. */
   dir?: "ltr";
   onEnter?: () => void;
+  /** Called when the field loses focus, for a field that commits a draft. */
+  onBlur?: () => void;
   onPaste?: (event: ClipboardEvent<HTMLInputElement>) => void;
   style?: CSSProperties;
   inputStyle?: CSSProperties;
@@ -654,7 +657,10 @@ export function TextField({
         }
         onPaste={onPaste}
         onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         spellCheck={false}

@@ -12,10 +12,17 @@
 //    search index as well as the panel. Search resolves straight to a panel
 //    id, so a `developerGated` tag there would hide the row from the one
 //    surface a user reaches for when they cannot find a setting.
-// 2. **The disclosure is complete and unclickable-away.** The two bounds (what
-//    enabling destroys, and the copy it cannot reach) render without any
-//    interaction. A bound behind a disclosure toggle is a bound most readers
-//    never see, and "erases" read on its own means more than it does.
+// 2. **The destructive bound is not hidden behind an interaction.** This file
+//    held that position before myne-md/myne#885, when it meant "the whole
+//    776-character stack renders on the row". The row now carries ONE sentence
+//    and the rest sits behind the question mark beside its label, so the
+//    position is restated at the level it was always about: the sentence kept
+//    on the row is the ACT of destruction, the two paragraphs that qualify it
+//    (what the erase cannot reach, and what the placeholder does) are one hover
+//    or one Tab away, and both remain in the document and named by the control
+//    while collapsed, so no reader loses them. What would be a defect is the
+//    reverse arrangement: the placeholder explanation on the row and the erase
+//    behind the question mark. That is asserted below, not assumed.
 // 3. **A failed probe is not an unavailable keychain.** The backend's
 //    unavailable case is a VALUE (`{ available: false }`) and never a rejection
 //    (`core/src/vault_label/commands.rs`), so a rejection means the question
@@ -144,11 +151,58 @@ describe("hide vault names: reachable without Developer mode", () => {
 });
 
 describe("hide vault names: the disclosure", () => {
-  it("shows both bounds with no interaction", async () => {
+  it("keeps the DESTRUCTIVE bound on the row, with no interaction", async () => {
+    // The arrangement that would be a defect is the placeholder on the row and
+    // the erase behind the question mark. This asserts the other one, by key:
+    // the inline helper IS the sentence that says the keys are destroyed.
     mountPanel();
-    const disclosure = await screen.findByTestId("settings.hide-vault-names-disclosure");
+    await screen.findByTestId("settings.hide-vault-names");
+    // The row's OWN helper paragraph, addressed through the control's first
+    // `aria-describedby` id rather than by tag: the moved paragraphs are `<p>`
+    // elements too, inside the label cell, so a `querySelector("p")` returns the
+    // first of THOSE and would assert against the copy that moved.
+    const describedBy = screen
+      .getByTestId("settings.hide-vault-names-toggle")
+      .getAttribute("aria-describedby")!
+      .split(/\s+/);
+    const helper = document.getElementById(describedBy[0]!);
+    expect(helper?.textContent).toBe(t("settings.privacy.hideVaultNamesInline"));
+    expect(t("settings.privacy.hideVaultNamesInline").toLowerCase()).toContain(
+      "destroys the keys",
+    );
+    // …and the placeholder sentence it replaced is NOT the one left on the row.
+    expect(t("settings.privacy.hideVaultNamesInline")).not.toBe(
+      t("settings.privacy.hideVaultNamesHelper"),
+    );
+  });
+
+  it("moves the qualifying paragraphs behind the question mark without losing them", async () => {
+    // The moved copy is present in the document while collapsed, so a screen
+    // reader reads it whether or not the disclosure is ever opened, and it is
+    // the control's description rather than a floating aside.
+    mountPanel();
+    const disclosure = await screen.findByTestId("settings.hide-vault-names-explanation");
+    expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesHelper"));
     expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesErases"));
     expect(disclosure.textContent).toContain(t("settings.privacy.hideVaultNamesResidue"));
+    const describedBy = screen
+      .getByTestId("settings.hide-vault-names-toggle")
+      .getAttribute("aria-describedby");
+    expect(describedBy).toContain(disclosure.id);
+  });
+
+  it("reveals the moved copy on KEYBOARD focus, not on hover alone", async () => {
+    // The half a hover-only implementation gets wrong. jsdom resolves the inline
+    // `display`, so "not shown" and "shown" are readable here.
+    mountPanel();
+    const disclosure = await screen.findByTestId("settings.hide-vault-names-explanation");
+    const trigger = await screen.findByTestId("settings.hide-vault-names-explain");
+    expect(window.getComputedStyle(disclosure).display).toBe("none");
+    fireEvent.focus(trigger);
+    expect(window.getComputedStyle(disclosure).display).not.toBe("none");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.blur(trigger);
+    expect(window.getComputedStyle(disclosure).display).toBe("none");
   });
 
   it("says what enabling destroys and that nothing further is written", () => {

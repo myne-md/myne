@@ -233,6 +233,23 @@ describe("MemberRosterPanel roles", () => {
     }
   });
 
+  it("puts the invite control inside the empty members state, not under it", () => {
+    // myne-md/myne#867: with no members the zero state says "invite someone",
+    // so the button sits under that sentence, centred, and nowhere else.
+    const saved = mockMembers;
+    mockMembers = [];
+    render(<MemberRosterPanel />);
+    try {
+      const empty = screen.getByTestId("member-roster.empty");
+      const buttons = screen.getAllByTestId("member-roster.invite-button");
+      expect(buttons).toHaveLength(1);
+      expect(empty.contains(buttons[0])).toBe(true);
+    } finally {
+      mockMembers = saved;
+      cleanup();
+    }
+  });
+
   it("hides the invite control from a member", () => {
     mockAuthority = "member";
     render(<MemberRosterPanel />);

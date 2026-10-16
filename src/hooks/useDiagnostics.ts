@@ -127,7 +127,15 @@ export function useDiagnostics(): DiagnosticsState {
       // `undefined` is the sentinel for a refused read, so the resolve branch can
       // tell it from the host answering "no record" with `null`.
       crashRecordState().catch(() => undefined),
-      reportManifest().catch(() => null),
+      // `?? null` rather than a bare `.catch`: `invoke<T>` is an unchecked cast,
+      // so a host that RESOLVES `undefined` (rather than rejecting) put
+      // `undefined` into a state whose type says `ReportManifest | null`, and the
+      // panel's `=== null` guard let it through to `.log_files` and crashed the
+      // whole About panel. A non-answer is "we do not know", which is a state the
+      // surface already has a sentence for.
+      reportManifest()
+        .then((manifest) => manifest ?? null)
+        .catch(() => null),
     ])
       .then(([flag, record, manifest]) => {
         if (cancelled) return;
@@ -152,7 +160,11 @@ export function useDiagnostics(): DiagnosticsState {
       // The same sentinel as the initial load: a refused read is recorded, so the
       // surface says it could not read the record rather than showing none.
       crashRecordState().catch(() => undefined),
-      reportManifest().catch(() => null),
+      // The same `?? null` as the initial load, for the same reason: a resolved
+      // `undefined` is a non-answer, not a manifest.
+      reportManifest()
+        .then((manifest) => manifest ?? null)
+        .catch(() => null),
     ]);
     if (record === undefined) {
       setCrashReadFailed(true);

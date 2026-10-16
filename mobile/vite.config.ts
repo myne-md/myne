@@ -215,6 +215,13 @@ export default defineConfig(async () => ({
       // order, then the transcript + machine notice). A hand-copy is how the two
       // clients would silently disagree about that layout.
       { find: /^@myne\/meeting-note$/, replacement: sib("../src/notes/meetingNote.ts") },
+      // The note-mention matcher (myne-md/myne#867). Pure: it projects a note
+      // to its path/title and splits a string on whole names, with no host and no
+      // vault access, so the phone can linkify a chat turn with the SAME three
+      // boundary rules the desktop applies, the rules that decide whether a
+      // mention opens the right note or one nobody named. A second copy is how
+      // the two clients would silently disagree about that.
+      { find: /^@myne\/note-mentions$/, replacement: sib("../src/notes/ai/noteMentions.ts") },
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's

@@ -135,7 +135,19 @@ describe("the mobile prefs chokepoint", () => {
     // setters. The slack was found by review rather than by this file: a floor
     // left behind an addition is exactly as green as a correct one, so the raise
     // is part of adding a setter and not a follow-up.
-    expect(covered.length).toBeGreaterThanOrEqual(50);
+    //
+    // Raised 50 -> 57 by myne-md/myne#880, which added `setPeriodicNoteSetting`
+    // and is the first change to re-measure rather than to bump by one: the
+    // count had drifted to 56 setters against a floor of 50, so six could have
+    // stopped reaching `invoke` with this file green. 57 is the measured value
+    // (`grep -c` reports 53 `await writePref(` calls; the roster keys off what
+    // each binding SENT to `invoke`, and a setter whose write sits in a helper
+    // still counts, which is why the two numbers differ).
+    //
+    // Raised 57 -> 62 later in the same branch, whose phase 3 rows bound five
+    // more setters (colour groups, AI excluded folders, chat-history budget,
+    // meeting prompt, attachment OCR). Measured by the roster, not by `grep`.
+    expect(covered.length).toBeGreaterThanOrEqual(62);
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
     // old value is worse here than a stale font size. Deliberately NOT cited to

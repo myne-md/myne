@@ -194,6 +194,17 @@
   distinguishing part was: a missing settings clause, a failed clause and a stale count all share
   that opening sentence. `throw new Error(...)` with the whole value in the message cost one line and
   named the answer immediately.
+- **`GET /text` on a just-inserted banner can answer `""` on the first read and the copy ~1.5 s
+  later, while the DOM is correct throughout.** Measured on the picker-reached unlock: `byTestId`
+  resolves the moment the node is in the DOM, `textContent` and `innerText` already carry the copy,
+  and WebDriver's `/text` returns `""` until WebKit's render tree catches up. A one-shot
+  `banner.text()` therefore fails on timing rather than on behaviour, and the failure reads exactly
+  like a missing banner (`expected '' to be 'Wrong password…'`). Read a banner with
+  `waitForBannerText` (`support/flows.ts`), which re-reads on every poll and re-finds the element
+  each time, so a banner that never carries the copy still fails. This is the `text()` versus
+  `textContent()` split on `Element` (`support/webdriver.ts`) seen on a fresh render: `/text` is for
+  direct text nodes and `textContent()` for nested ones, and for a banner that has just appeared
+  neither is safe as a one-shot.
 
 - One scenario = one story; every scenario declares its **vault-count
   precondition** in a comment (0 / 1 / ≥2 / legacy). Don't merge stories to

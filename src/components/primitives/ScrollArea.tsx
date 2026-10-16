@@ -87,6 +87,7 @@ export function ScrollArea({
   ariaLabel,
   scrollerRef: externalRef,
   onScroll: onScrolled,
+  watchSubtree = true,
 }: {
   children: ReactNode;
   style?: CSSProperties;
@@ -106,6 +107,19 @@ export function ScrollArea({
   scrollerRef?: RefObject<HTMLDivElement | null>;
   /** Called after every scroll the reader or the caller causes. */
   onScroll?: () => void;
+  /**
+   * Re-observe on every DOM change anywhere inside the scroller (the default),
+   * or only when the scroller's OWN children change.
+   *
+   * The default is right for content whose rows come and go as the user works.
+   * A virtualised list is the opposite case (myne-md/myne#867 review, D7): its
+   * visible slice changes on every scroll frame, so a subtree observer
+   * disconnected and re-observed every row each frame on the hottest list in
+   * the app. Such a caller wraps its content in ONE element whose height is the
+   * whole list, passes `false`, and the ResizeObserver on that wrapper is what
+   * reports a change in total height.
+   */
+  watchSubtree?: boolean;
 }) {
   const ownRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = externalRef ?? ownRef;
@@ -179,7 +193,7 @@ export function ScrollArea({
             measure();
           })
         : null;
-    mo?.observe(el, { childList: true, subtree: true });
+    mo?.observe(el, { childList: true, subtree: watchSubtree });
     if (ro === null && typeof window !== "undefined") {
       window.addEventListener("resize", measure);
     }
@@ -193,7 +207,7 @@ export function ScrollArea({
       }
       if (idleTimer.current !== null) clearTimeout(idleTimer.current);
     };
-  }, [measure, onScroll]);
+  }, [measure, onScroll, watchSubtree]);
 
   // Drag. The pointer capture is what keeps the thumb following a fast gesture
   // that leaves the six-pixel-wide element, which it always does.
@@ -260,7 +274,7 @@ export function ScrollArea({
           // its corner, and a full-width row lost its last characters.
           //
           // `--space-2` is the gutter, and the thumb's own geometry adds up to
-          // it (`inset-inline-end: 2px` + `width: 6px`, in the sheet): one
+          // it (`inset-inline-end: 4px` + `width: 4px`, in the sheet): one
           // number, so the two cannot drift into a 1px overlap. A margin
           // rather than padding, so a caller's own `contentStyle` padding is
           // additive instead of being replaced.

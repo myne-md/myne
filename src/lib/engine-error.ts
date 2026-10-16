@@ -115,6 +115,19 @@ export type ProviderErrorCause =
    *  rendered "The agent could not start", which names no control and no fix:
    *  the same collapse `feature_off` documents above. */
   | "empty_grant"
+  /** No model to run, and the surface must say so rather than say "no provider".
+   *
+   *  **Added by myne-md/myne#867, and its absence was a live defect rather than
+   *  a tidy-up.** `EngineError::NoModel` is the cause the capability report
+   *  emits when the local arm is active with no model file AND when a named
+   *  provider has none chosen, so a vault whose provider was named but whose
+   *  model was not yet picked reached the chat header as `no_model`, which this
+   *  table did not know, and the header's fall-through rendered it as
+   *  "No provider". It is also the cause `LocalInferenceState::remote_refusal`
+   *  now reports for the provider-named-no-model case, deliberately, so that
+   *  `not_ready` keeps meaning the one thing it is true about: nothing is named
+   *  at all. */
+  | "no_model"
   | "failed";
 
 /**
@@ -160,6 +173,7 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set<ProviderErrorCause>([
   "feature_off",
   "consent_missing",
   "empty_grant",
+  "no_model",
   "failed",
 ]);
 
@@ -224,6 +238,7 @@ const PROVIDER_ERROR_KEY: Readonly<Record<ProviderErrorCause, string>> = {
   feature_off: "settings.ai.providerError.featureOff",
   consent_missing: "settings.ai.providerError.consentMissing",
   empty_grant: "settings.ai.providerError.emptyGrant",
+  no_model: "settings.ai.providerError.noModel",
   unreachable: "settings.ai.providerError.unreachable",
   refused: "settings.ai.providerError.refused",
   timeout: "settings.ai.providerError.timeout",

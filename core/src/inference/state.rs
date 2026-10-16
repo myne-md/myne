@@ -398,6 +398,67 @@ impl LocalInferenceState {
         remote
     }
 
+    /// **Why a NAMED provider is not the arm that answers**, or `None` when the
+    /// question does not apply: no remote arm in this build, no provider named,
+    /// or the remote arm IS the active one.
+    ///
+    /// `active()` above consults [`super::provider_gate::authorize_remote`] for
+    /// its boolean and throws the gate's own refusal away, so the capability
+    /// report had nothing to say about a named-but-inactive provider beyond the
+    /// LOCAL arm's `NoModel`. That is how consent-missing, no-credential,
+    /// no-model-chosen and "no provider at all" all reached the chat header as
+    /// one sentence, "No provider", on a vault whose provider was named
+    /// (myne-md/myne#867).
+    ///
+    /// Returns the gate's refusal verbatim rather than a new vocabulary: it is
+    /// already the closed `EngineError` set the report promises to speak.
+    ///
+    /// Two edges deliberately return `None` and fall to the local reading: the
+    /// slot lock being contended, and the authorization belonging to a different
+    /// vault than the one unlocked. Both are the fail-safe direction `active()`
+    /// documents, and neither has a cause in the taxonomy that would describe it
+    /// better than the local arm's own state does. **The vault edge is checked
+    /// here the same way `active()` checks it**, and the first version of this
+    /// function documented the edge without implementing it, so a reviewer read
+    /// a bound the code did not have.
+    pub fn remote_refusal(&self) -> Option<EngineError> {
+        self.remote?;
+        let snapshot = self.snapshot.read().ok()?;
+        let snapshot = snapshot.as_ref()?;
+        let named = |v: Option<&str>| v.map(str::trim).filter(|s| !s.is_empty()).is_some();
+        if !named(snapshot.prefs.ai_provider.as_deref()) {
+            return None;
+        }
+        // Another vault's authorization is not this vault's refusal to report,
+        // exactly as `active()` refuses to select on it.
+        match (
+            self.active_vault_now.as_ref().and_then(|f| f()),
+            snapshot.vault_id,
+        ) {
+            (Some(active), Some(read_from)) if active == read_from => {}
+            _ => return None,
+        }
+        if let Err(cause) = super::provider_gate::authorize_remote(&snapshot.prefs) {
+            return Some(cause);
+        }
+        // Authorized, and still not answering: `active()` refuses a provider with
+        // no model chosen, because it cannot be asked anything.
+        //
+        // **`NoModel`, not `NotReady`, and the first version of this function had
+        // it wrong** (myne-md/myne#867). `NotReady` is the cause whose chip label
+        // is "No provider", which is the sentence this whole change exists to
+        // stop printing over a vault that HAS a provider named; the local arm's
+        // own no-model case is `NoModel`, and a named provider with no model
+        // chosen is the same fact from the reader's side. `engine-error.ts`
+        // documented this as `no_model` while the code answered `NotReady`, so
+        // the two halves of one change disagreed and the bug the issue was filed
+        // about survived in the one sub-case the test did not reach.
+        if !named(snapshot.prefs.ai_provider_model.as_deref()) {
+            return Some(EngineError::NoModel);
+        }
+        None
+    }
+
     /// The active backend's class, without touching a concrete engine type.
     /// Consumed by the ambient bar (task 6) and the capability report (task 8).
     #[cfg_attr(not(test), allow(dead_code))]
@@ -1257,6 +1318,125 @@ mod selection_proof {
             .expect("remote infers");
         assert_eq!(answer, "remote answered");
         assert!(wait_for_accept(&accepts), "the control arm must connect");
+    }
+
+    /// **What a NAMED provider is refusing over, one cause per state**
+    /// (myne-md/myne#867).
+    ///
+    /// This table exists because the function it covers was a unit no test could
+    /// fail: injected to return `None` unconditionally it left the whole
+    /// `local_inference` suite green, while the chat surface reads it to decide
+    /// which sentence to print. The row that earns its keep is the no-model one,
+    /// and it is a REGRESSION row rather than a coverage row: the first version
+    /// answered `NotReady` there, whose chip label is "No provider", which is the
+    /// exact sentence the issue was filed about, for a vault that HAS a provider
+    /// named.
+    #[test]
+    fn remote_refusal_names_the_reason_or_nothing_at_all() {
+        let (port, _accepts) = counting_listener();
+        let state = wired(port);
+        let local_only = LocalInferenceState::with_backends(
+            vec![Backend::new(
+                "in-process",
+                BackendClass::InProcessLocal,
+                Arc::new(LocalEngine),
+            )],
+            "in-process",
+        );
+
+        // A build with no remote arm at all has nothing to refuse over.
+        put(&local_only, Some(snap(configured())));
+        assert_eq!(local_only.remote_refusal(), None, "no remote arm");
+
+        let cases: Vec<(&str, Option<PrefsSnapshot>, Option<EngineError>)> = vec![
+            ("vault locked, no snapshot", None, None),
+            (
+                "nothing configured",
+                Some(snap(PrefsView::default())),
+                // `None` rather than `FeatureOff`: the provider-name guard runs
+                // FIRST, so a vault that has never named a provider has no refusal
+                // to report at all. This row is why the table is worth having:
+                // the first version asserted the GATE's order and was wrong.
+                None,
+            ),
+            (
+                "AI beta off",
+                Some(snap(PrefsView {
+                    ai_enabled: false,
+                    ..configured()
+                })),
+                Some(EngineError::FeatureOff),
+            ),
+            (
+                "no provider named",
+                Some(snap(PrefsView {
+                    ai_provider: None,
+                    ..configured()
+                })),
+                None,
+            ),
+            (
+                "a provider this build cannot reach",
+                Some(snap(PrefsView {
+                    ai_provider: Some("some-future-provider".into()),
+                    ai_provider_consent: Some("some-future-provider@device".into()),
+                    ..configured()
+                })),
+                Some(EngineError::NotReady),
+            ),
+            (
+                "consent missing for the named provider",
+                Some(snap(PrefsView {
+                    ai_provider_consent: None,
+                    ..configured()
+                })),
+                Some(EngineError::ConsentMissing),
+            ),
+            (
+                "consent recorded for a DIFFERENT provider",
+                Some(snap(PrefsView {
+                    ai_provider_consent: Some("ollama-cloud@device".into()),
+                    ..configured()
+                })),
+                Some(EngineError::ConsentMissing),
+            ),
+            (
+                "no key",
+                Some(snap(PrefsView {
+                    ai_provider_key: None,
+                    ..configured()
+                })),
+                Some(EngineError::NoCredential),
+            ),
+            // **The regression row.** `NoModel`, so the chip reads "No model"
+            // rather than "No provider".
+            (
+                "no model chosen (SYNC-24 ships no default)",
+                Some(snap(PrefsView {
+                    ai_provider_model: None,
+                    ..configured()
+                })),
+                Some(EngineError::NoModel),
+            ),
+            // Another vault's authorization is not this vault's answer, exactly
+            // as `active()` refuses to select on it.
+            (
+                "the snapshot belongs to a different vault",
+                Some(PrefsSnapshot {
+                    prefs: configured(),
+                    vault_id: Some(other_vault()),
+                }),
+                None,
+            ),
+            // The control arm: a fully configured provider has nothing to refuse
+            // over, so every cause above is the state's and not the function's.
+            ("fully configured", Some(snap(configured())), None),
+        ];
+
+        for (what, snapshot, expected) in cases {
+            put(&state, snapshot);
+            assert_eq!(state.remote_refusal(), expected, "{what}");
+        }
     }
 
     /// A model swap invalidates the LOCAL arm even while a provider is active

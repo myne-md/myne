@@ -15,7 +15,7 @@
 // because each one reads prefs on mount and this file is about one wire.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { REMINDER_HORIZON_CHOICES } from "../../src/lib/reminderSchedule";
 
 const setReminderHorizon = vi.fn();
@@ -27,6 +27,11 @@ vi.mock("../../src/hooks/usePrefs", () => ({
       reminders_enabled: remindersEnabled,
       reminder_horizon_days: null,
       developer_mode: false,
+      // The preview column reads these two (myne-md/myne#885 task 7), and a
+      // fixture that omits them is a fixture the real `PrefsView` never
+      // produces.
+      editor_toolbar_order: [],
+      editor_toolbar_hidden: [],
     },
     setReminderHorizon,
   }),
@@ -78,15 +83,34 @@ vi.mock("../../src/components/settings/VimModeSettings", () => ({
 }));
 
 const { EditorPanel } = await import("../../src/components/settings/EditorPanel");
+const { resetSettingsTopics, setActiveSettingsTopic } = await import(
+  "../../src/components/settings/SettingsTabs"
+);
+
+/**
+ * The reminder rows live in the Writing topic (myne-md/myne#885 task 6), and
+ * only the active topic's body is mounted, so opening the topic is part of this
+ * file's fixture rather than of the behaviour it proves. Without it the panel
+ * renders the Text topic and every assertion below fails on a control that is
+ * simply not on screen.
+ */
+function openWritingTopic(): void {
+  act(() => {
+    resetSettingsTopics();
+    setActiveSettingsTopic("editor", "writing");
+  });
+}
 
 afterEach(() => {
   cleanup();
+  resetSettingsTopics();
   setReminderHorizon.mockClear();
   remindersEnabled = true;
 });
 
 describe("the Editor panel's horizon row", () => {
   it("reaches the setter when a horizon is chosen", () => {
+    openWritingTopic();
     render(<EditorPanel />);
     const shortest = REMINDER_HORIZON_CHOICES[0];
     // The row is a `Select` (myne-md/myne#769): open its menu, then pick the
@@ -103,6 +127,7 @@ describe("the Editor panel's horizon row", () => {
   it("renders the row beside the switch, not nested under it", () => {
     // Two sibling `SettingRow`s: the canon's shape for a setting, and what gives
     // the picker a visible label of its own.
+    openWritingTopic();
     render(<EditorPanel />);
     expect(screen.getByTestId("settings.reminders")).toBeTruthy();
     expect(screen.getByTestId("settings.reminders-horizon-row")).toBeTruthy();
@@ -110,6 +135,7 @@ describe("the Editor panel's horizon row", () => {
 
   it("hides the row while reminders are off", () => {
     remindersEnabled = false;
+    openWritingTopic();
     render(<EditorPanel />);
     expect(screen.getByTestId("settings.reminders")).toBeTruthy();
     expect(screen.queryByTestId("settings.reminders-horizon-row")).toBeNull();

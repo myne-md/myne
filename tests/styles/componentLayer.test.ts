@@ -271,3 +271,36 @@ describe("a text chip is not a theme swatch", () => {
     ).toBe(false);
   });
 });
+
+describe("the searchable menu's list can shrink, or it cannot scroll", () => {
+  // myne-md/myne#867. The list is a flex item of a fixed-height flex column:
+  // `.myne-select-menu[data-searchable="true"]` is `display: flex;
+  // flex-direction: column; max-height: 320px; overflow-y: hidden`, and the list
+  // sits under a pinned search row. A column flex item's default `min-height` is
+  // `auto`, which resolves to its content height, so without the explicit `0`
+  // the list grew to fit every option, the menu clipped the rest, and the folder
+  // picker in the chat composer would not scroll.
+  //
+  // jsdom does not lay out, so no rendered test can see the clip: every option
+  // IS in the DOM and a keyboard walk reaches all of them. The declarations are
+  // the behaviour, which is why they are asserted here.
+
+  it("permits the shrink and takes the scroll", () => {
+    const body = ruleBody(SHEET, ".myne-select-list {");
+    expect(body, "a flex item without min-height: 0 cannot shrink").toContain(
+      "min-height: 0",
+    );
+    expect(body).toContain("overflow-y: auto");
+  });
+
+  it("is a flex item of a fixed-height, clipping column", () => {
+    // The precondition for the rule above. If the menu ever stops being a
+    // bounded flex column, the shrink permission stops meaning anything and
+    // this pair of assertions is one assertion written twice.
+    const menu = ruleBody(SHEET, '.myne-select-menu[data-searchable="true"]');
+    expect(menu).toContain("display: flex");
+    expect(menu).toContain("flex-direction: column");
+    expect(menu).toContain("overflow-y: hidden");
+    expect(menu).toMatch(/max-height:\s*\d+px/);
+  });
+});

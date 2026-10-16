@@ -113,9 +113,14 @@ describe("it still does the job it was added for", () => {
 
   it("shows a hidden item as off", async () => {
     await renderBar({ hidden_bar_items: ["tags"] });
-    expect(
-      screen.getByTestId("settings.bar-item-toggle.tags").getAttribute("aria-checked"),
-    ).toBe("false");
+    // `renderBar` waits for the read to be CALLED, not for its answer to reach
+    // state, and the rows render first from defaults. Under a loaded full run
+    // that gap was wide enough to read the default `true` here.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("settings.bar-item-toggle.tags").getAttribute("aria-checked"),
+      ).toBe("false"),
+    );
     expect(
       screen.getByTestId("settings.bar-item-toggle.lock").getAttribute("aria-checked"),
     ).toBe("true");

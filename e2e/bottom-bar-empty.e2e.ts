@@ -23,6 +23,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
@@ -65,6 +66,9 @@ describeE2E("BBE-1 the bottom bar is removed when nothing is left on it", () => 
 
         // Appearance is the panel that owns the bar-customization block.
         await openSettings(s, "appearance");
+        // The bar roster lives in Appearance's `interface` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "appearance", "interface");
         for (const id of BAR_ITEM_IDS) {
           const toggle = await s.byTestId(`settings.bar-item-toggle.${id}`);
           // The switch publishes its own state, so this is idempotent: turn OFF
@@ -85,6 +89,9 @@ describeE2E("BBE-1 the bottom bar is removed when nothing is left on it", () => 
         // right-click menu is unreachable now, so if Settings could not bring an
         // item back the setting would be a one-way door.
         await openSettings(s, "appearance");
+        // The reopen is a fresh mount, so the `interface` topic is selected
+        // again (myne-md/myne#885).
+        await selectSettingsTopic(s, "appearance", "interface");
         await (await s.byTestId("settings.bar-item-toggle.lock")).click();
         await closeSettings(s);
 

@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0
-// The person-identity session unlock, inline (myne-md/myne#831: moved out of
+// The person-identity session unlock (myne-md/myne#831: moved out of
 // MemberRosterPanel). One phrase entry, one surface: the Sync panel's Identity
-// block owns it, and the member roster reads the resulting
-// `personIdentityState` store instead of rendering a second grid.
+// row owns it, and the member roster reads the resulting `personIdentityState`
+// store instead of rendering a second grid.
+//
+// A trigger button plus a DIALOG, not an inline grid (myne-md/myne#885 visual
+// pass): the 24 cells expanded inside the Sync panel pushed every row below them
+// off screen, and the button sat on a line of its own under the row it belonged
+// to. The trigger now renders where the caller puts it (the Identity row's
+// control slot, beside "Add an identity"), and the phrase entry is a modal.
 //
 // It calls `personUnlock` (`sync_person_unlock`), the local once-per-process
 // session unlock of the backend-held sealed keypair. That is deliberately NOT
@@ -22,6 +28,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { personUnlock } from "../../lib/invite";
 import { Button } from "../primitives/Button";
+import { ModalShell } from "../primitives/ModalShell";
 import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
 import { buildPhraseCredential } from "./phrase-credential";
 import {
@@ -29,11 +36,25 @@ import {
   setPersonIdentityStateForGeneration,
 } from "./personIdentityState";
 
-const SECTION_STYLE: CSSProperties = {
+// `ModalShell`'s body carries no padding of its own (a settings surface fills
+// it edge to edge), so a dialog pads its own content. Without it the phrase
+// grid and the buttons ran flush to the modal's border while the title above
+// sat inset by the header's `--space-5` (myne-md/myne#867, on the user's read:
+// "this modal has no padding"). The same inset as the header, so the content
+// lines up under the title.
+const BODY_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  alignSelf: "stretch",
+  padding: "var(--space-4) var(--space-5) var(--space-5)",
+  overflowY: "auto",
+  minHeight: 0,
+};
+
+const ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
 };
 
 const ERROR_STYLE: CSSProperties = {
@@ -113,10 +134,34 @@ export function PersonIdentityUnlock({
     }
   };
 
+  const close = () => {
+    onOpenChange(false);
+    setPhraseCells(emptyCells());
+    setError(false);
+  };
+
   return (
-    <div data-testid="sync.panel.identity-unlock" style={SECTION_STYLE}>
-      {open ? (
-        <>
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        data-testid="sync.panel.identity-unlock.open"
+        onClick={() => {
+          onOpenChange(true);
+          setError(false);
+        }}
+      >
+        {t("sync.memberRoster.personUnlockOpen")}
+      </Button>
+      <ModalShell
+        open={open}
+        title={t("sync.memberRoster.personUnlock")}
+        onClose={close}
+        labelId="sync-identity-unlock-title"
+        width={640}
+        testId="sync.panel.identity-unlock"
+      >
+        <div style={BODY_STYLE}>
           <EnrollPhraseCredential
             baseId="sync.panel.identity-unlock"
             cells={phraseCells}
@@ -129,49 +174,32 @@ export function PersonIdentityUnlock({
                 : `sync.panel.identity-unlock.phrase-cell-${index + 1}`
             }
           />
-          <Button
-            type="button"
-            variant="primary"
-            style={{ alignSelf: "flex-start" }}
-            data-testid="sync.panel.identity-unlock.submit"
-            disabled={busy || !phraseCells.every((cell) => cell.length > 0)}
-            onClick={() => void unlock()}
-          >
-            {t("sync.memberRoster.personUnlock")}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            style={{ alignSelf: "flex-start" }}
-            data-testid="sync.panel.identity-unlock.cancel"
-            onClick={() => {
-              onOpenChange(false);
-              setPhraseCells(emptyCells());
-              setError(false);
-            }}
-          >
-            {t("common.cancel")}
-          </Button>
-        </>
-      ) : (
-        <Button
-          type="button"
-          variant="secondary"
-          style={{ alignSelf: "flex-start" }}
-          data-testid="sync.panel.identity-unlock.open"
-          onClick={() => {
-            onOpenChange(true);
-            setError(false);
-          }}
-        >
-          {t("sync.memberRoster.personUnlockOpen")}
-        </Button>
-      )}
-      {error ? (
-        <p data-testid="sync.panel.identity-unlock.error" style={ERROR_STYLE}>
-          {t("sync.memberRoster.personError")}
-        </p>
-      ) : null}
-    </div>
+          {error ? (
+            <p role="alert" data-testid="sync.panel.identity-unlock.error" style={ERROR_STYLE}>
+              {t("sync.memberRoster.personError")}
+            </p>
+          ) : null}
+          <div style={ACTIONS_STYLE}>
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="sync.panel.identity-unlock.cancel"
+              onClick={close}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              data-testid="sync.panel.identity-unlock.submit"
+              disabled={busy || !phraseCells.every((cell) => cell.length > 0)}
+              onClick={() => void unlock()}
+            >
+              {t("sync.memberRoster.personUnlock")}
+            </Button>
+          </div>
+        </div>
+      </ModalShell>
+    </>
   );
 }

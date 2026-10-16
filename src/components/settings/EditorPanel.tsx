@@ -6,12 +6,30 @@
 // theme). Taxonomy change recorded in `docs/decisions.md`
 // (supersedes the 2026-05-08 5-panel lock).
 //
+// **This panel has an in-panel topic strip since myne-md/myne#885**, and it is
+// the panel the requester named as the model. Its five `SettingsSection`s plus
+// the periodic-notes block become the six topics in `settingsTopics.ts`, whose
+// roster carries the boundary argument; each topic's body is wrapped in a
+// `SettingsTopicPanel` here, and only the active one is mounted. The preview
+// column follows the ACTIVE TOPIC (`PREVIEW_BANDS`), which is the one place the
+// work departs from the requester's literal "as you scroll" and is argued at
+// that map.
+//
 // Each child control persists **disk-first** with no in-flight gating (the
 // writes are fast, not Argon2-bound), matching their prior behaviour under
 // Appearance. This panel is a thin composition shell - the persistence logic
 // lives in the two child components.
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   contentWidthKey,
@@ -37,12 +55,26 @@ import { ViewsSettings } from "./ViewsSettings";
 import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
+import { SettingsTopicPanel, useActiveSettingsTopic } from "./SettingsTabs";
+import {
+  EDITOR_PANEL_TOPICS,
+  type EditorTopicId,
+} from "./settingsTopics";
 import { SettingRow } from "./SettingRow";
 import { Select } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { useSettingsCompact } from "./settingsCompact";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useWorkspace } from "../../notes/workspaceContext";
+import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
+import { formatStoredValue } from "../../lib/datetimeFormat";
+import { taskChipIcon } from "@myne/editor/host/notes/taskChipIcon";
+import { taskChipStyle } from "@myne/editor/host/notes/taskChipToken";
+import {
+  resolveToolbarHidden,
+  resolveToolbarOrder,
+  toolbarItemLabelKey,
+} from "../../notes/toolbarItems";
 import {
   TASK_CHIP_COLORS,
   TASK_CHIP_INK,
@@ -51,9 +83,12 @@ import {
 
 // Two-column layout: the controls scroll on the left, a live preview sticks on
 // the right. Only the Editor tab carries a preview - it is the one tab whose
-// settings (type size, line spacing, font) have an effect you cannot picture
-// without seeing it, and the editor itself is hidden behind the modal while you
-// choose. No other Settings tab needs one.
+// settings (type size, line spacing, font, the date format, the toolbar, the
+// task chips) have an effect you cannot picture without seeing it, and the
+// editor itself is hidden behind the modal while you choose. No other Settings
+// tab needs one. The preview column is a SIBLING of the controls column, inside
+// the shell's scroll container, which is what keeps its `sticky` positioning
+// working while the active topic's controls scroll past it.
 const EDITOR_LAYOUT_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
@@ -143,9 +178,6 @@ const SOURCE_LINE_STYLE: CSSProperties = {
 // Spell-check demo, shown only when spell-check is on: the editor's own wavy-red
 // underline (`.cm-spell-error` in `editor/src/theme.ts`) on a misspelled word.
 const SPELL_DEMO_STYLE: CSSProperties = {
-  marginTop: "var(--space-3)",
-  paddingTop: "var(--space-2)",
-  borderTop: "1px solid var(--line-1)",
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
@@ -157,16 +189,182 @@ const SPELL_SQUIGGLE_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
 };
 
-// Live typography specimen for the Editor tab. Reads prefs via its own
-// `usePrefs` - the typography setters (and line-numbers / view-mode / spell
-// toggles) bump the prefs nonce, which every `usePrefs` instance subscribes to
-// and re-reads on, so the specimen updates as the user changes a control (same
-// path the live editor updates through). It reflects the four typography
-// presets PLUS line numbers, the default view mode (Live markers / Reading /
-// Source), and spell-check.
+// A band under the note body: its own hairline, a small caption, and the thing
+// it demonstrates. The note body is not a band (it is the specimen), so every
+// band here is something the ACTIVE TOPIC's settings decide.
+// A band carries no separator of its own: the frame draws one BETWEEN bands
+// (`BAND_SEPARATOR_STYLE`), so a topic whose specimen is a single band does not
+// open with a hairline above nothing (myne-md/myne#885 visual pass).
+// A hairline inside the specimen frame, not a settings-section seam, so it is a
+// border (the section seam is `SettingsSection`'s alone, and
+// `settingsSectionTreatment.test.tsx` holds it there).
+const BAND_SEPARATOR_STYLE: CSSProperties = {
+  borderTop: "1px solid var(--line-1)",
+  margin: "var(--space-3) 0 var(--space-2)",
+};
+const BAND_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-1)",
+};
+// The toolbar band: the buttons the customisation resolves to, in their resolved
+// order, labelled with the same i18n keys the customisation list itself uses.
+const TOOLBAR_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "var(--space-1)",
+};
+const TOOLBAR_BUTTON_STYLE: CSSProperties = {
+  padding: "2px 6px",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  background: "var(--paper-2)",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  whiteSpace: "nowrap",
+};
+// The task band: one priority chip, drawn with the SHARED chip token
+// (`taskChipStyle`) so the specimen cannot drift from a chip inside a note.
+const TASK_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+// The chips sit on their own line under the task text, indented to the text's
+// start, which is how a task with several chips wraps in a narrow column anyway.
+const TASK_CHIPS_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "var(--space-1)",
+  paddingInlineStart: "calc(14px + var(--space-2))",
+};
+const TASK_BOX_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  width: 14,
+  height: 14,
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--radius-1)",
+};
+const TASK_BOX_DONE_STYLE: CSSProperties = {
+  ...TASK_BOX_STYLE,
+  background: "var(--accent)",
+  borderColor: "var(--accent)",
+};
+const TASK_TEXT_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+};
+const TASK_TEXT_DONE_STYLE: CSSProperties = {
+  ...TASK_TEXT_STYLE,
+  color: "var(--fg-3)",
+  textDecorationLine: "line-through",
+};
+
+/** The date and wall-clock the date/time band prints. A FIXED sample, so the
+ *  band answers "what does my format look like" rather than "what day is it",
+ *  which is also what makes it assertable without a clock. */
+const PREVIEW_SAMPLE_VALUE = "2026-08-01T14:30";
+
+/** One band of the specimen. See {@link PREVIEW_BANDS}. */
+type PreviewBand = "note" | "dateTime" | "toolbar" | "spell" | "taskChip";
+
+/**
+ * Which bands each Editor topic's specimen shows.
+ *
+ * **This map is the whole of the PRD's Open Question 4.** With a strip, "the
+ * section you scroll" becomes "the topic you are on", and the preview follows
+ * the TOPIC. The reason is not that the scroll version is impossible: it is that
+ * it would need an `IntersectionObserver` over a scroll container that already
+ * resets on every topic change (`SettingsModal`'s own scroll reset), it would
+ * move the specimen under the user while they read the controls they are
+ * comparing it against, and with topics the scroll is short enough that "which
+ * section is in view" is often ambiguous. The topic is discrete, it is what the
+ * user just clicked, and the strip makes it the panel's primary navigation, so
+ * the preview following it is the consistent answer. Recorded here because the
+ * PRD asks for the departure from the requester's literal words to be written
+ * down rather than discovered.
+ *
+ * `periodic` and `features` map to an EMPTY list on purpose, and that is the
+ * honest boundary task 7 asks for rather than a gap: periodic-note settings
+ * decide where a new note is FILED and how it is TITLED, and the two feature
+ * switches decide what the sidebar offers. Neither changes what a note looks
+ * like, so a specimen for either would be an imitation of a preview. For those
+ * topics the preview column is not drawn at all (myne-md/myne#885 visual pass):
+ * a framed box saying there is nothing to show was a panel spent on an absence,
+ * and the controls get the width instead.
+ */
+const PREVIEW_BANDS: Record<EditorTopicId, readonly PreviewBand[]> = {
+  text: ["note"],
+  editing: ["note", "dateTime", "toolbar"],
+  writing: ["note", "spell"],
+  tasks: ["taskChip"],
+  periodic: [],
+  features: [],
+};
+
+/** A task chip's glyph, built through the shared icon factory so the specimen
+ *  draws the same shape an inline chip does (a priority's level is carried by
+ *  the SHAPE, which is what survives a monochrome or colour-blind reading).
+ *  Built in an effect for `TaskRow`'s `ChipGlyph` reason: the factory returns a
+ *  DOM node, and this tree never reaches for an innerHTML escape hatch. */
+function ChipGlyph({ kind, value }: { kind: "due" | "priority"; value: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el !== null) el.replaceChildren(taskChipIcon(kind, value));
+  }, [kind, value]);
+  return (
+    <span
+      ref={ref}
+      aria-hidden="true"
+      style={{ display: "inline-flex", width: "1em", height: "1em", flex: "0 0 auto" }}
+    />
+  );
+}
+
+/** Whether the specimen is ONE band with no note above it, in which case the
+ *  preview's own caption (the topic's name) already says what the band is, and
+ *  a band caption under it would print the same word twice. */
+const LoneBandContext = createContext(false);
+
+/** A band's small caption, in the preview caption's own treatment. */
+function BandCaption({ children }: { children: ReactNode }) {
+  if (useContext(LoneBandContext)) return null;
+  return <span style={PREVIEW_CAPTION_STYLE}>{children}</span>;
+}
+
+// Live specimen for the Editor tab, one band set per ACTIVE TOPIC.
+//
+// It reads prefs via its own `usePrefs` - the typography setters (and
+// line-numbers / view-mode / spell / date-time / toolbar toggles) bump the prefs
+// nonce, which every `usePrefs` instance subscribes to and re-reads on, so the
+// specimen updates as the user changes a control (the same path the live editor
+// updates through). Two inputs deliberately do NOT come from prefs: the date and
+// time display comes from the SHARED store a note's own dates read
+// (`useDateTimeDisplay`, the same call `TaskRow` makes), and the task-chip
+// display comes from the workspace container (`useWorkspace`), because that is
+// where those two settings live. Reading them from anywhere else would let the
+// specimen print something no note would.
+//
+// Every band reads a token or a shared helper rather than a literal: the note
+// body reads the `--editor-*` custom properties the real editor reads, the date
+// band goes through the same formatter a note's dates go through, the toolbar
+// band through the same resolver the editor's toolbar uses, and the chip through
+// the shared chip token.
 function EditorSettingsPreview() {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
+  const ws = useWorkspace();
+  const display = useDateTimeDisplay();
+  const topic = useActiveSettingsTopic(
+    "editor",
+    EDITOR_PANEL_TOPICS,
+  ) as EditorTopicId;
+  const bands = PREVIEW_BANDS[topic] ?? [];
+
   const typo = typographyStyleFromKeys({
     textSize: textSizeKey(prefs),
     lineSpacing: lineSpacingKey(prefs),
@@ -175,7 +373,12 @@ function EditorSettingsPreview() {
   });
   const lineNumbers = prefs.editor_line_numbers === true;
   const mode = asViewMode(prefs.editor_default_view_mode);
-  const spell = prefs.spell_enabled === true;
+  // `null` is unset, and unset means ON (SYNC-15): the same resolution
+  // `SpellSettings` and the editor itself apply. Reading the raw pref here
+  // (`=== true`) was the stale half of this specimen: a fresh vault has spell
+  // check ON in every note while the preview drew no demo, so the one place a
+  // user looked to check it said the opposite of what the editor did.
+  const spell = prefs.spell_enabled ?? true;
 
   const heading = t("settings.editor.preview.heading");
   const body = t("settings.typography.previewBody");
@@ -189,6 +392,9 @@ function EditorSettingsPreview() {
       : mode === "source"
         ? "settings.viewMode.optionSource"
         : "settings.viewMode.optionLive";
+  const topicLabel = t(
+    EDITOR_PANEL_TOPICS.find((meta) => meta.id === topic)?.labelKey ?? "",
+  );
 
   // Wrap a rendered block with the gutter when line numbers are on.
   const numbered = (n: number, content: ReactNode): ReactNode =>
@@ -201,16 +407,16 @@ function EditorSettingsPreview() {
       content
     );
 
-  let bodyEl: ReactNode;
+  let noteBand: ReactNode;
   if (mode === "source") {
     // Raw markdown, mono - what Source view shows.
     const src = [`# ${heading}`, "", body, "", `- ${bullets[0]}`, `- ${bullets[1]}`];
-    bodyEl = (
+    noteBand = (
       <div>
         {src.map((ln, i) => (
           <div key={i} style={LINE_ROW_STYLE}>
             {lineNumbers && <span style={GUTTER_STYLE}>{i + 1}</span>}
-            <span style={{ ...SOURCE_LINE_STYLE, flex: 1 }}>{ln || " "}</span>
+            <span style={{ ...SOURCE_LINE_STYLE, flex: 1 }}>{ln || " "}</span>
           </div>
         ))}
       </div>
@@ -220,7 +426,7 @@ function EditorSettingsPreview() {
     // them and shows a • bullet glyph instead.
     const live = mode === "live";
     const bulletMark = live ? "- " : "• ";
-    bodyEl = (
+    noteBand = (
       <>
         {numbered(
           1,
@@ -248,23 +454,126 @@ function EditorSettingsPreview() {
     );
   }
 
+  const dateTimeBand = (
+    <div style={BAND_STYLE} data-testid="settings.editor-preview-datetime">
+      <BandCaption>{t("settings.editor.preview.dateTime")}</BandCaption>
+      <p style={{ ...SAMPLE_BODY_STYLE, marginBottom: 0 }}>
+        {formatStoredValue(PREVIEW_SAMPLE_VALUE, display)}
+      </p>
+    </div>
+  );
+
+  const toolbarOrder = resolveToolbarOrder(
+    prefs.editor_toolbar_order,
+    resolveToolbarHidden(prefs.editor_toolbar_hidden),
+  );
+  const toolbarBand = (
+    <div style={BAND_STYLE} data-testid="settings.editor-preview-toolbar">
+      <BandCaption>{t("settings.editor.preview.toolbar")}</BandCaption>
+      <div style={TOOLBAR_ROW_STYLE}>
+        {toolbarOrder.map((id) => (
+          <span
+            key={id}
+            style={TOOLBAR_BUTTON_STYLE}
+            data-testid={`settings.editor-preview-toolbar-${id}`}
+            data-item-id={id}
+          >
+            {t(toolbarItemLabelKey(id) ?? id)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+
+  // The colour is the SAME closed-enum-to-token mapping `Editor.tsx` publishes
+  // as `--task-chip-ink` for a note's own chips, so the specimen and a chip in a
+  // note cannot disagree.
+  //
+  // Two task lines rather than one bare chip (myne-md/myne#885 visual pass): a
+  // chip on its own did not say what it decorates. An open task carries a due
+  // chip (its date through the same formatter a note's dates use, so the date
+  // format setting shows here too) and the priority chip both settings act on;
+  // a done task shows the checked, struck-through state beside it.
+  const chipColor = ws.taskDisplay.chipColor;
+  const chipStyle: CSSProperties = { ...taskChipStyle(), color: TASK_CHIP_INK[chipColor] };
+  const dueText = formatStoredValue(PREVIEW_SAMPLE_VALUE.slice(0, 10), display);
+  const taskBand = (
+    <div style={BAND_STYLE} data-testid="settings.editor-preview-task">
+      <BandCaption>{t("settings.editor.preview.task")}</BandCaption>
+      <div style={TASK_ROW_STYLE}>
+        <span style={TASK_BOX_STYLE} aria-hidden="true" />
+        <span style={TASK_TEXT_STYLE}>{t("settings.editor.preview.taskSampleOpen")}</span>
+      </div>
+      <div style={TASK_CHIPS_STYLE}>
+        <span style={chipStyle} data-testid="settings.editor-preview-task-due">
+          <ChipGlyph kind="due" value={PREVIEW_SAMPLE_VALUE.slice(0, 10)} />
+          <span>{dueText}</span>
+        </span>
+        <span
+          style={chipStyle}
+          data-testid="settings.editor-preview-task-chip"
+          data-chip-color={chipColor}
+          data-icon-only={ws.taskDisplay.iconOnly ? "true" : "false"}
+        >
+          <ChipGlyph kind="priority" value="high" />
+          {/* The editor hides the label through a root attribute rather than
+              dropping it, because a live editor must not be reconfigured to
+              flip a setting. A specimen has no widget to reconfigure, so it
+              renders what the rule would hide: icon-only means the word is
+              gone. */}
+          {!ws.taskDisplay.iconOnly && (
+            <span data-testid="settings.editor-preview-task-label">
+              {t("tasks.priority.high")}
+            </span>
+          )}
+        </span>
+      </div>
+      <div style={TASK_ROW_STYLE}>
+        <span style={TASK_BOX_DONE_STYLE} aria-hidden="true" />
+        <span style={TASK_TEXT_DONE_STYLE}>{t("settings.editor.preview.taskSampleDone")}</span>
+      </div>
+    </div>
+  );
+
+  const spellBand = spell ? (
+    <div style={SPELL_DEMO_STYLE} data-testid="settings.editor-preview-spell">
+      <BandCaption>{t("settings.editor.preview.spellCaption")}</BandCaption>
+      <span style={SPELL_SQUIGGLE_STYLE}>
+        {t("settings.editor.preview.spellSample")}
+      </span>
+    </div>
+  ) : null;
+
   return (
-    <aside style={PREVIEW_COL_STYLE} data-testid="settings.editor-preview">
+    <aside
+      style={PREVIEW_COL_STYLE}
+      data-testid="settings.editor-preview"
+      data-topic={topic}
+    >
       <span style={PREVIEW_CAPTION_STYLE}>
-        {t("settings.typography.previewLabel")} · {t(modeLabelKey)}
+        {bands.includes("note")
+          ? `${t("settings.typography.previewLabel")} · ${topicLabel} · ${t(modeLabelKey)}`
+          : topicLabel}
       </span>
       <div style={PREVIEW_FRAME_STYLE}>
-        <div style={{ ...typo }}>{bodyEl}</div>
-        {spell && (
-          <div style={SPELL_DEMO_STYLE} data-testid="settings.editor-preview-spell">
-            <span style={PREVIEW_CAPTION_STYLE}>
-              {t("settings.editor.preview.spellCaption")}
-            </span>
-            <span style={SPELL_SQUIGGLE_STYLE}>
-              {t("settings.editor.preview.spellSample")}
-            </span>
-          </div>
-        )}
+        <LoneBandContext.Provider value={bands.length === 1 && !bands.includes("note")}>
+          {(
+            [
+              ["note", bands.includes("note") ? <div style={{ ...typo }}>{noteBand}</div> : null],
+              ["dateTime", bands.includes("dateTime") ? dateTimeBand : null],
+              ["spell", bands.includes("spell") ? spellBand : null],
+              ["taskChip", bands.includes("taskChip") ? taskBand : null],
+              ["toolbar", bands.includes("toolbar") ? toolbarBand : null],
+            ] as const
+          )
+            .filter(([, node]) => node !== null)
+            .map(([key, node], i) => (
+              <Fragment key={key}>
+                {i > 0 && <div style={BAND_SEPARATOR_STYLE} aria-hidden="true" />}
+                {node}
+              </Fragment>
+            ))}
+        </LoneBandContext.Provider>
       </div>
     </aside>
   );
@@ -384,6 +693,9 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
   // decoration for the settings, not a setting, and the space it frees lets the
   // controls column keep its rows side-by-side instead of overlapping.
   const compact = useSettingsCompact();
+  // The preview column is drawn only for a topic it can depict (see
+  // `PREVIEW_BANDS`), so the panel reads the active topic too.
+  const activeTopic = useActiveSettingsTopic("editor", EDITOR_PANEL_TOPICS) as EditorTopicId;
   const [remindersEnabled, setRemindersEnabledEcho] = useState<boolean | null>(null);
   useEffect(() => {
     setRemindersEnabledEcho(null);
@@ -396,7 +708,13 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
     <div style={EDITOR_LAYOUT_STYLE}>
       <div style={CONTROLS_COL_STYLE}>
       {/* MYND-624: grouped rather than run together. The order within each group
-          is unchanged; only the seams are new. */}
+          is unchanged; only the seams are new. **Each topic's body is wrapped at
+          the SAME indentation on purpose** (the convention the AI panel set): a
+          wrapper that re-indented 400 lines would turn "which rows landed in
+          which topic" into a whitespace diff nobody can read, and that is the
+          one thing a reviewer has to check here. The topic's own label is the
+          section title's key, so the tab and the heading name one concern. */}
+      <SettingsTopicPanel panelId="editor" topicId="text">
       <SettingsSection
         title={t("settings.editor.sections.text")}
         testId="settings.section.editor-text"
@@ -408,7 +726,9 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
             default. */}
         <LineNumbersSettings />
       </SettingsSection>
+      </SettingsTopicPanel>
 
+      <SettingsTopicPanel panelId="editor" topicId="editing">
       <SettingsSection
         title={t("settings.editor.sections.editing")}
         testId="settings.section.editor-editing"
@@ -445,7 +765,9 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
             selection toolbar's buttons over the frozen command vocabulary. */}
         <ToolbarCustomizeSettings />
       </SettingsSection>
+      </SettingsTopicPanel>
 
+      <SettingsTopicPanel panelId="editor" topicId="writing">
       <SettingsSection
         title={t("settings.editor.sections.writing")}
         testId="settings.section.editor-writing"
@@ -468,7 +790,9 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
           onChange={(days) => void setReminderHorizon(days)}
         />
       </SettingsSection>
+      </SettingsTopicPanel>
 
+      <SettingsTopicPanel panelId="editor" topicId="tasks">
       <SettingsSection
         title={t("settings.editor.sections.tasks")}
         testId="settings.section.editor-tasks"
@@ -478,17 +802,23 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
         {/* Icon-only priority chips (myne-md/myne#656 item 5) - device-local. */}
         <TaskChipIconOnlySetting />
       </SettingsSection>
+      </SettingsTopicPanel>
 
       {/* Periodic notes (MYND-191 daily, myne#177 weekly + monthly): folder /
           title format / template, ONE period at a time behind a switcher.
           Rendered at PANEL level rather than inside Writing above: `SettingsSection`
           draws a rule to the panel edge, so nesting it inside another section
           made the Reminder rows that followed sit under its divider and read as
-          its settings. `focusAnchorId` is the settings-search target, which the
-          switcher needs in order to open the right period before the shell
-          looks for the anchor. */}
+          its settings. Its own topic since myne-md/myne#885: the block is one
+          concern ("how are my daily, weekly and monthly notes filed and
+          titled") and it is reachable from exactly one topic. `focusAnchorId` is
+          the settings-search target, which the switcher needs in order to open
+          the right period before the shell looks for the anchor. */}
+      <SettingsTopicPanel panelId="editor" topicId="periodic">
       <PeriodicNotesSettings focusAnchorId={focusAnchorId} />
+      </SettingsTopicPanel>
 
+      <SettingsTopicPanel panelId="editor" topicId="features">
       <SettingsSection
         title={t("settings.editor.sections.features")}
         testId="settings.section.editor-features"
@@ -500,8 +830,9 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
             the vault already has saved views. Hides the sidebar "Views" entry. */}
         <ViewsSettings />
       </SettingsSection>
+      </SettingsTopicPanel>
       </div>
-      {!compact && <EditorSettingsPreview />}
+      {!compact && (PREVIEW_BANDS[activeTopic] ?? []).length > 0 && <EditorSettingsPreview />}
     </div>
   );
 }

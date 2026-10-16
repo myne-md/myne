@@ -43,6 +43,7 @@ import {
   enableDeveloperMode,
   lockAndReunlock,
   openSettings,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -71,6 +72,9 @@ async function vimMode(session: Session): Promise<string | null> {
 async function setVimMode(session: Session, on: boolean): Promise<void> {
   await enableDeveloperMode(session);
   await (await session.byTestId("settings.tab-editor")).click();
+  // The vim toggle lives in the Editor panel's `editing` topic since
+  // myne-md/myne#885; only the active topic's body is mounted.
+  await selectSettingsTopic(session, "editor", "editing");
   const toggle = await session.byTestId("settings.vim-mode");
   const checked = (await toggle.attribute("aria-checked")) === "true";
   if (checked !== on) await toggle.click();
@@ -267,6 +271,7 @@ describeE2E("vm4 hiding the vim toggle does not turn vim off (#181)", () => {
 
         // The control is gone from Editor, while the section around it stays.
         await (await s.byTestId("settings.tab-editor")).click();
+        await selectSettingsTopic(s, "editor", "editing");
         await s.byTestId("settings.section.editor-editing");
         expect((await s.byTestIdAll("settings.vim-mode")).length).toBe(0);
         await closeSettings(s);

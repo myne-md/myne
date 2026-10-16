@@ -55,6 +55,7 @@ import {
   rowMenuPick,
   nameNewNote,
   searchAndOpenNote,
+  selectSettingsTopic,
   setFolderNotesEnabled,
   setViewsEnabled,
   waitForSaved,
@@ -1434,6 +1435,9 @@ runner(
         async () => {
           await enableDeveloperModeInSettings(s);
           await (await s.byTestId("settings.tab-editor")).click();
+          // The vim toggle lives in the Editor panel's `editing` topic since
+          // myne-md/myne#885; only the active topic's body is mounted.
+          await selectSettingsTopic(s, "editor", "editing");
           const block = await s.byTestId("settings.vim-mode", { timeoutMs: 6000 });
           await safe("scroll vim-mode into view", async () => {
             await s.execute(
@@ -1707,6 +1711,8 @@ runner(
         "The delete-vault confirmation form in Vault settings, which requires typing a confirmation phrase before the vault is erased.",
         async () => {
           await (await s.byTestId("settings.tab-vault")).click();
+          // The erase is the Vault panel's `danger` topic (myne-md/myne#885).
+          await (await s.byTestId("settings.vault-tab-danger")).click();
           await (await s.byTestId("settings.delete-vault-cta")).click();
           await s.byTestId("delete-vault.confirm-input", { timeoutMs: 6000 });
           await settle(s, 400);

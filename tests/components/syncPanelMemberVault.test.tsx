@@ -20,6 +20,10 @@
 // "the member gets the member QR" is satisfied by a panel that offers it to
 // everyone, which is exactly the regression the owner-side case rules out.
 
+import {
+  resetSettingsTopics,
+  setActiveSettingsTopic,
+} from "../../src/components/settings/SettingsTabs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
@@ -69,7 +73,11 @@ afterEach(() => {
 });
 
 describe("the Sync panel, member vault vs owner vault", () => {
+  afterEach(() => resetSettingsTopics());
   it("offers the member's own-device QR on a member vault, and never the owner's", async () => {
+    // The device rows are the Sync panel's `devices` topic (myne-md/myne#885),
+    // and only the active topic's body is mounted.
+    setActiveSettingsTopic("sync", "devices");
     await mountWith({ memberVault: true });
 
     expect(await screen.findByTestId("sync.member-join-qr.open")).toBeTruthy();
@@ -79,6 +87,9 @@ describe("the Sync panel, member vault vs owner vault", () => {
   });
 
   it("does not offer the member's QR on an owner vault", async () => {
+    // The device rows are the Sync panel's `devices` topic (myne-md/myne#885),
+    // and only the active topic's body is mounted.
+    setActiveSettingsTopic("sync", "devices");
     await mountWith({ memberVault: false });
 
     // The owner's own icon is gated on the roster (`enrolledHere`), which the

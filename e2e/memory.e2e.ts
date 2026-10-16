@@ -21,12 +21,14 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickBySelector,
   closeSettings,
   createNote,
   dismissImporterOffer,
   enableAi,
   openSettings,
   runPaletteAction,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -97,10 +99,13 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
         const marker = await s.waitForElement(testIdSelector("agentFootprint.memory"), {
           timeoutMs: 30_000,
         });
-        // The i18n plural for count 1 spells the number out ("Memory updated
-        // with one entry."), so the assertion names the word rather than a
-        // digit a sibling locale may not render.
-        expect(await marker.textContent()).toContain("one entry");
+        // The marker renders `agent.footprint.memory` with the run's count, whose
+        // count-1 plural is `"{{count}} memory saved"` → `"1 memory saved"`
+        // (`locales/en/common.json`). The one-write-per-run bound makes the count
+        // exactly 1 here, so the copy is asserted whole. (The old marker this
+        // replaced rendered `agentTurn.memoryUpdated`, "Memory updated with one
+        // entry.", which is what this assertion was written against.)
+        expect(await marker.textContent()).toContain("1 memory saved");
         expect(await s.byTestIdAll("agentReview.screen")).toHaveLength(0);
 
         // ── The chat popover lists the remembered text. ──
@@ -124,6 +129,9 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
 
         // ── Settings → AI → the memory section lists it; delete it. ──
         await openSettings(s, "ai");
+        // Memory and personality live in the AI panel's `advanced` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "ai", "advanced");
         await s.waitForElement(testIdSelector("settings.memory-section"), {
           timeoutMs: 10_000,
         });
@@ -140,11 +148,28 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
         // bound is per run), then clear-all with confirm empties the roster.
         await openComposer(s);
         await sendTask(s, "please remember this for later");
-        await (await s.byTestId("agentFootprint.disclosure")).click();
+        // **Target the SECOND run's disclosure, which is the COLLAPSED one.**
+        // The transcript holds one footprint per turn, each with its own
+        // disclosure, and `byTestId` returns the FIRST. The block above already
+        // opened that first one, so a plain `byTestId(...).click()` here toggles
+        // the first run's detail CLOSED while the second run's marker stays
+        // behind its own collapsed disclosure, and the wait below times out on a
+        // screen that is behaving correctly (measured: 3 of 3 runs). The first
+        // run's `aria-expanded` is true and the second's is false, which is what
+        // tells the two apart; `clickBySelector` re-finds and re-clicks each poll
+        // so a replaced node cannot leave a stale handle behind.
+        await clickBySelector(
+          s,
+          testIdSelector("agentFootprint.disclosure", { "aria-expanded": "false" }),
+          { timeoutMs: 15_000 },
+        );
         await s.waitForElement(testIdSelector("agentFootprint.memory"), {
           timeoutMs: 30_000,
         });
         await openSettings(s, "ai");
+        // Memory and personality live in the AI panel's `advanced` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "ai", "advanced");
         await s.waitForElement(testIdSelector("settings.memory-section"), {
           timeoutMs: 10_000,
         });
@@ -174,6 +199,9 @@ aiDescribe("mem2 personality block saves and persists", () => {
         await enableAi(s);
 
         await openSettings(s, "ai");
+        // Memory and personality live in the AI panel's `advanced` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "ai", "advanced");
         await s.waitForElement(testIdSelector("settings.memory-section"), {
           timeoutMs: 10_000,
         });
@@ -186,6 +214,9 @@ aiDescribe("mem2 personality block saves and persists", () => {
         // A close/reopen round-trip: the value must come back from the
         // vault, proving a real write rather than a draft echo.
         await openSettings(s, "ai");
+        // Memory and personality live in the AI panel's `advanced` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "ai", "advanced");
         await s.waitForElement(testIdSelector("settings.memory-section"), {
           timeoutMs: 10_000,
         });

@@ -48,6 +48,8 @@ import { applyAccent, readAccent, writeAccent } from "../../lib/accentColor";
 import { CustomThemesSection } from "./CustomThemesSection";
 import { BarCustomizeSettings } from "./BarCustomizeSettings";
 import { RibbonCustomizeSettings } from "./RibbonCustomizeSettings";
+import { SettingsTopicPanel } from "./SettingsTabs";
+import { SettingsSection } from "./SettingsSection";
 
 // `value: "system"` maps to a `null` theme on the wire (clears the field).
 // `labelKey` holds the i18n key (resolved at render, not import) so a language
@@ -626,8 +628,24 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
 
   return (
     <div style={PANEL_ROOT_STYLE}>
+      {/* **Display**: everything that decides how the app is drawn and read.
+          The language selector leads it because it is the panel's first row
+          today, and every row here is a device-local display choice rather than
+          vault content (`LanguageSelect.tsx` writes localStorage; the accent
+          writes a device-local file).
+
+          **Each topic's body is wrapped at the SAME indentation on purpose**,
+          the convention the AI panel set: a wrapper that re-indented 200 lines
+          would turn "which rows landed in which topic" into a whitespace diff
+          nobody can read, and which rows landed where is the one thing a
+          reviewer has to check here. */}
+      <SettingsTopicPanel panelId="appearance" topicId="display">
+      {/* Language leads ungrouped: it is the one control here that changes text
+          rather than colour, and it is its own labelled row. The seam
+          (myne-md/myne#885) groups the three controls that repaint the app. */}
       <LanguageSelect />
 
+      <SettingsSection title={t("settings.appearance.sections.theme")}>
       <ControlBlock
         anchorId="appearance.theme"
         label={t("settings.appearance.themeLabel")}
@@ -654,6 +672,18 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
 
       <AccentColorRow onDialogOpenChange={onDialogOpenChange} />
 
+      <CustomThemesSection
+        activeCustom={activeCustom}
+        onActiveCustomChange={setActiveCustom}
+      />
+      </SettingsSection>
+      </SettingsTopicPanel>
+
+      {/* **Note list**: the two rows that decide what a row in the sidebar
+          shows. Both write `vault.prefs`, so unlike the topic above they travel
+          with the vault. */}
+      <SettingsTopicPanel panelId="appearance" topicId="notes">
+      <SettingsSection title={t("settings.appearance.sections.sidebar")}>
       <SettingRow
         label={t("settings.appearance.showEditTimesLabel")}
         helper={t("settings.appearance.showEditTimesHelper")}
@@ -683,7 +713,15 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
           />
         )}
       />
+      </SettingsSection>
+      </SettingsTopicPanel>
 
+      {/* **Interface**: how the chrome is arranged. The graph row leads it and
+          is the one row here that is not a control - it names where the graph's
+          own appearance and physics settings live and opens the graph
+          (MYND-604) - so it sits with the two customisation lists, which are the
+          other two answers to "what is on screen and in what order". */}
+      <SettingsTopicPanel panelId="appearance" topicId="interface">
       <SettingRow
         label={t("settings.appearance.graphSettingsLabel")}
         helper={t("settings.appearance.graphSettingsHelper")}
@@ -699,13 +737,14 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
         }
       />
 
-      <CustomThemesSection
-        activeCustom={activeCustom}
-        onActiveCustomChange={setActiveCustom}
-      />
-
+      {/* The graph row above leads ungrouped: it is a pointer to another
+          surface, not a control this panel draws. The seam groups the two
+          lists that decide what the chrome shows and in what order. */}
+      <SettingsSection title={t("settings.appearance.sections.customisation")}>
       <RibbonCustomizeSettings />
       <BarCustomizeSettings />
+      </SettingsSection>
+      </SettingsTopicPanel>
     </div>
   );
 }

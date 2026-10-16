@@ -2944,6 +2944,7 @@ function PopulatedList({
           keyOf={(row) => row.key}
           estimatedRowHeight={showTimestamps ? 44 : 30}
           heightResetToken={showTimestamps}
+          overlayScrollbar
           renderItem={(row) => {
             const anim = treeAnimRows.get(row.key);
             if (row.kind === "folder") {

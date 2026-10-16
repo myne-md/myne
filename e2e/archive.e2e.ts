@@ -23,6 +23,7 @@ import {
   dismissImporterOffer,
   openSettings,
   ribbonSelector,
+  selectSettingsTopic,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -191,6 +192,9 @@ describeE2E("ar3 disabling archiving empties the archive (archive-disable)", () 
         // (archiving enabled); clicking it empties the Archive first, then
         // persists the disable flag.
         await openSettings(s, "editor");
+        // The archive switch lives in the Editor panel's `features` topic since
+        // myne-md/myne#885; only the active topic's body is mounted.
+        await selectSettingsTopic(s, "editor", "features");
         await (await s.byTestId("settings.archive-disabled")).click();
         await s.waitUntil(
           async () =>

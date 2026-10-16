@@ -112,7 +112,7 @@ async function withFault<T>(fault: string, run: () => Promise<T>): Promise<T> {
 
 aiDescribe("ad1 the chat resting state names the cause it actually has", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
-  it("says no provider when the backend has nothing to answer with", async () => {
+  it("names the setup problem the backend actually has", async () => {
     let password = "";
     let cause: string | null = null;
     let body = "";
@@ -131,10 +131,18 @@ aiDescribe("ad1 the chat resting state names the cause it actually has", () => {
         },
       ),
     );
-    expect(cause).toBe("no-provider");
-    // The load-bearing half of the sentence: naming what stays quiet is what
-    // lets a user tell a deliberate absence from a broken app.
-    expect(body).toContain("chat, summaries, rewriting and semantic search");
+    // **The id moved with myne-md/myne#867, and the assertion moved with it.**
+    // `no-provider` was a bucket this surface computed from four arms, and it
+    // existed mostly because everything the bucket did not recognise fell into
+    // it: a vault with a provider named and no consent recorded read "No
+    // provider". The id is now the host's own cause (`EngineError::kind()`), so
+    // what this pins is that a fresh vault with AI on and nothing configured
+    // reads as a SETUP problem rather than as a fault, whichever of the two
+    // causes the stub reports for this lever.
+    expect(["not_ready", "no_model"]).toContain(cause);
+    // The load-bearing half of the sentence: naming the fix is what lets a user
+    // tell a deliberate absence from a broken app.
+    expect(body.toLowerCase()).toMatch(/nothing is ready|no model here to run/);
   });
 });
 

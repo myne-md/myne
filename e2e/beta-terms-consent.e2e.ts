@@ -43,7 +43,12 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { legalConsentSeed } from "./support/multi-device";
-import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  openSettings,
+  selectSettingsTopic,
+  unlockToEditor,
+} from "./support/flows";
 import {
   BETA_TERMS_DATA_LOSS,
   BETA_TERMS_WHAT_HAPPENS_NEXT,
@@ -87,6 +92,10 @@ describeE2E("beta-terms consent gate", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await openSettings(s, "sync");
+        // The beta-terms gate and the enrol form it guards live in Sync's
+        // `devices` topic since myne-md/myne#885; only the active topic's body
+        // is mounted.
+        await selectSettingsTopic(s, "sync", "devices");
 
         // Wait for the gate before counting anything. `byTestIdAll` is a
         // one-shot query with no wait in it, and the panel renders neither the
@@ -142,6 +151,10 @@ describeE2E("beta-terms consent gate", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await openSettings(s, "sync");
+        // The beta-terms gate and the enrol form it guards live in Sync's
+        // `devices` topic since myne-md/myne#885; only the active topic's body
+        // is mounted.
+        await selectSettingsTopic(s, "sync", "devices");
 
         await s.byTestId("sync.enroll.account-input");
         // Neither the gate nor its dialog. Checking only the dialog would pass
@@ -169,6 +182,10 @@ describeE2E("beta-terms consent gate", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await openSettings(s, "sync");
+        // The beta-terms gate and the enrol form it guards live in Sync's
+        // `devices` topic since myne-md/myne#885; only the active topic's body
+        // is mounted.
+        await selectSettingsTopic(s, "sync", "devices");
 
         await s.byTestId("sync.beta-terms.open");
         expect((await s.byTestIdAll("sync.enroll.account-input")).length).toBe(0);

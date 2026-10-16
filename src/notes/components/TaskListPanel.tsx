@@ -436,6 +436,23 @@ const SCROLL_STYLE: CSSProperties = {
   position: "relative",
 };
 
+/**
+ * A section heading, and it paints **no ground of its own** (myne-md/myne#867).
+ *
+ * It used to fill with `--paper`, the LIGHTEST stop of the surface ramp, while
+ * the panel it sits in is on a darker one. That floor is right for a FIELD (
+ * `SEARCH_STYLE` and `FILTERS_BUTTON_STYLE` below are `--paper` on purpose,
+ * because an input reads as inset into its panel) and wrong for a heading,
+ * because a full-width opaque band is not inset into anything: it reads as a
+ * surface belonging to something else, so "No date" looked like a different
+ * panel had been spliced into the Tasks view. It was also the only thing in that
+ * panel painting a surface of its own.
+ *
+ * The separation a heading needs is a hairline, which is what the canon asks for
+ * a divider. It follows that the fix holds in every theme by construction rather
+ * than by three measurements: with no fill declared, the heading shows whatever
+ * ground the theme gives the panel behind it.
+ */
 const HEADER_BASE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -447,7 +464,7 @@ const HEADER_BASE: CSSProperties = {
   fontSize: "var(--text-xs)",
   fontWeight: 600,
   color: "var(--fg-2)",
-  background: "var(--paper)",
+  borderBottom: "1px solid var(--line-1)",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };

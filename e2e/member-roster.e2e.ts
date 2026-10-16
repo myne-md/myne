@@ -24,6 +24,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   openSettings,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
@@ -66,6 +67,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await unlockToEditor(app.session, fixture.password);
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
+        // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
+        await selectSettingsTopic(app.session, "sync", "devices");
         // The panel mounts with the person-identity step first: the invite
         // path needs a held identity, so the phrase form is what a fresh
         // process shows.
@@ -104,6 +107,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await unlockToEditor(app.session, fixture.password);
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
+        // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
+        await selectSettingsTopic(app.session, "sync", "devices");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         // The identity unlock is the Sync panel's Identity block, collapsed by
         // default; the member roster no longer carries its own grid
@@ -177,6 +182,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await unlockToEditor(app.session, "CanaryPass-9-animals!");
            await dismissImporterOffer(app.session);
            await openSettings(app.session, "sync");
+           // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
+           await selectSettingsTopic(app.session, "sync", "devices");
           await app.session.byTestId("member-roster");
           // The identity unlock now lives in the Sync panel's Identity block
           // (myne-md/myne#831); it is collapsed by default.
@@ -207,6 +214,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await closeSettings(app.session);
            await server.teardown();
            await openSettings(app.session, "sync");
+           // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
+           await selectSettingsTopic(app.session, "sync", "devices");
            await app.session.byTestId("member-roster.person-ready");
            await app.session.byTestId("member-roster.invitations-error", { timeoutMs: 10_000 });
         },

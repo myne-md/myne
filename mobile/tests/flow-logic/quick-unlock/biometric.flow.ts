@@ -80,7 +80,8 @@ test.describe("biometric quick-unlock — settings", () => {
   async function openQuickUnlockPanel(page: import("@playwright/test").Page) {
     await page.goto("/");
     await page.getByRole("button", { name: "Settings" }).first().click();
-    await page.getByText("Privacy & security", { exact: true }).click();
+    // Quick unlock lives in the `vault` category since myne-md/myne#880 task 12.
+    await page.getByTestId("settings.category-vault").click();
     await page.getByTestId("settings.quick-unlock-row").click();
   }
 

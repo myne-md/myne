@@ -78,6 +78,7 @@ import {
 } from "../../lib/tor-routing";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
+import { SettingsSection } from "./SettingsSection";
 import { HELPER_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 
 const DISCLOSURE_BUTTON_STYLE: CSSProperties = {
@@ -239,18 +240,32 @@ export function NetworkPanel() {
 
   return (
     <div data-testid="settings.network-panel" style={PANEL_ROOT_STYLE}>
+      {/* One concern, so one section (myne-md/myne#885): the routing preference
+          and the posture it produces are one question, which is why the posture
+          is a child of the row rather than a block beside it. The heading names
+          the panel's subject so the short panel still carries the shared seam. */}
+      <SettingsSection title={t("settings.shell.panels.network")}>
       <SettingRow
         anchorId="network.tor-routing"
         testId="settings.tor-routing"
         stateAttrs={{ "data-enabled": String(enabled) }}
         label={t("settings.network.torLabel")}
-        helper={t("settings.network.torHelper")}
-        control={(helperId) => (
+        // 333 characters, the second-longest helper in the catalog
+        // (myne-md/myne#885). What the switch DOES stays on the row; the rest of
+        // the paragraph, including the two things it does not do, moves behind
+        // the question mark unchanged.
+        helper={t("settings.network.torInline")}
+        explanation={[t("settings.network.torHelper")]}
+        control={(helperId, explanationId) => (
           <Switch
             checked={enabled}
             onChange={busy ? undefined : (next) => void toggle(next)}
             ariaLabel={t("settings.network.torLabel")}
-            ariaDescribedBy={helperId}
+            ariaDescribedBy={
+              explanationId === undefined
+                ? helperId
+                : `${helperId} ${explanationId}`
+            }
             testId="settings.tor-routing-toggle"
           />
         )}
@@ -324,6 +339,7 @@ export function NetworkPanel() {
           </p>
         )}
       </SettingRow>
+      </SettingsSection>
     </div>
   );
 }

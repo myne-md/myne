@@ -43,6 +43,12 @@ permissions = [
   "allow-set-daily-date-format",
   "allow-set-daily-folder",
   "allow-set-daily-template",
+  "allow-set-periodic-note-setting",
+  "allow-set-color-groups",
+  "allow-set-ai-excluded-folders",
+  "allow-set-chat-history-budget",
+  "allow-set-attachment-ocr-enabled",
+  "allow-set-meeting-ai-prompt",
   "allow-set-date-format",
   "allow-set-time-format",
   "allow-set-timezone",
@@ -220,6 +226,64 @@ commands.allow = ["set_daily_folder"]
 identifier = "allow-set-daily-template"
 description = "Allow invoking prefs:set_daily_template (Slot::Unlocked-gated setter for the daily_template pointer — Option<String> UUID of the template to instantiate today's note from, None clears it; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_daily_template"]
+
+# Periodic-notes settings (myne#177, wired to mobile by myne-md/myne#880). One
+# weekly/monthly entry of the `periodic_notes` map, keyed `<period>.<setting>`;
+# `value = null` clears the entry. Shared core setter, so this plugin only wires
+# the ACL. Same three-site lockstep as every other prefs setter: this file, the
+# prefs generate_handler, and (optionally) build.rs's inlined list.
+# Graph colour groups (myne-md/myne#727, writable on mobile by myne-md/myne#880).
+# A WHOLE-LIST replace of the rule sequence, because rule order is precedence.
+# Shared core setter, so this plugin only wires the ACL. Same three-site
+# lockstep as every other prefs setter: this file, the prefs generate_handler,
+# and build.rs's inlined list.
+# AI excluded folders (local-ai epic MYND-408, writable on mobile by
+# myne-md/myne#880). The set the AI refusal path honours, so it is an EGRESS
+# CONTROL: a set-union mutation with unfolded removals, and §10.2 keeps the union
+# monotone. Shared core setter, so this plugin only wires the ACL. Same
+# three-site lockstep as every other prefs setter: this file, the prefs
+# generate_handler, and build.rs's inlined list.
+# AI limits (myne-md/myne#880). Two commands with different classes, kept
+# together because they are one surface: `set_chat_history_budget` is
+# DEVICE-LOCAL (a per-machine off-device volume bound) and
+# `set_meeting_ai_prompt` is SHARED / scalar LWW (vault content). Shared core
+# setters, so this plugin only wires the ACL. Same three-site lockstep as every
+# other prefs setter: this file, the prefs generate_handler, and build.rs's
+# inlined list.
+# Attachment image OCR (MYND-441), switchable on mobile since myne-md/myne#880.
+# DEVICE-LOCAL (per-device compute budget, §10.2), and the control is the point:
+# the import path already reads it and injects a no-op extractor when off, so the
+# device paying the compute cost can now turn it off. Shared core setter, so this
+# plugin only wires the ACL. Same three-site lockstep as every other prefs setter.
+[[permission]]
+identifier = "allow-set-attachment-ocr-enabled"
+description = "Allow invoking prefs:set_attachment_ocr_enabled (Slot::Unlocked-gated setter for the device-local image-OCR opt-out: turning it off stops the extraction worker without deleting cached results; defaults to true, so an unreadable prefs blob reads as ON; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_attachment_ocr_enabled"]
+
+[[permission]]
+identifier = "allow-set-chat-history-budget"
+description = "Allow invoking prefs:set_chat_history_budget (Slot::Unlocked-gated setter for the device-local chat-history seed budget, in characters, or null for the host default; the host CLAMPS it to MAX_HISTORY_BUDGET, so this permission is not a bound; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_chat_history_budget"]
+
+[[permission]]
+identifier = "allow-set-meeting-ai-prompt"
+description = "Allow invoking prefs:set_meeting_ai_prompt (Slot::Unlocked-gated setter for the shared meeting-summary instruction, or null to restore the built-in default; an all-whitespace value clears host-side and a value over 4000 bytes is refused; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_meeting_ai_prompt"]
+
+[[permission]]
+identifier = "allow-set-ai-excluded-folders"
+description = "Allow invoking prefs:set_ai_excluded_folders (Slot::Unlocked-gated set-union mutator for the folders AI never reads or indexes, with verbs rather than a whole set, because a stale caller's set would claim deletions it never made; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ai_excluded_folders"]
+
+[[permission]]
+identifier = "allow-set-color-groups"
+description = "Allow invoking prefs:set_color_groups (Slot::Unlocked-gated whole-list setter for the graph colour-group rule sequence, where order is rule precedence and first match wins; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_color_groups"]
+
+[[permission]]
+identifier = "allow-set-periodic-note-setting"
+description = "Allow invoking prefs:set_periodic_note_setting (Slot::Unlocked-gated setter for one weekly/monthly periodic-notes entry, the `periodic_notes` map keyed `<period>.<setting>`; a folder value is also registered as a deliberate folder so it survives empty, and a null value clears the entry; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_periodic_note_setting"]
 
 # Display date & time (myne#279, wired to mobile by myne-md/myne#609). The
 # command bodies live in the SHARED myne-core prefs core and the desktop has

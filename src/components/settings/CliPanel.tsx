@@ -39,10 +39,12 @@
 // the same split, and the same reason, as `PrivacyPanel` and its row
 // components. One file per panel plus the shared control blocks they compose.
 
+import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { mutationFrom } from "../../lib/prefs";
 import { CliAccessSettings } from "./CliAccessSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
+import { SettingsSection, SettingsSectionCounter } from "./SettingsSection";
 
 interface CliPanelProps {
   /** Wired by `SettingsModal`. The panel omits it in dev / non-Tauri contexts
@@ -52,6 +54,7 @@ interface CliPanelProps {
 }
 
 export function CliPanel({ onShowToast }: CliPanelProps = {}) {
+  const { t } = useTranslation();
   const {
     prefs,
     setCliEnabled,
@@ -61,6 +64,11 @@ export function CliPanel({ onShowToast }: CliPanelProps = {}) {
 
   return (
     <div style={PANEL_ROOT_STYLE}>
+      {/* One concern, so one section with no visible heading or rule
+          (myne-md/myne#885): the rail entry already names it, the same shape
+          the Transcription panel takes. The `<section aria-label>` stays. */}
+      <SettingsSectionCounter>
+      <SettingsSection title={t("settings.shell.panels.cli")}>
       <CliAccessSettings
         enabled={prefs.cli_enabled}
         excludedFolders={prefs.cli_excluded_folders}
@@ -82,6 +90,8 @@ export function CliPanel({ onShowToast }: CliPanelProps = {}) {
           void setCliRateLimitDisabled(next);
         }}
       />
+      </SettingsSection>
+      </SettingsSectionCounter>
     </div>
   );
 }

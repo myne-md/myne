@@ -302,7 +302,8 @@ impl crate::vault_io::VaultIo for ContainerVaultIo {
 }
 
 /// A [`crate::hooks::VaultLifecycleHooks`] that records the teardown calls it
-/// receives, in order, and no-ops everything else.
+/// receives, in order, records the live-index side effects a path fires (see
+/// [`IndexCall`]), and no-ops everything else.
 ///
 /// Shared rather than per-plugin because more than one slot-drop path owes the
 /// SAME teardown vector, and the whole value of the assertion is that the paths
@@ -325,18 +326,73 @@ impl crate::vault_io::VaultIo for ContainerVaultIo {
 /// covers that half; the two are complementary and neither subsumes the other.
 pub struct RecordingHooks {
     calls: std::sync::Mutex<Vec<&'static str>>,
+    /// The live-index side effects a path fired, recorded SEPARATELY from
+    /// `calls` (whose whole-vector equality is the teardown assertion) so adding
+    /// this half cannot perturb that one. See [`IndexCall`].
+    index_calls: std::sync::Mutex<Vec<IndexCall>>,
     /// Optional REAL index this recorder wipes in `zeroize_vault_indices`, the
     /// way a client's hook body does. Present, a test can assert the resulting
     /// STATE (the index is empty) rather than only the recorded call — the
     /// stronger of the two available assertions, per the repo's own rule.
     indices: Option<std::sync::Arc<crate::plugins::vault_indices::state::VaultIndicesState>>,
+    /// When set, `index_note_attachments` LOCKS this vault (drops its slot) after
+    /// recording, standing in for a lock that lands while a live flush awaits the
+    /// attachment hook. That await is the widest window in the flush's indexing,
+    /// so a test of the post-await re-check needs a fixture that can actually be
+    /// inside it (myne-md/myne#867 review).
+    lock_on_attachments: Option<crate::vault_id::VaultId>,
+}
+
+/// One live-index side effect a core path fired, recorded so a unit test can
+/// assert a DURABILITY path reaches the index.
+///
+/// **Why this exists.** This recorder used to no-op `search_upsert`,
+/// `index_note_attachments` and `ai_note_changed`, so no unit test could assert
+/// that a save path fires them and a fix like myne-md/myne#867 (a live-owned
+/// note's flush never reached the search index) rested on an E2E scenario alone,
+/// which is a weak gate for a durability path. Recording the CALL is exactly the
+/// property those tests need: the recorder is a test double, so it observes which
+/// hooks a path fires, never what a real client's hook body does
+/// (`scripts/check-lock-teardown.mjs` covers that half).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexCall {
+    SearchUpsert {
+        note_id: String,
+        title: String,
+        body: String,
+    },
+    IndexAttachments {
+        note_id: String,
+        title: String,
+        body: String,
+    },
+    AiNoteChanged {
+        note_id: String,
+        body: String,
+    },
+    SearchRemove {
+        note_id: String,
+    },
 }
 
 impl RecordingHooks {
     pub fn new() -> std::sync::Arc<Self> {
         std::sync::Arc::new(Self {
             calls: std::sync::Mutex::new(Vec::new()),
+            index_calls: std::sync::Mutex::new(Vec::new()),
             indices: None,
+            lock_on_attachments: None,
+        })
+    }
+
+    /// A recorder whose `index_note_attachments` locks `vault` once it has
+    /// recorded the call. See the `lock_on_attachments` field.
+    pub fn locking_on_attachments(vault: crate::vault_id::VaultId) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            calls: std::sync::Mutex::new(Vec::new()),
+            index_calls: std::sync::Mutex::new(Vec::new()),
+            indices: None,
+            lock_on_attachments: Some(vault),
         })
     }
 
@@ -348,7 +404,9 @@ impl RecordingHooks {
     ) -> std::sync::Arc<Self> {
         std::sync::Arc::new(Self {
             calls: std::sync::Mutex::new(Vec::new()),
+            index_calls: std::sync::Mutex::new(Vec::new()),
             indices: Some(indices),
+            lock_on_attachments: None,
         })
     }
 
@@ -356,9 +414,24 @@ impl RecordingHooks {
         self.calls.lock().expect("recording hooks mutex").push(name);
     }
 
+    fn record_index(&self, call: IndexCall) {
+        self.index_calls
+            .lock()
+            .expect("recording hooks mutex")
+            .push(call);
+    }
+
     /// Everything recorded so far, oldest first.
     pub fn calls(&self) -> Vec<&'static str> {
         self.calls.lock().expect("recording hooks mutex").clone()
+    }
+
+    /// The live-index side effects recorded so far, oldest first.
+    pub fn index_calls(&self) -> Vec<IndexCall> {
+        self.index_calls
+            .lock()
+            .expect("recording hooks mutex")
+            .clone()
     }
 }
 
@@ -402,12 +475,22 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     }
     fn index_note_attachments<'a>(
         &'a self,
-        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
-        _: &'a str,
-        _: &'a str,
-        _: &'a str,
+        state: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
+        note_id: &'a str,
+        note_title: &'a str,
+        note_body: &'a str,
     ) -> crate::hooks::BoxFuture<'a> {
-        Box::pin(std::future::ready(()))
+        self.record_index(IndexCall::IndexAttachments {
+            note_id: note_id.to_string(),
+            title: note_title.to_string(),
+            body: note_body.to_string(),
+        });
+        let lock = self.lock_on_attachments;
+        Box::pin(async move {
+            if let Some(vault) = lock {
+                drop(state.take(vault).await);
+            }
+        })
     }
     fn zeroize_search_index(&self) {
         self.record("zeroize_search_index");
@@ -448,9 +531,24 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn apply_screen_capture(&self, _: bool, _: &'static str) {
         self.record("apply_screen_capture");
     }
-    fn search_upsert(&self, _: &str, _: &str, _: &str) {}
-    fn search_remove(&self, _: &str) {}
-    fn ai_note_changed(&self, _: &str, _: &str) {}
+    fn search_upsert(&self, id: &str, title: &str, body: &str) {
+        self.record_index(IndexCall::SearchUpsert {
+            note_id: id.to_string(),
+            title: title.to_string(),
+            body: body.to_string(),
+        });
+    }
+    fn search_remove(&self, id: &str) {
+        self.record_index(IndexCall::SearchRemove {
+            note_id: id.to_string(),
+        });
+    }
+    fn ai_note_changed(&self, id: &str, body: &str) {
+        self.record_index(IndexCall::AiNoteChanged {
+            note_id: id.to_string(),
+            body: body.to_string(),
+        });
+    }
     fn ai_note_deleted(&self, _: &str) {}
     fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
