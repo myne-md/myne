@@ -325,6 +325,81 @@ describeE2E("tp2 the note-scoped panel shows only this note's tasks (MYND-616)",
   });
 });
 
+describeE2E("tp5 a task's fields are editable from the list (myne-md/myne#884 task 8)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("opens the anchored popover, writes the field, and the note's bytes change", async () => {
+    let password = "";
+    await scenario(
+      "tp5-list-field-edit",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        await createNote(s, "Bills");
+        await typeIntoEditor(s, "- [ ] pay the rent", { landedText: "pay the rent" });
+        await waitForSaved(s);
+        await waitForTaskIndex(s, ["pay the rent"]);
+        await openTaskTab(s);
+
+        // The control exists on the row, and it does not navigate: the note the
+        // task came from is NOT the open note at this point (the task tab is).
+        const control = await s.waitForElement(testIdSelector("tasks.row.fields"));
+        await control.scrollIntoView();
+        await control.clickOnce();
+
+        // Desktop declares no `floatingSurface`, so this is the ANCHORED
+        // presentation - the same popover the in-note `+` opens - and the docked
+        // sheet must not appear. That pair is the whole point of the
+        // presentation being declared rather than sniffed.
+        await s.waitForElement(testIdSelector("editor.task-field-menu"));
+        expect(
+          (await s.byTestIdAll("editor.task-field-sheet")).length,
+          "a docked sheet appeared on a client that declares anchored",
+        ).toBe(0);
+        expect(
+          (await s.byTestIdAll("editor.top-bar")).length,
+          "the row control navigated into the note instead of opening the popover",
+        ).toBe(0);
+
+        // Pick the due field, take the calendar's first quick pick, commit. The
+        // quick picks are the one-click path, so the assertion does not depend on
+        // the wall-clock month the suite runs in.
+        await (await s.byTestId("editor.task-field-menu-due")).click();
+        const quickPick = await s.waitForElement(".cm-date-quick button");
+        await quickPick.clickOnce();
+        await (await s.byTestId("editor.task-field-commit")).click();
+
+        // The bytes: the note the task came from now carries a due field on that
+        // exact line. Read through the same IPC the app reads with, so this is
+        // the note on disk rather than a re-render.
+        const row = await s.waitForElement('[data-testid="notes.row"]');
+        const noteId = (await row.attribute("data-note-id")) ?? "";
+        expect(noteId, "the seeded note carries no id in the sidebar").not.toBe("");
+
+        let lastBody = "";
+        await s.waitUntil(
+          async () => {
+            const r = await pageSeatInvoke(
+              s,
+              "plugin:notes|note_read",
+              { noteId },
+              IPC_TIMEOUT,
+            );
+            lastBody = typeof r.ok === "string" ? r.ok : "";
+            return /- \[ \] pay the rent \[due:: \d{4}-\d{2}-\d{2}\]/.test(lastBody) ? true : null;
+          },
+          {
+            label: () => `the note's line carries the committed due date (last: ${lastBody})`,
+            timeoutMs: 15_000,
+          },
+        );
+      },
+    );
+  });
+});
+
 describeE2E("tp3 empty-state copy is honest, not celebratory (MYND-616)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("a vault with no tasks says how to make one, and congratulates nobody", async () => {

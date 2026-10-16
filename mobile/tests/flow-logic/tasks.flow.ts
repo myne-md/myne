@@ -14,6 +14,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "./mock-ipc";
+import { noteUpdates } from "./helpers";
 
 /** Two notes, four tasks - enough that a vault-wide list is visibly wider than
  *  a note-scoped one, which is the distinction under test.
@@ -47,6 +48,21 @@ const TASKS = [
     remind: null,
     repeat: null,
     priority: null,
+    done: null,
+  },
+  {
+    noteId: "note-a",
+    noteTitle: "Groceries",
+    noteFolder: "Home",
+    lineIndex: 3,
+    rawLine:
+      "- [ ] water the plants [due:: 2026-08-03] [priority:: high] [repeat:: every weekday]",
+    completed: false,
+    oversized: false,
+    due: "2026-08-03",
+    remind: null,
+    repeat: "every weekday",
+    priority: "high",
     done: null,
   },
   {
@@ -165,6 +181,81 @@ test.describe("mobile task surfaces", () => {
 
     await pickFolder(page, "tasks.vault", "any");
     await expect(page.getByText("buy milk")).toBeVisible();
+  });
+
+  test("a row carrying priority and repeat shows both marks, in its meta cluster", async ({
+    page,
+  }) => {
+    // myne-md/myne#884 task 6. `roomyBox` is what mobile asks for, so the row it
+    // renders is the SHARED single-line one: this asserts the marks arrive on the
+    // surface a phone actually opens. The stacked arrangement is the unit tier's
+    // (twoLine + inlineDate), and which phone surface, if any, should switch to
+    // it is a separate decision rather than part of this task.
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+
+    const row = page
+      .getByTestId("tasks.vault.row.row")
+      .filter({ hasText: "water the plants" });
+    await expect(row).toBeVisible();
+    await expect(row.getByTestId("tasks.vault.row.priority")).toBeVisible();
+    await expect(row.getByTestId("tasks.vault.row.repeat")).toBeVisible();
+
+    // Beside the date, in the row's own meta cluster rather than over the task
+    // text: the same grouping the desktop row produces from the same component.
+    const grouping = await row.evaluate((el) => {
+      const mark = el.querySelector('[data-testid$=".priority"]')!;
+      const meta = mark.parentElement!;
+      return {
+        metaTestId: meta.getAttribute("data-testid"),
+        dateInTheSameCluster: meta.querySelector('[data-testid$=".due"]') !== null,
+        textIsElsewhere: !meta.querySelector('[data-testid$=".text"]'),
+      };
+    });
+    expect(grouping.metaTestId).toMatch(/\.meta$/);
+    expect(grouping.dateInTheSameCluster).toBe(true);
+    expect(grouping.textIsElsewhere).toBe(true);
+
+    // The absence half, in the running app: a row carrying neither field shows
+    // neither mark, so the fixture above is doing work rather than every row
+    // growing two glyphs.
+    const plain = page.getByTestId("tasks.vault.row.row").filter({ hasText: "buy bread" });
+    await expect(plain.getByTestId("tasks.vault.row.priority")).toHaveCount(0);
+    await expect(plain.getByTestId("tasks.vault.row.repeat")).toHaveCount(0);
+  });
+
+  test("editing a field from the list opens the sheet and writes the note", async ({ page }) => {
+    // myne-md/myne#884 task 8, on the client that declares the docked
+    // presentation: the row's trailing control opens the SAME sheet the in-note
+    // `+` does, and the commit writes through the view-free sequence rather than
+    // through any editor document (the note is not even open here).
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+
+    const row = page.getByTestId("tasks.vault.row.row").filter({ hasText: "buy bread" });
+    await expect(row).toBeVisible();
+    await row.getByTestId("tasks.vault.row.fields").click();
+
+    const sheet = page.getByTestId("editor.task-field-sheet");
+    await expect(sheet).toBeVisible();
+    // The row control does not navigate: the note it belongs to stays closed.
+    await expect(page.getByTestId("editor.top-bar")).toHaveCount(0);
+
+    await sheet.getByTestId("editor.task-field-menu-due").click();
+    // The quick picks are the one-click path into the calendar, so this does not
+    // depend on the wall-clock month the suite runs in.
+    await sheet.locator(".cm-date-quick button").first().click();
+    await sheet.getByTestId("editor.task-field-commit").click();
+
+    // The write lands in the note the task came from - and on the RIGHT LINE in
+    // it. The body the mock received is the whole note, so the meaningful
+    // assertion is which line carries the new field.
+    await expect.poll(() => noteUpdates(page)).toEqual([expect.stringContaining("[due::")]);
+    const written = await noteUpdates(page);
+    expect(written.join("\n")).toContain("- [ ] buy bread [due::");
+    expect(written.join("\n")).not.toContain("- [ ] buy milk [due::");
   });
 
   test("the editor sheet lists only the open note's tasks", async ({ page }) => {

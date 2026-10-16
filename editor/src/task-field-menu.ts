@@ -21,6 +21,8 @@
 import { EditorView } from "@codemirror/view";
 import { openModal } from "./host/lib/imperative-modal";
 import { computePosition, type Rect } from "./positioning";
+import { floatingSurfacePresentation } from "./host";
+import { createDockedSheet } from "./floating/docked-sheet";
 import {
   openTaskFieldEditor,
   type TaskFieldEditorHandle,
@@ -41,6 +43,424 @@ import i18n from "@myne/editor/i18n";
 const MENU_KINDS: readonly TaskFieldKind[] = ["due", "remind", "repeat", "priority"];
 
 /**
+ * Continue the wizard once the target's write settles.
+ *
+ * **A `void` commit runs `onOk` in the SAME TICK**: the editor paths have always
+ * re-rendered synchronously and their specs assert it, so only a Promise defers.
+ * A refusal lands in `onErr`, which is still a re-read: the surface must show
+ * what the line carries rather than what the user tried to write.
+ */
+function settleCommit(
+  result: void | Promise<void>,
+  onOk: () => void,
+  onErr: () => void,
+): void {
+  if (!(result instanceof Promise)) {
+    onOk();
+    return;
+  }
+  result.then(onOk, onErr);
+}
+
+/**
+ * Everything a task-field surface needs from whoever OWNS the line, so one
+ * component can serve an editor document and a task-list row that has no
+ * document behind it at all (myne-md/myne#884 task 8).
+ *
+ * The menu itself is layout and state; the line is not its business. Both callers
+ * answer these four questions, one over a tracked document span and one over a
+ * record's raw line, and neither can drift on what a field surface offers.
+ */
+export type TaskFieldTarget = {
+  /** The fields the line carries right now. */
+  present: () => ReadonlySet<TaskFieldKind>;
+  /** The source value for `kind`, or `""` when the line does not carry it. */
+  valueOf: (kind: TaskFieldKind) => string;
+  /** The line's text right now, or `null` when the line is gone. */
+  lineText: () => string | null;
+  /** Write one field. Returns a promise on the list path, which writes a note. */
+  commit: (kind: TaskFieldKind, value: string) => void | Promise<void>;
+};
+
+/** Open for a caller that has an editor document. */
+type TaskFieldMenuFromView = {
+  view: EditorView;
+  lineFrom: number;
+  anchor: HTMLElement | Rect;
+  initialKind?: TaskFieldKind;
+};
+
+/** Open for a caller that has a record and no document (the task list). */
+type TaskFieldMenuFromTask = {
+  target: TaskFieldTarget;
+  anchor: HTMLElement | Rect;
+  initialKind?: TaskFieldKind;
+  /** The surface closed. The caller drops whatever it was holding for it. */
+  onClose?: () => void;
+  /**
+   * Optional, and absent for every caller today: advancing a recurrence
+   * occurrence is an editor-side mutation (it needs the live document), so the
+   * list control offers no skip row. Declared rather than omitted so the two
+   * arms of {@link openTaskFieldMenu} stay uniform, and so a caller that ever
+   * gains a way to skip has a place to say so.
+   */
+  onSkip?: () => void;
+};
+
+export type TaskFieldMenuOpen = TaskFieldMenuFromView | TaskFieldMenuFromTask;
+
+/**
+ * A target over a live editor document.
+ *
+ * Two things the old inline version got right and this keeps: the span is
+ * tracked from BEFORE the surface opens (`myne#326`, because the autosave
+ * rewrites the frontmatter stamp and moves every offset on the line), and every
+ * read resolves against the document as it stands NOW rather than against the
+ * offsets captured at open time.
+ */
+function viewTarget(
+  view: EditorView,
+  lineFrom: number,
+): { target: TaskFieldTarget; onClose: () => void; onSkip?: () => void } {
+  const line = view.state.doc.lineAt(lineFrom);
+  // Minted with kind `repeat` because it spans the WHOLE line; the field
+  // actually being written overrides it at the commit.
+  const tracked: TaskFieldEditHandle = beginTaskFieldEdit(view, {
+    from: line.from,
+    to: line.to,
+    kind: "repeat",
+  });
+
+  /** The live line the surface is about, or null when it was deleted. */
+  const currentLine = (): { from: number; to: number; text: string } | null => {
+    const span = tracked.current();
+    if (span === null) return null;
+    const pos = Math.min(span.from, view.state.doc.length);
+    return view.state.doc.lineAt(pos);
+  };
+
+  const spansNow = (): ReturnType<typeof chipRangesIn> => {
+    const at = currentLine();
+    return at === null ? [] : chipRangesIn(view.state, at.from, at.to);
+  };
+
+  return {
+    onClose: () => tracked.end(),
+    // The skip action is an editor-side mutation, so it lives on the view's own
+    // target and the list path simply does not offer the row: advancing an
+    // occurrence needs the note's live document, which a list row does not have
+    // (and a list-side skip would be a third mutation, not this task).
+    onSkip: () => {
+      const span = tracked.current();
+      tracked.end();
+      if (span !== null) skipOccurrence(view, span.from);
+    },
+    target: {
+      present: () => {
+        const out = new Set<TaskFieldKind>();
+        for (const span of spansNow()) out.add(span.kind);
+        return out;
+      },
+      valueOf: (kind) => spansNow().find((span) => span.kind === kind)?.value ?? "",
+      lineText: () => currentLine()?.text ?? null,
+      commit: (kind, value) => {
+        const span = tracked.current();
+        // A null span means the line was deleted while the surface was open.
+        if (span === null) return;
+        applyTaskFieldEdit(view, { ...span, kind }, value);
+      },
+    },
+  };
+}
+
+/**
+ * The menu as an anchored popover: two panes beside the caret, or beside the row
+ * control on the list path.
+ *
+ * The list is built ONCE, from the line at open time, and does not re-read after
+ * a commit. Only the docked wizard does, because only it stays open on the list
+ * (B19).
+ */
+function openAnchoredMenu(opts: {
+  anchor: HTMLElement | Rect;
+  target: TaskFieldTarget;
+  onClose?: () => void;
+  /** The skip action, when the target can perform one. Absent → no skip row. */
+  onSkip?: () => void;
+}): void {
+  const { anchor, target } = opts;
+  const present = target.present();
+
+  // The editor currently mounted in the right pane, if any.
+  let activeEditor: TaskFieldEditorHandle | null = null;
+
+  const modal = openModal({
+    backdropStyle: {
+      position: "fixed",
+      inset: "0",
+      background: "transparent",
+      zIndex: "2147483000",
+    },
+    onDismiss: () => {
+      // Escape peels one layer at a time: an open listbox, then the pane, then
+      // the menu itself.
+      if (activeEditor !== null) {
+        if (activeEditor.escape?.()) return;
+        activeEditor.close();
+        activeEditor = null;
+        renderHint();
+        return;
+      }
+      opts.onClose?.();
+      modal.close();
+    },
+  });
+
+  const surface = document.createElement("div");
+  surface.className = "cm-task-field-menu";
+  surface.setAttribute("role", "dialog");
+  surface.setAttribute("aria-label", i18n.t("editor.taskField.menuTitle"));
+  surface.setAttribute("data-testid", "editor.task-field-menu");
+  // Inline position too, not only in the stylesheet: computePosition's left/top
+  // are inline and a bare test DOM never applies the imported CSS.
+  surface.style.position = "fixed";
+
+  const list = document.createElement("div");
+  list.className = "cm-task-field-menu-list";
+  list.setAttribute("role", "menu");
+  const pane = document.createElement("div");
+  pane.className = "cm-task-field-menu-pane";
+  surface.append(list, pane);
+
+  const hint = document.createElement("div");
+  hint.className = "cm-task-field-menu-hint";
+  hint.setAttribute("data-testid", "editor.task-field-menu-hint");
+  hint.textContent = i18n.t("editor.taskField.selectField");
+  const renderHint = (): void => {
+    pane.replaceChildren(hint);
+  };
+
+  // myne#276: whether picking **Repeat** here would mint an inert rule. The
+  // line carries no `due` and no `remind`, so whatever rule the user chooses
+  // has nothing to repeat FROM. Say so on the row, before they commit.
+  const repeatNeedsAnchor = !present.has("due") && !present.has("remind");
+
+  // Open `kind`'s editor in the right pane, mounting it with `host` so the menu
+  // owns the backdrop, the trap and the Escape/Enter routing.
+  const openKind = (kind: TaskFieldKind): void => {
+    // The line as it stands NOW (myne#326). Null means it was deleted.
+    if (target.lineText() === null) {
+      opts.onClose?.();
+      modal.close();
+      return;
+    }
+    activeEditor?.close();
+    activeEditor = openTaskFieldEditor({
+      host: { body: pane },
+      anchor,
+      kind,
+      value: target.valueOf(kind),
+      onCommit: (next) => {
+        activeEditor = null;
+        // An anchorless repeat is inert (myne#276). Rather than refuse the rule
+        // the user typed - which would discard it - offer the anchor it needs, in
+        // the same pane, immediately.
+        const afterWrite = (): void => {
+          const written = target.lineText();
+          if (kind === "repeat" && next !== "" && written !== null && !canRecur(written)) {
+            openKind("due");
+            return;
+          }
+          renderHint();
+        };
+        settleCommit(target.commit(kind, next), afterWrite, renderHint);
+      },
+      onCancel: () => {
+        activeEditor = null;
+        renderHint();
+      },
+    });
+  };
+
+  let firstRow: HTMLButtonElement | null = null;
+  for (const kind of MENU_KINDS) {
+    const row = buildFieldRow(kind, present, repeatNeedsAnchor, () => openKind(kind));
+    if (firstRow === null) firstRow = row;
+    list.appendChild(row);
+  }
+
+  if (opts.onSkip !== undefined) {
+    const skipRow = appendSkipAction(list, target.lineText() ?? "", () => {
+      // The skip action performs its own document work, including ending its
+      // tracking, so the surface is torn down WITHOUT calling `onClose` (which
+      // would end the same tracking a second time).
+      opts.onSkip?.();
+      modal.close();
+    });
+    if (firstRow === null) firstRow = skipRow;
+  }
+
+  renderHint();
+  modal.backdrop.appendChild(surface);
+
+  // Position after mounting so the surface has measurable dimensions. A bare rect
+  // (the slash command's caret coordinate) is used as-is, exactly as the field
+  // editor's own modal path treats it.
+  const rect = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor;
+  const placed = computePosition({
+    anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+    surfaceWidth: surface.offsetWidth || 420,
+    surfaceHeight: surface.offsetHeight || 200,
+    preferredPlacement: "below",
+  });
+  surface.style.left = `${placed.left}px`;
+  surface.style.top = `${placed.top}px`;
+
+  modal.installTrap(surface, firstRow);
+}
+
+/**
+ * The same menu as a bottom sheet (myne-md/myne#884), which is what a client that
+ * declares the docked presentation gets.
+ *
+ * **Two steps in one sheet.** The field list, then the chosen field's editor with
+ * a Back control that returns to the list. The alternative, one scroll holding all
+ * four editors, was rejected because the calendar and the recurrence builder are
+ * tall and would push each other off the screen.
+ *
+ * **The list is re-read after every commit.** Its rows say "Edit due date" for a
+ * field the line carries and "Due date" for one it does not, so a stale list would
+ * offer to ADD the field the user just set, which is the surface stating the
+ * opposite of the truth about the line.
+ *
+ * The write path is the target's: one tracked document span on the editor paths,
+ * the view-free sequence on the list path.
+ */
+function openDockedWizard(opts: {
+  target: TaskFieldTarget;
+  initialKind?: TaskFieldKind;
+  onClose?: () => void;
+  /** The skip action, when the target can perform one. Absent → no skip row. */
+  onSkip?: () => void;
+}): void {
+  const { target } = opts;
+  let activeEditor: TaskFieldEditorHandle | null = null;
+
+  const modal = openModal({
+    backdropStyle: {
+      position: "fixed",
+      inset: "0",
+      // The themed scrim. The canon allows exactly one translucent surface and
+      // names the modal case as what it is for; a full-width sheet pinned to the
+      // bottom edge is that case, and the transparent backdrop the anchored
+      // popover uses would leave a floating box over an undimmed page.
+      //
+      // No literal fallback here, deliberately: `--scrim` is declared by the shared
+      // token sheet every client imports, and a colour literal in this file is
+      // counted by the token-adoption ratchet.
+      background: "var(--scrim)",
+      zIndex: "2147483000",
+    },
+    onDismiss: () => {
+      // Escape peels one layer at a time: an open listbox, then the field step,
+      // then the sheet itself.
+      if (activeEditor !== null) {
+        if (activeEditor.escape?.()) return;
+        activeEditor.close();
+        activeEditor = null;
+        renderList();
+        return;
+      }
+      opts.onClose?.();
+      sheet.dispose();
+      modal.close();
+    },
+  });
+
+  const sheet = createDockedSheet({
+    title: i18n.t("editor.taskField.menuTitle"),
+    testId: "editor.task-field-sheet",
+    backLabel: i18n.t("common.back"),
+    closeLabel: i18n.t("common.close"),
+    onClose: () => {
+      activeEditor?.close();
+      activeEditor = null;
+      opts.onClose?.();
+      sheet.dispose();
+      modal.close();
+    },
+  });
+  modal.backdrop.appendChild(sheet.root);
+
+  const renderList = (): void => {
+    activeEditor?.close();
+    activeEditor = null;
+    sheet.setTitle(i18n.t("editor.taskField.menuTitle"));
+    sheet.setBack(null);
+
+    const present = target.present();
+    const list = document.createElement("div");
+    list.className = "cm-docked-sheet-list";
+    list.setAttribute("role", "menu");
+    const repeatNeedsAnchor = !present.has("due") && !present.has("remind");
+    for (const kind of MENU_KINDS) {
+      list.appendChild(buildFieldRow(kind, present, repeatNeedsAnchor, () => openKind(kind)));
+    }
+    if (opts.onSkip !== undefined) {
+      appendSkipAction(list, target.lineText() ?? "", () => {
+        // See the anchored twin: the skip action ends its own tracking, so this
+        // path tears the sheet down WITHOUT calling `onClose`.
+        opts.onSkip?.();
+        sheet.dispose();
+        modal.close();
+      });
+    }
+    sheet.body.replaceChildren(list);
+  };
+
+  const openKind = (kind: TaskFieldKind): void => {
+    const existing = target.valueOf(kind);
+    activeEditor?.close();
+    sheet.setTitle(i18n.t(`editor.taskField.title.${kind}`));
+    sheet.setBack(renderList);
+    activeEditor = openTaskFieldEditor({
+      // The docked shape: the controls scroll, the actions row does not.
+      host: { body: sheet.body, actions: sheet.actions },
+      anchor: sheet.root,
+      kind,
+      value: existing,
+      onCommit: (next) => {
+        activeEditor = null;
+        // An anchorless repeat is inert, so offer its anchor in the same sheet
+        // rather than refusing the write the user already wrote (myne#276).
+        const afterWrite = (): void => {
+          const written = target.lineText();
+          if (kind === "repeat" && next !== "" && written !== null && !canRecur(written)) {
+            openKind("due");
+            return;
+          }
+          renderList();
+        };
+        settleCommit(target.commit(kind, next), afterWrite, renderList);
+      },
+      onCancel: () => {
+        activeEditor = null;
+        renderList();
+      },
+    });
+  };
+
+  renderList();
+  // A chip tap and a slash command arrive with a field already chosen, so enter
+  // its step straight away. The list stays one Back away, which is what makes the
+  // three entry points one surface rather than two.
+  if (opts.initialKind !== undefined) openKind(opts.initialKind);
+  // The trap is on the sheet, so a backdrop click still dismisses: the same
+  // contract the anchored menu has with its own surface.
+  modal.installTrap(sheet.root, null);
+}
+
+/**
  * Open the field editor to ADD (or, if the line already carries this kind, EDIT)
  * one task field on the caret's task line.
  *
@@ -58,6 +478,15 @@ export function openTaskFieldAdd(
   anchor: HTMLElement | Rect,
   opts?: { handle?: TaskFieldEditHandle; onEditorClose?: () => void },
 ): void {
+  // Docked, a slash command opens the SAME sheet the `+` affordance does, entered
+  // on the field it named, with the list one Back away. That is the whole point of
+  // routing both here rather than letting each build its own surface
+  // (myne-md/myne#884).
+  if (floatingSurfacePresentation() === "docked") {
+    openTaskFieldMenu({ view, anchor, lineFrom, initialKind: kind });
+    return;
+  }
+
   const line = view.state.doc.lineAt(lineFrom);
   // Prefill from the existing field, if any, so choosing a present kind edits it
   // instead of clobbering it. `chipRangesIn` yields the SOURCE value (never the
@@ -126,227 +555,122 @@ export function openTaskFieldAdd(
 }
 
 /**
- * Open the "add field" mini-menu anchored to the `+` affordance.
+ * Open the "add field" menu for a task line (myne-md/myne#884).
  *
- * A kind the line already carries is relabelled "Edit …" and routes through the
+ * **One component, two callers.** With a `view` it is the `+` affordance, the
+ * chip and the slash commands, and the line is a tracked document span. With a
+ * `target` it is the task list's own control, where there is no document at all
+ * and a field is written with the view-free sequence instead. Everything below
+ * the line - the rows, the wizard, the commit chaining, the dismissal - is the
+ * same code, which is what stops the two entry points from behaving differently.
+ *
+ * A kind the line already carries is relabelled "Edit ..." and routes through the
  * same opener (which prefills it) - strictly more useful than hiding it, and it
- * reuses the seam. The menu is an anchored popover, not a blocking dialog, so it
- * uses the transparent-backdrop `openModal` shape `task-field-editor.ts` uses,
- * getting focus-trap + Esc + backdrop-click dismissal for free.
+ * reuses the seam.
  *
- * A **skip** row joins them when the caret's line carries a recurrence rule
- * that can actually be advanced (myne#198). It sits below a separator because it
- * is categorically different from its neighbours: the other rows open an editor
- * to change a value, this one performs an action and closes. The test for
- * showing it is deliberately "can this occurrence be skipped", not "does this
- * line carry a repeat field" - offering an action that would silently do nothing
- * on an unreadable or anchorless rule is the same failure the chip layer forbids
- * itself in `decorations/task-chip.ts`.
+ * A **skip** row joins them when the caret's line carries a recurrence rule that
+ * can actually be advanced (myne#198). It sits below a separator because it is
+ * categorically different from its neighbours: the other rows open an editor to
+ * change a value, this one performs an action and closes. The test for showing it
+ * is deliberately "can this occurrence be skipped", not "does this line carry a
+ * repeat field" - offering an action that would silently do nothing on an
+ * unreadable or anchorless rule is the same failure the chip layer forbids itself
+ * in `decorations/task-chip.ts`. It is a VIEW-side action, so a target without a
+ * document simply does not offer the row.
  */
-export function openTaskFieldMenu(opts: {
-  view: EditorView;
-  anchor: HTMLElement;
-  lineFrom: number;
-}): void {
-  const { view, anchor, lineFrom } = opts;
-  const line = view.state.doc.lineAt(lineFrom);
-  const present = new Set<TaskFieldKind>();
-  for (const span of chipRangesIn(view.state, line.from, line.to)) {
-    present.add(span.kind);
-  }
+export function openTaskFieldMenu(opts: TaskFieldMenuOpen): void {
+  const source = "view" in opts ? viewTarget(opts.view, opts.lineFrom) : opts;
 
-  // Track the caret's line for as long as the menu is open (myne#326).
-  //
-  // EVERY row needs this, not just the skip row. A menu is easily open for
-  // longer than the ~1 s autosave that rewrites the frontmatter `updated:`
-  // stamp, and any growth above the task line moves it forward - so the offset
-  // captured at open time lands in the PRECEDING line by the time a row is
-  // clicked. Nothing downstream guards it: `planTaskFieldWrite` rewrites
-  // whatever line text it is handed, so `[due:: …]` could be appended to an
-  // unrelated task, to prose, or to a YAML line inside the frontmatter block,
-  // corrupting it.
-  //
-  // Tracking has to begin HERE rather than on click: by click time the offsets
-  // have already moved. Ended when the MENU closes, since the hosted editor
-  // writes through this same handle rather than minting its own.
-  const tracked: TaskFieldEditHandle = beginTaskFieldEdit(view, {
-    from: line.from,
-    to: line.to,
-    kind: "repeat",
-  });
-
-  // The editor currently mounted in the right pane, if any.
-  let activeEditor: TaskFieldEditorHandle | null = null;
-
-  const modal = openModal({
-    backdropStyle: {
-      position: "fixed",
-      inset: "0",
-      background: "transparent",
-      zIndex: "2147483000",
-    },
-    onDismiss: () => {
-      // Escape peels one layer at a time: an open listbox, then the pane, then
-      // the menu itself.
-      if (activeEditor !== null) {
-        if (activeEditor.escape?.()) return;
-        activeEditor.close();
-        activeEditor = null;
-        renderHint();
-        return;
-      }
-      tracked.end();
-      modal.close();
-    },
-  });
-
-  const surface = document.createElement("div");
-  surface.className = "cm-task-field-menu";
-  surface.setAttribute("role", "dialog");
-  surface.setAttribute("aria-label", i18n.t("editor.taskField.menuTitle"));
-  surface.setAttribute("data-testid", "editor.task-field-menu");
-  // Inline position too, not only in the stylesheet: computePosition's left/top
-  // are inline and a bare test DOM never applies the imported CSS.
-  surface.style.position = "fixed";
-
-  const list = document.createElement("div");
-  list.className = "cm-task-field-menu-list";
-  list.setAttribute("role", "menu");
-  const pane = document.createElement("div");
-  pane.className = "cm-task-field-menu-pane";
-  surface.append(list, pane);
-
-  const hint = document.createElement("div");
-  hint.className = "cm-task-field-menu-hint";
-  hint.setAttribute("data-testid", "editor.task-field-menu-hint");
-  hint.textContent = i18n.t("editor.taskField.selectField");
-  const renderHint = (): void => {
-    pane.replaceChildren(hint);
-  };
-
-  // myne#276: whether picking **Repeat** here would mint an inert rule. The
-  // line carries no `due` and no `remind`, so whatever rule the user chooses
-  // has nothing to repeat FROM. Say so on the row, before they commit.
-  const repeatNeedsAnchor = !present.has("due") && !present.has("remind");
-
-  // Open `kind`'s editor in the right pane, mounting it with `host` so the menu
-  // owns the backdrop, the trap and the Escape/Enter routing.
-  const openKind = (kind: TaskFieldKind): void => {
-    // The line as it stands NOW, not as it stood when the menu opened
-    // (myne#326). Null means the line was deleted while the menu was open.
-    const span = tracked.current();
-    if (span === null) {
-      tracked.end();
-      modal.close();
-      return;
-    }
-    const existing = chipRangesIn(view.state, line.from, line.to).find(
-      (s) => s.kind === kind,
-    );
-    activeEditor?.close();
-    activeEditor = openTaskFieldEditor({
-      host: pane,
-      anchor,
-      kind,
-      value: existing?.value ?? "",
-      onCommit: (next) => {
-        activeEditor = null;
-        const current = tracked.current();
-        if (current === null) {
-          renderHint();
-          return;
-        }
-        // The tracked handle was made with kind `repeat`; the field actually
-        // being written overrides it.
-        if (!applyTaskFieldEdit(view, { ...current, kind }, next)) {
-          renderHint();
-          return;
-        }
-        // An anchorless repeat is inert; offer its anchor in the same pane
-        // rather than refusing the write (myne#276).
-        if (kind === "repeat" && next !== "") {
-          const written = view.state.doc.lineAt(
-            Math.min(current.from, view.state.doc.length),
-          );
-          if (!canRecur(written.text)) {
-            openKind("due");
-            return;
-          }
-        }
-        renderHint();
-      },
-      onCancel: () => {
-        activeEditor = null;
-        renderHint();
-      },
+  // The docked presentation is a different ANATOMY, not a different stylesheet:
+  // one step of a wizard in a bottom sheet, rather than two panes beside the
+  // caret. It therefore has its own layout, and the anchored one stays exactly as
+  // it was for every client that did not ask for sheets (myne-md/myne#884).
+  if (floatingSurfacePresentation() === "docked") {
+    openDockedWizard({
+      target: source.target,
+      initialKind: opts.initialKind,
+      onClose: source.onClose,
+      onSkip: source.onSkip,
     });
-  };
-
-  let firstRow: HTMLButtonElement | null = null;
-  for (const kind of MENU_KINDS) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "cm-task-field-menu-row";
-    row.setAttribute("role", "menuitem");
-    row.setAttribute("data-testid", `editor.task-field-menu-${kind}`);
-    const title = i18n.t(`editor.taskField.title.${kind}`);
-    // Leading icon, so the menu reads at a glance (myne-md/myne#656 review).
-    const main = document.createElement("span");
-    main.className = "cm-task-field-menu-main";
-    main.appendChild(taskChipIcon(kind, kind === "priority" ? "high" : ""));
-    const label = document.createElement("span");
-    label.textContent = present.has(kind)
-      ? i18n.t("editor.taskField.menuEdit", { field: title })
-      : title;
-    main.appendChild(label);
-    row.appendChild(main);
-    if (kind === "repeat" && repeatNeedsAnchor) {
-      const note = document.createElement("span");
-      note.className = "cm-task-field-menu-note";
-      note.setAttribute("data-testid", "editor.task-field-menu-repeat-note");
-      note.textContent = i18n.t("editor.taskField.repeatNeedsDate");
-      row.appendChild(note);
-    }
-    row.addEventListener("click", () => openKind(kind));
-    if (firstRow === null) firstRow = row;
-    list.appendChild(row);
+    return;
   }
 
-  if (canSkipOccurrence(line.text)) {
-    const separator = document.createElement("div");
-    separator.className = "cm-task-field-menu-sep";
-    separator.setAttribute("role", "separator");
-    list.appendChild(separator);
-
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "cm-task-field-menu-row";
-    row.setAttribute("role", "menuitem");
-    row.setAttribute("data-testid", "editor.task-field-menu-skip");
-    row.textContent = i18n.t("editor.taskField.skipOccurrence");
-    row.addEventListener("click", () => {
-      const span = tracked.current();
-      tracked.end();
-      modal.close();
-      if (span !== null) skipOccurrence(view, span.from);
-    });
-    if (firstRow === null) firstRow = row;
-    list.appendChild(row);
-  }
-
-  renderHint();
-  modal.backdrop.appendChild(surface);
-
-  // Position after mounting so the surface has measurable dimensions.
-  const rect = anchor.getBoundingClientRect();
-  const placed = computePosition({
-    anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-    surfaceWidth: surface.offsetWidth || 420,
-    surfaceHeight: surface.offsetHeight || 200,
-    preferredPlacement: "below",
+  openAnchoredMenu({
+    anchor: opts.anchor,
+    target: source.target,
+    onClose: source.onClose,
+    onSkip: source.onSkip,
   });
-  surface.style.left = `${placed.left}px`;
-  surface.style.top = `${placed.top}px`;
+}
 
-  modal.installTrap(surface, firstRow);
+/**
+ * One field row. Shared by both presentations so the two lists cannot drift on
+ * which fields they offer, what those are called, or how a field the line already
+ * carries is labelled ("Edit due date" rather than "Due date"). The test id is
+ * shared too, deliberately: a test can then target one row regardless of the
+ * presentation it is looking at, and the CONTAINER is what says which one it is.
+ */
+function buildFieldRow(
+  kind: TaskFieldKind,
+  present: ReadonlySet<TaskFieldKind>,
+  repeatNeedsAnchor: boolean,
+  onPick: () => void,
+): HTMLButtonElement {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "cm-task-field-menu-row";
+  row.setAttribute("role", "menuitem");
+  row.setAttribute("data-testid", `editor.task-field-menu-${kind}`);
+  const title = i18n.t(`editor.taskField.title.${kind}`);
+  // Leading icon, so the menu reads at a glance (myne-md/myne#656 review).
+  const main = document.createElement("span");
+  main.className = "cm-task-field-menu-main";
+  main.appendChild(taskChipIcon(kind, kind === "priority" ? "high" : ""));
+  const label = document.createElement("span");
+  label.textContent = present.has(kind)
+    ? i18n.t("editor.taskField.menuEdit", { field: title })
+    : title;
+  main.appendChild(label);
+  row.appendChild(main);
+  if (kind === "repeat" && repeatNeedsAnchor) {
+    const note = document.createElement("span");
+    note.className = "cm-task-field-menu-note";
+    note.setAttribute("data-testid", "editor.task-field-menu-repeat-note");
+    note.textContent = i18n.t("editor.taskField.repeatNeedsDate");
+    row.appendChild(note);
+  }
+  row.addEventListener("click", onPick);
+  return row;
+}
+
+/**
+ * The skip ACTION, below a separator: categorically different from the rows above
+ * it, which open a value editor, because this one performs something and closes.
+ *
+ * Offered only when the caret line's rule can actually be advanced (`myne#198`),
+ * never merely because the line carries a repeat field: offering an action that
+ * would silently do nothing on an unreadable or anchorless rule is the same
+ * failure the chip layer forbids itself. Returns the row, or null when there is
+ * nothing to advance.
+ */
+function appendSkipAction(
+  list: HTMLElement,
+  lineText: string,
+  onSkip: () => void,
+): HTMLButtonElement | null {
+  if (!canSkipOccurrence(lineText)) return null;
+  const separator = document.createElement("div");
+  separator.className = "cm-task-field-menu-sep";
+  separator.setAttribute("role", "separator");
+  list.appendChild(separator);
+
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "cm-task-field-menu-row";
+  row.setAttribute("role", "menuitem");
+  row.setAttribute("data-testid", "editor.task-field-menu-skip");
+  row.textContent = i18n.t("editor.taskField.skipOccurrence");
+  row.addEventListener("click", onSkip);
+  list.appendChild(row);
+  return row;
 }

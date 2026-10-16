@@ -17,7 +17,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { TaskListPanel } from "@myne/task-panel";
 import { DEFAULT_TASK_VIEW, type TaskView } from "@myne/task-view";
 import { todayLocal } from "@myne/task-filters";
-import { setTaskCompleted, useVaultTasks, type VaultTask } from "../lib/tasks";
+import { setTaskCompleted, setTaskField, useVaultTasks, type VaultTask } from "../lib/tasks";
 
 export type TaskSurfaceScope =
   /** Every task in the vault - the bottom-bar destination and its sidebar tab. */
@@ -84,6 +84,10 @@ export function TaskSurface({
       // the content-hash guard, without which a sync pull-apply racing a
       // checkbox flip would be clobbered.
       onToggle={(task) => void setTaskCompleted(task, !task.completed).catch(() => {})}
+      // The row's field control (myne-md/myne#884 task 8). Mobile declares the
+      // docked presentation, so it opens the bottom sheet; the surface is the
+      // shared list panel, so this is one prop rather than a second component.
+      onWriteField={(task, kind, value) => setTaskField(task, kind, value)}
       {...(onOpen === undefined ? {} : { onOpen })}
       {...(testIdPrefix === undefined ? {} : { testIdPrefix })}
     />
