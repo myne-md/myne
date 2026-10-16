@@ -17,6 +17,7 @@
     "web:preview": "vite preview --config web/vite.config.ts",
     "stories": "vite --config stories/vite.config.ts",
     "stories:build": "tsc -p stories/tsconfig.json && vite build --config stories/vite.config.ts",
+    "stories:build:public": "tsc -p stories/tsconfig.json && STORIES_PUBLIC=1 vite build --config stories/vite.config.ts",
     "stories:preview": "vite preview --config stories/vite.config.ts",
     "stories:test": "vitest run --config vitest.stories.config.ts",
     "stories:record": "STORIES_RECORD=1 vitest run --config vitest.stories.config.ts tests/stories/drift.test.tsx",
