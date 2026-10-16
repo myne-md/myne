@@ -529,6 +529,12 @@ steps:
       # above. A command declared, permitted, registered and mirrored in TS can
       # still be called by nothing, and then the feature behind it ships inert.
       - node scripts/check-ipc-binding-callers.mjs
+      # The diagnostic log's content claim (myne-md/myne#860): no `%` Display
+      # formatter at a level the file layer records, and no value interpolated
+      # into a message. The DENY list was review-enforced while the sink was a
+      # terminal nobody reads; a file the user is invited to send on is the point
+      # at which that stops being enough.
+      - node scripts/check-tracing-discipline.mjs
       # Playwright image vs lockfile (myne#529): the image bakes browsers for
       # its own version, so a tag behind the lockfile fails every test inside
       # `browserType.launch`. It took the whole mobile-flow-logic lane down,

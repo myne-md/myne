@@ -133,24 +133,36 @@ runSeamContract({
     state.subscribers.clear();
   },
   load: async (): Promise<SeamModules> => {
-    const [core, event, dialog, opener, path, win, webviewWindow, clipboardManager, deepLink] =
-      await Promise.all([
-        import("../../src/platform/core"),
-        import("../../src/platform/event"),
-        import("../../src/platform/dialog"),
-        import("../../src/platform/opener"),
-        import("../../src/platform/path"),
-        import("../../src/platform/window"),
-        import("../../src/platform/webviewWindow"),
-        import("../../src/platform/clipboardManager"),
-        import("../../src/platform/deepLink"),
-      ]);
+    const [
+      core,
+      event,
+      dialog,
+      opener,
+      path,
+      win,
+      webviewWindow,
+      clipboardManager,
+      deepLink,
+      diagnostics,
+    ] = await Promise.all([
+      import("../../src/platform/core"),
+      import("../../src/platform/event"),
+      import("../../src/platform/dialog"),
+      import("../../src/platform/opener"),
+      import("../../src/platform/path"),
+      import("../../src/platform/window"),
+      import("../../src/platform/webviewWindow"),
+      import("../../src/platform/clipboardManager"),
+      import("../../src/platform/deepLink"),
+      import("../../src/platform/diagnostics"),
+    ]);
     return {
       core,
       event,
       dialog,
       opener,
       path,
+      diagnostics,
       window: win,
       webviewWindow,
       clipboardManager,

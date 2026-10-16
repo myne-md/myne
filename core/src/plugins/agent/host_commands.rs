@@ -129,7 +129,15 @@ pub(crate) fn parse_probe_threshold(json: &str) -> Result<ProbeThreshold, String
 /// broken record switch the gate off.
 pub fn probe_threshold() -> ProbeThreshold {
     parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|reason| {
-        tracing::error!(event = "agent_probe_threshold_unreadable", %reason);
+        // `%reason` is KEPT, and it is a recorded exception in
+        // `scripts/check-tracing-discipline.mjs`: the text comes from parsing
+        // `PROBE_THRESHOLD_JSON`, which is a compile-time `include_str!` of a
+        // checked-in constant four lines up, so it can only name a JSON key or
+        // a type mismatch and can never carry a path or user data. Dropping it
+        // cost the one classification this arm had, in a change whose whole
+        // point is that a failure should say what it was (myne#860 adversarial
+        // review).
+        tracing::error!(event = "agent_probe_threshold_unreadable", reason = %reason);
         ProbeThreshold {
             attempts: 1,
             required: u8::MAX,

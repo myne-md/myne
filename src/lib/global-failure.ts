@@ -70,6 +70,30 @@ export function resetGlobalFailureForTest(): void {
 }
 
 /**
+ * The bounded code a fail-closed card reports: the card's OWN closed reason.
+ *
+ * **It deliberately does NOT join the recorded global failure, and the reason is
+ * a review finding.** An earlier revision returned `<reason>+<lastGlobalFailure>`
+ * so the card would carry both. `last` is module-scope and nothing clears it in
+ * production (`resetGlobalFailureForTest` is the test-only reset), so a card
+ * raised an hour later, or in the next vault's session, carried an unrelated
+ * class into `data-code` and into the copied report: a
+ * `corrupted-vault+worker-fatal` from a previous session misdirects exactly the
+ * investigation the code exists to help. Joining an unbounded-in-time value into
+ * a per-card field is the defect, so the join is gone rather than bounded.
+ *
+ * The recorded global failure keeps its reader, which is where it belongs: the
+ * About surface shows it as "the last recorded failure", a fact about the
+ * session rather than about this card.
+ *
+ * The parameter stays typed as `string` because the call sites pass the card's
+ * closed reason union; the value is bounded by construction at every caller.
+ */
+export function failClosedCode(reason: string): string {
+  return reason;
+}
+
+/**
  * Install the window-level handlers. Idempotent — a second call is a no-op, so
  * a hot reload or a double-invoked effect cannot register two.
  */

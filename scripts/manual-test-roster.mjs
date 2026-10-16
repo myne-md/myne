@@ -664,7 +664,7 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [],
     manual: [],
-    exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The fail-closed screen is forceable on both lanes (corrupt vault.meta on desktop; a header-less bundle server in the web lane, whose e2e-web/support/server.ts already takes securityHeaders() as a parameter), the diagnostics field allowlist is a pure tested module (src/lib/diagnostics.ts over src/lib/collect-diagnostics.ts), the pasteboard read-back is xclip on the xvfb runner, and \"a real number or an explicit unknown, never blank/zero/NaN\" is a rendered-string assertion. Owed: e2e/diagnostics-copy.e2e.ts and e2e-web/diagnostics-block.e2e.ts.",
+    exemptionReason: "Both candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). The fail-closed screen is forceable on both lanes (corrupt vault.meta on desktop; a header-less bundle server in the web lane, whose e2e-web/support/server.ts already takes securityHeaders() as a parameter), the diagnostics field allowlist is a pure tested module (src/lib/diagnostics.ts over src/lib/collect-diagnostics.ts), the pasteboard read-back is xclip on the xvfb runner, and \"a real number or an explicit unknown, never blank/zero/NaN\" is a rendered-string assertion. Owed: e2e-web/diagnostics-block.e2e.ts; the desktop half, e2e/diagnostics-copy.e2e.ts, landed with myne-md/myne#860.",
   },
   {
     id: "app.language-and-i18n",
@@ -730,6 +730,34 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 25,
         tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
+    // myne-md/myne#860. A new surface: the opt-in device-local diagnostic log
+    // and the bug-report rows in Settings, About.
+    id: "app.diagnostic-log",
+    title: "Diagnostic log and bug reports",
+    paths: [
+      "src/platform/diagnostics.ts",
+      "src/hooks/useDiagnostics.ts",
+      "src/components/settings/AboutPanel.tsx",
+      "src/components/FailClosedError.tsx",
+      "src-tauri/src/logging/",
+      "src-tauri/src/plugins/diagnostics/",
+      "scripts/check-tracing-discipline.mjs",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: ["e2e/diagnostics-copy.e2e.ts"],
+    manual: [
+      {
+        see: "On a real desktop session on macOS and on Windows, open Settings, About. Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm About lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
+        whyNotAutomated:
+          "The platform file manager is an OS session the Linux container does not have, and the permission half is per-platform file-mode and ACL observation: the container is Linux, so it can speak for 0600/0700 there and for neither WKWebView-era macOS nor WebView2 Windows ACL inheritance. The toggle, the block preview, the manifest line and the report actions are driven by the scenario named in automatedBy, but that scenario HAS NEVER EXECUTED in a container on this branch (the release compile dies with signal 9 on the machine it was written on, which scripts/lib/e2e-docker.sh documents), so nothing on this surface is automation-proven today and this item also covers that walkthrough until a green run is recorded here.",
+        clients: ["desktop-macos", "desktop-windows"],
+        estimateMin: 5,
+        tier: "standard",
       },
     ],
     exemptionReason: "",

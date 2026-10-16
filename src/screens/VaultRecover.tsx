@@ -51,6 +51,7 @@ import {
   type VaultDeleteError,
 } from "../lib/vault-delete";
 import type { VaultRecoveryError } from "../types/vault-recovery-error";
+import { failClosedCode } from "../lib/global-failure";
 import {
   vaultRecoverReducer,
   initialState,
@@ -275,6 +276,7 @@ export function VaultRecover({
     return (
       <FailClosedError
         reason={{ kind: state.failClosed }}
+        code={failClosedCode(state.failClosed)}
         onCtaClick={() => void failClosedExit()}
         ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
       />
