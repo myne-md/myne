@@ -798,6 +798,18 @@ steps:
       # account-number-shaped string outside a recorded placeholder. A missing
       # dist is a failure, not a skip.
       - node scripts/check-stories-bundle.mjs
+      # The PUBLIC variant, which is what `design.myne.md` serves: it renders
+      # neither the "Show on GitHub" affordance nor the issue form, because every
+      # myne-md repository is private and both URLs are a 404 to a reader who is
+      # not a member. Built here so the property is checked on the ARTEFACT
+      # rather than promised about the source, and built in the SAME step rather
+      # than a second one because it shares this step's `pnpm install` — the
+      # serial-install rule every node step in this chain follows.
+      - pnpm stories:build:public
+      # Fails if a private-repository link reached the public artefact, and
+      # equally if the public SENTINEL is missing — "no GitHub URL" is satisfied
+      # by an empty build too.
+      - node scripts/check-stories-public-bundle.mjs
 
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.

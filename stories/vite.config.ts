@@ -22,6 +22,29 @@ import packageJson from "../package.json";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const storiesRoot = fileURLToPath(new URL(".", import.meta.url));
 
+/**
+ * The PUBLIC variant, built with `STORIES_PUBLIC=1` (`pnpm stories:build:public`).
+ *
+ * The catalogue mounts the real screens against canned fixtures and, in its
+ * default build, offers two affordances that only make sense to somebody with
+ * access to this repository: "Show on GitHub", which links the surface's source
+ * to `github.com/myne-md/myne`, and "File issue", which opens that repository's
+ * issue form. Both are dead for anyone else, because every `myne-md` repository
+ * is private and both URLs answer 404 to a non-member.
+ *
+ * So the variant that ships to `design.myne.md` renders neither. That is a
+ * DIFFERENT build rather than a runtime check on purpose: a runtime flag would
+ * leave the URLs in the served bundle, one devtools breakpoint away, and the
+ * whole property is about what is IN the artefact. The `data-catalogue`
+ * attribute below is the positive sentinel `check-stories-public-bundle.mjs`
+ * asserts, so "no GitHub URL" cannot be satisfied by an empty or mis-wired
+ * build.
+ *
+ * Output goes to its own directory so the two variants do not clobber each
+ * other, and so a reviewer can tell at a glance which one they are looking at.
+ */
+const isPublic = process.env.STORIES_PUBLIC === "1";
+
 /** The branch the source links point at, so a link resolves for a reader on it. */
 function branchName(): string {
   try {
@@ -55,6 +78,9 @@ export default defineConfig({
     // The branch a source link is pinned to (myne-md/myne#845). A link is only
     // useful if it resolves to the tree the reader is looking at.
     __STORIES_BRANCH__: JSON.stringify(branchName()),
+    // The public variant (see `isPublic` above). Compile-time rather than
+    // runtime, because the property is about what reaches the artefact.
+    __STORIES_PUBLIC__: JSON.stringify(isPublic),
   },
   // The shared tree lives above the Vite root; allow the whole checkout.
   server: {
@@ -63,7 +89,9 @@ export default defineConfig({
     fs: { allow: [repoRoot] },
   },
   build: {
-    outDir: fileURLToPath(new URL("./dist", import.meta.url)),
+    outDir: fileURLToPath(
+      new URL(isPublic ? "./dist-public" : "./dist", import.meta.url),
+    ),
     emptyOutDir: true,
   },
 });

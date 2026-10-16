@@ -288,6 +288,11 @@ const REF_STYLE: CSSProperties = {
  * looking at.
  */
 function SourceReference({ story }: { story: StoryDescriptor }) {
+  // Absent from the public variant, as CODE rather than a hidden affordance: the
+  // URL names a private repository, so it is a 404 for anyone reading
+  // design.myne.md. Early return so the literal below is unreachable and can be
+  // dropped; `check-stories-public-bundle.mjs` verifies that it was.
+  if (__STORIES_PUBLIC__) return null;
   const ref = SOURCE_MAP[story.surface];
   if (ref === undefined) return null;
   const url = `https://github.com/myne-md/myne/blob/${__STORIES_BRANCH__}/${ref.file}#L${ref.line}`;
@@ -1172,7 +1177,15 @@ function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "var(--font-sans)" }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "var(--font-sans)" }}
+      // The positive sentinel `check-stories-public-bundle.mjs` asserts, as a
+      // `data-testid` because that is a string literal the bundler cannot rename
+      // — the same reason `check-web-no-phrase.mjs` greps for testids. Without
+      // it, "no GitHub URL in the artefact" is also satisfied by an EMPTY or
+      // mis-wired build, which is a guard passing on an input it could not see.
+      data-testid={__STORIES_PUBLIC__ ? "stories.catalogue.public" : "stories.catalogue.internal"}
+    >
       {!fullscreen && (
       <header style={NAV_STYLE} data-testid="stories.navbar">
         <Button
@@ -1281,7 +1294,13 @@ function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
 
         {/* Report what you are looking at. The URL carries the story, the theme
             and the page URL into the repo's issue form, so a finding arrives
-            reproducible rather than as a description of a memory. */}
+            reproducible rather than as a description of a memory.
+
+            Absent from the public variant: the form lives in a private
+            repository, so the link is a 404 for anyone reading design.myne.md.
+            Guarded as code rather than hidden, so the URL does not reach the
+            artefact at all — `check-stories-public-bundle.mjs` holds that. */}
+        {!__STORIES_PUBLIC__ && (
         <Button
           variant="secondary"
           icon="message-square"
@@ -1291,6 +1310,7 @@ function nearestNeighbourGap(target: HTMLElement, rect: DOMRect): string {
         >
           File issue
         </Button>
+        )}
       </header>
       )}
 

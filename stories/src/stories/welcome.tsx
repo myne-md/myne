@@ -107,7 +107,12 @@ function Out({ href, icon, children }: { href: string; icon: IconName; children:
 }
 
 /** The real destinations this project lives in. Kept in one place. */
-const LINKS: readonly { group: string; items: readonly { href: string; icon: IconName; label: string }[] }[] = [
+type LinkGroup = {
+  group: string;
+  items: readonly { href: string; icon: IconName; label: string }[];
+};
+
+const LINKS: readonly LinkGroup[] = [
   {
     group: "Product",
     items: [
@@ -127,19 +132,29 @@ const LINKS: readonly { group: string; items: readonly { href: string; icon: Ico
       { href: "https://myne.md/themes/builder", icon: "spell-check", label: "Theme builder" },
     ],
   },
-  {
-    group: "Source",
-    items: [
-      { href: "https://github.com/myne-md/myne", icon: "code", label: "myne" },
-      { href: "https://github.com/myne-md/myne-server", icon: "globe", label: "myne-server" },
-      { href: "https://github.com/myne-md/myne-website", icon: "globe", label: "myne-website" },
-      { href: "https://github.com/myne-md/myne-themes", icon: "palette", label: "myne-themes" },
-      { href: "https://github.com/myne-md/myne-branding", icon: "image", label: "myne-branding" },
-      { href: "https://github.com/myne-md/myne-test-vectors", icon: "circle-check", label: "myne-test-vectors" },
-      { href: "https://github.com/myne-md/myne-ops", icon: "settings", label: "myne-ops" },
-      { href: "https://github.com/myne-md/myne-clipper", icon: "paperclip", label: "myne-clipper" },
-    ],
-  },
+  // Omitted from the public variant (`STORIES_PUBLIC=1`, served at
+  // design.myne.md). Every `myne-md` repository is private, so each of these
+  // hrefs is a 404 to a reader who is not a member, and this is the landing page
+  // — the first screen anybody sees (`App.tsx`'s `WelcomePage`). Guarded as CODE
+  // rather than hidden at runtime so the URLs do not reach the artefact at all;
+  // `check-stories-public-bundle.mjs` holds that.
+  ...(__STORIES_PUBLIC__
+    ? []
+    : ([
+        {
+          group: "Source",
+          items: [
+            { href: "https://github.com/myne-md/myne", icon: "code", label: "myne" },
+            { href: "https://github.com/myne-md/myne-server", icon: "globe", label: "myne-server" },
+            { href: "https://github.com/myne-md/myne-website", icon: "globe", label: "myne-website" },
+            { href: "https://github.com/myne-md/myne-themes", icon: "palette", label: "myne-themes" },
+            { href: "https://github.com/myne-md/myne-branding", icon: "image", label: "myne-branding" },
+            { href: "https://github.com/myne-md/myne-test-vectors", icon: "circle-check", label: "myne-test-vectors" },
+            { href: "https://github.com/myne-md/myne-ops", icon: "settings", label: "myne-ops" },
+            { href: "https://github.com/myne-md/myne-clipper", icon: "paperclip", label: "myne-clipper" },
+          ],
+        },
+      ] satisfies LinkGroup[])),
 ];
 
 function WelcomePage(): ReactNode {
