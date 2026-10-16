@@ -179,6 +179,19 @@ pre-commit:
       # nothing called it. A RATCHET with reason-carrying exemptions.
       run: node scripts/check-ipc-binding-callers.mjs
 
+    tracing-discipline:
+      # myne-md/myne#860: the diagnostic log's content claim, machine-checked.
+      # `src-tauri/AGENTS.md`'s DENY list says about itself that it is
+      # "reviewer-enforced; no automated lint", and that was affordable while
+      # the sink was a terminal nobody reads. It stops being affordable the
+      # moment the sink is a FILE THE USER IS INVITED TO SEND ON, so the rule is
+      # now checked: no `%` Display formatter at `info` or above (the levels the
+      # file layer records, so a `debug!` one cannot reach disk and is not
+      # flagged), and no value interpolated into a message, which is the shape
+      # no field-name rule can see. The guard's header states what it
+      # deliberately does not check, and why.
+      run: node scripts/check-tracing-discipline.mjs
+
     playwright-image:
       # myne#529: the CI Playwright image tag against the version the lockfile
       # resolves. A tag one minor behind is not a stale toolchain: the image

@@ -731,6 +731,13 @@ Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-08-15 "Note cov
 A class of data structures that allow concurrent edits across multiple replicas to be merged without coordination. Myne uses [Automerge](#automerge) (a Rust CRDT library) as its CRDT: for the `NC05` note-body CRDT note-type (`automerge-sync-migration`, `decisions.md` 2026-08-09), which is the at-rest format, and since 2026-10-10 for [real-time collaboration](#real-time-collaboration), which ships in the next release (`decisions/sync/0655`).
 
 Used in: `vision.md`; `decisions.md` 2026-08-09, `decisions/sync/0655`
+### **crash record** &nbsp; 📦 *Product*
+
+The one artefact the desktop leaves behind when the process panics, even while diagnostic logging is switched OFF (myne-md/myne#860). It holds the **compiled-in source path and line**, the version and the platform, and nothing else: no panic message and no payload, because a panic message is arbitrary text from arbitrary code (an `expect("failed to decode note {id}")` carries a note id, an `unwrap` on a parse carries the bytes that failed to parse), and the surface it reaches is one the user is invited to send on. It lives in its own file in the same directory as the [diagnostic log](#diagnostic-log), is **bounded to one file** that the next crash overwrites rather than appends to, and is shown on the About surface with its date so its existence is never hidden. It is deleted by an explicit action or by a report that included it. It is the feature's ONE admitted exception to "the file sink is inert while the toggle is off", and it qualifies because it is **host code rather than a `tracing` call site**, so no emitted event can reach it. Same reasoning, and the same payload discipline, as `decisions/ops/0366`'s panic hook for the web build.
+
+Used in: `decisions/ops/0687`, `decisions/ops/0366`, `src-tauri/src/logging/crash.rs`, `threat-model.md` §7
+
+
 
 ### **credential phishing** &nbsp; ⚠️ *Threat*
 
@@ -967,6 +974,13 @@ Used in: `spec/protocol.md` §9.30; `decisions/protocol/0669`, `0670`
 The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
 
 Used in: `stories/README.md`; `decisions/ui/0653`
+### **diagnostic log** &nbsp; 📦 *Product*
+
+An **opt-in, device-local plaintext log** for the desktop client, OFF by default, written only while the user has switched it on (myne-md/myne#860). It exists so a bug report can say what the app was doing instead of only what the user saw. **Its content claim is machine-checked**: `scripts/check-tracing-discipline.mjs` fails the build if a `%` Display formatter reaches `info` or above, which are the only levels the file layer records (it carries its own fixed `LevelFilter::INFO` and ignores `RUST_LOG` entirely, so a `debug!` value cannot reach disk by any configuration), or if a value is interpolated into a message. No note text, note id, title, filename, filesystem path, account number or hash, key material, salt or nonce is written. **Its footprint is a number, not a proportionality**: size-based rotation with a retained-file count and a hard total ceiling, oldest dropped first. Files are created `0600` at create time inside a `0700` directory under the platform log directory, which on macOS and Windows is outside the backed-up app-data directory and on Linux is not (the §7 bullet states that rather than claiming uniformity). **Turning the toggle off erases the log in the same action** and does not erase the [crash record](#crash-record). The controlling switch is a device-local plaintext file rather than a `vault.prefs` field, because the sink is installed at process startup, before any vault unlocks.
+
+Used in: `decisions/ops/0687`, `src/platform/diagnostics.ts`, `src-tauri/src/logging/`, `threat-model.md` §7
+
+
 
 ### **domain separation** &nbsp; 📋 *Protocol*
 

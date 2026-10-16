@@ -181,6 +181,7 @@ runSeamContract({
       };
     })(),
     opener: await import("../../web/src/platform/opener"),
+    diagnostics: await import("../../web/src/platform/diagnostics"),
     path: await import("../../web/src/platform/path"),
     window: await import("../../web/src/platform/window"),
     webviewWindow: await import("../../web/src/platform/webviewWindow"),

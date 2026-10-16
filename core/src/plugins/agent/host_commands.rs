@@ -128,8 +128,14 @@ pub(crate) fn parse_probe_threshold(json: &str) -> Result<ProbeThreshold, String
 /// than available on an unverified backend. The opposite default would let a
 /// broken record switch the gate off.
 pub fn probe_threshold() -> ProbeThreshold {
-    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|reason| {
-        tracing::error!(event = "agent_probe_threshold_unreadable", %reason);
+    parse_probe_threshold(PROBE_THRESHOLD_JSON).unwrap_or_else(|_reason| {
+        // The static `event` names the failure and the fallback below is the
+        // behaviour. The callee's reason is a `String`, so the only thing this
+        // site could do with it under the DENY-list discipline is classify it,
+        // and the classification is already the arm being taken
+        // (myne-md/myne#860 removed the `%reason` field here rather than
+        // trusting a `String` to stay a compile-time literal).
+        tracing::error!(event = "agent_probe_threshold_unreadable");
         ProbeThreshold {
             attempts: 1,
             required: u8::MAX,

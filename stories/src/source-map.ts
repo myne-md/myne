@@ -11,7 +11,7 @@ export interface SourceReference {
 }
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
-  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 153 },
+  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 196 },
   "AccountBootstrap": { file: "src/screens/AccountBootstrap.tsx", line: 156 },
   "AccountNumberEntry": { file: "src/screens/AccountNumberEntry.tsx", line: 111 },
   "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 111 },
@@ -82,7 +82,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DeviceManagementPanel": { file: "src/components/sync/DeviceManagementPanel.tsx", line: 265 },
   "DeviceRevoked": { file: "src/screens/DeviceRevoked.tsx", line: 67 },
   "DiffView": { file: "src/notes/components/DiffView.tsx", line: 91 },
-  "Editor": { file: "src/screens/Editor.tsx", line: 523 },
+  "Editor": { file: "src/screens/Editor.tsx", line: 524 },
   "EditorPanel": { file: "src/components/settings/EditorPanel.tsx", line: 377 },
   "EmptyState": { file: "src/components/primitives/EmptyState.tsx", line: 86 },
   "EncryptingStep": { file: "src/screens/vault-creation/EncryptingStep.tsx", line: 21 },
@@ -226,13 +226,13 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "TreeRails": { file: "src/notes/components/TreeRails.tsx", line: 40 },
   "TypographySettings": { file: "src/components/settings/TypographySettings.tsx", line: 96 },
   "UnlinkedMentionsSection": { file: "src/notes/components/UnlinkedMentionsSection.tsx", line: 192 },
-  "Unlock": { file: "src/screens/Unlock.tsx", line: 458 },
+  "Unlock": { file: "src/screens/Unlock.tsx", line: 459 },
   "UpdateBanner": { file: "src/components/UpdateBanner.tsx", line: 35 },
   "UsedInNotesPopover": { file: "src/components/attachments/UsedInNotesPopover.tsx", line: 80 },
   "VaultExportModal": { file: "src/components/export/VaultExportModal.tsx", line: 200 },
   "VaultPanel": { file: "src/components/settings/VaultPanel.tsx", line: 406 },
   "VaultPicker": { file: "src/screens/VaultPicker.tsx", line: 566 },
-  "VaultRecover": { file: "src/screens/VaultRecover.tsx", line: 174 },
+  "VaultRecover": { file: "src/screens/VaultRecover.tsx", line: 175 },
   "VaultSwitcher": { file: "src/components/VaultSwitcher.tsx", line: 311 },
   "ViewSettings": { file: "src/notes/components/ViewSettings.tsx", line: 148 },
   "ViewsSection": { file: "src/notes/components/ViewsSection.tsx", line: 225 },

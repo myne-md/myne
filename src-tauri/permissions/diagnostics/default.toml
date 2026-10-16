@@ -1,0 +1,70 @@
+# Permissions for the in-app `diagnostics` Tauri plugin (myne-md/myne#860).
+# Picked up under the `diagnostics:` ACL namespace because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as
+# `diagnostics:default` (or the per-command identifiers below).
+#
+# The commands read and write the DEVICE-LOCAL `diagnostic-log.json` under
+# `<app_config_dir>`: never vault data, in any vault state, and never a path.
+# Deliberately main-window-only: this surface renders in the main webview, so
+# no other capability may ever grant these.
+#
+# Each command is its own identifier rather than one blanket grant, so a later
+# task of this feature (the log state read, the reveal action, the report
+# bundle) can be narrowed or withheld without editing `build.rs`.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the diagnostics plugin: the device-local diagnostic-log switch, and the log state, crash record, reveal and report-bundle commands later tasks of this feature add."
+permissions = [
+    "allow-diagnostic-log-enabled-get",
+    "allow-diagnostic-log-enabled-set",
+    "allow-crash-record-state",
+    "allow-crash-record-clear",
+    "allow-reveal-logs-folder",
+    "allow-report-manifest",
+    "allow-save-report",
+]
+
+[[permission]]
+identifier = "allow-diagnostic-log-enabled-get"
+description = "Allow invoking diagnostics:diagnostic_log_enabled_get (reads the device-local diagnostic-log.json; OFF by default, so an ABSENT file answers false, and an unreadable or malformed one answers false too)."
+commands.allow = ["diagnostic_log_enabled_get"]
+
+[[permission]]
+identifier = "allow-diagnostic-log-enabled-set"
+description = "Allow invoking diagnostics:diagnostic_log_enabled_set (atomic write of the device-local diagnostic-log.json switch; turning it off is also the erase action for the log files, and deliberately not for the crash record)."
+commands.allow = ["diagnostic_log_enabled_set"]
+
+[[permission]]
+identifier = "allow-crash-record-state"
+description = "Allow invoking diagnostics:crash_record_state (reads the crash record's presence and date; never its content, and never a path)."
+commands.allow = ["crash_record_state"]
+
+[[permission]]
+identifier = "allow-crash-record-clear"
+description = "Allow invoking diagnostics:crash_record_clear (deletes the one crash record; absent is success, because the caller's intent is no record)."
+commands.allow = ["crash_record_clear"]
+
+# The reveal, manifest and save triple. `reveal_logs_folder` is the narrowest of
+# the three by construction: it takes NO argument, so the WebView chooses only
+# whether the folder opens, never what opens. `save_report` takes a destination
+# the user chose in the OS save dialog, which is the one path shape the desktop
+# deliberately admits from page context (it originates in the user's own dialog,
+# so refusing it at the seam would protect nothing); what stays inside is the
+# backend's own resolution of everything else.
+
+[[permission]]
+identifier = "allow-reveal-logs-folder"
+description = "Allow invoking diagnostics:reveal_logs_folder (opens the platform log directory in the file manager; the path is resolved host-side, which is why the command takes no argument and why opener:allow-open-path is NOT widened)."
+commands.allow = ["reveal_logs_folder"]
+
+[[permission]]
+identifier = "allow-report-manifest"
+description = "Allow invoking diagnostics:report_manifest (the log file count, their total size and the crash record's date, so the surface can say what a saved report would contain; never log content and never a path)."
+commands.allow = ["report_manifest"]
+
+[[permission]]
+identifier = "allow-save-report"
+description = "Allow invoking diagnostics:save_report (writes ONE plaintext bundle at a destination the user chose in the OS save dialog: the block as the surface renders it, every retained log file and the crash record; clears the record when the bundle included it)."
+commands.allow = ["save_report"]

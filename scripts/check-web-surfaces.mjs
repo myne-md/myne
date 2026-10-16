@@ -554,6 +554,10 @@ const V = {
     "Publishes resolved prefs + the active language into the shared display store; prefs only.",
   ],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
+  "src/hooks/useDiagnostics.ts": [
+    "adapted",
+    "The hook reads the device-local log switch and the one crash record through `plugin:diagnostics`. It runs as written, but the whole `diagnostics` plugin is `Unsupported` on web (the web build installs no `tracing` subscriber at all, `design-notes/ops/0366`), so the `diagnosticLog` capability is absent and the effect short-circuits to off and no record. The About rows that render it are omitted rather than greyed; a failed read is deliberately indistinguishable from off, because off is the state in which nothing is written.",
+  ],
   "src/hooks/useReminderScheduler.ts": [
     "adapted",
     "The hook itself is timers over an injected notifier and runs as written. What differs is its input: the task list comes from the vault-indices plugin, which the web dispatcher still answers `Pending` (task 31), so the pass finds nothing to register until that lands. It fails quiet rather than loud — an empty target set is a valid pass.",

@@ -33,6 +33,11 @@ pub mod clipper_pairing;
 // is NOT gated on `local-inference` (the loop compiles unconditionally); the
 // `ai_enabled` pref is the runtime gate, re-read per command.
 pub mod detached_window;
+// myne-md/myne#860: the opt-in device-local diagnostic log and the bug-report
+// surface's host side. Desktop-only: the web build installs no `tracing`
+// subscriber at all (`design-notes/ops/0366`), so both other clients carry
+// `Unsupported` verdicts for the whole plugin.
+pub mod diagnostics;
 // B2B device-to-person bindings (`vault.device-bindings`, `MYU5`; protocol.md §9.30,
 // the `member-devices` feature). Core in `myne-core::plugins::device_binding`; this
 // shim registers the two commands.

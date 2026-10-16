@@ -214,11 +214,14 @@ fn select_device() -> Device {
             tracing::info!(target: "myne::ai", device = "metal", "AI compute device selected");
             dev
         }
-        Err(e) => {
+        Err(_) => {
+            // No error field: a candle `Display` can embed the model file path
+            // (its `Error::WithPath` wraps IO failures), and this level is one
+            // the diagnostic log records. The `device` field already names the
+            // fallback, which is the actionable half (myne-md/myne#860).
             tracing::warn!(
                 target: "myne::ai",
                 device = "cpu",
-                error = %e,
                 "Metal unavailable — falling back to CPU"
             );
             Device::Cpu

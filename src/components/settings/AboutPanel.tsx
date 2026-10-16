@@ -36,6 +36,12 @@ import { updateCheck, updateInstall, getAutoCheck, setAutoCheck, type UpdateChec
 import { renameFlushHooks } from "../../notes/renameFlushHook";
 import { LEGAL_LINKS, legalUrl, type LegalDoc } from "../../lib/legal-urls";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useDiagnostics } from "../../hooks/useDiagnostics";
+import { copyText } from "../../lib/clipboard";
+import { collectDiagnostics } from "../../lib/collect-diagnostics";
+import { lastGlobalFailure } from "../../lib/global-failure";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { toast } from "../toast/toastStore";
 import { Button } from "../primitives/Button";
 import { MyneMark } from "../primitives/MyneMark";
 import { Switch } from "../primitives/Switch";
@@ -44,6 +50,7 @@ import {
   BLOCK_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
+  MULTILINE_STYLE,
   PANEL_ROOT_STYLE,
 } from "./panel-styles";
 
@@ -118,6 +125,42 @@ function Block({
   );
 }
 
+/**
+ * The crash record's date, in the interface's language.
+ *
+ * A local `Intl.DateTimeFormat` rather than the shared display store: that store
+ * exists so the EDITOR's date fields follow one setting, and this is a single
+ * diagnostic fact rendered once in a settings panel. An unreadable record reads
+ * as an unknown date rather than as "just now", because a zero here means
+ * "present but unreadable" (see `src-tauri/src/logging/crash.rs`).
+ */
+function formatCrashDate(epochSeconds: number, language: string): string | null {
+  if (!Number.isFinite(epochSeconds) || epochSeconds <= 0) return null;
+  return new Intl.DateTimeFormat(language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(epochSeconds * 1000));
+}
+
+/**
+ * A byte count, for the manifest line.
+ *
+ * Coarse on purpose, and it matches the block's own storage figures: a
+ * maintainer reading it needs the order of magnitude, and a byte-exact number in
+ * a settings row is precision nobody acts on.
+ */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "kB", "MB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`;
+}
+
 function handleThreatModelClick() {
   openUrl(THREAT_MODEL_URL).catch((err) => {
     if (import.meta.env.DEV) {
@@ -153,6 +196,102 @@ function updateErrorKind(error: unknown): UpdateCheckError {
 export function AboutPanel() {
   const { t, i18n } = useTranslation();
   const { prefs, setDeveloperMode } = usePrefs();
+  // The opt-in diagnostic log and the one crash record (myne-md/myne#860).
+  // Host-owned rather than prefs, so they carry their own hook; absent on web,
+  // where the whole logging half is (a served bundle installs no subscriber),
+  // which is why the surface is gated rather than disabled.
+  const diagnostics = useDiagnostics();
+  // The exact string Copy puts on the clipboard, assembled through the existing
+  // block builder and environment collector. Kept in state rather than rendered
+  // from a second call, because the preview must be byte-identical to the copy
+  // and one source is the only way to guarantee that.
+  const [diagnosticBlock, setDiagnosticBlock] = useState<string | null>(null);
+  useEffect(() => {
+    // NOT gated on the capability: the block and its Copy button render on every
+    // client, so the block has to be assembled on every client. Gating this read
+    // would leave the web preview permanently empty while the capability
+    // descriptor promised a working copy.
+    let cancelled = false;
+    // The recorded global failure goes in as the block's `failureCode`. This is
+    // the second reader of `global-failure.ts`: the installer already runs at
+    // boot (`main.tsx`), and until now nothing read what it recorded.
+    void collectDiagnostics(lastGlobalFailure() ?? "none").then((block) => {
+      if (!cancelled) setDiagnosticBlock(block);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Copy reports BOTH outcomes through the one transport (`src/lib/clipboard.ts`),
+  // which is the rule `scripts/check-clipboard-feedback.mjs` enforces: a failed
+  // copy that looks like a successful one is how a user pastes the previous
+  // clipboard contents believing they are their diagnostics.
+  const copyDiagnostics = () => {
+    if (diagnosticBlock === null) return;
+    void copyText(clipboardWriteText, diagnosticBlock, {
+      onSuccess: {
+        kind: "toast",
+        run: () => {
+          toast({
+            message: t("settings.about.diagnosticCopyDone"),
+            variant: "info",
+          });
+        },
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => {
+          toast({
+            message: t("settings.about.diagnosticCopyFailed"),
+            variant: "error",
+          });
+        },
+      },
+    });
+  };
+  // Save asks for a destination first, and reports only a COMPLETED save: a
+  // cancelled dialog is not a failure and must not read as one. The manifest
+  // re-reads afterwards, because a bundle that included the crash record clears
+  // it, so the row above changes as a consequence.
+  const saveReportFlow = () => {
+    if (diagnosticBlock === null) return;
+    void diagnostics.saveReport(diagnosticBlock).then((outcome) => {
+      if (outcome === "cancelled") return;
+      toast({
+        message:
+          outcome === "saved"
+            ? t("settings.about.diagnosticSaveDone")
+            : t("settings.about.diagnosticSaveFailed"),
+        variant: outcome === "saved" ? "info" : "error",
+      });
+    });
+  };
+
+  // Reveal and Delete report where the action happened, for the reason the hook
+  // gives: the row's own error text names a setting change, so routing a failed
+  // folder-open or delete through it would tell the user a control they never
+  // touched had failed.
+  const revealFlow = () => {
+    void diagnostics.reveal().then((opened) => {
+      if (opened) return;
+      toast({
+        message: t("settings.about.diagnosticRevealFailed"),
+        variant: "error",
+      });
+    });
+  };
+
+  const clearCrashFlow = () => {
+    void diagnostics.clearCrash().then((cleared) => {
+      if (cleared) return;
+      toast({
+        message: t("settings.about.crashRecordClearFailed"),
+        variant: "error",
+      });
+    });
+  };
+
   // The SERVED bundle's identity, where there is one (phase3-web-client task
   // 114). `null` on desktop by construction — a desktop user's build identity is
   // the installer they ran, which the version string above already names.
@@ -438,6 +577,136 @@ export function AboutPanel() {
           />
         )}
       />
+
+      {/* myne-md/myne#860. Gated on the capability rather than rendered
+          disabled: on web the whole logging half is absent, because a served
+          bundle installs no `tracing` subscriber at all
+          (`design-notes/ops/0366`), so a greyed switch would be an offer the
+          platform cannot honour (`decisions.md` 2026-07-26).
+
+          Deliberately NOT behind the Developer-mode toggle. That gate hides
+          capabilities a normal user does not configure (a self-supplied
+          inference model, the terminal door, Tor routing); this switch is the
+          front door of a feature built for the user who has hit a bug, so
+          hiding it there would hide it from exactly the person it is for. */}
+      {/* The report block renders on EVERY client, deliberately, and it is the
+          one part of this surface that is not behind the `diagnosticLog`
+          capability. Copying the diagnostics block is the half the issue's scope
+          sentence keeps for the web client, and it is the half that matters most
+          there, because a browser user cannot open a devtools panel and read a
+          failure back to anyone. A capability descriptor that claims this while
+          the row sits behind the gate is the "canon and shipped screen disagree"
+          failure, caught in review.
+
+          `ControlBlock`'s documented exception applies to the preview: it is a
+          multi-line value that needs the full content width. The preview is the
+          EXACT string Copy writes, rendered from one source, because a preview
+          assembled separately is a preview that can lie. */}
+      <Block data-setting-anchor="about.diagnostic-report" data-setting-row="true">
+        <span style={LABEL_STYLE}>{t("settings.about.diagnosticBlockLabel")}</span>
+        <pre style={MULTILINE_STYLE} data-testid="about.diagnostic-block-preview">
+          {diagnosticBlock ?? ""}
+        </pre>
+        <div>
+          <Button
+            variant="secondary"
+            disabled={diagnosticBlock === null}
+            onClick={copyDiagnostics}
+            data-testid="about.diagnostic-copy"
+          >
+            {t("settings.about.diagnosticCopy")}
+          </Button>
+        </div>
+        <p style={HELPER_STYLE}>{t("settings.about.diagnosticBlockHelper")}</p>
+      </Block>
+
+      {has("diagnosticLog") && (
+        <>
+          <SettingRow
+            label={t("settings.about.diagnosticLogLabel")}
+            helper={t("settings.about.diagnosticLogHelper")}
+            error={diagnostics.error ? t("settings.about.diagnosticLogError") : null}
+            anchorId="about.diagnostic-log"
+            testId="about.diagnostic-log-row"
+            helperTestId="about.diagnostic-log-helper"
+            control={(helperId) => (
+              <Switch
+                checked={diagnostics.enabled}
+                disabled={diagnostics.loading}
+                onChange={(next) => {
+                  void diagnostics.setEnabled(next);
+                }}
+                ariaLabel={t("settings.about.diagnosticLogLabel")}
+                ariaDescribedBy={helperId}
+                testId="about.diagnostic-log-toggle"
+              />
+            )}
+          />
+
+          {/* The crash record is shown rather than hidden: privacy requires a
+              no-consent artefact's existence to be visible and its lifetime
+              bounded, so a row appears whenever one exists and Delete is the
+              manual half of that bound (a report that includes it clears it
+              too). The row is absent, not disabled, when there is no record,
+              because "no crash" is not a control. */}
+          {diagnostics.crash !== null && (
+            <SettingRow
+              label={t("settings.about.crashRecordLabel")}
+              helper={t("settings.about.crashRecordHelper", {
+                date:
+                  formatCrashDate(diagnostics.crash.at_epoch_seconds, i18n.language) ??
+                  t("settings.about.crashRecordDateUnknown"),
+              })}
+              anchorId="about.crash-record"
+              testId="about.crash-record-row"
+              helperTestId="about.crash-record-helper"
+              control={
+                <Button
+                  variant="secondary"
+                  onClick={clearCrashFlow}
+                  data-testid="about.crash-record-clear"
+                >
+                  {t("settings.about.crashRecordClear")}
+                </Button>
+              }
+            />
+          )}
+
+          {/* What a saved report WOULD contain, before anything is written, and
+              the two actions that move the log off the device: open the folder,
+              or save one bundle. This is the disclosure half of the file-save
+              decision: the user reads the size and the file count first, and can
+              open the log itself with Reveal before deciding. */}
+          <Block data-setting-anchor="about.diagnostic-report-files" data-setting-row="true">
+            <span style={LABEL_STYLE}>{t("settings.about.diagnosticFilesLabel")}</span>
+            <p style={HELPER_STYLE} data-testid="about.diagnostic-files-manifest">
+              {diagnostics.manifest === null
+                ? t("settings.about.diagnosticFilesUnknown")
+                : t("settings.about.diagnosticFilesHelper", {
+                    count: diagnostics.manifest.log_files,
+                    size: formatBytes(diagnostics.manifest.total_bytes),
+                  })}
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <Button
+                variant="secondary"
+                onClick={revealFlow}
+                data-testid="about.diagnostic-reveal"
+              >
+                {t("settings.about.diagnosticReveal")}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={diagnosticBlock === null}
+                onClick={saveReportFlow}
+                data-testid="about.diagnostic-save"
+              >
+                {t("settings.about.diagnosticSave")}
+              </Button>
+            </div>
+          </Block>
+        </>
+      )}
 
       <Block data-setting-anchor="about.changelog" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
