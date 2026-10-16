@@ -248,7 +248,7 @@ export function SettingsTabs({
     ro.observe(strip);
     for (const el of tabRefs.current) if (el != null) ro.observe(el);
     return () => ro.disconnect();
-  }, [activeIdx, topics.length]);
+  }, [activeIdx, panelId, topics.map((topic) => topic.id).join("|")]);
 
   if (topics.length < 2) return null;
 

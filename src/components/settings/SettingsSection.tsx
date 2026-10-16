@@ -24,7 +24,7 @@
 // active selection, and the section seam is the fifth use it now names. The
 // colour is not decoration and it is not the only signal: the rule marks where
 // one concern ends and the next begins, which is exactly the structure the
-// heading names, and the heading keeps `--fg-3` so a reader who cannot see the
+// heading names, and the heading carries `--accent` while the seam rule marks the boundary, so a reader who cannot see the
 // colour (colour-blind, high contrast, a monochrome custom theme) still gets the
 // grouping from the text. That is the test for whether an accent use is real: if
 // the surface stops communicating with the colour removed, the colour was
@@ -162,7 +162,8 @@ export function SettingsSection({
   /** Optional testid on the section root, for E2E to scope within a group. */
   testId?: string;
   /**
-   * `default` keeps the shared `--fg-3` heading. `danger` is the one tone: the
+   * `default` carries the shared `--accent` heading, which is what the canon
+   * states. `danger` is the one tone: the
    * heading carries `--danger` because the section destroys something, and the
    * seam rule is unchanged (see `TITLE_DANGER_STYLE`). The grouping still reads
    * without the colour, so the tone is reinforcement and not the only signal.

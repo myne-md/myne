@@ -154,6 +154,9 @@ import {
   type SettingsTopicMeta,
 } from "../../src/components/settings/settingsTopics";
 
+/** Anchors the shell scrolled to. Reset per test, filled by the stub above. */
+const scrolledAnchors: string[] = [];
+
 beforeEach(() => {
   resetSettingsTopics();
   loadModelPath.mockClear();
@@ -162,6 +165,16 @@ beforeEach(() => {
   tagModelAvailable.mockResolvedValue(true);
   listFolderPaths.mockClear();
   listFolderPaths.mockResolvedValue([]);
+  // jsdom implements no `scrollIntoView`, and the shell calls it inside a
+  // requestAnimationFrame callback, where a missing method is an UNHANDLED error
+  // rather than a failed assertion: vitest reported the file red while every
+  // assertion in it passed. Stubbed for the whole file rather than in the one
+  // test that reads the scroll, because the pending-scroll path is reached by
+  // more than one of them (myne#892 review; the same shape `src/AGENTS.md`
+  // records for `HTMLCanvasElement.getContext`).
+  Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+    scrolledAnchors.push((this as HTMLElement).dataset.settingAnchor ?? "?");
+  };
 });
 
 afterEach(cleanup);
@@ -374,11 +387,8 @@ describe("SettingsTabs: the search lands inside the topic", () => {
     // has to select that topic on this path too. jsdom lays nothing out, so the
     // scroll is captured rather than observed: the claim is WHICH row the shell
     // landed on, plus the topic that made it reachable at all.
-    const scrolled: string[] = [];
-    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
-      scrolled.push((this as HTMLElement).dataset.settingAnchor ?? "?");
-    };
-    render(
+    scrolledAnchors.length = 0;
+        render(
       <SettingsModal
         vaultId={null}
         open
@@ -393,6 +403,6 @@ describe("SettingsTabs: the search lands inside the topic", () => {
       await new Promise((r) => requestAnimationFrame(() => r(null)));
     });
     expect(screen.getByTestId("settings.ai-topic-models")).toBeTruthy();
-    expect(scrolled).toEqual(["ai.auto-tag"]);
+    expect(scrolledAnchors).toEqual(["ai.auto-tag"]);
   });
 });

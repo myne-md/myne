@@ -37,6 +37,7 @@ import {
   parityVerdict,
   reasonsCheck,
   recordDecision,
+  renderProjection,
 } from "../../scripts/check-prefs-parity.mjs";
 
 const ROOT: string = fileURLToPath(new URL("../..", import.meta.url));
@@ -260,16 +261,68 @@ describe("check-prefs-parity, the reasons record, both directions", () => {
     expect(v.unreasoned).toEqual(["set_foo", "set_bar", "set_baz"]);
   });
 
-  it("rejects a reason that would break the generated table", () => {
+  it("rejects a reason containing a newline, and escapes a pipe rather than rejecting it", () => {
+    // `renderProjection` escapes pipes through `esc`, so only a newline can
+    // break a table row. The check and the failure message both say exactly
+    // that, rather than claiming the pipe half too.
     const rows = roster([["set_foo", "setFoo"]], [], []);
-    const v = reasonsCheck({ rows, reasons: { set_foo: `${reason} a | b` } });
-    expect(v.unreasoned).toEqual([]);
-    expect(badReasonText({ set_foo: `${reason} a | b` })).toEqual(["set_foo"]);
+    const pipe = { set_foo: `${reason} a | b` };
+    expect(reasonsCheck({ rows, reasons: pipe }).unreasoned).toEqual([]);
+    expect(badReasonText(pipe)).toEqual([]);
+    expect(badReasonText({ set_foo: `${reason} a\nb` })).toEqual(["set_foo"]);
   });
 
-  it("turns a recorded deliberate absence into a fourth client state", () => {
-    // The row is `called` on both clients by measurement; the record says the
-    // control is deliberately not usable on mobile, which makes the row
+  it("names a row whose measured state moved while the verdict stayed one-sided", () => {
+    // The finding this arm exists for. The baseline recorded desktop=called,
+    // mobile=never-bound (desktop-only). The tree now measures
+    // desktop=bound-no-caller, mobile=never-bound (no-ui): a live defect, since
+    // the sheet can render a control whose write path nothing calls. The verdict
+    // stayed on the one-sided side of `both`, so missing, stale and
+    // redundantDeliberate all stay empty and the ratchet is unmoved; only the
+    // recorded state catches it. A one-command roster keeps `missing` genuinely
+    // empty rather than populated by the synthetic roster's other rows.
+    const rows = classifyRows({
+      commands: ["set_foo"],
+      classification: new Map([["foo", "shared"]]),
+      desktop: { path: "src/lib/prefs.ts", bound: new Map([["set_foo", "setFoo"]]) },
+      mobile: { path: "mobile/src/lib/prefs.ts", bound: new Map() },
+      dead: new Set(["src/lib/prefs.ts:setFoo"]),
+    });
+    const v = reasonsCheck({
+      rows,
+      reasons: { set_foo: reason },
+      states: { set_foo: "called|never-bound" },
+    });
+    expect(v.missing).toEqual([]);
+    expect(v.stale).toEqual([]);
+    expect(v.redundantDeliberate).toEqual([]);
+    expect(v.stateChanged).toHaveLength(1);
+    expect(v.stateChanged[0]).toContain("set_foo");
+    expect(v.stateChanged[0]).toContain("called|never-bound");
+    expect(v.stateChanged[0]).toContain("bound-no-caller|never-bound");
+  });
+
+  it("names a one-sided row with no recorded state, and accepts a matching one", () => {
+    const rows = roster([["set_foo", "setFoo"]], [], []);
+    expect(reasonsCheck({ rows, reasons: { set_foo: reason } }).stateUnrecorded).toContain(
+      "set_foo",
+    );
+    const recorded = reasonsCheck({
+      rows,
+      reasons: { set_foo: reason },
+      states: {
+        set_foo: "called|never-bound",
+        set_bar: "never-bound|never-bound",
+        set_baz: "never-bound|never-bound",
+      },
+    });
+    expect(recorded.stateUnrecorded).toEqual([]);
+    expect(recorded.stateChanged).toEqual([]);
+  });
+
+  it("turns a declared deliberate absence into a fourth client state", () => {
+    // The row is `called` on both clients by measurement; the declaration says
+    // the control is deliberately not usable on mobile, which makes the row
     // one-sided WITHOUT moving any measurement. The spell row is this shape.
     const rows = roster(
       [
@@ -284,34 +337,42 @@ describe("check-prefs-parity, the reasons record, both directions", () => {
       ],
       [],
     );
-    const reasons = { set_foo: { reason, deliberatelyAbsentOn: ["mobile"] } };
-    const applied = applyDeliberate(rows, reasons);
+    const marks = { set_foo: ["mobile"] };
+    const applied = applyDeliberate(rows, marks);
     expect(applied.find((r: ParityRow) => r.command === "set_foo")).toMatchObject({
       desktop: "called",
       mobile: "deliberately-absent",
       verdict: "desktop-only",
     });
     expect(applied.find((r: ParityRow) => r.command === "set_bar")!.verdict).toBe("both");
-    // And the record is checked against the row it created rather than against
-    // the raw measurement, so the entry is not reported stale.
-    const v = reasonsCheck({ rows, reasons });
+    // And the record is checked against the row the declaration created rather
+    // than against the raw measurement, so the entry is not reported stale.
+    const v = reasonsCheck({ rows, reasons: { set_foo: reason }, marks });
     expect(v.oneSided).toEqual(["set_foo"]);
     expect(v.stale).toEqual([]);
     expect(v.redundantDeliberate).toEqual([]);
   });
 
-  it("names a deliberate-absence mark on a client that does not reach the command", () => {
-    // The both-ways half of the fourth state: the mark says a control exists on
-    // a client and is deliberately unusable there, so where the client does not
-    // reach the command at all the mark describes nothing.
+  it("names a deliberate-absence declaration on a client that does not reach the command", () => {
+    // The both-ways half of the fourth state: the declaration says a control
+    // exists on a client and is deliberately unusable there, so where the client
+    // does not reach the command at all the declaration describes nothing.
     const rows = roster([["set_foo", "setFoo"]], [], []);
-    const v = reasonsCheck({ rows, reasons: { set_foo: { reason, deliberatelyAbsentOn: ["mobile"] } } });
+    const v = reasonsCheck({
+      rows,
+      reasons: { set_foo: reason },
+      marks: { set_foo: ["mobile"] },
+    });
     expect(v.redundantDeliberate).toEqual(["mobile:set_foo"]);
   });
 
-  it("names a deliberate-absence mark on an unknown client", () => {
+  it("names a deliberate-absence declaration on an unknown client", () => {
     const rows = roster([["set_foo", "setFoo"]], [["set_foo", "setFoo"]], []);
-    const v = reasonsCheck({ rows, reasons: { set_foo: { reason, deliberatelyAbsentOn: ["tablet"] } } });
+    const v = reasonsCheck({
+      rows,
+      reasons: { set_foo: reason },
+      marks: { set_foo: ["tablet"] },
+    });
     expect(v.unknownClient).toEqual(["set_foo (tablet)"]);
   });
 });
@@ -385,6 +446,37 @@ describe("check-prefs-parity, the tree as it stands", () => {
       expect(checked.out).toContain(oneSidedCommand());
     });
   }, 60_000);
+
+  it("seeds the deliberately-absent row a measured-only --record would drop", () => {
+    // The seed path's one-sided set is taken with `DELIBERATELY_ABSENT_ON`
+    // applied, so a row whose one-sidedness is a DECISION rather than a
+    // measurement is seeded. `set_spell_enabled` is measured `called|called` on
+    // both clients, so a seed that read only the measurement dropped it: the
+    // record stopped carrying it, `applyDeliberate` then left it `both`,
+    // `reasonsCheck` reported nothing missing or stale, and `--emit` rewrote the
+    // projection to `both` while every check stayed green.
+    withTempRecord(null, (path) => {
+      const seeded = run(["--record"], path);
+      expect(seeded.code).toBe(0);
+      const rec = JSON.parse(readFileSync(path, "utf8")) as {
+        oneSided: Record<string, unknown>;
+        states: Record<string, string>;
+      };
+      expect(rec.oneSided).toHaveProperty("set_spell_enabled");
+      expect(rec.states).toHaveProperty("set_spell_enabled", "called|called");
+    });
+  }, 60_000);
+
+  it("counts the panel record as rail panels plus the block inside one", () => {
+    // The projection used to read "Six desktop rail panels" over a record of
+    // five rail panels plus a CLI block inside Privacy, which is six surfaces
+    // but not six panels. The sentence is derived from which entries carry a
+    // `home`, so a block cannot be counted as a panel and the numbers cannot
+    // drift from the record.
+    const doc = renderProjection(roster([["set_foo", "setFoo"]], [], []), {});
+    expect(doc).toContain("6 desktop settings surfaces have no mobile counterpart: 5 rail panels and");
+    expect(doc).toContain("1 block inside a panel");
+  });
 
   it("REFUSES --record on a dirty tree, and --check stays red", () => {
     // The writer's half, arm two, and the one nobody tests. A command that

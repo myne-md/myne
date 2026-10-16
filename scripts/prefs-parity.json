@@ -6,6 +6,12 @@
     "needs. A reason whose command has converged fails as stale, and so does a",
     "one-sided command with no entry here: the record is compared BOTH ways.",
     "",
+    "Every entry also carries its row's MEASURED `desktop|mobile` state in `states`,",
+    "and the guard compares that state BOTH ways: a row whose measured state moved",
+    "while its verdict stayed one-sided (a `called` binding that became",
+    "`bound-no-caller`, say) fails naming the drift, because the verdict alone",
+    "cannot tell the three remedies apart and would stay green over a live defect.",
+    "",
     "A RATCHET: the set may shrink, never grow. `--record` REFUSES to write a grown",
     "set, so the command the failure message suggests cannot be used to make a",
     "regression go away. Locking in a convergence is the only edit it will make.",
@@ -18,6 +24,33 @@
     "The denominator has its own floor, and it is NOT in this file: COMMAND_FLOOR in",
     "scripts/check-prefs-parity.mjs."
   ],
+  "states": {
+    "set_active_workspace": "called|bound-no-caller",
+    "set_auto_tag_enabled": "called|never-bound",
+    "set_bar_items_order": "called|bound-no-caller",
+    "set_cli_enabled": "called|never-bound",
+    "set_cli_excluded_folders": "called|never-bound",
+    "set_cli_rate_limit_disabled": "called|never-bound",
+    "set_developer_mode": "called|never-bound",
+    "set_editor_content_width": "called|bound-no-caller",
+    "set_editor_layout": "called|bound-no-caller",
+    "set_editor_slash_hidden": "bound-no-caller|never-bound",
+    "set_editor_slash_order": "bound-no-caller|never-bound",
+    "set_editor_vim_mode": "called|never-bound",
+    "set_folder_notes_enabled": "called|never-bound",
+    "set_hidden_bar_items": "called|bound-no-caller",
+    "set_keymap_binding": "called|bound-no-caller",
+    "set_new_note_location": "called|bound-no-caller",
+    "set_ribbon_items": "called|never-bound",
+    "set_ribbon_visible": "called|never-bound",
+    "set_right_panel_active_tab": "called|bound-no-caller",
+    "set_right_panel_hidden_tabs": "called|bound-no-caller",
+    "set_right_panel_tab_order": "called|bound-no-caller",
+    "set_show_task_marker": "called|never-bound",
+    "set_spell_enabled": "called|called",
+    "set_spell_languages": "called|bound-no-caller",
+    "set_startup_open": "called|bound-no-caller"
+  },
   "oneSided": {
     "set_active_workspace": "Desktop-shaped by nature, expected to stay desktop-only: workspaces are a desktop bottom-bar surface, and no mobile screen reads or writes the active workspace. The binding exists on mobile only so the twin prefs modules keep identical export names (myne-md/myne#486). Recorded rather than deleted for that reason, and recorded here so a future parity audit does not re-open it as a gap.",
     "set_auto_tag_enabled": "Whole feature absent on mobile: automatic tag suggestion has no mobile surface and no mobile reader, so the phone neither honours nor can set it. The remedy is a feature rather than a row, and it stays desktop-only until that feature is decided. Not a defect this branch introduces or can close.",
@@ -40,13 +73,8 @@
     "set_right_panel_active_tab": "Desktop-shaped by nature: the right panel is a desktop chrome surface with no mobile equivalent and no mobile reader. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
     "set_right_panel_hidden_tabs": "Desktop-shaped by nature, the same surface as set_right_panel_active_tab: no mobile panel, no mobile reader. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
     "set_right_panel_tab_order": "Desktop-shaped by nature, the third of the right-panel trio: desktop-only panel order, default-only on this client. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
-    "set_show_task_marker": "Deliberately absent on mobile rather than a gap, and the choice is recorded here because a hidden control with no reason is indistinguishable from an oversight. The pref is SHARED (ScalarLww, MYND-613) and mobile's note list renders no task marker at all, so the phone inherits the desktop's choice and displays nothing either way; adding the row alone would be the inert control this feature exists to remove. The remedy is the rendering feature (a marker slot on mobile/src/app/flows/editor/chrome/NoteRow.tsx fed by the note's task kind), not a settings row, so the row stays off this client until that lands. See docs/decisions/ui/0695-settings-parity-is-a-shared-roster.md.",
-    "set_spell_enabled": {
-      "reason": "Deliberately absent on mobile rather than a gap: the client ships no spell backend at all (mobile/src/editor-host.ts omits the host's `spell` slot, so no squiggle can ever be drawn), which is why `spellCheckingAvailable()` in mobile/src/lib/spellSupport.ts returns false and the row is gated rather than live. The row stays visible and states its absence, so the sheet does not confirm a choice nothing applies. Its binding and its write path remain, which is exactly why the absence is recorded rather than measured. See docs/decisions/ui/0695-settings-parity-is-a-shared-roster.md.",
-      "deliberatelyAbsentOn": [
-        "mobile"
-      ]
-    },
+    "set_show_task_marker": "Deliberately absent on mobile rather than a gap, and the choice is recorded here because a hidden control with no reason is indistinguishable from an oversight. The pref is SHARED (ScalarLww, MYND-613) and mobile's note list renders no task marker at all, so the phone inherits the desktop's choice and displays nothing either way; adding the row alone would be the inert control this feature exists to remove. The remedy is the rendering feature (a marker slot on mobile/src/app/flows/editor/chrome/NoteRow.tsx fed by the note's task kind), not a settings row, so the row stays off this client until that lands. See docs/decisions/ui/0694-settings-parity-is-a-shared-roster.md.",
+    "set_spell_enabled": "Deliberately absent on mobile rather than a gap: the client ships no spell backend at all (mobile/src/editor-host.ts omits the host's `spell` slot, so no squiggle can ever be drawn), which is why `spellCheckingAvailable()` in mobile/src/lib/spellSupport.ts returns false and the row is gated rather than live. The row stays visible and states its absence, so the sheet does not confirm a choice nothing applies. Its binding and its write path remain, which is exactly why the absence is recorded rather than measured. See docs/decisions/ui/0694-settings-parity-is-a-shared-roster.md.",
     "set_spell_languages": "Desktop-shaped by nature: the language set for spell checking, and mobile has no spell backend at all (mobile/src/editor-host.ts resolves the spell service to nothing), so no language picker can exist. The binding is dead on mobile and the row it would have set is gated rather than live; see the settings-parity decision entry.",
     "set_startup_open": "Desktop-shaped by nature: desktop startup behaviour, and the mobile lifecycle (backgrounding, no cold-start note choice) has no such surface, so nothing reads it. Already recorded as dead on mobile in scripts/ipc-binding-callers.json."
   }
