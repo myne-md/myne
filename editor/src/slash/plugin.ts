@@ -22,9 +22,12 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
+import { floatingSurfacePresentation } from "../host";
+import { createDockedPicker, type DockedPicker } from "../floating/docked-sheet";
 import { filterCommands, type SlashCommand } from "./commands";
 import { makeSlashIcon } from "./icons";
 import { aiSlashEnabledFacet, slashCommandsForContext } from "./aiSlash";
+import i18n from "@myne/editor/i18n";
 
 const SUPPRESS_NODE_NAMES = new Set<string>([
   "FencedCode",
@@ -75,6 +78,7 @@ type MenuState = {
 
 class SlashMenuView implements PluginValue {
   private container: HTMLDivElement | null = null;
+  private docked: DockedPicker | null = null;
   private state: MenuState | null = null;
   private rafHandle: number | null = null;
   private readonly commands: readonly SlashCommand[];
@@ -208,7 +212,39 @@ class SlashMenuView implements PluginValue {
       this.container.remove();
       this.container = null;
     }
+    if (this.docked !== null) {
+      this.docked.dispose();
+      this.docked.root.remove();
+      this.docked = null;
+    }
     this.state = null;
+  }
+
+  /** The element the rows go into: the anchored popover's own box, or, when the
+   *  host declares the docked presentation, the sheet shell's list (myne-md/myne#884).
+   *  The two are mutually exclusive and `close()` tears down whichever exists. */
+  private surface(): HTMLElement {
+    if (floatingSurfacePresentation() === "docked") {
+      if (this.docked === null) {
+        this.docked = createDockedPicker({
+          title: i18n.t("editor.slash.sheetTitle"),
+          testId: "editor.slash-menu-sheet",
+          closeLabel: i18n.t("common.close"),
+          onClose: () => this.dismiss(),
+        });
+        document.body.appendChild(this.docked.root);
+      }
+      return this.docked.list;
+    }
+    if (this.container === null) {
+      this.container = document.createElement("div");
+      this.container.className = "cm-slash-menu";
+      this.container.setAttribute("role", "menu");
+      // Mount to document.body so position: fixed escapes any ancestor
+      // containing-block context (transform/filter/contain quirks).
+      document.body.appendChild(this.container);
+    }
+    return this.container;
   }
 
   /** Defer render to next animation frame so `coordsAtPos` returns
@@ -236,15 +272,8 @@ class SlashMenuView implements PluginValue {
       this.state.selectedIndex = filtered.length - 1;
     }
 
-    if (this.container === null) {
-      this.container = document.createElement("div");
-      this.container.className = "cm-slash-menu";
-      this.container.setAttribute("role", "menu");
-      // Mount to document.body so position: fixed escapes any ancestor
-      // containing-block context (transform/filter/contain quirks).
-      document.body.appendChild(this.container);
-    }
-    this.container.replaceChildren();
+    const surface = this.surface();
+    surface.replaceChildren();
     let selectedRow: HTMLDivElement | null = null;
     filtered.forEach((cmd, i) => {
       const row = document.createElement("div");
@@ -268,8 +297,8 @@ class SlashMenuView implements PluginValue {
       row.addEventListener("mousemove", () => {
         if (this.state === null || this.state.selectedIndex === i) return;
         this.state.selectedIndex = i;
-        this.container
-          ?.querySelectorAll(".cm-slash-menu-row")
+        surface
+          .querySelectorAll(".cm-slash-menu-row")
           .forEach((r, idx) =>
             r.classList.toggle("cm-slash-menu-row-selected", idx === i),
           );
@@ -295,47 +324,52 @@ class SlashMenuView implements PluginValue {
         e.preventDefault();
         this.applyCommand(cmd);
       });
-      this.container!.appendChild(row);
+      surface.appendChild(row);
     });
 
-    // Anchor on the cursor coords; fall back to the editor's content
-    // rect center if coords aren't measured yet.
-    const surfaceWidth = 300;
-    // Cap to the CSS max-height (.cm-slash-menu) so positioning flips above
-    // the cursor correctly when the full list would overflow below.
-    const surfaceHeight = Math.min(40 + filtered.length * 32, 300);
-    const coords = this.view.coordsAtPos(this.state.triggerTo);
-    let anchorRect;
-    if (coords !== null) {
-      anchorRect = {
-        left: coords.left,
-        top: coords.top,
-        right: coords.right,
-        bottom: coords.bottom,
-      };
-    } else {
-      const editorRect = this.view.contentDOM.getBoundingClientRect();
-      anchorRect = {
-        left: editorRect.left + 16,
-        top: editorRect.top + 16,
-        right: editorRect.left + 32,
-        bottom: editorRect.top + 32,
-      };
+    // Only the anchored popover is positioned against the caret. The docked
+    // sheet is pinned to the bottom edge by its own stylesheet, so running the
+    // positioner there would write inline `left`/`top` over the pinned box.
+    if (this.docked === null) {
+      // Anchor on the cursor coords; fall back to the editor's content
+      // rect center if coords aren't measured yet.
+      const surfaceWidth = 300;
+      // Cap to the CSS max-height (.cm-slash-menu) so positioning flips above
+      // the cursor correctly when the full list would overflow below.
+      const surfaceHeight = Math.min(40 + filtered.length * 32, 300);
+      const coords = this.view.coordsAtPos(this.state.triggerTo);
+      let anchorRect;
+      if (coords !== null) {
+        anchorRect = {
+          left: coords.left,
+          top: coords.top,
+          right: coords.right,
+          bottom: coords.bottom,
+        };
+      } else {
+        const editorRect = this.view.contentDOM.getBoundingClientRect();
+        anchorRect = {
+          left: editorRect.left + 16,
+          top: editorRect.top + 16,
+          right: editorRect.left + 32,
+          bottom: editorRect.top + 32,
+        };
+      }
+      const pos = computePosition({
+        anchor: anchorRect,
+        surfaceWidth,
+        surfaceHeight,
+        preferredPlacement: "below",
+      });
+      surface.style.position = "fixed";
+      surface.style.left = `${pos.left}px`;
+      surface.style.top = `${pos.top}px`;
+      surface.style.width = `${surfaceWidth}px`;
+      surface.style.zIndex = "1000";
     }
-    const pos = computePosition({
-      anchor: anchorRect,
-      surfaceWidth,
-      surfaceHeight,
-      preferredPlacement: "below",
-    });
-    this.container.style.position = "fixed";
-    this.container.style.left = `${pos.left}px`;
-    this.container.style.top = `${pos.top}px`;
-    this.container.style.width = `${surfaceWidth}px`;
-    this.container.style.zIndex = "1000";
 
     // Keep the highlighted row visible when the list scrolls (arrow nav past
-    // the menu's max-height).
+    // the menu's max-height, or the docked sheet's own scroller).
     if (selectedRow !== null) {
       (selectedRow as HTMLDivElement).scrollIntoView({ block: "nearest" });
     }

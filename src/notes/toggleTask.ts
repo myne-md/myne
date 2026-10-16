@@ -43,11 +43,13 @@ import { saveNote } from "./saveNote";
 import {
   announceWrite,
   writeTaskCompletion,
+  writeTaskField,
   // Imported as a VALUE (the re-export block below is types-and-names only, and
   // `instanceof` needs the binding) under an alias, so the re-export keeps the
   // public name.
   TaskWriteRefused as TaskWriteRefusedClass,
   type TaskWriteDeps,
+  type TaskFieldKind,
 } from "./taskWriteCore";
 import type { VaultTask } from "./taskIndex";
 import { reindexNoteFromBody } from "./vaultIndices";
@@ -86,8 +88,13 @@ export {
   TASK_WRITE_EVENT,
   TaskWriteRefused,
   flipMarker,
+  readTaskField,
+  rewriteTaskField,
   writeTaskCompletion,
+  writeTaskField,
   type RequiredTaskWriteIo,
+  type TaskFieldKind,
+  type TaskFieldWriteIo,
   type TaskWriteDeps,
   type TaskWriteEventDetail,
   type TaskWriteRefusal,
@@ -172,4 +179,35 @@ export async function toggleTaskSwallowingRefusal(
     }
     throw err;
   }
+}
+
+/**
+ * Write one task FIELD from a list surface.
+ *
+ * **It does NOT swallow a refusal, and that is the difference from
+ * {@link toggleTaskSwallowingRefusal}.** A checkbox that does not move is
+ * self-evident, so a swallowed refusal costs nothing there. A field editor is
+ * not: it closes over the value the user chose, and the surface keeps its own
+ * copy of the line for the NEXT edit in the same session. Swallowing means that
+ * copy advances to bytes that are not on disk, so the menu then states a value
+ * the note does not carry and every later edit in it is refused in turn
+ * (myne-md/myne#884 review). The surface's own commit handler catches the
+ * rejection, so nothing escapes to an unhandled rejection; it just does not get
+ * to pretend the write landed.
+ */
+export async function writeTaskFieldFromList(
+  task: VaultTask,
+  kind: TaskFieldKind,
+  value: string,
+  flushDirtyPanes: () => Promise<void>,
+): Promise<void> {
+  await writeTaskField(task, kind, value, {
+    flushDirtyPanes,
+    readNote: noteRead,
+    // The same desktop write as the marker flip: `saveNote`, then the index
+    // refresh. A field mutation needs the re-index for the same reason.
+    writeNote: saveAndReindex,
+    announce: announceWrite,
+    createConflictCopy: createConflictCopyImpl,
+  });
 }

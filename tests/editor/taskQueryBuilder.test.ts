@@ -27,6 +27,40 @@ const choice = (over: Partial<QueryBuilderChoice> = {}): QueryBuilderChoice => (
 const q = (id: string): HTMLElement | null =>
   document.querySelector(`[data-testid="${id}"]`);
 
+/**
+ * A minimal `visualViewport` stand-in: jsdom does not implement one. The same
+ * shape `floatingViewport.test.ts` uses, because the two specs assert the same
+ * two numbers on two different surfaces.
+ */
+function stubVisualViewport(init: { height: number; offsetTop: number }): {
+  set: (next: { height: number; offsetTop: number }) => void;
+  fire: (type: "resize" | "scroll") => void;
+} {
+  const listeners = new Map<string, Set<() => void>>();
+  const vv = {
+    height: init.height,
+    offsetTop: init.offsetTop,
+    addEventListener: (type: string, cb: () => void) => {
+      const set = listeners.get(type) ?? new Set();
+      set.add(cb);
+      listeners.set(type, set);
+    },
+    removeEventListener: (type: string, cb: () => void) => {
+      listeners.get(type)?.delete(cb);
+    },
+  };
+  Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+  return {
+    set: (next) => {
+      vv.height = next.height;
+      vv.offsetTop = next.offsetTop;
+    },
+    fire: (type) => {
+      for (const cb of listeners.get(type) ?? []) cb();
+    },
+  };
+}
+
 function cleanup(): void {
   document.querySelectorAll('[data-testid="editor.task-query-builder"]').forEach((n) => {
     n.parentElement?.remove();
@@ -192,5 +226,92 @@ describe("the slash command leads to the builder, not to a bare fence", () => {
     );
     expect(src).toContain('id: "task-query"');
     expect(src).toContain("openTaskQueryBuilder(");
+  });
+});
+
+describe("the dialog fits a phone (myne-md/myne#884 task 9)", () => {
+  /** A `readFileSync` return is untyped here (`@types/node` is not a dep), and an
+   *  inferred parameter from one is an implicit any - which is the trap
+   *  `check-test-typecheck` counts. Annotate rather than infer. */
+  function sheetSection(): string {
+    const fs = require("node:fs") as {
+      readFileSync: (p: string, enc: string) => string;
+    };
+    const css: string = fs.readFileSync("editor/src/task-surfaces.css", "utf8");
+    // SLICE to the builder's own section before asserting anything about it. An
+    // assertion over the whole sheet passes on a rule that lives in some other
+    // section, which is exactly the drift this is meant to catch.
+    const start = css.indexOf("── The task-query builder");
+    expect(start, "the builder's section marker is gone").toBeGreaterThan(-1);
+    const end = css.indexOf("── The `+` add-field affordance", start);
+    return css.slice(start, end === -1 ? undefined : end);
+  }
+
+  it("caps the dialog by the VISIBLE height, not `100vh`", () => {
+    const section = sheetSection();
+    expect(section).toContain("max-height: calc(var(--cm-visible-h, 100vh) - 32px)");
+    // Non-vacuity: the static basis must be gone from this section, or the
+    // assertion above could hold while the old rule still won on source order.
+    expect(section).not.toContain("max-height: calc(100vh - 32px)");
+    // And the scroll it already had, which the stacking must not take away.
+    expect(section).toContain("overflow-y: auto");
+  });
+
+  it("stacks each label above its control under a coarse pointer or a narrow width", () => {
+    const section = sheetSection();
+    const media = /@media \(pointer: coarse\), \(max-width: 480px\) \{([\s\S]*?)\n\}/.exec(section);
+    expect(media, "the stacking media query is gone").not.toBeNull();
+    expect(media![1]).toContain(".cm-task-query-builder-row");
+    expect(media![1]).toContain("flex-direction: column");
+    // Desktop keeps the row layout, so the un-queried rule must stay a row.
+    const base = /\.cm-task-query-builder-row \{([\s\S]*?)\n\}/.exec(section);
+    expect(base).not.toBeNull();
+    expect(base![1]).toContain("display: flex");
+    expect(base![1]).not.toContain("flex-direction: column");
+  });
+
+  it("follows the visible viewport's height and its keyboard offset", () => {
+    // jsdom has no `visualViewport` of its own; this is the platform shape iOS
+    // has with the software keyboard up: the layout viewport keeps its height,
+    // the visible area does not.
+    const innerHeight = window.innerHeight;
+    const vv = stubVisualViewport({ height: innerHeight - 300, offsetTop: 0 });
+    openTaskQueryBuilder({ onInsert: () => {} });
+
+    const surface = q("editor.task-query-builder")!;
+    const backdrop = surface.parentElement as HTMLElement;
+    expect(surface.style.getPropertyValue("--cm-visible-h")).toBe(`${innerHeight - 300}px`);
+    // The card is centred in the BACKDROP, so the keyboard's 300px must come off
+    // the backdrop's content box or a short dialog is still centred behind it.
+    expect(backdrop.style.paddingBottom).toBe(`300px`);
+
+    // A rotation, or the keyboard moving, re-measures...
+    vv.set({ height: innerHeight - 100, offsetTop: 0 });
+    vv.fire("resize");
+    expect(surface.style.getPropertyValue("--cm-visible-h")).toBe(`${innerHeight - 100}px`);
+    expect(backdrop.style.paddingBottom).toBe(`100px`);
+
+    // ...and closing stops it: a stale listener would keep writing inline styles
+    // into a detached node, which reads as a leak rather than as an error.
+    const closed = openTaskQueryBuilder({ onInsert: () => {} });
+    (q("editor.task-query-builder.insert") as HTMLElement).click();
+    closed.close();
+    const before = surface.style.getPropertyValue("--cm-visible-h");
+    vv.fire("resize");
+    expect(surface.style.getPropertyValue("--cm-visible-h")).toBe(before);
+    cleanup();
+    delete (window as unknown as { visualViewport?: unknown }).visualViewport;
+  });
+
+  it("falls back to the layout viewport where there is no visible one", () => {
+    // A platform without `visualViewport` gets exactly what it had before this
+    // task: the layout height, and no offset.
+    delete (window as unknown as { visualViewport?: unknown }).visualViewport;
+    openTaskQueryBuilder({ onInsert: () => {} });
+    const surface = q("editor.task-query-builder")!;
+    const backdrop = surface.parentElement as HTMLElement;
+    expect(surface.style.getPropertyValue("--cm-visible-h")).toBe(`${window.innerHeight}px`);
+    expect(backdrop.style.paddingBottom).toBe("0px");
+    cleanup();
   });
 });

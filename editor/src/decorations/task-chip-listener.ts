@@ -23,6 +23,7 @@
 import { EditorView } from "@codemirror/view";
 import { openTaskFieldEditor } from "../task-field-editor";
 import { openTaskFieldMenu } from "../task-field-menu";
+import { floatingSurfacePresentation } from "../host";
 import {
   applyTaskFieldEdit,
   beginTaskFieldEdit,
@@ -48,6 +49,21 @@ export function installTaskChipEditor(): () => void {
 
     const view = EditorView.findFromDOM(anchor);
     if (view === null) return;
+
+    // Docked, a tapped chip opens the SAME sheet the add affordance opens, entered
+    // at that field's step with the field list one Back away, so the three entry
+    // points cannot behave differently (myne-md/myne#884). The anchored client
+    // keeps the direct popover below, which is the interaction it was designed for.
+    if (floatingSurfacePresentation() === "docked") {
+      const chipLine = view.state.doc.lineAt(detail.from);
+      openTaskFieldMenu({
+        view,
+        anchor,
+        lineFrom: chipLine.from,
+        initialKind: detail.kind,
+      });
+      return;
+    }
 
     // Track the span across document changes for as long as the popover is open.
     // The document stays live underneath it — a background autosave rewrites the

@@ -15,6 +15,11 @@
 
 import "./task-surfaces.css";
 import { openModal } from "./host/lib/imperative-modal";
+import {
+  dockGeometry,
+  subscribeVisibleViewport,
+  visibleViewport,
+} from "./floating/viewport";
 import i18n from "@myne/editor/i18n";
 
 /** The choices the builder offers. Every one maps to a frozen roster clause. */
@@ -133,6 +138,14 @@ function select(
 /** Open the builder. Returns a handle whose `close` is idempotent. */
 export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   let inserted = false;
+  /** Set once the surface is mounted; the close path is the only one that tears
+   *  the viewport subscription down, and every exit goes through `closeModal`. */
+  let unsubscribe: (() => void) | null = null;
+  const closeModal = (): void => {
+    unsubscribe?.();
+    unsubscribe = null;
+    modal.close();
+  };
 
   const modal = openModal({
     // A dimmed, viewport-spanning backdrop that centers the dialog. Without a
@@ -140,7 +153,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
     // at the top-left corner of the page with no chrome — the defect this closes.
     backdropClass: "cm-task-query-builder-backdrop",
     onDismiss: () => {
-      modal.close();
+      closeModal();
       if (!inserted) options.onCancel?.();
     },
     onEnter: (e: KeyboardEvent) => {
@@ -243,7 +256,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
     if (inserted) return;
     inserted = true;
     const block = buildQueryBlock(current());
-    modal.close();
+    closeModal();
     options.onInsert(block);
   }
 
@@ -254,7 +267,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   cancel.setAttribute("data-testid", "editor.task-query-builder.cancel");
   cancel.textContent = i18n.t("common.cancel");
   cancel.addEventListener("click", () => {
-    modal.close();
+    closeModal();
     if (!inserted) options.onCancel?.();
   });
   const confirm = document.createElement("button");
@@ -271,5 +284,24 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   // dismisses — the card-modal convention this repo already uses.
   modal.installTrap(surface, status);
 
-  return { close: () => modal.close() };
+  // The dialog's height follows the VISIBLE viewport, not the layout one
+  // (myne-md/myne#884 task 9). On iOS the layout viewport does not shrink for the
+  // software keyboard, so `max-height: calc(100vh - 32px)` keeps the dialog its
+  // full height while its lower half (the Cancel/Insert row with it) sits
+  // behind the keyboard. These are the same two numbers the docked sheet uses,
+  // from the same module, so "how tall may a floating surface be, and how far
+  // above the keyboard does it sit" has one answer in the tree.
+  //
+  // The backdrop's own bottom padding is the other half: the card is centred in
+  // the backdrop, which spans the LAYOUT viewport, so capping the height alone
+  // would leave a short dialog centred behind the keyboard.
+  const applyVisibleViewport = (): void => {
+    const geometry = dockGeometry(visibleViewport());
+    surface.style.setProperty("--cm-visible-h", `${geometry.maxHeight}px`);
+    modal.backdrop.style.paddingBottom = `${geometry.bottom}px`;
+  };
+  applyVisibleViewport();
+  unsubscribe = subscribeVisibleViewport(applyVisibleViewport);
+
+  return { close: closeModal };
 }

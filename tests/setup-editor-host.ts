@@ -73,4 +73,11 @@ setEditorHost({
   // silently skipped and the tests that assert "absent when the host has no
   // seam" pass for the wrong reason.
   cover: { openPicker: () => {}, remove: () => {} },
+  // The floating-surface presentation (myne-md/myne#884). The stub declares
+  // `anchored` for the same reason it declares `meetingSession`: the seam's
+  // contract is that a client which OMITS the member gets the anchored popover,
+  // and a test asserting that absence is vacuous unless the stub can be replaced
+  // by a host that provides it. Specs that want the docked path install their own
+  // host over this one (`tests/platform/floatingSurfacePresentation.test.ts`).
+  floatingSurface: "anchored",
 });

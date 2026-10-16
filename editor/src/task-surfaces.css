@@ -461,7 +461,14 @@
   flex-direction: column;
   gap: var(--space-2);
   width: min(420px, 100%);
-  max-height: calc(100vh - 32px);
+  /* The VISIBLE height, written inline by `task-query-builder.ts` from the same
+     `floating/viewport.ts` the docked sheet uses (myne-md/myne#884 task 9). On
+     iOS the layout viewport does not shrink for the software keyboard, so a
+     `100vh` basis keeps this dialog's full height while its Cancel/Insert row
+     sits behind the keyboard. The fallback is the layout viewport, which is what
+     a platform without `visualViewport` gets - today's behaviour, degrade
+     honestly. */
+  max-height: calc(var(--cm-visible-h, 100vh) - 32px);
   overflow-y: auto;
   padding: 18px;
   background: var(--bg-1, #fbfaf7);
@@ -490,6 +497,23 @@
 .cm-task-query-builder-row > input {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* On a phone the label and its control STACK rather than sit side by side
+   (myne-md/myne#884 task 9). Side by side at 390px leaves the select about
+   200px wide, which clips the value labels the whole surface exists to make
+   readable ("due before in 1 week" is not a value a user can guess).
+
+   `(pointer: coarse)` OR a narrow width, because they are two different ways to
+   be on a phone: a touch laptop is coarse and wide and gets the stacked rows by
+   the first condition, while a squeezed desktop window gets them by the second.
+   Desktop keeps the row layout: neither condition holds for it. */
+@media (pointer: coarse), (max-width: 480px) {
+  .cm-task-query-builder-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+  }
 }
 
 /* The live canonical-text preview - teaches the roster by showing what it wrote. */
@@ -823,4 +847,89 @@
   height: 1px;
   margin: var(--space-1) -6px;
   background: var(--line-1, #e3e2dd);
+}
+
+/* ── The docked sheet's contents (myne-md/myne#884) ────────────────────────── */
+
+/* The sheet supplies the card, so the surfaces inside it drop theirs. Same rule
+   the anchored menu's right pane already carries, one container over. */
+.cm-docked-sheet .cm-task-field-editor {
+  position: static;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* The field list, as a sheet's first step: full width, one row per field. */
+.cm-docked-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+/* ── The anchored surfaces fit the window they were given (myne-md/myne#884) ── */
+
+/* The positioner clamps a surface's TOP against the viewport, so a window shorter
+   than the surface used to pin the top, push the bottom past the edge and leave
+   nothing to scroll: the Cancel/Save row went off-screen with no way to reach it.
+   The body now scrolls and the actions stay outside that scroll. */
+.cm-task-field-editor {
+  max-height: calc(100vh - var(--space-6));
+}
+
+/* The body is the editor's first child whatever field it holds (the calendar, the
+   recurrence builder, the priority select), so one rule covers all four. */
+.cm-task-field-editor > :first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cm-task-field-actions {
+  flex: none;
+}
+
+/* The two-pane popover holds the same editor in its right pane, so it needs the
+   same bound, and the pane is what scrolls. */
+.cm-task-field-menu {
+  max-height: calc(100vh - var(--space-6));
+}
+
+.cm-task-field-menu-pane {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Touch sizing for a docked surface. A phone's control vocabulary is a ~52px
+   field and a 44px target; the anchored popover's 32px controls were sized for a
+   mouse, and a phone inherited them. Stated as a coarse-pointer block rather than
+   read from the client's own geometry tokens, because this stylesheet is compiled
+   by every client and only one of them has those tokens.
+
+   AFTER every base rule it overrides, deliberately: a media query adds no
+   specificity, so source order is what decides. */
+@media (pointer: coarse) {
+  .cm-docked-sheet .cm-task-field-menu-row,
+  .cm-docked-sheet .cm-date-quick button,
+  .cm-docked-sheet .cm-time-meridiem,
+  .cm-docked-sheet .cm-time-add,
+  .cm-docked-sheet .cm-time-remove {
+    min-height: 44px;
+  }
+
+  .cm-docked-sheet .cm-task-field-editor input,
+  .cm-docked-sheet .cm-task-field-editor select,
+  .cm-docked-sheet .cm-select-trigger,
+  .cm-docked-sheet .cm-recurrence-day,
+  .cm-docked-sheet .cm-date-nav,
+  .cm-docked-sheet .cm-task-field-actions button {
+    min-height: 44px;
+  }
+
+  /* A calendar cell is a button that fills its grid cell, so it needs the width
+     as well as the height: seven columns at phone width are about 44px each. */
+  .cm-docked-sheet .cm-date-day {
+    min-height: 44px;
+  }
 }

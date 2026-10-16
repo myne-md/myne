@@ -12,7 +12,8 @@
 
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { TaskListPanel } from "./TaskListPanel";
-import { toggleTaskSwallowingRefusal } from "../toggleTask";
+import { toggleTaskSwallowingRefusal, writeTaskFieldFromList } from "../toggleTask";
+import type { TaskFieldKind } from "../toggleTask";
 import { useLocalToday } from "../useLocalToday";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { DEFAULT_TASK_VIEW, type TaskView } from "../taskView";
@@ -45,6 +46,11 @@ export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceIte
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
+  const onWriteField = useCallback(
+    (task: VaultTask, kind: TaskFieldKind, value: string) =>
+      writeTaskFieldFromList(task, kind, value, ws.flushAll),
+    [ws.flushAll],
+  );
   const onOpen = useCallback(
     (task: VaultTask) => {
       // Open the note, then ask the focused pane to scroll to the task's line.
@@ -63,6 +69,7 @@ export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceIte
       onViewChange={onViewChange}
       onToggle={onToggle}
       onOpen={onOpen}
+      onWriteField={onWriteField}
       testIdPrefix="tasks"
     />
   );
@@ -90,6 +97,11 @@ export function NoteTasksPanel(): ReactElement {
     (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
+  const onWriteField = useCallback(
+    (task: VaultTask, kind: TaskFieldKind, value: string) =>
+      writeTaskFieldFromList(task, kind, value, ws.flushAll),
+    [ws.flushAll],
+  );
   const onOpen = useCallback(
     (task: VaultTask) => {
       // Make sure the note is open (it may not be, even when selected), then ask
@@ -109,6 +121,7 @@ export function NoteTasksPanel(): ReactElement {
       onViewChange={setView}
       onToggle={onToggle}
       onOpen={onOpen}
+      onWriteField={onWriteField}
       testIdPrefix="notePanel.tasks"
       minimal
     />
