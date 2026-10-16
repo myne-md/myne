@@ -186,26 +186,73 @@ move whisper-tiny to an opt-in download (about 40 MiB, and it adds the consent
 flow the policy requires), or ship without the local-inference feature (which
 removes transcription outright).
 
-## The reproducibility answer, from one probe
+## The reproducibility answer
 
-**Not reproducible as this build stands, and the cause is a path.**
+**Two causes, both named. One is fixed and verified, one is not.**
 
-`grep -c -a` over the shipped `libmyne_mobile_lib.so` finds **117 occurrences of
+### Cause 1, fixed: dependency paths inside the library
+
+`grep -c -a` over the shipped `libmyne_mobile_lib.so` found **117 occurrences of
 `$CARGO_HOME/registry/…`**, because dependency panic locations carry the registry
-path of the machine that compiled them. It finds **zero** occurrences of the
-checkout path, which is the other usual suspect and which is the good news.
+path of the machine that compiled them. Zero occurrences of the checkout path,
+which is the other usual suspect.
 
-That decides it, because F-Droid's reproducibility flow wants a byte-identical
-APK: their container compiles with a different `CARGO_HOME`, so those 117 strings
-differ, so the APKs differ, so F-Droid cannot use Myne's signing key and signs
-with its own. The fix is the standard one, `--remap-path-prefix` for both the
-registry and the build directory, in `RUSTFLAGS` or in `.cargo/config.toml` so it
-applies to every lane; the check afterwards is the same `grep` returning zero.
-Nothing has been changed yet: a remap invalidates every crate, so it is a
-deliberate rebuild rather than a side effect of this change.
+`--remap-path-prefix` fixes it, and the fix is measured rather than assumed:
 
-That turns `docs/decisions/ops/0698` from "unknown" into "known, with a named fix
-and a cheap test", which is what the spike was for.
+| | `$CARGO_HOME/registry` strings | `$HOME` strings |
+|---|---|---|
+| before | 117 | 27 |
+| after `--remap-path-prefix=$HOME=/remap/home` | 0 | 0 |
+
+And the consequence that matters: two builds of the same ABI **in two different
+directories** produce a byte-identical library.
+
+```
+build A .so  sha256 4e782c7a3ed2cae58ffc351d53d91ccb3ffe4b206028b935d8e4a0a57a1e3843
+build B .so  sha256 4e782c7a3ed2cae58ffc351d53d91ccb3ffe4b206028b935d8e4a0a57a1e3843
+```
+
+A single remap of `$HOME` covers everything: remapping the checkout separately
+matched nothing, because the only leaking paths are `$HOME/.cargo` and
+`$HOME/.rustup`. **It is not in the repository yet**, and it has to live there
+rather than in an ad-hoc environment variable: F-Droid compares OUR build against
+THEIRS, so both sides must remap to the same targets. A remap invalidates every
+crate, so it is a deliberate rebuild and belongs with its own change.
+
+### Cause 2, not fixed: Tauri's embedded config has a random key order
+
+Comparing the two APKs entry by entry, **656 of 657 entries are identical**
+(`unzip -v`, name plus CRC-32, signature entries excluded). The one that differs
+is `assets/tauri.conf.json`, and the difference is this and nothing else:
+
+```
+"../../src-tauri/resources/models/ocr": "models/ocr",
+"../../src-tauri/resources/models/whisper-tiny": "models/whisper"
+```
+
+versus the same two lines in the opposite order. Both files are 3013 bytes and
+neither carries a machine path. The order is not a directory artefact: two builds
+in the **same** directory with the **same** config file produced different orders,
+which is `HashMap` iteration order seeded per process. `bundle.resources` is a
+two-entry map, so it is a coin flip per build.
+
+Two ways to close it, and neither is a one-line change:
+
+1. **Upstream.** Tauri serialises that map through a `HashMap`, so every Tauri app
+   with more than one `bundle.resources` entry has this. Reporting it is the
+   honest fix.
+2. **Here.** Make `bundle.resources` a **single** entry, so there is no order to
+   randomise: move the two mobile model directories under one parent and map that
+   parent once. It touches the resource layout, both clients' configs and the
+   model provenance READMEs, so it is its own change.
+
+### What this means for the signing decision
+
+F-Droid's reproducibility flow wants a byte-identical APK. Cause 1 is a
+`RUSTFLAGS` line away. Cause 2 is a Tauri serialisation order, so until one of the
+two fixes lands, **F-Droid signs with its own key** and the migration warning
+ships: an uninstall, and an uninstall deletes the vault. That is the answer to the
+question `docs/decisions/ops/0698` left open.
 
 ## The NDK revision in the draft was a beta
 
@@ -221,6 +268,22 @@ The draft now carries `29.0.14206865`, whose own `source.properties` reads
 `mobile/scripts/fdroid-build.sh --abi arm64` has already built an APK with.
 `mobile/docs/dev/device-matrix.md` carried the same stale revision and has been
 corrected in the same change.
+
+### A local dry run has to run the `sudo:` block by hand
+
+`fdroid build` refuses to run a build's `sudo:` commands off a dedicated build
+server. It prints the list and says so:
+
+```
+WARNING: md.myne.mobile:100002 runs this on the buildserver with sudo: [...]
+These commands were skipped because fdroid build is not running on a dedicated build server.
+```
+
+On F-Droid's own buildserver that block is the whole point of the field and it
+runs. In the container above it does not, so the `init:` step dies on
+`rustup: command not found` unless the same commands are run by hand in the same
+container first. That is a property of the local harness, not of the recipe, and
+it is worth knowing before the first attempt is misread as a broken recipe.
 
 ## Owed: the first dry run
 

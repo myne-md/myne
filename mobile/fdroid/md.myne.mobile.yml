@@ -58,7 +58,11 @@ Builds:
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
-      - apt-get install -y gcc libc-dev rustup git-lfs
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
       # The buildserver image ships an EMPTY Android SDK: platforms/,
       # build-tools/ and ndk/ are all empty directories. The platform therefore
       # has to be named. `platforms;android-37.0` is the API 37 package id (the
@@ -133,7 +137,11 @@ Builds:
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
-      - apt-get install -y gcc libc-dev rustup git-lfs
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
       # The buildserver image ships an EMPTY Android SDK: platforms/,
       # build-tools/ and ndk/ are all empty directories. The platform therefore
       # has to be named. `platforms;android-37.0` is the API 37 package id (the
@@ -175,7 +183,11 @@ Builds:
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
-      - apt-get install -y gcc libc-dev rustup git-lfs
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
       # The buildserver image ships an EMPTY Android SDK: platforms/,
       # build-tools/ and ndk/ are all empty directories. The platform therefore
       # has to be named. `platforms;android-37.0` is the API 37 package id (the
@@ -217,7 +229,11 @@ Builds:
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
-      - apt-get install -y gcc libc-dev rustup git-lfs
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
       # The buildserver image ships an EMPTY Android SDK: platforms/,
       # build-tools/ and ndk/ are all empty directories. The platform therefore
       # has to be named. `platforms;android-37.0` is the API 37 package id (the
