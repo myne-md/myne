@@ -285,6 +285,29 @@ runs. In the container above it does not, so the `init:` step dies on
 container first. That is a property of the local harness, not of the recipe, and
 it is worth knowing before the first attempt is misread as a broken recipe.
 
+### Local runs on Apple Silicon hit the emulated linker
+
+Everything above runs under `--platform linux/amd64`. On an arm64 host that is
+QEMU, and QEMU is not reliable enough to link a large Rust build: the first
+attempt to `cargo install tauri-cli` died with
+
+```
+cc: internal compiler error: Segmentation fault signal terminated program collect2
+error: could not compile `yoke-derive` (lib)
+```
+
+with `<jemalloc>: MADV_DONTNEED does not work ... (This is the expected behaviour
+if you are running under QEMU)` throughout. Nothing about that is the recipe's:
+it is the same `apt`, `rustup`, `node` and `pnpm` sequence working, and then the
+host's x86_64 emulation failing to run the linker.
+
+That limit is worth stating because it bounds what a local dry run can prove. On
+a real x86_64 machine, or on F-Droid's own buildserver, this step is just a
+compile. What CAN be checked locally on Apple Silicon is everything up to it:
+that the packages install, the versions are the pinned ones, the source clones,
+`fdroid` resolves the NDK revision, and the recipe's own `init`/`prebuild`
+sequence is reached at all.
+
 ## Owed: the first dry run
 
 The recipe was reasoned from a working Tauri v2 app on F-Droid plus this
@@ -311,10 +334,23 @@ about ITS toolchain rather than about ours. What remains, in order:
    `android-ndk-r29-beta3-linux.zip`, so the draft was pinning a beta of r29. The
    draft and the device matrix now carry the stable `29.0.14206865`. See "The NDK
    revision in the draft was a beta" above.
-7. **Break the postinit step and watch it fail.** Remove that one line, rebuild,
-   and confirm the failure is the manifest-merge error named above. A step
-   described as "fails loudly by design" is a claim, and this is the cheap
-   minute that turns it into evidence.
+7. ~~**Break the postinit step and watch it fail.**~~ **Answered.** A fresh
+   `tauri android init` with the postinit step skipped leaves `myne-widgets`
+   absent from `settings.gradle`, and the build then dies exactly where the claim
+   says it does, naming the resource:
+
+   ```
+   Execution failed for task ':app:processArm64ReleaseResources'
+   > Android resource linking failed
+     ERROR: .../gen/android/app/src/main/AndroidManifest.xml:41:13-102:
+       AAPT: error: resource xml/myne_shortcuts (aka md.myne.mobile:xml/myne_shortcuts) not found.
+   BUILD FAILED in 2m 48s
+   ```
+
+   That is `mobile/AGENTS.md`'s "forgetting it fails the build loudly by design"
+   turned from a claim into evidence, and it is the one step in this recipe whose
+   omission would otherwise be invisible until the widgets silently stopped
+   existing.
 8. Measure the per-ABI APK size and write it here.
 9. Check the release manifest for `android:usesCleartextTraffic="false"`.
 10. Confirm `fdroid lint` accepts `License: AGPL-3.0-only`. If its licence list
