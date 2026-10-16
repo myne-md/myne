@@ -15,40 +15,63 @@ afterEach(() => {
   scratch = null;
 });
 
+/**
+ * Run a guard in `cwd` and return its exit code and output.
+ *
+ * **A spawn failure is not a verdict, and the difference is the whole point.**
+ * `execFileSync` throws a `SystemError` carrying no `status`, `stdout` or
+ * `stderr` when the CHILD could not be started at all (EAGAIN on a loaded
+ * machine, where this file failed roughly one full suite in three with
+ * `expected undefined to be 0` and nothing else to read). A guard's own refusal
+ * always carries a numeric `status`, so only the spawn case is retried, once, and
+ * a persistent one is raised as itself rather than folded into an exit code.
+ */
+function runGuard(guard: string, cwd: string): { code: number; output: string } {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return { code: 0, output: execFileSync("node", [guard], { cwd, encoding: "utf8" }) };
+    } catch (error) {
+      const failure = error as {
+        status?: number;
+        stdout?: string;
+        stderr?: string;
+        code?: string;
+      };
+      if (typeof failure.status === "number") {
+        return { code: failure.status, output: `${failure.stdout ?? ""}${failure.stderr ?? ""}` };
+      }
+      if (attempt === 1) {
+        throw new Error(`the guard could not be spawned: ${failure.code ?? String(error)}`);
+      }
+    }
+  }
+  throw new Error("unreachable");
+}
+
 function run(
   bundleText = "const bundled = true;",
   extraScreen = false,
 ): { code: number; output: string } {
-  scratch = mkdtempSync(join(tmpdir(), "web-screens-"));
-  cpSync(join(ROOT, "src", "screens"), join(scratch, "src", "screens"), { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "web-screens-"));
+  scratch = dir;
+  cpSync(join(ROOT, "src", "screens"), join(dir, "src", "screens"), { recursive: true });
   if (extraScreen) {
-    writeFileSync(join(scratch, "src", "screens", "ZzGuardProbe.tsx"), "export const Probe = true;\n");
+    writeFileSync(join(dir, "src", "screens", "ZzGuardProbe.tsx"), "export const Probe = true;\n");
   }
-  mkdirSync(join(scratch, "web", "dist"), { recursive: true });
-  writeFileSync(join(scratch, "web", "dist", "index.html"), "<!doctype html>", "utf8");
-  writeFileSync(join(scratch, "web", "dist", "app.js"), bundleText, "utf8");
-  try {
-    const output = execFileSync("node", [GUARD], { cwd: scratch, encoding: "utf8" });
-    return { code: 0, output };
-  } catch (error) {
-    const failure = error as { status: number; stdout: string; stderr: string };
-    return { code: failure.status, output: `${failure.stdout}${failure.stderr}` };
-  }
+  mkdirSync(join(dir, "web", "dist"), { recursive: true });
+  writeFileSync(join(dir, "web", "dist", "index.html"), "<!doctype html>", "utf8");
+  writeFileSync(join(dir, "web", "dist", "app.js"), bundleText, "utf8");
+  return runGuard(GUARD, dir);
 }
 
 function runSurfaces(bundleText: string): { code: number; output: string } {
-  scratch = mkdtempSync(join(tmpdir(), "web-surfaces-"));
-  cpSync(join(ROOT, "src"), join(scratch, "src"), { recursive: true });
-  mkdirSync(join(scratch, "web", "dist"), { recursive: true });
-  writeFileSync(join(scratch, "web", "dist", "index.html"), "<!doctype html>", "utf8");
-  writeFileSync(join(scratch, "web", "dist", "app.js"), bundleText, "utf8");
-  try {
-    const output = execFileSync("node", [SURFACES_GUARD], { cwd: scratch, encoding: "utf8" });
-    return { code: 0, output };
-  } catch (error) {
-    const failure = error as { status: number; stdout: string; stderr: string };
-    return { code: failure.status, output: `${failure.stdout}${failure.stderr}` };
-  }
+  const dir = mkdtempSync(join(tmpdir(), "web-surfaces-"));
+  scratch = dir;
+  cpSync(join(ROOT, "src"), join(dir, "src"), { recursive: true });
+  mkdirSync(join(dir, "web", "dist"), { recursive: true });
+  writeFileSync(join(dir, "web", "dist", "index.html"), "<!doctype html>", "utf8");
+  writeFileSync(join(dir, "web", "dist", "app.js"), bundleText, "utf8");
+  return runGuard(SURFACES_GUARD, dir);
 }
 
 describe("check-web-screens", () => {
