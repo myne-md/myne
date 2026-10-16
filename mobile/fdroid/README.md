@@ -285,50 +285,71 @@ runs. In the container above it does not, so the `init:` step dies on
 container first. That is a property of the local harness, not of the recipe, and
 it is worth knowing before the first attempt is misread as a broken recipe.
 
-### Local runs on Apple Silicon hit the emulated linker
+### A from-source Rust build cannot finish on Apple Silicon
 
 Everything above runs under `--platform linux/amd64`. On an arm64 host that is
-QEMU, and QEMU is not reliable enough to link a large Rust build: the first
-attempt to `cargo install tauri-cli` died with
+QEMU, and QEMU is not reliable enough to link a large Rust build. `cargo install
+tauri-cli` failed twice, at a different crate each time:
 
 ```
 cc: internal compiler error: Segmentation fault signal terminated program collect2
 error: could not compile `yoke-derive` (lib)
+...
+error: could not compile `serde_derive` (lib) due to 1 previous error
 ```
 
 with `<jemalloc>: MADV_DONTNEED does not work ... (This is the expected behaviour
-if you are running under QEMU)` throughout. Nothing about that is the recipe's:
-it is the same `apt`, `rustup`, `node` and `pnpm` sequence working, and then the
-host's x86_64 emulation failing to run the linker.
+if you are running under QEMU)` throughout the build. Both failures are on
+**proc-macro dylibs**, which is the pattern rather than bad luck: the emulated
+linker dies building them. So on Apple Silicon the container can be driven up to
+the first from-source build and no further.
 
-That limit is worth stating because it bounds what a local dry run can prove. On
-a real x86_64 machine, or on F-Droid's own buildserver, this step is just a
-compile. What CAN be checked locally on Apple Silicon is everything up to it:
-that the packages install, the versions are the pinned ones, the source clones,
-`fdroid` resolves the NDK revision, and the recipe's own `init`/`prebuild`
-sequence is reached at all.
+That bounds what a local dry run proves, and the boundary is easy to misread as a
+broken recipe. **Verified on this machine**: the `sudo:` block's packages install
+(including `xz-utils`, which the image lacks), `rustup default 1.96.0` and the
+four Android targets, Node `v25.9.0`, pnpm `11.8.0`, git-lfs 3.6.1, the source
+clone from a local `file://` repository, `fdroid` resolving and setting up the
+NDK revision, and the recipe's `init` step being reached at all. **Not verifiable
+here**: any step that compiles Rust. Those are ordinary compiles on a real x86_64
+machine or on F-Droid's own buildserver.
 
 ## Owed: the first dry run
 
 The recipe was reasoned from a working Tauri v2 app on F-Droid plus this
-repository's own pins. Items 3, 8 and 9 below are now answered by the local run
-above; the rest still need the buildserver container, because they are questions
-about ITS toolchain rather than about ours. What remains, in order:
+repository's own pins. The local runs answered most of this list; what is left is
+marked, and the only items still genuinely open are the ones that need a real
+x86_64 machine. In order:
 
-1. Fill in `commit:` (currently a placeholder) and run `fdroid lint`, which
-   refuses the placeholder by name.
-2. `fdroid build` in the fdroiddata container against a **local** clone
-   (`Repo: file:///…`), which needs no public hosting, then read the four APKs.
+1. ~~Fill in `commit:` and run `fdroid lint`.~~ **`fdroid lint` ran; the
+   placeholder still has to become a real SHA.** The dry-run copy (a local
+   `file://` repository) produced exactly one complaint,
+   `Repo: git URLs must use https://`, which is the override rather than the
+   draft: the licence string, the categories and the version fields all passed.
+   `commit:` becomes `git rev-parse v<version>` before submission.
+2. ~~`fdroid build` in the fdroiddata container against a local clone.~~
+   **Attempted, and bounded by the host rather than by the recipe.** The
+   container did start, resolve the NDK, clone the local repository and reach the
+   recipe's `init` step, where `cargo install tauri-cli` cannot finish under
+   x86_64 emulation (see "A from-source Rust build cannot finish on Apple
+   Silicon"). Reading the four APKs needs a real x86_64 machine or F-Droid's
+   buildserver; everything the native runs could answer instead is in "What the
+   first local run measured".
 3. Do the four APKs carry `versionName 0.10.0` and `versionCode 100001` to
    `100004`? If the arithmetic Tauri uses has moved, this is where it surfaces.
-4. Do the APKs contain real model weights? Unzip the APK and check the size of
-   the bundled `models/whisper/model.gguf`; anything near 130 bytes means the
-   LFS fetch failed. `fdroidserver` has no `lfs` handling at all (checked in
-   `scanner.py`, `build.py` and `common.py`), which is why the recipe installs
-   `git-lfs` and runs `git lfs pull` itself.
-5. Does the buildserver's JDK satisfy AGP 9.3.1 and Gradle 9.6.1, and does its
-   SDK carry `platforms;android-37`? If not, the SDK installs in `sudo:` via
-   `sdkmanager`, or `compileSdk`/`targetSdk` come down. Neither is decided here.
+4. Do the APKs contain real model weights? **Still owed, and only a buildserver
+   can answer it.** The check is the size of the bundled `models/whisper/model.gguf`;
+   anything near 130 bytes means the LFS fetch failed. `fdroidserver` has no `lfs`
+   handling at all (checked in `scanner.py`, `build.py` and `common.py`), which is
+   why the recipe installs `git-lfs` and runs `git lfs pull` itself. The local dry
+   run could not exercise that step: it fed the build a clone that already carried
+   the real bytes, so the step was skipped rather than tested.
+5. ~~Does the buildserver's JDK satisfy AGP 9.3.1 and Gradle 9.6.1, and does its
+   SDK carry `platforms;android-37`?~~ **Answered.** The image's JDK is
+   21.0.12.1, which AGP 9.3.1 and Gradle 9.6.1 accept (the `source/target 8`
+   deprecation is a warning, not an error). Its Android SDK is **empty**: no
+   platforms, no build-tools, no NDK, which is why the recipe installs
+   `platforms;android-37.0` explicitly instead of hoping AGP fetches it mid-build.
+   `build-tools;37.0.0` is offered and AGP takes what it wants.
 6. ~~Does `ndk: 29.0.13846066` install?~~ **Answered, and the revision was
    wrong.** It installs (`sdkmanager` resolves it), but it resolves to
    `android-ndk-r29-beta3-linux.zip`, so the draft was pinning a beta of r29. The
