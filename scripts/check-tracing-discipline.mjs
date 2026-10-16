@@ -54,6 +54,13 @@
 //   separate concern with a separate check in
 //   `src-tauri/src/cli_bridge/logging_discipline.rs` for the directory where a
 //   path is actually handled.
+// - **A macro reached through a crate rename or a re-export is not resolved.**
+//   A direct alias (`use tracing::info as log_info;`, single or braced) is read,
+//   because it is the same call site under a different name. Two shapes are not,
+//   and neither appears in this tree: `use tracing as t;` followed by
+//   `t::info!(%path)`, and `use crate::log::info;` followed by `info!(%path)` in
+//   a file with no `use tracing` of its own. Resolving either would mean
+//   tracking a module graph rather than reading a `use` statement.
 //
 // Zero dependencies, node built-ins only, matching the other guards here.
 // Usage: `node scripts/check-tracing-discipline.mjs`.
@@ -117,9 +124,43 @@ export const MIN_INVOCATIONS = 400;
  * The macros a `tracing` call site may spell, qualified or bare.
  *
  * A bare name counts only in a file that also imports from `tracing`, because
- * that import is what makes the name refer to this crate.
+ * that import is what makes the name refer to this crate. A direct alias
+ * (`use tracing::info as log_info;`) joins these names; see
+ * `tracingMacroAliases`.
  */
 export const TRACING_MACROS = ["trace", "debug", "info", "warn", "error"];
+
+/**
+ * The macro each `use tracing::<name> as <alias>` binds an identifier to.
+ *
+ * The widened extractor admitted a bare macro name only when it was one of the
+ * five level names, so `use tracing::info as log_info;` followed by
+ * `log_info!(%path)` read as zero invocations and zero findings, the same hole
+ * the bare-spelling widening closed one name over (myne#860 review). An alias
+ * is that call site under a different name, so it is read the same way, and it
+ * carries the name it aliases so `info` under an alias still counts as the
+ * level the file layer records rather than as an unknown one.
+ *
+ * The two shapes are a single rename (`use tracing::info as log_info;`) and the
+ * braced form (`use tracing::{info as log_info, warn as log_warn};`). Both are
+ * read from `code`, i.e. after comments are stripped, so an alias named in a
+ * comment does not widen the scan.
+ */
+export function tracingMacroAliases(code) {
+  const aliases = new Map();
+  for (const match of code.matchAll(
+    /use\s+tracing\s*::\s*([A-Za-z0-9_]+)\s+as\s+([A-Za-z0-9_]+)/g,
+  )) {
+    aliases.set(match[2], match[1]);
+  }
+  for (const match of code.matchAll(/use\s+tracing\s*::\s*\{([^}]*)\}/g)) {
+    for (const item of match[1].split(",")) {
+      const alias = item.match(/^\s*([A-Za-z0-9_]+)\s+as\s+([A-Za-z0-9_]+)\s*$/);
+      if (alias) aliases.set(alias[2], alias[1]);
+    }
+  }
+  return aliases;
+}
 
 /**
  * Extract every `tracing::<level>!( ... )` and every bare `<level>!( ... )`
@@ -130,8 +171,11 @@ export const TRACING_MACROS = ["trace", "debug", "info", "warn", "error"];
  * was blind to it: R1, R2 and the R3 floor all read zero invocations for such a
  * file, so a call site could carry a `%` path into the log the user is invited
  * to publish while this guard reported ok (myne#860 adversarial review). A bare
- * name is admitted only when the same file imports from `tracing`, which is what
- * makes the identifier refer to this crate rather than to some other macro.
+ * name is admitted when the same file imports from `tracing`, under its own
+ * name or under a direct alias (`use tracing::info as log_info;`, and the
+ * braced form), which is what makes the identifier refer to this crate rather
+ * than to some other macro. A crate rename and a re-export are not read; the
+ * limits list in the header names why.
  *
  * The balanced-paren scan is blind to parens inside string literals, because a
  * log message may contain either and a naive counter mis-reads both. Only a
@@ -145,6 +189,8 @@ export function tracingInvocations(source) {
   // own tests quote `tracing::warn!` as data) is not read as a call site.
   const patterns = [/\btracing::([A-Za-z0-9_]+)!\(/g];
   if (importsTracing) patterns.push(/(?<![A-Za-z0-9_:.])([A-Za-z0-9_]+)!\(/g);
+  const aliases = tracingMacroAliases(code);
+  const bareNames = new Set([...TRACING_MACROS, ...aliases.keys()]);
 
   const sites = [];
   for (const [index, pattern] of patterns.entries()) {
@@ -152,9 +198,12 @@ export function tracingInvocations(source) {
       const ident = match[1];
       // Qualified calls admit any identifier, as before, so a `tracing::event!`
       // or a re-exported macro is still read. Bare ones are restricted to the
-      // five level macros, or every `assert!(` in an importing file would be
-      // scanned as a log record.
-      if (index > 0 && !TRACING_MACROS.includes(ident)) continue;
+      // five level macros and the aliases this file binds to them, or every
+      // `assert!(` in an importing file would be scanned as a log record.
+      if (index > 0 && !bareNames.has(ident)) continue;
+      // An alias reports the macro it aliases, so `info` under an alias is
+      // still the level the file layer records rather than an unknown name.
+      const level = index > 0 ? aliases.get(ident) ?? ident : ident;
       // `match[0]` ends at the macro name and its `!`, so this is the `(`.
       const open = match.index + match[0].length - 1;
       let depth = 0;
@@ -183,7 +232,7 @@ export function tracingInvocations(source) {
         }
       }
       if (end < 0) continue;
-      sites.push({ at: match.index, level: ident, args: code.slice(open + 1, end) });
+      sites.push({ at: match.index, level, args: code.slice(open + 1, end) });
     }
   }
   // Source order, so a finding's line number reads the way the file does. The
@@ -305,9 +354,69 @@ export function splitFieldAssign(arg) {
   return null;
 }
 
+/**
+ * The index of the `'` that closes a char literal opening at `open`, or `-1`
+ * when that `'` opens a lifetime instead.
+ *
+ * A lifetime (`&'static str`) begins with the same character, so the two are
+ * told apart by looking for the closing quote: `'%'` closes one character
+ * later, while `'static` does not close at all.
+ */
+function charLiteralClose(arg, open) {
+  let i = open + 1;
+  if (arg[i] === "\\") {
+    // An escape: `'\''`, `'\n'`, `'\x41'`, `'\u{25}'`. Past the backslash and
+    // the character it escapes, the extras in the longer forms are never a
+    // quote, so walking to the next `'` finds the close in every case.
+    i += 2;
+    while (i < arg.length) {
+      if (arg[i] === "'") return i;
+      i += 1;
+    }
+    return -1;
+  }
+  return arg[i + 1] === "'" ? i + 1 : -1;
+}
+
+/**
+ * The index of the first `%` outside a string or char literal, or `-1`.
+ *
+ * The first revision read the first `%` ANYWHERE in the argument, so a message
+ * containing a percent sign ("50% of the file was read") was read as a Display
+ * formatter and R1 fired naming a fragment of that literal as the field, whose
+ * only offered remedy was an EXCEPTIONS entry the stale arm then compares by
+ * name. A percent sign inside a literal is not a formatter, which is the same
+ * reason `splitFieldAssign` finds its `=` at the top level rather than by
+ * `indexOf`.
+ */
+function formatterIndex(arg) {
+  let inString = false;
+  for (let i = 0; i < arg.length; i += 1) {
+    const c = arg[i];
+    if (inString) {
+      if (c === "\\") i += 1;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === "'") {
+      const close = charLiteralClose(arg, i);
+      if (close >= 0) {
+        i = close;
+        continue;
+      }
+    }
+    if (c === "%") return i;
+  }
+  return -1;
+}
+
 /** The field name a `%`-formatted argument belongs to, or `null`. */
 export function displayField(arg) {
-  const at = arg.indexOf("%");
+  const at = formatterIndex(arg);
   if (at < 0) return null;
   const before = arg.slice(0, at).trim();
   const eq = before.lastIndexOf("=");

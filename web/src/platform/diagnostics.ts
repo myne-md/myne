@@ -13,13 +13,29 @@
 // commands are reachable only through a replayed command: exactly the path the
 // typed refusal exists for.
 
+import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
+
 import { invoke } from "./core";
 
-/** Mirror of the desktop error shape; the command refuses before it can occur. */
-export type DiagnosticLogError = {
-  kind: "io";
-  detail: { io_error_kind: "not_found" | "permission_denied" | "no_space" | "other" };
-};
+/**
+ * Mirror of the desktop error shape, and of the Rust enum both mirror.
+ *
+ * The outer tag is the Rust variant name, so it is `"Io"`, and the inner
+ * `IoFailureKind` serializes as bare PascalCase strings (`"PermissionDenied"`),
+ * which is why that enum is imported from the shared package rather than spelled
+ * out here. A lowercased, snake_cased copy of this type shipped once, and every
+ * real rejection then folded to the unnamed failure.
+ *
+ * The union is restated rather than re-exported from `src/platform/diagnostics.ts`,
+ * which is the desktop arm: the web build resolves that directory to this one, so
+ * such an import would resolve to this module. The two arms are therefore held in
+ * step by review, and `tests/types/rustEnumParity.test.ts` compares only the
+ * desktop arm, which the parity file states in its own limits because
+ * `web/src/platform` sits outside its `MIRROR_DIRS`.
+ */
+export type DiagnosticLogError =
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "InvalidDestination" };
 
 /** Whether this device writes a diagnostic log. Browser: rejects. */
 export async function diagnosticLogEnabledGet(): Promise<boolean> {

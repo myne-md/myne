@@ -23,10 +23,13 @@
 //! # The crash record is cleared when its purpose is served
 //!
 //! A successful save that INCLUDED the record clears it, which is the manual
-//! `Delete`'s other half. A save that did not include it (there was none) clears
-//! nothing. That is the bounded lifetime privacy asks of a no-consent artefact,
-//! and it is why `write_bundle` reports which happened rather than returning
-//! `()`.
+//! `Delete`'s other half. A save that did not include it clears nothing, and
+//! **"included" means the record's bytes are in the bundle**, never merely that
+//! a record exists: a record that is present but unreadable is named as such and
+//! left in place, so the surface keeps offering Delete and the next save can
+//! still capture it. That is the bounded lifetime privacy asks of a no-consent
+//! artefact, and it is why `write_bundle` reports which of the three happened
+//! rather than returning `()`.
 
 use crate::logging::crash::CRASH_FILE_NAME;
 use crate::logging::sink::{LogSink, LOG_FILE_NAME};
@@ -44,22 +47,42 @@ pub struct ReportManifest {
 }
 
 /// The log files present, newest first: the active one then its rotations.
+///
+/// Deliberately NOT a `Path::exists()` walk that stops at the first missing
+/// index. `exists()` answers `false` on any I/O error, so a file that cannot be
+/// stat'd was dropped silently; and stopping at the first absent index misses a
+/// rotation behind a gap that a partially failed rotation leaves behind (the
+/// `rename(.1 -> .2)` step succeeding before `active -> .1` fails). The walk is
+/// bounded by the sink's own retained-file count instead, so a gap costs one
+/// stat rather than a truncated manifest and a report that omits half the log
+/// without saying so. A path that is THERE but unreadable is INCLUDED, which is
+/// what lets `build_bundle` name it as unreadable instead of leaving it out
+/// (myne#860 review).
 pub fn log_files(sink: &LogSink) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     let active = sink.dir().join(LOG_FILE_NAME);
-    if active.exists() {
+    if present(&active) {
         out.push(active);
     }
-    let mut index = 1;
-    loop {
+    for index in 1..=sink.retained_files() {
         let rotated = sink.dir().join(format!("{LOG_FILE_NAME}.{index}"));
-        if !rotated.exists() {
-            break;
+        if present(&rotated) {
+            out.push(rotated);
         }
-        out.push(rotated);
-        index += 1;
     }
     out
+}
+
+/// A path that is THERE, by the one test that does not lie.
+///
+/// `Path::exists()` answers `false` on ANY I/O error, so a walk guarded by it
+/// drops a file it simply could not stat. This asks the opposite question, and
+/// only `NotFound` means absent.
+fn present(path: &Path) -> bool {
+    match std::fs::metadata(path) {
+        Ok(_) => true,
+        Err(e) => e.kind() != std::io::ErrorKind::NotFound,
+    }
 }
 
 /// The manifest the surface shows before anything is written.
@@ -113,15 +136,19 @@ pub fn build_bundle(block: &str, sink: &LogSink) -> (Vec<u8>, bool) {
         }
     }
 
-    let included_crash = crate::logging::crash::read_state(sink.dir()).is_some();
+    let crash_present = crate::logging::crash::read_state(sink.dir()).is_some();
+    let crash_body = std::fs::read_to_string(sink.dir().join(CRASH_FILE_NAME)).ok();
+    // Whether the record's BYTES are in the bundle, which is the only state a
+    // successful save may clear. `read_state` answers `Some` for a record that
+    // is present but cannot be read, so deriving this from presence would tell
+    // the surface the crash was captured and then delete the only copy, while
+    // the bundle itself admitted it could not read it (myne#860 review).
+    let included_crash = crash_body.is_some();
     out.push_str("\n## crash record\n\n");
-    if included_crash {
-        match std::fs::read_to_string(sink.dir().join(CRASH_FILE_NAME)) {
-            Ok(body) => out.push_str(&body),
-            Err(_) => out.push_str("(the crash record could not be read)\n"),
-        }
-    } else {
-        out.push_str("(none)\n");
+    match (crash_present, crash_body) {
+        (_, Some(body)) => out.push_str(&body),
+        (true, None) => out.push_str("(the crash record could not be read)\n"),
+        (false, None) => out.push_str("(none)\n"),
     }
 
     (out.into_bytes(), included_crash)
@@ -183,6 +210,40 @@ mod tests {
         assert!(bundle.contains("## crash record"));
         assert!(bundle.contains("(none)"));
         assert!(!included_crash, "nothing to clear when there was no record");
+    }
+
+    #[test]
+    fn a_record_that_cannot_be_read_is_not_reported_as_included() {
+        // The Critical this round closed: `read_state` answers `Some` for a
+        // record that is present but unreadable, and `save_report` clears the
+        // record when the bundle reports it INCLUDED one. Deriving that answer
+        // from presence alone therefore told the user their crash was captured
+        // and deleted the only copy, while the bundle it wrote said it could not
+        // read it (myne#860 review).
+        let dir = ScopedTempDir::new("report-bundle-crash-unreadable").expect("tempdir");
+        let sink = sink_with_log_lines(dir.path());
+        // Invalid UTF-8: the file is THERE, so `read_state` reports it present,
+        // and `read_to_string` fails on it, which is the state under test.
+        std::fs::write(dir.path().join(CRASH_FILE_NAME), [0xff, 0xfe, 0x00])
+            .expect("seed unreadable record");
+
+        assert!(
+            crate::logging::crash::read_state(dir.path()).is_some(),
+            "the record must still be VISIBLE, which is why the surface keeps offering Delete"
+        );
+
+        let (bytes, included_crash) = build_bundle("version: 0.10.0", &sink);
+        let bundle = String::from_utf8(bytes).expect("utf8");
+
+        assert!(
+            !included_crash,
+            "an unreadable record is not in the bundle, so the save must not clear it"
+        );
+        assert!(bundle.contains("(the crash record could not be read)"));
+        assert!(
+            dir.path().join(CRASH_FILE_NAME).exists(),
+            "and it is still on disk for the next attempt"
+        );
     }
 
     #[test]

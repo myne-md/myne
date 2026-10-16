@@ -101,6 +101,40 @@ describe("tracing discipline: R1, the `%` rule is scoped to the levels the file 
       lintSource(recorded.file, `tracing::warn!(${recorded.field} = %key);`),
     ).toHaveLength(1);
   });
+
+  it("does NOT flag a percent sign inside a message or a literal field value", () => {
+    // The false positive a literal-unaware lookup produced: the first revision
+    // took the first `%` ANYWHERE in the argument, so a message reading "50% of
+    // the file was read" was read as a Display formatter and R1 named a fragment
+    // of the literal as its field (`"50`). A message may contain a percent sign,
+    // and so may a literal field value, and neither is a formatter.
+    expect(
+      lint(`
+        fn go() {
+          tracing::info!(stage = "read_meta", "50% of the file was read");
+          tracing::info!(event = "100% complete");
+          tracing::warn!(percent = '%');
+        }
+      `),
+    ).toHaveLength(0);
+    expect(displayField(`"50% of the file was read"`)).toBeNull();
+    expect(displayField(`event = "100% complete"`)).toBeNull();
+    expect(displayField(`percent = '%'`)).toBeNull();
+  });
+
+  it("still flags a real % formatter beside a literal percent, so the rule is not vacuous", () => {
+    // The rejection half: skipping the `%` inside the literal must not skip the
+    // one after it.
+    const found = lint(`
+      fn go(e: MyErr) {
+        tracing::info!(event = "100% complete", error = %e);
+      }
+    `);
+    expect(found).toHaveLength(1);
+    expect(found[0].rule).toBe("R1");
+    expect(found[0].message).toContain("`error`");
+    expect(displayField("error = %e")).toBe("error");
+  });
 });
 
 describe("tracing discipline: R2, no unbounded value in the message or a field value", () => {
@@ -201,6 +235,60 @@ describe("tracing discipline: the extractor and the stale arm", () => {
     `;
     expect(tracingInvocations(bare)).toHaveLength(1);
     expect(lint(bare).length).toBeGreaterThan(0);
+  });
+
+  it("reads a macro imported under an alias, single and braced", () => {
+    // The widened extractor admitted a bare name only when it was one of the
+    // five level names, so an ALIASED import read as zero invocations and zero
+    // findings, the same hole the bare-spelling widening closed one name over.
+    // The alias is that call site under a different name, and it is read.
+    const single = `
+      use tracing::info as log_info;
+      fn go(path: &str) { log_info!(%path, "opening"); }
+    `;
+    expect(tracingInvocations(single)).toHaveLength(1);
+    const singleFindings = lint(single);
+    expect(singleFindings).toHaveLength(1);
+    expect(singleFindings[0].rule).toBe("R1");
+
+    const braced = `
+      use tracing::{info as log_info, warn as log_warn};
+      fn go(path: &str) { log_info!(%path, "opening"); log_warn!(%path, "bye"); }
+    `;
+    expect(tracingInvocations(braced)).toHaveLength(2);
+    expect(lint(braced)).toHaveLength(2);
+  });
+
+  it("still ignores an alias name that is not bound to tracing", () => {
+    // The boundary that keeps the alias rule from becoming "any name in a file
+    // that mentions tracing": a macro nothing here imports from `tracing` is not
+    // a tracing call site, whatever it is called.
+    const foreign = `
+      use tracing::debug;
+      use crate::fmt::pretty as log_info;
+      fn go(path: &str) { log_info!(%path, "not a log record"); debug!("ok"); }
+    `;
+    const found = tracingInvocations(foreign);
+    expect(found).toHaveLength(1);
+    expect(found[0].level).toBe("debug");
+  });
+
+  it("does not resolve a crate rename or a re-export, the limits the header states", () => {
+    // The shapes the header lists rather than claims. Resolving either needs a
+    // module graph, not a `use` statement, so both read as zero invocations and
+    // the limit is asserted rather than left to be discovered.
+    expect(
+      tracingInvocations(`
+        use crate::log::info;
+        fn go(p: &str) { info!(%p, "opening"); }
+      `),
+    ).toHaveLength(0);
+    expect(
+      tracingInvocations(`
+        use tracing as t;
+        fn go(p: &str) { t::info!(%p, "opening"); }
+      `),
+    ).toHaveLength(0);
   });
 
   it("still ignores a `!(` inside a string literal, so a quoted macro name is not a call site", () => {

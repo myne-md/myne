@@ -330,8 +330,16 @@ const MIRRORS: Mirror[] = [
   {
     // The diagnostic-log plugin's one error surface (myne-md/myne#860). It is
     // here rather than in the twins block because the mirror lives at the
-    // platform seam (`src/platform/`), not in `client-core`: the plugin is
-    // desktop-only, so there is no second client to hold a copy.
+    // platform seam (`src/platform/`), not in `client-core`.
+    //
+    // The plugin is desktop-only, but there IS a second copy: the web arm at
+    // `web/src/platform/diagnostics.ts` restates the same union. It cannot
+    // re-export this one, because the web build resolves `src/platform/*` to
+    // `web/src/platform/*`, so an import here would resolve to itself. That copy
+    // is therefore held in step by review plus a shared `IoFailureKind` import,
+    // NOT by this roster: `web/src/platform` sits outside `MIRROR_DIRS` below, so
+    // the both-ways denominator never walks it. See the stated limits on
+    // `MIRROR_DIRS`.
     //
     // **This row is what the wrong copy needed and did not have.** The mirror
     // shipped with a lowercased tag and a snake_cased `IoFailureKind`, against a
@@ -406,6 +414,15 @@ const STRUCT_MIRROR_FLOOR = 1;
  * shims: a shim carries no header, so it does not enter the denominator, and the
  * one file that is NOT a shim (`vault-repair-error.ts`, whose two client copies
  * mirror two different Rust types) must keep being seen.
+ *
+ * **Stated limit: `web/src/platform/` is deliberately NOT here.** The web
+ * client's platform seam is its own directory, so the both-ways denominator never
+ * walks it and a mirror file added there is unclaimed by construction. The one
+ * mirror there today (`web/src/platform/diagnostics.ts`, the web arm of the
+ * `DiagnosticLogError` row above) is compared only through its desktop twin and
+ * is held in step by review plus a shared `IoFailureKind` import. This file does
+ * not prove that agreement, and the row comment points back here rather than
+ * implying it does.
  */
 const MIRROR_DIRS = ["client-core/src/types", "src/types", "mobile/src/types"];
 
