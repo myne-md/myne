@@ -45,12 +45,12 @@ import { toast } from "../toast/toastStore";
 import { Button } from "../primitives/Button";
 import { MyneMark } from "../primitives/MyneMark";
 import { Switch } from "../primitives/Switch";
+import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
-  MULTILINE_STYLE,
   PANEL_ROOT_STYLE,
 } from "./panel-styles";
 
@@ -108,6 +108,31 @@ const LICENSE_BODY_STYLE: CSSProperties = {
   lineHeight: "var(--leading-normal)",
   color: "var(--fg-2)",
   margin: 0,
+};
+
+/**
+ * The diagnostics preview readout.
+ *
+ * The field shape (a monospace value on a `--paper-2` inset) without the field
+ * behaviour: this `<pre>` is read-only and never resized, so it takes no
+ * `resize` and instead sets `white-space: pre-wrap` with `overflow-wrap:
+ * anywhere`. The longest line is a 64-hex bundle hash, which has no break
+ * opportunity, so without both properties it paints past the panel's right edge
+ * in the narrow-dialog state this panel supports.
+ */
+const PREVIEW_STYLE: CSSProperties = {
+  marginTop: "var(--space-1)",
+  width: "100%",
+  font: "inherit",
+  fontSize: "var(--text-sm)",
+  fontFamily: "var(--font-mono)",
+  color: "var(--fg-1)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  padding: "var(--space-2)",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
 };
 
 function Block({
@@ -215,9 +240,17 @@ export function AboutPanel() {
     // The recorded global failure goes in as the block's `failureCode`. This is
     // the second reader of `global-failure.ts`: the installer already runs at
     // boot (`main.tsx`), and until now nothing read what it recorded.
-    void collectDiagnostics(lastGlobalFailure() ?? "none").then((block) => {
-      if (!cancelled) setDiagnosticBlock(block);
-    });
+    void collectDiagnostics(lastGlobalFailure() ?? "none")
+      .then((block) => {
+        if (!cancelled) setDiagnosticBlock(block);
+      })
+      .catch(() => {
+        // An unhandled rejection here would be recorded by the installed global
+        // handler as `unhandled-rejection`, which would stamp this panel's own
+        // failed promise into the very `failureCode` the block reads back. Leave
+        // the preview empty instead; the readout is not worth a global-failure
+        // class it did not cause.
+      });
     return () => {
       cancelled = true;
     };
@@ -250,10 +283,12 @@ export function AboutPanel() {
       },
     });
   };
-  // Save asks for a destination first, and reports only a COMPLETED save: a
-  // cancelled dialog is not a failure and must not read as one. The manifest
-  // re-reads afterwards, because a bundle that included the crash record clears
-  // it, so the row above changes as a consequence.
+  // Save asks for a destination first, and reports three outcomes: a CANCELLED
+  // dialog is silent, because nothing was attempted; a completed save confirms;
+  // and a refused dialog or a failed write reports the failure rather than
+  // folding into "cancelled". The manifest re-reads afterwards, because a
+  // bundle that included the crash record clears it, so the row above changes
+  // as a consequence.
   const saveReportFlow = () => {
     if (diagnosticBlock === null) return;
     void diagnostics.saveReport(diagnosticBlock).then((outcome) => {
@@ -604,27 +639,32 @@ export function AboutPanel() {
           the row sits behind the gate is the "canon and shipped screen disagree"
           failure, caught in review.
 
-          `ControlBlock`'s documented exception applies to the preview: it is a
-          multi-line value that needs the full content width. The preview is the
-          EXACT string Copy writes, rendered from one source, because a preview
-          assembled separately is a preview that can lie. */}
-      <Block data-setting-anchor="about.diagnostic-report" data-setting-row="true">
-        <span style={LABEL_STYLE}>{t("settings.about.diagnosticBlockLabel")}</span>
-        <pre style={MULTILINE_STYLE} data-testid="about.diagnostic-block-preview">
-          {diagnosticBlock ?? ""}
-        </pre>
-        <div>
-          <Button
-            variant="secondary"
-            disabled={diagnosticBlock === null}
-            onClick={copyDiagnostics}
-            data-testid="about.diagnostic-copy"
-          >
-            {t("settings.about.diagnosticCopy")}
-          </Button>
-        </div>
-        <p style={HELPER_STYLE}>{t("settings.about.diagnosticBlockHelper")}</p>
-      </Block>
+          The preview is composed from `ControlBlock`, the canon's documented
+          stacked exception for a control that needs the full content width: it
+          is the EXACT string Copy writes, rendered from one source, because a
+          preview assembled separately is a preview that can lie. */}
+      <ControlBlock
+        label={t("settings.about.diagnosticBlockLabel")}
+        helper={t("settings.about.diagnosticBlockHelper")}
+        anchorId="about.diagnostic-report"
+        control={
+          <>
+            <pre style={PREVIEW_STYLE} data-testid="about.diagnostic-block-preview">
+              {diagnosticBlock ?? ""}
+            </pre>
+            <div>
+              <Button
+                variant="secondary"
+                disabled={diagnosticBlock === null}
+                onClick={copyDiagnostics}
+                data-testid="about.diagnostic-copy"
+              >
+                {t("settings.about.diagnosticCopy")}
+              </Button>
+            </div>
+          </>
+        }
+      />
 
       {has("diagnosticLog") && (
         <>
@@ -683,34 +723,39 @@ export function AboutPanel() {
               or save one bundle. This is the disclosure half of the file-save
               decision: the user reads the size and the file count first, and can
               open the log itself with Reveal before deciding. */}
-          <Block data-setting-anchor="about.diagnostic-report-files" data-setting-row="true">
-            <span style={LABEL_STYLE}>{t("settings.about.diagnosticFilesLabel")}</span>
-            <p style={HELPER_STYLE} data-testid="about.diagnostic-files-manifest">
-              {diagnostics.manifest === null
-                ? t("settings.about.diagnosticFilesUnknown")
-                : t("settings.about.diagnosticFilesHelper", {
-                    count: diagnostics.manifest.log_files,
-                    size: formatBytes(diagnostics.manifest.total_bytes),
-                  })}
-            </p>
-            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-              <Button
-                variant="secondary"
-                onClick={revealFlow}
-                data-testid="about.diagnostic-reveal"
-              >
-                {t("settings.about.diagnosticReveal")}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={diagnosticBlock === null}
-                onClick={saveReportFlow}
-                data-testid="about.diagnostic-save"
-              >
-                {t("settings.about.diagnosticSave")}
-              </Button>
-            </div>
-          </Block>
+          <ControlBlock
+            label={t("settings.about.diagnosticFilesLabel")}
+            anchorId="about.diagnostic-report-files"
+            control={
+              <>
+                <p style={HELPER_STYLE} data-testid="about.diagnostic-files-manifest">
+                  {diagnostics.manifest === null
+                    ? t("settings.about.diagnosticFilesUnknown")
+                    : t("settings.about.diagnosticFilesHelper", {
+                        count: diagnostics.manifest.log_files,
+                        size: formatBytes(diagnostics.manifest.total_bytes),
+                      })}
+                </p>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <Button
+                    variant="secondary"
+                    onClick={revealFlow}
+                    data-testid="about.diagnostic-reveal"
+                  >
+                    {t("settings.about.diagnosticReveal")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={diagnosticBlock === null}
+                    onClick={saveReportFlow}
+                    data-testid="about.diagnostic-save"
+                  >
+                    {t("settings.about.diagnosticSave")}
+                  </Button>
+                </div>
+              </>
+            }
+          />
         </>
       )}
 

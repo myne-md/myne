@@ -206,3 +206,29 @@ describe("AboutPanel — build readout", () => {
     expect(screen.queryByTestId("about.bundle-hash")).toBeNull();
   });
 });
+
+describe("AboutPanel — diagnostics report blocks (myne-md/myne#860)", () => {
+  it("wraps the read-only preview rather than reusing the multi-line field shape", () => {
+    render(<AboutPanel />);
+    const preview = screen.getByTestId("about.diagnostic-block-preview");
+    // The longest line in the block is a 64-hex bundle hash, which has no break
+    // opportunity. `white-space: pre-wrap` plus `overflow-wrap: anywhere` is what
+    // folds it inside the narrow dialog the panel supports. The multi-line field
+    // shape's `resize` would be inert on a `<pre>`, so it is deliberately absent.
+    expect(preview.style.whiteSpace).toBe("pre-wrap");
+    expect(preview.style.overflowWrap).toBe("anywhere");
+    expect(preview.style.resize).toBe("");
+  });
+
+  it("keeps the preview's settings-search anchor on the canon block root", () => {
+    // The block moved from the local `Block` wrapper to `ControlBlock`, whose
+    // anchor prop is `anchorId` rather than a raw `data-setting-anchor`. If that
+    // prop were dropped the anchor would vanish and the scroll target would go
+    // with it, while every other assertion here stayed green.
+    render(<AboutPanel />);
+    const preview = screen.getByTestId("about.diagnostic-block-preview");
+    expect(preview.closest("[data-setting-anchor]")?.getAttribute("data-setting-anchor")).toBe(
+      "about.diagnostic-report",
+    );
+  });
+});

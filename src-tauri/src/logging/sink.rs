@@ -301,18 +301,33 @@ impl LogSink {
     /// deferred erase loses to a kill, and the point of the erase is that
     /// withdrawing consent withdraws the data.
     pub fn erase_log_files(&self) -> std::io::Result<()> {
-        let active = self.dir.join(LOG_FILE_NAME);
-        if active.exists() {
-            std::fs::remove_file(&active)?;
-        }
-        for index in 1..=self.retained_files {
-            let rotated = self.rotation_path(index);
-            if rotated.exists() {
-                std::fs::remove_file(&rotated)?;
+        // Attempt every removal and treat `NotFound` as success, rather than
+        // guarding each one on `Path::exists()`. `exists()` answers `false` on
+        // any I/O error, so a guarded remove reports `Ok` for a path it never
+        // actually looked at, and the plaintext survives the erase on the one
+        // path where surviving is the whole defect. The loop also keeps going
+        // after a failure, because one unremovable rotation must not spare the
+        // files behind it, and the first error is returned at the end so the
+        // partial erasure is an error rather than a silence.
+        let mut first_error: Option<std::io::Error> = None;
+        let paths = std::iter::once(self.dir.join(LOG_FILE_NAME))
+            .chain((1..=self.retained_files).map(|index| self.rotation_path(index)));
+        for path in paths {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    if first_error.is_none() {
+                        first_error = Some(e);
+                    }
+                }
             }
         }
         self.bytes.store(0, Ordering::Relaxed);
-        Ok(())
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     /// `<dir>/myne.log.<index>`.
@@ -553,6 +568,23 @@ mod tests {
             sink.dir().join("crash.log").exists(),
             "the crash record is not a log file and survives the erase"
         );
+    }
+
+    #[test]
+    fn the_erase_is_idempotent_and_does_not_depend_on_exists() {
+        // The boot reconcile runs the erase on a directory that may already be
+        // empty, and a repeat has to be `Ok` rather than an error about a file
+        // that is not there (myne#860 review). It also pins that the erase no
+        // longer guards each removal on `Path::exists()`, which answers `false`
+        // on any I/O error and so reported `Ok` for a path it never looked at.
+        let dir = ScopedTempDir::new("log-sink-erase-idempotent").expect("tempdir");
+        let header_len = header_bytes().len() as u64;
+        let sink = LogSink::with_limits(dir.path().join("logs"), header_len + 64, 3);
+
+        sink.set_enabled(false);
+        sink.erase_log_files()
+            .expect("erase on a directory with nothing in it");
+        sink.erase_log_files().expect("erase again");
     }
 
     #[test]

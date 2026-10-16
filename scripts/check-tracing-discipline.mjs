@@ -23,9 +23,14 @@
 //       that reaches a record with no field name a rule could inspect, and it
 //       is how an unbounded `Display` (an `io::Error`, a path-holding `String`,
 //       a candle error wrapping `WithPath`) would arrive.
-//   R2  no value interpolated INTO the message, at any level. A value in the
-//       message is invisible to every field-name rule, and the message is what
-//       a reader quotes.
+//   R2  no unbounded value in a `tracing` call, at any level, in either of the
+//       two shapes that reach a record under no field name a rule can inspect.
+//       One is a value interpolated INTO the message (`info!("opening {}",
+//       path)`), and the message is what a reader quotes. The other is a field
+//       VALUE built by `format!`, `concat!`, `.to_string()`, `.to_owned()` or
+//       `String::from`, a fresh string no rule can bound, which could carry a
+//       path or a note title into a file the user is invited to publish. A
+//       string literal, a `%` Display value or a `?` Debug value is accepted.
 //   R3  a non-vacuity floor, because an extractor that matches nothing passes
 //       silently, which is the one failure a guard like this cannot notice about
 //       itself.
@@ -51,7 +56,14 @@
 //   path is actually handled.
 //
 // Zero dependencies, node built-ins only, matching the other guards here.
-// Usage: `node scripts/check-tracing-discipline.mjs [--self-test]`.
+// Usage: `node scripts/check-tracing-discipline.mjs`.
+//
+// There is no `--self-test` flag here on purpose. The injected-defect evidence
+// is the suite in `tests/scripts/tracingDiscipline.test.ts`, which drives
+// `lintSource`, `scan` and the stale arm with fixtures and runs in `pnpm test`
+// (and in CI's `vitest` step). A second copy of those fixtures inside this file
+// would be a list that rots, which is the failure the stale-exception rule
+// below exists to name.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -89,64 +101,96 @@ export const EXCEPTIONS = [
     reason:
       "an ASCII-lowercase grammar token validated against the closed period vocabulary before the write, not user text; the site's own comment carries the argument, and the VALUE (a folder path) is never logged",
   },
+  {
+    file: "core/src/plugins/agent/host_commands.rs",
+    level: "error",
+    field: "reason",
+    reason:
+      "a parse error over a compile-time `include_str!` constant, so it can only name a JSON key or a type mismatch and never a path or user data; the field was removed in this change and restored because it was the only classification that arm carried",
+  },
 ];
 
 /** The floor R3 pins. Measured, not guessed: see the guard's own test. */
 export const MIN_INVOCATIONS = 400;
 
 /**
- * Extract every `tracing::<level>!( ... )` invocation's argument text.
+ * The macros a `tracing` call site may spell, qualified or bare.
+ *
+ * A bare name counts only in a file that also imports from `tracing`, because
+ * that import is what makes the name refer to this crate.
+ */
+export const TRACING_MACROS = ["trace", "debug", "info", "warn", "error"];
+
+/**
+ * Extract every `tracing::<level>!( ... )` and every bare `<level>!( ... )`
+ * invocation's argument text.
+ *
+ * **Both spellings, and the bare half is not optional.** `use tracing::info;`
+ * followed by `info!(%path)` is the idiomatic form, and a qualified-only scan
+ * was blind to it: R1, R2 and the R3 floor all read zero invocations for such a
+ * file, so a call site could carry a `%` path into the log the user is invited
+ * to publish while this guard reported ok (myne#860 adversarial review). A bare
+ * name is admitted only when the same file imports from `tracing`, which is what
+ * makes the identifier refer to this crate rather than to some other macro.
  *
  * The balanced-paren scan is blind to parens inside string literals, because a
- * log message may contain either and a naive counter mis-reads both. Only
- * `tracing::<ident>!(` counts, so a `tracing::Level::TRACE` path or a
- * doc-comment mention is not a call site.
+ * log message may contain either and a naive counter mis-reads both. Only a
+ * macro invocation counts, so a `tracing::Level::TRACE` path or a doc-comment
+ * mention is not a call site.
  */
 export function tracingInvocations(source) {
-  const out = [];
-  let rest = stripComments(source);
-  while (true) {
-    const at = rest.indexOf("tracing::");
-    if (at < 0) break;
-    const after = rest.slice(at + "tracing::".length);
-    const identEnd = after.search(/[^A-Za-z0-9_]/);
-    const ident = identEnd < 0 ? after : after.slice(0, identEnd);
-    const tail = after.slice(identEnd < 0 ? after.length : identEnd);
-    if (!tail.startsWith("!(")) {
-      rest = after;
-      continue;
-    }
-    const open = 1;
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let end = -1;
-    for (let i = open; i < tail.length; i += 1) {
-      const c = tail[i];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (inString) {
-        if (c === "\\") escaped = true;
-        else if (c === '"') inString = false;
-        continue;
-      }
-      if (c === '"') inString = true;
-      else if (c === "(" || c === "[" || c === "{") depth += 1;
-      else if (c === ")" || c === "]" || c === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
+  const code = stripComments(source);
+  const importsTracing = /use\s+tracing\s*::/.test(code);
+  // `!(` rather than `!`, so a macro NAME inside a string literal (this tree's
+  // own tests quote `tracing::warn!` as data) is not read as a call site.
+  const patterns = [/\btracing::([A-Za-z0-9_]+)!\(/g];
+  if (importsTracing) patterns.push(/(?<![A-Za-z0-9_:.])([A-Za-z0-9_]+)!\(/g);
+
+  const sites = [];
+  for (const [index, pattern] of patterns.entries()) {
+    for (const match of code.matchAll(pattern)) {
+      const ident = match[1];
+      // Qualified calls admit any identifier, as before, so a `tracing::event!`
+      // or a re-exported macro is still read. Bare ones are restricted to the
+      // five level macros, or every `assert!(` in an importing file would be
+      // scanned as a log record.
+      if (index > 0 && !TRACING_MACROS.includes(ident)) continue;
+      // `match[0]` ends at the macro name and its `!`, so this is the `(`.
+      const open = match.index + match[0].length - 1;
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let end = -1;
+      for (let i = open; i < code.length; i += 1) {
+        const c = code[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (inString) {
+          if (c === "\\") escaped = true;
+          else if (c === '"') inString = false;
+          continue;
+        }
+        if (c === '"') inString = true;
+        else if (c === "(" || c === "[" || c === "{") depth += 1;
+        else if (c === ")" || c === "]" || c === "}") {
+          depth -= 1;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
         }
       }
+      if (end < 0) continue;
+      sites.push({ at: match.index, level: ident, args: code.slice(open + 1, end) });
     }
-    if (end < 0) break;
-    out.push({ level: ident, args: tail.slice(open + 1, end) });
-    rest = tail.slice(end);
   }
-  return out;
+  // Source order, so a finding's line number reads the way the file does. The
+  // two patterns each walk the whole file, which is why the sort is not
+  // cosmetic.
+  sites.sort((a, b) => a.at - b.at);
+  return sites.map(({ level, args }) => ({ level, args }));
 }
 
 /**
@@ -230,6 +274,37 @@ export function topLevelArgs(args) {
   return out;
 }
 
+/**
+ * Split a `field = value` argument at its top-level `=`, or `null`.
+ *
+ * Top-level means outside string literals and brackets, and `==`, `!=`, `<=`,
+ * `>=` and `=>` are not a field assignment. The value half is what R2 lints for
+ * an unbounded shape; the field half names it in the finding.
+ */
+export function splitFieldAssign(arg) {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < arg.length; i += 1) {
+    const c = arg[i];
+    if (inString) {
+      if (c === "\\") i += 1;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === "(" || c === "[" || c === "{") depth += 1;
+    else if (c === ")" || c === "]" || c === "}") depth -= 1;
+    else if (c === "=" && depth === 0) {
+      const prev = arg[i - 1];
+      const next = arg[i + 1];
+      if (prev === "=" || prev === "!" || prev === "<" || prev === ">") continue;
+      if (next === "=" || next === ">") continue;
+      return { field: arg.slice(0, i).trim(), value: arg.slice(i + 1).trim() };
+    }
+  }
+  return null;
+}
+
 /** The field name a `%`-formatted argument belongs to, or `null`. */
 export function displayField(arg) {
   const at = arg.indexOf("%");
@@ -253,6 +328,18 @@ const SHORTHAND = /^[%?]?[A-Za-z_][A-Za-z0-9_:.]*$/;
 const PLACEHOLDER = /\{(?!\{)[^}]*\}/;
 
 /**
+ * A field VALUE that builds an unbounded string, i.e. a fresh string no
+ * field-name rule can bound. `format!` and `concat!` are the constructors,
+ * `String::from` the constructor call, and `.to_string()` / `.to_owned()` the
+ * conversions. The rule is deliberately this narrow: a string literal, a `%`
+ * Display value and a `?` Debug value are all accepted, and so is any other
+ * expression, because this guard catches the shape that produces a value
+ * rather than holding every field expression to an allowlist.
+ */
+const UNBOUNDED_FIELD_VALUE =
+  /(?:^|[^A-Za-z0-9_])(?:format!|concat!|String\s*::\s*from)\s*\(|\.\s*to_string\s*\(\s*\)|\.\s*to_owned\s*\(\s*\)/;
+
+/**
  * Lint one source, returning its findings.
  *
  * Pure over `(path, text)` so the guard's own test can drive it with fixtures
@@ -262,13 +349,16 @@ const PLACEHOLDER = /\{(?!\{)[^}]*\}/;
 export function lintSource(path, text) {
   const findings = [];
   for (const invocation of tracingInvocations(text)) {
-    // R2, at every level. Interpolation in `tracing` looks like `format!`:
-    // `info!("opening {}", path)` puts the value in the MESSAGE, where no field
-    // rule can see it and where a reader quotes it. The signal is a format
-    // placeholder inside a string literal, which is what makes this rule
-    // precise rather than a ban on bare identifiers (a bare identifier is
-    // `tracing`'s field shorthand, `info!(detail)`, and this tree uses it 111
-    // times).
+    // R2, at every level, in both of its shapes. (1) Interpolation in
+    // `tracing` looks like `format!`: `info!("opening {}", path)` puts the value
+    // in the MESSAGE, where no field rule can see it and where a reader quotes
+    // it. The signal is a format placeholder inside a string literal, which is
+    // what makes this rule precise rather than a ban on bare identifiers (a
+    // bare identifier is `tracing`'s field shorthand, `info!(detail)`, and this
+    // tree uses it 111 times). (2) A field VALUE built by `format!`, `concat!`,
+    // `.to_string()`, `.to_owned()` or `String::from` is the same problem one
+    // step to the right: the resulting string has no bound a rule can inspect.
+    // The `=` split below is what reaches the value half of `field = value`.
     for (const arg of topLevelArgs(invocation.args)) {
       if (META_FIELDS.test(arg)) continue;
       if (arg.startsWith('"')) {
@@ -277,6 +367,20 @@ export function lintSource(path, text) {
             path,
             rule: "R2",
             message: `a format placeholder in the message (${arg}), which interpolates a value where no field rule can inspect it`,
+          });
+        }
+        continue;
+      }
+      const assignment = splitFieldAssign(arg);
+      if (assignment !== null) {
+        if (UNBOUNDED_FIELD_VALUE.test(assignment.value)) {
+          findings.push({
+            path,
+            rule: "R2",
+            message:
+              `a field value that builds an unbounded string (\`${assignment.field} = ` +
+              `${assignment.value}\`), which no field-name rule can bound. Log a literal, ` +
+              `a \`%\` Display value or a \`?\` Debug value instead.`,
           });
         }
         continue;

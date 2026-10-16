@@ -33,8 +33,8 @@ import {
 
 /** A rejected command with no structured payload, folded into the closed set. */
 const UNKNOWN_FAILURE: DiagnosticLogError = {
-  kind: "io",
-  detail: { io_error_kind: "other" },
+  kind: "Io",
+  detail: { io_error_kind: "Other" },
 };
 
 export interface DiagnosticsState {
@@ -88,7 +88,16 @@ export function useDiagnostics(): DiagnosticsState {
     // simply reads twice and the surviving run settles the state.
     let cancelled = false;
     Promise.all([
-      diagnosticLogEnabledGet().catch(() => false),
+      // A refused READ is folded to the safe state, because a state nobody can
+      // read is a state in which no log is written. What it must not be is
+      // SILENT: the fold used to be indistinguishable from a real "off", which
+      // is a wiring failure reporting itself as a benign answer
+      // (myne#860 review). So the failure is recorded on the same `error` the
+      // surface already renders, which is the honest half of tolerant wiring.
+      diagnosticLogEnabledGet().catch((raw) => {
+        if (!cancelled) setError(foldFailure(raw));
+        return false;
+      }),
       crashRecordState().catch(() => null),
       reportManifest().catch(() => null),
     ])
@@ -161,13 +170,22 @@ export function useDiagnostics(): DiagnosticsState {
 
   const saveReportTo = useCallback(
     async (block: string): Promise<"saved" | "cancelled" | "failed"> => {
-      const destination = await saveDialog({
-        defaultPath: "myne-report.txt",
-        filters: [{ name: "Text", extensions: ["txt"] }],
-      }).catch(() => null);
-      // A cancelled dialog is not a failure and must not read as one: nothing
-      // was attempted, so nothing is reported.
-      if (typeof destination !== "string") return "cancelled";
+      // A dialog that FAILS to open is not a cancel, and collapsing the two
+      // leaves a dead button with no toast while `diagnosticSaveFailed` exists
+      // for exactly that outcome. Separated by construction, the way
+      // `src/lib/noteImageExport.ts` does it: `catch` returns `"failed"` and
+      // only a `null` resolve is a cancel (myne#860 review).
+      let destination: unknown;
+      try {
+        destination = await saveDialog({
+          defaultPath: "myne-report.txt",
+          filters: [{ name: "Text", extensions: ["txt"] }],
+        });
+      } catch {
+        return "failed";
+      }
+      if (destination === null || destination === undefined) return "cancelled";
+      if (typeof destination !== "string") return "failed";
       try {
         await saveReport(block, destination);
         await refresh();
@@ -194,14 +212,17 @@ export function useDiagnostics(): DiagnosticsState {
 
 /** A rejected command, as the closed error set the surface matches on. */
 function foldFailure(raw: unknown): DiagnosticLogError {
-  if (
-    typeof raw === "object" &&
-    raw !== null &&
-    "kind" in raw &&
-    (raw as { kind: unknown }).kind === "io" &&
-    "detail" in raw
-  ) {
-    return raw as DiagnosticLogError;
+  if (typeof raw === "object" && raw !== null && "kind" in raw) {
+    // The tag is the RUST VARIANT NAME, so it is `"Io"` and not `"io"`. Folding
+    // on a lowercased tag made every real rejection collapse to
+    // `UNKNOWN_FAILURE`, which the surface renders as an unnamed failure
+    // (myne#860 review).
+    if ((raw as { kind: unknown }).kind === "Io" && "detail" in raw) {
+      return raw as DiagnosticLogError;
+    }
+    if ((raw as { kind: unknown }).kind === "InvalidDestination") {
+      return { kind: "InvalidDestination" };
+    }
   }
   return UNKNOWN_FAILURE;
 }

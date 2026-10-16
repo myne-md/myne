@@ -18,9 +18,14 @@
 //     times across the tree. A guard that flagged them would be red on the tree
 //     it ships against, which is how a guard gets disabled.
 //
-// Without those three the guard would be over-broad, and an over-broad gate gets
-// an allowlist that grows until it means nothing. The measured count is asserted
-// too, so the fixture cannot start passing for the wrong reason.
+// A fourth holds the boundary of the field-VALUE rule: an unbounded-value rule
+// that names `format!`, `concat!`, `.to_string()`, `.to_owned()` and
+// `String::from` must still accept a literal, a `%` and a `?`, or it widens
+// into a ban on every field expression.
+//
+// Without those boundaries the guard would be over-broad, and an over-broad gate
+// gets an allowlist that grows until it means nothing. The measured count is
+// asserted too, so the fixture cannot start passing for the wrong reason.
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -98,7 +103,7 @@ describe("tracing discipline: R1, the `%` rule is scoped to the levels the file 
   });
 });
 
-describe("tracing discipline: R2, no value interpolated into the message", () => {
+describe("tracing discipline: R2, no unbounded value in the message or a field value", () => {
   it("flags format!-style interpolation at a recorded level", () => {
     const found = lint(`fn go(p: &str) { tracing::info!("opening {}", p); }`);
     expect(found).toHaveLength(1);
@@ -130,6 +135,43 @@ describe("tracing discipline: R2, no value interpolated into the message", () =>
       "neither the message",
     );
   });
+
+  it("flags a field VALUE that builds an unbounded string", () => {
+    // The shape the pre-fix guard skipped: `arg.includes("=")` short-circuited
+    // R2 for every `field = value`, so a `format!`-built value went through with
+    // no finding at all. A fresh string has no bound a field-name rule can see,
+    // and the log file is one the user is invited to publish.
+    const found = lint(`
+      fn go(p: &str) {
+        tracing::info!(detail = format!("path {}", p));
+      }
+    `);
+    expect(found).toHaveLength(1);
+    expect(found[0].rule).toBe("R2");
+    expect(found[0].message).toContain("unbounded");
+    expect(found[0].message).toContain("detail");
+  });
+
+  it("flags the other unbounded field-value constructors and conversions", () => {
+    expect(lint(`tracing::info!(detail = concat!("a", "b"));`)).toHaveLength(1);
+    expect(lint(`tracing::info!(detail = name.to_string());`)).toHaveLength(1);
+    expect(lint(`tracing::info!(detail = name.to_owned());`)).toHaveLength(1);
+    expect(lint(`tracing::info!(detail = String::from(name));`)).toHaveLength(1);
+  });
+
+  it("accepts a literal, a `%` and a `?` field value, so the new rule stays narrow", () => {
+    // The accept half of the boundary, and the reason the rule is not vacuous:
+    // a string literal is accepted by R2 itself, `?` Debug is deliberately
+    // exempt, and a `%` field value below a recorded level is nobody's rule.
+    expect(
+      lint(`
+        fn go(e: MyErr) {
+          tracing::info!(stage = "save", detail = ?e);
+          tracing::debug!(detail = %e);
+        }
+      `),
+    ).toHaveLength(0);
+  });
 });
 
 describe("tracing discipline: the extractor and the stale arm", () => {
@@ -144,6 +186,42 @@ describe("tracing discipline: the extractor and the stale arm", () => {
 
   it("does not treat a tracing::Level path as a call site", () => {
     expect(tracingInvocations(`let l = tracing::Level::TRACE;`)).toHaveLength(0);
+  });
+
+  it("reads the BARE macro spelling, which is why the extractor was widened", () => {
+    // The idiomatic `use tracing::info;` then `info!(%path)` was invisible to a
+    // qualified-only scan: R1, R2 and the invocation floor all read zero, so a
+    // call site could carry a `%` path into the log the user is invited to
+    // publish while the guard reported ok (myne#860 adversarial review). This is
+    // the rejection half, and the bare name is admitted only because the file
+    // imports from `tracing`.
+    const bare = `
+      use tracing::info;
+      fn go(path: &str) { info!(%path, "opening"); }
+    `;
+    expect(tracingInvocations(bare)).toHaveLength(1);
+    expect(lint(bare).length).toBeGreaterThan(0);
+  });
+
+  it("still ignores a `!(` inside a string literal, so a quoted macro name is not a call site", () => {
+    // The widened patterns require the `(` after the `!` for exactly this: this
+    // tree's own specs quote `tracing::warn!` as data, and a pattern that
+    // accepted the bare `!` read the rest of the file as its arguments.
+    const quoted = `
+      use tracing::warn;
+      fn go() { let s = "tracing::warn!({" ; assert!(!s.is_empty()); }
+    `;
+    expect(tracingInvocations(quoted)).toHaveLength(0);
+  });
+
+  it("does not read a bare assert! as a call site even when the file imports tracing", () => {
+    const withAssert = `
+      use tracing::debug;
+      fn go(v: &str) { assert!(!v.is_empty()); debug!("ok"); }
+    `;
+    const found = tracingInvocations(withAssert);
+    expect(found).toHaveLength(1);
+    expect(found[0].level).toBe("debug");
   });
 
   it("reads a multi-line invocation with a message containing parentheses", () => {

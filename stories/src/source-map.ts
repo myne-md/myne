@@ -11,7 +11,7 @@ export interface SourceReference {
 }
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
-  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 196 },
+  "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 221 },
   "AccountBootstrap": { file: "src/screens/AccountBootstrap.tsx", line: 156 },
   "AccountNumberEntry": { file: "src/screens/AccountNumberEntry.tsx", line: 111 },
   "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 111 },
@@ -62,7 +62,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ConflictsView": { file: "src/notes/components/ConflictsView.tsx", line: 310 },
   "ConnectedExtensions": { file: "src/components/settings/ConnectedExtensions.tsx", line: 107 },
   "ContextMenu": { file: "src/notes/components/ContextMenu.tsx", line: 171 },
-  "ControlBlock": { file: "src/components/settings/ControlBlock.tsx", line: 30 },
+  "ControlBlock": { file: "src/components/settings/ControlBlock.tsx", line: 32 },
   "CoverPicker": { file: "src/components/attachments/CoverPicker.tsx", line: 141 },
   "CreateVault": { file: "src/screens/CreateVault.tsx", line: 114 },
   "CredentialField": { file: "src/components/primitives/CredentialField.tsx", line: 94 },
@@ -174,7 +174,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ResizeHandle": { file: "src/components/primitives/ResizeHandle.tsx", line: 54 },
   "RestoreBackup": { file: "src/screens/RestoreBackup.tsx", line: 59 },
   "RibbonCustomizeSettings": { file: "src/components/settings/RibbonCustomizeSettings.tsx", line: 85 },
-  "RootErrorBoundary": { file: "src/components/RootErrorBoundary.tsx", line: 20 },
+  "RootErrorBoundary": { file: "src/components/RootErrorBoundary.tsx", line: 21 },
   "RunCostLine": { file: "src/notes/agent/components/RunCostLine.tsx", line: 31 },
   "SaveStatus": { file: "src/notes/components/SaveStatus.tsx", line: 92 },
   "ScopeExpansionDialog": { file: "src/notes/agent/components/ScopeExpansionDialog.tsx", line: 59 },

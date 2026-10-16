@@ -45,6 +45,11 @@ describe("Editor mount guard (SM-10: React stage ↔ Rust slot disagreement)", (
     // Single CTA, literal copy; the editor body never mounted.
     expect(screen.getByTestId("fail-closed.cta").textContent).toBe("Lock");
     expect(screen.queryByTestId("editor.root")).toBeNull();
+    // The Copy-diagnostics affordance is live here because the call site passes
+    // a code (myne-md/myne#860). This is the behavioural half of the wiring: the
+    // affordance the feature exists for renders on the mount guard's own card.
+    const copy = screen.getByTestId("fail-closed.copy-diagnostics");
+    expect(copy.getAttribute("data-code")).toBe("invalid-state");
   });
 
   it("Lock CTA fires the idempotent vault_lock, then the parent reset (reprobe) callback", async () => {

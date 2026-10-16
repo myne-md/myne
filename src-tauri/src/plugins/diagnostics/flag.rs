@@ -86,6 +86,21 @@ pub fn read_flag(path: &Path) -> bool {
     }
 }
 
+/// The flag's value as the FILE states it, or `None` when the file states
+/// nothing.
+///
+/// Deliberately distinct from [`read_flag`], which collapses three states into
+/// `false`. The erase pass at boot may only run on `Some(false)`: `None` means
+/// absent, unreadable or malformed, and a read failure must never become a
+/// destruction. `read_flag` stays the reader every other caller wants, because
+/// for them "off", "unreadable" and "absent" really are one answer.
+pub fn read_flag_written(path: &Path) -> Option<bool> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str::<DiagnosticLogFlag>(&raw)
+        .ok()
+        .map(|flag| flag.enabled)
+}
+
 /// Persist the flag.
 ///
 /// Atomic write (temp file in the same directory, then rename) so a concurrent
@@ -144,9 +159,47 @@ mod tests {
     }
 
     #[test]
+    fn the_written_value_distinguishes_absent_and_malformed_from_off() {
+        // The one place the two readers must disagree: the boot erase runs on
+        // `Some(false)` and on nothing else, so a read failure has to answer
+        // `None` rather than `false` or it becomes a destruction (myne#860
+        // review).
+        let dir = ScopedTempDir::new("diagnostic-log-flag-written").expect("tempdir");
+        let path = flag_path_in(dir.path());
+
+        assert_eq!(
+            read_flag_written(&path),
+            None,
+            "absent states nothing, so nothing may be erased on its account"
+        );
+        assert!(!read_flag(&path), "and the other reader still says off");
+
+        std::fs::write(&path, b"{ not json").expect("seed malformed");
+        assert_eq!(
+            read_flag_written(&path),
+            None,
+            "malformed states nothing either"
+        );
+        assert!(!read_flag(&path));
+
+        write_flag(&path, false).expect("write off");
+        assert_eq!(
+            read_flag_written(&path),
+            Some(false),
+            "an explicit off is the one answer the erase may act on"
+        );
+
+        write_flag(&path, true).expect("write on");
+        assert_eq!(read_flag_written(&path), Some(true));
+    }
+
+    #[test]
     fn turning_off_writes_the_value_rather_than_removing_the_file() {
-        // Presence must not encode the choice: a file that exists in BOTH
-        // states is one bit of at-rest signal this feature declines to emit.
+        // Presence must not encode the CHOICE. It does carry one bit, and the
+        // threat model states it rather than claiming it away: a file that
+        // exists says the toggle was used at least once, which is what the
+        // sibling screen-capture bullet records for the identically shaped
+        // file (myne#860 review).
         let dir = ScopedTempDir::new("diagnostic-log-flag-off-persisted").expect("tempdir");
         let path = flag_path_in(dir.path());
 

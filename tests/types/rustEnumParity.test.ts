@@ -327,6 +327,24 @@ const MIRRORS: Mirror[] = [
     rs: "format/src/export_error.rs",
     rsEnum: "VaultExportError",
   },
+  {
+    // The diagnostic-log plugin's one error surface (myne-md/myne#860). It is
+    // here rather than in the twins block because the mirror lives at the
+    // platform seam (`src/platform/`), not in `client-core`: the plugin is
+    // desktop-only, so there is no second client to hold a copy.
+    //
+    // **This row is what the wrong copy needed and did not have.** The mirror
+    // shipped with a lowercased tag and a snake_cased `IoFailureKind`, against a
+    // Rust enum that serializes `{"kind":"Io","detail":{"io_error_kind":"Other"}}`,
+    // and the binding spec pinned the same wrong shape against a mock, so the
+    // two agreed with each other while both disagreed with the wire. Every real
+    // rejection folded to the unnamed failure and the surface said "something
+    // went wrong" for a permission error it could have named.
+    ts: "src/platform/diagnostics.ts",
+    tsType: "DiagnosticLogError",
+    rs: "src-tauri/src/plugins/diagnostics/commands.rs",
+    rsEnum: "DiagnosticLogError",
+  },
 ];
 
 // ---- the shape mirrors (a struct, not an enum) --------------------------

@@ -10,16 +10,26 @@
 // folder to reveal, so the capability descriptor omits the whole surface
 // rather than showing it against a command that refuses.
 
+import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
+
 import { invoke } from "./core";
 
 /**
- * Why a diagnostic-log write failed. A closed set the UI matches to a calm
+ * Why a diagnostic-log command failed. A closed set the UI matches to a calm
  * line; the command rejects with one of these values.
+ *
+ * **The wire shape is the Rust enum's, and it is NOT lowercase.** The outer tag
+ * is the variant name, so it is `"Io"`; `IoFailureKind` is the repo-wide
+ * canonical enum and serializes as bare PascalCase strings (`"PermissionDenied"`),
+ * which is why it is imported rather than re-spelled here. A lowercased copy of
+ * this type shipped once, and because `foldFailure` folded on the lowercase tag
+ * every real rejection collapsed to `UNKNOWN_FAILURE`: the surface said
+ * "something went wrong" for a permission error it could have named, and the
+ * binding test pinned the wrong shape so nothing caught it (myne#860 review).
  */
-export type DiagnosticLogError = {
-  kind: "io";
-  detail: { io_error_kind: "not_found" | "permission_denied" | "no_space" | "other" };
-};
+export type DiagnosticLogError =
+  | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
+  | { kind: "InvalidDestination" };
 
 /**
  * Whether this device writes a diagnostic log.
@@ -100,10 +110,13 @@ export async function reportManifest(): Promise<ReportManifest> {
 /**
  * Write one plaintext report bundle to a destination the user chose.
  *
- * The destination comes from the OS save dialog, which is why a page-supplied
- * path is admissible here: it originates in the user's own dialog, so refusing
- * it at the seam would protect nothing. The host owns everything else, including
- * every log byte.
+ * The destination comes from the OS save dialog, and the host re-validates it
+ * anyway: a page that skipped the dialog can call this directly, and the writer
+ * renames over an existing path, so the host refuses any destination that
+ * resolves inside the app data directory (which holds `vaults/`). That is the
+ * same refusal `secret_export` and `export` make, and it is why a page-supplied
+ * path is admissible here at all rather than trusted. The host owns everything
+ * else, including every log byte.
  */
 export async function saveReport(block: string, destination: string): Promise<void> {
   await invoke<void>("plugin:diagnostics|save_report", { block, destination });

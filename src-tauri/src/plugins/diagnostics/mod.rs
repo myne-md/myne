@@ -49,7 +49,7 @@ use tauri::{plugin::TauriPlugin, Runtime};
 
 /// Register the plugin with the app.
 ///
-/// The two commands here are also the two identifiers granted in
+/// Every command here is also an identifier granted in
 /// `capabilities/default.json`. **Registration is its own edit** and this list
 /// is the only place it happens: an ACL entry alone does not wire a command,
 /// and a command missing from this list compiles, passes clippy and is dead at
