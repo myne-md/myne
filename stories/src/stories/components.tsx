@@ -1410,6 +1410,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           max_devices: 5,
           frozen: false,
         }}
+        // The catalogue renders the OWNER plane's shape: `showStorage` is what
+        // reveals the storage row and its meter, and on a member vault that row
+        // is suppressed because the figure would be the member's own person
+        // account. A story that omitted it would leave the meter out of the
+        // catalogue entirely.
+        showStorage={true}
       />
     ),
   },
