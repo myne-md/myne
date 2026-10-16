@@ -128,7 +128,7 @@ row. A failed row is stop-the-world for the release, same discipline as a failed
 # One-time host setup (JDK 21 keg-only + SDK under ~/Library/Android/sdk):
 export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-export NDK_HOME="$ANDROID_HOME/ndk/29.0.13846066"
+export NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
 export PATH="$ANDROID_HOME/platform-tools:$PATH"
 
 # Tablet: Settings → About → tap Build number ×7 → Developer options → USB debugging.

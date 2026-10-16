@@ -207,6 +207,21 @@ deliberate rebuild rather than a side effect of this change.
 That turns `docs/decisions/ops/0698` from "unknown" into "known, with a named fix
 and a cheap test", which is what the spike was for.
 
+## The NDK revision in the draft was a beta
+
+`sdkmanager` resolves `29.0.13846066` to
+**`android-ndk-r29-beta3-linux.zip`**, so the draft was pinning a pre-release of
+r29 while the stable release of the same version was available. That is two
+problems in one line: the inclusion policy restricts pre-release toolchains, and
+the NDK's clang is what links the shipped `.so`, so the revision is part of the
+build's identity rather than a neutral pin.
+
+The draft now carries `29.0.14206865`, whose own `source.properties` reads
+`Pkg.ReleaseName = r29` and which a local
+`mobile/scripts/fdroid-build.sh --abi arm64` has already built an APK with.
+`mobile/docs/dev/device-matrix.md` carried the same stale revision and has been
+corrected in the same change.
+
 ## Owed: the first dry run
 
 The recipe was reasoned from a working Tauri v2 app on F-Droid plus this
@@ -228,9 +243,11 @@ about ITS toolchain rather than about ours. What remains, in order:
 5. Does the buildserver's JDK satisfy AGP 9.3.1 and Gradle 9.6.1, and does its
    SDK carry `platforms;android-37`? If not, the SDK installs in `sudo:` via
    `sdkmanager`, or `compileSdk`/`targetSdk` come down. Neither is decided here.
-6. Does `ndk: 29.0.13846066` install? It should: `fdroidserver`'s
-   `common.auto_install_ndk` runs `sdkmanager install ndk;<ndk>` against the
-   live package list, and the revision form is explicitly supported.
+6. ~~Does `ndk: 29.0.13846066` install?~~ **Answered, and the revision was
+   wrong.** It installs (`sdkmanager` resolves it), but it resolves to
+   `android-ndk-r29-beta3-linux.zip`, so the draft was pinning a beta of r29. The
+   draft and the device matrix now carry the stable `29.0.14206865`. See "The NDK
+   revision in the draft was a beta" above.
 7. **Break the postinit step and watch it fail.** Remove that one line, rebuild,
    and confirm the failure is the manifest-merge error named above. A step
    described as "fails loudly by design" is a claim, and this is the cheap
