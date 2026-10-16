@@ -41,10 +41,17 @@ const FILE_NAME: &str = "diagnostic-log.json";
 
 /// The flag as persisted. One field, so a future second setting gets its own
 /// file rather than a read-modify-write hazard here.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// **`enabled` is required and carries no `serde(default)`**, and that is a
+/// destruction guard rather than a schema preference: `logging::init` runs the
+/// erase at boot when the file states `false`, so a document that states nothing
+/// (`{}`, or a foreign object like `{"other": true}`) must read as `None` from
+/// `read_flag_written` instead of as an explicit off. With the default in place
+/// the boot path deleted the user's log files on evidence that said nothing
+/// (myne#860 review).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiagnosticLogFlag {
     /// Whether this device writes a diagnostic log.
-    #[serde(default)]
     pub enabled: bool,
 }
 
@@ -181,6 +188,23 @@ mod tests {
             "malformed states nothing either"
         );
         assert!(!read_flag(&path));
+
+        // A document that parses but STATES NOTHING is the same answer, and this
+        // is the case `#[serde(default)]` used to turn into an explicit off: the
+        // boot erase then ran on evidence that said nothing and deleted the
+        // user's log files (myne#860 review).
+        for silent in [&b"{}"[..], &br#"{"other": true}"#[..]] {
+            std::fs::write(&path, silent).expect("seed silent document");
+            assert_eq!(
+                read_flag_written(&path),
+                None,
+                "a document that names no choice must read as None"
+            );
+            assert!(
+                !read_flag(&path),
+                "and the fail-closed reader still says off"
+            );
+        }
 
         write_flag(&path, false).expect("write off");
         assert_eq!(

@@ -446,6 +446,18 @@ export function AboutPanel() {
     });
   };
 
+  // The log row's error text, split by what failed. A READ failure gets its own
+  // sentence because the change sentence says "Myne could not change that
+  // setting", which is false of a read that runs on mount with the switch still
+  // off and untouched: the row would report a failed change beside an untouched
+  // control.
+  const diagnosticLogError =
+    diagnostics.error === null
+      ? null
+      : diagnostics.error.source === "read"
+        ? t("settings.about.diagnosticLogReadError")
+        : t("settings.about.diagnosticLogError");
+
   return (
     <div style={PANEL_ROOT_STYLE}>
       <Block>
@@ -671,7 +683,7 @@ export function AboutPanel() {
           <SettingRow
             label={t("settings.about.diagnosticLogLabel")}
             helper={t("settings.about.diagnosticLogHelper")}
-            error={diagnostics.error ? t("settings.about.diagnosticLogError") : null}
+            error={diagnosticLogError}
             anchorId="about.diagnostic-log"
             testId="about.diagnostic-log-row"
             helperTestId="about.diagnostic-log-helper"
@@ -694,8 +706,21 @@ export function AboutPanel() {
               bounded, so a row appears whenever one exists and Delete is the
               manual half of that bound (a report that includes it clears it
               too). The row is absent, not disabled, when there is no record,
-              because "no crash" is not a control. */}
-          {diagnostics.crash !== null && (
+              because "no crash" is not a control.
+
+              A REFUSED read is the third state, and it renders its own line
+              rather than nothing: an absent row would be indistinguishable from
+              the host answering "no record", which is the one thing a no-consent
+              artefact's disclosure must not hide. Delete is not offered here,
+              because it is the record's absence that is unknown. */}
+          {diagnostics.crashReadFailed ? (
+            <Block data-setting-anchor="about.crash-record" data-setting-row="true">
+              <span style={LABEL_STYLE}>{t("settings.about.crashRecordLabel")}</span>
+              <p style={HELPER_STYLE} data-testid="about.crash-record-read-failed">
+                {t("settings.about.crashRecordReadFailed")}
+              </p>
+            </Block>
+          ) : diagnostics.crash !== null ? (
             <SettingRow
               label={t("settings.about.crashRecordLabel")}
               helper={t("settings.about.crashRecordHelper", {
@@ -716,7 +741,7 @@ export function AboutPanel() {
                 </Button>
               }
             />
-          )}
+          ) : null}
 
           {/* What a saved report WOULD contain, before anything is written, and
               the two actions that move the log off the device: open the folder,

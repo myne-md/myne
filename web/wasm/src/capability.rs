@@ -553,9 +553,10 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     ("plain-file", Class::Unsupported),
     // myne-md/myne#860: the opt-in device-local diagnostic log and the
     // bug-report surface. `Unsupported` rather than `Pending`, the same call
-    // `plain-file` makes one line up: the feature's own PRD puts web out of
-    // scope (the issue's scope sentence keeps only "copying the same block to
-    // the clipboard"), and no port could make the logging half meaningful,
+    // `plain-file` makes one line up: the bound issue's own scope sentence
+    // keeps only "copying the same block to the clipboard", and
+    // `design-notes/ops/0690` records the same boundary, and no port could
+    // make the logging half meaningful,
     // because the web build installs NO subscriber and compiles every event
     // below `warn` out of the bundle (`design-notes/ops/0366`). There is no
     // log for it to write, no folder to reveal and no platform log directory

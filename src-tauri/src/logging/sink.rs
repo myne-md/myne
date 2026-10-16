@@ -151,6 +151,12 @@ impl LogSink {
         &self.dir
     }
 
+    /// How many rotated files this sink keeps, so a reader can bound its own
+    /// walk over them rather than stopping at the first absent index.
+    pub fn retained_files(&self) -> usize {
+        self.retained_files
+    }
+
     /// Whether the sink is currently writing.
     pub fn is_enabled(&self) -> bool {
         self.enabled.load(Ordering::Relaxed)

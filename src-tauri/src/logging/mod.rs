@@ -113,6 +113,17 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
         }
     }
 
+    // The erase's OUTCOME is carried past `install` deliberately: the erase has
+    // to run before the subscriber exists (it is part of preparing this boot),
+    // and a `tracing::warn!` emitted there would have no subscriber and be
+    // dropped, leaving a partial erasure (the one residue the reconcile exists to
+    // clear) unobservable in the log, on stdout and in the UI (myne#860 review).
+    let reconcile_error = if written == Some(false) {
+        sink.erase_log_files().err()
+    } else {
+        None
+    };
+
     // The panic hook is installed here, once, with the same directory the sink
     // writes into. It is the feature's ONE admitted exception to "the sink is
     // inert while the toggle is off": it is host code rather than a `tracing`
@@ -120,6 +131,15 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
     crash::install(sink.dir().to_path_buf());
 
     install(Some(Arc::clone(&sink)));
+
+    if let Some(e) = reconcile_error {
+        tracing::warn!(
+            event = "diagnostic_log_erase_incomplete",
+            io_error_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+            "the diagnostic log could not be fully erased; the next start retries"
+        );
+    }
+
     Ok(sink)
 }
 
@@ -138,8 +158,16 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
 /// empty the log, which is the one failure worse than the leak it prevents, so
 /// every entry is exercised rather than asserted.
 pub const FILE_TARGETS: &[&str] = &[
-    // The explicit `target:` overrides the tree writes by hand.
-    "myne",          // `myne::ai`, `myne::agent`
+    // The explicit `target:` overrides the tree writes by hand, and the `::` is
+    // load-bearing rather than cosmetic. `Targets::with_target` matches by
+    // target PREFIX with no separator boundary, so a bare `"myne"` also admitted
+    // `myne_cli`, `myne_tor_sidecar`, `myne_decrypt`, `myne_web_wasm` and every
+    // future `myne*` crate, while `scripts/check-tracing-discipline.mjs` scans
+    // only six directories: the day a `myne-*` crate is linked into this binary,
+    // its `info`+ records would land in the file the user is invited to publish
+    // with the guard reporting ok over a root it never read (myne#860 review).
+    // Every crate this binary actually links is named explicitly below.
+    "myne::",        // `myne::ai`, `myne::agent`
     "vault_migrate", // src-tauri's eager boot migration
     // The crates, by the name rustc uses for their default target.
     "myne_core",        // `myne-core`
@@ -210,7 +238,7 @@ mod tests {
     #[test]
     fn the_file_layer_admits_the_apps_own_targets_and_drops_everything_else() {
         const EMITTED: &[&str] = &[
-            "myne",
+            "myne::",
             "vault_migrate",
             "myne_core",
             "myne_desktop_lib",
@@ -234,7 +262,11 @@ mod tests {
         );
 
         tracing::subscriber::with_default(subscriber, || {
-            tracing::info!(target: "myne", "an admitted record");
+            // The `myne::` entry exists for the hand-written `target:`
+            // overrides, so these are what it is asserted against, not the bare
+            // crate prefix.
+            tracing::info!(target: "myne::ai", "an admitted record");
+            tracing::info!(target: "myne::agent", "an admitted record");
             tracing::info!(target: "vault_migrate", "an admitted record");
             tracing::info!(target: "myne_core", "an admitted record");
             tracing::info!(target: "myne_desktop_lib", "an admitted record");
@@ -243,10 +275,27 @@ mod tests {
             tracing::info!(target: "hyper::proto::h1", "dependency noise");
             tracing::info!(target: "automerge::sync::state", "dependency noise");
             tracing::info!(target: "zbus::connection", "dependency noise");
+            // Crates whose target merely STARTS WITH `myne`. They are the reason
+            // the entry is `myne::` rather than `myne`: `Targets::with_target`
+            // matches by prefix with no separator boundary, so a bare `myne`
+            // admitted all four of these while the guard scans none of their
+            // roots (myne#860 review).
+            tracing::info!(target: "myne_decrypt", "crate noise");
+            tracing::info!(target: "myne_web_wasm", "crate noise");
+            tracing::info!(target: "myne_cli", "crate noise");
+            tracing::info!(target: "myne_tor_sidecar", "crate noise");
         });
 
         let body = std::fs::read_to_string(sink.dir().join(LOG_FILE_NAME)).expect("read log");
-        for name in FILE_TARGETS {
+        // The `myne::` entry is asserted through its real overrides rather than
+        // as a literal, because the literal is a prefix and never appears as a
+        // target on its own.
+        assert!(
+            body.contains("myne::ai: an admitted record")
+                && body.contains("myne::agent: an admitted record"),
+            "the `myne::` entry must admit the hand-written target overrides: {body:?}"
+        );
+        for name in FILE_TARGETS.iter().filter(|name| **name != "myne::") {
             assert!(
                 body.contains(&format!("{name}: an admitted record")),
                 "target `{name}` is in FILE_TARGETS but the filter dropped it, so the log is \
@@ -256,6 +305,11 @@ mod tests {
         assert!(
             !body.contains("dependency noise"),
             "a dependency crate's record reached the file the user is invited to publish: {body:?}"
+        );
+        assert!(
+            !body.contains("crate noise"),
+            "a `myne*` CRATE whose root the guard never scans reached the file the user is \
+             invited to publish, which is what the `myne::` entry exists to prevent: {body:?}"
         );
     }
 }

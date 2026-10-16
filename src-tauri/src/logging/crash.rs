@@ -275,6 +275,22 @@ mod tests {
         );
         // A path with neither marker is passed through rather than mangled.
         assert_eq!(workspace_relative("main.rs", 1), "main.rs:1");
+
+        // **The case the boundary fix was written for.** A sibling directory
+        // whose name merely STARTS WITH the root's name used to strip to
+        // `-agents/...`, a location that does not exist, and the previous
+        // fixture could not reach that state because it only ever built a path
+        // under the root itself (myne#860 review). A revert to the bare
+        // `strip_prefix(root)` body now fails here.
+        let sibling = format!(
+            "{}-agents/src/lib.rs",
+            workspace_root().trim_end_matches(['/', '\\'])
+        );
+        assert_eq!(
+            workspace_relative(&sibling, 1),
+            format!("{sibling}:1"),
+            "a sibling directory must NOT be stripped as if it were under the root"
+        );
     }
 
     #[test]

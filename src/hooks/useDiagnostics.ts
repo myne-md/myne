@@ -37,15 +37,38 @@ const UNKNOWN_FAILURE: DiagnosticLogError = {
   detail: { io_error_kind: "Other" },
 };
 
+/**
+ * Which read or change failed, so the surface renders the sentence that matches.
+ *
+ * A failed READ gets its own arm because the row's change sentence ("Myne could
+ * not change that setting") describes an action the user never took: the read
+ * runs on mount, the switch is still off and untouched, and reporting a failed
+ * change beside it is false. `clearCrash` refuses the same reuse one function
+ * down. The state still folds to off either way, which is the direction in which
+ * nothing is written.
+ */
+export type DiagnosticsFailure =
+  | { source: "read" }
+  | { source: "change"; error: DiagnosticLogError };
+
 export interface DiagnosticsState {
   /** Whether this device writes a diagnostic log. False until the read lands. */
   enabled: boolean;
   /** True while the initial read is in flight; false once it settles. */
   loading: boolean;
   /** The last command failure, cleared on the next attempt. */
-  error: DiagnosticLogError | null;
+  error: DiagnosticsFailure | null;
   /** The crash record, or `null` when there is none. */
   crash: CrashState | null;
+  /**
+   * True when the crash record could not be READ, so its absence is unknown.
+   *
+   * Recorded rather than folded away: `crash === null` with this false means the
+   * host answered "no record", while true means the host could not answer. A
+   * no-consent artefact's existence must stay visible, and a refused read is not
+   * the same statement as there being nothing to show.
+   */
+  crashReadFailed: boolean;
   /** What a saved report would contain, or `null` before the first read. */
   manifest: ReportManifest | null;
   /** Flip the log switch. Resolves once the host has answered. */
@@ -70,15 +93,18 @@ export interface DiagnosticsState {
  *
  * Best effort in the same direction as the flag itself: a failed read leaves the
  * surface showing "off" and no crash record, which are the states in which
- * nothing is written, so a broken read can never be mistaken for consent or for
- * a clean history.
+ * nothing is written, so a broken read can never be mistaken for consent. It is
+ * not the same as a clean history either, which is why both read failures are
+ * recorded (`error` for the flag, `crashReadFailed` for the record) rather than
+ * folded into the benign answer.
  */
 export function useDiagnostics(): DiagnosticsState {
   const available = has("diagnosticLog");
   const [enabled, setEnabledState] = useState(false);
   const [loading, setLoading] = useState(available);
-  const [error, setError] = useState<DiagnosticLogError | null>(null);
+  const [error, setError] = useState<DiagnosticsFailure | null>(null);
   const [crash, setCrash] = useState<CrashState | null>(null);
+  const [crashReadFailed, setCrashReadFailed] = useState(false);
   const [manifest, setManifest] = useState<ReportManifest | null>(null);
 
   useEffect(() => {
@@ -92,19 +118,25 @@ export function useDiagnostics(): DiagnosticsState {
       // read is a state in which no log is written. What it must not be is
       // SILENT: the fold used to be indistinguishable from a real "off", which
       // is a wiring failure reporting itself as a benign answer
-      // (myne#860 review). So the failure is recorded on the same `error` the
-      // surface already renders, which is the honest half of tolerant wiring.
-      diagnosticLogEnabledGet().catch((raw) => {
-        if (!cancelled) setError(foldFailure(raw));
+      // (myne#860 review). So it is recorded as a READ failure, which the surface
+      // renders with its own sentence rather than the change sentence.
+      diagnosticLogEnabledGet().catch(() => {
+        if (!cancelled) setError({ source: "read" });
         return false;
       }),
-      crashRecordState().catch(() => null),
+      // `undefined` is the sentinel for a refused read, so the resolve branch can
+      // tell it from the host answering "no record" with `null`.
+      crashRecordState().catch(() => undefined),
       reportManifest().catch(() => null),
     ])
       .then(([flag, record, manifest]) => {
         if (cancelled) return;
         setEnabledState(flag);
-        setCrash(record);
+        if (record === undefined) {
+          setCrashReadFailed(true);
+        } else {
+          setCrash(record);
+        }
         setManifest(manifest);
       })
       .finally(() => {
@@ -117,10 +149,17 @@ export function useDiagnostics(): DiagnosticsState {
 
   const refresh = useCallback(async () => {
     const [record, next] = await Promise.all([
-      crashRecordState().catch(() => null),
+      // The same sentinel as the initial load: a refused read is recorded, so the
+      // surface says it could not read the record rather than showing none.
+      crashRecordState().catch(() => undefined),
       reportManifest().catch(() => null),
     ]);
-    setCrash(record);
+    if (record === undefined) {
+      setCrashReadFailed(true);
+    } else {
+      setCrash(record);
+      setCrashReadFailed(false);
+    }
     setManifest(next);
   }, []);
 
@@ -137,7 +176,7 @@ export function useDiagnostics(): DiagnosticsState {
         // also re-reads the crash record, which the erase path leaves alone.
         await refresh();
       } catch (raw) {
-        setError(foldFailure(raw));
+        setError({ source: "change", error: foldFailure(raw) });
       }
     },
     [refresh],
@@ -202,6 +241,7 @@ export function useDiagnostics(): DiagnosticsState {
     loading,
     error,
     crash,
+    crashReadFailed,
     manifest,
     setEnabled,
     clearCrash,
