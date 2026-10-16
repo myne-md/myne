@@ -69,6 +69,7 @@ function panel(over: Partial<React.ComponentProps<typeof TaskListPanel>> = {}) {
 
 const view = (over: Partial<TaskView> = {}): TaskView => ({ ...DEFAULT_TASK_VIEW, ...over });
 
+
 describe("sections (myne-md/myne#656)", () => {
   it("orders sections attention-first and labels each with its count", () => {
     const { host, cleanup } = render(

@@ -202,4 +202,18 @@ describe("editor host, per client", () => {
     expect(typeof attachments.resolveRef).toBe("function");
     expect(typeof attachments.warmRefs).toBe("function");
   });
+
+  // myne-md/myne#884. NOT a capability answer, which is why it is its own case
+  // rather than a line inside the two above: neither client lacks anything here.
+  // Both simply want the anchored popover, and they express that by omitting the
+  // member, since its ABSENCE is the anchored behaviour. Pinned in both
+  // directions so that giving desktop or web sheets becomes a deliberate edit to
+  // this test rather than a quiet side effect of one.
+  it("neither desktop nor web declares a docked presentation", async () => {
+    const desktop = await loadHost(DESKTOP_ABSENT);
+    expect("floatingSurface" in desktop).toBe(false);
+
+    const web = await loadHost(WEB_ABSENT);
+    expect("floatingSurface" in web).toBe(false);
+  });
 });

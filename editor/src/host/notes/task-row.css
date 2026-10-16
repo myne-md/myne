@@ -30,3 +30,23 @@
     inset: -15px;
   }
 }
+
+/* The row's trailing field control (myne-md/myne#884 task 8) gets the same
+ * treatment as the box above, and for the same reason: it is a 24 px square,
+ * which is a mouse target. 24 + 2×10 = 44.
+ *
+ * A separate rule rather than a shared one because the two start from different
+ * sizes, and `inset` is what has to differ - sharing it would silently take the
+ * box to 54 or the control to 34. */
+@media (pointer: coarse) {
+  .myne-task-fields {
+    position: relative;
+  }
+
+  .myne-task-fields::before {
+    content: "";
+    position: absolute;
+    /* 24 + 2×10 = 44. */
+    inset: -10px;
+  }
+}

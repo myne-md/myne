@@ -1263,7 +1263,7 @@ export type Panel =
   // icon, change password and quick unlock all act on the VAULT, and desktop
   // groups them the same way (Account's own `vault` topic). Mobile's drill-down
   // stack cannot carry a heading inside Account without a second scroll region,
-  // so the group is a category a reader can land on (docs/decisions/ui/0692).
+  // so the group is a category a reader can land on (docs/decisions/ui/0695).
   | "vault"
   | "appearance"
   | "editor"

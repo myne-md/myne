@@ -16,6 +16,7 @@ import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { TaskRow, type TaskRowData } from "@myne/editor/host/notes/TaskRow";
 import { taskChipStyle, TASK_CHIP_TOKEN } from "@myne/editor/host/notes/taskChipToken";
+import i18n from "@myne/editor/i18n";
 import {
   DEFAULT_DISPLAY,
   setDateTimeDisplay,
@@ -205,6 +206,115 @@ describe("canon rules are constraints", () => {
       />,
     );
     expect(host.querySelector("[data-overdue]")).toBeNull();
+    cleanup();
+  });
+});
+
+describe("the field marks (myne-md/myne#884 task 6)", () => {
+  const MARKED: TaskRowData = {
+    ...TASK,
+    priority: "high",
+    repeat: "every weekday",
+  };
+
+  it("marks priority and repeat when the record carries them", () => {
+    const { host, cleanup } = render(
+      <TaskRow task={MARKED} scope="vault" today={TODAY} />,
+    );
+
+    const priority = byTestId(host, "task-row.priority");
+    const repeat = byTestId(host, "task-row.repeat");
+    expect(priority, "a task carrying a priority showed no mark").not.toBeNull();
+    expect(repeat, "a task carrying a repeat rule showed no mark").not.toBeNull();
+    // The glyph is the shared icon source, so the row and the note's chip draw
+    // one level one way.
+    expect(priority!.querySelector("svg.cm-task-chip-icon")).not.toBeNull();
+    expect(repeat!.querySelector("svg.cm-task-chip-icon")).not.toBeNull();
+    cleanup();
+  });
+
+  it("an icon-only mark is named, so the field is not invisible to a screen reader", () => {
+    const { host, cleanup } = render(
+      <TaskRow task={MARKED} scope="vault" today={TODAY} />,
+    );
+
+    // The note's chip announces `<field name>, <what it shows>`; the row says the
+    // same two things.
+    expect(byTestId(host, "task-row.priority")?.getAttribute("aria-label")).toBe(
+      `${i18n.t("editor.taskField.title.priority")}, high`,
+    );
+    expect(byTestId(host, "task-row.repeat")?.getAttribute("aria-label")).toBe(
+      `${i18n.t("editor.taskField.title.repeat")}, every weekday`,
+    );
+    cleanup();
+  });
+
+  it("encodes the priority LEVEL in the glyph's shape, not in its colour", () => {
+    // The two-chevron-up shape for `highest` against the single one for `high`.
+    // Enumerated for one level rather than asserted in the abstract, because the
+    // shapes are the whole reason an icon-only priority is readable at all.
+    const counts: Record<string, number> = {};
+    for (const level of ["highest", "high"]) {
+      const { host, cleanup } = render(
+        <TaskRow task={{ ...TASK, priority: level }} scope="vault" today={TODAY} />,
+      );
+      counts[level] = byTestId(host, "task-row.priority")!.querySelectorAll("path").length;
+      cleanup();
+    }
+    expect(counts["highest"]).toBeGreaterThan(counts["high"]!);
+  });
+
+  it("renders nothing for a field the record does not carry", () => {
+    const { host, cleanup } = render(<TaskRow task={TASK} scope="vault" today={TODAY} />);
+    expect(byTestId(host, "task-row.priority")).toBeNull();
+    expect(byTestId(host, "task-row.repeat")).toBeNull();
+    cleanup();
+  });
+
+  it("carries the marks as marks, never as a filled pill", () => {
+    const { host, cleanup } = render(
+      <TaskRow task={MARKED} scope="vault" today={TODAY} />,
+    );
+
+    for (const id of ["task-row.priority", "task-row.repeat"]) {
+      const mark = byTestId(host, id)!;
+      // No fill, no border, no chip geometry: the mark's own glyph is the whole
+      // thing. Completion stays the one ruled exception, and it is elsewhere.
+      expect(mark.style.background, `${id} carries state as a fill`).toBe("");
+      expect(mark.style.border, `${id} drew a box`).toBe("");
+      expect(mark.style.borderRadius, `${id} drew a pill`).toBe("");
+      // And no green, anywhere, as ever.
+      expect(mark.innerHTML.toLowerCase()).not.toContain("green");
+    }
+    cleanup();
+  });
+
+  it("two-line: both marks sit on the second line, beside the date", () => {
+    // The second line is the `.stack`'s meta row. Geometry is the browser tier's
+    // business; what is assertable here is containment.
+    const { host, cleanup } = render(
+      <TaskRow task={MARKED} scope="vault" today={TODAY} twoLine />,
+    );
+    const stack = byTestId(host, "task-row.stack");
+    expect(stack).not.toBeNull();
+    const secondLine = byTestId(host, "task-row.meta")!;
+    expect(stack!.contains(secondLine)).toBe(true);
+    expect(secondLine.contains(byTestId(host, "task-row.priority")!)).toBe(true);
+    expect(secondLine.contains(byTestId(host, "task-row.repeat")!)).toBe(true);
+    expect(secondLine.contains(byTestId(host, "task-row.due")!)).toBe(true);
+    // And NOT on the first line: the text element is a sibling, not a parent.
+    expect(byTestId(host, "task-row.text")!.contains(byTestId(host, "task-row.priority")!)).toBe(false);
+    cleanup();
+  });
+
+  it("the inline-date panel layout keeps both marks too", () => {
+    // A third arrangement of the same fragment, which is why the marks live in
+    // `meta` rather than in one layout's JSX.
+    const { host, cleanup } = render(
+      <TaskRow task={MARKED} scope="note" today={TODAY} inlineDate />,
+    );
+    expect(byTestId(host, "task-row.priority")).not.toBeNull();
+    expect(byTestId(host, "task-row.repeat")).not.toBeNull();
     cleanup();
   });
 });

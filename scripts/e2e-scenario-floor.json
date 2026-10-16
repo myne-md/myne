@@ -677,7 +677,7 @@
   "_comment_376_to_379": [
     "Raised 376 -> 379 for myne-md/myne#867. THREE new scenarios, in ONE new file:",
     "`e2e/ai-model-surface.e2e.ts` (aims1 the catalogue renders inline in the Models",
-    "topic, with no button or modal (decisions/ui/0691), and every role has an assignment row; aims2 the row's",
+    "topic, with no button or modal (decisions/ui/0694), and every role has an assignment row; aims2 the row's",
     "Download button is WIRED, proven by the request the pinned fixture origin",
     "receives; aims3 an installed model shows Installed and Remove clears the",
     "stored path). The arithmetic is +3 rather than a choice between files: all",

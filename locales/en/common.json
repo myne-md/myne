@@ -1556,6 +1556,7 @@
       "priority": "Priority",
       "quote": "Quote",
       "repeat": "Repeat",
+      "sheetTitle": "Insert",
       "table": "Table",
       "taskQuery": "Task list",
       "time": "Time",
@@ -1618,6 +1619,9 @@
         "remind": "Reminder"
       },
       "invalidRemind": "Myne can't read this date, so it won't remind you."
+    },
+    "templateToken": {
+      "sheetTitle": "Insert token"
     },
     "toolbar": {
       "apply": "Apply",
@@ -1725,6 +1729,9 @@
       },
       "convertCore": {
         "noMatch": "no match"
+      },
+      "picker": {
+        "sheetTitle": "Link to note"
       }
     },
     "flow": {
@@ -2989,6 +2996,30 @@
       "developerModeInline": "Shows the settings Myne keeps out of the way by default.",
       "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
+      "diagnosticLogHelper": "Writes a plaintext log on this device, and only this device. It records what Myne is doing: never your note text, never a note title, never a file path. Myne caps its size and drops the oldest entries first, and turning this back off deletes the log. Nothing is ever sent anywhere; you decide what to share.",
+      "diagnosticLogLabel": "Diagnostic logging",
+      "diagnosticLogError": "Myne could not change that setting.",
+      "diagnosticLogReadError": "Myne could not read the diagnostic logging setting, so it is shown as off.",
+      "diagnosticBlockLabel": "Report details",
+      "diagnosticBlockHelper": "Exactly what Copy puts on your clipboard. Nothing is sent anywhere; you decide what to share.",
+      "diagnosticCopy": "Copy diagnostics",
+      "diagnosticCopyDone": "Diagnostics copied",
+      "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
+      "crashRecordLabel": "Crash record",
+      "crashRecordHelper": "Myne recorded a crash on {{date}}. It holds the file and line, the version and your platform, and nothing else. Delete it whenever you like.",
+      "crashRecordClear": "Delete",
+      "diagnosticFilesLabel": "Report file",
+      "diagnosticFilesHelper_one": "One file would contain this block plus {{count}} log file, {{size}} in total. Nothing is sent anywhere; you choose where it goes.",
+      "diagnosticFilesHelper_other": "One file would contain this block plus {{count}} log files, {{size}} in total. Nothing is sent anywhere; you choose where it goes.",
+      "diagnosticFilesUnknown": "Myne has not read the log yet.",
+      "crashRecordDateUnknown": "an unknown date",
+      "diagnosticReveal": "Reveal logs folder",
+      "diagnosticSave": "Save report as file…",
+      "diagnosticSaveDone": "Report saved",
+      "diagnosticSaveFailed": "Myne could not save the report.",
+      "diagnosticRevealFailed": "Myne could not open the log folder.",
+      "crashRecordClearFailed": "Myne could not delete the crash record.",
+      "crashRecordReadFailed": "Myne could not read the crash record, so it cannot say whether one exists.",
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
       "legalPrivacy": "Privacy policy",
@@ -3020,7 +3051,8 @@
         "version": "Version",
         "updates": "Staying up to date",
         "legal": "Legal and licensing",
-        "developer": "Developer"
+        "developer": "Developer",
+        "diagnostics": "Diagnostics"
       }
     },
     "account": {
@@ -4030,6 +4062,7 @@
         "update": "update upgrade check for updates new version release download",
         "changePassword": "change password passphrase credentials update reset",
         "changelog": "changelog release notes what is new history",
+        "diagnosticLog": "diagnostic log logging debug troubleshooting crash report bug report support",
         "cliAccess": "cli terminal access command line shell myne command console",
         "cliExcludedFolders": "cli excluded folders terminal exclude hide command line private",
         "cliRateLimit": "cli rate limit terminal speed throttle bulk pace commands per minute",
@@ -4701,6 +4734,7 @@
     "row": {
       "completed": "Task, completed",
       "notCompleted": "Task, not completed",
+      "editFields": "Edit task fields",
       "tooLongToWrite": "This task's line is too long to edit from here. Open its note instead.",
       "untitled": "Untitled task"
     },

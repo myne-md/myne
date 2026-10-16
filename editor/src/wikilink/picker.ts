@@ -29,6 +29,8 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
+import { floatingSurfacePresentation } from "../host";
+import { createDockedPicker, type DockedPicker } from "../floating/docked-sheet";
 import { isSlashSuppressed } from "../slash/plugin";
 import { readNoteSet } from "./note-set";
 import { readRecentNotes } from "./recent-notes";
@@ -54,6 +56,7 @@ import {
   emitVaultHeadingWikilink,
   emitVaultBlockAnchorWikilink,
 } from "./emit";
+import i18n from "@myne/editor/i18n";
 
 // MYND-305: the picker has three modes, discriminated by the filter prefix after
 // `[[`. `##query` → vault-wide headings; `#query` → current-note headings; else
@@ -114,6 +117,7 @@ type MenuState = {
 
 class WikilinkPickerView implements PluginValue {
   private container: HTMLDivElement | null = null;
+  private docked: DockedPicker | null = null;
   private state: MenuState | null = null;
   private rafHandle: number | null = null;
   private destroyed = false;
@@ -215,7 +219,38 @@ class WikilinkPickerView implements PluginValue {
       this.container.remove();
       this.container = null;
     }
+    if (this.docked !== null) {
+      this.docked.dispose();
+      this.docked.root.remove();
+      this.docked = null;
+    }
     this.state = null;
+  }
+
+  /** The element the rows go into: the anchored popover's own box, or, when the
+   *  host declares the docked presentation, the sheet shell's list
+   *  (myne-md/myne#884). The row classes are the same in both, so the picker's
+   *  two-line chrome (`cm-wiki-picker-*`) reads identically inside the sheet. */
+  private surface(): HTMLElement {
+    if (floatingSurfacePresentation() === "docked") {
+      if (this.docked === null) {
+        this.docked = createDockedPicker({
+          title: i18n.t("editor.wikilink.picker.sheetTitle"),
+          testId: "editor.wikilink-picker-sheet",
+          closeLabel: i18n.t("common.close"),
+          onClose: () => this.dismiss(),
+        });
+        document.body.appendChild(this.docked.root);
+      }
+      return this.docked.list;
+    }
+    if (this.container === null) {
+      this.container = document.createElement("div");
+      this.container.className = "cm-slash-menu cm-wiki-picker";
+      this.container.setAttribute("role", "menu");
+      document.body.appendChild(this.container);
+    }
+    return this.container;
   }
 
   private close(): void {
@@ -251,13 +286,8 @@ class WikilinkPickerView implements PluginValue {
       this.state.selectedIndex = rows.length - 1;
     }
 
-    if (this.container === null) {
-      this.container = document.createElement("div");
-      this.container.className = "cm-slash-menu cm-wiki-picker";
-      this.container.setAttribute("role", "menu");
-      document.body.appendChild(this.container);
-    }
-    this.container.replaceChildren();
+    const surface = this.surface();
+    surface.replaceChildren();
     let selectedRow: HTMLDivElement | null = null;
     rows.forEach((row, i) => {
       const el = document.createElement("div");
@@ -274,8 +304,8 @@ class WikilinkPickerView implements PluginValue {
       el.addEventListener("mousemove", () => {
         if (this.state === null || this.state.selectedIndex === i) return;
         this.state.selectedIndex = i;
-        this.container
-          ?.querySelectorAll(".cm-slash-menu-row")
+        surface
+          .querySelectorAll(".cm-slash-menu-row")
           .forEach((r, idx) => r.classList.toggle("cm-slash-menu-row-selected", idx === i));
       });
       this.renderRowBody(el, row);
@@ -283,35 +313,39 @@ class WikilinkPickerView implements PluginValue {
         e.preventDefault();
         this.applyRow(row);
       });
-      this.container!.appendChild(el);
+      surface.appendChild(el);
     });
 
-    const surfaceWidth = 320;
-    const surfaceHeight = Math.min(12 + rows.length * 40, 320);
-    const coords = this.view.coordsAtPos(this.state.triggerTo);
-    let anchorRect;
-    if (coords !== null) {
-      anchorRect = { left: coords.left, top: coords.top, right: coords.right, bottom: coords.bottom };
-    } else {
-      const editorRect = this.view.contentDOM.getBoundingClientRect();
-      anchorRect = {
-        left: editorRect.left + 16,
-        top: editorRect.top + 16,
-        right: editorRect.left + 32,
-        bottom: editorRect.top + 32,
-      };
+    // The docked sheet is pinned by its own stylesheet; only the anchored
+    // popover is positioned against the caret.
+    if (this.docked === null) {
+      const surfaceWidth = 320;
+      const surfaceHeight = Math.min(12 + rows.length * 40, 320);
+      const coords = this.view.coordsAtPos(this.state.triggerTo);
+      let anchorRect;
+      if (coords !== null) {
+        anchorRect = { left: coords.left, top: coords.top, right: coords.right, bottom: coords.bottom };
+      } else {
+        const editorRect = this.view.contentDOM.getBoundingClientRect();
+        anchorRect = {
+          left: editorRect.left + 16,
+          top: editorRect.top + 16,
+          right: editorRect.left + 32,
+          bottom: editorRect.top + 32,
+        };
+      }
+      const pos = computePosition({
+        anchor: anchorRect,
+        surfaceWidth,
+        surfaceHeight,
+        preferredPlacement: "below",
+      });
+      surface.style.position = "fixed";
+      surface.style.left = `${pos.left}px`;
+      surface.style.top = `${pos.top}px`;
+      surface.style.width = `${surfaceWidth}px`;
+      surface.style.zIndex = "1000";
     }
-    const pos = computePosition({
-      anchor: anchorRect,
-      surfaceWidth,
-      surfaceHeight,
-      preferredPlacement: "below",
-    });
-    this.container.style.position = "fixed";
-    this.container.style.left = `${pos.left}px`;
-    this.container.style.top = `${pos.top}px`;
-    this.container.style.width = `${surfaceWidth}px`;
-    this.container.style.zIndex = "1000";
 
     if (selectedRow !== null) {
       (selectedRow as HTMLDivElement).scrollIntoView({ block: "nearest" });

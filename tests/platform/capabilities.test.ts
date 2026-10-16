@@ -181,6 +181,13 @@ describe("capability descriptor", () => {
       // and no handler registration, and the surface exists to be independent
       // of vault state in a way a sync-required browser session is not.
       "plainFile",
+      // myne-md/myne#860, the diagnostic log. The web build installs NO
+      // `tracing` subscriber and compiles every event below `warn` out of the
+      // bundle (`decisions/ops/0366`), so there is no log to write, no platform
+      // log directory to resolve and no folder to reveal. Note what this does
+      // NOT cover: copying the diagnostics BLOCK is present on web, which is why
+      // the report preview and its Copy button sit OUTSIDE the rows this gates.
+      "diagnosticLog",
       // myne-md/myne#698, the B2B member-sharing substrate. The person keypair
       // is held backend-side in a sealed file outside browser storage, and the
       // panel's recovery-phrase prompt is substituted out of the served bundle

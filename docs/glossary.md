@@ -750,6 +750,14 @@ A class of data structures that allow concurrent edits across multiple replicas 
 
 Used in: `vision.md`; `decisions.md` 2026-08-09, `decisions/sync/0655`
 
+### **crash record** &nbsp; 📦 *Product*
+
+The one artefact the desktop leaves behind when the process panics, even while diagnostic logging is switched OFF (myne-md/myne#860). It holds the **compiled-in source path and line**, the version and the platform, and nothing else: no panic message and no payload, because a panic message is arbitrary text from arbitrary code (an `expect("failed to decode note {id}")` carries a note id, an `unwrap` on a parse carries the bytes that failed to parse), and the surface it reaches is one the user is invited to send on. It lives in its own file in the same directory as the [diagnostic log](#diagnostic-log), is **bounded to one file** that the next crash overwrites rather than appends to, and is shown on the About surface with its date so its existence is never hidden. It is deleted by an explicit action or by a report that included it. It is the feature's ONE admitted exception to "the file sink is inert while the toggle is off", and it qualifies because it is **host code rather than a `tracing` call site**, so no emitted event can reach it. Same reasoning, and the same payload discipline, as `decisions/ops/0366`'s panic hook for the web build.
+
+Used in: `decisions/ops/0690`, `decisions/ops/0366`, `src-tauri/src/logging/crash.rs`, `threat-model.md` §7
+
+
+
 ### **credential phishing** &nbsp; ⚠️ *Threat*
 
 *(Aliases: phrase phishing, lookalike origin. Myne-divergent: no, but what makes it reachable here is Myne-specific.)*
@@ -992,6 +1000,14 @@ Used in: `spec/protocol.md` §9.30; `decisions/protocol/0669`, `0670`
 The generated page every surface in the design-system catalogue carries (myne-md/myne#847): an overview from the surface's description, its states from the sibling story leaves, and accessibility from the declared level plus the measured facts, with an optional authored block for the two items no generator can produce (when not to use this, and content guidance). The generated half is required and the authored half is optional, because a filler "never" is worse than an absent note. It renders as an inspector tab rather than a rail row, because hoisting a single-state surface to one row leaves no parent row for a Documentation child to hang from. The page states which items are generated and which are authored, so a reader knows what they are trusting. Contrast [subcomponent edge](#subcomponent-edge) and [review axis](#review-axis).
 
 Used in: `stories/README.md`; `decisions/ui/0653`
+
+### **diagnostic log** &nbsp; 📦 *Product*
+
+An **opt-in, device-local plaintext log** for the desktop client, OFF by default, written only while the user has switched it on (myne-md/myne#860). It exists so a bug report can say what the app was doing instead of only what the user saw. **Its content claim is machine-checked**: `scripts/check-tracing-discipline.mjs` fails the build if a `%` Display formatter reaches `info` or above, which are the only levels the file layer records (it carries its own fixed `LevelFilter::INFO` and ignores `RUST_LOG` entirely, so a `debug!` value cannot reach disk by any configuration), or if a value is interpolated into a message. No note text, note id, title, filename, filesystem path, account number or hash, key material, salt or nonce is written. **Its footprint is a number, not a proportionality**: size-based rotation with a retained-file count and a hard total ceiling, oldest dropped first. Files are created `0600` at create time inside a `0700` directory under the platform log directory, which on macOS and Windows is outside the backed-up app-data directory and on Linux is not (the §7 bullet states that rather than claiming uniformity). **Turning the toggle off erases the log in the same action** and does not erase the [crash record](#crash-record). The controlling switch is a device-local plaintext file rather than a `vault.prefs` field, because the sink is installed at process startup, before any vault unlocks.
+
+Used in: `decisions/ops/0690`, `src/platform/diagnostics.ts`, `src-tauri/src/logging/`, `threat-model.md` §7
+
+
 
 ### **domain separation** &nbsp; 📋 *Protocol*
 
@@ -1419,9 +1435,9 @@ Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`;
 
 ### **invite code** &nbsp; 📦 *Product*
 
-A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0625`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
+A single shared admission code a sync-server operator may configure (`MYNE_INVITE_CODE`) to close new-account registration to a known group (`decisions/sync/0627`, myne-md/myne#800). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching code; with it unset, registration is open (the self-host and fresh-clone default). It is a **pure door**: compared in constant time, never logged, and never associated with the account, so the server keeps no code-to-account record and learns nothing it did not already (AS9 stays its only identifier). It gates **new accounts only**: a device joining an existing account sends no code. Stored device-locally by the client beside the [sync endpoint](#sync-endpoint) (never synced, never backed up) because it is a shared door word rather than a per-user credential. Not the [vault invite](#vault-invite): that invites a person into a vault, this admits an account to a server.
 
-Used in: `docs/decisions/sync/0625-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
+Used in: `docs/decisions/sync/0627-hosted-sync-access-is-gated-by-a-server-configured-invite-co.md`; `docs/spec/server-protocol.md` §5.3
 
 ### **invite relay** &nbsp; 📦 *Product*
 
@@ -2110,7 +2126,7 @@ Used in: `protocol.md` §9.23; `decisions/ai/0634`
 
 A note's name written inside an assistant answer, rendered as a link that opens that note in a new tab (myne-md/myne#867). It is recognised by an **exact** match against the strings that name a note the vault already holds: a vault-relative path, that path without its `.md`, or a bare title, all from the resolver's single `notePath` projection, so a mention and a displayed path cannot disagree about what a note is called. There is no fuzzy matching, deliberately: a text that only prefixes a real title (`Pixel 10` where the note is `Pixel 10 Graphene OS`) stays plain text, because a link that opens a note the model never named is worse than no link at all. A `[[wikilink]]` token whose target the vault holds renders through the same matcher, so a folder target (`[[Projects/]]`) and an unknown target stay plain labels. The click opens an in-vault note and does nothing else, and the renderer navigates nothing itself: the surface supplies the callback, and with none the text is rendered as it was before. Bounded in `threat-model.md` §7.
 
-Used in: `decisions/ai/0690`; `src/notes/ai/noteMentions.ts`
+Used in: `decisions/ai/0693`; `src/notes/ai/noteMentions.ts`
 
 ### **note-task** &nbsp; 📦 *Product*
 
@@ -2148,9 +2164,9 @@ Used in: `decisions/ai/0628`; `threat-model.md` §3 TB14, §7; `src-tauri/src/pl
 
 ### **model catalogue** &nbsp; 📦 *Product*
 
-The list of model artefacts [Myne's own origin](#model-artefact-origin) can serve, whether or not each one is installed (myne-md/myne#867). It answers "what can I get"; the per-role assignment rows beside it answer "which file does this role use", and the two were blocks in the same group competing for one reading until the catalogue became an inline table in the `Models` [settings topic](#settings-topic) (superseded by `decisions/ui/0691`, which withdrew the modal a download icon used to open). Fetching and installing stay separate acts: the catalogue only starts a download, and what a role then uses is recorded by the model-path store. A download is verified against a digest compiled into the client, so the origin is never the trust anchor.
+The list of model artefacts [Myne's own origin](#model-artefact-origin) can serve, whether or not each one is installed (myne-md/myne#867). It answers "what can I get"; the per-role assignment rows beside it answer "which file does this role use", and the two were blocks in the same group competing for one reading until the catalogue became an inline table in the `Models` [settings topic](#settings-topic) (superseded by `decisions/ui/0694`, which withdrew the modal a download icon used to open). Fetching and installing stay separate acts: the catalogue only starts a download, and what a role then uses is recorded by the model-path store. A download is verified against a digest compiled into the client, so the origin is never the trust anchor.
 
-Used in: `decisions/ai/0628`, `decisions/ui/0691`; `src/components/settings/AiModelCatalogue.tsx`
+Used in: `decisions/ai/0628`, `decisions/ui/0694`; `src/components/settings/AiModelCatalogue.tsx`
 
 ### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
@@ -3143,13 +3159,13 @@ Used in: `decisions/ai/0676`; `core/src/plugins/agent/setting.rs`; `scripts/agen
 
 The shared settings ROSTER and panel NAMING across clients, with the layout and interaction primitives staying per-client: a preference is a fact about the vault rather than a fact about the screen, so two clients must agree on which setting exists and what it is called while their rows remain their own. Distinct from [token parity](#token-parity), which is the same question asked of the design-token layer rather than the settings roster. The record is the projection `docs/dev/settings-parity.md`, generated by `scripts/check-prefs-parity.mjs` from the Rust `#[tauri::command]` roster in `core/src/plugins/prefs/commands.rs`: one row per command carrying each client's state and a written reason on every row that is not `both`.
 
-Used in: `decisions/ui/0692`; `docs/dev/settings-parity.md`; `scripts/check-prefs-parity.mjs`; myne-md/myne#880
+Used in: `decisions/ui/0695`; `docs/dev/settings-parity.md`; `scripts/check-prefs-parity.mjs`; myne-md/myne#880
 
 ### **settings topic** &nbsp; 📦 *Product*
 
 The second level of navigation inside the desktop Settings modal: a panel that holds more than one concern renders a topic strip (`role="tablist"`) at the top of the content column, and picking a topic shows that topic's body and no other. Distinct from the rail's **panel**, which is the first level. A panel earns a strip when it holds more than one concern, where a concern is a question a reader arrives holding, **and** every topic that rule produces is non-empty on every client and in every state that renders the panel; a capability-gated block joins the topic that owns its question rather than getting a topic of its own, because the strip renders the roster and not a filtered set, so a topic whose only member is gated off would be an empty tab. A topic whose WHOLE body is gated is therefore not produced on a client that has none of its capabilities (the roster's optional `liveOn`, resolved by `livePanelTopics`), and a panel left with one topic renders no strip at all: Privacy's `Access` is the one topic that carries it, and on the web client the panel falls to its single `Locking` concern. The active topic is remembered for the session and is deliberately not a `vault.prefs` field: a pref is a synced blob, and which sub-tab a reader was on is a surface fact rather than a vault fact.
 
-Used in: `docs/design/README.md` ("The settings panel: one section treatment, and topics where a panel needs them"); `decisions/ui/0691`; `src/components/settings/settingsTopics.ts`; myne-md/myne#885
+Used in: `docs/design/README.md` ("The settings panel: one section treatment, and topics where a panel needs them"); `decisions/ui/0694`; `src/components/settings/settingsTopics.ts`; myne-md/myne#885
 
 ### **selection toolbar** &nbsp; 📦 *Product*
 
@@ -3581,7 +3597,19 @@ The mobile placement of the **note-scoped** [task panel](#task-panel) (MYND-620)
 
 It is the phone's answer to the desktop's permanently-visible side panel — there is no room beside an editor on a phone, so the same information arrives on request, through the sheet mechanism attachments, snapshots, templates, settings and the view editor already use. In the expanded layout the same list is a sidebar tab instead, because a larger screen can show tasks *beside* a note rather than instead of it.
 
+**It is not a [docked surface](#docked-surface).** Both are bottom sheets on a phone and the two names must not be merged: this one is a **list of rows** (the vault's tasks, narrowed to one note), while a docked surface is an **authoring surface** (the task-field editor and the typeahead pickers) which the same desktop component shows as a popover anchored beside its trigger. Myne's prose therefore keeps "task sheet" for this placement alone, and the authoring surface is named by its fields; the docked shell's own test ids still spell `editor.task-field-sheet`, which is a container's name rather than this term.
+
 Used in: `decisions.md` 2026-07-28; MYND-620
+
+### **docked surface** &nbsp; 📦 *Product*
+
+An editor-owned floating surface presented as a **bottom sheet**: full width, pinned above the bottom edge of the *visible* viewport, over the shared `--scrim`, because the installed client **declared** it. Its twin is the **anchored popover**, the same component beside the caret or the control that opened it.
+
+**Which one a client gets is a declaration, never a device sniff.** `EditorHost.floatingSurface` carries `"anchored" | "docked"`, its **absence means anchored**, and the mobile client is the only one that declares the sheet; desktop and web omit the member, which their own test pins by name. The signal lives on the host because the package cannot tell a phone from a touch laptop, and a coarse-pointer query answers the wrong question for the second one (`decisions/editor/0691`).
+
+Three things are load-bearing rather than cosmetic. The sheet's height and its bottom offset come from `visualViewport` rather than from `100vh` or `bottom: 0`, because on iOS the layout viewport does not shrink for the software keyboard, so a sheet pinned to the layout viewport's bottom edge sits *behind* it with its Save button. Its commit controls are a **sibling** of the scrolling body, so they cannot scroll out of reach. And the typeahead pickers loaded into it are **not modal**: the editor keeps the focus and the user keeps typing to narrow the list, which a focus trap would end.
+
+Used in: `decisions/editor/0691`; myne-md/myne#884
 
 ### **two-line task row** &nbsp; 📦 *Product*
 

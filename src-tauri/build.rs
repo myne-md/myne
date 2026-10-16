@@ -528,6 +528,30 @@ fn main() {
             ]),
         )
         .plugin(
+            "diagnostics",
+            // myne-md/myne#860: the opt-in device-local diagnostic log and the
+            // bug-report surface's host side. Declared here so each gets an
+            // auto-generated `allow-`/`deny-` pair; each also needs a matching
+            // `commands.allow` entry in
+            // `permissions/diagnostics/default.toml` or the ACL resolver never
+            // authorizes the `plugin:diagnostics|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "diagnostic_log_enabled_get",
+                "diagnostic_log_enabled_set",
+                // The one crash record: its presence and date, and clearing it
+                // once a report has included it.
+                "crash_record_state",
+                "crash_record_clear",
+                // The reveal, manifest and save triple. Declared here so each
+                // gets an auto-generated `allow-`/`deny-` pair; each also needs
+                // its `commands.allow` entry in
+                // `permissions/diagnostics/default.toml`.
+                "reveal_logs_folder",
+                "report_manifest",
+                "save_report",
+            ]),
+        )
+        .plugin(
             "memory",
             // myne-md/myne#697: the agent-memory + personality store
             // (vault.agent-memory MYN1 + memories/<id> MYX1 +
