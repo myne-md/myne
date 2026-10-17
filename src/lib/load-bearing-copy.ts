@@ -389,9 +389,15 @@ export type AiTrustState =
  * a provider-neutral sentence that tried to cover all three states would have
  * to say something like "your notes stay where you put them", which is true
  * and tells the user nothing.
+ *
+ * **The literal moved to `@myne/copy`.** It was a verbatim copy here and on
+ * mobile, and the mobile copy's comment claimed the pair was "byte-identical by
+ * construction" because this file re-exported it — which it never did; it
+ * declared a second identical string. Both clients now import the one literal,
+ * which is the construction, and `tests/lib/aiTrustCopy.test.ts` pins the shared
+ * bytes rather than one client's opinion of them.
  */
-export const AI_TRUST_INVARIANT =
-  "Myne never sends your notes anywhere you have not named. A model downloads only when you ask, from Myne's own origin, which keeps no IP logs and no analytics.";
+export { AI_TRUST_INVARIANT } from "@myne/copy";
 
 /**
  * The A7 residual, shown in every state and **unchanged** from the pre-provider
