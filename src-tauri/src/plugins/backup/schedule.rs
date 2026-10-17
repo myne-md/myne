@@ -19,6 +19,7 @@ use tauri::{AppHandle, Runtime};
 use crate::backup_schedule::{self, BackupInterval, ScheduleEntry, ScheduleSettings};
 use crate::io_failure_kind::IoFailureKind;
 use crate::vault_id::VaultId;
+use myne_core::host::HostCtx;
 
 /// Closed error surface for the schedule-config commands. All variants are
 /// DENY-list-safe (no path, no id, bounded enum only).
@@ -149,23 +150,13 @@ pub async fn backup_schedule_write<R: Runtime>(
     })
 }
 
-/// Current wall-clock as Unix-epoch milliseconds (UTC). The per-device
-/// elapsed-check clock; the TS scheduler compares `Date.now()` against the
-/// `last_scheduled_success_at` this stamps — both UTC epoch ms, so they agree.
-fn now_epoch_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
-}
-
 /// Record the outcome of a scheduled backup the TS engine just ran (feature
 /// task 3 calls this after `vault_export_backup`). On success the verified
 /// backup's path is appended to the pruning ledger, the success/attempt clock
 /// + `Success` status are stamped, and the ledger is pruned to retention N. On
 /// failure only the attempt clock + `Failed` status are stamped — the schedule
 /// stays enabled and retries next cycle (feature task 5). The clock is the
-/// Rust-side `now_epoch_ms` (not trusted from the WebView).
+/// Rust-side host wall clock (not trusted from the WebView).
 #[tauri::command]
 pub async fn backup_schedule_record_result<R: Runtime>(
     app: AppHandle<R>,
@@ -178,7 +169,7 @@ pub async fn backup_schedule_record_result<R: Runtime>(
         return Err(ScheduleConfigError::MissingBackupPath);
     }
     let base = app_base(&app)?;
-    let now_ms = now_epoch_ms();
+    let now_ms = myne_core::host::tauri_host::TauriHost::new(app.clone()).now_unix_millis();
 
     // TB6 narrow-seam: the WebView-supplied `written_path` becomes a delete target
     // in the retention pruner (`prune_entry_files` remove_file's ledgered paths),
