@@ -18,7 +18,10 @@
 //! Native-only by design: consumed by the desktop client and the CLI. The
 //! `VaultIo` trait is carried for the CLI's future use; the export walk and the
 //! MYB1 container read half use `std::fs` directly and are gated out of the
-//! wasm build (`#[cfg(not(target_arch = "wasm32"))]`).
+//! wasm build (`#[cfg(not(target_arch = "wasm32"))]`). `dest_guard` is the one
+//! `std::fs` user here that is deliberately NOT gated: it compiles for wasm32,
+//! where `canonicalize` always fails and so every destination is refused — which
+//! is the right answer for a client with no OS path to write to.
 
 pub mod atomic_write;
 #[cfg(not(target_arch = "wasm32"))]
