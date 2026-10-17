@@ -15,6 +15,10 @@
 // room, escape the clipping ancestor, and dismiss on an outside press, and
 // four things re-derived per call site is four things that drift.
 //
+// A context menu is the same panel with a cursor for an anchor: `point` feeds
+// a zero-size box into the same placement, so a right-click menu flips up and
+// clamps at the window edges without a second copy of that arithmetic.
+//
 // ── What it does NOT own ───────────────────────────────────────────────────
 // The panel's own look. Background, border, radius and padding stay with the
 // caller, because a menu and a path disclosure do not want the same chrome.
@@ -43,9 +47,23 @@ interface AnchoredPanelProps {
    * in the same component.
    */
   anchorRef: RefObject<HTMLElement | null>;
+  /**
+   * Open at a CURSOR POINT instead of off the anchor (a context menu). The
+   * anchor is still the element an outside press must not dismiss, so
+   * `anchorRef` stays required; only the placement moves. The point is treated
+   * as a zero-size trigger, so it gets the same flip-up and edge clamp.
+   */
+  point?: { x: number; y: number } | null;
   children: ReactNode;
   /** Minimum width in px. Default 160. */
   minWidth?: number;
+  /**
+   * Ceiling on the panel's width in px. Passed as a prop rather than through
+   * `style`, because the placement writes its own `maxWidth` and would
+   * otherwise drop the caller's. Always additionally capped at the window's
+   * width. Default: no ceiling beyond the window.
+   */
+  maxWidth?: number;
   /** Which edge of the anchor to align to. Default `end` (the right edge). */
   align?: "start" | "end";
   /** The caller's chrome. Merged OVER the placement, so a caller can never
@@ -61,8 +79,10 @@ export function AnchoredPanel({
   open,
   onClose,
   anchorRef,
+  point = null,
   children,
   minWidth = 160,
+  maxWidth,
   align = "end",
   style,
   testId,
@@ -87,9 +107,36 @@ export function AnchoredPanel({
       setCoords(null);
       return;
     }
-    const el = anchorRef.current;
-    if (el === null) return;
-    const r = el.getBoundingClientRect();
+    // The box the panel hangs off. A cursor point is a zero-size box, so the
+    // context-menu shape reuses the whole path below rather than deriving a
+    // second arithmetic of its own.
+    let r: {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      width: number;
+    };
+    if (point !== null) {
+      r = {
+        left: point.x,
+        top: point.y,
+        right: point.x,
+        bottom: point.y,
+        width: 0,
+      };
+    } else {
+      const el = anchorRef.current;
+      if (el === null) return;
+      const box = el.getBoundingClientRect();
+      r = {
+        left: box.left,
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        width: box.width,
+      };
+    }
     const width = Math.max(minWidth, r.width);
     // Right-aligned to the anchor, or left-aligned to it, and clamped at BOTH
     // window edges either way. The clamp is not decoration: a panel wider than
@@ -106,10 +153,14 @@ export function AnchoredPanel({
       left,
       minWidth: width,
       // A hard ceiling as well as a clamp: whatever the content does, the panel
-      // cannot be wider than the window it has to live in.
-      maxWidth: window.innerWidth - EDGE * 2,
+      // cannot be wider than the window it has to live in, or than the cap the
+      // caller named.
+      maxWidth: Math.min(
+        maxWidth ?? Number.POSITIVE_INFINITY,
+        window.innerWidth - EDGE * 2,
+      ),
     });
-  }, [open, anchorRef, minWidth, align]);
+  }, [open, anchorRef, minWidth, maxWidth, align, point?.x, point?.y]);
 
   // **The second pass, and it is here because the first cannot know the width.**
   // (myne-md/myne#867.) `left` above is clamped against `max(minWidth,
