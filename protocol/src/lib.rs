@@ -72,6 +72,7 @@ pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
 pub mod graph_layout_blob;
+pub mod hex;
 pub mod kdf;
 pub mod manifest;
 pub mod member_names_blob;

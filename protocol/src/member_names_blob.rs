@@ -246,9 +246,7 @@ impl From<EnvelopeError> for MemberNamesBlobError {
 }
 
 fn is_person_id_hex(s: &str) -> bool {
-    s.len() == PERSON_ID_HEX_LEN
-        && s.bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    s.len() == PERSON_ID_HEX_LEN && crate::hex::is_lower_hex(s)
 }
 
 fn person_id_from_hex(s: &str) -> Option<[u8; 16]> {
@@ -265,21 +263,8 @@ fn person_id_from_hex(s: &str) -> Option<[u8; 16]> {
     Some(out)
 }
 
-/// Lowercase hex, the rendering every signature in this family uses.
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push(HEX[(b >> 4) as usize] as char);
-        s.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    s
-}
-
 fn is_hex_len(s: &str, byte_len: usize) -> bool {
-    s.len() == byte_len * 2
-        && s.bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    s.len() == byte_len * 2 && crate::hex::is_lower_hex(s)
 }
 
 /// Validate one row against the family's rules.
@@ -545,7 +530,7 @@ pub fn sign_member_name(
         name: String::from(name),
         version,
         tombstone,
-        signature_hex: hex_lower(&bytes),
+        signature_hex: crate::hex::encode_lower(&bytes),
     })
 }
 
@@ -723,7 +708,7 @@ mod tests {
         version: u64,
     ) -> (String, MemberNameEntry) {
         let mut rng = SeededRng(0);
-        let id = hex_lower(&person_id(byte));
+        let id = crate::hex::encode_lower(&person_id(byte));
         let row = sign_member_name(person, &person_id(byte), version, false, name, &mut rng)
             .expect("sign");
         (id, row)
@@ -959,7 +944,7 @@ mod tests {
         // A live entry with no name.
         let blank = format!(
             r#"{{"{}":{{"name":"","version":1,"tombstone":false,"signature_hex":"{}"}}}}"#,
-            hex_lower(&person_id(0x11)),
+            crate::hex::encode_lower(&person_id(0x11)),
             placeholder_signature()
         );
         assert_eq!(
@@ -970,7 +955,7 @@ mod tests {
         let long = "x".repeat(MAX_MEMBER_NAME_LEN + 1);
         let over = format!(
             r#"{{"{}":{{"name":"{}","version":1,"tombstone":false,"signature_hex":"{}"}}}}"#,
-            hex_lower(&person_id(0x11)),
+            crate::hex::encode_lower(&person_id(0x11)),
             long,
             placeholder_signature()
         );
@@ -982,7 +967,7 @@ mod tests {
         let mut short_sig = MemberNamesMap::new();
         let mut row = entry("Ada", 1, false);
         row.signature_hex = "aa".to_string();
-        short_sig.insert(hex_lower(&person_id(0x11)), row);
+        short_sig.insert(crate::hex::encode_lower(&person_id(0x11)), row);
         assert_eq!(
             encode_member_names_map(&short_sig),
             Err(MemberNamesBlobError::MapMalformed)
@@ -992,7 +977,7 @@ mod tests {
         // so the re-serialization differs and the parse is refused by name.
         let non_canonical = format!(
             r#"{{"{}":{{"version":1,"tombstone":false,"name":"Ada","signature_hex":"{}"}}}}"#,
-            hex_lower(&person_id(0x11)),
+            crate::hex::encode_lower(&person_id(0x11)),
             placeholder_signature()
         );
         assert_eq!(
@@ -1041,7 +1026,9 @@ mod tests {
         map.insert(id, row);
         let blob = encode_member_names_blob(&KEY, &ACCT, EPOCH, &map).expect("seal");
         let back = decode_member_names_blob(&KEY, &ACCT, EPOCH, &blob).expect("open");
-        let round_tripped = back.get(&hex_lower(&person_id(0x11))).expect("row");
+        let round_tripped = back
+            .get(&crate::hex::encode_lower(&person_id(0x11)))
+            .expect("row");
         assert!(verify_member_name(
             &ann.public_half(),
             &person_id(0x11),
@@ -1133,7 +1120,7 @@ mod tests {
         let (ann_id, ann_row) = signed_row(&ann, 0x11, "Ada", 1);
         let (_, mut forged) = signed_row(&bob, 0x22, "Bob", 1);
         forged.name = "Not Bob".to_string();
-        let bob_id = hex_lower(&person_id(0x22));
+        let bob_id = crate::hex::encode_lower(&person_id(0x22));
         let mut map = MemberNamesMap::new();
         map.insert(ann_id.clone(), ann_row);
         map.insert(bob_id.clone(), forged);
@@ -1158,7 +1145,7 @@ mod tests {
         let mut map = MemberNamesMap::new();
         let mut row = entry("Ada", 1, false);
         row.signature_hex = "not hex".to_string();
-        map.insert(hex_lower(&person_id(0x11)), row);
+        map.insert(crate::hex::encode_lower(&person_id(0x11)), row);
         assert_eq!(
             encode_member_names_map(&map),
             Err(MemberNamesBlobError::MapMalformed)
@@ -1194,7 +1181,7 @@ mod tests {
         use crate::aead::aad_member_names_blob;
         use crate::blob_envelope::encode_blob_envelope_raw;
         use crate::subkey::{derive_group_subkey_v0_2, GroupKey, GroupRole};
-        use crate::test_vector_fmt::{hex_lower, json_escape};
+        use crate::test_vector_fmt::json_escape;
         use alloc::format;
         use alloc::string::String;
 
@@ -1297,8 +1284,14 @@ mod tests {
 
         // ---- the maps the codec cases are built from -------------------------
         let mut two_row = MemberNamesMap::new();
-        two_row.insert(hex_lower(&person_id(0x0b)), entry("Ada Lovelace", 1, false));
-        two_row.insert(hex_lower(&person_id(0x0d)), entry("", 4, true));
+        two_row.insert(
+            crate::hex::encode_lower(&person_id(0x0b)),
+            entry("Ada Lovelace", 1, false),
+        );
+        two_row.insert(
+            crate::hex::encode_lower(&person_id(0x0d)),
+            entry("", 4, true),
+        );
         let empty: MemberNamesMap = MemberNamesMap::new();
         let cap_name: String = core::iter::repeat_n('x', MAX_MEMBER_NAME_LEN).collect();
         let over_cap_name: String = core::iter::repeat_n('x', MAX_MEMBER_NAME_LEN + 1).collect();
@@ -1310,9 +1303,15 @@ mod tests {
         assert_eq!(multibyte_cap.chars().count(), MAX_MEMBER_NAME_LEN / 2);
 
         let mut cap_map = MemberNamesMap::new();
-        cap_map.insert(hex_lower(&person_id(0x0b)), entry(&cap_name, 1, false));
+        cap_map.insert(
+            crate::hex::encode_lower(&person_id(0x0b)),
+            entry(&cap_name, 1, false),
+        );
         let mut multibyte_map = MemberNamesMap::new();
-        multibyte_map.insert(hex_lower(&person_id(0x0b)), entry(&multibyte_cap, 1, false));
+        multibyte_map.insert(
+            crate::hex::encode_lower(&person_id(0x0b)),
+            entry(&multibyte_cap, 1, false),
+        );
 
         // One map carrying a REAL signature, so the codec is pinned against a row
         // `verify_member_name` accepts rather than only against placeholders.
@@ -1333,9 +1332,9 @@ mod tests {
         let signer_json = |public: &crate::person_key::PersonPublicHalf| -> String {
             format!(
                 "      \"input_signer_kem_ek_hex\": \"{}\",\n      \"input_signer_ed_pk_hex\": \"{}\",\n      \"input_signer_mldsa_vk_hex\": \"{}\",\n",
-                hex_lower(public.kem_ek()),
-                hex_lower(public.ed_pk()),
-                hex_lower(public.mldsa_vk()),
+                crate::hex::encode_lower(public.kem_ek()),
+                crate::hex::encode_lower(public.ed_pk()),
+                crate::hex::encode_lower(public.mldsa_vk()),
             )
         };
         let entry_json = |e: &MemberNameEntry| -> String {
@@ -1348,7 +1347,7 @@ mod tests {
             )
         };
         let bytes_hex = |id: &[u8; 16], version: u64, tombstone: bool, name: &str| -> String {
-            hex_lower(&member_name_signed_bytes(id, version, tombstone, name))
+            crate::hex::encode_lower(&member_name_signed_bytes(id, version, tombstone, name))
         };
 
         // A member removing their OWN name: the row names the signer.
@@ -1433,12 +1432,12 @@ mod tests {
             );
             let body = format!(
                 "      \"input_member_names_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"input_nonce_hex\": \"{}\",\n      \"input_map\": {},\n      \"expected_blob_hex\": \"{}\",\n      \"informational_header_len\": {},\n      \"informational_nonce_offset\": 6,\n      \"expected_magic_ascii\": \"MYO5\",\n      \"expected_protocol_version_byte_hex\": \"01\",\n      \"expected_format_version_byte_hex\": \"01\"\n",
-                hex_lower(&key),
-                hex_lower(&acct),
+                crate::hex::encode_lower(&key),
+                crate::hex::encode_lower(&acct),
                 epoch,
-                hex_lower(&nonce),
+                crate::hex::encode_lower(&nonce),
                 mj,
-                hex_lower(&blob),
+                crate::hex::encode_lower(&blob),
                 MEMBER_NAMES_BLOB_HEADER_LEN,
             );
             case(&mut dump, slug, "encrypt", desc, &body, true);
@@ -1505,9 +1504,9 @@ mod tests {
             );
             let body = format!(
                 "      \"input_blob_hex\": \"{}\",\n      \"input_member_names_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"expected_error\": \"{}\"\n",
-                hex_lower(blob),
-                hex_lower(reader_key),
-                hex_lower(reader_account),
+                crate::hex::encode_lower(blob),
+                crate::hex::encode_lower(reader_key),
+                crate::hex::encode_lower(reader_account),
                 reader_epoch,
                 expected,
             );
@@ -1691,10 +1690,10 @@ mod tests {
             assert_eq!(err_name(&got), expected, "[{slug}] mislabelled error");
             let body = format!(
                 "      \"input_member_names_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"input_nonce_hex\": \"{}\",\n      \"input_map\": {},\n      \"expected_error\": \"{}\"\n",
-                hex_lower(writer_key),
-                hex_lower(&acct),
+                crate::hex::encode_lower(writer_key),
+                crate::hex::encode_lower(&acct),
                 writer_epoch,
-                hex_lower(&nonce),
+                crate::hex::encode_lower(&nonce),
                 map_json(map),
                 expected,
             );
@@ -1702,7 +1701,10 @@ mod tests {
         };
 
         let mut over_cap_map = MemberNamesMap::new();
-        over_cap_map.insert(hex_lower(&person_id(0x0b)), entry(&over_cap_name, 1, false));
+        over_cap_map.insert(
+            crate::hex::encode_lower(&person_id(0x0b)),
+            entry(&over_cap_name, 1, false),
+        );
         encode_case(
             &mut dump,
             "encode-fail-over-cap-name",
@@ -1714,7 +1716,10 @@ mod tests {
             true,
         );
         let mut named_tombstone = MemberNamesMap::new();
-        named_tombstone.insert(hex_lower(&person_id(0x0b)), entry("Ada Lovelace", 4, true));
+        named_tombstone.insert(
+            crate::hex::encode_lower(&person_id(0x0b)),
+            entry("Ada Lovelace", 4, true),
+        );
         encode_case(
             &mut dump,
             "encode-fail-tombstone-with-a-name",
@@ -1747,7 +1752,7 @@ mod tests {
                           trailing: bool| {
             let body = format!(
                 "      \"input_person_id_hex\": \"{}\",\n      \"input_version\": {},\n      \"input_tombstone\": {},\n      \"input_name_utf8\": \"{}\",\n      \"informational_name_len_bytes\": {},\n      \"expected_prefix_ascii\": \"myne.member-name v1|\",\n      \"expected_message_hex\": \"{}\"\n",
-                hex_lower(id),
+                crate::hex::encode_lower(id),
                 version,
                 tombstone,
                 json_escape(name),
@@ -1812,9 +1817,9 @@ mod tests {
             // the public half FROM these fields, would agree with the wrong
             // answer instead of failing.
             let rebuilt = crate::person_key::PersonPublicHalf::from_parts_hex(
-                &hex_lower(public.kem_ek()),
-                &hex_lower(public.ed_pk()),
-                &hex_lower(public.mldsa_vk()),
+                &crate::hex::encode_lower(public.kem_ek()),
+                &crate::hex::encode_lower(public.ed_pk()),
+                &crate::hex::encode_lower(public.mldsa_vk()),
             )
             .expect("the emitted public-half parts must round-trip");
             assert_eq!(
@@ -1835,10 +1840,10 @@ mod tests {
             let signed = member_name_signed_bytes(id, row.version, row.tombstone, &row.name);
             let body = format!(
                 "      \"verifier\": \"{verifier}\",\n      \"input_person_id_hex\": \"{}\",\n{}{}      \"informational_signed_bytes_hex\": \"{}\",\n      \"expected_verified\": {}\n",
-                hex_lower(id),
+                crate::hex::encode_lower(id),
                 entry_json(row),
                 signer_json(public),
-                hex_lower(&signed),
+                crate::hex::encode_lower(&signed),
                 expected,
             );
             case(dump, slug, "verify", description, &body, trailing);
@@ -1969,9 +1974,9 @@ mod tests {
             );
             let body = format!(
                 "      \"input_group_key_hex\": \"{}\",\n      \"input_role\": \"{}\",\n      \"expected_subkey_hex\": \"{}\"\n",
-                hex_lower(&group_key),
+                crate::hex::encode_lower(&group_key),
                 role_str,
-                hex_lower(&derived[..]),
+                crate::hex::encode_lower(&derived[..]),
             );
             case(dump, slug, "group_subkey", description, &body, trailing);
         };
