@@ -164,23 +164,7 @@ impl From<ProtocolError> for EmbeddingsBlobError {
     }
 }
 
-impl From<EnvelopeError> for EmbeddingsBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => EmbeddingsBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => EmbeddingsBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => EmbeddingsBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => EmbeddingsBlobError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => EmbeddingsBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => EmbeddingsBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => EmbeddingsBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => EmbeddingsBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => EmbeddingsBlobError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(EmbeddingsBlobError);
 
 /// Encode a `vault.embeddings` blob from an opaque `plaintext` (the desktop
 /// layer's serialized embedding store + manifest + model-identity tuple),

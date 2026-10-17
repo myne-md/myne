@@ -134,24 +134,8 @@ impl From<ProtocolError> for DictionaryBlobError {
     }
 }
 
-impl From<EnvelopeError> for DictionaryBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
-    /// `FormatUnsupported` → `DictFormatUnsupported` rename (§9.13 spelling).
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => DictionaryBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => DictionaryBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => DictionaryBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => DictionaryBlobError::DictFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => DictionaryBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => DictionaryBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => DictionaryBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => DictionaryBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => DictionaryBlobError::RandomnessUnavailable,
-        }
-    }
-}
+// §9.13 spells the format hook `DictFormatUnsupported`.
+crate::blob_envelope::impl_from_envelope_error!(DictionaryBlobError, format: DictFormatUnsupported, plaintext_too_large: PlaintextTooLarge);
 
 /// Encode a `vault.dictionary` blob from an opaque `plaintext` (the desktop
 /// layer's serialized `{personal_words, ignore_words}`), sealing under

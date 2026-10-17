@@ -130,23 +130,7 @@ impl From<ProtocolError> for WorkspaceBlobError {
     }
 }
 
-impl From<EnvelopeError> for WorkspaceBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => WorkspaceBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => WorkspaceBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => WorkspaceBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => WorkspaceBlobError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => WorkspaceBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => WorkspaceBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => WorkspaceBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => WorkspaceBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => WorkspaceBlobError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(WorkspaceBlobError);
 
 /// Encode a `vault.workspace` blob from an opaque `plaintext` (the desktop
 /// layer's serialized pane-tree descriptor), sealing under

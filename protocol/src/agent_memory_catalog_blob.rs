@@ -138,25 +138,7 @@ impl From<ProtocolError> for AgentMemoryCatalogError {
     }
 }
 
-impl From<EnvelopeError> for AgentMemoryCatalogError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface stays unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => AgentMemoryCatalogError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => AgentMemoryCatalogError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => {
-                AgentMemoryCatalogError::ProtocolVersionMismatch
-            }
-            EnvelopeError::FormatUnsupported => AgentMemoryCatalogError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => AgentMemoryCatalogError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => AgentMemoryCatalogError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => AgentMemoryCatalogError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => AgentMemoryCatalogError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => AgentMemoryCatalogError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(AgentMemoryCatalogError);
 
 /// Encode an agent-memory catalog blob from an opaque `plaintext` (the client
 /// layer's canonical-JSON roster), sealing under `agent_memory_catalog_key`

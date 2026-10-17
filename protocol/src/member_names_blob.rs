@@ -229,21 +229,9 @@ pub enum MemberNamesBlobError {
     SignatureUnavailable,
 }
 
-impl From<EnvelopeError> for MemberNamesBlobError {
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => Self::HeaderTooShort,
-            EnvelopeError::MagicMismatch => Self::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => Self::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => Self::MemberNamesFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => Self::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => Self::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => Self::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => Self::CiphertextLenOverflow,
-            EnvelopeError::RandomnessUnavailable => Self::RandomnessUnavailable,
-        }
-    }
-}
+// MYO5: the format hook is family-prefixed, and PlaintextTooLarge collapses
+// into CiphertextLenOverflow so this family's parse_fail surface does not widen.
+crate::blob_envelope::impl_from_envelope_error!(MemberNamesBlobError, format: MemberNamesFormatUnsupported, plaintext_too_large: CiphertextLenOverflow);
 
 fn is_person_id_hex(s: &str) -> bool {
     s.len() == PERSON_ID_HEX_LEN && crate::hex::is_lower_hex(s)

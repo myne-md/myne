@@ -152,25 +152,7 @@ impl From<ProtocolError> for VaultIndicesBlobError {
     }
 }
 
-impl From<EnvelopeError> for VaultIndicesBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => VaultIndicesBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => VaultIndicesBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => {
-                VaultIndicesBlobError::ProtocolVersionMismatch
-            }
-            EnvelopeError::FormatUnsupported => VaultIndicesBlobError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => VaultIndicesBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => VaultIndicesBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => VaultIndicesBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => VaultIndicesBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => VaultIndicesBlobError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(VaultIndicesBlobError);
 
 /// Encode a `vault.indices` blob from an opaque `plaintext` (the desktop
 /// layer's serialized structured-metadata index), sealing under
