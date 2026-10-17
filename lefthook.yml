@@ -28,6 +28,17 @@ pre-commit:
       # pre-commit gate and its `--no-verify` backstop cannot drift apart.
       run: node scripts/check-spdx-headers.mjs {staged_files}
 
+    private-path-refs:
+      # A path into a private companion (`myne-ops/`, `myne-agents/`,
+      # `myne-range/`) written into a tree this repository publishes is a
+      # reference a reader cannot follow, and they cannot tell "internal" from
+      # "moved". The recorded set may shrink and never grow: `--record` refuses a
+      # grown set, so the command its failure message suggests cannot make a
+      # finding disappear. Its own header states the classes and the reason each
+      # carries; ~250 dated decision entries are permanent by the append-only
+      # rule, and the rest is debt that can only fall.
+      run: node scripts/check-private-path-refs.mjs
+
     tsc:
       glob: "*.{ts,tsx}"
       run: pnpm exec tsc --noEmit
