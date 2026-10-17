@@ -2072,7 +2072,11 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
-      "e2e/floating-toolbar-placement.e2e.ts",
+      // `e2e/floating-toolbar-placement.e2e.ts` was credited here and is
+      // WITHDRAWN: its only test is `it.skip`, so it automates nothing. Recorded
+      // in `SKIPPED_SCENARIOS` (scripts/check-manual-test-roster.mjs) with what
+      // blocks it, which is where the gap is now visible instead of hidden
+      // behind this claim.
       "e2e/toolbar-customize.e2e.ts",
       "e2e/highlight-color.e2e.ts",
       "e2e/hotkeys.e2e.ts",
@@ -7273,7 +7277,8 @@ export const ROSTER = Object.freeze([
     automatedBy: [
       "e2e-web/opfs-seed.e2e.ts",
       "e2e-web/unlock-from-fixture.e2e.ts",
-      "e2e-web/quarantine-roundtrip.e2e.ts",
+      // `e2e-web/quarantine-roundtrip.e2e.ts` WITHDRAWN: `it.skip`, "this one
+      // never passes". See `SKIPPED_SCENARIOS`.
     ],
     manual: [
       {
@@ -7375,7 +7380,8 @@ export const ROSTER = Object.freeze([
       "e2e-web/opfs-seed.e2e.ts",
       "e2e-web/create-account.e2e.ts",
       "e2e-web/unlock-from-fixture.e2e.ts",
-      "e2e-web/quarantine-roundtrip.e2e.ts",
+      // `e2e-web/quarantine-roundtrip.e2e.ts` WITHDRAWN: `it.skip`, "this one
+      // never passes". See `SKIPPED_SCENARIOS`.
     ],
     manual: [
       {

@@ -10,11 +10,17 @@
 // synthetic roster rather than a mutation of the real one: no `git restore`, no
 // half-restored working copy, and every case runs on every commit.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
+const ROOT = new URL("../../", import.meta.url).pathname;
 
 import {
   CLIENTS,
   MIN_REASON_CHARS,
+  SKIPPED_SCENARIOS,
   VAGUE_REASONS,
   analyse,
   coverageGaps,
@@ -22,6 +28,8 @@ import {
   gates,
   hours,
   projectionBody,
+  runnableTestDeclarations,
+  staticallySkipped,
   totalMinutes,
 } from "../../scripts/check-manual-test-roster.mjs";
 
@@ -74,6 +82,10 @@ function healthy(): Io {
     files: [SCREEN, SETTING],
     e2eFiles: [SCENARIO],
     pathExists: (p: string) => REAL.includes(p),
+    // A scenario that declares a runnable test. `readFile` is a REQUIRED key of
+    // the injected world (the guard throws without it, like `ratchet`), because a
+    // default here would be the arm that silently excuses the automation rule.
+    readFile: (p: string) => (p === SCENARIO ? 'it("runs", () => {});\n' : null),
     verified: {},
     // One core item, one gated client, 3 minutes: gated 3, total 3.
     ratchet: {
@@ -87,6 +99,11 @@ function healthy(): Io {
     // to that would fail on every future widening of the real one.
     baseline: { gatedTiers: ["core"], gatedClients: ["desktop-macos"] },
     notASurface: { [SCREEN]: "Not really exempt, but the map needs an entry whose file exists to be non-vacuous." },
+    // Empty on purpose: the synthetic world has no statically-skipped scenarios,
+    // and injecting the REAL table here would have every one of its entries fail
+    // the staleness arm against files this world does not have. The real table is
+    // checked against the real tree in "ships a non-empty skip table…" below.
+    skippedScenarios: {},
   };
 }
 
@@ -608,5 +625,90 @@ describe("the rules that had a green path and no injection", () => {
     };
     io.pathExists = (p: string) => [...REAL, "src-tauri/src/main.rs"].includes(p);
     expect(messages(io)).toMatch(/NOT_A_SURFACE names src-tauri\/src\/main\.rs, which is in no denominator/);
+  });
+});
+
+describe("an automation claim must name a scenario that RUNS", () => {
+  const SKIPPED = "e2e/floating-toolbar-placement.e2e.ts";
+  const SKIP_SOURCE = 'it.skip("clamps inside the window", async () => {});\n';
+
+  /**
+   * The world the rule was written for: an entry credits a scenario whose only
+   * test is skipped, so the manual half is told CI covers a property nobody
+   * covers. `e2e/floating-toolbar-placement.e2e.ts` and
+   * `e2e-web/quarantine-roundtrip.e2e.ts` were both in that state, the first
+   * unnoticed by the audit that produced this rule.
+   */
+  function creditingASkip(): Io {
+    const io = healthy();
+    io.e2eFiles = [SKIPPED];
+    io.pathExists = (p: string) => p === SCREEN || p === SETTING || p === SKIPPED;
+    io.readFile = (p: string) => (p === SKIPPED ? SKIP_SOURCE : null);
+    io.skippedScenarios = {};
+    io.roster = [
+      {
+        ...io.roster![0]!,
+        automatedBy: [SKIPPED],
+      },
+      io.roster![1]!,
+    ];
+    return io;
+  }
+
+  it("names the entry that credits it", () => {
+    expect(messages(creditingASkip())).toMatch(/automatedBy credits e2e\/floating-toolbar-placement\.e2e\.ts/);
+  });
+
+  it("accepts the same scenario once no entry credits it, in a world where it is unclaimed", () => {
+    // The other direction: withdrawing the claim is a FIX, not a new finding.
+    // The scenario sits in the e2e denominator, so leaving it unclaimed is only
+    // allowed because the skip table records it — which is the next case.
+    const io = creditingASkip();
+    io.roster = [{ ...io.roster![0]!, automatedBy: [] }, io.roster![1]!];
+    expect(messages(io)).toMatch(/no roster entry names e2e\/floating-toolbar-placement\.e2e\.ts/);
+    io.skippedScenarios = { [SKIPPED]: "it.skip, and the file's header says why: doubleClick() takes no offset." };
+    expect(messages(io)).not.toMatch(/no roster entry names/);
+  });
+
+  it("refuses a skip-table entry whose file now RUNS, and one whose file is gone", () => {
+    const io = creditingASkip();
+    io.roster = [{ ...io.roster![0]!, automatedBy: [] }, io.roster![1]!];
+    // Runnable again → the note is stale and the gap it records is a claim about
+    // nothing.
+    io.skippedScenarios = { [SKIPPED]: "it.skip, and the file's header says why: doubleClick() takes no offset." };
+    io.readFile = () => 'it("runs", () => {});\n';
+    expect(messages(io)).toMatch(/SKIPPED_SCENARIOS\[e2e\/floating-toolbar-placement\.e2e\.ts\] is stale/);
+    // Gone → the entry describes a file that is not there.
+    io.pathExists = (p: string) => p === SCREEN || p === SETTING;
+    expect(messages(io)).toMatch(/SKIPPED_SCENARIOS names e2e\/floating-toolbar-placement\.e2e\.ts, which no longer exists/);
+  });
+
+  it("still credits a scenario that declares a runnable test, even with a skip beside it", () => {
+    const io = creditingASkip();
+    io.readFile = () => 'it("runs", () => {});\nit.skip("does not", () => {});\n';
+    io.skippedScenarios = {};
+    expect(messages(io)).not.toMatch(/automatedBy credits/);
+  });
+
+  it("ships a non-empty skip table whose every entry still describes a skipped file", () => {
+    // The real table, against the real tree. Without this the rule above could be
+    // satisfied by an EMPTY table and a roster that quietly credits nothing.
+    expect(Object.keys(SKIPPED_SCENARIOS).length).toBeGreaterThan(0);
+    for (const [file, reason] of Object.entries(SKIPPED_SCENARIOS)) {
+      expect(reason.length).toBeGreaterThan(MIN_REASON_CHARS);
+      expect(staticallySkipped(readFileSync(join(ROOT, file), "utf8"))).toBe(true);
+    }
+  });
+
+  it("tells a skipped scenario from a module that declares no tests at all", () => {
+    // `automatedBy` legitimately names the repo guards, which declare no tests
+    // and do automate the surface they are listed against. Flagging those would
+    // be the false positive `check-core-io-seam.mjs` records.
+    expect(staticallySkipped("const x = 1;\nconsole.log(x);\n")).toBe(false);
+    expect(runnableTestDeclarations('it("a", () => {});')).toBe(1);
+    expect(runnableTestDeclarations("it.skip(\"a\", () => {});")).toBe(0);
+    expect(runnableTestDeclarations("it.skipIf(true)(\"a\", () => {});")).toBe(0);
+    expect(staticallySkipped('it.skip("a", () => {});')).toBe(true);
+    expect(staticallySkipped('it("a", () => {});')).toBe(false);
   });
 });

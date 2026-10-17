@@ -176,6 +176,59 @@ export const DENOMINATORS = Object.freeze([
 export const SURFACE_SUBDIRS = Object.freeze(["screens", join("components", "settings")]);
 
 /**
+ * A non-skipped `it(` / `test(` declaration in a scenario source.
+ *
+ * `it.skip(` and `it.skipIf(` do NOT match: the name has to be followed by the
+ * call's own `(`. That is the whole discriminator, and it is deliberately
+ * syntactic — this guard reads a declaration, never a run.
+ */
+export function runnableTestDeclarations(source) {
+  return (source.match(/(?:^|[^\w.$])(?:it|test)\s*\(/gm) || []).length;
+}
+
+/**
+ * Is every test this scenario declares statically skipped?
+ *
+ * Needs BOTH halves: a file with no declarations at all is not a skipped
+ * scenario, it is an unrelated module — `automatedBy` legitimately names the
+ * repo guards (`scripts/check-icons.mjs`), which declare no tests and do automate
+ * the surface they are listed against. Flagging those would be a false positive
+ * of exactly the shape `check-core-io-seam.mjs` records.
+ */
+export function staticallySkipped(source) {
+  if (runnableTestDeclarations(source) > 0) return false;
+  return /(?:^|[^\w.$])(?:it|test)\.skip(?:If)?\s*\(/m.test(source);
+}
+
+/**
+ * Scenario files that declare nothing but skipped tests, and why.
+ *
+ * **A statically skipped scenario automates nothing, and until this table
+ * existed the roster could claim it anyway.** Rule 1 checked only that an
+ * `automatedBy` path EXISTED, so `e2e/floating-toolbar-placement.e2e.ts` — whose
+ * single test is `it.skip`, with a header explaining that the selection it needs
+ * cannot be built from `doubleClick()` — was credited as covering the floating
+ * toolbar's placement, and `e2e-web/quarantine-roundtrip.e2e.ts` as covering two
+ * web surfaces, in a file that says of itself "this one never passes".
+ *
+ * The consequence is not a missing test, which the file's own header admits to.
+ * It is that the manual half is told CI covers the property, so nobody walks it
+ * — the same silent hand-off `check-twin-drift.mjs` warns about one repository
+ * over. The fix is per-file and honest: the claim is withdrawn, the file is
+ * recorded here with what blocks it, and a file that starts RUNNING again fails
+ * this table's staleness arm so the note cannot outlive the fact.
+ *
+ * Membership does not require anything of the file beyond being statically
+ * skipped, and it satisfies the e2e denominator for a file that is in one.
+ */
+export const SKIPPED_SCENARIOS = Object.freeze({
+  "e2e/floating-toolbar-placement.e2e.ts":
+    "its only test is `it.skip`. The three placement probes need a selection the driver cannot make: `doubleClick()` takes no offset, so the right-edge probe cannot be built, which the file's own header states along with the fix (a hand-built pointer sequence).",
+  "e2e-web/quarantine-roundtrip.e2e.ts":
+    "its only test is `it.skip`, and it is not flaky — it does not pass. The driver cannot click `settings.tab-sync` inside the modal (`element not interactable` until the budget runs out), so the quarantine enumeration and unlink never run. The file's header records both the diagnosis and what would unblock it.",
+});
+
+/**
  * Directories that look like a surface roster and are not one.
  *
  * `mobile/src/screens/` is the DESIGN GALLERY, not the app: every module there
@@ -357,6 +410,8 @@ export function coverageGaps(roots, dirExists, exempt = NOT_A_SURFACE_ROSTER) {
  *                                  fires, excusing a future caller from Rule 5 without anyone
  *                                  choosing it (`AGENTS.md`, myne-md/myne#533).
  * @param {object} [io.notASurface] the exemption map; defaults to the module's own
+ * @param {object} [io.skippedScenarios] the statically-skipped scenario table; defaults to
+ *                                        the module's own {@link SKIPPED_SCENARIOS}
  * @param {Array}  [io.denominators] the denominator roster; defaults to {@link DENOMINATORS}
  * @param {{gatedTiers: string[], gatedClients: string[]}} [io.baseline] the gate floor; defaults to {@link RATCHET_BASELINE}
  * @param {string[]} [io.missingRoots] shared roots absent from the checkout
@@ -367,11 +422,18 @@ export function analyse(io) {
   if (!("ratchet" in io)) {
     throw new Error("analyse: `ratchet` is required. Pass the recorded pair, or `null` to opt out explicitly.");
   }
+  // Same reasoning as `ratchet` above: a default here would be the arm that
+  // never fires, and this one guards a rule about automation claims — the arm it
+  // would silently excuse is the whole point of the rule.
+  if (typeof io.readFile !== "function") {
+    throw new Error("analyse: `readFile` is required. Pass a repo-relative reader, or `null` to opt out explicitly.");
+  }
   const failures = [];
   const notes = [];
   const warnings = [];
   const roster = io.roster || [];
   const notASurface = io.notASurface || NOT_A_SURFACE;
+  const skippedScenarios = io.skippedScenarios || SKIPPED_SCENARIOS;
 
   // --- Rule 0: the entries are well formed at all. -------------------------
   const seenIds = new Set();
@@ -411,7 +473,43 @@ export function analyse(io) {
           `${entry.id}: automatedBy names a scenario file that does not exist: ${scenario}. ` +
             `An automation claim nobody can check is how a surface stops being tested by either half.`,
         );
+        continue;
       }
+      // Existence is not automation. A file whose every declaration is skipped
+      // runs nothing, so crediting it tells the manual half that CI covers a
+      // property nobody covers. It belongs in SKIPPED_SCENARIOS instead.
+      const source = io.readFile ? io.readFile(scenario) : null;
+      if (source !== null && staticallySkipped(source)) {
+        failures.push(
+          `${entry.id}: automatedBy credits ${scenario}, whose tests are ALL statically skipped. ` +
+            `A skipped scenario automates nothing: withdraw the claim and record the file in ` +
+            `SKIPPED_SCENARIOS with what blocks it, or the manual half is told CI covers this.`,
+        );
+      }
+    }
+  }
+
+  // ...and the skip table's own two directions. A note that outlives its subject
+  // is the shape Rule 1 exists to catch, and an entry here is a claim that a file
+  // does NOT run.
+  for (const [file, reason] of Object.entries(skippedScenarios)) {
+    if (!io.pathExists(file)) {
+      failures.push(`SKIPPED_SCENARIOS names ${file}, which no longer exists. Remove the entry.`);
+      continue;
+    }
+    if (typeof reason !== "string" || reason.trim().length < MIN_REASON_CHARS) {
+      failures.push(
+        `SKIPPED_SCENARIOS[${file}]: reason is shorter than ${MIN_REASON_CHARS} characters. ` +
+          `Saying a scenario does not run is a coverage claim; it has to say what blocks it.`,
+      );
+      continue;
+    }
+    const source = io.readFile ? io.readFile(file) : null;
+    if (source !== null && !staticallySkipped(source)) {
+      failures.push(
+        `SKIPPED_SCENARIOS[${file}] is stale: the file now declares a runnable test. ` +
+          `Remove the entry and let an entry credit it, or the gap it records is a claim about nothing.`,
+      );
     }
   }
 
@@ -505,6 +603,10 @@ export function analyse(io) {
   }
 
   for (const file of io.e2eFiles || []) {
+    // A scenario that declares nothing but skips is not owed a claim, because
+    // there is nothing for it to automate. It IS owed an entry in the skip table,
+    // which is where the gap is recorded instead.
+    if (skippedScenarios[file]) continue;
     if (!claimedScenarios.has(file)) {
       failures.push(
         `no roster entry names ${file} in automatedBy. Every scenario automates some surface; ` +
@@ -998,6 +1100,13 @@ async function main() {
     e2eFiles: walked.e2e,
     pathExists,
     verified,
+    readFile: (p) => {
+      try {
+        return readFileSync(join(ROOT, p), "utf8");
+      } catch {
+        return null;
+      }
+    },
     ratchet,
     coverage: coverageGaps(roots.present, (d) => existsSync(join(ROOT, d))),
     missingRoots: roots.missing,
