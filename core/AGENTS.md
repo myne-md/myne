@@ -222,15 +222,25 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
   field was carried by the wire type, the store and the renderer correctly: the only place it was
   absent was the one function that copied fields by name.
 
-- **Every keychain-backed device-local secret in this crate is Apple-only today.** `quick_unlock`
-  has an `apple.rs`, `captures/device_key.rs` is `#[cfg(any(target_os = "macos", target_os = "ios"))]`,
-  and `vault_label::key::platform_keychain` returns `UnavailableKeychain` on every other target. So a
+- **Every keychain-backed device-local secret in this crate was Apple-only, and there is now ONE
+  exception.** `quick_unlock`'s biometric provider lives in an `apple.rs`, `captures/device_key.rs` is
+  `#[cfg(any(target_os = "macos", target_os = "ios"))]`, and
+  `vault_label::key::platform_keychain` returns `UnavailableKeychain` on every other target, so a
   feature that seals something under a keychain works on macOS and iOS and reports "cannot work here"
   on Windows, Linux and Android. That is the posture rather than an oversight (adding a keychain crate
-  is a dependency decision, which root `AGENTS.md` classes as a security decision), but it has to
-  reach the UI copy and the user guide, or both promise something two of the four platforms do not
-  do. myne-md/myne#411 shipped a guide sentence blaming "a Linux desktop with no secret service",
-  which implied Linux with one worked, and mentioned neither Windows nor Android.
+  is a dependency decision, which root `AGENTS.md` classes as a security decision).
+  **`share_import`'s device key is the exception**: its seal/drain
+  commands call `device_key::resolve`, which reaches an Android Keystore-backed key through
+  `tauri-plugin-share-intent`, so the locked-vault SHARE path seals on Android (device verification
+  still owed — `mobile/src-tauri/tauri-plugin-share-intent/KEYSTORE_TODO.md`). Two clarifications a
+  reader will otherwise get wrong: the no-arg `get_or_create` Android arm still returns
+  `HardwareUnavailable` and is still what `captures` hits, so meeting chunks do NOT seal there; and
+  quick-unlock's PIN half is not keychain-backed at all, so it works off Apple regardless (only its
+  biometric provider is Apple-gated). The UI-copy half of the obligation is unchanged:
+  `vault_label` and quick-unlock biometrics report "cannot work here" on Windows, Linux and Android
+  and that has to reach the user, or both promise something two of the four platforms do not do.
+  myne-md/myne#411 shipped a guide sentence blaming "a Linux desktop with no secret service", which
+  implied Linux with one worked, and mentioned neither Windows nor Android.
 
 - **A breaking change here now fails in the same build, and it did not used to.** Mobile consumed this crate as a path dependency into a *sibling checkout*, so a changed trait method, a changed shared type, or a new `VaultLifecycleHooks` method compiled fine here and broke `MobileHooks` in another repository — which only went red once the change was already on `develop`. The mobile client moved in-repo on 2026-08-13 (`decisions.md`): `mobile/src-tauri` is a workspace member, `cargo clippy --workspace` compiles it, and the `mobile-compile` CI step gates it. No companion PR, no land order, no worktree dance. If you are following an older instruction that mentions any of those, it is stale.
 - **`../../AGENTS.md` pointers in this crate do not resolve.** Modules that moved here brought their relative pointers along, where `../../AGENTS.md` now names a `core/src/AGENTS.md` that has never existed. Write new pointers **repo-relative** — `src-tauri/AGENTS.md "Secret-handling logging discipline"` — which is what the crate-root modules already do.
