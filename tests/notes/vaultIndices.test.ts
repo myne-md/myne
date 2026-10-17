@@ -19,8 +19,11 @@ import {
   backlinks,
   byTag,
   reindexNoteFromBody,
+  tagTree,
+  __resetTagTreeForTest,
   type WikilinkEdge,
 } from "../../src/notes/vaultIndices";
+import { bumpIndexNonce, __resetIndexNonceForTest } from "../../src/notes/indexNonce";
 import type {
   ParseResult,
   WikilinkRef,
@@ -373,5 +376,40 @@ describe("reindexNoteFromBody → the working-set (`live`) leg of the apply payl
     // views would disagree from that moment on.
     await reindexNoteFromBody("n9", "---\ntrashed: 2026-13-45T99:99:99Z\n---\nbody\n");
     expect(applyPayload().live).toBe(true);
+  });
+});
+
+describe("tagTree memo (audit T6.13 item 8)", () => {
+  // Five surfaces plus the tag-suggestion trigger each read the full tree, and
+  // each read was its own IPC round-trip. The memo is keyed on the index-changed
+  // nonce, so reads within one nonce share a round-trip and an index mutation
+  // forces the next read to re-fetch.
+  afterEach(() => {
+    __resetTagTreeForTest();
+    __resetIndexNonceForTest();
+    invokeMock.mockReset();
+  });
+
+  it("shares one round-trip for reads within a nonce", async () => {
+    invokeMock.mockResolvedValue([]);
+    const [a, b] = await Promise.all([tagTree(), tagTree()]);
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(a).toEqual(b);
+  });
+
+  it("re-fetches after the index nonce advances", async () => {
+    invokeMock.mockResolvedValue([]);
+    await tagTree();
+    bumpIndexNonce();
+    await tagTree();
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache a rejected read for the rest of the nonce", async () => {
+    invokeMock.mockRejectedValueOnce(new Error("slot"));
+    await expect(tagTree()).rejects.toThrow("slot");
+    invokeMock.mockResolvedValue([]);
+    await expect(tagTree()).resolves.toEqual([]);
+    expect(invokeMock).toHaveBeenCalledTimes(2);
   });
 });
