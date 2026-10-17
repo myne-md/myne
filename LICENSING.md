@@ -87,6 +87,12 @@ mobile client moved in-repo. They had been in a `myne-mobile/LICENSING.md` of
 their own, and they are **not** duplicates of the desktop rows: the two bundles
 ship different Whisper weights.
 
+The **npm** half of this is not hand-maintained. `public/THIRD-PARTY-LICENSES.txt`
+is generated from the production dependency closure by
+`scripts/gen-third-party-licenses.mjs` and held byte-equal in CI, because a
+hand-written notice is correct on the day it is written and silently incomplete
+afterwards. The rows below are the assets no package manager knows about.
+
 | Asset | Where | Upstream | License | AGPL-3.0 compatibility |
 |---|---|---|---|---|
 | Default speech-to-text model (voice-to-text, MYND-270) | `src-tauri/resources/models/whisper/model.gguf` (Git LFS; desktop-only) | [OpenAI Whisper `whisper-base`](https://huggingface.co/openai/whisper-base) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible (Apache-2.0 → AGPL-3.0 is a one-way-compatible direction per the FSF license list). Redistribution requires only preserving the Apache-2.0 license + attribution, both satisfied here. |
