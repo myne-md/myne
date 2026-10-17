@@ -145,7 +145,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "PanelEmptyState": { file: "src/notes/components/PanelEmptyState.tsx", line: 28 },
   "PanelToggleGlyph": { file: "src/components/primitives/PanelToggleGlyph.tsx", line: 39 },
   "PaneTree": { file: "src/notes/components/PaneTree.tsx", line: 41 },
-  "PaneView": { file: "src/notes/components/PaneView.tsx", line: 319 },
+  "PaneView": { file: "src/notes/components/PaneView.tsx", line: 320 },
   "PasswordChangeForm": { file: "src/components/PasswordChangeForm.tsx", line: 62 },
   "PasswordCreateForm": { file: "src/components/PasswordCreateForm.tsx", line: 112 },
   "PasswordInput": { file: "src/components/PasswordInput.tsx", line: 129 },
