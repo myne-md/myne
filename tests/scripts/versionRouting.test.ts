@@ -41,7 +41,8 @@ describe("the debt figure is a property of the table, not of a reason string", (
     // The defect, restated as an assertion. If this ever becomes false the
     // original bug would be invisible again, because a prefix filter would
     // start working for a reason nobody wrote the rule for.
-    for (const [, [count, reason]] of DEBT) {
+    for (const [, entry] of DEBT as Map<string, [number, string]>) {
+      const [count, reason] = entry;
       expect(reason.startsWith("debt")).toBe(false);
       expect(count).toBeGreaterThan(0);
     }

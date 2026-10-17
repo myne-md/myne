@@ -409,6 +409,10 @@ export function coverageGaps(roots, dirExists, exempt = NOT_A_SURFACE_ROSTER) {
  *                                  REQUIRED as a key: a default here would be the arm that never
  *                                  fires, excusing a future caller from Rule 5 without anyone
  *                                  choosing it (`AGENTS.md`, myne-md/myne#533).
+ * @param {(p: string) => (string|null)} io.readFile  read a repo-relative file, or `null`
+ *                                  when it cannot be read. REQUIRED as a key, for the same
+ *                                  reason `ratchet` is: a default would be the arm that
+ *                                  silently excuses the automation rule.
  * @param {object} [io.notASurface] the exemption map; defaults to the module's own
  * @param {object} [io.skippedScenarios] the statically-skipped scenario table; defaults to
  *                                        the module's own {@link SKIPPED_SCENARIOS}
