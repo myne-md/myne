@@ -832,7 +832,7 @@
     "isolated in one warm container (2026-09-17, tip 10d8b4a6, AI lane with",
     "MYNE_E2E_AI=1 plus the local-inference-stub build; mem1 was 0/12 red",
     "before the popover viewport-cap fix and 3/3 green after). Log:",
-    "/Users/omer/mem-697-rerun.log. 359 was the develop base and the new file",
+    "/Users/<user>/mem-697-rerun.log. 359 was the develop base and the new file",
     "executes two scenarios under the AI gate, so the floor holds 361 on",
     "measured runs rather than counting."
   ],

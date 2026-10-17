@@ -111,7 +111,7 @@ fi
 # ── Reproducibility: strip machine-specific paths (task 16) ──────────────────
 #
 # A release build embeds ABSOLUTE source paths in its panic locations. Measured
-# on this very artefact before the change: **37 occurrences of `/Users/omer`**,
+# on this very artefact before the change: **37 occurrences of `/Users/<builder>`**,
 # across 19 distinct `$CARGO_HOME/registry/...` paths from dependencies
 # (argon2, blake2, cipher, js-sys, …). Those differ per machine — different
 # `$HOME`, different checkout directory — so two people building the same commit
