@@ -29,7 +29,6 @@
   "src/lib/routing.ts": 1,
   "src/lib/theme-errors.ts": 1,
   "src/notes/agent/settingCatalogue.ts": 1,
-  "src/notes/ai/aiOutputStore.ts": 1,
   "src/notes/ai/chatStore.ts": 3,
   "src/notes/components/NoteList.tsx": 1,
   "src/notes/graphColorGroups.ts": 1,

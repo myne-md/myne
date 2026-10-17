@@ -207,7 +207,6 @@ import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
-import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
@@ -3407,29 +3406,26 @@ function CommandPaletteHost({
   // sync engine now manages SSE as an always-on baseline with an info-only
   // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
   // mock removed on develop.)
-  // Drop the ephemeral AI render stores when the editor session tears down
-  // (lock / vault-switch unmounts this host) - the AS1 artifacts (summary text +
-  // the chat transcript) never outlive the open vault (SYNC-8;
-  // conversational-ai-chat task 12: the chat transcript is RAM-only, wiped on
-  // lock. Unlike the summary it is vault-scoped, so it is NOT cleared on a mere
-  // note switch below - only here, on the vault teardown). Tag suggestions are
-  // not among them: the band's state is per-pane React state (MYND-651), torn
-  // down with the pane rather than through a module store.
+  // Drop the ephemeral AI render store when the editor session tears down
+  // (lock / vault-switch unmounts this host) - the AS1 artifact (the chat
+  // transcript) never outlives the open vault (SYNC-8; conversational-ai-chat
+  // task 12: it is RAM-only, wiped on lock). Tag suggestions are not among them:
+  // the band's state is per-pane React state (MYND-651), torn down with the pane
+  // rather than through a module store.
+  //
+  // This used to clear a second store beside it, `aiOutputStore`, which held a
+  // note's summary and the Q and A answers over note content. The summarize
+  // capability is a chat turn now (`aiToChat.ts`), so that store and its own
+  // note-switch cleanup below both went with it; the transcript is cleared on
+  // BOTH leaving paths (`vault-unlock.ts`, `vault-switch.ts`) and here, and the
+  // note-switch case cannot arise for it because a turn carries the note it was
+  // asked about.
   useEffect(
     () => () => {
-      clearAiOutput();
       clearChat();
     },
     [],
   );
-  // Also drop the AI render stores when the SELECTED NOTE changes (the host
-  // stays mounted across a note switch, so the unmount cleanup above does not
-  // fire). Without this, note A's summary lingers - and could be inserted into
-  // note B - after switching. Bumping the run epoch (inside the clear) also
-  // drops any of A's in-flight runs so they never resolve onto B.
-  useEffect(() => {
-    clearAiOutput();
-  }, [ctx.selectedId]);
   // Open this period's note (MYND-191 daily, myne#177 weekly + monthly): one
   // entry point for all three, error handling included. Idempotent
   // open-or-create over the FULL note set (authoritative note_list +
@@ -3743,10 +3739,11 @@ function CommandPaletteHost({
       // workspace (the focused pane's active tab), so it follows a split.
       onOpenAgentNote: () => paletteWs.openAgentOnNote(paletteWs.focusedNoteId ?? undefined),
       // Summarize the focused note into the AI Chat tab (note-summarization
-      // tasks 3-4): reveal the render target, grab the focused pane's live view
-      // via the `getActiveEditorView` registry (the palette pattern), then drive
-      // the tested `runSummarizeToStore` pipeline (resolve → truncate → blocking
-      // `infer` → ephemeral render). Returns stub output until Candle.
+      // tasks 3-4, retargeted by conversational-ai-chat task 10): reveal the render
+      // target, grab the focused pane's live view via the `getActiveEditorView`
+      // registry (the palette pattern), then drive the tested `runSummarizeToChat`
+      // pipeline (resolve → truncate → blocking `infer` → one assistant turn).
+      // Returns stub output until Candle.
       onSummarizeNote: () => {
         revealRightPanelTab("ai-chat");
         const view = getActiveEditorView();

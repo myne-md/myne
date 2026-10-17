@@ -404,8 +404,9 @@ export const ROSTER = Object.freeze([
     title: "Summarize and ask about a note",
     paths: [
       "src/notes/ai/summarize.ts",
-      "src/notes/ai/runSummarizeToStore.ts",
-      "src/notes/ai/aiOutputStore.ts",
+      // `runSummarizeToStore.ts` and `aiOutputStore.ts` were claimed here and are
+      // deleted: the summarize capability is a chat turn now (`aiToChat.ts` over
+      // `chatStore`), which the `ai.chat` entry already covers.
       "src/lib/agent-run.ts",
       "src/lib/ai-capability.ts",
       "src/hooks/useAiModelReady.ts",
