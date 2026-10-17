@@ -30,6 +30,10 @@ housekeeping one.
 | `public/fonts/` (the two bundled webfonts) | **SIL OFL-1.1** | [`public/fonts/LICENSE.txt`](public/fonts/LICENSE.txt) |
 | `src-tauri/resources/dictionaries/**`, `src-tauri/resources/models/**` (bundled third-party data) | **per asset** | each dictionary's own `<lang>/license`; the models are listed under "Bundled third-party assets" below |
 
+One thing in this repository is outside that map entirely: the **Myne Marks**, which are
+trademark rather than code or content. [`TRADEMARK.md`](TRADEMARK.md) is the pointer, and the
+policy lives in [`myne-branding`](https://github.com/myne-md/myne-branding).
+
 Application code is licensed under the **GNU Affero General Public License,
 version 3** (AGPL-3.0, not "or-later").
 
