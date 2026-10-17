@@ -341,6 +341,22 @@ pub struct RecordingHooks {
     /// so a test of the post-await re-check needs a fixture that can actually be
     /// inside it (myne-md/myne#867 review).
     lock_on_attachments: Option<crate::vault_id::VaultId>,
+    /// Whether the live `.myn` was still on disk each time
+    /// `purge_note_snapshots` ran — the ordering probe. See that method body.
+    purge_saw_live_note: std::sync::Mutex<Vec<bool>>,
+    /// What `purge_note_snapshots` does after recording.
+    purge_behaviour: PurgeBehaviour,
+}
+
+/// What [`RecordingHooks::purge_note_snapshots`] does after it records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PurgeBehaviour {
+    /// Record and return `Ok(0)` — no snapshots to remove.
+    Record,
+    /// Record, then PANIC. Inside the delete path's `spawn_blocking` closure that
+    /// surfaces as a join failure, which is how a test proves the live note is
+    /// left in place rather than orphaned beside erased snapshots.
+    Panic,
 }
 
 /// One live-index side effect a core path fired, recorded so a unit test can
@@ -382,7 +398,34 @@ impl RecordingHooks {
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: None,
             lock_on_attachments: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
         })
+    }
+
+    /// A recorder whose `purge_note_snapshots` panics, injecting a join failure
+    /// inside the delete path's purge closure.
+    pub fn panicking_purge() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            calls: std::sync::Mutex::new(Vec::new()),
+            index_calls: std::sync::Mutex::new(Vec::new()),
+            indices: None,
+            lock_on_attachments: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Panic,
+        })
+    }
+
+    /// Whether the live `.myn` was still on disk at each purge, in call order.
+    ///
+    /// A delete path that purges first records `true`; one that unlinks first
+    /// records `false`. The end state is identical in both, which is why this
+    /// probe and not a state assertion is what pins the order.
+    pub fn purge_saw_live_note(&self) -> Vec<bool> {
+        self.purge_saw_live_note
+            .lock()
+            .expect("recording hooks mutex")
+            .clone()
     }
 
     /// A recorder whose `index_note_attachments` locks `vault` once it has
@@ -393,6 +436,8 @@ impl RecordingHooks {
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: None,
             lock_on_attachments: Some(vault),
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
         })
     }
 
@@ -407,6 +452,8 @@ impl RecordingHooks {
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: Some(indices),
             lock_on_attachments: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
         })
     }
 
@@ -572,7 +619,30 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
         false
     }
-    fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
-        Ok(0)
+    fn purge_note_snapshots(&self, vault_root: &Path, note_uuid: &str) -> std::io::Result<usize> {
+        // Recorded in its OWN vector rather than in `calls`: that one is compared
+        // by WHOLE-VECTOR equality in the slot-teardown tests, so a new entry
+        // there would perturb assertions this probe has nothing to do with. Same
+        // split, and same reason, as `index_calls` above.
+        //
+        // What is recorded is the ORDERING property and nothing else: whether the
+        // live `.myn` was still on disk at the moment the purge ran. A delete that
+        // unlinks first and purges second is one crash away from leaving
+        // decryptable snapshots behind, and no assertion on the end state can see
+        // which order ran (both end with everything gone when nothing fails).
+        let live = vault_root
+            .join("notes")
+            .join(format!("{note_uuid}.myn"))
+            .exists();
+        self.purge_saw_live_note
+            .lock()
+            .expect("recording hooks mutex")
+            .push(live);
+        match self.purge_behaviour {
+            PurgeBehaviour::Record => Ok(0),
+            // A panic inside the `spawn_blocking` closure surfaces as a join
+            // failure — the state the delete path must abort on.
+            PurgeBehaviour::Panic => panic!("injected purge failure"),
+        }
     }
 }

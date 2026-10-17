@@ -2012,40 +2012,29 @@ pub async fn note_delete_with_dir(
         return Err(NoteDeleteError::NotesDirNotADirectory);
     }
 
-    // The unlink moved onto the IO seam and out of `run_blocking` (task 13).
-    // What stays in the closure is the snapshot purge (a hooks call) and the
-    // Unix parent-directory fsync — both genuinely blocking, neither expressible
-    // through the seam.
-    match io.remove_file(&path).await {
-        Ok(()) => {}
-        Err(IoFailureKind::NotFound) => {
-            tracing::debug!(
-                stage = "remove_file",
-                error_kind = "NoteNotFound",
-                "note_delete file already gone"
-            );
-            return Err(NoteDeleteError::NoteNotFound);
-        }
-        Err(io_error_kind) => {
-            let mapped = NoteDeleteError::Io { io_error_kind };
-            tracing::error!(
-                stage = "remove_file",
-                error_kind = note_delete_error_kind(&mapped),
-                "note_delete remove_file failed"
-            );
-            return Err(mapped);
-        }
-    }
-    let join_result = crate::task::run_blocking(move || -> Result<(), NoteDeleteError> {
-        // MYND-96 SYNC-1: purge this note's snapshots BEFORE removing the live
-        // `.myn`, so cryptographic erase holds. A snapshot is a verbatim `.myn`
-        // copy carrying its own wrapped `enc_item_key`, so it stays decryptable
-        // under `itemsKey` even after the live note is gone — the purge IS the
-        // erase of the note's history. Purge-first ordering means a crash
-        // mid-delete leaves the live note intact (recoverable) rather than
-        // orphan decryptable snapshots. Best-effort; a failure is logged, not
-        // fatal to the delete (the live note removal is the user-facing action).
-        if let Some(vault_root) = notes_dir.parent() {
+    // (1) PURGE FIRST — MYND-96 SYNC-1. Purge this note's snapshots BEFORE
+    // removing the live `.myn`, so cryptographic erase holds. A snapshot is a
+    // verbatim `.myn` copy carrying its own wrapped `enc_item_key`, so it stays
+    // decryptable under `itemsKey` even after the live note is gone — the purge
+    // IS the erase of the note's history. Purge-first is what makes a crash
+    // mid-delete leave the live note intact (recoverable by retrying the delete)
+    // rather than orphan decryptable snapshots.
+    //
+    // **This is the ordering the comment below the closure had claimed since
+    // MYND-96 while the code did the opposite**: the unlink ran first (`:2019`)
+    // and the purge second (`:2039`), so the two failure windows the comment
+    // describes were both live. The retry that closes them is why the purge sits
+    // above the `NoteNotFound` arm too: an unlink that already landed (a crash
+    // one step later, or a second click) still finds the snapshots and erases
+    // them, instead of skipping the half that never ran.
+    //
+    // Best-effort INSIDE the closure (a purge error is logged, not fatal to the
+    // delete — the live note removal is the user-facing action), but a PANIC
+    // aborts the whole delete: a join failure after the unlink is exactly the
+    // orphan state this ordering exists to prevent.
+    let notes_dir_for_purge = notes_dir.clone();
+    let purge = crate::task::run_blocking(move || {
+        if let Some(vault_root) = notes_dir_for_purge.parent() {
             match hooks.purge_note_snapshots(vault_root, &note_uuid_str) {
                 Ok(n) if n > 0 => {
                     tracing::debug!(
@@ -2064,14 +2053,55 @@ pub async fn note_delete_with_dir(
                 }
             }
         }
-        // Unix-only durability: flush the directory entry's removal to
+    })
+    .await;
+    if purge.is_err() {
+        tracing::error!(
+            stage = "spawn_blocking_join",
+            error_kind = "JoinFailure",
+            "note_delete snapshot purge panicked or runtime shutdown — \
+             the live note is left in place rather than orphaned"
+        );
+        return Err(NoteDeleteError::JoinFailure);
+    }
+
+    // (2) Unlink the live note. Moved onto the IO seam and out of
+    // `run_blocking` (task 13).
+    match io.remove_file(&path).await {
+        Ok(()) => {}
+        Err(IoFailureKind::NotFound) => {
+            // The live file is already gone — a retry, or a crash that landed
+            // after step (2) of an earlier attempt. The purge above has already
+            // run for THIS call, so the retry erases the snapshots the crashed
+            // attempt left behind instead of skipping them.
+            tracing::debug!(
+                stage = "remove_file",
+                error_kind = "NoteNotFound",
+                "note_delete file already gone"
+            );
+            return Err(NoteDeleteError::NoteNotFound);
+        }
+        Err(io_error_kind) => {
+            let mapped = NoteDeleteError::Io { io_error_kind };
+            tracing::error!(
+                stage = "remove_file",
+                error_kind = note_delete_error_kind(&mapped),
+                "note_delete remove_file failed"
+            );
+            return Err(mapped);
+        }
+    }
+
+    let notes_dir_for_sync = notes_dir.clone();
+    let join_result = crate::task::run_blocking(move || -> Result<(), NoteDeleteError> {
+        // (3) Unix-only durability: flush the directory entry's removal to
         // the journal. Windows arm is intentionally absent —
         // `decisions.md` 2026-05-07 "`note_delete` durability" pins the
         // asymmetry (write durability is data-integrity, delete
         // durability is redundancy-elimination; failure mode'lar farklı).
         #[cfg(unix)]
         {
-            let dir = std::fs::File::open(&notes_dir).map_err(|e| {
+            let dir = std::fs::File::open(&notes_dir_for_sync).map_err(|e| {
                 let mapped = NoteDeleteError::Io {
                     io_error_kind: from_io_error_kind(e.kind()),
                 };
@@ -2094,6 +2124,8 @@ pub async fn note_delete_with_dir(
                 mapped
             })?;
         }
+        #[cfg(not(unix))]
+        let _ = notes_dir_for_sync;
         Ok(())
     })
     .await;
@@ -2819,8 +2851,8 @@ mod tests {
     // stay desktop-side as documented above.
 
     use super::{
-        note_create_from_host, note_create_with_dir, note_read_with_dir, note_update_from_host,
-        note_update_with_dir,
+        note_create_from_host, note_create_with_dir, note_delete_with_dir, note_read_with_dir,
+        note_update_from_host, note_update_with_dir, NoteDeleteError,
     };
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::vault_unlock::state::{
@@ -2905,6 +2937,100 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(on_disk, "moved on", "a rejected save must not touch disk");
+        })
+    }
+
+    #[test]
+    fn delete_purges_snapshots_before_it_unlinks_the_live_note() {
+        // MYND-96 SYNC-1, and the ordering is the whole guarantee. The comment
+        // beside the purge had claimed purge-first since MYND-96 while the code
+        // unlinked first and purged second, so a crash between the two left
+        // orphan `MY01`/`NC05` snapshots that stay decryptable under `itemsKey`
+        // with the live note already gone — the cryptographic erase defeated by
+        // an ordering. End-state assertions cannot see it: when nothing fails,
+        // both orders delete everything.
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("note-delete-purge-order").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let io = crate::vault_io::StdVaultIo;
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "to be purged".to_string(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("create");
+            let live = notes_dir.join(format!("{id}.myn"));
+            assert!(
+                live.exists(),
+                "fixture must have a live note to be meaningful"
+            );
+
+            let hooks = crate::test_support::RecordingHooks::new();
+            note_delete_with_dir(
+                notes_dir.clone(),
+                &state,
+                &(hooks.clone() as crate::hooks::Hooks),
+                id.clone(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("delete");
+
+            assert_eq!(
+                hooks.purge_saw_live_note(),
+                vec![true],
+                "the purge must run while the live note is still on disk"
+            );
+            assert!(!live.exists(), "and the delete must still finish");
+        })
+    }
+
+    #[test]
+    fn a_purge_join_failure_leaves_the_live_note_in_place() {
+        // The crash half of the same ordering. With the purge first, an abort
+        // inside it leaves the live note untouched — the user retries the delete
+        // and the retry erases the snapshots. With the unlink first, that same
+        // abort is the orphan state.
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("note-delete-purge-join-fail").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let io = crate::vault_io::StdVaultIo;
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "must survive the aborted delete".to_string(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("create");
+            let live = notes_dir.join(format!("{id}.myn"));
+
+            let hooks = crate::test_support::RecordingHooks::panicking_purge();
+            let result = note_delete_with_dir(
+                notes_dir.clone(),
+                &state,
+                &(hooks.clone() as crate::hooks::Hooks),
+                id.clone(),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await;
+
+            assert!(
+                matches!(result, Err(NoteDeleteError::JoinFailure)),
+                "expected JoinFailure, got {result:?}"
+            );
+            assert!(
+                live.exists(),
+                "an aborted purge must not have unlinked the live note"
+            );
         })
     }
 
