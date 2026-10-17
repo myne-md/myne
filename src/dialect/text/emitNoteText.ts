@@ -30,7 +30,7 @@
 import type { SyntaxNode } from "@lezer/common";
 import { parser } from "../lezer/parser";
 import { locateFrontmatter } from "../lezer/frontmatter";
-import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
+import { foldLabel } from "@myne/editor/decorations/reference-label";
 
 // === Public API ============================================================
 

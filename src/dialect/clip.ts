@@ -43,7 +43,7 @@
 
 import type { SyntaxNode } from "@lezer/common";
 import { parser } from "./lezer/parser";
-import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
+import { foldLabel } from "@myne/editor/decorations/reference-label";
 import { CALLOUT_HEADER_RE, CALLOUT_HTML_TYPES } from "./html/callout-types";
 import { HIGHLIGHT_CLASSES } from "@myne/editor/html/sanitize";
 import {
