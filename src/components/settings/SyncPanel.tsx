@@ -562,6 +562,18 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
               />
             </div>
           ) : null}
+          {/* What the code is, beside the code itself (example-org/operations#54).
+              The identity home carried this sentence and this box did not, so
+              the one place a reader is most likely to think "this looks like a
+              secret, should I be pasting it into a message?" was the one place
+              that did not answer. Same key as the home: one sentence, one
+              meaning, and `identityHome.shareCodeHint` already names the
+              distinction that matters (public material, never the phrase). */}
+          {hasIdentity && !identityUnlocked && identityCode ? (
+            <p style={HELPER_STYLE} data-testid="sync.panel.identity-code-hint">
+              {t("identityHome.shareCodeHint")}
+            </p>
+          ) : null}
         </SettingRow>
       )}
 

@@ -264,16 +264,21 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
  *  runs (at most 100 entries) and your voice preferences, each entry with a
  *  stable identifier (myne-md/myne#697). */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles, identifiers and folder paths of the notes it may read, before it has read any of them. That set is the whole working set, minus the folders you excluded from AI, unless you narrow it. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier.";
+  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles, identifiers and folder paths of the notes it may read, before it has read any of them. That set is the whole working set, minus the folders you excluded from AI, unless you narrow it. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier. A meeting-notes run sends the transcript of the recording, which is other people's speech as well as your own.";
 
 /** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
  *
  *  The agent run is the fifth trigger and was added late: this branch amends
  *  TB12 and TB13 to widen what crosses, and this screen is the surface that
  *  amendment is meant to reach (myne-md/myne#531 review round six). A consent
- *  screen that enumerates four of five triggers is not one. */
+ *  screen that enumerates four of five triggers is not one. **The meeting-notes
+ *  run is the sixth and was added later still** (example-org/operations#63): it is a
+ *  second bounded-series surface and, unlike every other entry here, what it
+ *  sends is other people's speech. Leaving it out left a user who consented to
+ *  "chat, summarize, rewrite, edit selection, or an agent run" untold that a
+ *  surface they can reach also reaches a provider. */
 export const CONSENT_WHEN_IT_LEAVES =
-  "Only when you ask for something: chat, summarize, rewrite, edit selection, or an agent run. Nothing is sent as you type, and nothing is sent in the background.";
+  "Only when you ask for something: chat, summarize, rewrite, edit selection, an agent run, or a meeting-notes run. Nothing is sent as you type, and nothing is sent in the background.";
 
 /** TO WHOM. Interpolates the provider because a consent screen that cannot
  *  name the recipient is not consent. */

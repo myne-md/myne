@@ -4,10 +4,10 @@
 //
 // `tests/components/AboutPanel.test.tsx` already drives these through
 // the panel, which is the right test for the panel and the wrong one for the
-// mapping: it exercises one document per language and reaches the German slugs
-// for two of the four documents. A slug typo in `notice.de` or `privacy.de`
-// passes it. This file pins the whole matrix — five documents by two languages —
-// plus the three properties the mapping's own header states and nothing checks:
+// mapping: it exercises one document per language. A slug typo in `terms.de` or
+// `privacy.de` passes it. This file pins the whole matrix — three documents by
+// two languages — plus the three properties the mapping's own header states and
+// nothing checks:
 //
 //  * the primary subtag decides, so a regional German lands on German;
 //  * the Impressum takes no locale at all, because it is a German statutory
@@ -38,11 +38,6 @@ const REPO_ROOT = process.cwd();
 const EXPECTED: Record<LegalDoc, { en: string; de: string }> = {
   privacy: { en: "https://myne.md/privacy/", de: "https://myne.md/datenschutz/" },
   terms: { en: "https://myne.md/terms/", de: "https://myne.md/nutzungsbedingungen/" },
-  lawEnforcement: {
-    en: "https://myne.md/law-enforcement/",
-    de: "https://myne.md/behoerdenanfragen/",
-  },
-  notice: { en: "https://myne.md/notice/", de: "https://myne.md/meldung/" },
   // Takes no locale: one German text, both ways.
   impressum: { en: "https://myne.md/impressum/", de: "https://myne.md/impressum/" },
 };
@@ -115,7 +110,8 @@ describe("legalUrl: the canonical form", () => {
 describe("LEGAL_LINKS: one list, every client", () => {
   it("offers exactly the privacy policy", () => {
     // One entry, not four: terms, the DSA notice route and the law-enforcement
-    // page describe an offering Myne no longer makes, so no client links them
+    // page described an offering Myne no longer makes, and all four of those
+    // pages are now deleted from the site rather than merely unlinked
     // (`design-notes/sync/0696`).
     expect(LEGAL_LINKS.map((l) => l.doc)).toEqual(["privacy"]);
   });

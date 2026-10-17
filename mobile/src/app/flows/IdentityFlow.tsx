@@ -1377,6 +1377,14 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
             <div style={{ marginTop: "var(--space-5)" }}>
               <FieldLabel>{t("identityFlow.home.codeLabel")}</FieldLabel>
               <MonoBox value={identityCode} testId="identity-flow.home-code" />
+              {/* What the code is, beside the code (example-org/operations#54). The
+                  desktop identity home carried this sentence and the phone did
+                  not, so a reader was shown a long string with a copy button and
+                  nothing telling them whether sending it is safe. Same key as
+                  the desktop: one sentence, one meaning. */}
+              <Lead style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
+                {t("identityHome.shareCodeHint")}
+              </Lead>
             </div>
           ) : null}
 
