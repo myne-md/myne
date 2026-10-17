@@ -35,3 +35,9 @@ export type { ResolverNote } from "./host/notes/resolveWikilink";
 // feed the vault-wide `[[^^` picker index.
 export { extractBlockAnchors } from "./wikilink/anchor";
 export type { BlockAnchor } from "./wikilink/anchor";
+// Audit T6.13 item 1: the two attachment commands were exported-ready but had no
+// command-palette entry, so "attach a file" and "convert imported attachments"
+// were reachable only from `/attach` (and, for the convert path, from nothing).
+// Exposed here so `src/commands/actions.ts` can run them on the active view.
+export { pickAndInsert } from "./attachments/picker";
+export { runImportAndConvert } from "./attachments/convert-command";

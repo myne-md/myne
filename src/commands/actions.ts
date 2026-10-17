@@ -19,7 +19,7 @@ import { getActiveEditorView } from "../editor/active-view";
 import { exportSelectionAsImage } from "../lib/noteImageExport";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
-import { cycleHeading } from "@myne/editor";
+import { cycleHeading, pickAndInsert, runImportAndConvert } from "@myne/editor";
 import { sidebarCommands } from "../notes/sidebarCommands";
 import { enterRegion } from "../lib/regions";
 import { appDataDir, join } from "../platform/path";
@@ -905,6 +905,47 @@ const openAttachmentsAction: CommandAction = {
   },
 };
 
+/**
+ * "Attach file…" (audit T6.13 item 1) — the palette entry the `/attach` slash
+ * command already had. Runs the same picker-backed import on the active view;
+ * a no-op when no view is mounted (the visibility guard keeps it out of the
+ * palette anyway, but the run path is defensive like `cycleHeading`.
+ */
+const attachFileAction: CommandAction = {
+  id: "attachments.attach-file",
+  get label() {
+    return i18n.t("commands.actions.attachFile.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) void pickAndInsert(view);
+  },
+};
+
+/**
+ * "Convert imported attachments…" (audit T6.13 item 1) — the palette entry
+ * `runImportAndConvert` was exported for and never got, so the command was
+ * unreachable from any surface. Opens the same diff-preview-then-rewrite flow.
+ */
+const convertImportedAttachmentsAction: CommandAction = {
+  id: "attachments.convert-imported",
+  get label() {
+    return i18n.t("commands.actions.convertImportedAttachments.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) void runImportAndConvert(view);
+  },
+};
+
 const convertWikilinksAction: CommandAction = {
   id: "wikilinks.convert-in-this-note",
   get label() {
@@ -1674,6 +1715,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,
+  attachFileAction,
+  convertImportedAttachmentsAction,
   foldAllAction,
   unfoldAllAction,
   openSnapshotsAction,

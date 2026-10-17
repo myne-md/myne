@@ -666,6 +666,12 @@
       "openAttachments": {
         "label": "Open attachments…"
       },
+      "attachFile": {
+        "label": "Attach file…"
+      },
+      "convertImportedAttachments": {
+        "label": "Convert imported attachments…"
+      },
       "openInNewWindow": {
         "label": "Open note in new window"
       },
