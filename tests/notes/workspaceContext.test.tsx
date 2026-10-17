@@ -466,3 +466,41 @@ describe("useWorkspace — closeNoteEverywhere (#219)", () => {
     expect(anyHasA).toBe(false);
   });
 });
+
+// `api` identity across an otherwise inert re-render.
+//
+// `collectLeaves(root)` and `focusedLeaf(state)` each allocate a fresh array or
+// object on every call, and both sat in the `api` memo's dep list. Called bare
+// they rebuilt the whole `useWorkspace` value on EVERY render, including one
+// where the pane tree had not moved at all, so an unrelated parent re-render
+// re-rendered every workspace surface. The fix memoizes the two with deps
+// naming the fields they actually read.
+//
+// Pinned as IDENTITY rather than as a render count: identity is the thing the
+// memo gates on, and it is what a render count cannot isolate. The second case
+// is the non-vacuity half — without it, a memo that returned a module constant
+// would pass the first.
+describe("useWorkspace — api identity is inert-render stable", () => {
+  it("hands back the same api, leaves and focused leaf when nothing moved", () => {
+    const { result, rerender } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.openNewTabInFocused("A"));
+
+    const api = result.current;
+    const leaves = result.current.leaves;
+    const focused = result.current.focusedLeaf;
+
+    act(() => rerender());
+
+    expect(result.current).toBe(api);
+    expect(result.current.leaves).toBe(leaves);
+    expect(result.current.focusedLeaf).toBe(focused);
+  });
+
+  it("still rebuilds when the pane tree actually moves", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    const before = result.current;
+    act(() => result.current.openInFocused("A"));
+    expect(result.current).not.toBe(before);
+    expect(result.current.leaves).not.toBe(before.leaves);
+  });
+});
