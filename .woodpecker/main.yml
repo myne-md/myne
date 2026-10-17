@@ -759,6 +759,19 @@ steps:
       # Tauri bundle manifest may reference `stories/`, so "deployable" cannot
       # quietly become "shipped to users".
       - node scripts/check-stories-isolation.mjs
+      # The shipped third-party notice (MYND-504), which the drawing-notes work
+      # left as a known gap: `public/THIRD-PARTY-LICENSES.txt` is now GENERATED
+      # from the production dependency closure, and this holds it byte-equal.
+      # A hand-written notice is correct on the day it is written and silently
+      # incomplete afterwards: a dependency lands, its licence text never does,
+      # and nothing in this tree reads that file to notice.
+      #
+      # Here rather than in a pre-commit hook because it needs the INSTALLED
+      # tree and the pnpm store the install used, which is what the `--store-dir`
+      # passthrough is for (the `licenses` subcommand rejects the option's own
+      # name, so the spelling is `--config.store-dir=`). A run that cannot
+      # evaluate exits 2 instead of reporting a finding it did not find.
+      - node scripts/gen-third-party-licenses.mjs --check --store-dir /cache/cargo/pnpm-store
 
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
