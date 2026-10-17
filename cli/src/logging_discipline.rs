@@ -284,6 +284,15 @@ fn every_error_message_this_crate_originates_is_bounded() {
         BackendError::FolderExcluded,
         BackendError::RateLimited,
         BackendError::PlainFileOff,
+        // The one arm this list could not carry until the relay was bounded. Its
+        // content is the DESKTOP's string rather than this crate's wording, so it
+        // is the only message whose bound lives somewhere else — `backend::ipc`'s
+        // `bounded_relayed_message`. Built by CALLING that, not by hand-writing a
+        // short literal: a fixture that supplies its own short string cannot reach
+        // the defective state and would pass with the bound deleted.
+        BackendError::Io(crate::backend::ipc::bounded_relayed_message(
+            &"an unbounded relayed message ".repeat(400),
+        )),
     ] {
         let message = crate::output::message_for(&err);
         assert!(
