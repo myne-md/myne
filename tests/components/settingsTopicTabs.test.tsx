@@ -82,7 +82,6 @@ vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
       backendId: "candle",
       backendClass: "in_process_local",
       generation: { available: false, cause: "no_model" },
-      embedding: { available: false, cause: "no_model" },
       transcription: { available: false, cause: "no_model" },
       autoTag: { available, cause: available ? null : "no_model" },
     })),

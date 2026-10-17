@@ -1275,8 +1275,6 @@
           "empty": "Rezumatele, răspunsurile și sugestiile apar aici pe măsură ce le ceri.",
           "error": "Solicitarea AI nu a putut fi finalizată.",
           "errorTurn": "Asistentul nu a putut răspunde.",
-          "gettingReadyHint": "Se pregătesc notele tale pentru AI. Un moment.",
-          "noSearchModelHint": "Întrebările caută în notele tale de pe acest dispozitiv, iar pentru asta este nevoie de un model de căutare aici. Un furnizor nu poate face asta. Alege un model de căutare din Setări → Developer → AI. Editarea notelor cu AI funcționează în continuare.",
           "insert": "Inserează în notă",
           "noAnswer": "Niciun răspuns. Încearcă să reformulezi.",
           "newChat": "Chat nou",
@@ -1285,8 +1283,6 @@
           "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula. Nicio setare nu va schimba asta — e nevoie de o versiune care include AI.",
           "offHint": "Funcția AI local este dezactivată. Activeaz-o din Setări → Developer → AI.",
           "send": "Trimite",
-          "statusGettingReady": "Se pregătește…",
-          "statusNoSearchModel": "Niciun model de căutare",
           "statusNoModel": "Niciun furnizor",
           "statusUnreachable": "Nu răspunde",
           "statusUnavailable": "Indisponibil",
@@ -3020,9 +3016,6 @@
       "legalLabel": "Juridic",
       "legalHelper": "Se deschide pe myne.md în browserul tău. În germană acolo unde interfața este în germană.",
       "legalPrivacy": "Politica de confidențialitate",
-      "legalTerms": "Termeni beta",
-      "legalNotice": "Raportează conținut ilegal",
-      "legalLawEnforcement": "Cereri de la autorități",
       "licenseBody": "Pre-alfa · documentație CC-BY-4.0 · cod de aplicație AGPL-3.0 la lansarea Fazei 1.",
       "licenseLabel": "Licență",
       "tagline": "Pre-alfa · Client desktop Faza 1",
@@ -3502,10 +3495,8 @@
         "emptyGrant": "Tot ce a putut citi această rulare se află în dosare pe care IA nu le vede niciodată. Nu s-a trimis nimic. Schimbați în Setări, IA, Dosare excluse."
       },
       "modelChoose": "Alege fișierul…",
-      "modelEmbeddingLabel": "Model de căutare: căutare semantică și întrebări-răspunsuri",
       "modelFilter": {
-        "gguf": "Model GGUF",
-        "safetensors": "Model Safetensors"
+        "gguf": "Model GGUF"
       },
       "modelGenerationLabel": "Model de text: chat, rezumate, scriere",
       "modelNone": "Niciun fișier selectat",
@@ -3538,7 +3529,6 @@
       "providerNone": "Niciunul",
       "providerNothingAnswering": "Nu este configurat încă nimic care să răspundă.",
       "modelsLabel": "Modele",
-      "recommendedFilesEmbedding": "Necesită model.safetensors + config.json + tokenizer.json în același dosar.",
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
@@ -3566,7 +3556,6 @@
       "modelShowLocation": "Arată locația pentru {{name}}",
       "downloadsLabel": "Descarcă modele",
       "downloadsHelper": "Preia un model de la propria origine a Myne. Este verificat față de o amprentă integrată în aplicație înainte de a fi folosit, așa că o descărcare alterată este respinsă. Nu se preia nimic decât dacă dai clic.",
-      "downloadEmbeddingSize": "Model multilingv, aproximativ 449 MB.",
       "downloadTagLabel": "Model de etichete: sugestii automate de etichete",
       "downloadTagSize": "Model local mic, aproximativ 337 MB.",
       "downloadInstalled": "Instalat",
@@ -4081,10 +4070,6 @@
       "intro": "Sincronizarea trimite notele tale, criptate, către un server. Merită să știi mai întâi patru lucruri.",
       "whatThisIsLabel": "Ce este",
       "dataLossLabel": "Dacă pierzi ambele secrete",
-      "whatHappensNextLabel": "Când se încheie beta",
-      "whatWeCanSeeLabel": "Ce putem vedea",
-      "readFull": "Citește termenii integrali",
-      "review": "Revizuiește termenii beta",
       "accept": "Am înțeles, activează sincronizarea"
     },
     "materialising": "Se descarcă notele tale: {{done}} din {{total}}. Poți începe să lucrezi; celelalte vor apărea pe măsură ce sosesc.",
@@ -4206,8 +4191,7 @@
       "tlsHelp": "Introdu aceeași adresă URL de server pe fiecare dispozitiv. Un server auto-găzduit are nevoie de un certificat HTTPS de încredere.",
       "tlsFailure": "Certificatul HTTPS al serverului nu a putut fi verificat. Verifică adresa serverului, certificatul și validitatea acestuia.",
       "inviteLabel": "Cod de invitație (doar dacă acest server cere unul)",
-      "invitePlaceholder": "Codul pe care ți l-a dat operatorul serverului",
-      "changeInviteCode": "Schimbă codul de invitație"
+      "invitePlaceholder": "Codul pe care ți l-a dat operatorul serverului"
     },
     "enroll": {
       "accountNumberLabel": "Număr de cont",
@@ -5385,12 +5369,8 @@
   },
   "aiOnboarding": {
     "title": "Configurează AI",
-    "intro": "Myne poate căuta în notele tale după sens, poate sugera etichete și poate conversa despre ele. Nimic din toate acestea nu este obligatoriu și le poți activa mai târziu din Setări.",
+    "intro": "Myne poate sugera etichete și poate conversa despre ele. Nimic din toate acestea nu este obligatoriu și le poți activa mai târziu din Setări.",
     "enableLabel": "Activează funcțiile AI",
-    "semantic": {
-      "title": "Căutare semantică",
-      "body": "Descarcă un model de încorporare multilingv (aproximativ 449 MB) ca să poți căuta după sens, nu doar după cuvinte."
-    },
     "tag": {
       "title": "Etichetare automată",
       "body": "Descarcă modelul de etichete (aproximativ 337 MB) ca Myne să poată sugera etichete în timp ce scrii."
@@ -5457,18 +5437,10 @@
   "firstRun": {
     "server": {
       "heading": "Alege un server de sincronizare",
-      "chooseHeading": "Unde să se sincronizeze notele tale?",
-      "chooseIntro": "Myne are nevoie de un server care să găzduiască notele tale criptate și să te contacteze pentru invitații. Folosește serviciul Myne Sync sau îndreaptă acest dispozitiv către un server pe care îl rulezi singur. În ambele cazuri, notele tale rămân criptate pe acest dispozitiv înainte de a-l părăsi; serverul stochează doar text cifrat.",
-      "myneSyncHint": "Serverul operat de Myne. Certificatul său HTTPS este verificat automat.",
       "intro": "Myne are nevoie de un server care să găzduiască notele tale criptate și să te contacteze pentru invitații. Notele tale rămân criptate pe acest dispozitiv înainte de a-l părăsi; serverul stochează doar text cifrat.",
       "notConfigured": "Introdu o adresă de server mai sus și apasă Conectare pentru a continua.",
       "back": "Înapoi",
-      "continue": "Continuă",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Serverul tău propriu",
-      "selfHostedHint": "Un server de sincronizare pe care îl rulezi. Introduci adresa lui pe ecranul următor.",
-      "connectAction": "Conectează",
-      "setUpAction": "Configurează"
+      "continue": "Continuă"
     }
   },
   "identityFlow": {
@@ -5483,8 +5455,6 @@
       "title": "Alege un server de sincronizare",
       "lead": "Notele tale rămân criptate pe acest dispozitiv înainte de a-l părăsi. Serverul stochează doar text cifrat.",
       "urlLabel": "Adresa serverului",
-      "useMyneSync": "Folosește Myne Sync",
-      "selfHostedHint": "Sau introdu adresa unui server pe care îl rulezi singur.",
       "connect": "Conectează",
       "connecting": "Se conectează…"
     },

@@ -1218,8 +1218,6 @@
           "empty": "Opsummeringer, svar og forslag vises her, efterhånden som du beder om dem.",
           "error": "AI-anmodningen kunne ikke fuldføres.",
           "errorTurn": "Assistenten kunne ikke svare.",
-          "gettingReadyHint": "Forbereder dine noter til AI. Et øjeblik.",
-          "noSearchModelHint": "Når du spørger, søges der i dine noter på denne enhed, og det kræver en søgemodel her. En udbyder kan ikke gøre det. Vælg en under Indstillinger → Developer → AI. Du kan stadig redigere dine noter med AI'en.",
           "insert": "Indsæt i note",
           "noAnswer": "Intet svar. Prøv at omformulere.",
           "newChat": "Ny chat",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Dette build af Myne er kompileret uden lokal AI, så intet her kan køre. Ingen indstilling ændrer det — det kræver et build med AI inkluderet.",
           "offHint": "Lokal AI er slået fra. Aktivér den under Indstillinger → Developer → AI.",
           "send": "Send",
-          "statusGettingReady": "Forbereder…",
-          "statusNoSearchModel": "Ingen søgemodel",
           "statusNoModel": "Ingen udbyder",
           "statusUnreachable": "Svarer ikke",
           "statusUnavailable": "Ikke tilgængelig",
@@ -2909,9 +2905,6 @@
       "legalLabel": "Juridisk",
       "legalHelper": "Åbner på myne.md i din browser. Tysk, hvor grænsefladen er tysk.",
       "legalPrivacy": "Privatlivspolitik",
-      "legalTerms": "Betavilkår",
-      "legalNotice": "Anmeld ulovligt indhold",
-      "legalLawEnforcement": "Anmodninger fra myndigheder",
       "licenseBody": "Pre-alfa · CC-BY-4.0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alfa · Fase 1 desktopklient",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "Alt dette kørsel kunne læse er i mapper, AI aldrig ser. Intet blev sendt. Ændr det i Indstillinger, AI, Undtagne mapper."
       },
       "modelChoose": "Vælg fil…",
-      "modelEmbeddingLabel": "Søgemodel: semantisk søgning og spørgsmål/svar",
       "modelFilter": {
-        "gguf": "GGUF-model",
-        "safetensors": "Safetensors-model"
+        "gguf": "GGUF-model"
       },
       "modelGenerationLabel": "Tekstmodel: chat, opsummeringer, skrivning",
       "modelNone": "Ingen fil valgt",
@@ -3418,7 +3409,6 @@
       "providerNone": "Ingen",
       "providerNothingAnswering": "Der er endnu ikke konfigureret noget til at svare.",
       "modelsLabel": "Modeller",
-      "recommendedFilesEmbedding": "Kræver model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Kræver .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Kræver Whisper .gguf-filen + config.json + tokenizer.json i samme mappe.",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "Vis placeringen af {{name}}",
       "downloadsLabel": "Download modeller",
       "downloadsHelper": "Hent en model fra Mynes eget ophav. Den tjekkes mod et fingeraftryk, der er indbygget i appen, før den bruges, så en manipuleret download afvises. Der hentes intet, medmindre du klikker.",
-      "downloadEmbeddingSize": "Flersproget model, ca. 449 MB.",
       "downloadTagLabel": "Tag-model: automatiske tag-forslag",
       "downloadTagSize": "Lille lokal model, ca. 337 MB.",
       "downloadInstalled": "Installeret",
@@ -3954,10 +3943,6 @@
       "intro": "Synkronisering sender dine noter krypteret til en server. Fire ting er værd at vide først.",
       "whatThisIsLabel": "Hvad det er",
       "dataLossLabel": "Hvis du mister begge hemmeligheder",
-      "whatHappensNextLabel": "Når betaen slutter",
-      "whatWeCanSeeLabel": "Hvad vi kan se",
-      "readFull": "Læs de fulde vilkår",
-      "review": "Gennemgå betavilkårene",
       "accept": "Jeg forstår, slå synkronisering til"
     },
     "materialising": "Henter dine noter: {{done}} af {{total}}. Du kan godt gå i gang; resten dukker op, efterhånden som de ankommer.",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "Indtast den samme server-URL på hver enhed. En selvhostet server kræver et betroet HTTPS-certifikat.",
       "tlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen, certifikatet og dets gyldighed.",
       "inviteLabel": "Invitationskode (kun hvis denne server beder om en)",
-      "invitePlaceholder": "Den kode, serverens operatør gav dig",
-      "changeInviteCode": "Ændr invitationskode"
+      "invitePlaceholder": "Den kode, serverens operatør gav dig"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Opsæt AI",
-    "intro": "Myne kan søge i dine noter efter betydning, foreslå tags og chatte om dem. Intet af det er påkrævet, og du kan slå det til senere fra Indstillinger.",
+    "intro": "Myne kan foreslå tags og chatte om dem. Intet af det er påkrævet, og du kan slå det til senere fra Indstillinger.",
     "enableLabel": "Slå AI-funktioner til",
-    "semantic": {
-      "title": "Semantisk søgning",
-      "body": "Download en flersproget embedding-model (ca. 449 MB), så du kan søge efter betydning, ikke kun efter ord."
-    },
     "tag": {
       "title": "Auto-tagging",
       "body": "Download tag-modellen (ca. 337 MB), så Myne kan foreslå tags, mens du skriver."
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "Vælg en synkroniseringsserver",
-      "chooseHeading": "Hvor skal dine noter synkroniseres?",
-      "chooseIntro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Brug Myne Sync-tjenesten, eller peg denne enhed mod en server, du selv driver. Uanset hvad forbliver dine noter krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
-      "myneSyncHint": "Den Myne-drevne server. Dens HTTPS-certifikat tjekkes automatisk.",
       "intro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Dine noter forbliver krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
       "notConfigured": "Indtast en serveradresse ovenfor, og tryk på Opret forbindelse for at fortsætte.",
       "back": "Tilbage",
-      "continue": "Fortsæt",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Din egen server",
-      "selfHostedHint": "En synkroniseringsserver, du selv driver. Du indtaster dens adresse på næste skærm.",
-      "connectAction": "Opret forbindelse",
-      "setUpAction": "Opsæt"
+      "continue": "Fortsæt"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "Vælg en synkroniseringsserver",
       "lead": "Dine noter forbliver krypteret på denne enhed, før de forlader den. Serveren gemmer kun ciphertext.",
       "urlLabel": "Serveradresse",
-      "useMyneSync": "Brug Myne Sync",
-      "selfHostedHint": "Eller indtast adressen på en server, du selv driver.",
       "connect": "Opret forbindelse",
       "connecting": "Opretter forbindelse…"
     },

@@ -1218,8 +1218,6 @@
           "empty": "Muhtasari, majibu na mapendekezo yanaonekana hapa unapoyaomba.",
           "error": "Ombi la AI halikuweza kukamilika.",
           "errorTurn": "Msaidizi hakuweza kujibu.",
-          "gettingReadyHint": "Inaandaa madokezo yako kwa AI. Subiri kidogo.",
-          "noSearchModelHint": "Kuuliza hutafuta madokezo yako kwenye kifaa hiki, na hilo linahitaji modeli ya utafutaji hapa. Mtoa huduma hawezi kufanya hivyo. Chagua moja katika Mipangilio → Msanidi → AI. Kuhariri madokezo yako kwa AI bado kunafanya kazi.",
           "insert": "Weka kwenye dokezo",
           "noAnswer": "Hakuna jibu. Jaribu kuuliza kwa njia nyingine.",
           "newChat": "Gumzo jipya",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Toleo hili la Myne lilijengwa bila AI ya ndani, hivyo hakuna kinachoweza kufanya kazi hapa. Hakuna mpangilio utakaobadilisha hilo — linahitaji toleo lenye AI.",
           "offHint": "AI ya kifaa hiki imezimwa. Iwashe katika Mipangilio → Msanidi → AI.",
           "send": "Tuma",
-          "statusGettingReady": "Inaandaa…",
-          "statusNoSearchModel": "Hakuna modeli ya utafutaji",
           "statusNoModel": "Hakuna mtoa huduma",
           "statusUnreachable": "Hajibu",
           "statusUnavailable": "Haipatikani",
@@ -2909,9 +2905,6 @@
       "legalLabel": "Kisheria",
       "legalHelper": "Hufunguka kwenye myne.md katika kivinjari chako. Kwa Kijerumani pale kiolesura kilipo Kijerumani.",
       "legalPrivacy": "Sera ya faragha",
-      "legalTerms": "Masharti ya beta",
-      "legalNotice": "Ripoti maudhui haramu",
-      "legalLawEnforcement": "Maombi ya vyombo vya sheria",
       "licenseBody": "Pre-alpha · nyaraka za CC-BY-4.0 · msimbo wa programu wa AGPL-3.0 katika toleo la Awamu ya 1.",
       "licenseLabel": "Leseni",
       "tagline": "Pre-alpha · kiteja cha kompyuta cha Awamu ya 1",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "Kila kitu ambacho kifurushi hiki kingeweza kusoma kiko kwenye fulda ambazo AI haioni kamwe. Hakuna kilichotumwa. Badilisha kwenye Mipangilio, AI, Fulda zilizoachwa nje."
       },
       "modelChoose": "Chagua faili…",
-      "modelEmbeddingLabel": "Modeli ya utafutaji: utafutaji wa kimaana na maswali na majibu",
       "modelFilter": {
-        "gguf": "Modeli ya GGUF",
-        "safetensors": "Modeli ya Safetensors"
+        "gguf": "Modeli ya GGUF"
       },
       "modelGenerationLabel": "Modeli ya maandishi: gumzo, muhtasari, uandishi",
       "modelNone": "Hakuna faili lililochaguliwa",
@@ -3418,7 +3409,6 @@
       "providerNone": "Hakuna",
       "providerNothingAnswering": "Bado hakuna kilichowekwa kujibu.",
       "modelsLabel": "Modeli",
-      "recommendedFilesEmbedding": "Inahitaji model.safetensors + config.json + tokenizer.json katika folda moja.",
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "Onyesha mahali pa {{name}}",
       "downloadsLabel": "Pakua modeli",
       "downloadsHelper": "Chukua modeli kutoka chanzo cha Myne chenyewe. Hukaguliwa dhidi ya alama ya kidole iliyojengwa ndani ya programu kabla ya kutumika, hivyo upakuaji uliodukuliwa hukataliwa. Hakuna kinachochukuliwa bila wewe kubofya.",
-      "downloadEmbeddingSize": "Modeli ya lugha nyingi, takriban 449 MB.",
       "downloadTagLabel": "Modeli ya lebo: mapendekezo ya lebo kiotomatiki",
       "downloadTagSize": "Modeli ndogo ya ndani, takriban 337 MB.",
       "downloadInstalled": "Imesakinishwa",
@@ -3954,10 +3943,6 @@
       "intro": "Usawazishaji hutuma madokezo yako, yakiwa yamesimbwa, kwenye seva. Mambo manne yanafaa kujulikana kwanza.",
       "whatThisIsLabel": "Hili ni nini",
       "dataLossLabel": "Ukipoteza siri zote mbili",
-      "whatHappensNextLabel": "Beta itakapokwisha",
-      "whatWeCanSeeLabel": "Tunachoweza kukiona",
-      "readFull": "Soma masharti kamili",
-      "review": "Kagua masharti ya beta",
       "accept": "Naelewa, washa usawazishaji"
     },
     "materialising": "Inapakua madokezo yako: {{done}} kati ya {{total}}. Unaweza kuanza kufanya kazi; yaliyobaki yataonekana yanapowasili.",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "Weka URL ile ile ya seva kwenye kila kifaa. Seva unayoiendesha mwenyewe inahitaji cheti cha HTTPS kinachoaminika.",
       "tlsFailure": "Imeshindwa kuthibitisha cheti cha HTTPS cha seva. Angalia anwani ya seva, cheti na uhalali wake.",
       "inviteLabel": "Msimbo wa mkaribisho (tu kama seva hii inauomba)",
-      "invitePlaceholder": "Msimbo ambao mwendeshaji wa seva alikupa",
-      "changeInviteCode": "Badilisha msimbo wa mkaribisho"
+      "invitePlaceholder": "Msimbo ambao mwendeshaji wa seva alikupa"
     },
     "enroll": {
       "accountNumberLabel": "Nambari ya akaunti",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Sanidi AI",
-    "intro": "Myne inaweza kutafuta madokezo yako kwa maana, kupendekeza lebo, na kuzungumza kuyahusu. Hakuna kinacholazimika, na unaweza kukiwasha baadaye kutoka Mipangilio.",
+    "intro": "Myne inaweza kupendekeza lebo na kuzungumza kuzihusu. Hakuna kinacholazimika, na unaweza kukiwasha baadaye kutoka Mipangilio.",
     "enableLabel": "Washa vipengele vya AI",
-    "semantic": {
-      "title": "Utafutaji wa kimaana",
-      "body": "Pakua modeli ya uingizaji ya lugha nyingi (takriban 449 MB) ili uweze kutafuta kwa maana, si kwa maneno pekee."
-    },
     "tag": {
       "title": "Kuweka lebo kiotomatiki",
       "body": "Pakua modeli ya lebo (takriban 337 MB) ili Myne ipendekeze lebo unapoandika."
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "Chagua seva ya usawazishaji",
-      "chooseHeading": "Madokezo yako yasawazishwe wapi?",
-      "chooseIntro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Tumia huduma ya Myne Sync, au elekeza kifaa hiki kwenye seva unayoendesha mwenyewe. Kwa njia yoyote, madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
-      "myneSyncHint": "Seva inayoendeshwa na Myne. Cheti chake cha HTTPS hukaguliwa kiotomatiki.",
       "intro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
       "notConfigured": "Weka anwani ya seva juu na ubonyeze Unganisha ili kuendelea.",
       "back": "Nyuma",
-      "continue": "Endelea",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Seva yako mwenyewe",
-      "selfHostedHint": "Seva ya usawazishaji unayoendesha. Utaweka anwani yake kwenye skrini inayofuata.",
-      "connectAction": "Unganisha",
-      "setUpAction": "Sanidi"
+      "continue": "Endelea"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "Chagua seva ya usawazishaji",
       "lead": "Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka. Seva huhifadhi maandishi yaliyosimbwa pekee.",
       "urlLabel": "Anwani ya seva",
-      "useMyneSync": "Tumia Myne Sync",
-      "selfHostedHint": "Au weka anwani ya seva unayoendesha mwenyewe.",
       "connect": "Unganisha",
       "connecting": "Inaunganisha…"
     },

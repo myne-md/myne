@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Length-prefixed frame reader/writer for the CLI bridge socket
 //! (cli-thin-client task 3).
 //!

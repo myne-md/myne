@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-global WebView navigation policy (myne#383).
 //!
 //! **The one exfiltration channel the CSP cannot see.** `connect-src` governs

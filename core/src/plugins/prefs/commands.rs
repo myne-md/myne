@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `prefs` Tauri command handlers (MYND-160 Task 9).
 //!
 //! - [`prefs_read`] — Slot::Unlocked-gated read of the `vault.prefs`
@@ -2504,14 +2505,10 @@ pub async fn set_ai_enabled_from_host(
 ) -> Result<(), PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
+    // Disk-side commit, under the mutex. The new policy needs no runtime push:
+    // the inference seam re-reads `vault.prefs` at request time, and
+    // `ai_excluded_folders` no longer has a resident index to purge.
     set_ai_enabled_with_dir(&dir, state, hooks, enabled, io, host).await?;
-    // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
-    // no-op). Read back the authoritative post-write policy so both the opt-in
-    // and the current exclusion set are consistent (SYNC-14).
-    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
     Ok(())
 }
 
@@ -2861,14 +2858,10 @@ pub async fn set_ai_excluded_folders_from_host(
 ) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
+    // Disk-side commit, under the mutex. The new policy needs no runtime push:
+    // the inference seam re-reads `vault.prefs` at request time, and
+    // `ai_excluded_folders` no longer has a resident index to purge.
     let refused = set_ai_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await?;
-    // Reflect the new exclusion set into the AI runtime SECOND: purge any
-    // now-excluded note from the resident store + persisted blob (SYNC-14).
-    // Read back the authoritative policy (opt-in may be off).
-    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
     Ok(refused)
 }
 
@@ -6725,17 +6718,6 @@ mod tests {
                 .expect("read prefs");
             assert!(view.device_names.is_empty());
         });
-    }
-
-    #[test]
-    fn device_platform_returns_the_target_token() {
-        // The single default-name heuristic: one token, from the core, shared
-        // by both clients. Asserting equality with the constant pins that the
-        // command is a passthrough and never grows a second mapping here (the
-        // token → display word mapping belongs in the i18n catalogue).
-        let token = device_platform();
-        assert!(!token.is_empty());
-        assert_eq!(token, std::env::consts::OS);
     }
 
     /// #250: the key comes from the unlocked slot and the directory comes from

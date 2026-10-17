@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_export_backup` — write a verified `.myne-backup` container
 //! (MYND-32, spec §9.11; SYNC-3 member set, SYNC-4 "success = verified").
 //!

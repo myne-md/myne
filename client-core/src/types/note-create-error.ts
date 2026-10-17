@@ -74,23 +74,3 @@ export type NoteCreateError =
    * banner, not a structural error.
    */
   | { kind: "JoinFailure" };
-
-/**
- * Type-narrowing helper for the `Io` variant.
- *
- * ```ts
- * if (isCreateIoError(e)) {
- *   switch (e.detail.io_error_kind) {
- *     case "PermissionDenied": ...
- *     case "NotFound":         ...
- *     case "NoSpace":          ...
- *     case "Other":            ...
- *   }
- * }
- * ```
- */
-export function isCreateIoError(
-  e: NoteCreateError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}

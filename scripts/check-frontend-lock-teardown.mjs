@@ -277,30 +277,6 @@ export const TEARDOWN_CALLS = [
         "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
-    {
-    call: "clearAiOutput",    declaredIn: "src/notes/ai/aiOutputStore.ts",
-    holds: "the rendered AI output: a summary of a note, and every Q and A answer over note content that src/lib/ai-qa.ts routes through this same store",
-    // Every leaving path, and it was left on the OLD teardown when `clearChat`
-    // moved onto these two. It sits one line above `clearChat` in the same
-    // Editor unmount effect and had no entry here, so this roster reported ok
-    // about it by never naming it. The argument for moving `clearChat` is the
-    // argument for this one, unchanged: the Editor unmount does fire on a lock
-    // today and is a rendering fact rather than a guarantee, and the store's
-    // own header calls its contents an AS1-class RAM artifact dropped on lock.
-    //
-    // The note-SWITCH call in the Editor stays where it is. That one is about a
-    // different event (note A's summary must not be insertable into note B) and
-    // neither leaving path can speak for it.
-    appliesTo: ["desktop-lock", "desktop-switch"],
-    skips: {
-      "desktop-create": SKIP_CREATE,
-      "mobile-lock": SKIP_DESKTOP_ONLY,
-      "mobile-delete": SKIP_DESKTOP_ONLY,
-      "desktop-delete": SKIP_ERASED,
-      "mobile-background":
-        "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
-    },
-  },
   {
     call: "resetScrollMemory",
     declaredIn: "src/notes/scrollMemory.ts",

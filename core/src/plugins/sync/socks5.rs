@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! A minimal SOCKS5 client for the sync transport (desktop Tor routing,
 //! MYND-650 task 3).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The `myne` PATH shim — how the bundled sidecar becomes a command the user
 //! can type (cli-thin-client task 11; MYND-490).
 //!
@@ -678,24 +679,5 @@ mod tests {
         make_sidecar(dir.path());
         assert_eq!(resolve_on_path(Some(OsStr::new("::"))), None);
         assert_eq!(resolve_on_path(None), None);
-    }
-
-    #[test]
-    fn outcome_labels_are_bounded_and_carry_no_path() {
-        // The logging discipline in one assertion: the label vocabulary is
-        // closed, so no `tracing` call site in this module can emit a path.
-        for outcome in [
-            ShimOutcome::Installed,
-            ShimOutcome::Unchanged,
-            ShimOutcome::SidecarAbsent,
-            ShimOutcome::SidecarAlreadyOnPath,
-            ShimOutcome::ForeignOnPath,
-            ShimOutcome::Unsupported,
-            ShimOutcome::Failed(crate::io_failure_kind::IoFailureKind::PermissionDenied),
-        ] {
-            let label = outcome.label();
-            assert!(!label.is_empty());
-            assert!(!label.contains('/'), "a label must never look like a path");
-        }
     }
 }

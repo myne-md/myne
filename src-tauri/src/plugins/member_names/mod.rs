@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `member-names` Tauri plugin: desktop wiring of the shared `myne-core` member
 //! display-name store (`vault.member-names`, `MYO5`; protocol.md §9.29,
 //! `decisions/protocol/0666`).

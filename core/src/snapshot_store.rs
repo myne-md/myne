@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! On-disk storage layer for encrypted per-note snapshots (MYND-96 — the
 //! write-path / storage side of the encrypted-snapshots epic). Shared by the
 //! notes-plugin creation hook (snapshot-write-path) and the snapshots plugin's
@@ -67,17 +68,6 @@ pub struct SnapshotFile {
 /// capture time and the embedded clock is the capture timestamp).
 pub fn new_snapshot_uuid() -> Uuid {
     Uuid::now_v7()
-}
-
-/// Current wall-clock time in milliseconds since the Unix epoch. The single
-/// clock read for the snapshot subsystem — passed into the pure
-/// `snapshot_policy` predicate / retention selection so those stay testable. A
-/// pre-1970 / unset clock yields 0 (conservative: treated as "within window").
-pub fn now_unix_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 /// Durably write a snapshot blob (the verbatim pre-overwrite `.myn` bytes) into

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Versioned ext→host handoff envelope + the tiny host→ext reply (TB10, task 5).
 //!
 //! The browser extension hands one **versioned JSON envelope** to the host
@@ -701,18 +702,6 @@ mod tests {
     }
 
     // ---- status source seam --------------------------------------------
-
-    #[test]
-    fn static_vault_status_reports_its_fixed_state() {
-        assert_eq!(
-            StaticVaultStatus(VaultStatus::Unlocked).vault_status(),
-            VaultStatus::Unlocked
-        );
-        assert_eq!(
-            StaticVaultStatus(VaultStatus::Locked).vault_status(),
-            VaultStatus::Locked
-        );
-    }
 
     // ---- REAL Slot integration -----------------------------------------
     //

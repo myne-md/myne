@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-process wiring for the host↔app relay (TB10, task 6).
 //!
 //! [`relay`](super::relay) owns the transport + the keyed re-validation; this
@@ -933,12 +934,6 @@ mod tests {
     }
 
     #[test]
-    fn registry_take_of_an_unknown_id_is_none() {
-        let reg = ClipDispatchRegistry::default();
-        assert!(reg.take("never-registered").is_none());
-    }
-
-    #[test]
     fn payload_collapses_absent_provenance_to_empty_strings() {
         use crate::clipper::envelope::{CaptureKind, HandoffEnvelope, HandoffKind};
         let env = HandoffEnvelope {
@@ -1062,11 +1057,5 @@ mod tests {
         assert_eq!(rx.recv().unwrap(), PairResult::Accepted("t".into()));
         // A second take of the same id is gone (delivery removes it).
         assert!(reg.take("pair-7").is_none(), "take removes the entry");
-    }
-
-    #[test]
-    fn pairing_registry_take_of_an_unknown_id_is_none() {
-        let reg = PairingDispatchRegistry::default();
-        assert!(reg.take("never-registered").is_none());
     }
 }

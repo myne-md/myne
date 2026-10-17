@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Device-local backup-schedule config store (MYND-351).
 //!
 //! ## What this is

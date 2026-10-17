@@ -3,8 +3,8 @@
 //
 // # The failure this prevents
 //
-// `docs/threat-model.md` names 19 adversary classes (A1..A19) and 13 trust
-// boundaries (TB1..TB13). The internal-service epic exercises them with live
+// `docs/threat-model.md` names 19 adversary classes (A1..A19) and 14 trust
+// boundaries (TB1..TB14). The internal-service epic exercises them with live
 // attack scenarios, and until this guard existed NOTHING related the two: a
 // threat-model row could land with no scenario ever written against it, and a
 // scenario could be retired with no row the wiser. The binding lives in THIS

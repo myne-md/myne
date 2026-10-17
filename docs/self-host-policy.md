@@ -2,22 +2,30 @@
 
 > **Status:** normative operator contract for the Phase 2 sync server (MYND-413). This document is the
 > operator-facing projection of `spec/server-protocol.md` §6 and `threat-model.md` TB5/§7. The
-> *mechanical* HOW (compose, env vars, snapshot commands) lives in the `operations` runbooks; this is the
-> WHAT-you-are-obligated-to. License: CC-BY-4.0 (like all of `docs/`), so independent server implementations'
+> *mechanical* HOW (compose, env vars, snapshot commands) lives in the user guide at
+> [myne.md/user-guide/sync-and-devices/run-your-own-sync-server](https://myne.md/user-guide/sync-and-devices/run-your-own-sync-server/);
+> this is the WHAT-you-are-obligated-to. That page is the how and this is the contract, and neither is a
+> copy of the other. License: CC-BY-4.0 (like all of `docs/`), so independent server implementations'
 > operators can rely on the same contract.
 
 ## 1. Self-host = the same trust boundary as hosted
 
-Running your own server **changes the operator, not the security model**. The sync server — hosted by us
-or by you — sits **outside** the trust boundary (TB5): it stores only opaque ciphertext, hashed
-account-number identifiers, version counters, and aggregate quota counters, and it holds **no keys**. It
-cannot read your notes, merge them, or reorder them. The protocol assumes a *curious or compelled* server
-either way.
+Running your own server **changes the operator, not the security model**. The sync server, whether you
+run it or somebody else does, sits **outside** the trust boundary (TB5): it stores only opaque ciphertext,
+hashed account-number identifiers, version counters, and aggregate quota counters, and it holds **no
+keys**. It cannot read your notes, merge them, or reorder them. The protocol assumes a *curious or
+compelled* server either way.
 
-**Self-hosting does not give you cryptographic superiority over the hosted service.** Your client encrypts
-the same way against both. What self-hosting gives you is control over the *policy* knobs below — and the
-corresponding *responsibility* to honour the obligations below. By TB5 a self-host deployment that honours
-the policy column is "exactly as trustworthy — and as untrusted — as the hosted service, no more, no less."
+**Myne operates no sync service it offers** (`decisions/sync/0696`, 2026-10-16), so on this page "an
+operator" means one of: you, for your own devices; somebody you know, who set a server up for people they
+know; or yourself again, on behalf of others. The trust-boundary reasoning below was written when a
+Myne-run instance existed and it does not depend on one: TB5 says any operator sits outside the boundary.
+
+**Self-hosting does not give you cryptographic superiority over anybody else's server.** Your client
+encrypts the same way against all of them. What running your own gives you is control over the *policy*
+knobs below, and the corresponding *responsibility* to honour the obligations below. By TB5 a deployment
+that honours the policy column is "exactly as trustworthy (and as untrusted) as any other operator's
+server, no more, no less."
 
 ## 2. Protocol guarantees vs your policy obligations
 
@@ -48,8 +56,9 @@ they are violations:
   backup taken *before* a deletion necessarily carries that ciphertext until the backup itself ages out, so
   operational durability and cryptographic-erase are reconciled by a **bound**, not by having no backups.
   If you back the store up, keep it **encrypted, off-box, and short-cycle** so the *effective* worst-case
-  window a deleted blob survives is `horizon + backup-retention`, and **disclose that number** (Myne's
-  hosted tier: a 14-day encrypted off-box cycle, so ≤ horizon + 14 days). An **unbounded**, plaintext, or
+  window a deleted blob survives is `horizon + backup-retention`, and **disclose that number** (the figure
+  Myne published while it ran its own instance was a 14-day encrypted off-box cycle, so ≤ horizon + 14
+  days). An **unbounded**, plaintext, or
   never-pruned backup re-creates the hoarding this rule forbids. The server ships a **built-in feature that
   implements this correctly** (`MYNE_BACKUP_*`, §4) — encrypted, off-box, pruned to a disclosed window — so
   you do not hand-roll it.
@@ -74,7 +83,7 @@ they are violations:
 
 ## 4. Policy knobs you control
 
-Set via env vars in the bundle (see the `operations` bundle README for syntax). These bound **storage and
+Set via env vars in the bundle (the [user guide](https://myne.md/user-guide/sync-and-devices/run-your-own-sync-server/) lists every one with its syntax). These bound **storage and
 abuse, not confidentiality** — none of them can weaken the zero-knowledge protocol.
 
 - **Quota ceiling** (`MYNE_QUOTA_CEILING_BYTES`, per-account deduplicated ciphertext bytes). Default `0` =
@@ -120,8 +129,20 @@ abuse, not confidentiality** — none of them can weaken the zero-knowledge prot
   window past what you disclose re-creates the hoarding §3 forbids** — if you must, re-disclose it
   (threat-model §7 + this section) as §3 requires.
 
-Numeric *recommended* quota/rate values for the hosted tier are set elsewhere (the billing epic); for
-self-host, this document gives you the **mechanism**, and you choose the number for your deployment.
+- **Member data after a removal** (`store.DefaultRetirementGrace`, **a code constant and not a knob: 7
+  days**). When an owner removes a member, the rotated group key is posted once for each remaining
+  member (see the privacy network table) and the retired namespace is scheduled for reclamation after a
+  **seven-day grace**: long enough for an in-flight rotation to finish, short enough that a departed
+  member's sealed packages and per-person profile do not accumulate. There is **no environment variable
+  for this window** — the value lives in `internal/store/retirement.go`, and an operator who changes it is
+  changing the software. If you do, §3's disclosure rule applies to the new number the same way it applies
+  to the backup window. What matters is that the shipped default is **bounded**: nothing here is reclaimed
+  "never", which is the shape that would leave a departed member's key material on your disk forever.
+
+This document gives you the **mechanism**, and for almost every number you choose the value yourself,
+because Myne operates no service of its own (`decisions/sync/0696`). The exception is a value the software
+fixes rather than exposes — the member-data grace above — and it is named as a constant precisely so that
+nobody goes looking for a knob that does not exist.
 
 ## 5. Verifying the server image
 
@@ -146,7 +167,9 @@ Both of the unshipped two are deferred beta work rather than dropped commitments
 signing half of the compensating-controls set in `threat-model.md` §6 and they are expected before v1.
 Until they land, verify the reproducibility and do not assume the other two.
 
-The mechanical commands for the part that works are in the `operations` reproducible-build runbook.
+The mechanical command for the part that works is `myne-server`'s own `scripts/repro-gate.sh`, named
+above: it rebuilds the image and compares the digest on every push, so it is the gate rather than a
+procedure to follow by hand. It lives with the server, which is the repository you are deploying.
 
 ## 6. Certificate trust
 
@@ -199,7 +222,7 @@ connection sees only ciphertext. What a web client additionally depends on is th
 the client code, which is a separate boundary with a separate adversary (`threat-model.md` TB11 / A15) —
 and if you self-host the web client too, that origin is yours.
 
-- **Hosted and self-hosted:** a native client checks the same public CA roots and hostname at
+- **Every operator, whoever it is:** a native client checks the same public CA roots and hostname at
   first connect and on every reconnect, including over Tor. A valid renewed certificate does
   not interrupt sync. An untrusted, expired or wrong-hostname certificate fails the handshake;
   neither a stored legacy pin nor a QR payload can override that refusal. Two consequences follow
@@ -216,6 +239,165 @@ and if you self-host the web client too, that origin is yours.
 The protocol structurally prevents the server from reading your content. It **cannot** structurally prevent
 a *malicious or compelled* operator from logging IPs, retaining old ciphertext, or correlating metadata
 **at the policy level** — that is exactly why these are *obligations* in §2, not guarantees. When you
-self-host, your users are trusting **your** adherence to the policy column; when they use the hosted
-service, they are trusting ours. This residual is recorded normatively in `threat-model.md` §7 (self-host
-known limitation). Neither hosting model claims more than this — and that honesty is the point.
+run the server, the people using it are trusting **your** adherence to the policy column. This residual is
+recorded normatively in `threat-model.md` §7 (self-host known limitation). No hosting model claims more
+than this, and that honesty is the point.
+
+## 8. Running on Kubernetes
+
+The same server, the same image and the same knobs, with a different edge. **Nothing in §1–§7 changes**;
+what changes is that three things the Compose bundle does *for* the operator become the operator's own
+work, and a fourth is new. The mechanical HOW is
+`myne-server/deploy/kubernetes/README.md` and the two chart READMEs beside it; this is the contract.
+
+**The edge is yours, and so is its access log.** The bundle's Caddy edge deletes every IP-bearing log
+field, which is what makes the AS14 no-persistent-IP-logging commitment true for a Compose deployment. An
+Ingress replaces that edge, and a **default-configured** ingress controller writes the client address and
+the `X-Forwarded-For` chain on every request. Enabling the Ingress therefore obliges you, as §3 already
+does, to turn that logging off or drop the IP-bearing fields, and to strip the forwarding headers on the
+way in. A page load at the sync origin is a vault opening, so the record being avoided is precisely "when
+and from where this account synced".
+
+**One replica, and the volume snapshot is the backup unit.** The server is a single writer on one
+filesystem: blobs, account metadata, the record-head chain, the device-auth state (`auth.json`), the
+operator policy (`accounts.json`) and the person-to-vault state (`b2b.json`, below) all live on that one
+volume, which is what makes a snapshot of it a consistent cut rather than a copy taken mid-write. Keep
+replicas at one; a second replica is a second writer on one claim, not more capacity. If you back up with
+the built-in restic feature, the disclosed `horizon + backup-retention` window and the operator-held
+repository key from §4 apply unchanged.
+
+**The operator surfaces stay off the network.** `MYNE_ADMIN_SOCKET` is a Unix socket inside the pod
+(reach it with `kubectl exec`), and `MYNE_ADMIN_PANEL_ADDR` is the read-only, **unauthenticated** panel
+§3 already describes — on a cluster the temptation is a Service or an Ingress rule for it. Do not: bind it
+to loopback and use `kubectl port-forward`. Nothing about a cluster makes the roster less of a credential
+list.
+
+**The person-to-vault state is a persistence obligation, not a cluster nicety.** `b2b.json` is written
+beside `auth.json` (0600, same volume, operator-trust-equivalent: opaque sealed bytes and pseudonymous
+ids, no key material) and holds the invite relay, the per-person profile store, the group packages, the
+membership bindings and tokens, and the retired-namespace registry. Without it a restart drops pending
+invites, loses the **only copy** of a member's sealed `MYY5` profile, revokes every member token, and
+reopens a namespace the owner retired. A single container that restarts gets the same protection; a
+cluster makes the restart routine, which is why this is stated here rather than left to the runbook.
+
+**Retired namespaces are reclaimed on the grace you configured.** When an owner retires a key epoch,
+the old namespace's ids are refused for writes permanently, and the ciphertext is now physically
+released once the grace window has elapsed: the registry's due list is driven into the store by a
+background reclaimer, reclaim-first and acknowledge-after, so a reclaim that fails (a disk error) stays
+due and is retried rather than being silently forgotten. The count is exported as one aggregate metric,
+`myne_retired_blobs_reclaimed_total`, and nothing per-account is. This closed a real gap: the window
+used to be a comment, because the store had no way to drop a *non-tombstoned* blob's body, and the
+Kubernetes path inherited it exactly as the Compose path did (`myne-server/KNOWN-GAPS-711.md` item 2).
+
+**Pin by digest, and expect one architecture per tagged build.** The reproducible multi-arch
+(`linux/amd64` + `linux/arm64`) manifest list is what both the Compose bundle and the charts pin; the
+**tagged** builds have not all been published that way, so a tag-pinned deployment on an arm64 node
+may need emulation or fail with `exec format error`. Verify any reference before you pin or run it:
+
+```sh
+docker manifest inspect ghcr.io/myne-md/myne-server:<tag>
+```
+
+That prints the index digest and the architectures the reference carries, so you can see whether both
+`linux/amd64` and `linux/arm64` are there; a single-platform reference prints one entry rather than a
+list. `docker buildx imagetools inspect <ref>` gives the same answer in a friendlier shape, and neither
+needs credentials for a public image. A digest pin is also what
+§5's rebuild-and-compare check can be performed against.
+
+## 9. If you run it for other people, some duties move from "ours" to yours
+
+This section exists because it used to be unnecessary. While Myne operated an instance it offered to the
+public, the obligations that attach to *offering* a service were Myne's, and this document only had to
+describe the security policy an operator must preserve. Myne offers no service now
+(`decisions/sync/0696`), and that changes who stands in the provider's place for a deployment that stores
+another person's notes.
+
+**The roles, stated as questions a lawyer answers, not as advice.** If your server holds content that other
+people gave you, you are the one storing information provided by recipients of your service, which is the
+shape the EU's Digital Services Act (Regulation 2022/2065) calls a **hosting service**, and the shape the
+GDPR calls processing personal data. Whether your particular deployment falls inside those regimes, or
+inside an exemption (a purely personal or domestic activity is the candidate for the GDPR, and whether an
+equivalent carve-out reaches a private server under the DSA is not something this document settles), is a
+question for a qualified lawyer in your jurisdiction. **This document is not legal advice and is not a
+substitute for it.** What follows is the list of things that list is likely to include, so the question is
+asked before the deployment is public rather than after.
+
+**The duties most likely to attach, and none of them is escaped by encryption.** Hosting duties are
+generally **not** size-exempt, so "it is only me and ten friends" is not by itself an answer. They are
+mostly about being reachable and about acting on a notice you actually receive:
+
+- **A contact point for users and one for authorities**, published and kept current, with the languages you
+  will answer in.
+- **A notice-and-action route for illegal content.** Note the asymmetry this architecture creates and that
+  your terms should state plainly: you **cannot** selectively remove one item, because you cannot read any
+  of them. The only instrument you have is account-level, which is why a freeze is a policy you should
+  write down and disclose *before* you need it.
+- **A duty to inform** the user (or the authority) when you restrict content or end an account. This one is
+  often moot in practice, because it applies only where you hold the person's electronic contact details,
+  and this design collects no email address. That is an architectural consequence, not a forgotten duty,
+  and it is worth saying so in your own documentation rather than leaving a reader to wonder.
+- **A duty to report** to law enforcement where you obtain knowledge of a credible threat to life or
+  safety. In a zero-knowledge deployment this can only be triggered by information reaching you **off** the
+  service, such as somebody writing to you directly, and it binds you as an ordinary person rather than
+  because you run a server.
+- **A data-protection record and a privacy notice**, if the GDPR reaches you: your account identifiers are
+  pseudonymous, but a device registry, a quota counter and a transient connection address are still
+  processing.
+
+**What does not change, because it is structural.** The server cannot read the content, so no duty here can
+be discharged by reading it, and no duty can require you to build a scanner: a general obligation to
+monitor what you transmit or store is expressly ruled out. What you must not do is the policy column in §2:
+no persistent IP logging, no retaining deleted ciphertext past the horizon you disclosed, no metadata
+correlation. Those are the promises your users are trusting you for.
+
+**Where the analysis behind this section comes from.** A sourced study of these questions for a German
+operator of a free, zero-knowledge service, written before the offering changed and still the best
+starting material found here. It is internal rather than published, for the reason the rest of the ops
+repository is: it names hosts. It is not legal advice either, and the two questions it leaves open are the
+ones to put to a lawyer. The summary is: four mechanisms and two
+statements cover the practical load, and the whole list is a day's work for a deployment that has a
+contact address, a notice route, honest terms, and a decision recorded about which exemption it is
+claiming.
+
+## 10. What a Myne server holds, and what a request can therefore produce
+
+This section is the operator-facing copy of the inventory, and it is **new here because the page it used to
+live on is gone**. Until 2026-10-17 `myne.md/law-enforcement/` (and its German twin) published this list to
+authorities and their counsel. It was deleted with the rest of the DSA roster, because it described a
+server Myne operated and Myne operates none (`decisions/sync/0696`); a request now arrives at *you*. The
+wording below is the same inventory stated to that reader, and it agrees with the privacy policy's stored
+list, which is its other copy. Myne's own processing record says the same for the deployment it used to
+operate, and that record is not yours to inherit.
+
+**What a deployment of this software holds.** A server that has been run for a while will have, per
+account:
+
+| Stored | What it is |
+|---|---|
+| `account_number_hash` | A 16-byte hash. Not the account number itself. |
+| SCRAM verifier | What a login is checked against. Not a password, and not reversible into one. |
+| Encrypted blobs | Notes and attachments as ciphertext. The server holds no key. Producible only in that form. |
+| Device registry | One record per enrolled device: a client-generated device id and enrolment/activity state. No device names, no hardware identifiers, no addresses. |
+| Counters | Total bytes stored, number of devices. |
+| Account policy | A freeze flag and any per-account storage or device limit. Server-side plain text. |
+
+**What it never has.** None of the following is collected, at any layer, by any deployment of this
+software — this is a property of the protocol rather than a setting an operator can change (§2):
+
+- Email address — none is collected at signup, and there is no field for one
+- Name, postal address, telephone number
+- Payment details — the software takes none
+- IP addresses — not logged, in any persisted form, at any layer
+- Connection logs, access times, session history
+- Readable content — note text, titles, folder names, tags
+- Timestamps that mean anything — they exist only inside the ciphertext
+
+**What follows for a request, and this is the part worth stating plainly.** A request can be answered with
+an account identifier, a login verifier, counters and ciphertext; it **cannot** be answered with content,
+because there is none to produce. The data is not withheld — it does not exist. An operator who wants a
+public address for such requests should publish one, state the languages they answer in, and keep this list
+in front of it, exactly as the deleted page did.
+
+**One thing this section does not settle.** Whether a given deployment is a hosting service under the DSA,
+and therefore whether it owes the Art. 16 and 18 duties §9 lists, is the question for a lawyer that §9
+already says it is. This section is the factual half of that answer, not the legal one.

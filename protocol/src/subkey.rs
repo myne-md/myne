@@ -182,15 +182,6 @@ const ROLE_STR_CATALOG_SYNC_ID: &[u8] = b"catalog-sync-id";
 /// existing account.
 const ROLE_STR_PREFS_SYNC_ID: &[u8] = b"prefs-sync-id";
 
-/// Registered role string for the v0.1 AI-embeddings blob KEK
-/// (MYND-453; encrypts the `vault.embeddings` on-device AI embedding index —
-/// `embeddings_blob.rs`, `MYR1`, `protocol.md` § 9.17 + § 3.4). Load-bearing:
-/// drift silently changes the KEK. `root_key`-derived (like prefs/search/
-/// indices), so it is `itemsKey`-independent and survives a later epoch
-/// rotation. Only ever derived with the default-off `local-inference` feature +
-/// `ai_enabled` on. DISTINCT from the AAD role string `"ai-embeddings-blob"`.
-const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
-
 /// Registered role string for the v0.1 custom-themes blob KEK
 /// (MYND-486; encrypts the `vault.themes` custom-theme palette store —
 /// `themes_blob.rs`, `MYT1`, `protocol.md` § 9.21 + § 3.4). Load-bearing:
@@ -248,7 +239,7 @@ const ROLE_STR_CHATS_KEY: &[u8] = b"chats-key";
 /// Registered role string for the v0.1 graph-layout blob KEK (encrypts the
 /// `vault.graph` on-device knowledge-graph layout cache — `graph_layout_blob.rs`,
 /// `MYG1`, `protocol.md` § 9.19). Load-bearing: drift silently changes the KEK.
-/// `root_key`-derived (like prefs/search/indices/embeddings), so it is
+/// `root_key`-derived (like prefs/search/indices), so it is
 /// `itemsKey`-independent and survives a later epoch rotation. A rebuildable
 /// cache — never synced, never backed up. DISTINCT from the AAD role string
 /// `"graph-layout-blob"`.
@@ -404,7 +395,6 @@ pub enum OwnerRole {
     ServerAuth,
     MembershipKey,
     VaultHeadMac,
-    AiEmbeddingsKey,
     ChatsCatalogKey,
     ChatsCatalogSyncId,
     ChatsKey,
@@ -417,12 +407,11 @@ pub enum OwnerRole {
 }
 
 impl OwnerRole {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 13] = [
         Self::GroupKeyWrap,
         Self::ServerAuth,
         Self::MembershipKey,
         Self::VaultHeadMac,
-        Self::AiEmbeddingsKey,
         Self::ChatsCatalogKey,
         Self::ChatsCatalogSyncId,
         Self::ChatsKey,
@@ -440,7 +429,6 @@ impl OwnerRole {
             Self::ServerAuth => ROLE_STR_SERVER_AUTH,
             Self::MembershipKey => ROLE_STR_MEMBERSHIP_KEY,
             Self::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
-            Self::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
             Self::ChatsCatalogKey => ROLE_STR_CHATS_CATALOG_KEY,
             Self::ChatsCatalogSyncId => ROLE_STR_CHATS_CATALOG_SYNC_ID,
             Self::ChatsKey => ROLE_STR_CHATS_KEY,
@@ -622,7 +610,6 @@ impl SubkeyRole {
             Self::VaultHeadMac
             | Self::ServerAuth
             | Self::AttachmentsIdHmac
-            | Self::AiEmbeddingsKey
             | Self::ChatsCatalogKey
             | Self::ChatsCatalogSyncId
             | Self::ChatsKey
@@ -708,14 +695,6 @@ pub enum SubkeyRole {
     /// `attachment_id` AAD binding (§ 9.15.3). Distinct from every other
     /// `root_key`-derived blob KEK so the families stay domain-separated.
     AttachmentTextKey,
-    /// KEK for the v0.1 AI-embeddings blob (`vault.embeddings`, `MYR1`,
-    /// MYND-453). Encrypts the on-device AI embedding index (semantic-search /
-    /// Q&A vectors + `{note_id → content_nonce}` manifest + the model-identity
-    /// tuple) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
-    /// (like prefs/search/indices), so it is `itemsKey`-independent and survives
-    /// a later epoch rotation. Distinct from every other blob KEK so the families
-    /// stay domain-separated; only derived with the `local-inference` feature.
-    AiEmbeddingsKey,
     /// Phase 2 sync blob-id derivation for the `vault.attachments` catalog
     /// (MYND-468; `protocol.md` §3.4, `sync-protocol.md` §8.1). The first 16
     /// bytes of the derived output are the catalog's reserved sync-plane
@@ -751,7 +730,7 @@ pub enum SubkeyRole {
     /// KEK for the v0.1 graph-layout blob (`vault.graph`, `MYG1`). Encrypts the
     /// on-device knowledge-graph layout cache (node positions + a staleness
     /// marker) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
-    /// (like prefs/search/indices/embeddings), so it is `itemsKey`-independent and
+    /// (like prefs/search/indices), so it is `itemsKey`-independent and
     /// survives a later epoch rotation. A rebuildable cache — never synced, never
     /// backed up. Distinct from every other blob KEK so the families stay
     /// domain-separated.
@@ -877,7 +856,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 29] = [
+    pub const ALL: [SubkeyRole; 28] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -889,7 +868,6 @@ impl SubkeyRole {
         SubkeyRole::VaultHeadMac,
         SubkeyRole::ServerAuth,
         SubkeyRole::AttachmentTextKey,
-        SubkeyRole::AiEmbeddingsKey,
         SubkeyRole::CatalogSyncId,
         SubkeyRole::PrefsSyncId,
         SubkeyRole::CustomThemesKey,
@@ -925,7 +903,6 @@ impl SubkeyRole {
             SubkeyRole::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
             SubkeyRole::ServerAuth => ROLE_STR_SERVER_AUTH,
             SubkeyRole::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
-            SubkeyRole::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
             SubkeyRole::CatalogSyncId => ROLE_STR_CATALOG_SYNC_ID,
             SubkeyRole::PrefsSyncId => ROLE_STR_PREFS_SYNC_ID,
             SubkeyRole::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
@@ -1075,24 +1052,23 @@ mod tests {
                 SubkeyRole::VaultHeadMac => 8,
                 SubkeyRole::ServerAuth => 9,
                 SubkeyRole::AttachmentTextKey => 10,
-                SubkeyRole::AiEmbeddingsKey => 11,
-                SubkeyRole::CatalogSyncId => 12,
-                SubkeyRole::PrefsSyncId => 13,
-                SubkeyRole::CustomThemesKey => 14,
-                SubkeyRole::ThemesSyncId => 15,
-                SubkeyRole::GraphLayoutKey => 16,
-                SubkeyRole::ChatsCatalogKey => 17,
-                SubkeyRole::ChatsCatalogSyncId => 18,
-                SubkeyRole::ChatsKey => 19,
-                SubkeyRole::MembershipKey => 20,
-                SubkeyRole::AgentMemoryCatalogKey => 21,
-                SubkeyRole::AgentMemoryCatalogSyncId => 22,
-                SubkeyRole::AgentMemoryKey => 23,
-                SubkeyRole::AgentPersonalityKey => 24,
-                SubkeyRole::AgentPersonalitySyncId => 25,
-                SubkeyRole::PersonVaultCarrier => 26,
-                SubkeyRole::AwarenessRoomId => 27,
-                SubkeyRole::AwarenessKey => 28,
+                SubkeyRole::CatalogSyncId => 11,
+                SubkeyRole::PrefsSyncId => 12,
+                SubkeyRole::CustomThemesKey => 13,
+                SubkeyRole::ThemesSyncId => 14,
+                SubkeyRole::GraphLayoutKey => 15,
+                SubkeyRole::ChatsCatalogKey => 16,
+                SubkeyRole::ChatsCatalogSyncId => 17,
+                SubkeyRole::ChatsKey => 18,
+                SubkeyRole::MembershipKey => 19,
+                SubkeyRole::AgentMemoryCatalogKey => 20,
+                SubkeyRole::AgentMemoryCatalogSyncId => 21,
+                SubkeyRole::AgentMemoryKey => 22,
+                SubkeyRole::AgentPersonalityKey => 23,
+                SubkeyRole::AgentPersonalitySyncId => 24,
+                SubkeyRole::PersonVaultCarrier => 25,
+                SubkeyRole::AwarenessRoomId => 26,
+                SubkeyRole::AwarenessKey => 27,
             }
         }
 
@@ -1462,7 +1438,7 @@ mod tests {
     /// act, not a side effect of `cargo test`. Run with:
     /// `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored`
     ///
-    /// The 48 cases cover the v0.1 input space. Every case before the eight
+    /// The 46 cases cover the v0.1 input space. Every case before the eight
     /// appends shares its root with a sibling role, which is what the
     /// independence argument below rests on; the eight appends do NOT, so they
     /// are pinned as single inputs and the argument deliberately excludes them.
@@ -1496,17 +1472,17 @@ mod tests {
     ///   the `vault.dictionary` KEK, pinned in lockstep with the
     ///   `vault-dictionary` family; distinct from the AAD role
     ///   `personal-dictionary-blob`.
-    /// - 18 further roles, each as a {all-zero, alpha} pair, appended one
+    /// - 16 further roles, each as a {all-zero, alpha} pair, appended one
     ///   feature at a time rather than as one block: `CatalogSyncId`,
     ///   `PrefsSyncId`, `CustomThemesKey`, `ThemesSyncId`, `GraphLayoutKey`,
-    ///   `AttachmentTextKey`, `AiEmbeddingsKey`, `VaultHeadMac` and
+    ///   `AttachmentTextKey`, `VaultHeadMac` and
     ///   `ServerAuth`. The alpha half of each carries
-    ///   `informational_info_utf8_hex`, which is where the nine canonical info
+    ///   `informational_info_utf8_hex`, which is where the eight canonical info
     ///   assemblies are documented for porters. The list above is grouped by
     ///   feature rather than partitioned, so every group is named in ONE sum to
-    ///   make the 48 reconcile: 4 baseline + 6 pseudorandom + 2 search + 4
+    ///   make the 46 reconcile: 4 baseline + 6 pseudorandom + 2 search + 4
     ///   attachments + 2 session-state + 2 vault-indices + 2 personal-dictionary
-    ///   + 18 (the nine pairs above) + 8 single-input = 48.
+    ///   + 16 (the eight pairs above) + 8 single-input = 46.
     /// - 8 single-input roles: the `chats-*` family (MYM1 / MYJ1, myne-md/myne#675)
     ///   and the `agent-*` family (MYN1 / MYX1 / MYZ1, myne-md/myne#697), each
     ///   under the shared `chats_agent_root` (`0x42` repeated). These append
@@ -1548,7 +1524,6 @@ mod tests {
                 SubkeyRole::VaultHeadMac => "vault-head-mac",
                 SubkeyRole::ServerAuth => "server-auth",
                 SubkeyRole::AttachmentTextKey => "attachment-text-key",
-                SubkeyRole::AiEmbeddingsKey => "ai-embeddings-key",
                 SubkeyRole::CatalogSyncId => "catalog-sync-id",
                 SubkeyRole::PrefsSyncId => "prefs-sync-id",
                 SubkeyRole::CustomThemesKey => "custom-themes-key",
@@ -1594,7 +1569,7 @@ mod tests {
         let chats_agent_root: [u8; 32] = [0x42; 32];
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 48] = [
+        let cases: [Case<'_>; 46] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -1764,20 +1739,6 @@ mod tests {
                 true,
             ),
             (
-                "zero-root-ai-embeddings-key",
-                "All-zero root_key with the AiEmbeddingsKey role (MYND-453, §9.17). KEK for the vault.embeddings on-device AI embedding-index blob (MYR1); role string 'ai-embeddings-key' (17 ASCII bytes). Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the ai-embeddings lineage onto another role's info string (most importantly vault-indices-key and search-index-key, its structural siblings).",
-                &zero_root,
-                SubkeyRole::AiEmbeddingsKey,
-                false,
-            ),
-            (
-                "prn-alpha-ai-embeddings-key",
-                "Pseudorandom alpha root with the AiEmbeddingsKey role. The informational_info_utf8_hex field carries the canonical 27-byte HKDF info bytes ('myne.v0.1 ai-embeddings-key') so independent implementers can verify the tenth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'ai-embeddings-key' is DISTINCT from the AAD role string 'ai-embeddings-blob' (aad_ai_embeddings_blob, ctx-aead / aad-construction vectors), AND distinct from vault-indices-key / search-index-key — vault.embeddings (dense AI vectors), vault.indices (structured metadata), and vault.search (BM25) are separate blob families, one KEK each.",
-                &alpha,
-                SubkeyRole::AiEmbeddingsKey,
-                true,
-            ),
-            (
                 "zero-root-catalog-sync-id",
                 "All-zero root_key with the CatalogSyncId role (MYND-468, §3.4; sync-protocol.md §8.1). Derives the reserved sync-plane blob-id of the vault.attachments catalog — the FIRST 16 BYTES of this 32-byte output are the id; role string 'catalog-sync-id' (15 ASCII bytes). An identifier derivation like attachments-id-hmac, NOT a KEK — the catalog KEK stays attachments-catalog-key. Pairs with the other zero-root vectors under the same trivial root.",
                 &zero_root,
@@ -1807,14 +1768,14 @@ mod tests {
             ),
             (
                 "zero-root-graph-layout-key",
-                "All-zero root_key with the GraphLayoutKey role (§3.4; §9.19). KEK for the vault.graph knowledge-graph layout cache (MYG1); role string 'graph-layout-key' (16 ASCII bytes). root_key-derived (like prefs/search/indices/embeddings), a rebuildable cache — never synced, never backed up. Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the graph-layout lineage onto another role's info string.",
+                "All-zero root_key with the GraphLayoutKey role (§3.4; §9.19). KEK for the vault.graph knowledge-graph layout cache (MYG1); role string 'graph-layout-key' (16 ASCII bytes). root_key-derived (like prefs/search/indices), a rebuildable cache — never synced, never backed up. Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the graph-layout lineage onto another role's info string.",
                 &zero_root,
                 SubkeyRole::GraphLayoutKey,
                 false,
             ),
             (
                 "prn-alpha-graph-layout-key",
-                "Pseudorandom alpha root with the GraphLayoutKey role. The informational_info_utf8_hex field carries the canonical 26-byte HKDF info bytes ('myne.v0.1 graph-layout-key') so independent implementers can verify the thirteenth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'graph-layout-key' is DISTINCT from the AAD role string 'graph-layout-blob' (aad_graph_layout_blob), AND distinct from its rebuildable-cache siblings search-index-key / vault-indices-key / ai-embeddings-key — vault.graph (layout), vault.search (BM25), vault.indices (metadata), vault.embeddings (AI vectors) are separate blob families, one KEK each.",
+                "Pseudorandom alpha root with the GraphLayoutKey role. The informational_info_utf8_hex field carries the canonical 26-byte HKDF info bytes ('myne.v0.1 graph-layout-key') so independent implementers can verify the thirteenth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'graph-layout-key' is DISTINCT from the AAD role string 'graph-layout-blob' (aad_graph_layout_blob), AND distinct from its rebuildable-cache siblings search-index-key / vault-indices-key — vault.graph (layout), vault.search (BM25), vault.indices (metadata) are separate blob families, one KEK each.",
                 &alpha,
                 SubkeyRole::GraphLayoutKey,
                 true,
@@ -1946,7 +1907,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key + chats-catalog-key + chats-catalog-sync-id + chats-key + agent-memory-catalog-key + agent-memory-catalog-sync-id + agent-memory-key + agent-personality-key + agent-personality-sync-id. MembershipKey derives under the v0.2 prefix and is pinned by the hkdf-sha256/v0.2 category instead. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key + chats-catalog-key + chats-catalog-sync-id + chats-key + agent-memory-catalog-key + agent-memory-catalog-sync-id + agent-memory-key + agent-personality-key + agent-personality-sync-id. MembershipKey derives under the v0.2 prefix and is pinned by the hkdf-sha256/v0.2 category instead. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
@@ -2192,16 +2153,15 @@ mod tests {
                 OwnerRole::ServerAuth => 1,
                 OwnerRole::MembershipKey => 2,
                 OwnerRole::VaultHeadMac => 3,
-                OwnerRole::AiEmbeddingsKey => 4,
-                OwnerRole::ChatsCatalogKey => 5,
-                OwnerRole::ChatsCatalogSyncId => 6,
-                OwnerRole::ChatsKey => 7,
-                OwnerRole::AgentMemoryCatalogKey => 8,
-                OwnerRole::AgentMemoryCatalogSyncId => 9,
-                OwnerRole::AgentMemoryKey => 10,
-                OwnerRole::AgentPersonalityKey => 11,
-                OwnerRole::AgentPersonalitySyncId => 12,
-                OwnerRole::PersonVaultCarrier => 13,
+                OwnerRole::ChatsCatalogKey => 4,
+                OwnerRole::ChatsCatalogSyncId => 5,
+                OwnerRole::ChatsKey => 6,
+                OwnerRole::AgentMemoryCatalogKey => 7,
+                OwnerRole::AgentMemoryCatalogSyncId => 8,
+                OwnerRole::AgentMemoryKey => 9,
+                OwnerRole::AgentPersonalityKey => 10,
+                OwnerRole::AgentPersonalitySyncId => 11,
+                OwnerRole::PersonVaultCarrier => 12,
             }
         }
 

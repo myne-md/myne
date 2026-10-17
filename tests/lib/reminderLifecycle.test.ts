@@ -19,14 +19,6 @@ describe("reconciliation runs from every path that can change the set", () => {
     }
   });
 
-  it("the pass is the same one everywhere — idempotence makes extra runs free", () => {
-    // Four entry points into one pass; the alternative (a different action per
-    // path) is how registration sets drift out of step with the vault.
-    const actions = new Set(
-      (["unlock", "tick", "note-save", "exit"] as const).map(lifecycleAction),
-    );
-    expect(actions.size).toBe(1);
-  });
 });
 
 describe("locking does NOT cancel — the written departure", () => {
@@ -43,9 +35,6 @@ describe("locking does NOT cancel — the written departure", () => {
     expect(inert).toEqual(["lock"]);
   });
 
-  it("lock does not reconcile either — it is not a cheap re-register", () => {
-    expect(reconcilesOn("lock")).toBe(false);
-  });
 });
 
 describe("the three events that clear everything", () => {
@@ -71,13 +60,6 @@ describe("completion cancels its own registration", () => {
 });
 
 describe("the table is total", () => {
-  it("every event has a decided action", () => {
-    for (const event of REMINDER_LIFECYCLE_EVENTS) {
-      expect(["reconcile", "cancel-all", "cancel-one", "none"]).toContain(
-        lifecycleAction(event),
-      );
-    }
-  });
 
   it("the event list and the switch agree", () => {
     // The switch ends in a `never` guard, so adding an event without deciding

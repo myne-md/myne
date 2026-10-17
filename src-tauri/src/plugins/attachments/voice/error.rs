@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Error taxonomy for the voice-record commands (MYND-259).
 
 use super::capture::RecordError;

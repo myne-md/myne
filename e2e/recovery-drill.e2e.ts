@@ -9,7 +9,7 @@
 // workflow, so this drill is a release gate rather than a push one. The
 // parameters are untouched. Fixture generation pays Argon2id twice and
 // the in-app phrase unlock plus password reset pay it again, so budget
-// accordingly (vitest.e2e.config allows 180 s per test).
+// accordingly (.config/vitest/e2e.config allows 180 s per test).
 //
 // SYNC-13: this spec NEVER logs the phrase/passwords; the plaintext
 // scan reports needle indices, not contents.

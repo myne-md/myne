@@ -131,6 +131,7 @@ export function CustomizeRow({
   id,
   icon,
   label,
+  note,
   index,
   total,
   reorder,
@@ -138,12 +139,26 @@ export function CustomizeRow({
   testId,
 }: {
   id: string;
-  icon: IconName;
+  /**
+   * Omitted by the floating-toolbar list, whose frozen vocabulary carries no
+   * icons (MYND-336) — so the row renders the label without one. The ribbon and
+   * the bottom bar both pass one. A THIRD adopter without icons needed this slot
+   * to be optional, which is the shape a shared row is supposed to have: the
+   * difference between the three is real and lives in props, not in a fourth copy.
+   */
+  icon?: IconName;
   label: string;
+  /**
+   * A trailing remark rendered after the label, still inside the labelled area:
+   * the toolbar's "not yet renderable" hint. Deliberately not part of `label`,
+   * which is a translated string rather than a node.
+   */
+  note?: ReactNode;
   index: number;
   total: number;
   reorder: DragReorder;
-  /** The per-row operation that differs: the ribbon's ×, the bar's switch. */
+  /** The per-row operation that differs: the ribbon's ×, the bar's switch, the
+   *  toolbar's show/hide box. */
   trailing: ReactNode;
   testId: string;
 }) {
@@ -176,8 +191,9 @@ export function CustomizeRow({
         ⠿
       </span>
       <span style={LABEL_STYLE}>
-        <Icon name={icon} size={16} />
+        {icon !== undefined && <Icon name={icon} size={16} />}
         {label}
+        {note}
       </span>
       {trailing}
     </div>

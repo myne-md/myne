@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Failed-attempt counter for quick-unlock (MYND-329, task 5).
 //!
 //! A **code-enforced**, replay-resistant counter that bounds *online* guessing

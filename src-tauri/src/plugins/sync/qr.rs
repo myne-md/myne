@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Desktop-only QR device-join generation (MYND-466).
 //!
 //! Two producers, both rendering a scanner-only payload from
@@ -22,10 +23,10 @@
 //! Desktop-only: mobile scans, never generates — so the `qrcode` dependency lives
 //! here rather than in the shared core (kept off the mobile build).
 
+use myne_core::host::HostCtx;
 use myne_core::plugins::sync::commands::sync_get_endpoint;
 use myne_core::plugins::sync::qr_join::{QrJoinPayload, QR_JOIN_TTL_SECS};
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Runtime};
 use thiserror::Error;
 
@@ -83,8 +84,13 @@ pub async fn sync_device_join_qr<R: Runtime>(
     // the retired field as `None` regardless of what a legacy config holds. Emitting
     // it explicitly keeps a future reader from reading the local `endpoint` binding
     // as the source of trust material.
-    let payload = QrJoinPayload::new(endpoint_url, account_number.trim(), None, now_unix())
-        .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
+    let payload = QrJoinPayload::new(
+        endpoint_url,
+        account_number.trim(),
+        None,
+        myne_core::host::tauri_host::TauriHost::new(app.clone()).now_unix_secs(),
+    )
+    .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
 
     render_payload(&payload)
 }
@@ -147,8 +153,12 @@ pub async fn sync_member_join_qr<R: Runtime>(
     }
 
     let endpoint_url = endpoint_url_from_host(&app).await?;
-    let payload = QrJoinPayload::member_vault(endpoint_url, account_hash_hex.trim(), now_unix())
-        .map_err(|_| DeviceJoinQrError::VaultAccountUnknown)?;
+    let payload = QrJoinPayload::member_vault(
+        endpoint_url,
+        account_hash_hex.trim(),
+        myne_core::host::tauri_host::TauriHost::new(app.clone()).now_unix_secs(),
+    )
+    .map_err(|_| DeviceJoinQrError::VaultAccountUnknown)?;
 
     render_payload(&payload)
 }
@@ -163,13 +173,6 @@ async fn endpoint_url_from_host<R: Runtime>(
     endpoint
         .endpoint_url
         .ok_or(DeviceJoinQrError::NotConfigured)
-}
-
-fn now_unix() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
 }
 
 /// Encode + render an already-validated payload.

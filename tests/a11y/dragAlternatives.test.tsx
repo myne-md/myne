@@ -169,12 +169,18 @@ const NO_ALTERNATIVE_NEEDED: Record<string, string> = {
   "src/notes/components/LeftRibbon.tsx":
     "The rail itself. Its reorder IS the Alt+Arrow contract the other rosters " +
     "borrow, implemented in `RibbonCustomizeSettings` over the same order.",
-  "src/components/settings/ToolbarCustomizeSettings.tsx":
-    "Already has the BEST alternative rather than none: explicit 'Move up' / " +
-    "'Move down' buttons per row, each a named control calling the same " +
-    "`move(id, delta)` the drag ends in. The scan flagged it because the " +
-    "predicate looks for a key handler, and a visible button is a stronger " +
-    "answer to 2.5.7 than a key contract a user has to know about.",
+  // `src/components/settings/ToolbarCustomizeSettings.tsx` was recorded here with
+  // the reason that it already had the BEST alternative rather than none: explicit
+  // "Move up" / "Move down" buttons per row, each a named control calling the same
+  // `move(id, delta)` the drag ends in — a visible button being a stronger answer to
+  // WCAG 2.5.7 than a key contract a user has to know about. The entry left when the
+  // list adopted the shared `CustomizeRow` (myne#773): the keyword `draggable` is no
+  // longer in that file's text, so the scan no longer sees it as a drag surface, and
+  // a recorded reason may not outlive its subject. The buttons are still there — tc2
+  // of `e2e/toolbar-customize.e2e.ts` drives them — and the drag they back up now
+  // lives in `CustomizeList.tsx`, which carries its own `onKeyDown` and so needs no
+  // entry. That is the general shape worth keeping: when a drag moves into a shared
+  // primitive, the alternative moves with it.
   "src/notes/components/NoteList.tsx":
     "Two drags: note/folder move (palette `note.move` plus the context menu) " +
     "and Favorites reorder, which gained its Alt+Arrow path in this change.",

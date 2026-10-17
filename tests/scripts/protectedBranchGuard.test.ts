@@ -36,6 +36,8 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { manifestRepos } from "../../scripts/lib/repo-manifest.mjs";
+
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 // Companions are cloned INTO the main repo as nested directories by
@@ -43,12 +45,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // carry the guard without being on that manifest, so the sweep in setup.sh
 // walks disk rather than the manifest. Both facts matter to the floor below.
 const MANIFEST = join(REPO_ROOT, "workspace", "manifest.txt");
-const manifestRepos = readFileSync(MANIFEST, "utf8")
-  .split("\n")
-  .map((l: string) => l.replace(/#.*$/, "").trim())
-  .filter(Boolean);
+const manifestEntries = manifestRepos(readFileSync(MANIFEST, "utf8"));
 const OFF_MANIFEST = ["internal-service", "homebrew-tap"];
-const COMPANIONS = [...manifestRepos, ...OFF_MANIFEST];
+const COMPANIONS = [...manifestEntries.map((e) => e.name), ...OFF_MANIFEST];
 
 const ZERO = "0".repeat(40);
 const SHA = "a".repeat(40);

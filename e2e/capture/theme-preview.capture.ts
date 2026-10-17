@@ -181,8 +181,13 @@ runner(
           {
             commit,
             capturedAt: new Date().toISOString(),
-            htmlBytes: html.length,
-            cssBytes: css.length,
+            // `String.length` is UTF-16 code units, not bytes: the field names
+            // said `Bytes` while the values were characters (myne#394 review).
+            // Renamed to what they measure rather than converting, because the
+            // numbers are already committed in two repos and a byte count would
+            // have to be re-captured in a container to stay honest.
+            htmlChars: html.length,
+            cssChars: css.length,
             note: "Captured from the running desktop app by e2e/capture/theme-preview.capture.ts. Do not hand-edit — re-run the capture.",
           },
           null,
@@ -191,7 +196,7 @@ runner(
       );
       // eslint-disable-next-line no-console
       console.log(
-        `[theme-preview] ${OUT_DIR}: ${html.length} B html, ${css.length} B css @ ${commit.slice(0, 8)}`,
+        `[theme-preview] ${OUT_DIR}: ${html.length} chars html, ${css.length} chars css @ ${commit.slice(0, 8)}`,
       );
     } finally {
       await app.teardown();

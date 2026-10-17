@@ -1275,8 +1275,6 @@
           "empty": "Los resúmenes, las respuestas y las sugerencias aparecen aquí a medida que los pides.",
           "error": "No se pudo completar la solicitud de IA.",
           "errorTurn": "El asistente no pudo responder.",
-          "gettingReadyHint": "Preparando tus notas para la IA. Un momento.",
-          "noSearchModelHint": "Preguntar implica buscar en tus notas de este dispositivo, y para eso hace falta aquí un modelo de búsqueda. Un proveedor no puede hacerlo. Elige uno en Ajustes → Desarrollador → IA. Editar tus notas con la IA sigue funcionando.",
           "insert": "Insertar en la nota",
           "noAnswer": "Sin respuesta. Prueba a reformular.",
           "newChat": "Chat nuevo",
@@ -1285,8 +1283,6 @@
           "unavailableHint": "Esta compilación de Myne se creó sin IA local, así que aquí no puede ejecutarse nada. Ningún ajuste cambiará eso — hace falta una compilación que incluya la IA.",
           "offHint": "La IA local está desactivada. Actívala en Ajustes → Desarrollador → IA.",
           "send": "Enviar",
-          "statusGettingReady": "Preparando…",
-          "statusNoSearchModel": "Sin modelo de búsqueda",
           "statusNoModel": "Sin proveedor",
           "statusUnreachable": "No responde",
           "statusUnavailable": "No disponible",
@@ -3020,9 +3016,6 @@
       "legalLabel": "Legal",
       "legalHelper": "Se abre en myne.md en tu navegador. En alemán cuando la interfaz está en alemán.",
       "legalPrivacy": "Política de privacidad",
-      "legalTerms": "Términos de la beta",
-      "legalNotice": "Denunciar contenido ilegal",
-      "legalLawEnforcement": "Solicitudes de las autoridades",
       "licenseBody": "Pre-alfa · Documentación CC-BY-4.0 · Código de la aplicación AGPL-3.0 en la versión de la Fase 1.",
       "licenseLabel": "Licencia",
       "tagline": "Pre-alfa · Cliente de escritorio de la Fase 1",
@@ -3502,10 +3495,8 @@
         "emptyGrant": "Todo lo que esta ejecución pudo leer está en carpetas que la IA nunca ve. No se envió nada. Cámbialo en Ajustes, IA, Carpetas excluidas."
       },
       "modelChoose": "Elegir archivo…",
-      "modelEmbeddingLabel": "Modelo de búsqueda: búsqueda semántica y preguntas y respuestas",
       "modelFilter": {
-        "gguf": "Modelo GGUF",
-        "safetensors": "Modelo Safetensors"
+        "gguf": "Modelo GGUF"
       },
       "modelGenerationLabel": "Modelo de texto: chat, resúmenes, escritura",
       "modelNone": "Ningún archivo seleccionado",
@@ -3538,7 +3529,6 @@
       "providerNone": "Ninguno",
       "providerNothingAnswering": "Todavía no hay nada configurado para responder.",
       "modelsLabel": "Modelos",
-      "recommendedFilesEmbedding": "Necesita model.safetensors + config.json + tokenizer.json en una misma carpeta.",
       "recommendedFilesGeneration": "Necesita el archivo .gguf + tokenizer.json en la misma carpeta.",
       "recommendedFilesTranscription": "Necesita el archivo .gguf de Whisper + config.json + tokenizer.json en la misma carpeta.",
       "title": "IA",
@@ -3566,7 +3556,6 @@
       "modelShowLocation": "Mostrar la ubicación de {{name}}",
       "downloadsLabel": "Descargar modelos",
       "downloadsHelper": "Descarga un modelo desde el propio origen de Myne. Se comprueba con una huella integrada en la aplicación antes de usarlo, así que se rechaza una descarga manipulada. No se descarga nada a menos que hagas clic.",
-      "downloadEmbeddingSize": "Modelo multilingüe, unos 449 MB.",
       "downloadTagLabel": "Modelo de etiquetas: sugerencias automáticas de etiquetas",
       "downloadTagSize": "Modelo local pequeño, unos 337 MB.",
       "downloadInstalled": "Instalado",
@@ -4081,10 +4070,6 @@
       "intro": "La sincronización envía tus notas, cifradas, a un servidor. Conviene saber cuatro cosas antes.",
       "whatThisIsLabel": "Qué es esto",
       "dataLossLabel": "Si pierdes los dos secretos",
-      "whatHappensNextLabel": "Cuando termine la beta",
-      "whatWeCanSeeLabel": "Qué podemos ver",
-      "readFull": "Leer los términos completos",
-      "review": "Revisar los términos de la beta",
       "accept": "Lo entiendo, activar la sincronización"
     },
     "materialising": "Descargando tus notas: {{done}} de {{total}}. Puedes empezar a trabajar; el resto aparecerá a medida que vayan llegando.",
@@ -4206,8 +4191,7 @@
       "tlsHelp": "Introduce la misma URL de servidor en todos los dispositivos. Un servidor autoalojado necesita un certificado HTTPS de confianza.",
       "tlsFailure": "No se pudo verificar el certificado HTTPS del servidor. Comprueba la dirección del servidor, el certificado y su validez.",
       "inviteLabel": "Código de invitación (solo si este servidor lo pide)",
-      "invitePlaceholder": "El código que te dio quien administra el servidor",
-      "changeInviteCode": "Cambiar el código de invitación"
+      "invitePlaceholder": "El código que te dio quien administra el servidor"
     },
     "enroll": {
       "accountNumberLabel": "Número de cuenta",
@@ -5385,12 +5369,8 @@
   },
   "aiOnboarding": {
     "title": "Configurar la IA",
-    "intro": "Myne puede buscar en tus notas por significado, sugerir etiquetas y charlar sobre ellas. Nada de esto es obligatorio, y puedes activarlo más tarde desde Ajustes.",
+    "intro": "Myne puede sugerir etiquetas y charlar sobre ellas. Nada de esto es obligatorio, y puedes activarlo más tarde desde Ajustes.",
     "enableLabel": "Activar las funciones de IA",
-    "semantic": {
-      "title": "Búsqueda semántica",
-      "body": "Descarga un modelo de embeddings multilingüe (unos 449 MB) para poder buscar por significado, no solo por palabras."
-    },
     "tag": {
       "title": "Etiquetado automático",
       "body": "Descarga el modelo de etiquetas (unos 337 MB) para que Myne pueda sugerirte etiquetas mientras escribes."
@@ -5457,18 +5437,10 @@
   "firstRun": {
     "server": {
       "heading": "Elige un servidor de sincronización",
-      "chooseHeading": "¿Dónde deben sincronizarse tus notas?",
-      "chooseIntro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Usa el servicio Myne Sync, o apunta este dispositivo a un servidor que ejecutes tú mismo. En cualquier caso, tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
-      "myneSyncHint": "El servidor operado por Myne. Su certificado HTTPS se comprueba automáticamente.",
       "intro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
       "notConfigured": "Introduce una dirección de servidor arriba y pulsa Conectar para continuar.",
       "back": "Atrás",
-      "continue": "Continuar",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Tu propio servidor",
-      "selfHostedHint": "Un servidor de sincronización que ejecutas tú. Introducirás su dirección en la pantalla siguiente.",
-      "connectAction": "Conectar",
-      "setUpAction": "Configurar"
+      "continue": "Continuar"
     }
   },
   "identityFlow": {
@@ -5483,8 +5455,6 @@
       "title": "Elige un servidor de sincronización",
       "lead": "Tus notas permanecen cifradas en este dispositivo antes de salir de él. El servidor solo almacena texto cifrado.",
       "urlLabel": "Dirección del servidor",
-      "useMyneSync": "Usar Myne Sync",
-      "selfHostedHint": "O introduce la dirección de un servidor que ejecutes tú mismo.",
       "connect": "Conectar",
       "connecting": "Conectando…"
     },

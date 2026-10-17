@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_label` Tauri plugin (mobile shim): the hide-vault-names option
 //! (myne-md/myne#411).
 //!

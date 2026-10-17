@@ -981,8 +981,20 @@ export function WorkspaceProvider({
   const canGoBack = canStepBack(focusedHistory);
   const canGoForward = canStepForward(focusedHistory);
 
-  const leaves = collectLeaves(state.root);
-  const focused = focusedLeaf(state);
+  // Both are pure functions of the pane tree, and both allocate a fresh array
+  // or object on every call. Called bare they made the `api` memo below (and
+  // every one of its consumers) miss on EVERY render: `leaves` and `focused`
+  // were new identities each pass, and both sit in that dep list, so the whole
+  // `useWorkspace` fanout re-rendered even when the workspace had not changed.
+  //
+  // The deps name the fields each function actually reads rather than `state`,
+  // whose identity moves for reasons the pane tree does not care about.
+  // `collectLeaves` reads `root`; `focusedLeaf` is `findLeaf(root, focusedPaneId)`.
+  const leaves = useMemo(() => collectLeaves(state.root), [state.root]);
+  const focused = useMemo(
+    () => focusedLeaf(state),
+    [state.root, state.focusedPaneId],
+  );
   // The focused pane's open note, or `null`. The agent tab's Focus view and the
   // "open agent on note" verb both read it (myne-md/myne#771).
   const focusedNoteId: NoteId | null =

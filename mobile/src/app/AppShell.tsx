@@ -312,6 +312,10 @@ function StageSwitch() {
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
+            // The corrupted screen's restore route (audit T6.8). Legal only from
+            // `unlock` by the transition table; the FailClosed surface renders the
+            // button only on the corrupted case.
+            onRestoreBackup={() => dispatch({ type: "unlock.restore-backup" })}
             // #45: reprobe, not a hardcoded → welcome. Boot routing then picks
             // the return surface by REMAINING vault count (picker at ≥2, unlock
             // at 1, welcome at 0); the old arm stranded a multi-vault user on

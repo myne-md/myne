@@ -36,7 +36,7 @@ export interface FakeOllama {
 /** What the fixture answers, per endpoint. Deterministic — a scenario asserts
  *  on these exact strings, so they must not vary run to run. */
 export const FAKE_COMPLETION = "the fake runtime answered";
-export const FAKE_MODEL_NAME = "fake-embed-model";
+export const FAKE_MODEL_NAME = "fake-model";
 export const FAKE_MODEL_DIGEST = "sha256:0000feed";
 
 /**
@@ -69,11 +69,9 @@ export async function startFakeOllama(): Promise<FakeOllama> {
                 },
               ],
             })
-          : path.startsWith("/api/embeddings")
-            ? JSON.stringify({ embedding: [0.1, 0.2, 0.3] })
-            : path.startsWith("/api/chat")
-              ? JSON.stringify({ message: { content: FAKE_COMPLETION } })
-              : JSON.stringify({ response: FAKE_COMPLETION });
+          : path.startsWith("/api/chat")
+            ? JSON.stringify({ message: { content: FAKE_COMPLETION } })
+            : JSON.stringify({ response: FAKE_COMPLETION });
       res.writeHead(200, {
         "content-type": "application/json",
         "content-length": String(Buffer.byteLength(body)),

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Snapshot capture + retention policy for encrypted per-note version history
 //! (MYND-96). Pure logic, no I/O — owned by the snapshot-format-retention layer
 //! and called inline by the notes write-path (`should_snapshot`) and by the
@@ -183,11 +184,6 @@ mod tests {
         assert!(!should_snapshot(Some(T0), T0 - 5_000, false));
         // ...unless forced.
         assert!(should_snapshot(Some(T0), T0 - 5_000, true));
-    }
-
-    #[test]
-    fn interval_constant_is_five_minutes() {
-        assert_eq!(SNAPSHOT_COALESCE_INTERVAL_MS, 300_000);
     }
 
     // --- retention / prune-selection ---

@@ -8,30 +8,33 @@
 // generic error telling them to configure a server, with no way to do it from
 // where they were standing (the settings surface is unreachable at zero vaults).
 //
-// # The choice
+// # One door, and why the other one left
 //
-// The step now opens with two doors, because "which server" has two honest
-// answers: `Myne Sync` (the hosted server, one tap) and `self-hosted` (the
-// operator types their own URL). Both are first-class and neither is presumed:
-// `decisions/sync/0020` puts hosted and self-host at the same trust boundary.
+// This step used to open with a choice: `Myne Sync` (a one-tap connection to the
+// Myne-operated server) beside `self-hosted` (the operator types their own URL).
+// The hosted door is gone, and the reason is not a UI preference. Myne operates
+// no sync service it offers, so there is nothing to point a one-tap button at.
+// A first-run screen that offers a server under the product's own name is a
+// hosted offering regardless of who may be admitted to it, and the invite code
+// that gated it was an admission control rather than a legal one. See the
+// decision entry recorded with this change.
 //
-// The hosted door writes `HOSTED_SYNC_ORIGIN` and lets the first connection
-// verify the chain against public CA roots; it deliberately claims no
-// build-time pin (myne-md/myne#781, and `decisions/sync/0620` withdrew pinning
-// outright rather than solving it). The self-hosted door is the SAME
-// `EndpointConfig` the Settings panel mounts: free-text URL, Connect, a CA +
-// hostname handshake before the URL is stored, the same device-local
-// `sync-config.json`. A second endpoint control would be a second
-// contract, and the two would drift in exactly the place a user is least able
-// to recover. What this component adds is the first-run framing, the choice and
-// the continue gate, not a new way to configure a server.
+// What that costs, stated rather than implied: a new user has to have a server
+// before identity creation can finish, and the step says so. There is no
+// default endpoint and no pre-filled address, which is also the property that
+// makes the removal real rather than cosmetic.
+//
+// The one remaining control is the SAME `EndpointConfig` the Settings panel
+// mounts: free-text URL, Connect, a CA + hostname handshake before the URL is
+// stored, the same device-local `sync-config.json`. A second endpoint control
+// would be a second contract, and the two would drift in exactly the place a
+// user is least able to recover. What this component adds is the first-run
+// framing and the continue gate, not a new way to configure a server.
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { HOSTED_SYNC_ORIGIN } from "@myne/client-core/hosted-sync";
 import { invoke } from "../../platform/core";
 import { Button } from "../primitives/Button";
-import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "../ChoiceList";
 import { EndpointConfig } from "./EndpointConfig";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
@@ -71,18 +74,13 @@ export function useHasSyncEndpoint(): boolean {
 
 export function FirstRunServerStep({ onConnected, onBack, requireConnection = false }: FirstRunServerStepProps) {
   const { t } = useTranslation();
-  // Which door is open. `choose` is the fork itself; `hosted` is the fixed
-  // `sync.myne.md` form (address locked, invite code enterable); `self-hosted`
-  // is the URL form behind the second door.
-  const [mode, setMode] = useState<"choose" | "hosted" | "self-hosted">("choose");
   // The endpoint control reports a successful connection before Continue can
   // advance. A saved endpoint alone is insufficient in the repair flow.
   const [configured, setConfigured] = useState(false);
   const hasEndpoint = useHasSyncEndpoint();
   // The beta-terms gate stands at every door that first enables sync
   // (`decisions/sync/0483`), and this first-run step is one: it is where a user
-  // with no vault configures a server for the first time. Reused rather than
-  // reimplemented, so the consent text cannot drift between doors.
+  // with no vault configures a server for the first time.
   const betaTerms = useBetaTermsGate();
   const [termsOpen, setTermsOpen] = useState(false);
 
@@ -99,99 +97,6 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
     setConfigured(true);
     onConnected();
   };
-
-  // The hosted door uses the same verified HTTPS transport as self-hosting.
-  // It routes through the SAME `EndpointConfig` the self-hosted door mounts,
-  // seeded with `HOSTED_SYNC_ORIGIN` and with the address locked: the hosted
-  // server is a gated server (`MYNE_INVITE_CODE`, myne-md/myne#800), so its
-  // one-tap connection needs the invite-code field the self-hosted form already
-  // has. A bare `sync_set_endpoint` here would have been a second endpoint
-  // contract missing exactly the field a gated server needs.
-  const openHosted = () => {
-    setMode("hosted");
-  };
-
-  if (mode === "choose") {
-    return (
-      <div
-        data-testid="first-run-server.root"
-        style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <div
-            style={{
-              fontSize: "var(--text-xl)",
-              fontWeight: "var(--weight-semibold)",
-              color: "var(--fg-display)",
-            }}
-          >
-            {t("firstRun.server.chooseHeading")}
-          </div>
-          <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--fg-2)" }}>
-            {t("firstRun.server.chooseIntro")}
-          </div>
-        </div>
-
-        {/* Two doors on one card, each saying where it leads: the hint under
-            Myne Sync is the honest pin statement (TOFU), so it has to be read
-            before the button, not after it.
-
-            The hosted door routes through `EndpointConfig` (`openHosted`)
-            rather than a one-tap connect, because the hosted server is gated
-            (`MYNE_INVITE_CODE`, myne-md/myne#800) and its connection needs the
-            invite-code field that form already carries. */}
-        <ChoiceCard>
-          <ChoiceRow
-            title={t("firstRun.server.myneSyncTitle")}
-            body={t("firstRun.server.myneSyncHint")}
-            action={
-              <Button
-                variant="primary"
-                onClick={openHosted}
-                data-testid="first-run-server.myne-sync"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("firstRun.server.connectAction")}
-              </Button>
-            }
-          />
-          <ChoiceRow
-            title={t("firstRun.server.selfHostedTitle")}
-            body={t("firstRun.server.selfHostedHint")}
-            action={
-              <Button
-                variant="secondary"
-                onClick={() => setMode("self-hosted")}
-                data-testid="first-run-server.self-hosted"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("firstRun.server.setUpAction")}
-              </Button>
-            }
-            last
-          />
-        </ChoiceCard>
-
-        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-          <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">
-            {t("firstRun.server.back")}
-          </Button>
-        </div>
-
-        <BetaTermsConsent
-          open={termsOpen}
-          testId="first-run-server.beta-terms"
-          onAccept={() => {
-            setTermsOpen(false);
-            void betaTerms.accept();
-            setConfigured(true);
-            onConnected();
-          }}
-          onCancel={() => setTermsOpen(false)}
-        />
-      </div>
-    );
-  }
 
   return (
     <div
@@ -213,15 +118,7 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
         </div>
       </div>
 
-      <EndpointConfig
-        // The hosted door fixes the origin and lets only the invite code be
-        // entered; the self-hosted door is the free-text form. Same component,
-        // same contract (myne-md/myne#800).
-        initialUrl={mode === "hosted" ? HOSTED_SYNC_ORIGIN : undefined}
-        lockedUrl={mode === "hosted"}
-        onConnected={() => setConfigured(true)}
-        onEdit={() => setConfigured(false)}
-      />
+      <EndpointConfig onConnected={() => setConfigured(true)} onEdit={() => setConfigured(false)} />
 
       {!connected && (
         <p
@@ -233,12 +130,7 @@ export function FirstRunServerStep({ onConnected, onBack, requireConnection = fa
       )}
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-        <Button
-          variant="ghost"
-          onClick={() => setMode("choose")}
-          icon="arrow-left"
-          data-testid="first-run-server.back"
-        >
+        <Button variant="ghost" onClick={onBack} icon="arrow-left" data-testid="first-run-server.back">
           {t("firstRun.server.back")}
         </Button>
         <div style={{ flex: 1 }} />

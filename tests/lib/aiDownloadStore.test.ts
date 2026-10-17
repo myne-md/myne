@@ -43,12 +43,12 @@ afterEach(() => {
 
 describe("ai-download-store", () => {
   it("drives state to complete on a resolved invoke", async () => {
-    downloadModel.mockResolvedValue("/models/embedding/model.safetensors");
+    downloadModel.mockResolvedValue("/models/tag/model.gguf");
     const store = await freshStore();
-    expect(store.getModelDownloadState("embedding-e5-small").status).toBe("idle");
-    await store.startModelDownload("embedding-e5-small");
-    expect(downloadModel).toHaveBeenCalledWith("embedding-e5-small", "dl-1");
-    expect(store.getModelDownloadState("embedding-e5-small").status).toBe("complete");
+    expect(store.getModelDownloadState("tag").status).toBe("idle");
+    await store.startModelDownload("tag");
+    expect(downloadModel).toHaveBeenCalledWith("tag", "dl-1");
+    expect(store.getModelDownloadState("tag").status).toBe("complete");
   });
 
   it("applies progress events to the running artefact", async () => {
@@ -102,8 +102,8 @@ describe("ai-download-store", () => {
     isChecksumMismatch.mockReturnValue(true);
     downloadModel.mockRejectedValue({ kind: "store", detail: "DigestMismatch" });
     const store = await freshStore();
-    await store.startModelDownload("embedding-e5-small");
-    const state = store.getModelDownloadState("embedding-e5-small");
+    await store.startModelDownload("tag");
+    const state = store.getModelDownloadState("tag");
     expect(state.status).toBe("failed");
     expect(state.cause).toBe("checksum");
   });

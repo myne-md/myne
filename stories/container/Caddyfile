@@ -1,0 +1,133 @@
+# The design-system catalogue as a container (design.myne.md).
+#
+# ── Why a container rather than "here is a directory of files" ──────────────
+#
+# The catalogue is dev tooling that mounts the REAL screens, and the public
+# variant (`STORIES_PUBLIC=1`) is what a stranger may read. Two properties have
+# to travel with it and neither survives a host-side `rsync` of a build:
+#
+#   * the security headers. `style-src` here has to allow `'unsafe-inline'`
+#     because every Myne component styles itself through inline `style={{…}}`
+#     props, and the moment that policy lives in a host Caddy block instead of
+#     the image, a reviewer has to reconstruct it to know what is served.
+#   * the exact bytes. The build is the artefact `check-stories-public-bundle.mjs`
+#     passes judgement on, so the thing deployed and the thing checked are the
+#     same image layer rather than two runs of a command.
+#
+# `app.example.com`'s container is the precedent for this file.
+#
+# ── The policy is STATIC, and that is the whole difference from the web client ─
+#
+# The web client's CSP is generated at container start because it must name the
+# operator's own sync origin, which cannot be baked into a bundle. The catalogue
+# has no such variable: it makes no network call at all, so `connect-src 'none'`
+# is the policy rather than a placeholder. Nothing here is templated, and
+# `generate-headers.mjs` has no counterpart on purpose.
+
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	root * /srv/catalogue
+	encode gzip zstd
+
+	# --- no client-IP access logging -----------------------------------------
+	# "No persistent server-side IP logging" is a hard architectural commitment
+	# and AS14 is normative, and it applies here with less at stake than on the
+	# web client and no less strictly: this is a public origin a person reads.
+	# Caddy's default access log emits the client IP, so the same field-delete
+	# filter `operations/bundle/Caddyfile` and `web/container/Caddyfile` use is
+	# applied verbatim, so the three edges cannot drift.
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers>X-Forwarded-For delete
+				request>headers>X-Real-Ip delete
+				request>headers>Forwarded delete
+			}
+		}
+	}
+	log_skip /healthz
+
+	header {
+		# Start from nothing and name what is allowed. A policy built by
+		# subtraction acquires holes as the app grows.
+		#
+		# `style-src 'unsafe-inline'` is REQUIRED and is the one relaxation here:
+		# the catalogue mounts Myne's own components, which style themselves
+		# through inline `style={{…}}` props, so a policy without it renders the
+		# whole catalogue unstyled rather than safe. `web/csp.ts` refuses the
+		# directive outright because the web CLIENT is bundled CSS only — this is
+		# a different surface with a different honest answer, and the difference
+		# is stated rather than inherited.
+		#
+		# `connect-src 'none'` is tighter than the web client's and is the
+		# catalogue's real posture: nothing is fetched at runtime, because the
+		# story host is in-page (`stories/src/host/internals.ts`) and every asset
+		# is served from this origin. decisions/ui/0644 recorded it.
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' blob:; media-src 'self' blob:; connect-src 'none'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		# The catalogue is never framed. `frame-ancestors 'none'` above is the
+		# modern control; these two are the older half kept for engines that do
+		# not implement it, and dropping them silently weakens the older ones.
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# `same-origin` rather than `cross-origin`: there is no wasm here, so the
+		# cross-origin isolation the web client buys with COOP/COEP is not needed
+		# and `same-origin` is the tighter of the two.
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		# HSTS is set HERE rather than at the edge, which is the posture
+		# `web/container/Caddyfile` already takes and `check-web-container-headers.sh`
+		# already requires. The container is the authority on the WHOLE header set
+		# and `app.example.com.caddy` deliberately adds none, so the two cannot drift
+		# into "the edge is stricter about one header than the image it fronts" —
+		# the failure the neighbouring block records for X-Frame-Options. The edge
+		# terminates TLS; this header is forwarded through it and read by the
+		# browser over https. The catalogue's own first draft put HSTS at the edge
+		# on the reasoning that it is a TLS-origin property, and that reasoning is
+		# right about browsers and wrong about this deployment: it left the header
+		# set by nobody, since the edge imports no `(secure-headers)` snippet for
+		# the reason above.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	# The entry document is never cached: it is how a reader picks up a rebuilt
+	# catalogue, and a cached one pins them to an old version.
+	@entry path / /index.html
+	header @entry Cache-Control "no-cache"
+	header @entry Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' blob:; media-src 'self' blob:; connect-src 'none'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+	# Filenames carry a content hash, so they are immutable by construction.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# `handle` blocks, NOT a bare `respond` beside the file handler. Written the
+	# obvious way this route never fires: with a `try_files` fallback the
+	# unmatched path is REWRITTEN to `/index.html` before the matcher runs, so
+	# `/healthz` arrives already renamed and answers 200 with the whole
+	# catalogue — the right status and entirely the wrong body, which every
+	# naive health check passes. `web/container/Caddyfile` records the same bug
+	# and `check-web-container-headers.sh` the same reasoning.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# Plain file serving, deliberately WITHOUT the web client's
+	# `try_files {path} /index.html` fallback. The catalogue routes entirely in
+	# the URL FRAGMENT (`#primitives/button/variants`), which never reaches the
+	# server, so there is no deep path to rewrite and a typo'd path should be a
+	# 404 rather than a page. An SPA fallback here would answer a missing
+	# `.js` with HTML, which is a failure that reads like a build problem.
+	handle {
+		file_server
+	}
+}

@@ -2,12 +2,12 @@
 // the `settings.panel.about` bullet ("the per-language legal slug is a pure
 // function").
 //
-// `tests/components/AboutPanel.test.tsx` already drives four of these through
+// `tests/components/AboutPanel.test.tsx` already drives these through
 // the panel, which is the right test for the panel and the wrong one for the
-// mapping: it exercises one document per language and reaches the German slugs
-// for two of the four documents. A slug typo in `notice.de` or `privacy.de`
-// passes it. This file pins the whole matrix — five documents by two languages —
-// plus the three properties the mapping's own header states and nothing checks:
+// mapping: it exercises one document per language. A slug typo in `terms.de` or
+// `privacy.de` passes it. This file pins the whole matrix — three documents by
+// two languages — plus the three properties the mapping's own header states and
+// nothing checks:
 //
 //  * the primary subtag decides, so a regional German lands on German;
 //  * the Impressum takes no locale at all, because it is a German statutory
@@ -16,10 +16,10 @@
 //    link costs no redirect.
 //
 // And one cross-client claim the module's own doc comment makes and nothing
-// verifies: the same four documents, in the same order, under the same test
+// verifies: the same documents, in the same order, under the same test
 // ids, on every client. `LEGAL_LINKS` is imported by the desktop AboutPanel and
 // by `mobile/src/app/flows/SettingsSheet.tsx` — the shared list is what stops a
-// client quietly offering three.
+// client quietly offering a different set.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -38,11 +38,6 @@ const REPO_ROOT = process.cwd();
 const EXPECTED: Record<LegalDoc, { en: string; de: string }> = {
   privacy: { en: "https://myne.md/privacy/", de: "https://myne.md/datenschutz/" },
   terms: { en: "https://myne.md/terms/", de: "https://myne.md/nutzungsbedingungen/" },
-  lawEnforcement: {
-    en: "https://myne.md/law-enforcement/",
-    de: "https://myne.md/behoerdenanfragen/",
-  },
-  notice: { en: "https://myne.md/notice/", de: "https://myne.md/meldung/" },
   // Takes no locale: one German text, both ways.
   impressum: { en: "https://myne.md/impressum/", de: "https://myne.md/impressum/" },
 };
@@ -113,13 +108,12 @@ describe("legalUrl: the canonical form", () => {
 });
 
 describe("LEGAL_LINKS: one list, every client", () => {
-  it("offers exactly the four documents, in reader order", () => {
-    expect(LEGAL_LINKS.map((l) => l.doc)).toEqual([
-      "privacy",
-      "terms",
-      "notice",
-      "lawEnforcement",
-    ]);
+  it("offers exactly the privacy policy", () => {
+    // One entry, not four: terms, the DSA notice route and the law-enforcement
+    // page described an offering Myne no longer makes, and all four of those
+    // pages are now deleted from the site rather than merely unlinked
+    // (`design-notes/sync/0696`).
+    expect(LEGAL_LINKS.map((l) => l.doc)).toEqual(["privacy"]);
   });
 
   it("does not list the Impressum while its address is unpublished", () => {
@@ -144,7 +138,7 @@ describe("LEGAL_LINKS: one list, every client", () => {
 
   it("is the list BOTH clients render, not a desktop-only copy", () => {
     // The module's header claims the desktop, web and mobile clients show the
-    // same four documents because they share this list. The way that claim
+    // same documents because they share this list. The way that claim
     // breaks is a client growing its own array, which no compiler and no other
     // test would notice — so assert the import is still there.
     const mobileSheet = readFileSync(

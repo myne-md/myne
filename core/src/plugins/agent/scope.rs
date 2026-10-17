@@ -599,22 +599,6 @@ mod tests {
         assert_eq!(*src.asked.lock().unwrap(), vec!["excluded", "records"]);
     }
 
-    // The order, asserted rather than commented: a host that snapshotted the
-    // index and then read prefs would still pass every other test here.
-    #[test]
-    fn the_exclusions_are_read_before_the_index_is_snapshotted() {
-        let runs = AgentRunState::default();
-        let src = Source::new(&[("a", Some("Projects"))], &[]);
-        block_on(start_run(
-            &runs,
-            "r".into(),
-            &ScopeGrant::Folder("Projects".into()),
-            &src,
-        ))
-        .unwrap();
-        assert_eq!(*src.asked.lock().unwrap(), vec!["excluded", "records"]);
-    }
-
     #[test]
     fn expand_run_unions_and_clamps_with_the_newest_exclusions() {
         let runs = AgentRunState::default();

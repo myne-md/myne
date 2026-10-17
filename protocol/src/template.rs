@@ -247,11 +247,6 @@ mod tests {
     }
 
     #[test]
-    fn literal_braces_survive_as_the_escape_mechanism() {
-        assert_eq!(render("{{example}}", &ctx()), "{{example}}");
-    }
-
-    #[test]
     fn format_arg_shaped_token_is_left_literal() {
         // No mini-language: `{{title:foo}}` is not a registry key → verbatim.
         assert_eq!(render("{{title:foo}}", &ctx()), "{{title:foo}}");

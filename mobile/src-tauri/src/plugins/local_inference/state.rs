@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Plugin state: the shared [`Engine`] instance.
 //!
 //! Held as `Arc<dyn Engine>` so the (single) engine can back concurrent
-//! `infer`/`embed` commands across the async runtime — the trait is
+//! `infer` commands across the async runtime — the trait is
 //! `Send + Sync`, so this is too. The real engine (tasks 3–5) may wrap mutable
 //! model-load state in `tokio::sync::Mutex`; the task-1 stub is immutable and
 //! needs none.

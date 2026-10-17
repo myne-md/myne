@@ -31,9 +31,11 @@
 // recover" would be a good translation and a false statement. Only the chrome
 // around them is translated.
 //
-// It links the published terms rather than reproducing them: these four
-// clauses are what a person must have read before sync starts carrying their
-// notes, and the full text is a page, not a dialog.
+// **It used to link the published terms and no longer does.** Those terms were
+// the beta terms of a service Myne closed (`design-notes/sync/0696`); linking
+// them from a dialog that says "turn on sync" pointed the reader at a document
+// that governs nothing. The four clauses are the whole of it now, and the
+// privacy policy stays one link away in Settings → About.
 
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,8 +46,6 @@ import {
   BETA_TERMS_WHAT_THIS_IS,
   BETA_TERMS_WHAT_WE_CAN_SEE,
 } from "../../lib/load-bearing-copy";
-import { legalUrl } from "../../lib/legal-urls";
-import { openUrl } from "../../platform/opener";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { HELPER_STYLE, LABEL_STYLE } from "../settings/panel-styles";
@@ -54,19 +54,6 @@ const CLAUSE_STYLE: CSSProperties = {
   ...HELPER_STYLE,
   lineHeight: 1.55,
   marginTop: "var(--space-1)",
-};
-
-const LINK_STYLE: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  color: "var(--accent)",
-  textDecoration: "underline",
-  background: "none",
-  border: 0,
-  padding: 0,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  display: "block",
-  marginTop: "var(--space-3)",
 };
 
 /** The clauses scroll; the actions do not. A dialog whose buttons scroll out
@@ -120,7 +107,7 @@ export function BetaTermsConsent({
   onAccept,
   onCancel,
 }: BetaTermsConsentProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   return (
     <ModalShell
@@ -153,23 +140,9 @@ export function BetaTermsConsent({
         <Clause
           label={t("sync.betaTerms.whatWeCanSeeLabel")}
           body={BETA_TERMS_WHAT_WE_CAN_SEE}
-          testId="sync.beta-terms.what-we-can-see"
+          testId="sync.beta-terms.what-the-operator-can-see"
         />
 
-        <button
-          type="button"
-          style={LINK_STYLE}
-          data-testid="sync.beta-terms.full-text"
-          onClick={() => {
-            openUrl(legalUrl("terms", i18n.language)).catch((err) => {
-              if (import.meta.env.DEV) {
-                console.warn("BetaTermsConsent: openUrl(terms) rejected", err);
-              }
-            });
-          }}
-        >
-          {t("sync.betaTerms.readFull")} ↗
-        </button>
       </div>
 
       <div style={ACTIONS_STYLE}>

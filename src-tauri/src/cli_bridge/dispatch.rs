@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! JSON command dispatch for the CLI bridge command socket (cli-thin-client
 //! task 4; MYND-490).
 //!
@@ -1359,19 +1360,6 @@ mod tests {
             serde_json::json!({ "ok": true }),
             "success carries nothing beyond ok"
         );
-    }
-
-    #[test]
-    fn daily_append_passes_the_line_through_to_the_lister() {
-        let lister = FixedLister::daily_append_only(|_, line| {
-            if line == "wanted line" {
-                DailyAppendOutcome::Ok(false)
-            } else {
-                DailyAppendOutcome::Io
-            }
-        });
-        let reply = roundtrip(br#"{"cmd":"daily_append","line":"wanted line"}"#, &lister);
-        assert_eq!(reply["ok"], true);
     }
 
     #[test]

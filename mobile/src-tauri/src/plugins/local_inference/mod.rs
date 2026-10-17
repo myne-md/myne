@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! On-device speech-to-text (Whisper) — the mobile port of the desktop
 //! `local_inference` engine, **transcription-only** (MYND-563).
 //!
@@ -9,7 +10,7 @@
 //!
 //! The engine files mirror `src-tauri/src/plugins/local_inference/`
 //! (`audio`/`whisper`/`engine`/`engine_candle`/`model_store`/`cancel`/`error`),
-//! with the desktop engine's generation (Qwen2) + embedding (Bert) roles dropped
+//! with the desktop engine's generation (Qwen2) role dropped
 //! — mobile transcribes only. DENY-list logging is normative here
 //! (`src-tauri/AGENTS.md`): audio, PCM, transcript, and model paths are never
 //! logged.

@@ -20,8 +20,8 @@
 // positions are not in the DOM (same reason graph-tab.e2e.ts asserts the tab
 // contract, not node hit-testing). `GraphPane` exposes bounded, DENY-list-clean
 // observability attributes on `editor.graph-pane` (node-count / hydrated / an
-// opaque build nonce — never a note id or coordinate; SYNC-8, modeled on
-// AiHydrationProbe). The deeper "re-render during heavy index churn does not
+// opaque build nonce — never a note id or coordinate; SYNC-8). The deeper
+// "re-render during heavy index churn does not
 // re-scatter" property is enforced by the effect-deps design (GraphCanvas deps
 // = [model]; the build effect reads `notes` through a ref) + its Vitest
 // coverage; E2E owns the observable surface.

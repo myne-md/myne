@@ -1849,7 +1849,7 @@ runner(
       await app.teardown();
     }
   },
-  // Per-test timeout (this arg overrides vitest.capture.config.ts's testTimeout
+  // Per-test timeout (this arg overrides .config/vitest/capture.config.ts's testTimeout
   // for THIS test). The expanded ~60-frame pass at @2x runs ~10-14 min — the
   // original 600s aborted it mid-pass (manifest never written). Keep in sync
   // with the config's testTimeout.

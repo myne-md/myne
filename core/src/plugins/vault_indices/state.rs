@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! In-RAM `VaultIndices` state (MYND-31 / A11, Task 1 — foundation).
 //!
 //! The structural twin of [`crate::search::SearchIndexState`]: a live,

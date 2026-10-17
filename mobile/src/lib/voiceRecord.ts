@@ -159,7 +159,8 @@ export async function startVoiceCapture(): Promise<VoiceCaptureHandle> {
       const wav = encodeWav(pcm, TARGET_SAMPLE_RATE, 1);
       // `File` extends `Blob`; back it with the WAV's own ArrayBuffer (the
       // Uint8Array owns its full buffer, so no copy). The bytes then flow through
-      // `importFile` → `attachment_import` (bytes arm) unchanged.
+      // `importFile` → `attachment_import` (the `bytes_b64` arm, which is the one
+      // that does not make the WebView materialize a number per byte).
       return new File([wav.buffer as ArrayBuffer], voiceNoteFilename(new Date()), { type: "audio/wav" });
     },
     cancel() {

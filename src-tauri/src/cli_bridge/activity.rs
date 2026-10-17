@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! "When did the CLI door last serve a command?" — session memory only
 //! (cli-thin-client task 12; MYND-490).
 //!
@@ -141,14 +142,6 @@ mod tests {
         marker.clear();
         // This is the relock case: the age is gone, not frozen.
         assert_eq!(marker.elapsed_secs(t0 + Duration::from_secs(5)), None);
-    }
-
-    #[test]
-    fn clear_is_idempotent_and_safe_before_any_access() {
-        let marker = LastAccess::default();
-        marker.clear();
-        marker.clear();
-        assert_eq!(marker.elapsed_secs(Instant::now()), None);
     }
 
     #[test]

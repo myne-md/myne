@@ -15,7 +15,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
-  applyScrollAnchor,
   beginScrollRestore,
   evictClosedTabs,
   forgetScroll,
@@ -25,6 +24,11 @@ import {
   rememberScroll,
   resetScrollMemory,
 } from "../../src/notes/scrollMemory";
+// `applyScrollAnchor` is the one function here that needs the `EditorView`
+// VALUE, so it lives in its own module (see that file's header). The rest of the
+// store must stay CodeMirror-free: the vault-leaving paths import it before
+// anything the editor owns.
+import { applyScrollAnchor } from "../../src/notes/scrollAnchorApply";
 
 afterEach(() => {
   resetScrollMemory();

@@ -267,7 +267,6 @@ export const ROSTER = Object.freeze([
       "src/lib/chats.ts",
       "src/lib/memory.ts",
       "src/notes/agent/agentStore.ts",
-      "src/notes/components/AiHydrationProbe.tsx",
       "src/notes/components/MemoryPopover.tsx",
       "src/components/settings/MemorySection.tsx",
       "src-tauri/src/plugins/local_inference/",
@@ -294,7 +293,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-degradation.e2e.ts",
       "e2e/ai-ollama-backend.e2e.ts",
       "e2e/ai-remote-providers.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
       "e2e/chat-history.e2e.ts",
       "e2e/memory.e2e.ts",
       "e2e-web/chat-history-reload.e2e.ts",
@@ -404,8 +402,9 @@ export const ROSTER = Object.freeze([
     title: "Summarize and ask about a note",
     paths: [
       "src/notes/ai/summarize.ts",
-      "src/notes/ai/runSummarizeToStore.ts",
-      "src/notes/ai/aiOutputStore.ts",
+      // `runSummarizeToStore.ts` and `aiOutputStore.ts` were claimed here and are
+      // deleted: the summarize capability is a chat turn now (`aiToChat.ts` over
+      // `chatStore`), which the `ai.chat` entry already covers.
       "src/lib/agent-run.ts",
       "src/lib/ai-capability.ts",
       "src/hooks/useAiModelReady.ts",
@@ -418,7 +417,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-degradation.e2e.ts",
       "e2e/ai-ux-surface.e2e.ts",
       "e2e/ai-chat.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
     ],
     manual: [
       {
@@ -2072,7 +2070,11 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
-      "e2e/floating-toolbar-placement.e2e.ts",
+      // `e2e/floating-toolbar-placement.e2e.ts` was credited here and is
+      // WITHDRAWN: its only test is `it.skip`, so it automates nothing. Recorded
+      // in `SKIPPED_SCENARIOS` (scripts/check-manual-test-roster.mjs) with what
+      // blocks it, which is where the gap is now visible instead of hidden
+      // behind this claim.
       "e2e/toolbar-customize.e2e.ts",
       "e2e/highlight-color.e2e.ts",
       "e2e/hotkeys.e2e.ts",
@@ -4546,8 +4548,8 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "On an Android device in the same state, run `adb shell bmgr backupnow md.myne.mobile`, then restore onto a second device (or factory-reset the first and restore). Confirm the same three Keystore-sealed secrets fail closed, and record the sync token separately against the same recorded posture as the iOS item above. Separately, on one device clear the Keystore (or reset the device lock credential, which invalidates Keystore keys) and confirm the app requires the master password rather than opening with an empty state. Both devices in this item are spares carrying a disposable vault: a factory reset and a Keystore wipe are irreversible for every app on the phone, not only for Myne.",
-        whyNotAutomated: "Android Keystore keys are non-exportable, are hardware-backed only where the device has a TEE or StrongBox (which is what KeyInfo.getSecurityLevel() exists to report, and mobile/docs/dev/device-matrix.md row A.3 records the provider as not wired on Android yet), and are invalidated on credential reset only when created with user-authentication binding. Those are properties only observable across a real backup restore or a real Keystore wipe, neither of which any lane performs.",
+        see: "On an Android device in the same state, run `adb shell bmgr backupnow md.myne.mobile`, then restore onto a second device (or factory-reset the first and restore). Confirm the same three device-local secrets fail closed, and record the sync token separately against the same recorded posture as the iOS item above. Confirm them one at a time, because they fail closed for different reasons here and the reason is what this row is measuring: only the share-import device key is actually Keystore-held on Android (it is wrapped by a Keystore AES key, so a restore onto other hardware must open no sealed entry), while quick-unlock biometrics has no Android provider at all and the vault label has no Android keychain backend, so those two must report unavailable rather than present an empty success. Separately, on one device clear the Keystore (or reset the device lock credential, which invalidates Keystore keys) and confirm the app requires the master password rather than opening with an empty state. Both devices in this item are spares carrying a disposable vault: a factory reset and a Keystore wipe are irreversible for every app on the phone, not only for Myne.",
+        whyNotAutomated: "Android Keystore keys are non-exportable, are hardware-backed only where the device has a TEE or StrongBox (which is what KeyInfo.getSecurityLevel() exists to report), and are invalidated on credential reset only when created with user-authentication binding. Those are properties only observable across a real backup restore or a real Keystore wipe, neither of which any lane performs. The share-import key is the only one of the three that is Keystore-held on Android today, and the manual-test roster's Android share-import rows are what exercise its seal.",
         clients: ["android"],
         estimateMin: 40,
         tier: "core",
@@ -5421,7 +5423,7 @@ export const ROSTER = Object.freeze([
       "e2e/developer-mode.e2e.ts",
     ],
     manual: [],
-    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). Version/channel/commit are compile-time defines a scenario compares against package.json and git HEAD; the served bundle hash is comparable against version.json inside scripts/web-smoke.sh, which already runs against the public origin; the per-language legal slug is a pure function plus an interception of the opener IPC (the same template note-export.e2e.ts uses for plugin:dialog|save); and the no-browser-handler failure path is the e2e container's DEFAULT state.",
+    exemptionReason: "All four candidate items were ruled automatable and moved to the automation-debt tracker (myne-md/myne#554 and its lane sub-issues). Version/channel/commit are compile-time defines a scenario compares against package.json and git HEAD; the bundle hash the About panel renders is the one the build wrote into version.json, so it is comparable on one runner without a live origin (which is the only way it CAN be checked since 2026-10-16, when the hosted origin closed); the legal link set is a single document, the privacy policy, and its per-language slug is a pure function plus an interception of the opener IPC (the same template note-export.e2e.ts uses for plugin:dialog|save); and the no-browser-handler failure path is the e2e container's DEFAULT state.",
   },
   {
     id: "settings.panel.account",
@@ -5499,7 +5501,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-ollama-backend.e2e.ts",
       "e2e/ai-degradation.e2e.ts",
       "e2e/developer-mode.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
       // The in-panel topic strip's own scenario (myne-md/myne#885): selection,
       // the strip's row measured against the search row's, Left/Right, Up/Down
       // left to the rail, the topic held across a close and reopen, and a
@@ -5848,8 +5849,8 @@ export const ROSTER = Object.freeze([
     automatedBy: [],
     manual: [
       {
-        see: "With the vault LOCKED, share a file into Myne from another app and stop there, before unlocking. Pull the app's private storage (`adb shell run-as md.myne.mobile`) and inspect the pending-shares directory. TWO outcomes pass and one fails, and knowing which is the whole point of doing this while locked. It passes if the queued entry is a sealed MYF1 blob with no readable copy of the shared bytes anywhere in private storage or the OS share cache. It also passes if the locked-vault staging path REFUSED the share outright and queued nothing, because the Android Keystore arm is still an Err(HardwareUnavailable) stub (mobile/src-tauri/tauri-plugin-share-intent/KEYSTORE_TODO.md), and refusing is the fail-closed behaviour that stub should produce. It FAILS if the shared bytes are persisted in any readable form: that is the realistic regression, and it is the one nobody can see after the drain. Record WHICH of the three you observed, because docs/threat-model.md AS19 currently describes the sealed-blob outcome as the Android behaviour, and only this observation says whether that is true today. Then unlock, let it drain, and confirm no readable copy appears at any point.",
-        whyNotAutomated: "The observation has to happen while the vault is still locked, on a device, in a window that ends the moment the tester unlocks, and no lane runs on Android at all. It is worth doing rather than assuming because this entry's own text records that core's device_key::get_or_create is still an Err(HardwareUnavailable) stub on Android and the Kotlin envelope is not wired to it, so the realistic failure is a queue that persists the shared bytes unsealed. The item that inspects storage AFTER the drain cannot see that: by then the file has moved into the encrypted library either way.",
+        see: "With the vault LOCKED, share a file into Myne from another app and stop there, before unlocking. Pull the app's private storage (`adb shell run-as md.myne.mobile`) and inspect the pending-shares directory. ONE outcome passes and two fail, and knowing which is the whole point of doing this while locked. It passes if the queued entry is a sealed MYF1 blob with no readable copy of the shared bytes anywhere in private storage or the OS share cache. It FAILS if the shared bytes are persisted in any readable form: that is the realistic regression, and it is the one nobody can see after the drain. It ALSO FAILS if the locked-vault staging path REFUSED the share outright and queued nothing. That refusal was formerly a PASS, because the Android Keystore arm was then an Err(HardwareUnavailable) stub; the arm is wired now (core's `device_key::resolve` reads the host-registered provider, which reaches the Keystore through `tauri-plugin-share-intent`; mobile/src-tauri/tauri-plugin-share-intent/KEYSTORE_TODO.md), so the share path is expected to seal on Android and a refusal is the defect to record. The sealing itself is device-unverified, which is exactly why this item is manual. Record WHICH of the outcomes you observed, because docs/threat-model.md AS19 describes the sealed-blob outcome as the Android behaviour and only an observation says whether that holds. Then unlock, let it drain, and confirm no readable copy appears at any point.",
+        whyNotAutomated: "The observation has to happen while the vault is still locked, on a device, in a window that ends the moment the tester unlocks, and no lane runs on Android at all. The Keystore-backed seal is what makes the pass condition interesting: the key is non-exportable and hardware-held, the non-prompting behaviour of a background seal cannot be observed from a desktop browser tier or a mock IPC layer, and a failure to seal is silent (the share simply queues nothing readable) until the tester inspects private storage before unlocking.",
         clients: ["android"],
         estimateMin: 12,
         tier: "core",
@@ -5862,8 +5863,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "LOCK the vault, then share a file into Myne from another app. Confirm the share is accepted rather than silently dropped, then unlock and confirm the file drains into the attachment library. If nothing arrives, check the log for HardwareUnavailable, since the Keystore arm is documented as wired-but-device-unverified and this is exactly the silent no-op it would produce.",
-        whyNotAutomated: "KEYSTORE_TODO.md records that core's device_key::get_or_create is still an Err(HardwareUnavailable) stub on Android and the Kotlin envelope is not wired to it, so the failure is a silent no-op that only a real Keystore on a device can resolve either way.",
+        see: "LOCK the vault, then share a file into Myne from another app. Confirm the share is accepted rather than silently dropped, then unlock and confirm the file drains into the attachment library. If nothing arrives, check the log for HardwareUnavailable: the Keystore arm is wired but device-unverified, and that error is the exact shape a broken seal produces.",
+        whyNotAutomated: "KEYSTORE_TODO.md records that the Android Keystore provider is wired through core's device_key::resolve but that neither the seal nor the drain has been observed on hardware, so what a real device does here cannot be read off any tier this repo runs.",
         clients: ["android"],
         estimateMin: 9,
         tier: "core",
@@ -7273,7 +7274,8 @@ export const ROSTER = Object.freeze([
     automatedBy: [
       "e2e-web/opfs-seed.e2e.ts",
       "e2e-web/unlock-from-fixture.e2e.ts",
-      "e2e-web/quarantine-roundtrip.e2e.ts",
+      // `e2e-web/quarantine-roundtrip.e2e.ts` WITHDRAWN: `it.skip`, "this one
+      // never passes". See `SKIPPED_SCENARIOS`.
     ],
     manual: [
       {
@@ -7375,7 +7377,8 @@ export const ROSTER = Object.freeze([
       "e2e-web/opfs-seed.e2e.ts",
       "e2e-web/create-account.e2e.ts",
       "e2e-web/unlock-from-fixture.e2e.ts",
-      "e2e-web/quarantine-roundtrip.e2e.ts",
+      // `e2e-web/quarantine-roundtrip.e2e.ts` WITHDRAWN: `it.skip`, "this one
+      // never passes". See `SKIPPED_SCENARIOS`.
     ],
     manual: [
       {

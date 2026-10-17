@@ -1,0 +1,5 @@
+First Myne release on F-Droid.
+
+This build is the same app as the .apk published on myne.md; F-Droid compiles it from source and signs it with F-Droid's signing key.
+
+Because the signing key differs, this build cannot be installed over a sideloaded .apk. Uninstall that one first. Uninstalling removes the app's private storage, which is where the on-device vault lives, so export your notes to markdown before you switch.

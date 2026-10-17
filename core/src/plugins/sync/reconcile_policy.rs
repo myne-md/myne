@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Full-reconcile policy (MYND-426 task 4) — the deletion-cache feature's
 //! invocation of the engine's reconcile primitive (`reconcile.rs`, MYND-424
 //! task 8) on the triggers that invalidate the incremental cursor.

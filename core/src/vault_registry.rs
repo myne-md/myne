@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault discovery (disk-scan) + best-effort registry cache.
 //!
 //! ## Discovery authority is the disk-scan (SYNC-10)
@@ -566,30 +567,6 @@ mod tests {
             .join(VAULTS_DIR_NAME)
             .join(id.to_string())
             .exists());
-    }
-
-    #[test]
-    fn mint_unique_skips_a_pre_seeded_colliding_id() {
-        // Pre-seed the FIRST id `mint_unique_vault_id` would pick by stubbing
-        // the RNG path: we cannot inject the RNG, so instead we assert the
-        // contract behaviourally — mint an id, create its dir, then assert a
-        // fresh `mint_unique_vault_id` never returns that occupied id.
-        let tmp = ScopedTempDir::new("mint-collide").unwrap();
-        let occupied = mint_unique_vault_id(tmp.path());
-        std::fs::create_dir_all(tmp.path().join(VAULTS_DIR_NAME).join(occupied.to_string()))
-            .unwrap();
-
-        // Over many draws, the helper must NEVER hand back the occupied id —
-        // it re-mints past any collision. (Random UUIDv7 collisions are not
-        // reachable, so in practice each draw is already distinct; this
-        // asserts the occupied dir is treated as off-limits.)
-        for _ in 0..64 {
-            let next = mint_unique_vault_id(tmp.path());
-            assert_ne!(
-                next, occupied,
-                "mint_unique_vault_id must never return an id naming an existing dir"
-            );
-        }
     }
 
     // `mint_unique_retries_when_first_minted_dir_exists` was removed

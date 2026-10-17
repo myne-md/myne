@@ -43,7 +43,6 @@ const LANG_LABELS: Record<string, string> = {
   fa: "فارسی",
   fr: "Français",
   he: "עברית",
-  hr: "Hrvatski",
   hu: "Magyar",
   it: "Italiano",
   ko: "한국어",

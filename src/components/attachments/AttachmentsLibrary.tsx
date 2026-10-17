@@ -21,7 +21,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,7 +28,6 @@ import {
   type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { createPortal } from "react-dom";
 import { open as openFileDialog } from "../../platform/dialog";
 import {
   attachmentCleanUnused,
@@ -64,6 +62,7 @@ import { Skeleton } from "../primitives/Skeleton";
 import { VISUALLY_HIDDEN as visuallyHidden } from "../primitives/visuallyHidden";
 import { Tooltip } from "../primitives/Tooltip";
 import { Select, type SelectOption } from "../primitives/Select";
+import { AnchoredPanel } from "../primitives/AnchoredPanel";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitives/interactiveSurface";
 import type { IconName } from "../../lib/icons";
@@ -1493,9 +1492,6 @@ function UsedInNotes({
 // ---- per-item ⋮ action menu -----------------------------------------------
 
 const MENU_STYLE: CSSProperties = {
-  position: "fixed",
-  zIndex: 60,
-  minWidth: 160,
   background: "var(--bg-1)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-2)",
@@ -1528,10 +1524,16 @@ interface ItemMenuEntry {
 }
 
 /**
- * Portal-rendered dropdown anchored under the ⋮ trigger. Like the used-in-notes
- * popover (Fix 2), it renders to `document.body` so the tile's `overflow:
- * hidden` + the grid's scroll container don't clip it. Closes on outside-click
- * / Esc / scroll / resize.
+ * Portal-rendered dropdown anchored under the ⋮ trigger, or AT THE CURSOR for a
+ * right-click on the card. Placement, the portal to `document.body` and every
+ * dismissal belong to `<AnchoredPanel>` — this used to hand-roll all three, a
+ * second copy of the shape `UsedInNotesPopover` carried beside it.
+ *
+ * What the primitive adds on top is the height: the hand-written version
+ * ESTIMATED the menu's height from the item count to decide whether to flip,
+ * where `placeMenu` measures the real room and bounds the panel to it. The tile
+ * sits in a scrolling grid, so "not enough room below" is the common case, not
+ * the edge one.
  */
 function AttachmentActionMenu({
   items,
@@ -1545,109 +1547,55 @@ function AttachmentActionMenu({
   /** Cursor point to open at (right-click); `null` → anchor under the ⋮ button. */
   at?: { x: number; y: number } | null;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
-    null,
-  );
-
-  // Position at the cursor when opened via right-click; otherwise anchor below
-  // the ⋮ trigger, right-aligned to it. Either way clamp into the viewport and
-  // flip up when there isn't room below (estimated from the item count).
-  useLayoutEffect(() => {
-    const width = 160;
-    const estHeight = items.length * 34 + 8;
-    if (at !== null) {
-      const openUp = at.y + estHeight + 8 > window.innerHeight;
-      const top = openUp ? Math.max(8, at.y - estHeight) : at.y;
-      const left = Math.min(at.x, window.innerWidth - width - 8);
-      setCoords({ top, left: Math.max(8, left) });
-      return;
-    }
-    const el = anchorRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const left = Math.min(r.right - width, window.innerWidth - width - 8);
-    const openUp = r.bottom + estHeight + 8 > window.innerHeight;
-    const top = openUp ? Math.max(8, r.top - estHeight - 4) : r.bottom + 4;
-    setCoords({ top, left: Math.max(8, left) });
-  }, [anchorRef, items.length, at]);
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (
-        ref.current &&
-        !ref.current.contains(t) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(t)
-      ) {
-        onClose();
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    const onReflow = () => onClose();
-    const tid = setTimeout(
-      () => document.addEventListener("click", onDocClick),
-      0,
-    );
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onReflow, true);
-    window.addEventListener("resize", onReflow);
-    return () => {
-      clearTimeout(tid);
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onReflow, true);
-      window.removeEventListener("resize", onReflow);
-    };
-  }, [onClose, anchorRef]);
-
-  if (coords === null) return null;
-
-  return createPortal(
-    <div
-      ref={ref}
-      style={{ ...MENU_STYLE, top: coords.top, left: coords.left }}
-      role="menu"
+  return (
+    <AnchoredPanel
+      open
+      onClose={onClose}
+      anchorRef={anchorRef}
+      // A right-click opens with the menu's left edge AT the pointer; the ⋮
+      // trigger opens right-aligned to itself, so it cannot spill past the tile.
+      point={at}
+      align={at !== null ? "start" : "end"}
+      minWidth={160}
+      testId="attachments.action-menu"
+      style={MENU_STYLE}
     >
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          role="menuitem"
-          disabled={item.disabled}
-          aria-disabled={item.disabled}
-          data-testid={`attachments.action-${item.id}`}
-          // hoverSurface deepens only the background; the Delete item keeps its
-          // `--danger` text colour set below.
-          {...interactiveSurface({ disabled: item.disabled })}
-          style={{
-            ...MENU_ITEM_STYLE,
-            color: item.disabled
-              ? "var(--fg-3)"
-              : item.destructive
-                ? "var(--danger)"
-                : "var(--fg-1)",
-            cursor: item.disabled ? "default" : "pointer",
-            opacity: item.disabled ? 0.6 : 1,
-            transition: HOVER_TRANSITION,
-          }}
-          onClick={() => {
-            if (item.disabled) return;
-            item.onSelect();
-            onClose();
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>,
-    document.body,
+      {/* The role stays on the list, not on the panel, so `role="menu"` still
+          names what the user reads. */}
+      <div role="menu">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            aria-disabled={item.disabled}
+            data-testid={`attachments.action-${item.id}`}
+            // hoverSurface deepens only the background; the Delete item keeps its
+            // `--danger` text colour set below.
+            {...interactiveSurface({ disabled: item.disabled })}
+            style={{
+              ...MENU_ITEM_STYLE,
+              color: item.disabled
+                ? "var(--fg-3)"
+                : item.destructive
+                  ? "var(--danger)"
+                  : "var(--fg-1)",
+              cursor: item.disabled ? "default" : "pointer",
+              opacity: item.disabled ? 0.6 : 1,
+              transition: HOVER_TRANSITION,
+            }}
+            onClick={() => {
+              if (item.disabled) return;
+              item.onSelect();
+              onClose();
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </AnchoredPanel>
   );
 }
 

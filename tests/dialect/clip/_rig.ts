@@ -72,14 +72,17 @@ export function assertIdempotent(input: string): string {
 }
 
 /**
- * Assert both invariants AND purity (the input string is never mutated — it is
- * immutable in JS, so this guards that the function returns a value derived from
- * it without throwing). The one-call convenience every construct slice uses.
+ * Assert both invariants — round-trip and idempotency — and return the emitted
+ * markdown. The one-call convenience every construct slice uses.
+ *
+ * It used to also assert `expect(input).toBe(before)` with `before = input`,
+ * under a comment about purity. That is a tautology over a JS string: the
+ * reference cannot change, so the line could not fail and said nothing about the
+ * serializer. Removed rather than restated — the two invariants above are the
+ * real contract, and a third assertion that cannot fail dilutes them.
  */
 export function assertCanonicalD1(input: string): string {
-  const before = input;
   const emitted = assertRoundTrip(input);
   assertIdempotent(input);
-  expect(input).toBe(before); // pure: input reference unchanged
   return emitted;
 }

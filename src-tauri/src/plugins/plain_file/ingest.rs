@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The OS ingress for the plain-file editor (myne-md/myne#788).
 //!
 //! One funnel for every path that arrives from outside the WebView:

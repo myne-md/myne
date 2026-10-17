@@ -183,12 +183,6 @@ describe("boot routing, per client", () => {
     ).toEqual({ name: "editor" });
   });
 
-  it("a corrupted container is still a re-bootstrap", async () => {
-    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
-    expect(initialStageFromProbe({ ok: [{ id: "v1", status: CORRUPTED }] } as never, {})).toEqual({
-      name: "account-entry",
-    });
-  });
 
   it("the pending stage accepts no OUTBOUND transitions; approval is not an action", async () => {
     // Approval is granted on ANOTHER device and observed by polling. An

@@ -27,6 +27,14 @@ describe("attachmentRef", () => {
     const body = `intro ![[att:${ID}|a.png]] mid ![[att:${ID2}|b.pdf]] again ![[att:${ID}|a.png]]`;
     expect(extractAttachmentIds(body)).toEqual([ID, ID2]);
   });
+
+  it("reads the canonical embed, alias newline and all (T6.13 item 3)", () => {
+    // The removed local copy used `[^\]\n]` for the alias, so this body
+    // extracted NOTHING on mobile while the canonical reader (desktop, and now
+    // mobile) extracts the id. Proving the two clients agree is the point.
+    const body = `![[att:${ID}|line one\nline two]]`;
+    expect(extractAttachmentIds(body)).toEqual([ID]);
+  });
 });
 
 describe("attachmentSrc (platform-aware, MYND-519)", () => {

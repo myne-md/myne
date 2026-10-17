@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Conflict resolution (SYNC-11 + `protocol.md` §9.5.2), MYND-424 task 7.
 //!
 //! When two devices change the same logical thing concurrently (the engine saw

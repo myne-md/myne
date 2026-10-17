@@ -11,8 +11,9 @@
 //
 // `BUNDLED_SPELL_LANGUAGES` mirrors the Rust `commands::BUNDLED_LANGUAGES`
 // manifest (MYND-263 t4) — the single source the settings language picker
-// (MYND-267) renders. v1 = 23 languages (en-US + 22 that load in spellbook and
-// carry AGPL-compatible licenses). TR/da/gl/uk/el and the GPL-2.0-only dicts are
+// (MYND-267) renders. v1 = 22 languages (en-US + 21 that load in spellbook and
+// carry AGPL-compatible licenses). TR/da/gl/uk/el, hr (its OpenOffice dict is
+// SISSL — retired and AGPL-incompatible) and the GPL-2.0-only dicts are
 // excluded (SYNC-12 + size/compat). Adding a bundled language is a one-site
 // change on each side (and a hash-pin in dict_manifest.rs).
 
@@ -31,7 +32,7 @@ export type SpellWord = {
 /**
  * The languages bundled + loadable at v1 — the single source the settings
  * language picker renders (never hard-coded elsewhere). Mirrors the Rust
- * `spell::commands::BUNDLED_LANGUAGES` (23 languages; TR deferred per SYNC-12:
+ * `spell::commands::BUNDLED_LANGUAGES` (22 languages; TR deferred per SYNC-12:
  * spellbook 0.4.2 rejects the tr `.aff`'s flag-0).
  */
 export const BUNDLED_SPELL_LANGUAGES = [
@@ -44,7 +45,6 @@ export const BUNDLED_SPELL_LANGUAGES = [
   "fa",
   "fr",
   "he",
-  "hr",
   "hu",
   "it",
   "ko",

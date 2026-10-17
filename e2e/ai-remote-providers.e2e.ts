@@ -349,7 +349,7 @@ describeE2E("arp2 the remote arm is wired, and the bars fall back rather than br
           // they fall back to the local one. A build with no model reports
           // `no_model` here — never `remote_barred`, which is the regression
           // this asserts against.
-          for (const feature of ["embedding", "auto_tag", "transcription"] as const) {
+          for (const feature of ["auto_tag", "transcription"] as const) {
             const f = report[feature] as { cause?: string | null };
             expect(f?.cause ?? null, `${feature} must not be barred`).not.toBe("remote_barred");
           }

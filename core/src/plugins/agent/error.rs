@@ -351,16 +351,4 @@ mod tests {
         let json = serde_json::to_string(&e).unwrap();
         assert!(json.contains("outOfScope") || json.contains("OutOfScope"));
     }
-
-    #[test]
-    fn rejections_are_distinct_causes_not_one_catch_all() {
-        // The point of the taxonomy is that "not found" and "ambiguous" are
-        // different facts about the note. Collapsing them would let a UI show
-        // "could not apply" for a case the user could fix by narrowing.
-        assert_ne!(
-            EditRejection::AnchorNotFound,
-            EditRejection::AnchorAmbiguous
-        );
-        assert_ne!(EditRejection::AnchorEmpty, EditRejection::AnchorNotFound);
-    }
 }

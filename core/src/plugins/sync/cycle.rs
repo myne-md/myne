@@ -281,7 +281,6 @@ async fn reindex_pulled_notes(
             .is_some()
         {
             hooks.search_remove(id);
-            hooks.ai_note_changed(id, &plaintext);
             continue;
         }
         // The same drawing fold as the local writers: a `kind: drawing` body is
@@ -296,8 +295,6 @@ async fn reindex_pulled_notes(
                 .index_note_attachments(state, id, &title, &plaintext)
                 .await;
         }
-        // Raw body — the AI arm projects for itself (myne#304).
-        hooks.ai_note_changed(id, &plaintext);
     }
 }
 
@@ -1317,8 +1314,8 @@ mod tests {
             let calls = rec.index_calls();
             assert_eq!(
                 calls.len(),
-                3,
-                "an applied write owes search_upsert + index_note_attachments + ai_note_changed, got {calls:?}"
+                2,
+                "an applied write owes search_upsert + index_note_attachments, got {calls:?}"
             );
             match &calls[0] {
                 IndexCall::SearchUpsert {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // All four commands are WebView-facing — the reconciliation pass that drives
 // them (`runReminderPass`) is TypeScript, so the WebView is the caller. They are
 // therefore listed here and `tauri_plugin::Builder` autogenerates their

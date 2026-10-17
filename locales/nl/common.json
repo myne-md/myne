@@ -1218,8 +1218,6 @@
           "empty": "Samenvattingen, antwoorden en suggesties verschijnen hier zodra je erom vraagt.",
           "error": "Het AI-verzoek kon niet worden voltooid.",
           "errorTurn": "De assistent kon niet antwoorden.",
-          "gettingReadyHint": "Je notities worden voorbereid voor AI. Een moment.",
-          "noSearchModelHint": "Vragen stellen doorzoekt je notities op dit apparaat, en daarvoor is hier een zoekmodel nodig. Een provider kan dat niet. Kies er een in Instellingen → Developer → AI. Je notities bewerken met de AI werkt nog wel.",
           "insert": "Invoegen in notitie",
           "noAnswer": "Geen antwoord. Probeer het anders te formuleren.",
           "newChat": "Nieuw gesprek",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Deze build van Myne is gecompileerd zonder lokale AI, dus hier kan niets draaien. Geen enkele instelling verandert dat — daar is een build met AI voor nodig.",
           "offHint": "Lokale AI staat uit. Schakel deze in via Instellingen → Developer → AI.",
           "send": "Verzenden",
-          "statusGettingReady": "Voorbereiden…",
-          "statusNoSearchModel": "Geen zoekmodel",
           "statusNoModel": "Geen provider",
           "statusUnreachable": "Antwoordt niet",
           "statusUnavailable": "Niet beschikbaar",
@@ -2909,9 +2905,6 @@
       "legalLabel": "Juridisch",
       "legalHelper": "Opent op myne.md in je browser. Duits waar de interface Duits is.",
       "legalPrivacy": "Privacybeleid",
-      "legalTerms": "Bètavoorwaarden",
-      "legalNotice": "Illegale inhoud melden",
-      "legalLawEnforcement": "Verzoeken van opsporingsinstanties",
       "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "Alles wat deze run kon lezen, staat in mappen die de AI nooit ziet. Er is niets verzonden. Wijzig dit in Instellingen, AI, Uitgesloten mappen."
       },
       "modelChoose": "Bestand kiezen…",
-      "modelEmbeddingLabel": "Zoekmodel: semantisch zoeken en vraag-en-antwoord",
       "modelFilter": {
-        "gguf": "GGUF-model",
-        "safetensors": "Safetensors-model"
+        "gguf": "GGUF-model"
       },
       "modelGenerationLabel": "Tekstmodel: chat, samenvattingen, schrijven",
       "modelNone": "Geen bestand geselecteerd",
@@ -3418,7 +3409,6 @@
       "providerNone": "Geen",
       "providerNothingAnswering": "Er is nog niets ingesteld om te antwoorden.",
       "modelsLabel": "Modellen",
-      "recommendedFilesEmbedding": "Vereist model.safetensors + config.json + tokenizer.json in één map.",
       "recommendedFilesGeneration": "Vereist het .gguf-bestand + tokenizer.json in dezelfde map.",
       "recommendedFilesTranscription": "Vereist het .gguf-bestand van Whisper + config.json + tokenizer.json in dezelfde map.",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "De locatie van {{name}} tonen",
       "downloadsLabel": "Modellen downloaden",
       "downloadsHelper": "Haalt een model op van de eigen origin van Myne. Het wordt voordat het wordt gebruikt gecontroleerd tegen een vingerafdruk die in de app is ingebouwd, dus een gemanipuleerde download wordt geweigerd. Er wordt niets opgehaald tenzij je klikt.",
-      "downloadEmbeddingSize": "Meertalig model, ongeveer 449 MB.",
       "downloadTagLabel": "Tagmodel: automatische tagvoorstellen",
       "downloadTagSize": "Klein lokaal model, ongeveer 337 MB.",
       "downloadInstalled": "Geïnstalleerd",
@@ -3954,10 +3943,6 @@
       "intro": "Synchronisatie stuurt je notities versleuteld naar een server. Vier dingen zijn eerst goed om te weten.",
       "whatThisIsLabel": "Wat dit is",
       "dataLossLabel": "Als je beide geheimen kwijtraakt",
-      "whatHappensNextLabel": "Als de bèta eindigt",
-      "whatWeCanSeeLabel": "Wat wij kunnen zien",
-      "readFull": "Lees de volledige voorwaarden",
-      "review": "Bètavoorwaarden bekijken",
       "accept": "Ik begrijp het, synchronisatie aanzetten"
     },
     "materialising": "Je notities worden gedownload: {{done}} van {{total}}. Je kunt al beginnen; de rest verschijnt zodra die binnenkomt.",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "Voer op elk apparaat dezelfde server-URL in. Een zelfgehoste server heeft een vertrouwd HTTPS-certificaat nodig.",
       "tlsFailure": "Kon het HTTPS-certificaat van de server niet verifiëren. Controleer het serveradres, het certificaat en de geldigheid ervan.",
       "inviteLabel": "Uitnodigingscode (alleen als deze server er een vraagt)",
-      "invitePlaceholder": "De code die de beheerder van de server je gaf",
-      "changeInviteCode": "Uitnodigingscode wijzigen"
+      "invitePlaceholder": "De code die de beheerder van de server je gaf"
     },
     "enroll": {
       "accountNumberLabel": "Accountnummer",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "AI instellen",
-    "intro": "Myne kan je notities op betekenis doorzoeken, tags voorstellen en erover chatten. Niets daarvan is verplicht, en je kunt het later aanzetten bij Instellingen.",
+    "intro": "Myne kan tags voorstellen en erover chatten. Niets daarvan is verplicht, en je kunt het later aanzetten bij Instellingen.",
     "enableLabel": "AI-functies aanzetten",
-    "semantic": {
-      "title": "Semantisch zoeken",
-      "body": "Download een meertalig embeddingmodel (ongeveer 449 MB) zodat je op betekenis kunt zoeken, niet alleen op woorden."
-    },
     "tag": {
       "title": "Automatisch taggen",
       "body": "Download het tagmodel (ongeveer 337 MB) zodat Myne tags kan voorstellen terwijl je schrijft."
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "Kies een synchronisatieserver",
-      "chooseHeading": "Waar moeten je notities synchroniseren?",
-      "chooseIntro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Gebruik de Myne Sync-dienst, of wijs dit apparaat naar een server die je zelf draait. Hoe dan ook blijven je notities op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
-      "myneSyncHint": "De server die Myne beheert. Het HTTPS-certificaat ervan wordt automatisch gecontroleerd.",
       "intro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Je notities blijven op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
       "notConfigured": "Voer hierboven een serveradres in en druk op Verbinden om door te gaan.",
       "back": "Terug",
-      "continue": "Doorgaan",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Je eigen server",
-      "selfHostedHint": "Een synchronisatieserver die je zelf draait. Je voert het adres op het volgende scherm in.",
-      "connectAction": "Verbinden",
-      "setUpAction": "Instellen"
+      "continue": "Doorgaan"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "Kies een synchronisatieserver",
       "lead": "Je notities blijven op dit apparaat versleuteld voordat ze het verlaten. De server bewaart alleen ciphertext.",
       "urlLabel": "Serveradres",
-      "useMyneSync": "Myne Sync gebruiken",
-      "selfHostedHint": "Of voer het adres in van een server die je zelf draait.",
       "connect": "Verbinden",
       "connecting": "Verbinden…"
     },

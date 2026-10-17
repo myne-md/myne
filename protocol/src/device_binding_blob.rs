@@ -241,33 +241,16 @@ pub enum DeviceBindingBlobError {
     ConflictingBinding,
 }
 
-impl From<EnvelopeError> for DeviceBindingBlobError {
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => Self::HeaderTooShort,
-            EnvelopeError::MagicMismatch => Self::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => Self::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => Self::DeviceBindingFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => Self::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => Self::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => Self::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => Self::CiphertextLenOverflow,
-            EnvelopeError::RandomnessUnavailable => Self::RandomnessUnavailable,
-        }
-    }
-}
+// MYU5: the format hook is family-prefixed, and PlaintextTooLarge collapses
+// into CiphertextLenOverflow so this family's parse_fail surface does not widen.
+crate::blob_envelope::impl_from_envelope_error!(DeviceBindingBlobError, format: DeviceBindingFormatUnsupported, plaintext_too_large: CiphertextLenOverflow);
 
 fn is_device_id_hex(s: &str) -> bool {
-    s.len() == DEVICE_ID_HEX_LEN && is_lower_hex(s)
+    s.len() == DEVICE_ID_HEX_LEN && crate::hex::is_lower_hex(s)
 }
 
 fn is_fingerprint_hex(s: &str) -> bool {
-    s.len() == PERSON_FINGERPRINT_HEX_LEN && is_lower_hex(s)
-}
-
-fn is_lower_hex(s: &str) -> bool {
-    s.bytes()
-        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    s.len() == PERSON_FINGERPRINT_HEX_LEN && crate::hex::is_lower_hex(s)
 }
 
 fn device_id_from_hex(s: &str) -> Option<[u8; 16]> {
@@ -286,7 +269,7 @@ fn fingerprint_from_hex(s: &str) -> Option<[u8; crate::person_key::PERSON_FINGER
 
 /// Decode exactly `byte_len` bytes of lowercase hex, or `None`.
 fn hex_bytes(s: &str, byte_len: usize) -> Option<Vec<u8>> {
-    if s.len() != byte_len * 2 || !is_lower_hex(s) {
+    if s.len() != byte_len * 2 || !crate::hex::is_lower_hex(s) {
         return None;
     }
     let raw = s.as_bytes();
@@ -299,19 +282,8 @@ fn hex_bytes(s: &str, byte_len: usize) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Lowercase hex, the rendering every id and signature in this family uses.
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push(HEX[(b >> 4) as usize] as char);
-        s.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    s
-}
-
 fn is_hex_len(s: &str, byte_len: usize) -> bool {
-    s.len() == byte_len * 2 && is_lower_hex(s)
+    s.len() == byte_len * 2 && crate::hex::is_lower_hex(s)
 }
 
 /// Validate one row against the family's rules.
@@ -635,10 +607,10 @@ pub fn sign_device_binding(
     bytes.extend_from_slice(&signed.ed25519_sig);
     bytes.extend_from_slice(&signed.mldsa_sig);
     Ok(DeviceBindingEntry {
-        person_fingerprint: hex_lower(person_fingerprint),
+        person_fingerprint: crate::hex::encode_lower(person_fingerprint),
         version,
         tombstone,
-        signature_hex: hex_lower(&bytes),
+        signature_hex: crate::hex::encode_lower(&bytes),
     })
 }
 
@@ -876,7 +848,7 @@ mod tests {
             &mut rng,
         )
         .expect("sign");
-        (hex_lower(&device_id(device_byte)), row)
+        (crate::hex::encode_lower(&device_id(device_byte)), row)
     }
 
     #[test]
@@ -1244,7 +1216,9 @@ mod tests {
         map.insert(id, row);
         let blob = encode_device_binding_blob(&KEY, &ACCT, EPOCH, &map).expect("seal");
         let back = decode_device_binding_blob(&KEY, &ACCT, EPOCH, &blob).expect("open");
-        let round_tripped = back.get(&hex_lower(&device_id(0x11))).expect("row");
+        let round_tripped = back
+            .get(&crate::hex::encode_lower(&device_id(0x11)))
+            .expect("row");
         assert!(verify_device_binding(
             &ann.public_half(),
             &device_id(0x11),
@@ -1301,7 +1275,7 @@ mod tests {
         // The claimed fingerprint is inside the signed message AND checked against the
         // verifying key, so rewriting it is refused twice over.
         let mut refiled = row.clone();
-        refiled.person_fingerprint = hex_lower(&fingerprint(0x99));
+        refiled.person_fingerprint = crate::hex::encode_lower(&fingerprint(0x99));
         assert!(!verify_device_binding(
             &ann.public_half(),
             &device_id(0x11),
@@ -1384,13 +1358,13 @@ mod tests {
         let bob = pair(b"bob");
         let (ann_dev, ann_row) = signed_binding(&ann, 0x11, 1, false);
         let (_, mut forged) = signed_binding(&bob, 0x22, 1, false);
-        forged.person_fingerprint = hex_lower(ann.fingerprint());
-        let bob_dev = hex_lower(&device_id(0x22));
+        forged.person_fingerprint = crate::hex::encode_lower(ann.fingerprint());
+        let bob_dev = crate::hex::encode_lower(&device_id(0x22));
         let mut map = DeviceBindingsMap::new();
         map.insert(ann_dev.clone(), ann_row);
         map.insert(bob_dev.clone(), forged);
-        let ann_fp = hex_lower(ann.fingerprint());
-        let bob_fp = hex_lower(bob.fingerprint());
+        let ann_fp = crate::hex::encode_lower(ann.fingerprint());
+        let bob_fp = crate::hex::encode_lower(bob.fingerprint());
         let (verified, unverified) = partition_verified_bindings(
             &map,
             |fingerprint| {
@@ -1448,7 +1422,7 @@ mod tests {
         use crate::aead::aad_device_binding_blob;
         use crate::blob_envelope::encode_blob_envelope_raw;
         use crate::subkey::{derive_group_subkey_v0_2, GroupKey, GroupRole};
-        use crate::test_vector_fmt::{hex_lower, json_escape};
+        use crate::test_vector_fmt::json_escape;
         use alloc::format;
         use alloc::string::String;
 
@@ -1553,8 +1527,8 @@ mod tests {
 
         // ---- the maps the codec cases are built from -------------------------
         let mut two_row = DeviceBindingsMap::new();
-        two_row.insert(hex_lower(&dev_a), entry(&fp(0x0e), 1, false));
-        two_row.insert(hex_lower(&dev_b), entry(&fp(0x0e), 4, true));
+        two_row.insert(crate::hex::encode_lower(&dev_a), entry(&fp(0x0e), 1, false));
+        two_row.insert(crate::hex::encode_lower(&dev_b), entry(&fp(0x0e), 4, true));
         let empty: DeviceBindingsMap = DeviceBindingsMap::new();
 
         // One map carrying a REAL signature, so the codec is pinned against a row
@@ -1570,9 +1544,9 @@ mod tests {
         let signer_json = |public: &crate::person_key::PersonPublicHalf| -> String {
             format!(
                 "      \"input_signer_kem_ek_hex\": \"{}\",\n      \"input_signer_ed_pk_hex\": \"{}\",\n      \"input_signer_mldsa_vk_hex\": \"{}\",\n",
-                hex_lower(public.kem_ek()),
-                hex_lower(public.ed_pk()),
-                hex_lower(public.mldsa_vk()),
+                crate::hex::encode_lower(public.kem_ek()),
+                crate::hex::encode_lower(public.ed_pk()),
+                crate::hex::encode_lower(public.mldsa_vk()),
             )
         };
         let entry_json = |e: &DeviceBindingEntry| -> String {
@@ -1586,7 +1560,7 @@ mod tests {
         };
         let bytes_hex =
             |id: &[u8; 16], fingerprint: &[u8; 32], version: u64, tombstone: bool| -> String {
-                hex_lower(&device_binding_signed_bytes(
+                crate::hex::encode_lower(&device_binding_signed_bytes(
                     id,
                     fingerprint,
                     version,
@@ -1681,12 +1655,12 @@ mod tests {
             );
             let body = format!(
                 "      \"input_device_binding_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"input_nonce_hex\": \"{}\",\n      \"input_map\": {},\n      \"expected_blob_hex\": \"{}\",\n      \"informational_header_len\": {},\n      \"informational_nonce_offset\": 6,\n      \"expected_magic_ascii\": \"MYU5\",\n      \"expected_protocol_version_byte_hex\": \"01\",\n      \"expected_format_version_byte_hex\": \"01\"\n",
-                hex_lower(&key),
-                hex_lower(&acct),
+                crate::hex::encode_lower(&key),
+                crate::hex::encode_lower(&acct),
                 epoch,
-                hex_lower(&nonce),
+                crate::hex::encode_lower(&nonce),
                 mj,
-                hex_lower(&blob),
+                crate::hex::encode_lower(&blob),
                 DEVICE_BINDING_BLOB_HEADER_LEN,
             );
             case(&mut dump, slug, "encrypt", desc, &body, true);
@@ -1747,9 +1721,9 @@ mod tests {
             );
             let body = format!(
                 "      \"input_blob_hex\": \"{}\",\n      \"input_device_binding_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"expected_error\": \"{}\"\n",
-                hex_lower(blob),
-                hex_lower(reader_key),
-                hex_lower(reader_account),
+                crate::hex::encode_lower(blob),
+                crate::hex::encode_lower(reader_key),
+                crate::hex::encode_lower(reader_account),
                 reader_epoch,
                 expected,
             );
@@ -1930,10 +1904,10 @@ mod tests {
             assert_eq!(err_name(&got), expected, "[{slug}] mislabelled error");
             let body = format!(
                 "      \"input_device_binding_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"input_nonce_hex\": \"{}\",\n      \"input_map\": {},\n      \"expected_error\": \"{}\"\n",
-                hex_lower(&key),
-                hex_lower(&acct),
+                crate::hex::encode_lower(&key),
+                crate::hex::encode_lower(&acct),
                 writer_epoch,
-                hex_lower(&nonce),
+                crate::hex::encode_lower(&nonce),
                 map_json(map),
                 expected,
             );
@@ -1943,7 +1917,7 @@ mod tests {
         let mut bad_fingerprint = DeviceBindingsMap::new();
         let mut row = entry(&fp(0x0e), 1, false);
         row.person_fingerprint = "aa".to_string();
-        bad_fingerprint.insert(hex_lower(&dev_c), row);
+        bad_fingerprint.insert(crate::hex::encode_lower(&dev_c), row);
         encode_case(
             &mut dump,
             "encode-fail-fingerprint-wrong-shape",
@@ -2012,9 +1986,9 @@ mod tests {
         // The same device, moved from one person to another at a HIGHER version: the
         // version arm resolves it, and neither order may disagree.
         let mut moved_a = DeviceBindingsMap::new();
-        moved_a.insert(hex_lower(&dev_a), entry(&fp(0x0e), 3, false));
+        moved_a.insert(crate::hex::encode_lower(&dev_a), entry(&fp(0x0e), 3, false));
         let mut moved_b = DeviceBindingsMap::new();
-        moved_b.insert(hex_lower(&dev_a), entry(&fp(0x0f), 4, false));
+        moved_b.insert(crate::hex::encode_lower(&dev_a), entry(&fp(0x0f), 4, false));
         merge_case(
             &mut dump,
             "merge-rebind-resolves-by-version",
@@ -2025,9 +1999,9 @@ mod tests {
         );
         // The same device, two different people, one version: refused.
         let mut tie_a = DeviceBindingsMap::new();
-        tie_a.insert(hex_lower(&dev_a), entry(&fp(0x0e), 3, false));
+        tie_a.insert(crate::hex::encode_lower(&dev_a), entry(&fp(0x0e), 3, false));
         let mut tie_b = DeviceBindingsMap::new();
-        tie_b.insert(hex_lower(&dev_a), entry(&fp(0x0f), 3, false));
+        tie_b.insert(crate::hex::encode_lower(&dev_a), entry(&fp(0x0f), 3, false));
         merge_case(
             &mut dump,
             "merge-same-version-two-people-refused",
@@ -2039,9 +2013,9 @@ mod tests {
         // A tombstone against a live row at the same version, same person: the tombstone
         // arm decides it, and it decides it the same way in either order.
         let mut live_same = DeviceBindingsMap::new();
-        live_same.insert(hex_lower(&dev_b), entry(&fp(0x0e), 4, false));
+        live_same.insert(crate::hex::encode_lower(&dev_b), entry(&fp(0x0e), 4, false));
         let mut dead_same = DeviceBindingsMap::new();
-        dead_same.insert(hex_lower(&dev_b), entry(&fp(0x0e), 4, true));
+        dead_same.insert(crate::hex::encode_lower(&dev_b), entry(&fp(0x0e), 4, true));
         merge_case(
             &mut dump,
             "merge-tombstone-beats-live-at-equal-version",
@@ -2062,8 +2036,8 @@ mod tests {
                           trailing: bool| {
             let body = format!(
                 "      \"input_device_id_hex\": \"{}\",\n      \"input_person_fingerprint_hex\": \"{}\",\n      \"input_version\": {},\n      \"input_tombstone\": {},\n      \"expected_prefix_ascii\": \"myne.device-binding v1|\",\n      \"informational_message_len_bytes\": {},\n      \"expected_message_hex\": \"{}\"\n",
-                hex_lower(id),
-                hex_lower(fingerprint),
+                crate::hex::encode_lower(id),
+                crate::hex::encode_lower(fingerprint),
                 version,
                 tombstone,
                 DEVICE_BINDING_PREFIX.len() + 16 + 32 + 8 + 1,
@@ -2125,9 +2099,9 @@ mod tests {
             // field would pin a case whose expected outcome no longer describes the key
             // beside it.
             let rebuilt = crate::person_key::PersonPublicHalf::from_parts_hex(
-                &hex_lower(public.kem_ek()),
-                &hex_lower(public.ed_pk()),
-                &hex_lower(public.mldsa_vk()),
+                &crate::hex::encode_lower(public.kem_ek()),
+                &crate::hex::encode_lower(public.ed_pk()),
+                &crate::hex::encode_lower(public.mldsa_vk()),
             )
             .expect("the emitted public-half parts must round-trip");
             assert_eq!(
@@ -2153,10 +2127,10 @@ mod tests {
             );
             let body = format!(
                 "      \"verifier\": \"{verifier}\",\n      \"input_device_id_hex\": \"{}\",\n{}{}      \"informational_signed_bytes_hex\": \"{}\",\n      \"expected_verified\": {}\n",
-                hex_lower(id),
+                crate::hex::encode_lower(id),
                 entry_json(row),
                 signer_json(public),
-                hex_lower(&signed),
+                crate::hex::encode_lower(&signed),
                 expected,
             );
             case(dump, slug, "verify", description, &body, trailing);
@@ -2209,7 +2183,7 @@ mod tests {
             true,
         );
         let mut refiled = live_row.clone();
-        refiled.person_fingerprint = hex_lower(&fingerprint(0x0f));
+        refiled.person_fingerprint = crate::hex::encode_lower(&fingerprint(0x0f));
         verify_case(
             &mut dump,
             "verify-altered-fingerprint-refused",
@@ -2287,9 +2261,9 @@ mod tests {
             );
             let body = format!(
                 "      \"input_group_key_hex\": \"{}\",\n      \"input_role\": \"{}\",\n      \"expected_subkey_hex\": \"{}\"\n",
-                hex_lower(&group_key),
+                crate::hex::encode_lower(&group_key),
                 role_str,
-                hex_lower(&derived[..]),
+                crate::hex::encode_lower(&derived[..]),
             );
             case(dump, slug, "group_subkey", description, &body, trailing);
         };

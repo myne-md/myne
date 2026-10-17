@@ -26,7 +26,6 @@ const FULL = {
   backend_id: "candle",
   backend_class: "in_process_local",
   generation: { available: true, cause: null },
-  embedding: { available: false, cause: "no_model" },
   transcription: { available: true, cause: null },
   auto_tag: { available: false, cause: "remote_barred" },
 };
@@ -48,7 +47,6 @@ describe("aiCapabilityReport", () => {
     expect(report.compiled).toBe(true);
     expect(report.backendClass).toBe("in_process_local");
     expect(report.generation).toEqual({ available: true, cause: null });
-    expect(report.embedding).toEqual({ available: false, cause: "no_model" });
     // snake_case on the wire, camelCase on this side.
     expect(report.autoTag).toEqual({
       available: false,
@@ -70,7 +68,6 @@ describe("aiCapabilityReport", () => {
     // a cause here would put a fake EngineError kind in front of the user.
     for (const f of [
       report.generation,
-      report.embedding,
       report.transcription,
       report.autoTag,
     ]) {
@@ -98,7 +95,7 @@ describe("aiCapabilityReport", () => {
 describe("surfaceStateOf", () => {
   it("reports absent for a build with no AI compiled in, whatever the features say", async () => {
     const { surfaceStateOf, UNCOMPILED_REPORT } = await seam();
-    for (const feature of ["generation", "embedding", "transcription", "autoTag"] as const) {
+    for (const feature of ["generation", "transcription", "autoTag"] as const) {
       expect(surfaceStateOf(UNCOMPILED_REPORT, feature)).toEqual({ kind: "absent" });
     }
   });
@@ -107,31 +104,21 @@ describe("surfaceStateOf", () => {
     const { surfaceStateOf } = await seam();
     // Annotated rather than inferred, so the NEXT field added to the report
     // fails on this line with the field's name. Untyped, the drift surfaced
-    // four call sites down as "not assignable", which is how `indexReady`
-    // (myne-md/myne#545) went missing here without anyone reading a name.
+    // four call sites down as "not assignable", which is how a report field
+    // went missing here without anyone reading a name.
     const report: AiCapabilityReport = {
       compiled: true,
       backendId: "candle",
       backendClass: "in_process_local",
       generation: { available: false, cause: "no_model" },
-      embedding: { available: false, cause: "remote_barred" },
       transcription: { available: false, cause: "unreachable" },
       autoTag: { available: true, cause: null },
-      // Coherent with `embedding` above: nothing to index against. The field
-      // itself is myne-md/myne#545 — whether the embedding index is BUILT, as
-      // distinct from whether an embedding model exists at all. Required here,
-      // and irrelevant to what this test asserts, which is the causes above.
-      indexReady: false,
     };
-    // Three unavailable features, three DIFFERENT reasons. Before this task all
-    // three arrived at the UI as `false` and every surface said "select a model".
+    // Three features, three DIFFERENT reasons. Before this task all three
+    // arrived at the UI as `false` and every surface said "select a model".
     expect(surfaceStateOf(report, "generation")).toEqual({
       kind: "unavailable",
       cause: "no_model",
-    });
-    expect(surfaceStateOf(report, "embedding")).toEqual({
-      kind: "unavailable",
-      cause: "remote_barred",
     });
     expect(surfaceStateOf(report, "transcription")).toEqual({
       kind: "unavailable",

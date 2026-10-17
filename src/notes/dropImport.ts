@@ -36,12 +36,6 @@ export interface DropImportResult {
   skipped: Array<{ name: string; reason: "type" | "too-large" | "failed" }>;
 }
 
-/** Whether a dropped `DataTransfer` carries at least one importable file. */
-export function hasImportableFiles(data: DataTransfer | null): boolean {
-  if (data === null) return false;
-  return Array.from(data.files).some(isMarkdownFile);
-}
-
 function isMarkdownFile(file: File): boolean {
   const lower = file.name.toLowerCase();
   return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));

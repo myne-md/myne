@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `sync` plugin command handlers (MYND-424 task 3).
 //!
 //! v0.1 surface is the **endpoint-config** pair (SYNC-14) — the only commands
@@ -2104,7 +2105,6 @@ pub async fn sync_restore_quarantine<R: Runtime>(
             .index_note_attachments(state.inner(), &new_id, &title, &body)
             .await;
     }
-    hooks.ai_note_changed(&new_id, &body);
     hooks.bump_local_change();
     Ok(new_id)
 }

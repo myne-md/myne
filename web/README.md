@@ -103,17 +103,18 @@ this file stays a contributor's map of the target, not an operator runbook
 
 ## State
 
-Implemented and deployed. Every module under `src/platform/` is a real web
+Implemented. Every module under `src/platform/` is a real web
 implementation — the wasm Worker, OPFS persistence, browser dialogs, downloads
 — and the target has its own CI lane. `web-build` typechecks and bundles, then
 runs the seam contract against this implementation plus the artefact greps, the
 bundle budget and the screen/surface/testid rosters; `e2e-web` drives the built
 bundle in a real browser. Publishing is **by hand** and not in the pipeline
 (myne-md/myne#584): `web-container-check` builds the `container/` image to ask it
-questions, and the deploy that publishes `app.example.com` is one procedure in the
-`operations` runbook `web-client-deploy.md`, carrying its
-`check-bundle-record.mjs --has` precondition against
-[`docs/web-bundle-hashes.md`](../docs/web-bundle-hashes.md) and its post-deploy smoke.
+questions. The procedure that used to publish `app.example.com` is in the `operations`
+runbook `web-client-deploy.md`, and it is retired as of 2026-10-16: the
+maintainer-run origin closed, so a bundle now reaches users only from an origin
+they or someone else runs. The `check-bundle-record.mjs --has` precondition it
+carried is likewise no longer a deploy gate.
 CI verifies and does not publish, so a green pipeline is not a release.
 
 **Durability is not the desktop's, and cannot be.** OPFS offers no crash-atomic
@@ -128,11 +129,13 @@ scheme, so a vault is held under a Web Locks lease and a second tab **reports**
 rather than takes over (`src/vault-lock.ts`).
 
 **Narrower than the native clients, by decision and in the artefact.** Account
-and vault creation are absent, and nothing that generates or accepts the 24-word
-recovery phrase is in the bundle: those modules are substituted away at build
-time by the same resolver that substitutes the seam (`src/screens/`), and
-`scripts/check-web-no-phrase.mjs` greps the built output to keep it that way.
-Sync is required — there is no offline-first first run. `decisions.md`
-2026-07-26 is the normative record of that capability set, and
-[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
-served-code delivery channel costs relative to a signed desktop build.
+and vault creation ship, and so does phrase-based recovery: the phrase may be
+generated, displayed and typed in served code (`decisions.md` 2026-08-15, entry
+0514, which supersedes the 2026-07-26 capability set). What does **not** ship is
+the phrase as a **device-enrolment** credential: the enrolment grid is
+substituted away at build time by the same resolver that substitutes the seam
+(`src/screens/`), and `scripts/check-web-no-phrase.mjs` greps the built output to
+keep it out. Sync is required — there is no offline-first first run. Also absent:
+quick-unlock and backup import/export. [`docs/threat-model.md`](../docs/threat-model.md)
+A15 / TB11 states what the served-code delivery channel costs relative to a
+signed desktop build.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `graph_layout` Tauri command handlers.
 //!
 //! - [`graph_layout_read`] — Slot::Unlocked-gated read of the `vault.graph`

@@ -20,8 +20,7 @@
 //
 // Notes on coverage: the streaming CARET and the STOP control are covered by the
 // Vitest component tests (AiChatTab) — the stub streams too fast to reliably
-// catch a mid-stream Stop here. CITATIONS depend on embedded-note retrieval
-// (embed-on-unlock over the stub's zero-vectors); this suite asserts the core
+// catch a mid-stream Stop here. This suite asserts the core
 // send → stream → follow-up → lock-clears path, which is deterministic.
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).

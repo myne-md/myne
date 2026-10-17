@@ -1988,7 +1988,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba91f619216e76a5eb2515783f7ec2e271938b51aadac592f4930517f4626863"
 dependencies = [
  "heck 0.5.0",
- "indexmap 2.14.0",
+ "indexmap 1.9.3",
  "itertools 0.14.0",
  "proc-macro-crate 3.5.0",
  "proc-macro2",
@@ -5030,7 +5030,7 @@ dependencies = [
  "windows-sys 0.60.2",
  "x11rb",
  "zeroize",
- "zip 2.4.2",
+ "zip 2.6.1",
 ]
 
 [[package]]
@@ -6500,7 +6500,7 @@ dependencies = [
  "derive-deftly",
  "libc",
  "paste",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -7237,9 +7237,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.45"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "log",
  "once_cell",
@@ -8022,8 +8022,8 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
 dependencies = [
- "foldhash 0.2.0",
- "hashbrown 0.17.1",
+ "foldhash 0.1.5",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -12164,18 +12164,16 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.4.2"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
+checksum = "1dcb24d0152526ae49b9b96c1dcf71850ca1e0b882e4e28ed898a93c41334744"
 dependencies = [
  "arbitrary",
  "crc32fast",
  "crossbeam-utils",
- "displaydoc",
  "flate2",
  "indexmap 2.14.0",
  "memchr",
- "thiserror 2.0.18",
  "zopfli",
 ]
 

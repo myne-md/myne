@@ -1218,8 +1218,6 @@
           "empty": "要約や回答、提案は、あなたが求めるとここに表示されます。",
           "error": "AIリクエストを完了できませんでした。",
           "errorTurn": "アシスタントは回答できませんでした。",
-          "gettingReadyHint": "AIのためにノートを準備しています。しばらくお待ちください。",
-          "noSearchModelHint": "質問するとこのデバイス上のノートを検索するため、ここに検索モデルが必要です。プロバイダーでは行えません。設定 → 開発者 → AI で選択してください。AIによるノートの編集は引き続き利用できます。",
           "insert": "ノートに挿入",
           "noAnswer": "回答がありません。言い換えてみてください。",
           "newChat": "新規チャット",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "このMyneのビルドはローカルAIなしでコンパイルされているため、ここでは何も実行できません。設定を変えてもそれは変わりません — AIを含むビルドが必要です。",
           "offHint": "ローカルAIはオフです。設定 → 開発者 → AI でオンにしてください。",
           "send": "送信",
-          "statusGettingReady": "準備中…",
-          "statusNoSearchModel": "検索モデルなし",
           "statusNoModel": "プロバイダーなし",
           "statusUnreachable": "応答なし",
           "statusUnavailable": "利用不可",
@@ -2909,9 +2905,6 @@
       "legalLabel": "法的情報",
       "legalHelper": "ブラウザで myne.md を開きます。インターフェースがドイツ語のときはドイツ語で表示されます。",
       "legalPrivacy": "プライバシーポリシー",
-      "legalTerms": "ベータ版利用規約",
-      "legalNotice": "違法コンテンツの報告",
-      "legalLawEnforcement": "捜査機関からの要請",
       "licenseBody": "プレアルファ · ドキュメントはCC-BY-4.0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
       "licenseLabel": "ライセンス",
       "tagline": "プレアルファ · フェーズ1デスクトップクライアント",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "この実行が読めたものはすべて、AIが見ないフォルダにあります。送信はありません。設定、AI、除外フォルダで変更してください。"
       },
       "modelChoose": "ファイルを選択…",
-      "modelEmbeddingLabel": "検索モデル：セマンティック検索とQ&A",
       "modelFilter": {
-        "gguf": "GGUFモデル",
-        "safetensors": "Safetensorsモデル"
+        "gguf": "GGUFモデル"
       },
       "modelGenerationLabel": "テキストモデル：チャット、要約、執筆",
       "modelNone": "ファイルが選択されていません",
@@ -3418,7 +3409,6 @@
       "providerNone": "なし",
       "providerNothingAnswering": "回答できるものはまだ設定されていません。",
       "modelsLabel": "モデル",
-      "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "{{name}} の場所を表示",
       "downloadsLabel": "モデルをダウンロード",
       "downloadsHelper": "Myne自身の配信元からモデルを取得します。使用前にアプリに組み込まれたフィンガープリントと照合されるため、改ざんされたダウンロードは拒否されます。クリックしない限り何も取得されません。",
-      "downloadEmbeddingSize": "多言語モデル、約449MB。",
       "downloadTagLabel": "タグモデル: タグの自動提案",
       "downloadTagSize": "小さなローカルモデル、約337MB。",
       "downloadInstalled": "インストール済み",
@@ -3954,10 +3943,6 @@
       "intro": "同期はノートを暗号化してサーバーに送信します。まず知っておきたいことが4つあります。",
       "whatThisIsLabel": "これは何か",
       "dataLossLabel": "秘密情報を両方とも失った場合",
-      "whatHappensNextLabel": "ベータ版が終了したら",
-      "whatWeCanSeeLabel": "私たちに見えるもの",
-      "readFull": "利用規約の全文を読む",
-      "review": "ベータ版利用規約を確認",
       "accept": "理解しました。同期をオンにする"
     },
     "materialising": "ノートをダウンロード中：{{total}}件中{{done}}件。作業を始められます。残りは届き次第表示されます。",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "すべてのデバイスで同じサーバーURLを入力してください。セルフホストのサーバーには信頼されたHTTPS証明書が必要です。",
       "tlsFailure": "サーバーのHTTPS証明書を検証できませんでした。サーバーアドレス、証明書、その有効性を確認してください。",
       "inviteLabel": "招待コード（このサーバーが求める場合のみ）",
-      "invitePlaceholder": "サーバーの運用者から渡されたコード",
-      "changeInviteCode": "招待コードを変更"
+      "invitePlaceholder": "サーバーの運用者から渡されたコード"
     },
     "enroll": {
       "accountNumberLabel": "アカウント番号",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "AIを設定",
-    "intro": "Myneはノートを意味で検索し、タグを提案し、ノートについて対話できます。どれも必須ではなく、後から設定でオンにできます。",
+    "intro": "Myneはタグを提案し、ノートについて対話できます。どれも必須ではなく、後から設定でオンにできます。",
     "enableLabel": "AI機能をオンにする",
-    "semantic": {
-      "title": "セマンティック検索",
-      "body": "多言語の埋め込みモデル（約449MB）をダウンロードすると、言葉だけでなく意味で検索できます。"
-    },
     "tag": {
       "title": "自動タグ付け",
       "body": "タグ用モデル（約337MB）をダウンロードすると、書いている間にMyneがタグを提案できます。"
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "同期サーバーを選択",
-      "chooseHeading": "ノートをどこに同期しますか？",
-      "chooseIntro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。Myne Syncサービスを使うか、このデバイスを自分で運用するサーバーに向けてください。どちらの場合も、ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
-      "myneSyncHint": "Myneが運営するサーバーです。HTTPS証明書は自動で確認されます。",
       "intro": "Myneは、暗号化されたノートを保持し、招待のためにあなたに届くサーバーを必要とします。ノートはこのデバイスを離れる前に暗号化され、サーバーが保存するのは暗号文だけです。",
       "notConfigured": "上のサーバーアドレスを入力し、接続を押して続けてください。",
       "back": "戻る",
-      "continue": "続ける",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "自分のサーバー",
-      "selfHostedHint": "自分で運用する同期サーバーです。次の画面でアドレスを入力します。",
-      "connectAction": "接続",
-      "setUpAction": "設定"
+      "continue": "続ける"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "同期サーバーを選択",
       "lead": "ノートはこのデバイスを離れる前に暗号化されます。サーバーが保存するのは暗号文だけです。",
       "urlLabel": "サーバーアドレス",
-      "useMyneSync": "Myne Syncを使用",
-      "selfHostedHint": "または、自分で運用するサーバーのアドレスを入力してください。",
       "connect": "接続",
       "connecting": "接続中…"
     },

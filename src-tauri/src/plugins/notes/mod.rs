@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `notes` plugin — host-side per-note CRUD + listing.
 //!
 //! Five Tauri commands: `note_create`, `note_read`, `note_update`,

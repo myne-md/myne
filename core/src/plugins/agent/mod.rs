@@ -103,6 +103,6 @@ pub use scope::{
     ScopeSource,
 };
 pub use tools::{
-    list_scope, read_note, render_scope_entry, search_scope, NoteReader, ScopeEntry, ScopeSearcher,
-    SearchHit,
+    list_scope, read_note, render_scope_entry, search_scope, NoScopeSearch, NoteReader, ScopeEntry,
+    ScopeSearcher, SearchHit,
 };

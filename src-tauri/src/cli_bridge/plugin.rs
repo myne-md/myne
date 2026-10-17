@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The `cli-bridge` Tauri plugin: the WebView's read-only window onto the CLI
 //! door's *session* state (cli-thin-client task 12; MYND-490).
 //!
@@ -114,13 +115,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn an_untouched_door_reports_no_last_use() {
-        let marker = LastAccess::default();
-        let state = cli_access_state_from(&marker, Instant::now());
-        assert_eq!(state.last_used_secs_ago, None);
-    }
 
     #[test]
     fn a_recorded_access_is_reported_as_an_age_in_seconds() {

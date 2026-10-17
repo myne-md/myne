@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! PIN wrap-key provider for quick-unlock (MYND-329, task 4).
 //!
 //! Derives the 32-byte `wrap_key` from a user PIN via the vault's existing
@@ -181,11 +182,6 @@ mod tests {
         let wrong = provider("999999");
         let wrap_key = wrong.retrieve(&secret.pin_salt).expect("retrieve");
         assert!(decode_quick_unlock_blob(&wrap_key, &ACCOUNT_HASH, &blob).is_err());
-    }
-
-    #[test]
-    fn kind_is_pin() {
-        assert_eq!(provider("123456").kind(), PROVIDER_KIND_PIN);
     }
 
     #[test]

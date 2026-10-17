@@ -88,11 +88,6 @@ interface ModelArtifact {
  * non-integer keys) and there is no second place to fall behind.
  */
 const MODEL_ARTIFACT_ROWS: Record<DownloadArtifactId, ModelArtifact> = {
-  "embedding-e5-small": {
-    role: "embedding",
-    labelKey: "settings.ai.modelEmbeddingLabel",
-    sizeKey: "settings.ai.downloadEmbeddingSize",
-  },
   tag: {
     role: "tag",
     labelKey: "settings.ai.downloadTagLabel",

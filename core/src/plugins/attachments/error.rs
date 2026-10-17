@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `attachments` plugin IPC error enums (MYND-169).
 //!
 //! Closed taxonomies for `attachment_import`, `catalog_list`, and
@@ -66,11 +67,12 @@ pub enum AttachmentImportError {
 
     /// Reserved IPC-contract variant. Since MYND-173 the import path
     /// accepts arbitrary bytes (a non-allowlisted type is stored as
-    /// `application/octet-stream`, not rejected), so the host no longer
-    /// constructs this. The TS error contract + its skip-reason mapping
-    /// still recognize `{"kind":"UnsupportedType"}` defensively, so the
-    /// variant is retained for wire-contract stability rather than removed.
-    #[allow(dead_code)]
+    /// `application/octet-stream`, not rejected), so the TYPE of a payload
+    /// never produces this. It IS still produced for a payload that cannot be
+    /// read at all: `ImportSource::BytesB64` whose `bytes_b64` will not decode.
+    /// The TS error contract + its skip-reason mapping already recognize
+    /// `{"kind":"UnsupportedType"}`, so the variant stays a closed contract
+    /// rather than a second tag for the same outcome.
     #[error("unsupported attachment type")]
     UnsupportedType,
 

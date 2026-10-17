@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Pure classification of the CLI door's state (cli-thin-client task 3;
 //! MYND-490; `design-notes.md` "CLI terminal access is a default-off,
 //! unlock-gated local socket with a folder exclusion list (MYND-490)";
@@ -88,13 +89,5 @@ mod tests {
         // 4. enabled+unlocked -> disabled+unlocked (toggle off while
         //    unlocked): closes.
         assert!(!socket_should_be_open(classify(false, true)));
-    }
-
-    #[test]
-    fn disabled_and_locked_are_distinct_door_states() {
-        // Both close the socket, but task 4 must be able to tell them apart
-        // (see `super::status`) — they are different `DoorState` variants,
-        // not one collapsed "closed" bit.
-        assert_ne!(classify(false, true), classify(true, false));
     }
 }

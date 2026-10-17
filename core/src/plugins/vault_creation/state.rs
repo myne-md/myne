@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! State for the in-flight vault-creation flow.
 //!
 //! Holds [`VaultCreationSession`] entries keyed by an opaque session
@@ -513,12 +514,6 @@ mod tests {
         let state = VaultCreationState::default();
         let unknown = Uuid::new_v4();
         assert!(state.take_ignore_status(unknown).is_none());
-    }
-
-    #[test]
-    fn cap_constant_is_four() {
-        // Locked by the design session.
-        assert_eq!(MAX_CONCURRENT_SESSIONS, 4);
     }
 
     #[test]

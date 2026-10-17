@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // iOS WKWebView chrome tweaks that CANNOT be expressed from web code.
 //
 // The soft keyboard's "form assistant" bar — the ‹ › ⌄ Done strip WKWebView

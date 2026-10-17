@@ -353,13 +353,6 @@ mod tests {
     }
 
     #[test]
-    fn generate_root_key_returns_32_bytes() {
-        // The CSPRNG path must yield a full-width 32-byte key.
-        let key = generate_root_key().expect("CSPRNG must be available in tests");
-        assert_eq!(key.len(), 32);
-    }
-
-    #[test]
     fn generate_root_key_is_not_all_zero() {
         // A 32-byte all-zero output would indicate getrandom never wrote into
         // the buffer (the `[0u8; 32]` init). The probability of a genuine

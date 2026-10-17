@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Real on-device [`Engine`] backed by Candle (local-ai epic, MYND-406 tasks
-//! 3/4). `infer` runs a **quantized Qwen2 GGUF** generation model; `embed` runs
-//! an **all-MiniLM-L6-v2 BERT** embedding model. Both are **side-loaded** from
+//! 3/4). `infer` runs a **quantized Qwen2 GGUF** generation model. It is
+//! **side-loaded** from
 //! the user's disk via `model_store` (SYNC-1) — never downloaded (SYNC-2; the
 //! `hf-hub`/`http` crate families are kept out of the tree by
 //! `default-features = false`, verified by the no-egress gate).
@@ -18,8 +19,6 @@
 //!
 //! Side-load layout (the user picks the primary file; siblings live next to it):
 //! - generation: `<model>.gguf` + `tokenizer.json` in the same directory.
-//! - embedding: `model.safetensors` + `config.json` + `tokenizer.json` in the
-//!   same directory.
 //!
 //! Bundled layout (under the Tauri `resource_dir`, `model_store`):
 //! - transcription: `models/whisper/model.gguf` + `config.json` + `tokenizer.json`.
@@ -29,7 +28,7 @@
 //!   generation role. Since myne-md/myne#805 the desktop bundle ships no tag
 //!   model by default.
 //!
-//! Secret-handling: a prompt / note text / embedding is never logged (DENY-list)
+//! Secret-handling: a prompt / note text is never logged (DENY-list)
 //! — only the closed [`EngineError`] kind escapes.
 
 // Under the E2E `local-inference-stub` variant the production `CandleEngine`
@@ -45,9 +44,7 @@ use std::time::Instant;
 
 use candle_core::quantized::gguf_file;
 use candle_core::{Device, Tensor};
-use candle_nn::VarBuilder;
 use candle_transformers::generation::{LogitsProcessor, Sampling};
-use candle_transformers::models::bert::{BertModel, Config as BertConfig, DTYPE};
 use candle_transformers::models::quantized_qwen2::ModelWeights as Qwen2;
 use candle_transformers::models::whisper::{
     quantized_model::{VarBuilder as WhisperVarBuilder, Whisper},
@@ -128,58 +125,6 @@ const TAG_LOAD_STAGES: GgufLoadStages = GgufLoadStages {
     tokenizer: "load_tag.tokenizer",
 };
 
-/// The vocabulary size shared by every `intfloat/multilingual-e5-*` checkpoint
-/// (the XLM-R sentencepiece vocabulary). Used to recognise the E5 family at load
-/// so the asymmetric `query: ` / `passage: ` prefixes are applied to it and only
-/// it. The English `all-MiniLM-L6-v2` uses a 30,522-word BERT vocabulary and is
-/// correctly excluded; a symmetric model must NOT get the prefixes, or its
-/// retrieval quality degrades the same way the E5 family's does without them.
-const E5_MULTILINGUAL_VOCAB_SIZE: usize = 250_037;
-
-/// Which side of an asymmetric retrieval model a text is embedded for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EmbedMode {
-    /// No prefix, whatever the model family (`Engine::embed`).
-    Plain,
-    /// A live retrieval query (`Engine::embed_query`).
-    Query,
-    /// One indexed document chunk (`Engine::embed_passage`).
-    Passage,
-}
-
-/// The prefix an E5-family model needs for `mode`, or `None` for a symmetric
-/// model. Pure and unit-tested, so the query/passage asymmetry is provable
-/// without loading a 471 MB model.
-fn retrieval_prefix(is_e5: bool, mode: EmbedMode) -> Option<&'static str> {
-    if !is_e5 {
-        return None;
-    }
-    match mode {
-        EmbedMode::Query => Some("query: "),
-        EmbedMode::Passage => Some("passage: "),
-        EmbedMode::Plain => None,
-    }
-}
-
-/// A loaded embedding model + its tokenizer.
-struct LoadedEmbed {
-    model: BertModel,
-    tokenizer: Tokenizer,
-    /// Whether this is a multilingual E5-family model, from the vocabulary size
-    /// at load time. E5 needs the `query: ` / `passage: ` prefixes; a symmetric
-    /// model does not.
-    is_e5: bool,
-    /// The device the model + its inference tensors live on (Metal GPU or CPU).
-    device: Device,
-    /// The model's positional-embedding limit (`config.max_position_embeddings`,
-    /// 512 for MiniLM). A chunk that tokenizes longer than this is truncated
-    /// before the forward pass — feeding a BERT more positions than it has
-    /// embeddings for is an out-of-bounds index (panic / wrong output), and note
-    /// content is attacker-influenceable (a synced note could be a giant CJK /
-    /// base64 blob), so this bound is load-bearing, not just a nicety.
-    max_tokens: usize,
-}
-
 /// A loaded transcription (Whisper) model + its tokenizer, config, computed mel
 /// filterbank, and resolved control tokens. Mirrors [`LoadedGen`] — lazy-loaded
 /// once behind the `transcription` mutex; the `&mut` decode borrows the model.
@@ -256,18 +201,17 @@ pub struct CandleEngine {
     bundled_tag: Option<PathBuf>,
     /// Compute device chosen once at construction (Metal GPU on macOS, else CPU).
     device: Device,
-    /// Serializes ALL GPU/compute work across `infer` + `embed`. The `gen` and
-    /// `embed` models sit behind SEPARATE locks (for independent lazy-load), so
-    /// without this a summarize (`infer`) and the background embed-walk (`embed`)
+    /// Serializes ALL GPU/compute work across `infer` and the other roles. The
+    /// roles sit behind SEPARATE locks (for independent lazy-load), so
+    /// without this a summarize (`infer`) and a transcription would
     /// run on the Metal device from two threads at once — candle's `MetalDevice`
     /// is not safe for concurrent command-buffer submission, and the AGX driver
     /// crashes (`AGXG14XFamilyCommandBuffer …`). Held for the duration of each
-    /// call, so operations interleave at call boundaries (each embed is ~ms) but
+    /// call, so operations interleave at call boundaries but
     /// never overlap on the GPU. Cheap on CPU (just serializes; no correctness
     /// need there).
     compute: Mutex<()>,
     gen: Mutex<Option<LoadedGen>>,
-    embed: Mutex<Option<LoadedEmbed>>,
     transcription: Mutex<Option<LoadedTranscription>>,
     /// The lazily-loaded tag model (auto-tag, MYND-651). Its own lock, like every
     /// other role, so a first tag pass never serializes behind a generation load
@@ -279,7 +223,7 @@ pub struct CandleEngine {
 
 impl CandleEngine {
     /// Construct with the `model_store` base dir (`app_data_dir`). Nothing loads
-    /// until the first `infer`/`embed`; the compute device is picked now. No
+    /// until the first `infer`; the compute device is picked now. No
     /// bundled transcription model by default (tests + the model-less baseline);
     /// production wires one via [`with_bundled_transcription`].
     pub fn new(base: PathBuf) -> Self {
@@ -290,7 +234,6 @@ impl CandleEngine {
             device: select_device(),
             compute: Mutex::new(()),
             gen: Mutex::new(None),
-            embed: Mutex::new(None),
             transcription: Mutex::new(None),
             tag: Mutex::new(None),
         }
@@ -448,85 +391,6 @@ impl CandleEngine {
             tokenizer,
             eos,
             device: self.device.clone(),
-        })
-    }
-
-    fn load_embed(&self) -> Result<LoadedEmbed, EngineError> {
-        let started = Instant::now();
-        // **The VERIFIED reader** (myne-md/myne#545 follow-up). This used to take
-        // the recorded path on trust, so a marker pointing at a deleted file
-        // reached `File::open` and failed as a generic not-ready. The whole
-        // embed-on-unlock walk then exited silently on that, which is how a
-        // vault sat on "Preparing…" indefinitely with nothing running.
-        // `selected_model_verified`'s own note calls the loaders "knowingly left
-        // on the unverified reader"; this is the embedding half of that debt.
-        let model_path = match selected_model_verified(&self.base, ModelRole::Embedding) {
-            Ok(Some(p)) => p,
-            Ok(None) => {
-                // Recorded-and-gone is a different fault from never-chosen, and
-                // a different sentence: one says choose again, the other says
-                // choose.
-                let recorded = selected_model(&self.base, ModelRole::Embedding)
-                    .ok()
-                    .flatten()
-                    .is_some();
-                tracing::warn!(
-                    target: "myne::ai",
-                    stage = "load_embed",
-                    recorded,
-                    "no loadable embedding (search) model — pick a .safetensors in Settings → AI"
-                );
-                return Err(if recorded {
-                    EngineError::LocalModelMissing
-                } else {
-                    EngineError::NotReady
-                });
-            }
-            Err(e) => {
-                tracing::error!(
-                    target: "myne::ai",
-                    stage = "load_embed.resolve",
-                    error_kind = e.kind(),
-                    "could not resolve the embedding model path"
-                );
-                return Err(EngineError::NotReady);
-            }
-        };
-        tracing::info!(
-            target: "myne::ai",
-            stage = "load_embed",
-            "loading embedding model (first use)…"
-        );
-        let config_path = Self::sibling(&model_path, "config.json");
-        let tok_path = Self::sibling(&model_path, "tokenizer.json");
-        let config_json = std::fs::read_to_string(&config_path)
-            .map_err(|e| io_stage_fail("load_embed.read_config", &e, EngineError::NotReady))?;
-        let config: BertConfig = serde_json::from_str(&config_json).map_err(|e| {
-            fmt_stage_fail("load_embed.parse_config", e, EngineError::EmbeddingFailed)
-        })?;
-        let tokenizer = Tokenizer::from_file(&tok_path)
-            .map_err(|e| fmt_stage_fail("load_embed.tokenizer", e, EngineError::EmbeddingFailed))?;
-        // SAFETY: mmap of a user-side-loaded safetensors file; candle's own API.
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[model_path], DTYPE, &self.device).map_err(
-                |e| fmt_stage_fail("load_embed.safetensors", e, EngineError::EmbeddingFailed),
-            )?
-        };
-        let model = BertModel::load(vb, &config).map_err(|e| {
-            fmt_stage_fail("load_embed.build_model", e, EngineError::EmbeddingFailed)
-        })?;
-        tracing::info!(
-            target: "myne::ai",
-            stage = "load_embed",
-            elapsed_ms = started.elapsed().as_millis() as u64,
-            "embedding model loaded"
-        );
-        Ok(LoadedEmbed {
-            model,
-            tokenizer,
-            is_e5: config.vocab_size == E5_MULTILINGUAL_VOCAB_SIZE,
-            device: self.device.clone(),
-            max_tokens: config.max_position_embeddings.max(1),
         })
     }
 
@@ -916,58 +780,6 @@ fn tag_prompt_head(prompt: &str) -> String {
     prompt.chars().take(TAG_PROMPT_MAX_CHARS).collect()
 }
 
-/// Mean-pool + L2-normalize a BERT last-hidden-state into a sentence embedding.
-fn run_embed(loaded: &LoadedEmbed, text: &str) -> Result<Vec<f32>, EngineError> {
-    let device = loaded.device.clone();
-    let encoding = loaded
-        .tokenizer
-        .encode(text, true)
-        .map_err(|e| fmt_stage_fail("embed.encode", e, EngineError::EmbeddingFailed))?;
-    // Truncate to the model's positional-embedding limit BEFORE the forward
-    // pass: a longer sequence indexes past the position table (panic / garbage),
-    // and note text is attacker-influenceable. Mean-pooling over the first
-    // `max_tokens` is a standard, safe degradation for an over-long chunk.
-    let all_ids = encoding.get_ids();
-    let ids = &all_ids[..all_ids.len().min(loaded.max_tokens)];
-    let input_ids = Tensor::new(ids, &device)
-        .map_err(|_| EngineError::EmbeddingFailed)?
-        .unsqueeze(0)
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    let token_type_ids = input_ids
-        .zeros_like()
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    let embeddings = loaded
-        .model
-        .forward(&input_ids, &token_type_ids, None)
-        .map_err(|e| fmt_stage_fail("embed.forward", e, EngineError::EmbeddingFailed))?;
-    // [1, seq, hidden] → mean over seq → [1, hidden] → [hidden].
-    let (_b, n_tokens, _h) = embeddings
-        .dims3()
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    let pooled = (embeddings
-        .sum(1)
-        .map_err(|_| EngineError::EmbeddingFailed)?
-        / (n_tokens as f64))
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    let pooled = pooled
-        .squeeze(0)
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    // L2 normalize.
-    let norm = pooled
-        .sqr()
-        .map_err(|_| EngineError::EmbeddingFailed)?
-        .sum_all()
-        .map_err(|_| EngineError::EmbeddingFailed)?
-        .sqrt()
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    let normalized = pooled
-        .broadcast_div(&norm)
-        .map_err(|_| EngineError::EmbeddingFailed)?;
-    normalized
-        .to_vec1()
-        .map_err(|_| EngineError::EmbeddingFailed)
-}
-
 /// Decode a loaded Whisper model over `pcm` (16 kHz mono), delegating the mel
 /// front end + segment loop to [`super::whisper::transcribe_pcm`]. `on_segment`
 /// streams each 30 s window's text and its `Break` stops early. Shared by the
@@ -991,50 +803,6 @@ fn run_transcribe(
     )
 }
 
-impl CandleEngine {
-    /// Shared embedding body. Loads the embedding model lazily, prepends the
-    /// asymmetric E5 prefix when the loaded model is E5-family and `mode` asks
-    /// for one, then runs the forward pass. The three [`Engine`] embedding
-    /// methods are thin wrappers over this.
-    fn embed_inner(&self, text: &str, mode: EmbedMode) -> Result<Vec<f32>, EngineError> {
-        // Serialize all GPU work (see `compute`): a concurrent infer on the same
-        // Metal device crashes the AGX driver. Held for the whole call.
-        let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
-        let mut guard = self.embed.lock().unwrap_or_else(|p| p.into_inner());
-        if guard.is_none() {
-            *guard = Some(self.load_embed()?);
-        }
-        let loaded = guard.as_ref().expect("just loaded");
-        // Bound the prefixed string to this scope; `input` borrows it.
-        let prefixed;
-        let input = match retrieval_prefix(loaded.is_e5, mode) {
-            Some(prefix) => {
-                prefixed = format!("{prefix}{text}");
-                prefixed.as_str()
-            }
-            None => text,
-        };
-        let started = Instant::now();
-        let out = run_embed(loaded, input);
-        match &out {
-            Ok(v) => tracing::debug!(
-                target: "myne::ai",
-                op = "embed",
-                elapsed_ms = started.elapsed().as_millis() as u64,
-                dims = v.len(),
-                "embedding complete"
-            ),
-            Err(e) => tracing::error!(
-                target: "myne::ai",
-                op = "embed",
-                error_kind = e.kind(),
-                "embedding failed"
-            ),
-        }
-        out
-    }
-}
-
 impl Engine for CandleEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         self.infer_bounded(prompt, MAX_NEW_TOKENS)
@@ -1045,7 +813,7 @@ impl Engine for CandleEngine {
         // own budget rather than honouring it. Zero would generate nothing at
         // all, which would read as "the model had no answer".
         let capped = max_new_tokens.clamp(1, MAX_NEW_TOKENS);
-        // Serialize all GPU work (see `compute`): a concurrent embed on the same
+        // Serialize all GPU work (see `compute`): a concurrent GPU call on the same
         // Metal device crashes the AGX driver. Held for the whole call.
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         let mut guard = self.gen.lock().unwrap_or_else(|p| p.into_inner());
@@ -1079,10 +847,10 @@ impl Engine for CandleEngine {
         prompt: &str,
         on_token: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
-        // Serialize all GPU work (see `compute`): a concurrent embed on the same
+        // Serialize all GPU work (see `compute`): a concurrent GPU call on the same
         // Metal device crashes the AGX driver. Held for the WHOLE streamed
-        // generation — a stream holds it longer than a blocking infer, so the
-        // background embed-walk waits at call boundaries (accepted; the single
+        // generation — a stream holds it longer than a blocking infer, so a
+        // concurrent call waits at call boundaries (accepted; the single
         // compute lock is the crash-safety invariant, not a perf knob).
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         let mut guard = self.gen.lock().unwrap_or_else(|p| p.into_inner());
@@ -1223,7 +991,7 @@ impl Engine for CandleEngine {
 
     fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
         // Blocking, no streaming — a no-op segment sink; the transcript is the
-        // return value. Serializes GPU work like infer/embed (Metal safety).
+        // return value. Serializes GPU work like every other role (Metal safety).
         self.transcribe_streaming(pcm, &mut |_seg| ControlFlow::Continue(()))
     }
 
@@ -1232,7 +1000,7 @@ impl Engine for CandleEngine {
         pcm: &[f32],
         on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
     ) -> Result<String, EngineError> {
-        // Serialize all GPU work (see `compute`): a concurrent infer/embed on the
+        // Serialize all GPU work (see `compute`): a concurrent GPU call on the
         // same Metal device crashes the AGX driver. Held for the whole decode.
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         let mut guard = self.transcription.lock().unwrap_or_else(|p| p.into_inner());
@@ -1262,34 +1030,17 @@ impl Engine for CandleEngine {
 
     fn invalidate_models(&self) {
         // Drop every cached model under the compute lock so an in-flight
-        // infer/embed/transcribe finishes first and the next call reloads the
-        // freshly selected weights (model-swap-without-restart correctness,
-        // §9.17.2; the transcript MYE1 cache keys on the model hash, SYNC-V3).
+        // infer/transcribe finishes first and the next call reloads the
+        // freshly selected weights (model-swap-without-restart correctness;
+        // the transcript MYE1 cache keys on the model hash, SYNC-V3).
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         *self.gen.lock().unwrap_or_else(|p| p.into_inner()) = None;
-        *self.embed.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.transcription.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.tag.lock().unwrap_or_else(|p| p.into_inner()) = None;
         // The tag model joined the list above with myne-md/myne#805: now that
         // `tag.path` is selectable, a download, remove or re-pick changes which
         // bytes `load_tag` would reload, so the cached tag must drop like the
         // others or a stale model answers the next tag pass.
-    }
-
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.embed_inner(text, EmbedMode::Plain)
-    }
-
-    /// A live retrieval query. On an E5-family model this prepends `query: `;
-    /// on a symmetric model it is byte-for-byte [`Engine::embed`].
-    fn embed_query(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.embed_inner(text, EmbedMode::Query)
-    }
-
-    /// One indexed document chunk. On an E5-family model this prepends
-    /// `passage: `; on a symmetric model it is byte-for-byte [`Engine::embed`].
-    fn embed_passage(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.embed_inner(text, EmbedMode::Passage)
     }
 }
 
@@ -1337,11 +1088,10 @@ mod tests {
     use crate::test_support::ScopedTempDir;
     use std::path::Path;
 
-    // Model-loading + real inference/embedding are verified only with a model
+    // Model-loading + real inference are verified only with a model
     // present (side-loaded) — those are `#[ignore]`d, driven by env vars so any
     // dev who has side-loaded a model can smoke-test the real engine:
     //   MYNE_TEST_GEN_MODEL=<qwen2.gguf>       (sibling tokenizer.json)
-    //   MYNE_TEST_EMBED_MODEL=<minilm.safetensors> (sibling config.json + tokenizer.json)
     //   cargo test -p myne-desktop --features local-inference --lib \
     //     engine_candle -- --ignored --nocapture
     // What IS verifiable model-free: the no-model path returns `NotReady` (never
@@ -1392,44 +1142,6 @@ mod tests {
             selected_model(tmp.path(), ModelRole::Generation).unwrap(),
             Some(gen_model)
         );
-    }
-
-    #[test]
-    fn embed_without_a_model_is_not_ready() {
-        let tmp = ScopedTempDir::new("candle-engine-noembed").expect("tempdir");
-        let engine = CandleEngine::new(tmp.path().to_path_buf());
-        assert_eq!(engine.embed("hello"), Err(EngineError::NotReady));
-    }
-
-    /// The E5 asymmetric prefixes, proved at the decision seam rather than
-    /// needing a 471 MB model. Query and passage MUST differ for E5, and a
-    /// symmetric model MUST get neither (applying one would degrade MiniLM the
-    /// same way its absence degrades E5).
-    #[test]
-    fn e5_needs_distinct_query_and_passage_prefixes_and_a_symmetric_model_neither() {
-        assert_eq!(retrieval_prefix(true, EmbedMode::Query), Some("query: "));
-        assert_eq!(
-            retrieval_prefix(true, EmbedMode::Passage),
-            Some("passage: ")
-        );
-        assert_ne!(
-            retrieval_prefix(true, EmbedMode::Query),
-            retrieval_prefix(true, EmbedMode::Passage),
-            "the two sides of an asymmetric model must not collapse to one prefix"
-        );
-        assert_eq!(
-            retrieval_prefix(true, EmbedMode::Plain),
-            None,
-            "an identity/readiness probe is not a query or a passage"
-        );
-        // The control: a symmetric model gets nothing, in every mode.
-        for mode in [EmbedMode::Query, EmbedMode::Passage, EmbedMode::Plain] {
-            assert_eq!(
-                retrieval_prefix(false, mode),
-                None,
-                "{mode:?}: a symmetric model must never be prefixed"
-            );
-        }
     }
 
     #[test]
@@ -1918,45 +1630,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs a side-loaded MiniLM safetensors — set MYNE_TEST_EMBED_MODEL=<path>.safetensors (siblings config.json + tokenizer.json)"]
-    fn embed_with_a_real_model_returns_a_384_vector() {
-        let Some(model) = required_test_env("MYNE_TEST_EMBED_MODEL", "skip: set MYNE_TEST_EMBED_MODEL to a MiniLM safetensors (with siblings config.json + tokenizer.json)") else {
-            return;
-        };
-        let tmp = ScopedTempDir::new("candle-real-embed").expect("tempdir");
-        set_selected_model(tmp.path(), ModelRole::Embedding, Path::new(&model))
-            .expect("record embedding model");
-        let engine = CandleEngine::new(tmp.path().to_path_buf());
-
-        let anchor = engine
-            .embed("The mitochondria is the powerhouse of the cell.")
-            .expect("embed should succeed with a real model");
-        assert_eq!(anchor.len(), 384, "MiniLM-L6 produces 384-dim embeddings");
-        // L2-normalized → unit length.
-        let norm: f32 = anchor.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!(
-            (norm - 1.0).abs() < 1e-3,
-            "expected L2-normalized (norm≈1), got {norm}"
-        );
-
-        // Cosine sanity: related text is closer than unrelated.
-        let cos = |a: &[f32], b: &[f32]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f32>();
-        let close = engine
-            .embed("Cells generate energy inside mitochondria.")
-            .expect("embed");
-        let far = engine
-            .embed("The stock market fell sharply this afternoon.")
-            .expect("embed");
-        let sim_close = cos(&anchor, &close);
-        let sim_far = cos(&anchor, &far);
-        eprintln!("\n=== REAL EMBED cosine: related={sim_close:.3}  unrelated={sim_far:.3} ===\n");
-        assert!(
-            sim_close > sim_far,
-            "related text ({sim_close:.3}) should be more similar than unrelated ({sim_far:.3})"
-        );
-    }
-
-    #[test]
     #[ignore = "needs a side-loaded Whisper GGUF — set MYNE_TEST_TRANSCRIPTION_MODEL=<path>.gguf (siblings config.json + tokenizer.json) and MYNE_TEST_TRANSCRIPTION_AUDIO=<path>.wav (optional MYNE_TEST_TRANSCRIPTION_EXPECT=<substring>)"]
     fn transcribe_with_a_real_model_streams_a_transcript() {
         use crate::plugins::local_inference::audio::wav_to_mono_16k;
@@ -2062,124 +1735,5 @@ mod tests {
             "tag reply should be short, got {} chars",
             out.chars().count()
         );
-    }
-
-    // Retrieval-quality eval (conversational-ai-chat tuning): index a real folder
-    // of `.md` notes through the SAME chunker + MiniLM embed + top-k the app uses,
-    // then print the top hits + cosine scores for a set of queries — so the
-    // relevance threshold / k are set from data, not guesswork.
-    //   MYNE_TEST_EMBED_MODEL=/…/minilm/model.safetensors \
-    //   MYNE_TEST_NOTES_DIR=/…/My\ Vault \
-    //   cargo test -p myne-desktop --features local-inference --lib \
-    //     retrieval_score_eval -- --ignored --nocapture
-    #[test]
-    #[ignore = "retrieval eval — set MYNE_TEST_EMBED_MODEL + MYNE_TEST_NOTES_DIR"]
-    fn retrieval_score_eval_over_real_notes() {
-        use crate::plugins::local_inference::chunker::{
-            chunk_note, is_substantive_chunk, ChunkParams,
-        };
-        use crate::plugins::local_inference::retrieval::top_k_matches;
-        use crate::plugins::local_inference::vector_store::{AiVectorStore, ChunkKey};
-        use myne_core::plugins::notes::note_id::NoteId;
-        use std::collections::HashMap;
-
-        let Some(model) = required_test_env(
-            "MYNE_TEST_EMBED_MODEL",
-            "skip: set MYNE_TEST_EMBED_MODEL to a MiniLM safetensors",
-        ) else {
-            return;
-        };
-        let Some(notes_dir) = required_test_env(
-            "MYNE_TEST_NOTES_DIR",
-            "skip: set MYNE_TEST_NOTES_DIR to a folder of .md notes",
-        ) else {
-            return;
-        };
-        let tmp = ScopedTempDir::new("retrieval-eval").expect("tempdir");
-        set_selected_model(tmp.path(), ModelRole::Embedding, Path::new(&model))
-            .expect("record embedding model");
-        let engine = CandleEngine::new(tmp.path().to_path_buf());
-
-        fn collect(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
-            let Ok(rd) = std::fs::read_dir(dir) else {
-                return;
-            };
-            for e in rd.flatten() {
-                let p = e.path();
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if name.starts_with('.') {
-                    continue; // skip .trash / .obsidian / hidden
-                }
-                if p.is_dir() {
-                    collect(&p, out);
-                } else if p.extension().and_then(|x| x.to_str()) == Some("md") {
-                    out.push(p);
-                }
-            }
-        }
-        let mut files = Vec::new();
-        collect(Path::new(&notes_dir), &mut files);
-        files.sort();
-
-        let mut store = AiVectorStore::new();
-        let mut bodies: HashMap<NoteId, String> = HashMap::new();
-        let mut names: HashMap<NoteId, String> = HashMap::new();
-        let mut n_chunks = 0usize;
-        for (i, path) in files.iter().enumerate() {
-            let Ok(text) = std::fs::read_to_string(path) else {
-                continue;
-            };
-            if text.trim().is_empty() {
-                continue;
-            }
-            let note_id =
-                NoteId::parse(&format!("01970e83-4f2f-7000-8000-{i:012}")).expect("note id");
-            let short = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("?")
-                .to_string();
-            for c in chunk_note(note_id, &text, ChunkParams::default()) {
-                let slice = c.slice(&text);
-                // Same structural-chunk filter as the real embed path.
-                if !is_substantive_chunk(slice) {
-                    continue;
-                }
-                let v = engine.embed_passage(slice).expect("embed chunk");
-                store.insert_vector(ChunkKey::from_chunk(&c), v);
-                n_chunks += 1;
-            }
-            bodies.insert(note_id, text);
-            names.insert(note_id, short);
-        }
-        eprintln!(
-            "\n=== indexed {} notes, {} chunks ===",
-            names.len(),
-            n_chunks
-        );
-
-        for q in [
-            "what is my skincare routine",
-            "hello how are you",
-            "Barbekü sos yedim mi?",
-            "when is my France trip",
-            "how to delete a git branch",
-            "which products am I tracking the price of",
-        ] {
-            let qv = engine.embed_query(q).expect("embed query");
-            let hits = top_k_matches(&qv, &store, 10, |_| false);
-            eprintln!("\n########## QUERY: {q}");
-            for (r, h) in hits.iter().enumerate() {
-                let name = names.get(&h.key.note_id).map(|s| s.as_str()).unwrap_or("?");
-                let snip: String = bodies
-                    .get(&h.key.note_id)
-                    .map(|b| b[h.key.start..h.key.end].replace('\n', " "))
-                    .unwrap_or_default()
-                    .chars()
-                    .take(68)
-                    .collect();
-                eprintln!("  #{:<2} {:.3}  {name:<26}| {snip}", r + 1, h.score);
-            }
-        }
     }
 }

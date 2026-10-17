@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The rotating file writer behind the diagnostic log (myne-md/myne#860).
 //!
 //! # Why this is hand-rolled rather than `tracing-appender`
@@ -69,16 +70,14 @@ pub const RETAINED_FILES: usize = 3;
 /// is parsing without guessing from the field set.
 pub const LOG_FORMAT: u32 = 1;
 
-/// The build's update channel, read the same way `plugins::update` reads it.
+/// The build's update channel, from the one place that resolves it.
 ///
-/// Compile-time on purpose, and the same match `update::channel_endpoint` makes:
-/// the channel the log names and the manifest the client fetches cannot then
-/// disagree, which a runtime value plus a compile-time endpoint allowed.
+/// This used to be a private copy of the same `match` `plugins::update` kept,
+/// which is the shape where a channel added to one of them and not the other
+/// disagrees silently: the log names a channel the client is not fetching.
+/// `crate::update::Channel::from_env` is the single reader now.
 fn channel() -> &'static str {
-    match option_env!("MYNE_UPDATE_CHANNEL") {
-        Some("beta") => "beta",
-        _ => "stable",
-    }
+    crate::update::Channel::from_env().as_str()
 }
 
 /// The header record, as it is written at the top of every log file.

@@ -10,7 +10,6 @@ import { releaseAttachmentUrls } from "../platform/attachments";
 import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAwareness } from "../notes/collab/awarenessStore";
-import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
 import { resetScrollMemory } from "../notes/scrollMemory";
@@ -104,25 +103,18 @@ export async function lockVault(): Promise<void> {
   // session comes through here. `design-notes/ai/0276` rests its
   // no-new-blob-family argument on the transcript not outliving the session.
   teardownStep("clearChat", () => clearChat());
-  teardownStep("clearChatPersistForLock", () => clearChatPersistForLock());
   // The persist module's write state, on the same leg: the last serialized
   // payload, one stashed failed append, and the lagging flag are the same
   // plaintext the transcript is, and module state survives the wipe above
   // (myne-md/myne#675 review: a stash that survived the lock kept vault A's
   // turns resident into vault B's session, and replayed them there).
-  // The rendered AI output, on the same leg and for the same reason. It holds a
-  // note's summary and, through `src/lib/ai-qa.ts`, every Q and A answer over
-  // note content, and its own header calls that an AS1-class RAM artifact
-  // dropped on lock. It was left behind when the transcript moved here: the two
-  // sit one line apart in the Editor's unmount effect, and only one of them was
-  // given a leaving-path call.
   //
-  // Both arrived on this path in myne-md/myne#533 while this branch was open,
-  // and both are wrapped for the reason `teardownStep` exists: a throwing reset
-  // before the lock IPC used to skip the IPC entirely, which is the one failure
-  // here that leaves KEYS resident. The wrapper keeps the call text intact so
+  // It arrived on this path in myne-md/myne#533 while that branch was open, and
+  // is wrapped for the reason `teardownStep` exists: a throwing reset before the
+  // lock IPC used to skip the IPC entirely, which is the one failure here that
+  // leaves KEYS resident. The wrapper keeps the call text intact so
   // `scripts/check-frontend-lock-teardown.mjs`'s scan still sees each name.
-  teardownStep("clearAiOutput", () => clearAiOutput());
+  teardownStep("clearChatPersistForLock", () => clearChatPersistForLock());
   // The task list is the one nonce consumer that answers from MODULE state
   // rather than refetching in its own mount effect, so unlike every other
   // reader surface it does not self-heal on remount (myne#277). The backend

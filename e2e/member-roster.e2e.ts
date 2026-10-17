@@ -298,7 +298,7 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     }
   });
 
-  it("a vault-less device with a saved server can still choose a self-hosted server", async () => {
+  it("a vault-less device with a saved server can still reach the server step", async () => {
     // Vault-count precondition: 0. A saved endpoint is not a vault or an identity.
     await scenario(
       "mr4-first-run-server-recovery",
@@ -307,14 +307,13 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await (await app.session.byTestId("welcome.identity-cta")).click();
         await app.session.byTestId("identity-setup.create-cta");
         await (await app.session.byTestId("identity-setup.change-server")).click();
-        await app.session.byTestId("first-run-server.myne-sync");
-        await (await app.session.byTestId("first-run-server.self-hosted")).click();
         await app.session.byTestId("sync.endpoint-config");
         await app.session.byTestId("sync.pin-source");
+        // One door, no hosted one, and nothing pre-fills the address.
+        expect(await app.session.byTestIdAll("first-run-server.myne-sync")).toHaveLength(0);
         expect(await app.session.byTestIdAll("sync.endpoint-reverify")).toHaveLength(0);
         const continueButton = await app.session.byTestId("first-run-server.continue");
         expect(await continueButton.attribute("disabled")).not.toBeNull();
-        await (await app.session.byTestId("first-run-server.back")).click();
         await (await app.session.byTestId("first-run-server.back")).click();
         await app.session.byTestId("identity-setup.create-cta");
       },

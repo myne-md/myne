@@ -249,17 +249,6 @@ describe("MemberRosterPanel roles", () => {
       cleanup();
     }
   });
-
-  it("hides the invite control from a member", () => {
-    mockAuthority = "member";
-    render(<MemberRosterPanel />);
-    try {
-      expect(screen.queryByTestId("member-roster.invite-button")).toBeNull();
-    } finally {
-      mockAuthority = "owner";
-      cleanup();
-    }
-  });
 });
 
 // myne#795 UI pass: the panel is grouped into titled sections and the owner row

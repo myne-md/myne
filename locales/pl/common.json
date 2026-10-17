@@ -1332,8 +1332,6 @@
           "empty": "Podsumowania, odpowiedzi i sugestie pojawiają się tutaj, gdy o nie poprosisz.",
           "error": "Nie udało się zrealizować żądania AI.",
           "errorTurn": "Asystent nie mógł odpowiedzieć.",
-          "gettingReadyHint": "Przygotowywanie notatek dla AI. Chwileczkę.",
-          "noSearchModelHint": "Pytanie przeszukuje Twoje notatki na tym urządzeniu, a to wymaga tutaj modelu wyszukiwania. Dostawca tego nie zrobi. Wybierz model w Ustawienia → Deweloper → AI. Edytowanie notatek przez AI nadal działa.",
           "insert": "Wstaw do notatki",
           "noAnswer": "Brak odpowiedzi. Spróbuj przeformułować.",
           "newChat": "Nowa rozmowa",
@@ -1342,8 +1340,6 @@
           "unavailableHint": "Tę kompilację Myne zbudowano bez lokalnego AI, więc nic tutaj nie zadziała. Żadne ustawienie tego nie zmieni — potrzebna jest kompilacja z dołączonym AI.",
           "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Deweloper → AI.",
           "send": "Wyślij",
-          "statusGettingReady": "Przygotowywanie…",
-          "statusNoSearchModel": "Brak modelu wyszukiwania",
           "statusNoModel": "Brak dostawcy",
           "statusUnreachable": "Nie odpowiada",
           "statusUnavailable": "Niedostępne",
@@ -3131,9 +3127,6 @@
       "legalLabel": "Informacje prawne",
       "legalHelper": "Otwiera się na myne.md w Twojej przeglądarce. Po niemiecku, gdy interfejs jest po niemiecku.",
       "legalPrivacy": "Polityka prywatności",
-      "legalTerms": "Warunki bety",
-      "legalNotice": "Zgłoś nielegalne treści",
-      "legalLawEnforcement": "Wnioski organów ścigania",
       "licenseBody": "Pre-alfa · dokumentacja CC-BY-4.0 · kod aplikacji AGPL-3.0 w wydaniu Fazy 1.",
       "licenseLabel": "Licencja",
       "tagline": "Pre-alfa · klient desktopowy Fazy 1",
@@ -3621,10 +3614,8 @@
         "emptyGrant": "Wszystko, co to uruchomienie mogło czytać, jest w folderach, których AI nigdy nie widzi. Nic nie zostało wysłane. Zmień w Ustawieniach, AI, Wykluczone foldery."
       },
       "modelChoose": "Wybierz plik…",
-      "modelEmbeddingLabel": "Model wyszukiwania: wyszukiwanie semantyczne i pytania/odpowiedzi",
       "modelFilter": {
-        "gguf": "Model GGUF",
-        "safetensors": "Model Safetensors"
+        "gguf": "Model GGUF"
       },
       "modelGenerationLabel": "Model tekstowy: czat, podsumowania, pisanie",
       "modelNone": "Nie wybrano pliku",
@@ -3658,7 +3649,6 @@
       "providerNone": "Brak",
       "providerNothingAnswering": "Nic nie jest jeszcze skonfigurowane do odpowiadania.",
       "modelsLabel": "Modele",
-      "recommendedFilesEmbedding": "Wymaga plików model.safetensors + config.json + tokenizer.json w jednym folderze.",
       "recommendedFilesGeneration": "Wymaga pliku .gguf + tokenizer.json w tym samym folderze.",
       "recommendedFilesTranscription": "Wymaga pliku Whisper .gguf + config.json + tokenizer.json w tym samym folderze.",
       "title": "AI",
@@ -3687,7 +3677,6 @@
       "modelShowLocation": "Pokaż lokalizację {{name}}",
       "downloadsLabel": "Pobieranie modeli",
       "downloadsHelper": "Pobierz model z własnego źródła Myne. Przed użyciem jest sprawdzany względem odcisku wbudowanego w aplikację, więc zmodyfikowane pobranie zostaje odrzucone. Nic nie jest pobierane, dopóki nie klikniesz.",
-      "downloadEmbeddingSize": "Model wielojęzyczny, około 449 MB.",
       "downloadTagLabel": "Model tagów: automatyczne propozycje tagów",
       "downloadTagSize": "Mały model lokalny, około 337 MB.",
       "downloadInstalled": "Zainstalowany",
@@ -4208,10 +4197,6 @@
       "intro": "Synchronizacja wysyła Twoje notatki w postaci zaszyfrowanej na serwer. Warto najpierw poznać cztery rzeczy.",
       "whatThisIsLabel": "Czym to jest",
       "dataLossLabel": "Jeśli utracisz oba sekrety",
-      "whatHappensNextLabel": "Gdy beta się skończy",
-      "whatWeCanSeeLabel": "Co widzimy my",
-      "readFull": "Przeczytaj pełne warunki",
-      "review": "Przejrzyj warunki bety",
       "accept": "Rozumiem, włącz synchronizację"
     },
     "materialising": "Pobieranie Twoich notatek: {{done}} z {{total}}. Możesz już zacząć pracę; reszta pojawi się, gdy dotrze.",
@@ -4335,8 +4320,7 @@
       "tlsHelp": "Wprowadź ten sam adres serwera na każdym urządzeniu. Serwer hostowany samodzielnie wymaga zaufanego certyfikatu HTTPS.",
       "tlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera, certyfikat i jego ważność.",
       "inviteLabel": "Kod zaproszenia (tylko jeśli ten serwer go wymaga)",
-      "invitePlaceholder": "Kod, który przekazał Ci operator serwera",
-      "changeInviteCode": "Zmień kod zaproszenia"
+      "invitePlaceholder": "Kod, który przekazał Ci operator serwera"
     },
     "enroll": {
       "accountNumberLabel": "Numer konta",
@@ -5532,12 +5516,8 @@
   },
   "aiOnboarding": {
     "title": "Skonfiguruj AI",
-    "intro": "Myne może wyszukiwać Twoje notatki po znaczeniu, proponować tagi i rozmawiać o nich. Nic z tego nie jest wymagane, a możesz to włączyć później w Ustawieniach.",
+    "intro": "Myne może proponować tagi i rozmawiać o nich. Nic z tego nie jest wymagane, a możesz to włączyć później w Ustawieniach.",
     "enableLabel": "Włącz funkcje AI",
-    "semantic": {
-      "title": "Wyszukiwanie semantyczne",
-      "body": "Pobierz wielojęzyczny model osadzeń (około 449 MB), aby wyszukiwać po znaczeniu, a nie tylko po słowach."
-    },
     "tag": {
       "title": "Automatyczne tagowanie",
       "body": "Pobierz model tagów (około 337 MB), aby Myne proponowało tagi podczas pisania."
@@ -5604,18 +5584,10 @@
   "firstRun": {
     "server": {
       "heading": "Wybierz serwer synchronizacji",
-      "chooseHeading": "Gdzie mają synchronizować się Twoje notatki?",
-      "chooseIntro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Użyj usługi Myne Sync albo wskaż temu urządzeniu serwer, który sam prowadzisz. Tak czy inaczej Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
-      "myneSyncHint": "Serwer prowadzony przez Myne. Jego certyfikat HTTPS jest sprawdzany automatycznie.",
       "intro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
       "notConfigured": "Wprowadź powyżej adres serwera i naciśnij Połącz, aby kontynuować.",
       "back": "Wstecz",
-      "continue": "Kontynuuj",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Twój własny serwer",
-      "selfHostedHint": "Serwer synchronizacji, który sam prowadzisz. Jego adres podasz na następnym ekranie.",
-      "connectAction": "Połącz",
-      "setUpAction": "Skonfiguruj"
+      "continue": "Kontynuuj"
     }
   },
   "identityFlow": {
@@ -5630,8 +5602,6 @@
       "title": "Wybierz serwer synchronizacji",
       "lead": "Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą. Serwer przechowuje wyłącznie szyfrogram.",
       "urlLabel": "Adres serwera",
-      "useMyneSync": "Użyj Myne Sync",
-      "selfHostedHint": "Albo wprowadź adres serwera, który sam prowadzisz.",
       "connect": "Połącz",
       "connecting": "Łączenie…"
     },

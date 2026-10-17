@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Cross-plugin test fixtures.
 //!
 //! The vault-creation, vault-unlock, and vault-recover plugins each
@@ -309,9 +310,9 @@ impl crate::vault_io::VaultIo for ContainerVaultIo {
 /// SAME teardown vector, and the whole value of the assertion is that the paths
 /// are compared against one another: `lock_from_host` (the manual + auto lock)
 /// and the change-password force-relock each drop `Slot::Unlocked` to `Empty`,
-/// and `spec/protocol.md` §9.8.5 (`vault.indices`) and §9.17.5
-/// (`vault.embeddings`) both say the decrypted material is zeroized at **every**
-/// such site. A recorder private to one test module cannot express that.
+/// and `spec/protocol.md` §9.8.5 (`vault.indices`) says the decrypted material is
+/// zeroized at **every** such site. A recorder private to one test module cannot
+/// express that.
 ///
 /// It also records hooks a given path deliberately does NOT call —
 /// `persist_search_index` and `apply_screen_capture` among them — so a
@@ -335,19 +336,29 @@ pub struct RecordingHooks {
     /// STATE (the index is empty) rather than only the recorded call — the
     /// stronger of the two available assertions, per the repo's own rule.
     indices: Option<std::sync::Arc<crate::plugins::vault_indices::state::VaultIndicesState>>,
-    /// When set, `index_note_attachments` LOCKS this vault (drops its slot) after
-    /// recording, standing in for a lock that lands while a live flush awaits the
-    /// attachment hook. That await is the widest window in the flush's indexing,
-    /// so a test of the post-await re-check needs a fixture that can actually be
-    /// inside it (myne-md/myne#867 review).
-    lock_on_attachments: Option<crate::vault_id::VaultId>,
+    /// Whether the live `.myn` was still on disk each time
+    /// `purge_note_snapshots` ran — the ordering probe. See that method body.
+    purge_saw_live_note: std::sync::Mutex<Vec<bool>>,
+    /// What `purge_note_snapshots` does after recording.
+    purge_behaviour: PurgeBehaviour,
+}
+
+/// What [`RecordingHooks::purge_note_snapshots`] does after it records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PurgeBehaviour {
+    /// Record and return `Ok(0)` — no snapshots to remove.
+    Record,
+    /// Record, then PANIC. Inside the delete path's `spawn_blocking` closure that
+    /// surfaces as a join failure, which is how a test proves the live note is
+    /// left in place rather than orphaned beside erased snapshots.
+    Panic,
 }
 
 /// One live-index side effect a core path fired, recorded so a unit test can
 /// assert a DURABILITY path reaches the index.
 ///
-/// **Why this exists.** This recorder used to no-op `search_upsert`,
-/// `index_note_attachments` and `ai_note_changed`, so no unit test could assert
+/// **Why this exists.** This recorder used to no-op `search_upsert` and
+/// `index_note_attachments`, so no unit test could assert
 /// that a save path fires them and a fix like myne-md/myne#867 (a live-owned
 /// note's flush never reached the search index) rested on an E2E scenario alone,
 /// which is a weak gate for a durability path. Recording the CALL is exactly the
@@ -366,10 +377,6 @@ pub enum IndexCall {
         title: String,
         body: String,
     },
-    AiNoteChanged {
-        note_id: String,
-        body: String,
-    },
     SearchRemove {
         note_id: String,
     },
@@ -381,19 +388,33 @@ impl RecordingHooks {
             calls: std::sync::Mutex::new(Vec::new()),
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: None,
-            lock_on_attachments: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
         })
     }
 
-    /// A recorder whose `index_note_attachments` locks `vault` once it has
-    /// recorded the call. See the `lock_on_attachments` field.
-    pub fn locking_on_attachments(vault: crate::vault_id::VaultId) -> std::sync::Arc<Self> {
+    /// A recorder whose `purge_note_snapshots` panics, injecting a join failure
+    /// inside the delete path's purge closure.
+    pub fn panicking_purge() -> std::sync::Arc<Self> {
         std::sync::Arc::new(Self {
             calls: std::sync::Mutex::new(Vec::new()),
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: None,
-            lock_on_attachments: Some(vault),
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Panic,
         })
+    }
+
+    /// Whether the live `.myn` was still on disk at each purge, in call order.
+    ///
+    /// A delete path that purges first records `true`; one that unlinks first
+    /// records `false`. The end state is identical in both, which is why this
+    /// probe and not a state assertion is what pins the order.
+    pub fn purge_saw_live_note(&self) -> Vec<bool> {
+        self.purge_saw_live_note
+            .lock()
+            .expect("recording hooks mutex")
+            .clone()
     }
 
     /// A recorder that also does what a client's `zeroize_vault_indices` body
@@ -406,7 +427,8 @@ impl RecordingHooks {
             calls: std::sync::Mutex::new(Vec::new()),
             index_calls: std::sync::Mutex::new(Vec::new()),
             indices: Some(indices),
-            lock_on_attachments: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
         })
     }
 
@@ -467,12 +489,6 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
         self.record("persist_search_index");
         Box::pin(std::future::ready(()))
     }
-    fn hydrate_ai_vectors<'a>(
-        &'a self,
-        _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
-    ) -> crate::hooks::BoxFuture<'a> {
-        Box::pin(std::future::ready(()))
-    }
     fn index_note_attachments<'a>(
         &'a self,
         state: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
@@ -485,12 +501,8 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
             title: note_title.to_string(),
             body: note_body.to_string(),
         });
-        let lock = self.lock_on_attachments;
-        Box::pin(async move {
-            if let Some(vault) = lock {
-                drop(state.take(vault).await);
-            }
-        })
+        let _ = state;
+        Box::pin(std::future::ready(()))
     }
     fn zeroize_search_index(&self) {
         self.record("zeroize_search_index");
@@ -543,14 +555,6 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
             note_id: id.to_string(),
         });
     }
-    fn ai_note_changed(&self, id: &str, body: &str) {
-        self.record_index(IndexCall::AiNoteChanged {
-            note_id: id.to_string(),
-            body: body.to_string(),
-        });
-    }
-    fn ai_note_deleted(&self, _: &str) {}
-    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
     fn emit_notes_deleted(&self, _: &str) {
@@ -572,7 +576,30 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
         false
     }
-    fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
-        Ok(0)
+    fn purge_note_snapshots(&self, vault_root: &Path, note_uuid: &str) -> std::io::Result<usize> {
+        // Recorded in its OWN vector rather than in `calls`: that one is compared
+        // by WHOLE-VECTOR equality in the slot-teardown tests, so a new entry
+        // there would perturb assertions this probe has nothing to do with. Same
+        // split, and same reason, as `index_calls` above.
+        //
+        // What is recorded is the ORDERING property and nothing else: whether the
+        // live `.myn` was still on disk at the moment the purge ran. A delete that
+        // unlinks first and purges second is one crash away from leaving
+        // decryptable snapshots behind, and no assertion on the end state can see
+        // which order ran (both end with everything gone when nothing fails).
+        let live = vault_root
+            .join("notes")
+            .join(format!("{note_uuid}.myn"))
+            .exists();
+        self.purge_saw_live_note
+            .lock()
+            .expect("recording hooks mutex")
+            .push(live);
+        match self.purge_behaviour {
+            PurgeBehaviour::Record => Ok(0),
+            // A panic inside the `spawn_blocking` closure surfaces as a join
+            // failure — the state the delete path must abort on.
+            PurgeBehaviour::Panic => panic!("injected purge failure"),
+        }
     }
 }

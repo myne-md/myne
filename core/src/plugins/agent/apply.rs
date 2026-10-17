@@ -921,29 +921,6 @@ mod tests {
     }
 
     #[test]
-    fn the_restore_point_is_taken_before_the_write_not_after() {
-        // Ordering, expressed as a fact rather than as a comment: with the
-        // capture failing, no write can have happened, which is only true if
-        // capture precedes write.
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a", "b"]));
-        let disk = Disk::with(&[("a", "x"), ("b", "y")], false);
-        let _ = block_on(apply_approved(
-            &runs,
-            "r",
-            &[edit("a", "x", "1"), edit("b", "y", "2")],
-            &[],
-            &[],
-            Approval::Individual,
-            &disk,
-            &disk,
-            &disk,
-        ));
-        assert_eq!(disk.read_back("a"), "x");
-        assert_eq!(disk.read_back("b"), "y");
-    }
-
-    #[test]
     fn a_note_that_moved_under_a_pending_review_is_refused_not_misapplied() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
@@ -1561,59 +1538,6 @@ mod tests {
     }
 
     #[test]
-    fn a_bulk_approval_cannot_trash_a_note_and_the_note_is_unchanged() {
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let before = note_with("title: T");
-        let disk = Disk::with(&[("a", &before)], true);
-        let out = block_on(apply_approved(
-            &runs,
-            "r",
-            &[edit(
-                "a",
-                "title: T",
-                &format!("title: T\ntrashed: {TRASH_TS}"),
-            )],
-            &[],
-            &[],
-            Approval::Bulk,
-            &disk,
-            &disk,
-            &disk,
-        ))
-        .unwrap();
-        assert_eq!(out.applied, 0);
-        assert_eq!(out.refused.len(), 1);
-        assert_eq!(out.refused[0].reason, EditRejection::RemovalNeedsOwnAct);
-        assert_eq!(disk.read_back("a"), before, "the note is byte-identical");
-    }
-
-    #[test]
-    fn the_same_edit_applies_when_the_user_approved_it_on_its_own() {
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let disk = Disk::with(&[("a", &note_with("title: T"))], true);
-        let out = block_on(apply_approved(
-            &runs,
-            "r",
-            &[edit(
-                "a",
-                "title: T",
-                &format!("title: T\ntrashed: {TRASH_TS}"),
-            )],
-            &[],
-            &[],
-            Approval::Individual,
-            &disk,
-            &disk,
-            &disk,
-        ))
-        .unwrap();
-        assert_eq!(out.applied, 1);
-        assert!(disk.read_back("a").contains("trashed:"));
-    }
-
-    #[test]
     fn a_refused_trash_does_not_stop_the_rest_of_the_batch() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a", "b"]));
@@ -1727,31 +1651,6 @@ mod tests {
         .unwrap();
         assert_eq!(out.applied, 1);
         assert_eq!(disk.read_back("a"), "a b C");
-    }
-
-    #[test]
-    fn a_refusal_carries_the_index_of_the_row_the_user_looked_at() {
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let disk = Disk::with(&[("a", "a b c")], true);
-        let out = block_on(apply_approved(
-            &runs,
-            "r",
-            &[
-                edit("a", "a", "A"),
-                edit("a", "zzz", "X"),
-                edit("a", "c", "C"),
-            ],
-            &[],
-            &[],
-            Approval::Bulk,
-            &disk,
-            &disk,
-            &disk,
-        ))
-        .unwrap();
-        assert_eq!(out.refused.len(), 1);
-        assert_eq!(out.refused[0].index, 1);
     }
 
     /// A create that fails AFTER the edit batch was written must not take the

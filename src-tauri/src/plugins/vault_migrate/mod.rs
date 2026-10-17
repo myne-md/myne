@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-migration Tauri plugin (automerge-sync-migration #420).
 //!
 //! Owns the `vault-migrate:` IPC commands — `vault_migrate` (the whole-vault

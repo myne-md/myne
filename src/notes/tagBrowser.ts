@@ -6,8 +6,8 @@
 // `directCount` / `subtreeCount` / `display`, computed Rust-side (N2). The UI
 // renders `display` and NEVER the folded `key` (SYNC-2).
 
-import { byTag, type TagTreeNode } from "./vaultIndices";
-import { liveIdSet, type ResolverNote } from "./resolveWikilink";
+import type { TagTreeNode } from "./vaultIndices";
+import type { ResolverNote } from "./resolveWikilink";
 
 /** Indentation step (px) applied per tag-tree depth level. */
 export const TAG_INDENT_PX = 14;
@@ -61,17 +61,4 @@ export function tagNoteRows(
     out.push({ noteId: id, title: titleById.get(id) ?? null });
   }
   return out;
-}
-
-/**
- * A tag's notes (subtree-inclusive, trash-excluded), as display rows. Consumes
- * the single `byTag` surface (SYNC-10) with the SYNC-3 live-id set, then resolves
- * titles. Async (one IPC).
- */
-export async function notesForTag(
-  tag: string,
-  notes: ReadonlyArray<ResolverNote>,
-): Promise<TaggedNote[]> {
-  const ids = await byTag(tag, liveIdSet(notes));
-  return tagNoteRows(ids, notes);
 }

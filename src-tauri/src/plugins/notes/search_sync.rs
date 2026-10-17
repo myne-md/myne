@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Search-index IO lifecycle: the impure shell that drives the pure
 //! persistence core (`crate::search::persist`) on the unlock / lock / quit
 //! paths (`search-index` feature, MYND-29 Task 7).

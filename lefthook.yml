@@ -19,18 +19,25 @@ pre-commit:
       run: cargo fmt --all -- --check
 
     spdx-header:
-      # Every protocol/ source file MUST carry the AGPL-3.0 SPDX header on line 1
-      # (root AGENTS.md "License" + protocol/AGENTS.md). This is the machine-readable
-      # anchor of the file-level licensing claim; drift here is a normative violation.
-      # Fix: add `// SPDX-License-Identifier: AGPL-3.0` as the first line.
-      run: |
-        fail=0
-        for f in {staged_files}; do
-          case "$f" in protocol/*.rs) ;; *) continue ;; esac
-          [ -f "$f" ] || continue
-          head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0' || { echo "missing SPDX header: $f"; fail=1; }
-        done
-        exit $fail
+      # Every tracked Rust source file MUST carry the AGPL-3.0 SPDX header on
+      # line 1 (root AGENTS.md "License" + LICENSING.md). This is the
+      # machine-readable anchor of the file-level licensing claim; drift here is
+      # a normative violation. The rule itself lives in
+      # `scripts/check-spdx-headers.mjs`: this hook calls it with the staged
+      # paths, and `scripts/hooks-parity-check.sh` calls it with none, so the
+      # pre-commit gate and its `--no-verify` backstop cannot drift apart.
+      run: node scripts/check-spdx-headers.mjs {staged_files}
+
+    private-path-refs:
+      # A path into a private companion (`operations/`, `agent-tooling/`,
+      # `internal-service/`) written into a tree this repository publishes is a
+      # reference a reader cannot follow, and they cannot tell "internal" from
+      # "moved". The recorded set may shrink and never grow: `--record` refuses a
+      # grown set, so the command its failure message suggests cannot make a
+      # finding disappear. Its own header states the classes and the reason each
+      # carries; ~250 dated decision entries are permanent by the append-only
+      # rule, and the rest is debt that can only fall.
+      run: node scripts/check-private-path-refs.mjs
 
     tsc:
       glob: "*.{ts,tsx}"
@@ -179,6 +186,19 @@ pre-commit:
       # nothing called it. A RATCHET with reason-carrying exemptions.
       run: node scripts/check-ipc-binding-callers.mjs
 
+    export-callers:
+      # The layer above `ipc-binding-callers`, and the third time the same
+      # question has to be asked. `unwired` asks whether a MODULE has a
+      # production importer; `ipc-binding-callers` whether a BINDING has a
+      # caller. A single dead `export function` inside an otherwise live module
+      # is below both, and the audit that produced this guard deleted seventeen
+      # of them from files that pass the other two. Nothing else can see it: the
+      # declaration compiles, this tree has no eslint (and an unused EXPORT is
+      # not lintable in principle, since the file cannot know who imports it),
+      # and no test can fail on something nothing calls. A per-file RATCHET whose
+      # `--record` may only shrink.
+      run: node scripts/check-export-callers.mjs
+
     tracing-discipline:
       # myne-md/myne#860: the diagnostic log's content claim, machine-checked.
       # `src-tauri/AGENTS.md`'s DENY list says about itself that it is
@@ -259,6 +279,21 @@ pre-commit:
       # nothing here to break.
       glob: "{mobile/**,scripts/check-ios-extensions.mjs}"
       run: node scripts/check-ios-extensions.mjs
+
+    fdroid-metadata:
+      # The F-Droid store metadata against the Android build it describes.
+      # Three hand-written artefacts have to agree by arithmetic and nothing else
+      # compares them: `mobile/src-tauri/tauri.conf.json`'s version, the four
+      # build blocks in `mobile/fdroid/md.myne.mobile.yml`, and the four
+      # `changelogs/<versionCode>.txt` names. Bump the version and nothing breaks
+      # that any compiler or test can see — the store page just goes blank, and
+      # four blocks sharing one versionCode drops three architectures because a
+      # client installs only the highest code it can run.
+      #
+      # `fastlane/**` is in the glob and is not under `mobile/`, which is the
+      # whole reason this cannot ride on an existing mobile guard.
+      glob: "{fastlane/**,mobile/fdroid/**,mobile/src-tauri/tauri.conf.json,mobile/package.json,scripts/check-fdroid-metadata.mjs}"
+      run: node scripts/check-fdroid-metadata.mjs
 
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
@@ -384,6 +419,22 @@ pre-commit:
       glob: "{dialect/src/embedLayout.ts,core/src/export_naming.rs,scripts/check-embed-layout-drift.mjs}"
       run: node scripts/check-embed-layout-drift.mjs
 
+    update-channel:
+      # The update channel is chosen by MYNE_UPDATE_CHANNEL and used to be named
+      # in four places that could disagree, one of which did nothing at all:
+      # `plugins.updater.endpoints` is REPLACED, not merged, by the updater the
+      # plugin builds, so a value there was silently ignored while a reader
+      # believed the reverse. The other half is that each channel's manifest
+      # file name is written in Rust AND in the emitter that produces the
+      # document, so moving one stops the channel updating with every gate
+      # green. `check-update-channel.mjs` holds the config, the Rust table, the
+      # Vite define and the About label together. It is offline and static; the
+      # PUBLISHED half (both manifests reachable, beta never behind stable) is
+      # `scripts/check-published-manifests.mjs`, which needs the network and
+      # runs by hand from the release runbook.
+      glob: "{src-tauri/tauri.conf.json,src-tauri/src/update/mod.rs,vite.config.ts,vitest.config.ts,src/components/settings/AboutPanel.tsx,scripts/emit-update-manifest.mjs,scripts/check-update-channel.mjs}"
+      run: node scripts/check-update-channel.mjs
+
     token-adoption:
       glob: "{src,editor/src}/**/*.{ts,tsx,css}"
       # myne#394: a hardcoded visual value in an inline style is unreachable to
@@ -393,6 +444,16 @@ pre-commit:
       # what would otherwise happen (no compiler or lint reports a new literal).
       # A RATCHET: a file's recorded count may fall, never rise.
       run: node scripts/check-token-adoption.mjs
+
+    hex-helpers:
+      glob: "**/*.rs,scripts/check-hex-helpers.mjs,scripts/hex-helpers.json"
+      # Audit T6.10(c): the lowercase-hex encoder and its predicate were
+      # re-derived by hand across a dozen blob families and client modules, and
+      # the copies had drifted on the empty string and on whether uppercase is
+      # accepted. `protocol/src/hex.rs` is the one contract; this is the
+      # shrink-only ratchet over what still re-derives it. A new local
+      # `fn hex_lower` / `fn is_lower_hex` fails by name.
+      run: node scripts/check-hex-helpers.mjs
 
     target-size:
       # myne#775: WCAG 2.2 AA SC 2.5.8, the 24px pointer floor. axe has this
@@ -712,6 +773,41 @@ pre-commit:
       glob: "*.{mjs,json,yml}"
       run: node scripts/check-server-env-roster.mjs
 
+    selfhost-bundle-drift:
+      # The self-host bundle is three files that must agree: the runnable compose in
+      # `operations/bundle/`, the annotated `.env` example beside it, and the user guide's copy
+      # of the compose (`myne-website`). Nothing compared them.
+      #
+      # WRITTEN BECAUSE THE DRIFT WAS LIVE, and the severity is why it is a failure and not a
+      # warning: `bundle.env.example` documented 14 `kind: server` knobs that
+      # `bundle/docker-compose.yml` never forwarded into the container. Compose reads `.env` to
+      # interpolate `${...}` in the compose file; it does NOT inject the file into the
+      # container's environment. An operator who set `MYNE_INVITE_CODE` there, restarted, and
+      # believed new-account registration was closed had done nothing at all, and neither file
+      # said so. The compose now forwards every documented knob, and this rule holds it there.
+      #
+      # The trigger caveat from `server-env-roster` above applies unchanged: the inputs live in
+      # two OTHER git repositories, so this fires on an unrelated edit here and nothing fires
+      # when a companion breaks it. It is a local periodic check, not a gate on the change.
+      glob: "*.{md,mjs,yml,yaml,json}"
+      run: node scripts/check-selfhost-bundle-drift.mjs
+
+    referenced-digests:
+      # Every `ghcr.io` pin this project hands a self-hoster must RESOLVE, and the server image
+      # must resolve to a manifest list carrying amd64 AND arm64. A transposed hex digit is
+      # invisible in review and fails at an operator's `docker compose up`; a single-platform
+      # tag fails only on arm64 hardware, where nothing on the amd64 path notices. Both were
+      # found in the shipped tree while writing this: `:0.8.0` is one amd64 manifest, and two
+      # files claimed a `v0.9.0` tag that does not exist.
+      #
+      # THE ONE GUARD HERE THAT NEEDS THE NETWORK, which is exactly why it is pre-commit and
+      # NOT CI: a network dependency in a pipeline gate makes a red pipeline mean "GitHub was
+      # slow". The release-time gate is `operations/scripts/check-image-multiarch.sh`, wired into
+      # the release checklist and run by the publish script. Offline, this prints COULD NOT
+      # REACH and says its closing line is not a verdict rather than reporting a pass.
+      glob: "*.{md,mjs,yml,yaml,json,example,toml}"
+      run: node scripts/check-referenced-digests.mjs
+
     npm-license-mirror:
       # myne#527: the npm allowlist in check-npm-licenses.mjs claims, in a
       # comment, to mirror deny.toml's [licenses].allow — and it had already
@@ -899,7 +995,7 @@ pre-commit:
       # do this properly with a maintained ruleset; that is a dependency
       # decision (see docs/dependency-policy.md), not a hook edit.
       run: |
-        vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}'
+        vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}|plane_api_[A-Za-z0-9_-]{20,}'
         fail=0
         for f in {staged_files}; do
           [ -f "$f" ] || continue
@@ -1185,6 +1281,21 @@ pre-push:
 # file path as {1}.
 commit-msg:
   commands:
+    require-signoff:
+      # DCO (CONTRIBUTING.md): every commit carries a `Signed-off-by:` trailer, which
+      # is what makes the certification in the pull-request template a statement the
+      # contributor actually made. Merge commits are exempt: git writes their message
+      # and there is no authorship decision in it.
+      run: |
+        if head -1 "{1}" | grep -q '^Merge '; then exit 0; fi
+        if sed -e '/^#.*>8/,$d' "{1}" | git stripspace --strip-comments | grep -qE '^Signed-off-by: .+ <.+@.+>'; then
+          exit 0
+        fi
+        echo "commit message has no 'Signed-off-by:' trailer. This project uses the DCO (CONTRIBUTING.md)."
+        echo "  Fix the last commit:   git commit --amend -s"
+        echo "  Fix the whole branch:  git rebase --signoff origin/develop"
+        exit 1
+
     no-ai-coauthor:
       run: |
         # The message file still holds git's `#` comment block at hook time,

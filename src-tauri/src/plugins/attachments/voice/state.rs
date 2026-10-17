@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Active-recording session state for the voice-record commands (MYND-259).
 //!
 //! Only `Send` handles live in the Tauri-managed state — the cpal `Stream`

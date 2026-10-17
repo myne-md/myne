@@ -24,7 +24,7 @@ import {
 import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
 import type { ParseResult, WikilinkRef } from "../dialect/types";
 import { collectFrontmatterTags } from "./frontmatterTags";
-import { bumpIndexNonce } from "./indexNonce";
+import { bumpIndexNonce, getIndexNonce } from "./indexNonce";
 import { noteRead } from "./readNote";
 import {
   applyNoteAttachmentRefs,
@@ -536,10 +536,42 @@ export type TagTreeNode = {
   subtreeCount: number;
 };
 
+/**
+ * Memo for [`tagTree`], keyed on the index-changed nonce (SYNC-5).
+ *
+ * Five surfaces read the full tag tree (the palette, the filter builder, the
+ * graph view, the tag browser and the editor host), and `useTagSuggestions`
+ * fires one more read per `#`. Each was an independent IPC round-trip returning
+ * the same bytes, because the tree only changes when the index does. Keying the
+ * cache on `getIndexNonce()` collapses them to one round-trip per mutation,
+ * and a bump (every index mutation goes through the single chokepoint) makes
+ * the next read re-fetch, so a tag accepted mid-session still appears.
+ */
+let tagTreeCache: { nonce: number; promise: Promise<TagTreeNode[]> } | null = null;
+
 /** The full tag tree (nodes with direct + subtree counts + deterministic
- *  display), derived Rust-side from the stored exact folded tags (N2). */
+ *  display), derived Rust-side from the stored exact folded tags (N2).
+ *  Memoized on the index-changed nonce (see `tagTreeCache`). */
 export async function tagTree(): Promise<TagTreeNode[]> {
-  return await invoke<TagTreeNode[]>("plugin:vault-indices|vault_indices_tag_tree");
+  const nonce = getIndexNonce();
+  if (tagTreeCache !== null && tagTreeCache.nonce === nonce) {
+    return tagTreeCache.promise;
+  }
+  const promise = invoke<TagTreeNode[]>("plugin:vault-indices|vault_indices_tag_tree");
+  tagTreeCache = { nonce, promise };
+  // A rejected promise must not be cached for the rest of the nonce: a
+  // transient slot/IO failure would otherwise be re-thrown on every reader
+  // until the next index mutation. Clearing lets the next caller retry.
+  promise.catch(() => {
+    if (tagTreeCache !== null && tagTreeCache.promise === promise) tagTreeCache = null;
+  });
+  return promise;
+}
+
+/** Test-only: drop the memo so a spec starts from a clean cache. A nonce reset
+ *  alone would leave a same-nonce entry behind (both start at 0). */
+export function __resetTagTreeForTest(): void {
+  tagTreeCache = null;
 }
 
 /**

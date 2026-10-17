@@ -649,6 +649,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
         message={t("unlock.vaultUnreadable")}
         fromPicker={fromPicker}
         onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
+        onRestore={props.onRestoreBackup}
       />
     );
   }
@@ -988,19 +989,23 @@ export function UnlockFlow(props: UnlockFlowProps) {
 }
 
 /** Fail-closed surface shared by the corrupted + IO-error initial states. No
- *  password form: the only legitimate exits are restore-from-backup
- *  (out-of-band, via Close app) or — when reached from the picker — choosing a
+ *  password form: the legitimate exits are a restore route (corrupted only —
+ *  see `onRestore` below) and, when reached from the picker, choosing a
  *  different vault. */
 function FailClosed({
   heading,
   message,
   fromPicker,
   onBackToPicker,
+  onRestore,
 }: {
   heading: string;
   message: string;
   fromPicker?: boolean;
   onBackToPicker?: () => void;
+  /** When present, render the restore route. Only the corrupted case passes it:
+   *  an IO error is a transient read failure, not a damaged vault. */
+  onRestore?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -1016,10 +1021,15 @@ function FailClosed({
           <Banner kind="danger">{message}</Banner>
         </div>
         <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)", textAlign: "center", maxWidth: 280 }}>
-          {t("unlock.restoreHint")}
+          {onRestore ? t("unlock.restoreHint") : t("unlock.ioErrorHint")}
         </p>
       </div>
       <div style={{ paddingBottom: 46, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+        {onRestore && (
+          <Button variant="secondary" data-testid="unlock-restore-backup" onClick={onRestore}>
+            {t("unlock.restoreCta")}
+          </Button>
+        )}
         <Button onClick={() => void closeApp()}>{t("failClosed.corrupted.cta")}</Button>
       </div>
     </Screen>

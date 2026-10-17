@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_indices` plugin IPC error enum (MYND-31 / A11, Task 1).
 //!
 //! Closed taxonomy, DENY-list clean per `src-tauri/AGENTS.md`

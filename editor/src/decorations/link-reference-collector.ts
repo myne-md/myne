@@ -15,6 +15,7 @@
 
 import { syntaxTree } from "@codemirror/language";
 import { type EditorState, StateField } from "@codemirror/state";
+import { foldLabel } from "./reference-label";
 
 /** A `[ref]: url` definition resolved from a `LinkReference` node. */
 export interface LinkReferenceEntry {
@@ -27,19 +28,18 @@ export interface LinkReferenceEntry {
 export type LinkReferenceMap = ReadonlyMap<string, LinkReferenceEntry>;
 
 /**
- * Normalize a reference label per CommonMark "matches" rules: strip the
- * surrounding `[` `]` if present, trim, collapse internal whitespace runs to a
- * single space, and case-fold. `toLowerCase()` is a pragmatic stand-in for full
- * Unicode case folding — adequate for v0.1 ASCII-dominant labels; documented in
- * markdown-dialect.md §3.2.
+ * `foldLabel` lives in `./reference-label`, a leaf module with no imports, and
+ * is re-exported here so this module's existing importers are unchanged.
+ *
+ * It moved because this file value-imports `@codemirror/language` and
+ * `@codemirror/state` at module scope for the collector below, and
+ * `@codemirror/language` depends on `@codemirror/view` — so any caller that
+ * wanted only the label fold pulled the whole CodeMirror view stack with it.
+ * The desktop dialect emission code did exactly that from the first-load graph.
+ * Entry-graph callers import `./reference-label` DIRECTLY; going through this
+ * re-export is still the expensive path.
  */
-export function foldLabel(raw: string): string {
-  let s = raw;
-  if (s.length >= 2 && s.startsWith("[") && s.endsWith("]")) {
-    s = s.slice(1, -1);
-  }
-  return s.trim().replace(/\s+/g, " ").toLowerCase();
-}
+export { foldLabel } from "./reference-label";
 
 /**
  * Walk the whole document for `LinkReference` definition nodes and build a

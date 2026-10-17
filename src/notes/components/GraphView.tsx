@@ -138,7 +138,7 @@ export function GraphPane() {
   // Whether the "make these editable" write failed. Local and transient: it is
   // an outcome to report, not state worth keeping (myne-md/myne#727).
   const [materializeFailed, setMaterializeFailed] = useState(false);
-  // E2E test-observability (SYNC-8; modeled on AiHydrationProbe). Reflected onto
+  // E2E test-observability (SYNC-8). Reflected onto
   // `data-*` on the graph pane — bounded totals + a boolean + an opaque monotonic
   // nonce, all post-unlock and DENY-list clean (never a note id or x/y coord):
   //   layoutHydrated — the disk-hydrate path ran this mount (Tier 3 restore);

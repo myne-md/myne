@@ -84,7 +84,6 @@ const REPORT = {
   backendId: "x",
   backendClass: "in_process_local",
   generation: { available: true, cause: null },
-  embedding: { available: true, cause: null },
   transcription: { available: true, cause: null },
   autoTag: { available: true, cause: null },
 };
@@ -126,7 +125,6 @@ describe("the expansion gate's egress line", () => {
       backendId: null,
       backendClass: null,
       generation: { available: false, cause: null },
-      embedding: { available: false, cause: null },
       transcription: { available: false, cause: null },
       autoTag: { available: false, cause: null },
     });

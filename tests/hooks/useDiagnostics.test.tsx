@@ -108,6 +108,32 @@ describe("useDiagnostics — a failed flag read", () => {
   });
 });
 
+describe("useDiagnostics — a non-boolean flag answer", () => {
+  // The catalogue's fake IPC answers `""` for a command it does not know, and
+  // `invoke<T>` is an unchecked cast, so `""` reached a state whose type says
+  // `boolean`. It rendered as `aria-checked=""`, which is not a valid state
+  // token: axe reported the switch as missing a required attribute and a screen
+  // reader announced no state. Coerced at the boundary now, like the manifest's
+  // `?? null` one field over.
+  it("folds a non-boolean answer to false rather than storing it", async () => {
+    h.diagnosticLogEnabledGet.mockResolvedValueOnce("");
+    const { result } = await mount();
+    expect(result.current.enabled).toBe(false);
+  });
+
+  it("folds an undefined answer to false as well", async () => {
+    h.diagnosticLogEnabledGet.mockResolvedValueOnce(undefined);
+    const { result } = await mount();
+    expect(result.current.enabled).toBe(false);
+  });
+
+  it("still reports a real true", async () => {
+    h.diagnosticLogEnabledGet.mockResolvedValueOnce(true);
+    const { result } = await mount();
+    expect(result.current.enabled).toBe(true);
+  });
+});
+
 describe("useDiagnostics — a failed crash-record read", () => {
   it("is recorded rather than folded into no record", async () => {
     h.crashRecordState.mockRejectedValueOnce(new Error("refused"));

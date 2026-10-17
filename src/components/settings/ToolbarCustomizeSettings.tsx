@@ -3,20 +3,47 @@
 // Self-contained like its sibling controls (LineNumbersSettings): local state
 // loaded on mount, disk-first persist via the vault.prefs setters. The resolved
 // order/hidden is what the editor's toolbar plugin renders (the plugin wiring is
-// a follow-up; this owns the config surface + persistence). The slash-menu twin
-// list is a follow-up (same shape, its own vocabulary).
+// a follow-up; this owns the config surface + persistence).
+//
+// **The row itself is `CustomizeRow`** (myne-md/myne#773). This list was the third
+// to answer "reorder and show/hide a strip of commands" and the only one that had
+// hand-rolled the drag bookkeeping: a private `dragId`/`dropAt` pair, its own
+// `onDragOver`/`onDrop`, and a `.myne-drop-row` indicator — while the ribbon and
+// the bottom bar already shared `useDragReorder` + `CustomizeRow`. None of those
+// three differences was a design decision; the two shared components came second
+// and this file was never revisited. What arrives with the adoption, and what was
+// genuinely missing here: Alt+↑/↓ keyboard reorder, `role="listitem"`, `tabIndex`
+// and a positional `aria-label`. What goes: the duplicate drag code, and
+// `.myne-drop-row` from the shared sheet, which nothing else used.
+//
+// Two things deliberately do NOT unify, each for a reason worth reading before
+// "finishing" the job:
+//
+//   * **The show/hide control stays a checkbox**, not the bar's `Switch`
+//     primitive. `e2e/toolbar-customize.e2e.ts`'s tc1 reads `.checked` off this
+//     element by testid — a `<button role="switch">` answers `undefined` there,
+//     so switching primitives reddens a shipped scenario that is currently the
+//     only automated proof this toggle persists. That scenario changes in the
+//     same change or this one does not move.
+//   * **The ↑/↓ buttons stay.** They are the whole subject of tc2
+//     (myne-md/myne#557): the roster row asked a human to reorder by DRAGGING,
+//     and the buttons are why that row could be retired — a WebDriver seat cannot
+//     start a native HTML5 drag session. The ribbon and the bar have drag +
+//     Alt+arrows and no buttons; deleting these would re-open a manual row.
+//
+// The toolbar's vocabulary carries no icons, so `icon` is omitted here (the
+// shared row renders the label without one); the bar and the ribbon both pass one.
 
-import { useEffect, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { ERROR_STYLE } from "./panel-styles";
+import { CustomizeRow, CUSTOMIZE_LIST_STYLE, useDragReorder } from "./CustomizeList";
 import { Icon } from "../primitives/Icon";
-import {
-  HOVER_TRANSITION,
-} from "../primitives/hoverSurface";
+import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
-import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
+import { resolveBarOrder } from "../../notes/barItemsOrder";
 import {
   EDITOR_TOOLBAR_DEFAULT_ORDER,
   EDITOR_TOOLBAR_PENDING_IDS,
@@ -28,45 +55,11 @@ import {
 // hidden, so their rows are visibly disabled and non-toggleable.
 const PENDING_SET = new Set(EDITOR_TOOLBAR_PENDING_IDS);
 
-const LIST_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-  minWidth: 240,
-};
-const ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-2)",
-  padding: "5px 8px",
-  borderRadius: "var(--radius-1)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-};
-const GRIP_STYLE: CSSProperties = {
-  cursor: "grab",
-  color: "var(--fg-3)",
-  fontSize: "var(--text-sm)",
-  lineHeight: 1,
-  userSelect: "none",
-  padding: "0 2px",
-};
-const ITEM_LABEL_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-2)",
-  cursor: "pointer",
-  flex: 1,
-  minWidth: 0,
-};
-// A pinned (not-yet-renderable) row keeps its real label, dimmed + inert.
-const ITEM_LABEL_PENDING_STYLE: CSSProperties = {
-  ...ITEM_LABEL_STYLE,
-  cursor: "default",
-  color: "var(--fg-3)",
-};
+// `CUSTOMIZE_LIST_STYLE` is the shared column; this list is a fixed-width
+// control inside a settings block, so it keeps the width it shipped with.
+const LIST_STYLE: CSSProperties = { ...CUSTOMIZE_LIST_STYLE, minWidth: 240 };
+
+// A pinned (not-yet-renderable) row keeps its real label + hint, dimmed + inert.
 const PENDING_HINT_STYLE: CSSProperties = {
   fontSize: "var(--text-xs)",
   color: "var(--fg-3)",
@@ -105,6 +98,11 @@ function checkboxBoxStyle(checked: boolean, disabled: boolean): CSSProperties {
       "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
   };
 }
+const ARROWS_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+};
 const ARROW_STYLE: CSSProperties = {
   background: "transparent",
   border: 0,
@@ -127,10 +125,6 @@ export function ToolbarCustomizeSettings() {
   const [order, setOrder] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_ORDER]);
   const [hidden, setHidden] = useState<string[]>(resolveToolbarHidden([]));
   const [error, setError] = useState<string | null>(null);
-  // Drag-to-reorder transient state: the id being dragged + the current drop
-  // target (row id + which edge the drop indicator paints on).
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,20 +187,11 @@ export function ToolbarCustomizeSettings() {
     [next[idx], next[to]] = [next[to]!, next[idx]!];
     void persistOrder(next);
   }
-  function onDragOver(e: DragEvent, id: string) {
-    if (dragId === null || dragId === id) return;
-    e.preventDefault(); // allow the drop
-    const rect = e.currentTarget.getBoundingClientRect();
-    const edge = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
-    setDropAt({ id, edge });
-  }
-  function onDrop(id: string) {
-    if (dragId !== null && dragId !== id && dropAt !== null) {
-      void persistOrder(reorderByDrop(fullOrder, dragId, dropAt.id, dropAt.edge));
-    }
-    setDragId(null);
-    setDropAt(null);
-  }
+
+  // Drag, drop indication and the Alt+↑/↓ fallback all live in the shared hook.
+  // `fullOrder` rather than `order`: the roster is self-healed before it is
+  // reordered, so a drop writes the complete vocabulary.
+  const reorder = useDragReorder(fullOrder, (next) => void persistOrder(next));
 
   return (
     <>
@@ -216,92 +201,75 @@ export function ToolbarCustomizeSettings() {
         control={
           <div data-testid="settings.toolbar-customize" style={LIST_STYLE}>
             {fullOrder.map((id, i) => {
-              // The INSET drop indicator (`.myne-drop-row` in the shared
-              // component layer, myne-md/myne#778). Inset rather than a
-              // positioned bar, and that is a recorded decision rather than a
-              // preference: these rows are rounded and dark, and WKWebView
-              // renders a 2px transparent border on one as a visible light
-              // line (QA screenshot). An inset shadow adds nothing to the box,
-              // so rows never reflow when it appears.
-              const dropEdge = dropAt?.id === id ? dropAt.edge : undefined;
-              const isFirst = i === 0;
-              const isLast = i === fullOrder.length - 1;
               const isPending = PENDING_SET.has(id);
               return (
-                <div
+                <CustomizeRow
                   key={id}
-                  className="myne-drop-row"
-                  data-edge={dropEdge}
-                  style={{ ...ROW_STYLE, opacity: dragId === id ? 0.4 : 1 }}
-                  draggable
-                  onDragStart={() => setDragId(id)}
-                  onDragEnd={() => {
-                    setDragId(null);
-                    setDropAt(null);
-                  }}
-                  onDragOver={(e) => onDragOver(e, id)}
-                  onDrop={() => onDrop(id)}
-                  data-item-id={id}
-                >
-                  <label style={isPending ? ITEM_LABEL_PENDING_STYLE : ITEM_LABEL_STYLE}>
-                    <span style={GRIP_STYLE} aria-hidden="true">
-                      ⠿
-                    </span>
-                    <span
-                      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!hiddenSet.has(id)}
-                        onChange={() => toggleShown(id)}
-                        disabled={isPending}
-                        style={HIDDEN_INPUT_STYLE}
-                        data-testid="settings.toolbar-customize.toggle"
-                        data-item-id={id}
-                      />
-                      <span
-                        aria-hidden="true"
-                        style={checkboxBoxStyle(!hiddenSet.has(id), isPending)}
-                      >
-                        {!hiddenSet.has(id) && (
-                          <Icon name="check" size={12} strokeWidth={3} />
-                        )}
-                      </span>
-                    </span>
-                    {t(toolbarItemLabelKey(id) ?? id)}
-                    {isPending && (
+                  id={id}
+                  label={t(toolbarItemLabelKey(id) ?? id)}
+                  index={i}
+                  total={fullOrder.length}
+                  reorder={reorder}
+                  testId={`settings.toolbar-customize.row.${id}`}
+                  note={
+                    isPending ? (
                       <span style={PENDING_HINT_STYLE}>
                         {t("settings.toolbarCustomize.pendingHint")}
                       </span>
-                    )}
-                  </label>
-                  <span>
-                    <button
-                      type="button"
-                      aria-label={t("settings.toolbarCustomize.moveUp")}
-                      disabled={isFirst}
-                      onClick={() => move(id, -1)}
-                      {...interactiveSurface({ disabled: isFirst })}
-                      style={isFirst ? ARROW_DISABLED_STYLE : ARROW_STYLE}
-                      data-testid="settings.toolbar-customize.move-up"
-                      data-item-id={id}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("settings.toolbarCustomize.moveDown")}
-                      disabled={isLast}
-                      onClick={() => move(id, 1)}
-                      {...interactiveSurface({ disabled: isLast })}
-                      style={isLast ? ARROW_DISABLED_STYLE : ARROW_STYLE}
-                      data-testid="settings.toolbar-customize.move-down"
-                      data-item-id={id}
-                    >
-                      ↓
-                    </button>
-                  </span>
-                </div>
+                    ) : undefined
+                  }
+                  trailing={
+                    <>
+                      <span
+                        style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!hiddenSet.has(id)}
+                          onChange={() => toggleShown(id)}
+                          disabled={isPending}
+                          style={HIDDEN_INPUT_STYLE}
+                          data-testid="settings.toolbar-customize.toggle"
+                          data-item-id={id}
+                        />
+                        <span
+                          aria-hidden="true"
+                          style={checkboxBoxStyle(!hiddenSet.has(id), isPending)}
+                        >
+                          {!hiddenSet.has(id) && <Icon name="check" size={12} strokeWidth={3} />}
+                        </span>
+                      </span>
+                      <span style={ARROWS_STYLE}>
+                        <button
+                          type="button"
+                          aria-label={t("settings.toolbarCustomize.moveUp")}
+                          disabled={i === 0}
+                          onClick={() => move(id, -1)}
+                          {...interactiveSurface({ disabled: i === 0 })}
+                          style={i === 0 ? ARROW_DISABLED_STYLE : ARROW_STYLE}
+                          data-testid="settings.toolbar-customize.move-up"
+                          data-item-id={id}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("settings.toolbarCustomize.moveDown")}
+                          disabled={i === fullOrder.length - 1}
+                          onClick={() => move(id, 1)}
+                          {...interactiveSurface({ disabled: i === fullOrder.length - 1 })}
+                          style={
+                            i === fullOrder.length - 1 ? ARROW_DISABLED_STYLE : ARROW_STYLE
+                          }
+                          data-testid="settings.toolbar-customize.move-down"
+                          data-item-id={id}
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    </>
+                  }
+                />
               );
             })}
           </div>

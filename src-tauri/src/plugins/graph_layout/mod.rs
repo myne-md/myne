@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `graph_layout` Tauri plugin.
 //!
 //! Owns `graph_layout_read` + `graph_layout_write` — the persistence side of

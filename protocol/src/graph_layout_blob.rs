@@ -123,23 +123,7 @@ impl From<ProtocolError> for GraphLayoutBlobError {
     }
 }
 
-impl From<EnvelopeError> for GraphLayoutBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => GraphLayoutBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => GraphLayoutBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => GraphLayoutBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => GraphLayoutBlobError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => GraphLayoutBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => GraphLayoutBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => GraphLayoutBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => GraphLayoutBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => GraphLayoutBlobError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(GraphLayoutBlobError);
 
 /// Encode a `vault.graph` blob from an opaque `plaintext` (the desktop layer's
 /// serialized position map + staleness marker), sealing under

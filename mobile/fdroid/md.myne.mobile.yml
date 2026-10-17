@@ -1,0 +1,270 @@
+# fdroiddata build metadata for Myne (Android client).
+#
+# DRAFT, not submitted, and not yet fed to `fdroid lint`.
+#
+# DESTINATION ON SUBMISSION: `fdroiddata/metadata/md.myne.mobile.yml`
+# (the file name is the application ID). Nothing in this repository reads this
+# file; it lives here so the recipe moves in the same commit as the build it
+# describes, instead of in a merge request nobody can compare against the tree.
+#
+# BLOCKED ON: `myne-md/myne` being publicly readable. F-Droid's buildserver
+# clones `Repo:` itself, so a private repository cannot be built at all. See
+# `mobile/fdroid/README.md`.
+#
+# The build itself is `mobile/scripts/fdroid-build.sh`, which is the same
+# sequence one ABI at a time in a dev checkout. When this recipe and that script
+# disagree, one of them is wrong and the difference is the bug.
+#
+# WHAT THIS RECIPE STILL OWES is a first dry run in the fdroiddata buildserver
+# container: the exact toolchain (JDK, SDK 37, NDK), the LFS fetch, and the
+# versionCode arithmetic are all reasoned rather than measured. The checklist is
+# `mobile/fdroid/README.md` section "Owed: the first dry run".
+
+Categories:
+  - Writing
+  - Security
+License: AGPL-3.0-only
+AuthorName: Myne
+WebSite: https://myne.md
+SourceCode: https://github.com/myne-md/myne
+IssueTracker: https://github.com/myne-md/myne/issues
+Changelog: https://github.com/myne-md/myne/tree/develop/fastlane/metadata/android/en-US/changelogs
+
+AutoName: Myne
+
+RepoType: git
+Repo: https://github.com/myne-md/myne.git
+
+# No UpdateCheckMode/AutoUpdateMode, deliberately: Tauri derives the Android
+# versionCode from the semver in `mobile/src-tauri/tauri.conf.json`
+# (major * 1000000 + minor * 1000 + patch), and F-Droid's update checker can
+# only apply a regex, not that arithmetic. Each release therefore adds four build
+# blocks here by hand. The two ways to make this automatic, and the reason
+# neither is taken yet, are in `mobile/fdroid/README.md`
+# "Auto-update: the decision".
+
+# Four build blocks, one per ABI, because F-Droid installs the highest
+# versionCode a device can run and therefore every architecture needs its own.
+# The digit order is F-Droid's (armeabi-v7a < arm64-v8a < x86 < x86_64), applied
+# by the `sed` in `prebuild`: 0.10.0 derives versionCode 10000, so the four APKs
+# carry 100001..100004 and `versionCode:` below is that final value, matching the
+# changelog filenames in `fastlane/metadata/android/en-US/changelogs/`.
+Builds:
+  # armeabi-v7a, 32-bit ARM. versionCode 100001.
+  - versionName: 0.10.0
+    versionCode: 100001
+    # OWED: the commit SHA the release tag points at, e.g.
+    # `git rev-parse v0.10.0`. A placeholder here fails `fdroid lint` by name.
+    commit: REPLACE_WITH_RELEASE_COMMIT
+    sudo:
+      - apt-get update
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
+      # The buildserver image ships an EMPTY Android SDK: platforms/,
+      # build-tools/ and ndk/ are all empty directories. The platform therefore
+      # has to be named. `platforms;android-37.0` is the API 37 package id (the
+      # `.0` is not a typo; there is no bare `platforms;android-37`) and it is
+      # what `compileSdk = 37` resolves to. Without this, AGP either downloads it
+      # mid-build or fails, and which one happens is a race nobody wants in a
+      # release build.
+      - sdkmanager --install "platforms;android-37.0"
+      # git-lfs is NOT optional and is not something fdroidserver does for you:
+      # fdroidserver has no `lfs` handling at all (checked in scanner.py,
+      # build.py and common.py), so without this the bundle carries 130-byte
+      # LFS pointer files instead of whisper-tiny's 42 MB of weights and the
+      # app ships with transcription that silently does nothing.
+      #
+      # Node comes from the first-party origin rather than Debian, pinned to the
+      # version `.nvmrc` already pins and `ci/Dockerfile` already bakes, so the
+      # Android bundle is built by the same engine as every other gate.
+      # F-Droid's inclusion policy allows Node prebuilt binaries explicitly.
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+    init:
+      - rustup default 1.96.0
+      - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+      - cargo install tauri-cli --version 2.12.1 --locked
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - git lfs install --local
+      - git lfs pull
+      - cd mobile
+      - cargo tauri android init
+      # NOT OPTIONAL, and the one step nothing else re-applies. gen/android is
+      # git-ignored and `tauri android init` regenerates it whole, so the
+      # `:myne-widgets` gradle module lives in this committed script. Without it
+      # the build fails at manifest merge on `@xml/myne_shortcuts`, because
+      # `src-tauri/build.rs` injects that <meta-data> on every Android build
+      # while the resource it names ships in `mobile/android-widgets/`.
+      # `mobile/AGENTS.md` states the same thing as "forgetting it fails the
+      # build loudly by design".
+      - bash scripts/android-postinit.sh
+    output: mobile/src-tauri/gen/android/app/build/outputs/apk/arm/release/app-arm-release-unsigned.apk
+    prebuild:
+      # The container installs pnpm globally at the pinned version, so corepack
+      # must not fire and fetch its own. DIVERGENCE: the local twin
+      # (`mobile/scripts/fdroid-build.sh`) leaves these lines out on purpose.
+      - sed -i '/"packageManager"/d' package.json mobile/package.json
+      # Per-ABI versionCode. `* 10 + digit`, the digit being this block's ABI.
+      - sed -i 's|\.toInt()$|.toInt() * 10 + 1|' mobile/src-tauri/gen/android/app/build.gradle.kts
+    build:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - pnpm install --frozen-lockfile
+      - cd mobile
+      - cargo tauri android build --apk --split-per-abi --target armv7
+    # The revision form, which fdroidserver installs through sdkmanager itself
+    # (`common.auto_install_ndk`), so it need not already exist on the
+    # buildserver. 29.0.14206865 is r29 FINAL: its own source.properties says
+    # `Pkg.ReleaseName = r29`, and it is the revision a local
+    # `mobile/scripts/fdroid-build.sh --abi arm64` has already built with.
+    #
+    # Deliberately NOT the 29.0.13846066 that `mobile/docs/dev/device-matrix.md`
+    # used to name: sdkmanager resolves that one to
+    # `android-ndk-r29-beta3-linux.zip`, so it was a BETA of r29, and the
+    # inclusion policy restricts pre-release toolchains. It is also part of the
+    # build's identity, since the NDK's clang is what links the shipped `.so`.
+    ndk: 29.0.14206865
+
+  # arm64-v8a. versionCode 100002.
+  - versionName: 0.10.0
+    versionCode: 100002
+    commit: REPLACE_WITH_RELEASE_COMMIT
+    sudo:
+      - apt-get update
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
+      # The buildserver image ships an EMPTY Android SDK: platforms/,
+      # build-tools/ and ndk/ are all empty directories. The platform therefore
+      # has to be named. `platforms;android-37.0` is the API 37 package id (the
+      # `.0` is not a typo; there is no bare `platforms;android-37`) and it is
+      # what `compileSdk = 37` resolves to. Without this, AGP either downloads it
+      # mid-build or fails, and which one happens is a race nobody wants in a
+      # release build.
+      - sdkmanager --install "platforms;android-37.0"
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+    init:
+      - rustup default 1.96.0
+      - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+      - cargo install tauri-cli --version 2.12.1 --locked
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - git lfs install --local
+      - git lfs pull
+      - cd mobile
+      - cargo tauri android init
+      - bash scripts/android-postinit.sh
+    output: mobile/src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release-unsigned.apk
+    prebuild:
+      - sed -i '/"packageManager"/d' package.json mobile/package.json
+      - sed -i 's|\.toInt()$|.toInt() * 10 + 2|' mobile/src-tauri/gen/android/app/build.gradle.kts
+    build:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - pnpm install --frozen-lockfile
+      - cd mobile
+      - cargo tauri android build --apk --split-per-abi --target aarch64
+    ndk: 29.0.14206865
+
+  # x86 (emulator and some tablets). versionCode 100003.
+  - versionName: 0.10.0
+    versionCode: 100003
+    commit: REPLACE_WITH_RELEASE_COMMIT
+    sudo:
+      - apt-get update
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
+      # The buildserver image ships an EMPTY Android SDK: platforms/,
+      # build-tools/ and ndk/ are all empty directories. The platform therefore
+      # has to be named. `platforms;android-37.0` is the API 37 package id (the
+      # `.0` is not a typo; there is no bare `platforms;android-37`) and it is
+      # what `compileSdk = 37` resolves to. Without this, AGP either downloads it
+      # mid-build or fails, and which one happens is a race nobody wants in a
+      # release build.
+      - sdkmanager --install "platforms;android-37.0"
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+    init:
+      - rustup default 1.96.0
+      - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+      - cargo install tauri-cli --version 2.12.1 --locked
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - git lfs install --local
+      - git lfs pull
+      - cd mobile
+      - cargo tauri android init
+      - bash scripts/android-postinit.sh
+    output: mobile/src-tauri/gen/android/app/build/outputs/apk/x86/release/app-x86-release-unsigned.apk
+    prebuild:
+      - sed -i '/"packageManager"/d' package.json mobile/package.json
+      - sed -i 's|\.toInt()$|.toInt() * 10 + 3|' mobile/src-tauri/gen/android/app/build.gradle.kts
+    build:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - pnpm install --frozen-lockfile
+      - cd mobile
+      - cargo tauri android build --apk --split-per-abi --target i686
+    ndk: 29.0.14206865
+
+  # x86_64 (emulator). versionCode 100004.
+  - versionName: 0.10.0
+    versionCode: 100004
+    commit: REPLACE_WITH_RELEASE_COMMIT
+    sudo:
+      - apt-get update
+      - apt-get install -y gcc libc-dev rustup git-lfs xz-utils
+      # xz-utils is not optional: the Node tarball below is `.tar.xz` and the
+      # buildserver image has no xz binary, so `tar -xJ` dies with
+      # "xz: Cannot exec: No such file or directory" before anything is built.
+      # Learned from the first local dry run rather than from a build cycle.
+      # The buildserver image ships an EMPTY Android SDK: platforms/,
+      # build-tools/ and ndk/ are all empty directories. The platform therefore
+      # has to be named. `platforms;android-37.0` is the API 37 package id (the
+      # `.0` is not a typo; there is no bare `platforms;android-37`) and it is
+      # what `compileSdk = 37` resolves to. Without this, AGP either downloads it
+      # mid-build or fails, and which one happens is a race nobody wants in a
+      # release build.
+      - sdkmanager --install "platforms;android-37.0"
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+    init:
+      - rustup default 1.96.0
+      - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+      - cargo install tauri-cli --version 2.12.1 --locked
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - git lfs install --local
+      - git lfs pull
+      - cd mobile
+      - cargo tauri android init
+      - bash scripts/android-postinit.sh
+    output: mobile/src-tauri/gen/android/app/build/outputs/apk/x86_64/release/app-x86_64-release-unsigned.apk
+    prebuild:
+      - sed -i '/"packageManager"/d' package.json mobile/package.json
+      - sed -i 's|\.toInt()$|.toInt() * 10 + 4|' mobile/src-tauri/gen/android/app/build.gradle.kts
+    build:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - export ANDROID_HOME=$$SDK$$
+      - export NDK_HOME=$$NDK$$
+      - pnpm install --frozen-lockfile
+      - cd mobile
+      - cargo tauri android build --apk --split-per-abi --target x86_64
+    ndk: 29.0.14206865

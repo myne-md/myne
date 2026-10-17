@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Plain-HTTP sync transport for loopback endpoints (MYND-424 task 2 gap-fix).
 //!
 //! `RustlsTransport` is https-only, but the endpoint-config policy also permits

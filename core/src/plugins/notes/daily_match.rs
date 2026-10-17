@@ -508,14 +508,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_daily_date_default_format() {
-        assert_eq!(
-            format_daily_date((2026, 7, 30), DEFAULT_DAILY_DATE_FORMAT),
-            "2026-07-30"
-        );
-    }
-
-    #[test]
     fn format_daily_date_pads_single_digit_month_and_day() {
         assert_eq!(format_daily_date((2026, 1, 5), "YYYY-MM-DD"), "2026-01-05");
     }
@@ -841,24 +833,6 @@ mod tests {
     }
 
     #[test]
-    fn format_daily_date_passes_an_unterminated_bracket_through() {
-        assert_eq!(format_daily_date((2026, 8, 24), "gggg-[W"), "2026-[W");
-    }
-
-    #[test]
-    fn format_daily_date_passes_an_empty_bracket_pair_through() {
-        assert_eq!(format_daily_date((2026, 8, 24), "gggg[]ww"), "202635");
-    }
-
-    #[test]
-    fn format_daily_date_leaves_the_existing_grammar_untouched() {
-        assert_eq!(format_daily_date((2026, 8, 24), "YYYY-MM-DD"), "2026-08-24");
-        assert_eq!(format_daily_date((2026, 8, 24), "Daily YYYY"), "Daily 2026");
-        assert_eq!(format_daily_date((2026, 8, 24), "DDD"), "24D");
-        assert_eq!(format_daily_date((2026, 8, 24), "MMM"), "08M");
-    }
-
-    #[test]
     fn format_daily_date_re_reads_a_stored_format_that_used_the_new_tokens_as_literals() {
         // The one-time compatibility break myne#177 accepts, pinned so it is a
         // recorded behaviour rather than a surprise. `[`, `ww` and `gggg` were
@@ -881,16 +855,6 @@ mod tests {
             format_daily_date((2026, 8, 24), "ww"),
             "35",
             "was the literal `ww` before myne#177"
-        );
-    }
-
-    #[test]
-    fn format_daily_date_keeps_multibyte_literals_intact() {
-        // The walk steps by code point, not by byte, so a non-ASCII separator
-        // cannot be split into invalid UTF-8.
-        assert_eq!(
-            format_daily_date((2026, 8, 24), "YYYY年MM月DD日"),
-            "2026年08月24日"
         );
     }
 

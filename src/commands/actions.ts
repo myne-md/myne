@@ -19,11 +19,12 @@ import { getActiveEditorView } from "../editor/active-view";
 import { exportSelectionAsImage } from "../lib/noteImageExport";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
-import { cycleHeading } from "@myne/editor";
+import { cycleHeading, pickAndInsert, runImportAndConvert } from "@myne/editor";
 import { sidebarCommands } from "../notes/sidebarCommands";
 import { enterRegion } from "../lib/regions";
 import { appDataDir, join } from "../platform/path";
 import { openPath } from "../platform/opener";
+import { activeVaultId } from "../lib/vault-list";
 import {
   setEditorLineNumbers,
   setEditorVimMode,
@@ -640,14 +641,22 @@ const revealVaultFolderAction: CommandAction = {
     return i18n.t("commands.actions.category.vault");
   },
   visibility: editorOnly,
-  // Opens the Phase-1 single-vault dir (`<app_data_dir>/vault`, the documented
-  // resolution — decisions.md "single vault per OS user in Phase 1"). Best-
-  // effort: a non-existent path (a multi-vault `vaults/<id>` layout) simply
-  // no-ops. Revisit when an active-vault-id accessor reaches the palette.
+  // Opens THIS vault's directory, `<app_data_dir>/vaults/<id>/` — the
+  // multi-vault layout (`decisions.md` 2026-06-09 "Vault disk layout:
+  // vaults/<id>/ + eager boot migration"), NOT the retired Phase-1 single
+  // `<app_data_dir>/vault` the previous version opened. The id comes from the
+  // AUTHORITATIVE runtime slot (`activeVaultId()`), never from `listVaults()`'s
+  // `last_unlock`-ordered registry cache, which names a different vault after a
+  // quick-unlock or recovery (#250). `null` means no vault is unlocked, and a
+  // reveal must never guess one — so it no-ops. Resolution is UI-side because a
+  // backend-resolved path may not cross IPC (`src-tauri/AGENTS.md` "Never
+  // crosses IPC"); the two `join` hops mirror `StoragePanel`'s.
   run: () => {
     void (async () => {
       try {
-        await openPath(await join(await appDataDir(), "vault"));
+        const id = await activeVaultId();
+        if (id === null) return;
+        await openPath(await join(await appDataDir(), "vaults", id));
       } catch {
         /* best-effort — reveal failure is non-fatal */
       }
@@ -893,6 +902,47 @@ const openAttachmentsAction: CommandAction = {
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onOpenAttachments();
+  },
+};
+
+/**
+ * "Attach file…" (audit T6.13 item 1) — the palette entry the `/attach` slash
+ * command already had. Runs the same picker-backed import on the active view;
+ * a no-op when no view is mounted (the visibility guard keeps it out of the
+ * palette anyway, but the run path is defensive like `cycleHeading`.
+ */
+const attachFileAction: CommandAction = {
+  id: "attachments.attach-file",
+  get label() {
+    return i18n.t("commands.actions.attachFile.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) void pickAndInsert(view);
+  },
+};
+
+/**
+ * "Convert imported attachments…" (audit T6.13 item 1) — the palette entry
+ * `runImportAndConvert` was exported for and never got, so the command was
+ * unreachable from any surface. Opens the same diff-preview-then-rewrite flow.
+ */
+const convertImportedAttachmentsAction: CommandAction = {
+  id: "attachments.convert-imported",
+  get label() {
+    return i18n.t("commands.actions.convertImportedAttachments.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) void runImportAndConvert(view);
   },
 };
 
@@ -1665,6 +1715,8 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   randomNoteAction,
   manageTemplatesAction,
   openAttachmentsAction,
+  attachFileAction,
+  convertImportedAttachmentsAction,
   foldAllAction,
   unfoldAllAction,
   openSnapshotsAction,

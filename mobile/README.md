@@ -4,95 +4,143 @@
 
 > The same notes, in your pocket. Nothing leaves unencrypted.
 
-The mobile client for [Myne](https://github.com/myne-md/myne) — an open-source, end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. No email at signup: a 20-character account number identifies you, and a BIP-39 24-word phrase is your only recovery path. Keys are derived with Argon2id; notes are sealed with XChaCha20-Poly1305.
+The Android and iOS client for [Myne](https://myne.md): an open-source,
+end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge
+sync. No email at signup, an account number identifies your vault, and a BIP-39
+24-word phrase is the only recovery path. Keys are derived with Argon2id; notes
+are sealed with XChaCha20-Poly1305.
 
-This repository is one of several under [`myne-md`](https://github.com/myne-md): the main repo ([`myne`](https://github.com/myne-md/myne)) holds the desktop client and the canonical specs, with companion repos for the sync server, web client, website, ops, and cross-implementation test vectors. The protocol, threat model, and on-disk format are defined once in the main repo's [`docs/`](https://github.com/myne-md/myne/tree/develop/docs) and shared by every client — read those before touching anything cryptographic here.
+This client is **in this repository**, at `mobile/`, since 2026-08-13. The pnpm
+package is still named `myne-mobile`; the directory is not. All three clients live
+here now: the desktop client and the canonical specifications at the repository
+root, the browser client at `web/`, and this one. The server, website, ops,
+clipper, themes, branding and the adversarial test range remain companion
+repositories under [`myne-md`](https://github.com/myne-md), each with its own
+`AGENTS.md`.
+
+The protocol, threat model and on-disk format are defined once in
+[`docs/`](../docs) and shared by every client. Read those before touching
+anything cryptographic here.
 
 ## Status
 
-**Pre-alpha — Phase 3, not yet started.** Mobile is the last of the planned phases: the desktop client (Phase 1) ships first, the sync server (Phase 2) follows, and the mobile client lands in Phase 3 alongside the web client.
+**In active build, pre-alpha.** This is not a design mock and not an empty
+scaffold: the app runs a real vault against the same `protocol/` and `core/`
+crates the desktop client ships, which is the whole reason a repository boundary
+here was never real.
 
-What exists in this repo today:
+`AGENTS.md` beside this file is the roster of record and it is kept closer to the
+code than anything written here. In outline, what is wired:
 
-- `AGENTS.md` — stack-direction notes, trade-off analysis, and architectural commitments carried over from the main project.
-- `lefthook.yml` — baseline pre-commit hooks (whitespace check, EOF-newline check, secret-pattern guard).
-- `LICENSE` — AGPL-3.0.
-- **A UI-only build of the full mobile design** (see below). The application *shell* — screens, theming, device chrome — is implemented; **no logic is wired** (no crypto, no vault, no sync, no Tauri commands).
+- **Vault lifecycle**: create, unlock, recover from the phrase, change password,
+  repair, delete, multi-vault.
+- **Notes**: markdown editing, note CRUD, snapshots and trash, attachments,
+  full-text search (BM25, run in the shared core), backlinks, vault indices and
+  the knowledge-graph layout cache.
+- **Settings**: the prefs plugin, appearance and editor typography, custom themes
+  (read-only: palettes are authored on a computer and arrive by sync), privacy
+  controls.
+- **Sync**: the shared sync engine under a deny-by-default capability, foreground
+  loop and poke listener.
+- **Native surfaces**: quick unlock, screen-capture protection, voice notes,
+  on-device transcription, OS share target, home-screen widgets and app
+  shortcuts, deep links.
+- **Gallery** (`?gallery`): the desktop feature-parity *design target*, not
+  backed by the app. It is where the parity map is drawn, not a claim that those
+  screens work.
 
-## UI build (design pass)
+### Known gaps, stated rather than discovered
 
-The desktop/Tauri stack is scaffolded and the entire mobile design is reproduced
-as a runnable, theme-aware React app — pixel-faithful to the Claude-Design
-bundle, **UI only, no logic**:
+Biometric unlock returns `HardwareUnavailable` on Android (there is no Keystore
+provider yet) while working on iOS. Background sync is deferred, so the loop is
+foreground-only. The iOS share extension exists but is not wired, because it
+needs an App Group on the App ID first. QR device-join is iOS-only. Spell check
+and dictionaries, backup and restore, Obsidian import, PDF export and AI
+embeddings have no mobile implementation yet, and the reminder pass has a
+`remindersReachTheOs()` gate so the settings screen cannot promise a delivery
+that is not running.
 
-- **Stack** — Vite + React 19 + TS + pnpm (mirrors the main repo); `src-tauri/`
-  is a Tauri 2 mobile host (`md.myne.mobile`, lib `myne_mobile_lib`). Native
-  iOS (`gen/apple`, Xcode) + Android (`gen/android`, Gradle) projects are
-  generated by `tauri ios/android init` (both ignored, regenerated).
-- **Design system** — the canonical `tokens.css` (light / dark / amoled) is
-  reused verbatim, so colours follow the theme automatically; geometry is the
-  design's literal px. Self-hosted Inter + JetBrains Mono.
-- **One adaptive codebase** — each screen is one component; a `PlatformContext`
-  swaps iOS (Liquid Glass, Face ID, dynamic island) vs Android (Material,
-  fingerprint, gesture pill) chrome.
-- **~103 phone screens** across 16 sections (onboarding, recovery, unlock,
-  notes, reading, editor + 11 editor surfaces, search, graph, settings + 11
-  detail panels, multi-vault, conflicts, sync, organize, right-panel, share,
-  backup, import, system states), plus an **iPad** three-pane workspace and the
-  command / editor tablet surfaces.
-- **iOS Widgets** — native SwiftUI/WidgetKit sources under `ios-widgets/`
-  (launchers, lock-screen accessories, StandBy, Control Center "New note", the
-  WG-04 capture sheet) with an integration README. Deliberately content-free
-  (no titles/counts/timestamps) — the widget process is outside the plaintext
-  trust boundary.
+Per-release device coverage is `docs/dev/device-matrix.md`, and it records
+honest-gap rows rather than papering over them.
 
-```bash
-pnpm install
-pnpm dev            # Vite on :1420 — open the gallery: every screen in its
-                    # device frame, with iOS/Android/iPad + light/dark/amoled toggles
-pnpm build          # tsc + vite build
+## Layout
+
+```
+mobile/
+├── src/                  own React tree, source-consuming ~25 @myne/* aliases
+│   ├── app/              the wired flows (AppShell, unlock, editor, settings)
+│   ├── screens/          the design gallery
+│   ├── platform/         the host seam: the ONLY place importing @tauri-apps/*
+│   └── formfactor/       iOS-vs-Android and phone-vs-tablet presentation split
+├── src-tauri/            Tauri 2 host
+│   ├── src/              plugin wiring + the mobile-local plugins
+│   ├── ios/project.yml   the committed XcodeGen spec (gen/ is regenerated)
+│   ├── build.rs          the regeneration-surviving Android manifest injection
+│   └── tauri-plugin-*/   five in-repo native plugins, each carrying its own
+│                         Kotlin and/or Swift
+├── android-widgets/      RemoteViews widgets, a gradle module outside gen/
+├── ios-widgets/          WidgetKit sources
+├── ios-watch/            watchOS app + complications
+├── ios-share/            Share Extension sources (not yet wired)
+├── fdroid/               F-Droid packaging: recipe draft + procedure
+├── docs/dev/             device matrix, e2e options, per-feature checklists
+├── scripts/              platform post-init, icon sync, the Tauri wrapper
+└── tests/                Vitest specs
 ```
 
-Everything below describes the longer-term intended direction (logic, real
-crypto/sync), not yet built.
+`gen/` is git-ignored on both platforms and regenerated whole by `tauri ios
+init` / `tauri android init`, which is why every durable native fact lives in a
+committed file outside it: `ios/project.yml`, `build.rs`, `ios-widgets/`,
+`android-widgets/`, and the post-init scripts.
 
-## Intended direction
+## Development
 
-The goal is maximum reuse of the audited main-repo codebase rather than a second, separately-audited implementation:
+```bash
+pnpm install            # repository root: one lockfile for every workspace member
 
-- **One crypto crate, every platform.** The main repo's `protocol/` Rust crate is `#![no_std]` + `alloc` precisely so it compiles for desktop, mobile, and (eventually) the web. No second crypto codebase to audit; primitives stay bit-identical by construction. `myne-test-vectors` validates those primitives, and a vector failure stops the world for all clients because they share the crate.
-- **One UI codebase.** The main repo's React screens are meant to carry over, with per-platform differences kept to layout/CSS rather than a parallel UI.
-- **One trust-boundary discipline.** The capability-ACL model used on desktop extends to mobile, scoped per platform (iOS and Android entitlements differ).
+pnpm mobile:dev         # Vite on :1422 (the desktop client holds :1420, web :1421)
+pnpm mobile:build       # typecheck + production bundle
+pnpm mobile:test        # Vitest
+pnpm mobile:test:flow   # Playwright flow-logic tier (mock IPC, no device)
 
-The concrete framework choice (Tauri 2 Mobile vs. the React Native direction recorded in the main repo's earlier plan) is not yet final — it is to be re-verified and recorded in the main repo's `design-notes.md` before Phase 3 work begins. See `AGENTS.md` for the current reasoning and the open trade-offs.
+pnpm mobile:ios         # tauri ios dev     (needs Xcode)
+pnpm mobile:android     # tauri android dev (needs the Android SDK and NDK)
+```
 
-Open questions that mobile must answer before it ships, all already flagged in the threat model and decisions log:
-
-- **Argon2id on mobile.** The desktop parameters (`m=256 MiB, t=3, p=2`) may exceed mobile background-task budgets; a calibrated lower-cost unlock profile needs verification on real devices.
-- **OS keychain integration** differs across iOS and Android.
-- **Biometric vault unlock** is a UX win but a threat-model trade-off — it gets a `decisions.md` entry analyzing the cost before it ships, never by default.
-
-Feature parity with desktop is explicitly **not** a launch goal: the first target is the minimum viable read-plus-write client (vault unlock, note read, note edit, sync). Parity creeps closer over time as code reuse pays off.
+Android and iOS native builds need their SDKs and are not runnable on the Linux
+CI runner, so they live in the release matrix rather than in a push pipeline.
+`mobile/docs/dev/device-matrix.md` has the dev loop for both, including the
+`adb reverse` recipe, and `mobile/fdroid/` carries the F-Droid packaging.
 
 ## Hard commitments
 
-These hold for every Myne client and are not negotiable on mobile:
+These hold for every Myne client and are not negotiable here:
 
 - No email at signup, no email recovery.
-- No plaintext mode, no encryption opt-in — privacy is the default.
-- No telemetry or analytics. App Store and Play Store ecosystems push analytics SDKs hard; the answer is to resist them, or document an explicit exemption in the main repo's `design-notes.md`.
-- Reproducible builds — harder on mobile (Xcode/Gradle variability), still the goal; the recipe will live in `operations`.
+- No plaintext mode, no encryption opt-in. Privacy is the default.
+- **No telemetry or analytics.** The app stores are built to push analytics SDKs
+  at you; the answer is to refuse them, not to document an exemption.
+- Reproducible builds are the goal. They are harder on mobile because Xcode and
+  Gradle vary by environment, which is why the F-Droid recipe and the
+  reproducible-build question are written down in `mobile/fdroid/README.md`
+  rather than assumed.
 
-## Dev setup
+## Distribution
 
-There is no app to build yet. The only local tooling is the commit-hook baseline:
+Today the Android client ships as a universal `.apk` published by hand, signed
+with Myne's own release key. Preparation for the F-Droid main repository is
+complete and staged in `mobile/fdroid/`; submission waits on the source
+repository becoming publicly readable, which F-Droid requires because it builds
+the app itself.
 
-```bash
-brew install lefthook && lefthook install   # one-time per clone; activates git hooks
-```
-
-Skip a hook run ad hoc with `LEFTHOOK=0 git commit …` or `git commit --no-verify`, only when you understand why.
+If you are moving from the published `.apk` to the F-Droid build, read the
+signing note in `mobile/fdroid/README.md` first: the two are signed by different
+keys, so the switch needs an uninstall, and an uninstall removes the on-device
+vault.
 
 ## License
 
-This repository is licensed **AGPL-3.0** (see [`LICENSE`](LICENSE)), matching the application code across the Myne project. The specifications in the main repo's `docs/` carry a permissive content license (CC-BY-4.0) so the protocol stays reusable by independent implementations.
+This client is **AGPL-3.0** (see [`LICENSE`](../LICENSE) and
+[`LICENSING.md`](../LICENSING.md), which also carries this bundle's third-party
+asset attributions). The specifications in [`docs/`](../docs) are CC-BY-4.0 so
+the protocol stays reusable by independent implementations.

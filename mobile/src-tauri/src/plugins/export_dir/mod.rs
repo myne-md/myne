@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `export-dir` plugin: the mobile host (myne-md/myne#517).
 //!
 //! One command, `export_path`. It resolves the export directory, creates it,

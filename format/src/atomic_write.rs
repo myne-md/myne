@@ -54,7 +54,7 @@
 //!
 //! One export payload is a **bearer credential** rather than user content —
 //! the 24-word recovery phrase and the account number, both written by
-//! [`crate::plugins::secret_export`]. That write needs the unclobbered temp
+//! `myne-core`'s `plugins::secret_export`. That write needs the unclobbered temp
 //! naming (the destination is user-owned) *and* the `0600` create mode (a
 //! umask-default `0644` leaves the phrase readable by every other local
 //! account). Neither of the two helpers above supplies both, so the
@@ -104,8 +104,8 @@ use std::path::Path;
 /// See the module-level docs for the `replace` semantic and durability
 /// story. Caller responsibilities:
 ///
-/// - The parent directory must already exist (helpers like
-///   [`crate::paths::vault_dir`] / `notes_dir` `create_dir_all` before
+/// - The parent directory must already exist (`myne-core`'s
+///   `paths::vault_dir` / `notes_dir` helpers `create_dir_all` before
 ///   handing a path here).
 /// - Temp file lives at `<path>.tmp`; concurrent writers to the same
 ///   `path` are not handled (v0.1 has at most one writer per vault path
@@ -120,7 +120,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result
 /// `0600` (owner-only) on Unix **from the moment it exists**, so the committed
 /// destination is never briefly group/world-readable in the window a
 /// create-then-`chmod` would open. Use this for device-local credential files
-/// (the per-device sync token, [`crate::plugins::sync::token_store`]). On
+/// (the per-device sync token, `myne-core`'s `plugins::sync::token_store`). On
 /// non-Unix the mode is a no-op — the OS keychain is the production target and
 /// the fallback file rides the user-profile ACL (documented as weaker).
 pub fn atomic_write_private(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
@@ -186,7 +186,7 @@ pub fn atomic_write_unclobbered(path: &Path, bytes: &[u8], replace: bool) -> std
 /// owns (it would truncate a pre-existing file of that name), while
 /// [`atomic_write_unclobbered`] takes the ambient umask and so lands `0644`
 /// under a typical `022`. The recovery phrase and the account number both leave
-/// the app through [`crate::plugins::secret_export`], so both land here.
+/// the app through `myne-core`'s `plugins::secret_export`, so both land here.
 ///
 /// Unix-only in effect: [`normalize_private_mode`] is a documented no-op
 /// elsewhere and Windows rides the user-profile ACL, exactly as

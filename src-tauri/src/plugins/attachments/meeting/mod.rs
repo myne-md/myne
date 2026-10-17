@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Meeting sessions (myne-md/myne#789).
 //!
 //! A meeting session is the voice-note capture pipeline with a different

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // Without `InlinedPlugin`, permissions under `permissions/vault-creation/`
 // silently flatten into `__app-acl__` and the ACL resolver registers the
 // `commands.allow` entries as bare names that never match the
@@ -319,7 +320,6 @@ fn main() {
                 "vault_indices_backlink_candidates",
                 "vault_indices_by_tag",
                 "vault_indices_tag_tree",
-                "vault_indices_note_properties",
                 "vault_indices_property_values",
                 "vault_indices_property_keys",
                 "vault_indices_persist",
@@ -736,8 +736,6 @@ fn main() {
                 "sync_person_unlock_member_vault_with_biometric",
                 "sync_member_unlock_status",
                 "sync_person_clear_member_unlock",
-                "sync_person_profile_write",
-                "sync_person_profile_read",
                 "sync_list_roster",
                 "sync_remove_member",
             ]),
@@ -846,8 +844,6 @@ fn main() {
                 "infer",
                 "infer_ambient",
                 "infer_batch",
-                "embed",
-                "semantic_search",
                 "chat_stop",
                 "transcribe",
                 "read_transcript",

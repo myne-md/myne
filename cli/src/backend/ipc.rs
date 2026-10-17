@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! [`IpcBackend`] — the Phase 1 [`MyneBackend`]: talks to the desktop's
 //! already-running, already-unlocked CLI bridge command socket
 //! (`src-tauri/src/cli_bridge/`). Never opens the vault, never holds a
@@ -186,6 +187,52 @@ impl MyneBackend for IpcBackend {
     }
 }
 
+/// Byte cap on a message this crate RELAYS from the desktop.
+///
+/// The desktop's `error.message` is the one value in this CLI's human output
+/// that this crate did not write, and relaying it verbatim is deliberate: a
+/// version-skewed pair (a newer desktop, an older binary) should say something
+/// true rather than mislabel the failure. But "another process's string" is
+/// also a string of unbounded length from an unreviewed producer, so it is
+/// bounded here — a cap, not a preference. `logging_discipline.rs`'s
+/// `every_error_message_this_crate_originates_is_bounded` holds the RENDERED
+/// message to 200 bytes, which this leaves room for the marker under.
+const MAX_RELAYED_MESSAGE_BYTES: usize = 160;
+
+/// Marker for a relayed message that was cut, so a truncated one never reads as
+/// a complete sentence that simply stops.
+const RELAYED_TRUNCATION_MARKER: &str = " \u{2026}";
+
+/// Bound a relayed desktop message: one line, at most
+/// [`MAX_RELAYED_MESSAGE_BYTES`] bytes, with a marker when something was dropped.
+///
+/// Control characters become spaces rather than surviving, and the direction
+/// matters: this string is PRINTED. A newline inside it would forge an extra line
+/// of CLI output, and a carriage return would rewrite the line the user is
+/// reading — a diagnostic from a compromised or merely newer desktop could claim
+/// a line this crate never emitted. The bound is in BYTES, not characters, so the
+/// guarantee holds for a message that is 160 characters of four-byte script as
+/// much as for one of ASCII.
+pub(crate) fn bounded_relayed_message(raw: &str) -> String {
+    if raw.len() <= MAX_RELAYED_MESSAGE_BYTES {
+        return raw
+            .chars()
+            .map(|c| if c.is_control() { ' ' } else { c })
+            .collect();
+    }
+    let mut out = String::with_capacity(MAX_RELAYED_MESSAGE_BYTES);
+    let room = MAX_RELAYED_MESSAGE_BYTES - RELAYED_TRUNCATION_MARKER.len();
+    for ch in raw.chars() {
+        let ch = if ch.is_control() { ' ' } else { ch };
+        if out.len() + ch.len_utf8() > room {
+            break;
+        }
+        out.push(ch);
+    }
+    out.push_str(RELAYED_TRUNCATION_MARKER);
+    out
+}
+
 /// Map a failure reply's wire `kind` onto the transport-independent
 /// [`BackendError`] taxonomy — one table for every command, rather than a
 /// per-command copy that has to be revisited each time a kind is added (the
@@ -194,8 +241,9 @@ impl MyneBackend for IpcBackend {
 ///
 /// An unrecognized kind — including a kind a newer desktop knows and this
 /// binary does not — falls through to [`BackendError::Io`] carrying the
-/// desktop's own message, so a version-skewed pair still says something
-/// true rather than mislabelling the failure.
+/// desktop's own message, bounded by [`bounded_relayed_message`], so a
+/// version-skewed pair still says something true rather than mislabelling the
+/// failure.
 fn map_wire_error(error: Option<wire::WireError>) -> BackendError {
     match error.as_ref().map(|e| e.kind.as_str()) {
         Some("vault_locked") => BackendError::VaultLocked,
@@ -203,17 +251,79 @@ fn map_wire_error(error: Option<wire::WireError>) -> BackendError {
         Some("folder_excluded") => BackendError::FolderExcluded,
         Some("rate_limited") => BackendError::RateLimited,
         Some("plain_file_off") => BackendError::PlainFileOff,
-        _ => BackendError::Io(
-            error
+        _ => BackendError::Io(bounded_relayed_message(
+            &error
                 .map(|e| e.message)
                 .unwrap_or_else(|| "an internal error occurred".to_string()),
-        ),
+        )),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_relayed_desktop_message_is_bounded_and_single_line() {
+        // The desktop's message is another process's string, so a compromised or
+        // merely newer desktop decides what it says. Two properties stand between
+        // that and this crate's human output: it cannot be longer than the cap, and
+        // it cannot contain a control character. The second is the one a length check
+        // cannot see and it is the worse of the two — a newline forges a line of CLI
+        // output and a carriage return rewrites the line being read.
+        //
+        // **The fixture carries a control character in BOTH branches, and that is a
+        // correction.** The first version put the newline after 4000 padding
+        // characters and the over-cap case is CUT at 160 bytes, so the newline was
+        // never in the output: deleting the replacement left the test green, which is
+        // a fixture that cannot reach the defective state rather than a test.
+        let over_cap = format!("/Users/somebody/secret-notes/{}", "x".repeat(4000));
+        let cases = [
+            // Under the cap: relayed verbatim except for the controls, which is the
+            // branch a short desktop message takes.
+            "line one\nline two\r[ok] forged a line Myne never wrote".to_string(),
+            // Over the cap with the control FIRST, so the cut cannot hide it.
+            format!("\n\r{over_cap}"),
+            // …and with it at the boundary the 160-byte window lands on.
+            format!("{}\n\r{}", "y".repeat(150), "z".repeat(4000)),
+        ];
+        for hostile in cases {
+            let bounded = bounded_relayed_message(&hostile);
+            assert!(
+                bounded.len() <= MAX_RELAYED_MESSAGE_BYTES,
+                "relayed message is {} bytes, over the {MAX_RELAYED_MESSAGE_BYTES}-byte cap: {bounded:?}",
+                bounded.len()
+            );
+            assert!(
+                !bounded.chars().any(char::is_control),
+                "relayed message kept a control character: {bounded:?}"
+            );
+        }
+        // A cut message says so, because a truncated sentence that simply stops reads
+        // as a complete one.
+        assert!(bounded_relayed_message(&over_cap).ends_with(RELAYED_TRUNCATION_MARKER.trim()));
+        // Non-vacuity: a short message is relayed VERBATIM, marker and all — the point
+        // is to relay the desktop's own wording, not to rewrite it.
+        assert_eq!(bounded_relayed_message("No such note."), "No such note.");
+        // …and the four-byte-script case, where a character cap would have passed while
+        // a byte cap is what the rendered-output assertion is about.
+        let wide = "\u{1F600}".repeat(400);
+        assert!(bounded_relayed_message(&wide).len() <= MAX_RELAYED_MESSAGE_BYTES);
+    }
+
+    #[test]
+    fn an_unrecognized_wire_kind_relays_a_bounded_message() {
+        // The version-skew arm: a kind this binary does not know falls through to
+        // `Io` carrying the desktop's message, which is exactly the path the bound
+        // exists for. Driven through the real mapping rather than by constructing
+        // `Io` by hand, so the test cannot pass with the bound removed from it.
+        let err = map_wire_error(Some(wire::WireError {
+            kind: "a_kind_from_the_future".to_string(),
+            message: "z".repeat(5000),
+        }));
+        assert!(matches!(err, BackendError::Io(_)));
+        assert!(crate::output::message_for(&err).len() <= MAX_RELAYED_MESSAGE_BYTES);
+    }
     use std::os::unix::net::UnixListener;
 
     // Unix socket paths are kernel-capped at ~104-108 bytes; a long temp-dir

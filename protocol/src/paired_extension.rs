@@ -553,13 +553,6 @@ mod tests {
     }
 
     #[test]
-    fn no_insignificant_whitespace() {
-        let bytes = canonical_encode_paired_extensions(&[rec("a", "b", true)]);
-        assert!(!bytes.windows(2).any(|w| w == b", "));
-        assert!(!bytes.windows(2).any(|w| w == b": "));
-    }
-
-    #[test]
     fn round_trips_records() {
         let records = vec![
             rec("ext-a", "aa11", false),

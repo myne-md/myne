@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Transactional multi-note write — the §8.3 rollback primitive for wikilink
 //! auto-update on rename (MYND-85 / WL-7).
 //!

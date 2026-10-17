@@ -56,7 +56,7 @@ vi.mock("react-i18next", () => ({
 
 import { AiModelCatalogue } from "../../src/components/settings/AiModelCatalogue";
 
-const PATHS = { generation: null, embedding: null, transcription: null, tag: null };
+const PATHS = { generation: null, transcription: null, tag: null };
 
 function mount(overrides: Partial<Parameters<typeof AiModelCatalogue>[0]> = {}) {
   const props = {
@@ -80,19 +80,19 @@ afterEach(() => cleanup());
 
 describe("AiModelCatalogue: the download states", () => {
   it("renders an in-flight download as progress, percent and a cancel that cancels", () => {
-    downloadStates.set("embedding-e5-small", {
+    downloadStates.set("tag", {
       status: "downloading",
       downloaded: 250,
       total: 500,
     });
     mount();
-    const bar = screen.getByTestId("ai.download-progress-embedding-e5-small");
+    const bar = screen.getByTestId("ai.download-progress-tag");
     expect(bar.getAttribute("aria-valuenow")).toBe("50");
-    expect(screen.getByTestId("ai.download-percent-embedding-e5-small").textContent).toBe(
+    expect(screen.getByTestId("ai.download-percent-tag").textContent).toBe(
       "settings.ai.downloadingPercent:50",
     );
-    fireEvent.click(screen.getByTestId("ai.download-cancel-embedding-e5-small"));
-    expect(cancelModelDownloadFor).toHaveBeenCalledWith("embedding-e5-small");
+    fireEvent.click(screen.getByTestId("ai.download-cancel-tag"));
+    expect(cancelModelDownloadFor).toHaveBeenCalledWith("tag");
   });
 
   it("names a failed transfer, and a checksum refusal names itself", () => {
@@ -141,19 +141,19 @@ describe("AiModelCatalogue: the download states", () => {
     expect(screen.queryByTestId("ai.download-button-tag")).toBeNull();
   });
 
-  it("renders both artefacts as rows of the same columns, with a header naming them", () => {
+  it("renders the artefact as a row of the shared columns, with a header naming them", () => {
     // The presentation half of myne-md/myne#885: the same four columns on every
     // row, and a header row naming three of them. Asserted as the row's own
     // children rather than by reading a style, so a row that lost a cell fails.
     //
     // **The list below is NOT the coverage guarantee, and it is worth saying so
     // because this test used to read as one** (myne-md/myne#867 review): a
-    // hardcoded pair cannot notice a third artefact. The guarantee is the
-    // `Record<DownloadArtifactId, ModelArtifact>` in the component, which fails
-    // to build the day the union grows; what this loop asserts is that the rows
-    // the roster produces RENDER.
+    // hardcoded list cannot notice an artefact the roster forgot. The guarantee
+    // is the `Record<DownloadArtifactId, ModelArtifact>` in the component, which
+    // fails to build the day the union grows; what this loop asserts is that the
+    // rows the roster produces RENDER.
     mount();
-    for (const artifact of ["embedding-e5-small", "tag"]) {
+    for (const artifact of ["tag"]) {
       const row = screen.getByTestId(`ai.download-row-${artifact}`);
       expect(row.children.length).toBeGreaterThanOrEqual(3);
       // The anchor the settings search scrolls to travels with the row.

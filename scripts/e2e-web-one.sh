@@ -70,11 +70,11 @@ export MYNE_WEB_E2E_BROWSER="$BROWSER"
 # file has nothing to parallelise anyway.
 #
 # Set through the lane's own knob rather than a CLI flag, for two reasons. It is
-# the variable `vitest.web-e2e.config.ts` already reads into `maxWorkers`, so the
+# the variable `.config/vitest/web-e2e.config.ts` already reads into `maxWorkers`, so the
 # runner and the config cannot disagree about the shard count — the same
 # same-variable reasoning `e2e-web-local.sh` uses to keep its driver count
 # honest. And it does not depend on a CLI spelling: this line previously passed
 # `--poolOptions.threads.maxThreads=1`, which vitest 4 removed, so the script
 # died with `CACError: Unknown option --poolOptions` before running anything.
 export MYNE_WEB_E2E_SHARDS=1
-pnpm exec vitest run --config vitest.web-e2e.config.ts "e2e-web/${SPEC}.e2e.ts" "$@"
+pnpm exec vitest run --config .config/vitest/web-e2e.config.ts "e2e-web/${SPEC}.e2e.ts" "$@"

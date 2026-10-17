@@ -130,8 +130,8 @@ const CATALOGUE_FIXTURE: Fixture = {
   handlers: {
     ...PREFS_FIXTURE.handlers,
     "plugin:local-inference|get_model_path": (args: Record<string, unknown>) =>
-      args.role === "embedding"
-        ? "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors"
+      args.role === "tag"
+        ? "/Users/you/Library/Application Support/md.myne.desktop/models/tag/model.gguf"
         : null,
   },
 };
@@ -301,10 +301,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
         <AiModelCatalogue
           modelPaths={{
             generation: null,
-            embedding:
-              "/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors",
             transcription: null,
-            tag: null,
+            tag: "/Users/you/Library/Application Support/md.myne.desktop/models/tag/model.gguf",
           }}
           aiEnabled
           onChanged={action("onChanged")}
@@ -324,8 +322,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     render: () => (
       <Frame>
         <ModelPathButton
-          path="/Users/you/Library/Application Support/md.myne.desktop/models/embedding-e5-small/model.safetensors"
-          label="Search model: semantic search & Q&A"
+          path="/Users/you/Library/Application Support/md.myne.desktop/models/tag/model.gguf"
+          label="Tag model: automatic tag suggestions"
           revealLabel="Show in folder"
           testId="story.model-path"
           panelTestId="story.model-path-panel"

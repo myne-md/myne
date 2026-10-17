@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! POSIX shell quoting, shared by every generator in this crate that writes a
 //! `/bin/sh` script around a path it did not choose.
 //!

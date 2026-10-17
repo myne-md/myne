@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `snapshots` plugin commands (MYND-96, SYNC-9): the read/management surface
 //! for encrypted per-note snapshots. The creation hook + prune-on-create +
 //! purge-on-delete live in the `notes` plugin (the `note_update`/`note_delete`
@@ -548,17 +549,18 @@ pub(crate) async fn snapshot_restore_in(
             let note_uuid_str = note_id_parsed.as_uuid().to_string();
             let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
             let hooks_owned: crate::hooks::Hooks = hooks.clone();
+            // The wall clock comes from the host seam, not a direct
+            // `SystemTime::now()`. Read here, before the closure: `host` is a
+            // borrowed trait object and cannot move into it.
+            let now_ms = host.now_unix_millis();
             let undo_failed = crate::task::run_blocking(move || match std::fs::read(&live_path) {
-                Ok(old_blob) => {
-                    let now_ms = crate::snapshot_store::now_unix_ms();
-                    hooks_owned.capture_snapshot(
-                        &vault_root,
-                        &note_uuid_str,
-                        &old_blob,
-                        now_ms,
-                        /* force = */ true,
-                    )
-                }
+                Ok(old_blob) => hooks_owned.capture_snapshot(
+                    &vault_root,
+                    &note_uuid_str,
+                    &old_blob,
+                    now_ms,
+                    /* force = */ true,
+                ),
                 Err(_) => false, // no live blob → nothing to undo
             })
             .await
@@ -637,13 +639,6 @@ pub(crate) async fn snapshot_restore_in(
             .index_note_attachments(state, &note_id, &title, &plaintext)
             .await;
     }
-    // MYND-453: keep the live AI embedding index correct too — `note_update`
-    // does not fire the re-index hooks itself (its callers do), and this restore
-    // path re-indexed search directly above but left the AI vectors stale
-    // (pre-restore content). Re-embed the restored note over its prose (parity
-    // with the create/update path — 448a); feature/ai-gated + detached, no-op
-    // when AI is off.
-    hooks.ai_note_changed(&note_id, &plaintext);
 
     Ok(())
 }
@@ -717,6 +712,10 @@ pub(crate) async fn snapshot_prune_in(
     snapshots_dir: PathBuf,
     state: &VaultRuntimeState,
     note_id: String,
+    // The wall clock, supplied by the host-seam caller (`snapshot_prune_from_host`)
+    // rather than read here, so the retention decision stays a pure function of
+    // an explicit `now` and the test drives it deterministically.
+    now_ms: u64,
 ) -> Result<u32, SnapshotError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
 
@@ -729,7 +728,6 @@ pub(crate) async fn snapshot_prune_in(
     }
 
     let note_uuid = note_id.as_uuid().to_string();
-    let now_ms = crate::snapshot_store::now_unix_ms();
     let removed = crate::task::run_blocking(move || {
         crate::snapshot_store::prune_note_snapshots(
             &snapshots_dir,
@@ -756,7 +754,8 @@ pub async fn snapshot_prune_from_host(
     note_id: String,
 ) -> Result<u32, SnapshotError> {
     let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
-    snapshot_prune_in(snapshots_dir, state, note_id)
+    let now_ms = host.now_unix_millis();
+    snapshot_prune_in(snapshots_dir, state, note_id, now_ms)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -867,12 +866,6 @@ mod tests {
         ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn hydrate_ai_vectors<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
         fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -895,9 +888,6 @@ mod tests {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
-        fn ai_note_changed(&self, _: &str, _: &str) {}
-        fn ai_note_deleted(&self, _: &str) {}
-        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn emit_notes_deleted(&self, _: &str) {}
@@ -1449,8 +1439,16 @@ mod tests {
             )
             .await
             .unwrap();
-            // The lone snapshot is recent → retention keeps it.
-            assert_eq!(snapshot_prune_in(sdir, &state, id).await.unwrap(), 0);
+            // The lone snapshot is recent → retention keeps it. "Now" is the
+            // snapshot's own capture instant, so the fixture genuinely holds an
+            // in-window snapshot and the rule has something true to decide on
+            // rather than a synthetic clock.
+            let now_ms =
+                crate::snapshot_store::list_note_snapshots(&sdir, &id).unwrap()[0].captured_at_ms;
+            assert_eq!(
+                snapshot_prune_in(sdir, &state, id, now_ms).await.unwrap(),
+                0
+            );
         });
     }
 }

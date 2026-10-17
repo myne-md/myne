@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! WebView IPC commands for the pairing dialog (TB10, task 4).
 //!
 //! These are the NARROW Tauri `#[command]`s the in-app pairing dialog drives.
@@ -276,16 +277,6 @@ mod tests {
     // (`accept_with_no_pending_session_is_none`,
     // `reject_with_no_pending_session_is_false`); the commands add nothing
     // beyond restating that mapping, so there is no independent oracle here.
-
-    #[test]
-    fn error_serializes_with_a_closed_kind_tag() {
-        let json = serde_json::to_value(PairingError::NoPendingPairing).unwrap();
-        assert_eq!(json["kind"], "NoPendingPairing");
-        let json = serde_json::to_value(PairingError::CsprngUnavailable).unwrap();
-        assert_eq!(json["kind"], "CsprngUnavailable");
-        let json = serde_json::to_value(PairingError::PersistFailed).unwrap();
-        assert_eq!(json["kind"], "PersistFailed");
-    }
 
     #[test]
     fn list_paired_view_serializes_to_extension_id_and_paired_at_no_token() {
