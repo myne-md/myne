@@ -36,14 +36,12 @@ permissions = [
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
   "allow-vault-indices-tag-tree",
-  # `allow-vault-indices-note-properties` is deliberately NOT in this bundle
-  # (myne#389 item B). `vault_indices_note_properties` has no caller anywhere —
-  # not in `src/`, `editor/`, `web/src/`, `tests/` or `e2e/` — so granting it
-  # widened the main window's surface for a command no product path reaches.
-  # Its `[[permission]]` block stays below: the command is still registered and
-  # still correct, and re-granting it is one line the day a caller exists. A
-  # grant with no consumer is not free — it is a decision nobody has had to
-  # make.
+  # `vault_indices_note_properties` was REMOVED entirely (audit T6.4b). It had
+  # no caller in `src/`, `editor/`, `web/src/`, `tests/` or `e2e/`, so myne#389
+  # item B withheld the grant; a command with neither a caller nor a grant is
+  # dead weight, not a parked one. Its `[[permission]]` block is gone with it.
+  # `VaultIndicesState::note_properties` remains, because the by-key accessors
+  # below still read it.
   "allow-vault-indices-property-values",
   "allow-vault-indices-property-keys",
   "allow-vault-indices-persist",
@@ -104,11 +102,6 @@ commands.allow = ["vault_indices_by_tag"]
 identifier = "allow-vault-indices-tag-tree"
 description = "Allow invoking vault-indices:vault_indices_tag_tree (Slot::Unlocked-gated read of the full tag tree — nodes with direct + subtree counts and a deterministic display, derived from the stored exact folded tags)."
 commands.allow = ["vault_indices_tag_tree"]
-
-[[permission]]
-identifier = "allow-vault-indices-note-properties"
-description = "Allow invoking vault-indices:vault_indices_note_properties (Slot::Unlocked-gated read of a note's typed frontmatter properties — the opaque pre-typed values TS stored on apply, §3.6.4 / MYND-271; pure accessor, type-aware filter/sort happens TS-side, no expression eval). Returns per-note property metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters."
-commands.allow = ["vault_indices_note_properties"]
 
 [[permission]]
 identifier = "allow-vault-indices-property-values"

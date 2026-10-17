@@ -41,7 +41,6 @@ use super::engine::Engine;
 use super::error::EngineError;
 use super::hydrate::{folder_is_excluded, folder_of};
 use super::model_store::{self, ModelRole, ModelStoreError};
-use super::retrieval::{self, ScoredChunk};
 use super::state::LocalInferenceState;
 use super::state::RequestClass;
 use super::vector_store::LocalInferenceVectorState;
@@ -808,78 +807,6 @@ fn read_cached_transcript(
     } else {
         None
     }
-}
-
-/// One ranked semantic-search hit crossing IPC (semantic-search-qa task 7). The
-/// `{note_id, byte-range}` the UI resolves for display + navigation, plus the
-/// cosine score. Content-free — no plaintext (DENY-list; `note_id` is a
-/// correlation tag, but the UI already holds it).
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SearchHit {
-    /// Canonical `NoteId` display form.
-    pub note_id: String,
-    /// Chunk byte-range start into the note's decrypted markdown.
-    pub byte_start: usize,
-    /// Chunk byte-range end.
-    pub byte_end: usize,
-    /// Cosine similarity to the query in `[-1.0, 1.0]`.
-    pub score: f32,
-}
-
-/// Map retrieval [`ScoredChunk`]s to IPC [`SearchHit`]s. Pure + testable.
-fn to_search_hits(scored: Vec<ScoredChunk>) -> Vec<SearchHit> {
-    scored
-        .into_iter()
-        .map(|s| SearchHit {
-            note_id: s.key.note_id.to_string(),
-            byte_start: s.key.start,
-            byte_end: s.key.end,
-            score: s.score,
-        })
-        .collect()
-}
-
-/// Semantic search over the resident chunk vectors (semantic-search-qa tasks
-/// 5 + 7). Embeds the query once through the `Engine` seam off the async thread
-/// (blocking, SYNC-7), then scans the `app.manage`d store. No streaming, no
-/// network.
-///
-/// Two host-side policy gates run here so a compromised WebView cannot bypass
-/// the user's controls (they are NOT trusted to stop calling): the store's
-/// live `ai_enabled` opt-in short-circuits to no results when off, and the
-/// query-time `ai_excluded_folders` filter is enforced from the store's own
-/// per-note folder map (defense-in-depth — even a stale resident vector for a
-/// now-excluded note can never surface; SYNC-14).
-#[tauri::command]
-pub async fn semantic_search(
-    query: String,
-    k: usize,
-    engine_state: State<'_, LocalInferenceState>,
-    vector_state: State<'_, LocalInferenceVectorState>,
-    priority: State<'_, ComputePriority>,
-) -> Result<Vec<SearchHit>, EngineError> {
-    // First statement: bound the query plaintext to a Zeroizing wrapper.
-    let query = Zeroizing::new(query);
-    // The user typed a query — auto-tag yields to it (MYND-651 task 4).
-    let _interactive = priority.interactive();
-    // Embedding path (SYNC-16): the strict accessor, which never hands back a
-    // remote backend. This surface only embeds — there is no generation here to
-    // split off (#415 task 18 split the two handles where there was one).
-    let engine = engine_state.embedding_engine()?;
-    // Embed off the async thread (CPU-bound); the wrapper zeroizes on drop.
-    let query_vec = tokio::task::spawn_blocking(move || engine.embed_query(&query))
-        .await
-        .map_err(|_| EngineError::EmbeddingFailed)??;
-    // Scan the resident store synchronously — no await, no model call, so the
-    // std-Mutex guard never spans a suspension point.
-    let hits = {
-        let store = vector_state.lock();
-        if !store.is_enabled() {
-            return Ok(Vec::new());
-        }
-        retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
-    };
-    Ok(to_search_hits(hits))
 }
 
 /// Signal the active streaming generation to stop (transcription's "Stop").
@@ -1667,28 +1594,6 @@ mod tests {
              infer_batch, transcribe. A new prompt-bearing command owes a \
              registration; a vanished one is a request the lock cannot abort"
         );
-    }
-
-    #[test]
-    fn to_search_hits_maps_note_id_range_and_score() {
-        use super::super::vector_store::ChunkKey;
-        use myne_core::plugins::notes::note_id::NoteId;
-
-        let note = NoteId::parse("01970e83-4f2f-7000-8000-000000000051").unwrap();
-        let scored = vec![ScoredChunk {
-            key: ChunkKey {
-                note_id: note,
-                start: 4,
-                end: 20,
-            },
-            score: 0.87,
-        }];
-        let hits = to_search_hits(scored);
-        assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].note_id, note.to_string());
-        assert_eq!(hits[0].byte_start, 4);
-        assert_eq!(hits[0].byte_end, 20);
-        assert!((hits[0].score - 0.87).abs() < 1e-6);
     }
 
     /// The tag prompt used across the gate tests. Real prompts embed the note

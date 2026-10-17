@@ -85,8 +85,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             person_account::sync_person_unlock_member_vault_with_biometric,
             person_account::sync_member_unlock_status,
             person_account::sync_person_clear_member_unlock,
-            person_account::sync_person_profile_write,
-            person_account::sync_person_profile_read,
             commands::sync_person_lock,
             commands::sync_person_create_invite,
             commands::sync_list_roster,

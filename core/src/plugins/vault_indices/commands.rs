@@ -435,35 +435,6 @@ pub async fn vault_indices_tag_tree(
     vault_indices_tag_tree_from_host(runtime.inner(), indices.inner()).await
 }
 
-/// Return a note's typed frontmatter properties (Task 7 / MYND-271) — the
-/// opaque pre-typed values TS stored on `apply`. Empty when the note is
-/// absent / propertyless. Pure accessor: type-aware filter/sort happens
-/// TS-side in the query-engine sub-feature; there is **no** evaluatable
-/// expression hook here. Rejected with
-/// [`VaultIndicesError::SlotNotUnlocked`] when no vault is unlocked.
-pub async fn vault_indices_note_properties_from_host(
-    note_id: String,
-    runtime: &VaultRuntimeState,
-    indices: &VaultIndicesState,
-) -> Result<Vec<PropertyEntry>, VaultIndicesError> {
-    if runtime.slot_kind_active().await != SlotKind::Unlocked {
-        return Err(VaultIndicesError::SlotNotUnlocked);
-    }
-    Ok(indices.note_properties(&note_id))
-}
-
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn vault_indices_note_properties(
-    note_id: String,
-    runtime: State<'_, VaultRuntimeState>,
-    indices: State<'_, VaultIndicesState>,
-) -> Result<Vec<PropertyEntry>, VaultIndicesError> {
-    vault_indices_note_properties_from_host(note_id, runtime.inner(), indices.inner()).await
-}
-
 /// Vault-wide by-key property accessor (Task 7 / MYND-271) — `(noteId, entry)`
 /// for every note carrying a property named `key`. The query engine's
 /// primitive: it compares + filters these values TS-side (`rating > 4`, sort by

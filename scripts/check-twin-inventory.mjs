@@ -1459,7 +1459,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1223 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1222 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
     a: "src/lib/agent-run.ts",
