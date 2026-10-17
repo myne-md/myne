@@ -326,6 +326,26 @@ export const CONSENT_HOW_TO_REVOKE =
  *  turned Developer mode off, and a device enrolled before the
  *  reclassification, both hold, and the gate must re-ask rather than honour it
  *  (myne-md/myne#456). */
+/** The AI trust INVARIANT, rendered FIRST and unchanged by the provider state.
+ *
+ *  **Why it lives here, and why that matters more than tidiness.** It was a
+ *  verbatim copy in `src/lib/load-bearing-copy.ts` and
+ *  `mobile/src/lib/load-bearing-copy.ts`, and the mobile copy's own comment
+ *  claimed the two were "byte-identical by construction" because "desktop's
+ *  `src/lib/load-bearing-copy.ts` re-exports this same literal". It did not: it
+ *  declared its own identical string, so the sentence could drift between
+ *  clients with nothing saying so. This package is the construction that
+ *  comment described, one layer down from where the A7 residual already
+ *  established it (myne-md/myne#456).
+ *
+ *  The string is a privacy claim, not UI copy: pinned byte-for-byte by
+ *  `tests/lib/aiTrustCopy.test.ts`, rendered VERBATIM in every locale, and
+ *  bounded by `threat-model.md` §5 — "no byte leaves the device unless the user
+ *  has named a provider" — plus the download clause of `decisions/ai/0627`.
+ *  A later slice may say LESS than this, never more. */
+export const AI_TRUST_INVARIANT =
+  "Myne never sends your notes anywhere you have not named. A model downloads only when you ask, from Myne's own origin, which keeps no IP logs and no analytics.";
+
 /** The A7 residual, rendered as the LAST clause of every AI trust disclosure.
  *
  *  **It lives here rather than in `src/lib/load-bearing-copy.ts` because mobile
