@@ -1275,8 +1275,6 @@
           "empty": "Riassunti, risposte e suggerimenti compaiono qui man mano che li chiedi.",
           "error": "Impossibile completare la richiesta AI.",
           "errorTurn": "L'assistente non è riuscito a rispondere.",
-          "gettingReadyHint": "Preparazione delle tue note per l'AI. Un momento.",
-          "noSearchModelHint": "Le domande cercano tra le tue note su questo dispositivo, e per farlo serve un modello di ricerca qui. Un provider non può farlo. Scegline uno in Impostazioni → Developer → AI. La modifica delle tue note con l'AI continua a funzionare.",
           "insert": "Inserisci nella nota",
           "noAnswer": "Nessuna risposta. Prova a riformulare.",
           "newChat": "Nuova chat",
@@ -1285,8 +1283,6 @@
           "unavailableHint": "Questa build di Myne è stata compilata senza l'AI locale, quindi qui non può essere eseguito nulla. Nessuna impostazione lo cambierà — serve una build con l'AI inclusa.",
           "offHint": "L'AI locale è disattivata. Attivala da Impostazioni → Developer → AI.",
           "send": "Invia",
-          "statusGettingReady": "Preparazione…",
-          "statusNoSearchModel": "Nessun modello di ricerca",
           "statusNoModel": "Nessun provider",
           "statusUnreachable": "Non risponde",
           "statusUnavailable": "Non disponibile",
@@ -3499,10 +3495,8 @@
         "emptyGrant": "Tutto ciò che questa esecuzione poteva leggere è in cartelle che l'IA non vede mai. Non è stato inviato nulla. Cambialo in Impostazioni, IA, Cartelle escluse."
       },
       "modelChoose": "Scegli file…",
-      "modelEmbeddingLabel": "Modello di ricerca: ricerca semantica e domande e risposte",
       "modelFilter": {
-        "gguf": "Modello GGUF",
-        "safetensors": "Modello Safetensors"
+        "gguf": "Modello GGUF"
       },
       "modelGenerationLabel": "Modello di testo: chat, riassunti, scrittura",
       "modelNone": "Nessun file selezionato",
@@ -3535,7 +3529,6 @@
       "providerNone": "Nessuno",
       "providerNothingAnswering": "Non è ancora configurato nulla che possa rispondere.",
       "modelsLabel": "Modelli",
-      "recommendedFilesEmbedding": "Richiede model.safetensors + config.json + tokenizer.json nella stessa cartella.",
       "recommendedFilesGeneration": "Richiede il file .gguf + tokenizer.json nella stessa cartella.",
       "recommendedFilesTranscription": "Richiede il file .gguf di Whisper + config.json + tokenizer.json nella stessa cartella.",
       "title": "AI",
@@ -3563,7 +3556,6 @@
       "modelShowLocation": "Mostra la posizione di {{name}}",
       "downloadsLabel": "Scarica i modelli",
       "downloadsHelper": "Scarica un modello dall'origine di Myne stessa. Prima dell'uso viene confrontato con un'impronta incorporata nell'app, così un download manomesso viene rifiutato. Non viene scaricato nulla finché non fai clic.",
-      "downloadEmbeddingSize": "Modello multilingue, circa 449 MB.",
       "downloadTagLabel": "Modello per i tag: suggerimenti automatici di tag",
       "downloadTagSize": "Piccolo modello locale, circa 337 MB.",
       "downloadInstalled": "Installato",
@@ -5377,12 +5369,8 @@
   },
   "aiOnboarding": {
     "title": "Configura l'AI",
-    "intro": "Myne può cercare nelle tue note in base al significato, suggerire tag e conversare su di esse. Nulla di tutto ciò è obbligatorio e puoi attivarlo in seguito dalle Impostazioni.",
+    "intro": "Myne può suggerire tag e conversare su di esse. Nulla di tutto ciò è obbligatorio e puoi attivarlo in seguito dalle Impostazioni.",
     "enableLabel": "Attiva le funzioni AI",
-    "semantic": {
-      "title": "Ricerca semantica",
-      "body": "Scarica un modello di embedding multilingue (circa 449 MB) per cercare in base al significato, non solo alle parole."
-    },
     "tag": {
       "title": "Etichettatura automatica",
       "body": "Scarica il modello per i tag (circa 337 MB) così Myne può suggerire tag mentre scrivi."

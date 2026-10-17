@@ -9,9 +9,10 @@
 //! answers, and how a scope is searched. Those two arrive as trait objects.
 //!
 //! **What is left here is the wiring that genuinely differs**, and it is the
-//! `State<'_, …>` list: this client resolves a `LocalInferenceState` and a
-//! `LocalInferenceVectorState` to build its engine and its embedding-backed
-//! searcher, and mobile resolves neither. That is the three-layer command shape
+//! `State<'_, …>` list: this client resolves a `LocalInferenceState` to build
+//! its engine, and supplies a searcher that finds nothing (its embedding-index
+//! searcher was retired with the `MYR1` family). Mobile resolves its own and
+//! answers search from the full-text index. That is the three-layer command shape
 //! `core/AGENTS.md` describes, applied to a plugin that had not adopted it.
 //!
 //! Which guards apply per command is documented on `mod.rs` and is unchanged by
@@ -39,14 +40,14 @@ use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 
-use crate::plugins::agent::adapters::{EngineAdapter, SearchAdapter};
+use crate::plugins::agent::adapters::EngineAdapter;
 use crate::plugins::local_inference::state::LocalInferenceState;
-use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
 use myne_core::host::tauri_host::TauriHost;
 use myne_core::plugins::agent::history::{
     history_budget, seed_messages, HistoryTurn, SeedControls,
 };
 use myne_core::plugins::agent::host_adapters::MemoryAdapter;
+use myne_core::plugins::agent::tools::NoScopeSearch;
 use myne_core::plugins::prefs::commands::prefs_read_from_host;
 use myne_core::vault_io::StdVaultIo;
 
@@ -83,7 +84,6 @@ pub async fn agent_start<R: Runtime>(
     indices: State<'_, VaultIndicesState>,
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, LocalInferenceState>,
-    vectors: State<'_, LocalInferenceVectorState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
@@ -196,16 +196,14 @@ pub async fn agent_start<R: Runtime>(
         &indices,
         &vault,
         // The two seams this client supplies for itself: its own engine, and
-        // an embedding-backed searcher. Mobile builds different ones and calls
-        // the same `step`.
+        // a searcher. Desktop's searcher used to query the AI embedding index;
+        // with that index retired it supplies one that finds nothing, so the
+        // search tools answer empty rather than the run failing.
         &EngineAdapter {
             state: ai.inner(),
             cancel: Arc::clone(&cancel),
         },
-        &SearchAdapter {
-            state: ai.inner(),
-            vectors: vectors.inner(),
-        },
+        &NoScopeSearch,
         // The run's memory store (myne-md/myne#697): the shared
         // `MemoryAdapter` over this client's host + slot + hooks, so a
         // `remember` write lands in the vault (and its sync bump fires)
@@ -248,7 +246,6 @@ pub async fn agent_approve_scope<R: Runtime>(
     indices: State<'_, VaultIndicesState>,
     vault: State<'_, VaultRuntimeState>,
     ai: State<'_, LocalInferenceState>,
-    vectors: State<'_, LocalInferenceVectorState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
     require_unlocked(&vault).await?;
@@ -279,16 +276,13 @@ pub async fn agent_approve_scope<R: Runtime>(
         &indices,
         &vault,
         // The two seams this client supplies for itself: its own engine, and
-        // an embedding-backed searcher. Mobile builds different ones and calls
-        // the same `step`.
+        // a searcher. Desktop's searcher used to query the AI embedding index;
+        // with that index retired it supplies one that finds nothing.
         &EngineAdapter {
             state: ai.inner(),
             cancel: Arc::clone(&cancel),
         },
-        &SearchAdapter {
-            state: ai.inner(),
-            vectors: vectors.inner(),
-        },
+        &NoScopeSearch,
         // The run's memory store (myne-md/myne#697): the shared
         // `MemoryAdapter` over this client's host + slot + hooks, so a
         // `remember` write lands in the vault (and its sync bump fires)

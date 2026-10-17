@@ -843,7 +843,6 @@ fn main() {
                 "infer",
                 "infer_ambient",
                 "infer_batch",
-                "embed",
                 "chat_stop",
                 "transcribe",
                 "read_transcript",

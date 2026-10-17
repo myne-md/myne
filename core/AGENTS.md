@@ -16,7 +16,7 @@ Three clients consume it, and each supplies its own edges:
 
 **What does NOT live here:** the `tauri::Builder` app wiring, `generate_handler!` registration, capability/permission ACLs, and any plugin with no cross-client meaning (`backup`, `clipper_pairing`, `importer`, `pdf_export`, `vault_repair`, `spell`, `clipper`, all desktop-side). The crate-level docs in `src/lib.rs` and `src/plugins/mod.rs` restate this split; keep them true.
 
-`local_inference` used to be on that list and is now **split** (myne-md/myne#456). Its LOCAL half stays desktop-side, the Candle engine, the Ollama loopback engine, retrieval, the vector store, the model store, whisper, the Tauri surface. Its portable half moved here as `src/inference/` and is covered below.
+`local_inference` used to be on that list and is now **split** (myne-md/myne#456). Its LOCAL half stays desktop-side, the Candle engine, the Ollama loopback engine, the model store, whisper, the Tauri surface. Its portable half moved here as `src/inference/` and is covered below.
 
 ## The three seams
 
@@ -37,7 +37,7 @@ Rules that travel with them:
 
 ## The hooks seam (desktop-only side effects)
 
-`src/hooks.rs` — `VaultLifecycleHooks` is the fourth seam, one axis over: not "what the host provides" but "what a side effect does". A shared core that needs to touch the search index, the spell dictionary, the snapshot store, the AI vector store or screen-capture protection calls a hook method instead of reaching for a client type. `Hooks = Arc<dyn VaultLifecycleHooks>`, taken by commands as `State<'_, Hooks>`.
+`src/hooks.rs` — `VaultLifecycleHooks` is the fourth seam, one axis over: not "what the host provides" but "what a side effect does". A shared core that needs to touch the search index, the spell dictionary, the snapshot store or screen-capture protection calls a hook method instead of reaching for a client type. `Hooks = Arc<dyn VaultLifecycleHooks>`, taken by commands as `State<'_, Hooks>`.
 
 Object-safe by construction: no generic methods, and async methods return a hand-rolled `BoxFuture` (the `async-trait` desugaring, written out) so the trait stays `R`-free without a dependency. `BoxFuture` is `Send` on native and `?Send` on `wasm32` — a storage-touching hook awaits a `VaultIo` future, and the browser arm's OPFS handles are pinned to their Worker thread.
 

@@ -1,11 +1,12 @@
 //! The [`Engine`] trait — the single seam every AI capability sibling reaches
 //! inference through (SYNC-3/7).
 //!
-//! **Ten methods, four of which stream.** The header used to say "two methods,
-//! `infer` and `embed`" and "no streaming (SYNC-7)"; streaming was added for
-//! the chat surface and that clause superseded by `decisions.md` 2026-07-04.
-//! Eight of the ten are defaulted, which is what lets a backend implement only
-//! `infer` + `embed` and still be a first-class citizen — the mechanism by
+//! **Thirteen methods, five of which stream.** The header used to say "two
+//! methods, `infer` and `embed`" and "no streaming (SYNC-7)"; streaming was
+//! added for the chat surface and that clause superseded by `decisions.md`
+//! 2026-07-04, and the embedding methods were retired with the `MYR1` family.
+//! Eleven of the thirteen are defaulted, which is what lets a backend implement
+//! only `infer` and still be a first-class citizen — the mechanism by
 //! which partial capability is modelled, rather than by splitting the trait.
 //!
 //! The concrete impl is hidden so the in-host-vs-sidecar process boundary and
@@ -23,11 +24,6 @@ use std::ops::ControlFlow;
 
 use super::cancellable_io::CancelledFn;
 use super::error::EngineError;
-
-/// Length of the **stub** embedding vector. The real embedding model
-/// (all-MiniLM-L6-v2, 384-dim, SYNC-1) lands in task 4; the stub returns a
-/// short deterministic zero vector purely to exercise the trait shape.
-pub const STUB_EMBED_DIM: usize = 8;
 
 /// The role of a chat message (conversational-ai-chat task 2). Only
 /// `User`/`Assistant` — the system instruction is a separate TRUSTED field on
@@ -112,8 +108,8 @@ impl std::fmt::Debug for AgentReply {
     }
 }
 
-/// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`
-/// and `embed(text) -> vector`. No streaming (SYNC-7). Implementors must be
+/// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`.
+/// No streaming (SYNC-7). Implementors must be
 /// `Send + Sync` so a single engine instance can back concurrent commands
 /// behind `Arc`.
 pub trait Engine: Send + Sync {
@@ -212,32 +208,6 @@ pub trait Engine: Send + Sync {
                 text,
                 truncated: false,
             })
-    }
-
-    /// Embedding vector for `text`. Real models return a fixed dimensionality
-    /// (task 4: 384); the stub returns [`STUB_EMBED_DIM`] zeros.
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError>;
-
-    /// Embedding vector for a live retrieval **query**. Default:
-    /// [`Engine::embed`].
-    ///
-    /// A separate method because an ASYMMETRIC retrieval model needs a different
-    /// input on the query side than on the passage side. The multilingual E5
-    /// family requires a `query: ` prefix on queries and a `passage: ` prefix on
-    /// every indexed chunk; embedding a query the same way as a passage degrades
-    /// retrieval measurably, and embedding a passage with the query prefix
-    /// degrades the index. The engine decides from the model it actually loaded,
-    /// so a symmetric model (the English MiniLM family) is byte-for-byte
-    /// unaffected and inherits this default unchanged.
-    fn embed_query(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.embed(text)
-    }
-
-    /// Embedding vector for an indexed **passage** (one document chunk).
-    /// Default: [`Engine::embed`]. See [`Engine::embed_query`] for why the split
-    /// exists.
-    fn embed_passage(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.embed(text)
     }
 
     /// Streaming text completion for `prompt` (conversational-ai-chat task 1;
@@ -341,8 +311,8 @@ pub trait Engine: Send + Sync {
     /// Whether this engine supplies the models for the LOCAL roles itself, so a
     /// missing side-loaded or bundled file is not the absence of a model.
     ///
-    /// The capability report resolves generation / embedding / transcription by
-    /// asking the DISK — a selected GGUF for generation and embedding, a bundled
+    /// The capability report resolves generation / transcription by
+    /// asking the DISK — a selected GGUF for generation, a bundled
     /// blob for transcription — which is right for the Candle engine and wrong
     /// for any engine that carries its own weights. The E2E [`StubEngine`] is
     /// the one such engine today: it answers deterministically with no file
@@ -361,40 +331,12 @@ pub trait Engine: Send + Sync {
         false
     }
 
-    /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
+    /// Drop any lazily-cached loaded model so the next `infer` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
-    /// otherwise the process keeps serving the previously-loaded weights while a
-    /// freshly persisted embeddings index is (correctly) labeled with the NEW
-    /// model identity, silently poisoning retrieval (§9.17.2/§9.17.4). Default
+    /// otherwise the process keeps serving the previously-loaded weights. Default
     /// no-op — the stub holds no cache.
     fn invalidate_models(&self) {}
-
-    /// The **name + content digest** the backend reports for the embedding
-    /// model it is currently serving, or `None` for an engine whose model is a
-    /// file the client hashes itself.
-    ///
-    /// This does not contradict the header's "description lives on
-    /// `state::Backend`, not here". A descriptor is static and known before
-    /// any request; this is a **runtime query only the engine can answer** —
-    /// the digest is the runtime's own bookkeeping, reachable only by asking
-    /// it. `Backend` could not carry it without becoming a cache of something
-    /// that changes underneath it.
-    ///
-    /// Why it exists: `vault.embeddings` is keyed by a model identity
-    /// (`protocol.md` §9.17.2), and a served model has no file to hash. Before
-    /// this method the served case produced NO identity, so the snapshot was
-    /// never written and every unlock re-embedded the whole vault.
-    ///
-    /// Costs a round trip, so callers ask once per walk, not per note. `None`
-    /// on any failure — an unreachable runtime degrades to "no persistence
-    /// this session", never to a wrong identity.
-    ///
-    /// Neither string is logged (both name the user's model choice, and the
-    /// DENY-list discipline in `src-tauri/AGENTS.md` governs this whole tree).
-    fn served_model_identity(&self) -> Option<(String, String)> {
-        None
-    }
 
     /// Transcribe already-decoded audio to text (voice-to-text, MYND-550;
     /// SYNC-V5). `pcm` is **16 kHz mono f32** — the WAV decode + resample happen
@@ -408,7 +350,7 @@ pub trait Engine: Send + Sync {
     /// returned transcript is likewise content and is never logged.
     ///
     /// Default: [`EngineError::NoModel`] — an engine with no ASR model (a
-    /// generation/embedding-only build) has no transcription path, which is the
+    /// generation-only build) has no transcription path, which is the
     /// "no model available" case (MYND-591: the transcribe path never returns
     /// the generic `NotReady`). The real Candle-Whisper impl and the
     /// [`StubEngine`] override this.
@@ -512,8 +454,8 @@ pub(crate) fn models_present_under(fault: StubFault) -> bool {
 
 /// Trivial in-memory engine used before any model lands (the task-1 tracer).
 ///
-/// `infer` echoes the prompt behind a fixed marker; `embed` returns a
-/// [`STUB_EMBED_DIM`]-length zero vector. Deterministic, allocation-only — no
+/// `infer` echoes the prompt behind a fixed marker. Deterministic,
+/// allocation-only — no
 /// model, no network, no file I/O — so it proves the trait shape and the
 /// feature isolation compile and round-trip.
 #[derive(Debug, Default, Clone, Copy)]
@@ -1108,13 +1050,6 @@ impl Engine for StubEngine {
         self.infer_streaming(&prompt, on_token)
     }
 
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        if let Some(e) = self.fault() {
-            return Err(e);
-        }
-        Ok(vec![0.0; STUB_EMBED_DIM])
-    }
-
     fn infer_streaming(
         &self,
         prompt: &str,
@@ -1171,7 +1106,7 @@ impl Engine for StubEngine {
 
     fn carries_own_models(&self) -> bool {
         // The stub IS every local model in the E2E build — it answers
-        // generation, embedding and transcription from code, with no file
+        // generation and transcription from code, with no file
         // anywhere — so the capability report must stop asking the disk about
         // roles this engine already serves. Same fault mapping as
         // `tag_model_available` above, through the same helper.
@@ -1239,7 +1174,6 @@ mod stub_fault_tests {
     fn the_stub_is_unchanged_when_no_fault_is_set() {
         let e = StubEngine;
         assert!(e.infer("hello").is_ok());
-        assert!(e.embed("x").is_ok());
         assert!(e.tag_model_available());
         assert!(e.carries_own_models());
     }
@@ -1269,9 +1203,6 @@ mod stub_fault_tests {
         impl Engine for DiskBacked {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok(String::new())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(Vec::new())
             }
         }
         assert!(!DiskBacked.carries_own_models());
@@ -1343,32 +1274,6 @@ mod tests {
             engine.infer_bounded("hello", 24),
             engine.infer("hello"),
             "an engine with no per-call ceiling answers as if unbounded"
-        );
-    }
-
-    #[test]
-    fn stub_embed_returns_fixed_dim_through_trait() {
-        let engine: &dyn Engine = &StubEngine;
-        let v = engine.embed("hello").expect("stub embed never fails");
-        assert_eq!(v.len(), STUB_EMBED_DIM);
-    }
-
-    /// An engine that does not override the split inherits the symmetric
-    /// behaviour, so adding `embed_query`/`embed_passage` changes nothing for
-    /// the stub, Ollama or the remote arm. This is the property that lets the
-    /// E5 prefixes be a Candle-only concern.
-    #[test]
-    fn default_embed_query_and_passage_delegate_to_embed() {
-        let engine: &dyn Engine = &StubEngine;
-        assert_eq!(
-            engine.embed_query("x").unwrap(),
-            engine.embed("x").unwrap(),
-            "the query default must delegate to embed"
-        );
-        assert_eq!(
-            engine.embed_passage("x").unwrap(),
-            engine.embed("x").unwrap(),
-            "the passage default must delegate to embed"
         );
     }
 
@@ -1510,7 +1415,7 @@ mod tests {
 
     #[test]
     fn default_infer_tags_is_not_ready() {
-        // An engine that overrides nothing (generation/embedding-only, e.g. an
+        // An engine that overrides nothing (generation-only, e.g. an
         // AI build with no bundled tag weights) has no tag path: the trait
         // default returns NotReady rather than falling back to `infer`, which
         // would silently answer with the WRONG model.
@@ -1518,9 +1423,6 @@ mod tests {
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok("generation output".to_string())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(Vec::new())
             }
         }
         let engine: &dyn Engine = &BareEngine;
@@ -1540,9 +1442,6 @@ mod tests {
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok(String::new())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(Vec::new())
             }
         }
         assert!(
@@ -1565,16 +1464,13 @@ mod tests {
 
     #[test]
     fn default_transcribe_is_no_model() {
-        // An engine that overrides nothing (generation/embedding-only) has no
+        // An engine that overrides nothing (generation-only) has no
         // ASR path: the trait default returns NoModel (the "no model available"
         // cause, MYND-591) rather than panicking or the generic NotReady.
         struct BareEngine;
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok(String::new())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(Vec::new())
             }
         }
         let engine: &dyn Engine = &BareEngine;

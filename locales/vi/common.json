@@ -1218,8 +1218,6 @@
           "empty": "Tóm tắt, câu trả lời và gợi ý xuất hiện ở đây khi bạn yêu cầu.",
           "error": "Không thể hoàn thành yêu cầu AI.",
           "errorTurn": "Trợ lý không thể trả lời.",
-          "gettingReadyHint": "Đang chuẩn bị ghi chú của bạn cho AI. Chờ một chút.",
-          "noSearchModelHint": "Việc hỏi sẽ tìm trong ghi chú của bạn ngay trên thiết bị này, và điều đó cần một mô hình tìm kiếm ở đây. Nhà cung cấp không làm được việc này. Hãy chọn một mô hình trong Cài đặt → Nhà phát triển → AI. Việc dùng AI để sửa ghi chú vẫn hoạt động.",
           "insert": "Chèn vào ghi chú",
           "noAnswer": "Không có câu trả lời. Hãy thử diễn đạt lại.",
           "newChat": "Trò chuyện mới",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Bản dựng Myne này được biên dịch mà không kèm AI cục bộ, nên không có gì ở đây chạy được. Không cài đặt nào thay đổi được điều đó — cần một bản dựng có kèm AI.",
           "offHint": "AI cục bộ đang tắt. Hãy bật nó trong Cài đặt → Nhà phát triển → AI.",
           "send": "Gửi",
-          "statusGettingReady": "Đang chuẩn bị…",
-          "statusNoSearchModel": "Không có mô hình tìm kiếm",
           "statusNoModel": "Không có nhà cung cấp",
           "statusUnreachable": "Không phản hồi",
           "statusUnavailable": "Không khả dụng",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Mọi thứ lần chạy này có thể đọc nằm trong thư mục AI không bao giờ thấy. Không gửi gì. Đổi trong Cài đặt, AI, Thư mục loại trừ."
       },
       "modelChoose": "Chọn tệp…",
-      "modelEmbeddingLabel": "Mô hình tìm kiếm: tìm kiếm ngữ nghĩa & Hỏi đáp",
       "modelFilter": {
-        "gguf": "Mô hình GGUF",
-        "safetensors": "Mô hình Safetensors"
+        "gguf": "Mô hình GGUF"
       },
       "modelGenerationLabel": "Mô hình văn bản: trò chuyện, tóm tắt, viết",
       "modelNone": "Chưa chọn tệp",
@@ -3415,7 +3409,6 @@
       "providerNone": "Không có",
       "providerNothingAnswering": "Chưa có gì được thiết lập để trả lời.",
       "modelsLabel": "Mô hình",
-      "recommendedFilesEmbedding": "Cần model.safetensors + config.json + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesGeneration": "Cần tệp .gguf + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Hiện vị trí của {{name}}",
       "downloadsLabel": "Tải xuống mô hình",
       "downloadsHelper": "Lấy một mô hình từ origin của chính Myne. Nó được đối chiếu với một dấu vân tay tích hợp trong ứng dụng trước khi được dùng, nên một bản tải xuống bị can thiệp sẽ bị từ chối. Không có gì được tải trừ khi bạn nhấp.",
-      "downloadEmbeddingSize": "Mô hình đa ngôn ngữ, khoảng 449 MB.",
       "downloadTagLabel": "Mô hình gắn thẻ: gợi ý thẻ tự động",
       "downloadTagSize": "Mô hình cục bộ nhỏ, khoảng 337 MB.",
       "downloadInstalled": "Đã cài đặt",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Thiết lập AI",
-    "intro": "Myne có thể tìm ghi chú của bạn theo ý nghĩa, gợi ý thẻ và trò chuyện về chúng. Không điều nào là bắt buộc, và bạn có thể bật sau từ Cài đặt.",
+    "intro": "Myne có thể gợi ý thẻ và trò chuyện về chúng. Không điều nào là bắt buộc, và bạn có thể bật sau từ Cài đặt.",
     "enableLabel": "Bật các tính năng AI",
-    "semantic": {
-      "title": "Tìm kiếm ngữ nghĩa",
-      "body": "Tải xuống một mô hình nhúng đa ngôn ngữ (khoảng 449 MB) để bạn có thể tìm theo ý nghĩa, không chỉ theo từ ngữ."
-    },
     "tag": {
       "title": "Tự động gắn thẻ",
       "body": "Tải xuống mô hình gắn thẻ (khoảng 337 MB) để Myne có thể gợi ý thẻ khi bạn viết."

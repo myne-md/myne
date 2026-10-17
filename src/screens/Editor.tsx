@@ -111,7 +111,6 @@ import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
-import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
 import { AiOnboardingSurface } from "../components/settings/AiOnboardingSurface";
 import {
   readAiOnboardingSeen,
@@ -2730,7 +2729,6 @@ function EditorChrome({
         onRestored={() => ctx.reloadOpenNote()}
       />
       <SnapshotFailedIndicator />
-      <AiHydrationProbe />
       {/* First-run AI onboarding (myne-md/myne#805): offered once per device,
           after the first successful unlock. Gated on `localAi` as a whole: a
           host with no AI at all (web, per `decisions/ai/0628`) renders nothing,

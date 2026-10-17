@@ -118,71 +118,51 @@ pub struct Artifact {
     pub approx_total_bytes: u64,
 }
 
-/// The compiled-in artefact table. Only the multilingual embedding model is
-/// offered: `downloads.myne.md` hosts `intfloat/multilingual-e5-small` and no
-/// English-only embedder, and an English-only model flattens the cosine
-/// distribution `CHAT_RELEVANCE_THRESHOLD` (0.30) was tuned against, so offering
-/// one would be a retrieval-quality regression rather than a size trade.
-pub const ARTIFACTS: &[Artifact] = &[
-    Artifact {
-        id: "embedding-e5-small",
-        role: ModelRole::Embedding,
-        url_prefix: "/models/embedding/1a55775f5344",
-        dest_dir: "embedding-1a55775f5344",
-        // "about 449 MB" in the settings copy; 449 MiB.
-        approx_total_bytes: 449 * 1024 * 1024,
-        files: &[
-            ArtifactFile {
-                name: "model.safetensors",
-                sha256_hex: "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
-            },
-            ArtifactFile {
-                name: "config.json",
-                sha256_hex: "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
-            },
-            ArtifactFile {
-                name: "tokenizer.json",
-                sha256_hex: "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
-            },
-        ],
-    },
-    Artifact {
-        id: "tag",
-        role: ModelRole::TagSuggestion,
-        url_prefix: "/models/tag/05df94f8140a",
-        dest_dir: "tag-05df94f8140a",
-        // "about 337 MB" in the settings copy; 337 MiB.
-        approx_total_bytes: 337 * 1024 * 1024,
-        files: &[
-            ArtifactFile {
-                name: "model.gguf",
-                sha256_hex: "05df94f8140a0cb43910c1f7b4c680c6dd1539ef6790b33dd9c6a10dc714cd93",
-            },
-            ArtifactFile {
-                name: "tokenizer.json",
-                sha256_hex: "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
-            },
-        ],
-    },
-];
+/// The compiled-in artefact table. Only the auto-tag model is
+/// offered here; the transcription model ships in the bundle.
+pub const ARTIFACTS: &[Artifact] = &[Artifact {
+    id: "tag",
+    role: ModelRole::TagSuggestion,
+    url_prefix: "/models/tag/05df94f8140a",
+    dest_dir: "tag-05df94f8140a",
+    // "about 337 MB" in the settings copy; 337 MiB.
+    approx_total_bytes: 337 * 1024 * 1024,
+    files: &[
+        ArtifactFile {
+            name: "model.gguf",
+            sha256_hex: "05df94f8140a0cb43910c1f7b4c680c6dd1539ef6790b33dd9c6a10dc714cd93",
+        },
+        ArtifactFile {
+            name: "tokenizer.json",
+            sha256_hex: "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        },
+    ],
+}];
 
 /// Stub-build fixture artefacts (myne-md/myne#805 task 8). Deterministic bytes
 /// live here as digests only; the bytes themselves are served by
 /// `e2e/support/model-fixture-origin.ts`, which computes the same values. Kept
 /// out of the production table so a shipped binary cannot name them.
+///
+/// **One entry, for the auto-tag role.** It replaced `fixture-embedding` when
+/// the AI embedding index was retired (`docs/decisions/ai/0703-*`): the
+/// download path still needs a stub-only artefact to exercise install, digest
+/// verification, marker write and removal without a network, and the tag role
+/// is the surviving one with an otherwise identical flow. A fixture naming no
+/// role the client still offers would leave that flow covered by nothing.
 #[cfg(feature = "local-inference-stub")]
 pub static FIXTURE_ARTIFACTS: &[Artifact] = &[Artifact {
-    id: "fixture-embedding",
-    role: ModelRole::Embedding,
-    url_prefix: "/fixture/embedding",
-    dest_dir: "fixture-embedding",
+    id: "fixture-tag",
+    role: ModelRole::TagSuggestion,
+    url_prefix: "/fixture/tag",
+    dest_dir: "fixture-tag",
     // Fixture bytes are tiny; a small non-zero total keeps the bar determinate.
     approx_total_bytes: 4096,
     files: &[ArtifactFile {
-        name: "model.safetensors",
-        // sha256("myne-e2e-fixture-embedding-model-bytes"), the exact bytes
+        name: "model.gguf",
+        // sha256("myne-e2e-fixture-tag-model-bytes"), the exact bytes
         // `e2e/support/model-fixture-origin.ts` serves.
-        sha256_hex: "59796f4a717acce393fb5aa2da4353b5434b2593e7fa8551e3d59f60c2ebc44f",
+        sha256_hex: "7f7ba98a1997e0f1c7cc0f1b6b2ae51c255eba84262cfc1800f935ffb9b8a22e",
     }],
 }];
 
@@ -389,6 +369,51 @@ pub fn cancelled_fn(token: &CancelToken) -> CancelledFn {
 mod tests {
     use super::*;
 
+    /// The stub fixture table obeys the same shape rules as the production one,
+    /// and every entry really resolves through [`artifact_by_id`]: the download
+    /// E2E lane names `fixture-tag` by id, so a table that silently stopped
+    /// carrying it would redden that lane with no compile error here.
+    #[cfg(feature = "local-inference-stub")]
+    #[test]
+    fn the_fixture_table_is_shape_checked_and_resolvable() {
+        assert!(
+            !FIXTURE_ARTIFACTS.is_empty(),
+            "the model-download E2E lane needs a stub fixture artefact"
+        );
+        for a in FIXTURE_ARTIFACTS {
+            assert!(a.url_prefix.starts_with("/fixture/"), "{} prefix", a.id);
+            assert!(!a.files.is_empty(), "{} has no files", a.id);
+            for f in a.files {
+                assert!(
+                    !f.name.contains('/'),
+                    "{} file {} is not bare",
+                    a.id,
+                    f.name
+                );
+                assert_eq!(
+                    f.sha256_hex.len(),
+                    64,
+                    "{} {} digest not 32 bytes",
+                    a.id,
+                    f.name
+                );
+                assert!(
+                    f.sha256_hex
+                        .chars()
+                        .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                    "{} {} digest is not lowercase hex",
+                    a.id,
+                    f.name
+                );
+            }
+            assert!(
+                artifact_by_id(a.id).is_some(),
+                "{} does not resolve through artifact_by_id",
+                a.id
+            );
+        }
+    }
+
     #[test]
     fn the_table_ids_are_unique_and_each_names_bare_files() {
         let mut seen = std::collections::BTreeSet::new();
@@ -427,10 +452,6 @@ mod tests {
         assert_eq!(
             artifact_by_id("tag").map(|a| a.role),
             Some(ModelRole::TagSuggestion)
-        );
-        assert_eq!(
-            artifact_by_id("embedding-e5-small").map(|a| a.role),
-            Some(ModelRole::Embedding)
         );
         assert!(artifact_by_id("all-minilm").is_none());
     }

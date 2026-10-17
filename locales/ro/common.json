@@ -1275,8 +1275,6 @@
           "empty": "Rezumatele, răspunsurile și sugestiile apar aici pe măsură ce le ceri.",
           "error": "Solicitarea AI nu a putut fi finalizată.",
           "errorTurn": "Asistentul nu a putut răspunde.",
-          "gettingReadyHint": "Se pregătesc notele tale pentru AI. Un moment.",
-          "noSearchModelHint": "Întrebările caută în notele tale de pe acest dispozitiv, iar pentru asta este nevoie de un model de căutare aici. Un furnizor nu poate face asta. Alege un model de căutare din Setări → Developer → AI. Editarea notelor cu AI funcționează în continuare.",
           "insert": "Inserează în notă",
           "noAnswer": "Niciun răspuns. Încearcă să reformulezi.",
           "newChat": "Chat nou",
@@ -1285,8 +1283,6 @@
           "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula. Nicio setare nu va schimba asta — e nevoie de o versiune care include AI.",
           "offHint": "Funcția AI local este dezactivată. Activeaz-o din Setări → Developer → AI.",
           "send": "Trimite",
-          "statusGettingReady": "Se pregătește…",
-          "statusNoSearchModel": "Niciun model de căutare",
           "statusNoModel": "Niciun furnizor",
           "statusUnreachable": "Nu răspunde",
           "statusUnavailable": "Indisponibil",
@@ -3499,10 +3495,8 @@
         "emptyGrant": "Tot ce a putut citi această rulare se află în dosare pe care IA nu le vede niciodată. Nu s-a trimis nimic. Schimbați în Setări, IA, Dosare excluse."
       },
       "modelChoose": "Alege fișierul…",
-      "modelEmbeddingLabel": "Model de căutare: căutare semantică și întrebări-răspunsuri",
       "modelFilter": {
-        "gguf": "Model GGUF",
-        "safetensors": "Model Safetensors"
+        "gguf": "Model GGUF"
       },
       "modelGenerationLabel": "Model de text: chat, rezumate, scriere",
       "modelNone": "Niciun fișier selectat",
@@ -3535,7 +3529,6 @@
       "providerNone": "Niciunul",
       "providerNothingAnswering": "Nu este configurat încă nimic care să răspundă.",
       "modelsLabel": "Modele",
-      "recommendedFilesEmbedding": "Necesită model.safetensors + config.json + tokenizer.json în același dosar.",
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
@@ -3563,7 +3556,6 @@
       "modelShowLocation": "Arată locația pentru {{name}}",
       "downloadsLabel": "Descarcă modele",
       "downloadsHelper": "Preia un model de la propria origine a Myne. Este verificat față de o amprentă integrată în aplicație înainte de a fi folosit, așa că o descărcare alterată este respinsă. Nu se preia nimic decât dacă dai clic.",
-      "downloadEmbeddingSize": "Model multilingv, aproximativ 449 MB.",
       "downloadTagLabel": "Model de etichete: sugestii automate de etichete",
       "downloadTagSize": "Model local mic, aproximativ 337 MB.",
       "downloadInstalled": "Instalat",
@@ -5377,12 +5369,8 @@
   },
   "aiOnboarding": {
     "title": "Configurează AI",
-    "intro": "Myne poate căuta în notele tale după sens, poate sugera etichete și poate conversa despre ele. Nimic din toate acestea nu este obligatoriu și le poți activa mai târziu din Setări.",
+    "intro": "Myne poate sugera etichete și poate conversa despre ele. Nimic din toate acestea nu este obligatoriu și le poți activa mai târziu din Setări.",
     "enableLabel": "Activează funcțiile AI",
-    "semantic": {
-      "title": "Căutare semantică",
-      "body": "Descarcă un model de încorporare multilingv (aproximativ 449 MB) ca să poți căuta după sens, nu doar după cuvinte."
-    },
     "tag": {
       "title": "Etichetare automată",
       "body": "Descarcă modelul de etichete (aproximativ 337 MB) ca Myne să poată sugera etichete în timp ce scrii."

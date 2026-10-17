@@ -1218,8 +1218,6 @@
           "empty": "要約や回答、提案は、あなたが求めるとここに表示されます。",
           "error": "AIリクエストを完了できませんでした。",
           "errorTurn": "アシスタントは回答できませんでした。",
-          "gettingReadyHint": "AIのためにノートを準備しています。しばらくお待ちください。",
-          "noSearchModelHint": "質問するとこのデバイス上のノートを検索するため、ここに検索モデルが必要です。プロバイダーでは行えません。設定 → 開発者 → AI で選択してください。AIによるノートの編集は引き続き利用できます。",
           "insert": "ノートに挿入",
           "noAnswer": "回答がありません。言い換えてみてください。",
           "newChat": "新規チャット",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "このMyneのビルドはローカルAIなしでコンパイルされているため、ここでは何も実行できません。設定を変えてもそれは変わりません — AIを含むビルドが必要です。",
           "offHint": "ローカルAIはオフです。設定 → 開発者 → AI でオンにしてください。",
           "send": "送信",
-          "statusGettingReady": "準備中…",
-          "statusNoSearchModel": "検索モデルなし",
           "statusNoModel": "プロバイダーなし",
           "statusUnreachable": "応答なし",
           "statusUnavailable": "利用不可",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "この実行が読めたものはすべて、AIが見ないフォルダにあります。送信はありません。設定、AI、除外フォルダで変更してください。"
       },
       "modelChoose": "ファイルを選択…",
-      "modelEmbeddingLabel": "検索モデル：セマンティック検索とQ&A",
       "modelFilter": {
-        "gguf": "GGUFモデル",
-        "safetensors": "Safetensorsモデル"
+        "gguf": "GGUFモデル"
       },
       "modelGenerationLabel": "テキストモデル：チャット、要約、執筆",
       "modelNone": "ファイルが選択されていません",
@@ -3415,7 +3409,6 @@
       "providerNone": "なし",
       "providerNothingAnswering": "回答できるものはまだ設定されていません。",
       "modelsLabel": "モデル",
-      "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
       "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "{{name}} の場所を表示",
       "downloadsLabel": "モデルをダウンロード",
       "downloadsHelper": "Myne自身の配信元からモデルを取得します。使用前にアプリに組み込まれたフィンガープリントと照合されるため、改ざんされたダウンロードは拒否されます。クリックしない限り何も取得されません。",
-      "downloadEmbeddingSize": "多言語モデル、約449MB。",
       "downloadTagLabel": "タグモデル: タグの自動提案",
       "downloadTagSize": "小さなローカルモデル、約337MB。",
       "downloadInstalled": "インストール済み",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "AIを設定",
-    "intro": "Myneはノートを意味で検索し、タグを提案し、ノートについて対話できます。どれも必須ではなく、後から設定でオンにできます。",
+    "intro": "Myneはタグを提案し、ノートについて対話できます。どれも必須ではなく、後から設定でオンにできます。",
     "enableLabel": "AI機能をオンにする",
-    "semantic": {
-      "title": "セマンティック検索",
-      "body": "多言語の埋め込みモデル（約449MB）をダウンロードすると、言葉だけでなく意味で検索できます。"
-    },
     "tag": {
       "title": "自動タグ付け",
       "body": "タグ用モデル（約337MB）をダウンロードすると、書いている間にMyneがタグを提案できます。"

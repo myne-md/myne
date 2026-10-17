@@ -24,8 +24,9 @@
 //! verified by public CA plus hostname and cannot be pinned around. There is no
 //! accept-anything verifier here.
 //!
-//! **Why the body is streamed and not buffered.** The embedding artefact is
-//! ~471 MB, far past the 64 MiB `MAX_SYNC_RESPONSE_BYTES` the sync transport
+//! **Why the body is streamed and not buffered.** A model artefact is
+//! hundreds of MB, far past the 64 MiB `MAX_SYNC_RESPONSE_BYTES` the sync
+//! transport
 //! passes to the codec, and holding it whole in RAM would be its own denial of
 //! service. So this module reuses the codec's request framing and response
 //! *head* parser and streams the body to a caller-supplied [`Write`] sink in

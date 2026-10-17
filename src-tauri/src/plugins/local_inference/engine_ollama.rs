@@ -29,7 +29,7 @@
 //! the tokenizing, so that defense is unavailable and the filter is the only
 //! layer Myne controls. `decisions.md` 2026-08-09 records the downgrade.
 //!
-//! Logging: nothing here logs. No prompt, note body, embedding or model output
+//! Logging: nothing here logs. No prompt, note body, or model output
 //! reaches an error value or a panic message — the [`EngineError`] variants are
 //! unit and content-free by construction (`src-tauri/AGENTS.md` DENY list).
 
@@ -60,7 +60,7 @@ use super::error::EngineError;
 /// **Supplied explicitly rather than inherited.** Task 1 made the codec's cap a
 /// parameter precisely so this arm does not silently take sync's 64 MiB number,
 /// which is paired with the batch-blob fetch window and means nothing here. A
-/// completion or an embedding is orders of magnitude smaller; this bounds a
+/// completion is orders of magnitude smaller; this bounds a
 /// hostile or broken responder without pretending to be a sync bound.
 const MAX_RESPONSE_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -130,34 +130,6 @@ struct ChatReplyMessage {
     content: String,
 }
 
-#[derive(Deserialize)]
-struct EmbedReply {
-    #[serde(default)]
-    embedding: Vec<f32>,
-}
-
-/// `/api/tags` — the runtime's inventory of locally-available models. It is the
-/// endpoint that publishes a **content digest** per model; `/api/show` returns
-/// the modelfile, parameters and family metadata but no digest. Everything in
-/// each entry except the name and the digest is ignored on purpose.
-#[derive(Deserialize, Default)]
-struct TagsReply {
-    #[serde(default)]
-    models: Vec<TagsEntry>,
-}
-
-#[derive(Deserialize)]
-struct TagsEntry {
-    /// The tag as the user types it (`nomic-embed-text:latest`).
-    #[serde(default)]
-    name: String,
-    /// Same value under the newer key; older runtimes emit only `name`.
-    #[serde(default)]
-    model: String,
-    #[serde(default)]
-    digest: String,
-}
-
 impl OllamaEngine {
     pub fn new(host: String, port: u16, model: String) -> Self {
         Self::with_cancel(host, port, model, Arc::new(|| false))
@@ -186,12 +158,6 @@ impl OllamaEngine {
     /// A POST round trip — every inference call.
     fn post_json(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, EngineError> {
         self.request_json(HttpMethod::Post, path, body)
-    }
-
-    /// A GET round trip. One caller: the model-inventory query that
-    /// [`Engine::served_model_identity`] reads a digest out of.
-    fn get_json(&self, path: &str) -> Result<Vec<u8>, EngineError> {
-        self.request_json(HttpMethod::Get, path, b"")
     }
 
     /// One request/response round trip, and **the only socket call site on the
@@ -351,10 +317,6 @@ impl Engine for ConfiguredOllamaEngine {
         }
     }
 
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        self.resolve(&self.cancelled)?.embed(text)
-    }
-
     fn chat_streaming(
         &self,
         system: &str,
@@ -375,19 +337,6 @@ impl Engine for ConfiguredOllamaEngine {
         self.resolve(cancelled)?
             .chat_streaming(system, messages, on_token)
     }
-
-    fn served_model_identity(&self) -> Option<(String, String)> {
-        self.resolve(&self.cancelled).ok()?.served_model_identity()
-    }
-}
-
-/// Do two Ollama model references name the same model? An untagged reference
-/// means `:latest`, which the runtime applies but the inventory spells out.
-fn names_same_model(inventory: &str, chosen: &str) -> bool {
-    fn canonical(s: &str) -> &str {
-        s.strip_suffix(":latest").unwrap_or(s)
-    }
-    !inventory.is_empty() && canonical(inventory) == canonical(chosen)
 }
 
 impl Engine for OllamaEngine {
@@ -402,45 +351,6 @@ impl Engine for OllamaEngine {
         let reply: GenerateReply =
             serde_json::from_slice(&raw).map_err(|_| EngineError::InferenceFailed)?;
         Ok(reply.response)
-    }
-
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
-        let body = json!({ "model": self.model, "prompt": text }).to_string();
-        let raw = self.post_json("/api/embeddings", body.as_bytes())?;
-        let reply: EmbedReply =
-            serde_json::from_slice(&raw).map_err(|_| EngineError::EmbeddingFailed)?;
-        if reply.embedding.is_empty() {
-            return Err(EngineError::EmbeddingFailed);
-        }
-        Ok(reply.embedding)
-    }
-
-    /// The name the user chose plus the digest the runtime publishes for it —
-    /// the served arm of the `vault.embeddings` model identity (§9.17.2).
-    ///
-    /// `None` rather than a guess on every failure path: unreachable runtime,
-    /// unparseable reply, or a name the inventory does not list (the runtime
-    /// serves a model it did not record, or the tag was pulled away between
-    /// calls). A missing identity costs one un-persisted session; a fabricated
-    /// one — the name alone, say, with an empty digest — would persist vectors
-    /// under an identity that cannot distinguish two different models, which
-    /// §9.17.4 could then never invalidate.
-    fn served_model_identity(&self) -> Option<(String, String)> {
-        let raw = self.get_json("/api/tags").ok()?;
-        let reply: TagsReply = serde_json::from_slice(&raw).ok()?;
-        let digest = reply
-            .models
-            .iter()
-            // The user may type `nomic-embed-text` for an inventory entry named
-            // `nomic-embed-text:latest`; the runtime resolves that itself, so
-            // accept the implicit-`:latest` form here too rather than reporting
-            // "no identity" for the most common way to name a model.
-            .find(|m| {
-                names_same_model(&m.name, &self.model) || names_same_model(&m.model, &self.model)
-            })
-            .map(|m| m.digest.clone())
-            .filter(|d| !d.is_empty())?;
-        Some((self.model.clone(), digest))
     }
 
     /// Role-structured chat. Overrides the default **because** the default
@@ -535,58 +445,6 @@ pub(crate) mod tests {
         OllamaEngine::new("127.0.0.1".into(), port, "test-model".into())
     }
 
-    fn engine_named(port: u16, model: &str) -> OllamaEngine {
-        OllamaEngine::new("127.0.0.1".into(), port, model.into())
-    }
-
-    #[test]
-    fn served_identity_reads_the_digest_the_runtime_publishes() {
-        let (port, rx) = fake_server(
-            r#"{"models":[{"name":"other:latest","model":"other:latest","digest":"sha256:aaa"},{"name":"nomic-embed-text:latest","model":"nomic-embed-text:latest","digest":"sha256:bbb"}]}"#,
-        );
-        // The user typed the untagged form; the inventory spells out `:latest`.
-        let id = engine_named(port, "nomic-embed-text").served_model_identity();
-        assert_eq!(
-            id,
-            Some(("nomic-embed-text".to_string(), "sha256:bbb".to_string()))
-        );
-        let req = rx.recv().expect("request captured");
-        // A GET, not a POST — /api/tags is the only endpoint publishing digests.
-        assert!(req.starts_with("GET /api/tags"), "got: {req}");
-    }
-
-    #[test]
-    fn served_identity_is_none_when_the_inventory_does_not_list_the_model() {
-        // The runtime serves a name it did not record, or the tag was pulled
-        // away. A fabricated identity here would persist vectors under a label
-        // that cannot distinguish two models, which §9.17.4 could never
-        // invalidate — so the honest answer is no identity at all.
-        let (port, _rx) =
-            fake_server(r#"{"models":[{"name":"something-else","digest":"sha256:aaa"}]}"#);
-        assert_eq!(
-            engine_named(port, "nomic-embed-text").served_model_identity(),
-            None
-        );
-    }
-
-    #[test]
-    fn served_identity_is_none_on_an_empty_digest() {
-        // Present in the inventory but with no digest — the name alone is not
-        // an identity (a re-tag would be invisible).
-        let (port, _rx) = fake_server(r#"{"models":[{"name":"test-model","digest":""}]}"#);
-        assert_eq!(engine(port).served_model_identity(), None);
-    }
-
-    #[test]
-    fn served_identity_is_none_when_the_runtime_is_unreachable() {
-        // Nothing listening: degrade to "no persistence this session", never to
-        // a wrong identity. Port 1 on loopback is reliably refused.
-        assert_eq!(
-            engine_named(1, "nomic-embed-text").served_model_identity(),
-            None
-        );
-    }
-
     #[test]
     fn a_completion_round_trips_and_returns_the_models_text() {
         let (port, rx) = fake_server(r#"{"response":"hello there"}"#);
@@ -595,24 +453,6 @@ pub(crate) mod tests {
         let req = rx.recv().expect("request captured");
         assert!(req.starts_with("POST /api/generate"), "got: {req}");
         assert!(req.contains(r#""model":"test-model""#));
-    }
-
-    #[test]
-    fn an_embedding_returns_a_vector() {
-        let (port, _rx) = fake_server(r#"{"embedding":[0.1,0.2,0.3]}"#);
-        let v = engine(port).embed("some text").expect("embedding");
-        assert_eq!(v.len(), 3);
-    }
-
-    #[test]
-    fn an_empty_embedding_is_a_failure_not_an_empty_answer() {
-        // A zero-length vector would poison retrieval silently; refusing it is
-        // the difference between "no answer" and "a wrong one".
-        let (port, _rx) = fake_server(r#"{"embedding":[]}"#);
-        assert_eq!(
-            engine(port).embed("x").err(),
-            Some(EngineError::EmbeddingFailed)
-        );
     }
 
     /// SYNC-20: each turn is its own role field. Asserted on the **serialized

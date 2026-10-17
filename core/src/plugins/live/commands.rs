@@ -252,8 +252,8 @@ pub async fn live_session_patch_frontmatter_from_host(
 /// still in the registry" says nothing about the vault: on the manual lock the
 /// slot is dropped and the search index wiped BEFORE the live sessions are
 /// cleared, so a session-only check let the note's title and body back into the
-/// index the lock had just zeroized. The attachment await widens that window for
-/// `ai_note_changed`, so the state is checked again after it.
+/// index the lock had just zeroized. The attachment await widens that window, so
+/// the state is checked again after it.
 async fn index_live_note(
     hooks: &Hooks,
     state: &VaultRuntimeState,
@@ -277,7 +277,6 @@ async fn index_live_note(
         // A removal carries no plaintext, so it is not gated: dropping a doc from
         // an index the lock already wiped is a no-op, never a leak.
         hooks.search_remove(note_id);
-        while_unlocked(state, vault_id, || hooks.ai_note_changed(note_id, markdown)).await;
         return;
     }
     // The same drawing fold as the stateless writers (SF5 / SYNC-4): a drawing
@@ -286,34 +285,26 @@ async fn index_live_note(
     // (`live_session_applies`), so this arm is parity rather than a live case.
     if is_drawing(markdown.as_bytes()) {
         let body = project_drawing_text(markdown.as_bytes()).unwrap_or_default();
-        if !while_unlocked(state, vault_id, || {
+        let _ = while_unlocked(state, vault_id, || {
             hooks.search_upsert(note_id, &title, &body)
         })
-        .await
-        {
-            return;
-        }
-    } else {
-        if !while_unlocked(state, vault_id, || {
-            hooks.search_upsert(note_id, &title, markdown)
-        })
-        .await
-        {
-            return;
-        }
-        // Not run under the slot guard: the hook resolves the vault through
-        // `state` itself, and a nested read on a tokio `RwLock` with a lock's
-        // write queued behind the outer guard deadlocks. It refuses a locked
-        // vault on its own key peek.
-        hooks
-            .index_note_attachments(state, note_id, &title, markdown)
-            .await;
+        .await;
+        return;
     }
-    // Raw body, the AI arm projects for itself (myne#304). Re-checked rather than
-    // carried over from the upsert above: the attachment await is the widest
-    // window in this function, and a lock landing inside it must not be followed
-    // by a re-embed of the note's body.
-    while_unlocked(state, vault_id, || hooks.ai_note_changed(note_id, markdown)).await;
+    if !while_unlocked(state, vault_id, || {
+        hooks.search_upsert(note_id, &title, markdown)
+    })
+    .await
+    {
+        return;
+    }
+    // Not run under the slot guard: the hook resolves the vault through
+    // `state` itself, and a nested read on a tokio `RwLock` with a lock's
+    // write queued behind the outer guard deadlocks. It refuses a locked
+    // vault on its own key peek.
+    hooks
+        .index_note_attachments(state, note_id, &title, markdown)
+        .await;
 }
 
 /// Run `index` only if `vault_id` is still `Unlocked`, HOLDING that slot's read

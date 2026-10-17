@@ -1,4 +1,4 @@
-// The AI model surface: the download catalogue and the four role rows
+// The AI model surface: the download catalogue and the three role rows
 // (myne-md/myne#867).
 //
 // == WHAT THIS PROVES, AND WHAT IT DOES NOT ==
@@ -19,17 +19,17 @@
 //           the host's stored path for the role is gone.
 //
 // **The button's SUCCESS path is deliberately not driven, and this is the
-// reason.** The catalogue names the two artefacts Myne's own origin serves
-// (`embedding-e5-small`, `tag`) with the production URLs and the production
-// digests compiled into the binary. The harness serves ONE stub-only artefact
-// (`fixture-embedding`, whose digest is the digest of the fixture bytes), and
-// `download.rs::artifact_by_id` resolves a production id from the PRODUCTION
-// table first. So pointing the button at fixture bytes would mean compiling a
-// stub-only digest over a production id: a stub build that accepts the wrong
-// bytes for a real artefact, which is exactly the trust anchor `mdo3` asserts
-// it cannot do. The download itself is therefore driven through the same IPC
-// command the button calls (`aims3`), the refusal path is `mdo3`'s, and what
-// this file adds is the SURFACE: reachable, honest about state, and wired.
+// reason.** The catalogue names the artefact Myne's own origin serves (`tag`)
+// with the production URL and the production digest compiled into the binary.
+// The harness serves ONE stub-only artefact (`fixture-tag`, whose digest is the
+// digest of the fixture bytes), and `download.rs::artifact_by_id` resolves a
+// production id from the PRODUCTION table first. So pointing the button at
+// fixture bytes would mean compiling a stub-only digest over a production id: a
+// stub build that accepts the wrong bytes for a real artefact, which is exactly
+// the trust anchor `mdo3` asserts it cannot do. The download itself is therefore
+// driven through the same IPC command the button calls (`aims3`), the refusal
+// path is `mdo3`'s, and what this file adds is the SURFACE: reachable, honest
+// about state, and wired.
 //
 // Gated on `MYNE_E2E_AI=1` AND the stub build, paired by
 // `scripts/e2e-ai-buildrun.sh`, like its neighbours in this directory.
@@ -107,7 +107,7 @@ async function installFixture(s: Session, downloadId: string): Promise<string> {
   return (await ipcOk(
     s,
     "plugin:local-inference|download_model",
-    { artifact: "fixture-embedding", downloadId },
+    { artifact: "fixture-tag", downloadId },
     60_000,
   )) as string;
 }
@@ -128,16 +128,13 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
         await s.byTestId("settings.ai-panel");
         await selectSettingsTopic(s, "ai", "models");
 
-        // The Models table's four role rows, by their own controls. The tag row
+        // The Models table's three role rows, by their own controls. The tag row
         // is the one myne-md/myne#867 added; without it the tag model was
         // reachable only by downloading it, and a user with their own file had
         // no way to point Myne at it.
-        for (const role of ["", "-embedding", "-transcription"]) {
+        for (const role of ["", "-transcription", "-tag"]) {
           await s.byTestId(`ai.model-choose${role}`);
         }
-        // The tag role is the fourth row of the same table since the Tagging
-        // topic folded into Models (myne-md/myne#867).
-        await s.byTestId("ai.model-choose-tag");
 
         // **The catalogue, INLINE in the Models topic.** There is no button to
         // press and no modal: it is in the same topic as the assignment rows,
@@ -151,10 +148,10 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
         });
         expect((await s.byTestIdAll("ai.catalogue-button")).length).toBe(0);
 
-        // **Both artefacts, whether or not either is installed**, which is the
-        // point of a catalogue over a "download" block: what Myne offers cannot
+        // **The artefact, whether or not it is installed**, which is the point
+        // of a catalogue over a "download" block: what Myne offers cannot
         // depend on what this machine happens to have.
-        for (const artifact of ["embedding-e5-small", "tag"]) {
+        for (const artifact of ["tag"]) {
           const row = await s.byTestId(`ai.download-row-${artifact}`);
           expect(await row.textContent()).not.toBe("");
           expect(await rowState(s, artifact)).toBe(NOT_INSTALLED);
@@ -183,7 +180,7 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
           await openCatalogue(s);
 
           const before = origin.requests();
-          const button = await s.byTestId("ai.download-button-embedding-e5-small");
+          const button = await s.byTestId("ai.download-button-tag");
           await button.click();
 
           // **A request is what proves the button is wired.** An unwired button
@@ -201,16 +198,16 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
           // "Downloading".
           await s.waitUntil(
             async () => {
-              const row = await s.byTestId("ai.download-row-embedding-e5-small");
+              const row = await s.byTestId("ai.download-row-tag");
               return (await row.textContent()).includes(DOWNLOAD_FAILED) ? true : null;
             },
             { label: "the failure to be named on the row", timeoutMs: 20_000 },
           );
           await s.waitUntil(
-            async () => (await s.byTestIdAll("ai.download-button-embedding-e5-small")).at(0) ?? null,
+            async () => (await s.byTestIdAll("ai.download-button-tag")).at(0) ?? null,
             { label: "the download action to return", timeoutMs: 20_000 },
           );
-          expect(await rowState(s, "embedding-e5-small")).toBe(NOT_INSTALLED);
+          expect(await rowState(s, "tag")).toBe(NOT_INSTALLED);
         },
       );
     } finally {
@@ -238,10 +235,10 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
           // download started from the UI reloads the same map through its own
           // `onChanged`, which is why `aims2`'s row recovers without this.
           const installed = await installFixture(s, "aims3");
-          expect(await rolePath(s, "embedding")).toBe(installed);
+          expect(await rolePath(s, "tag")).toBe(installed);
 
           await openCatalogue(s);
-          expect(await rowState(s, "embedding-e5-small")).toBe(INSTALLED);
+          expect(await rowState(s, "tag")).toBe(INSTALLED);
           // **The provenance is the PATH, and it is behind the row's own press.**
           // `ai.model-provenance-<artifact>` is the ICON BUTTON, so its own text is
           // empty by construction; the path renders in the anchored panel the press
@@ -249,26 +246,26 @@ aiDescribe("aims AI model surface (catalogue + role assignment)", () => {
           // asserted non-empty text on the button and failed at 45 s on the one
           // assertion in this file that could not pass, which is what running a
           // scenario once is for.
-          const provenance = await s.byTestId("ai.model-provenance-embedding-e5-small");
+          const provenance = await s.byTestId("ai.model-provenance-tag");
           await (await provenance.click(), s.waitUntil(
             async () =>
-              (await s.byTestIdAll("ai.model-provenance-panel-embedding-e5-small")).at(0) ?? null,
+              (await s.byTestIdAll("ai.model-provenance-panel-tag")).at(0) ?? null,
             { label: "the provenance panel", timeoutMs: 15_000 },
           ));
-          const shown = await s.byTestId("ai.model-provenance-panel-embedding-e5-small-path");
+          const shown = await s.byTestId("ai.model-provenance-panel-tag-path");
           expect((await shown.textContent()).trim()).toBe(installed);
 
-          const remove = await s.byTestId("ai.remove-button-embedding-e5-small");
+          const remove = await s.byTestId("ai.remove-button-tag");
           await remove.click();
 
           // Gone from the host as well as from the row: this is the assertion
           // that separates "the row redrew" from "the model was forgotten".
           await s.waitUntil(
-            async () => ((await rolePath(s, "embedding")) === null ? true : null),
-            { label: "the stored embedding path to clear", timeoutMs: 15_000 },
+            async () => ((await rolePath(s, "tag")) === null ? true : null),
+            { label: "the stored tag path to clear", timeoutMs: 15_000 },
           );
           await s.waitUntil(
-            async () => ((await rowState(s, "embedding-e5-small")) === NOT_INSTALLED ? true : null),
+            async () => ((await rowState(s, "tag")) === NOT_INSTALLED ? true : null),
             { label: "the row to return to Not installed", timeoutMs: 15_000 },
           );
         },

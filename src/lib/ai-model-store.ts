@@ -10,7 +10,7 @@ import { invoke } from "../platform/core";
 /** Which model a stored path refers to (mirrors the Rust `ModelRole`). `tag`
  *  joined this set with myne-md/myne#805, when the auto-tag model became a
  *  downloaded/side-loaded role rather than a bundled-only one. */
-export type ModelRole = "generation" | "embedding" | "transcription" | "tag";
+export type ModelRole = "generation" | "transcription" | "tag";
 
 /**
  * Persist the user-picked model `path` for `role` device-locally. Returns the

@@ -1218,8 +1218,6 @@
           "empty": "Zusammenfassungen, Antworten und Vorschläge erscheinen hier, sobald Sie danach fragen.",
           "error": "Die KI-Anfrage konnte nicht abgeschlossen werden.",
           "errorTurn": "Der Assistent konnte nicht antworten.",
-          "gettingReadyHint": "Deine Notizen werden für die KI vorbereitet. Einen Moment.",
-          "noSearchModelHint": "„Fragen“ durchsucht Ihre Notizen auf diesem Gerät, und dafür wird hier ein Suchmodell benötigt. Ein Anbieter kann das nicht. Wählen Sie eines unter Einstellungen → Developer → KI aus. Das Bearbeiten Ihrer Notizen mit der KI funktioniert weiterhin.",
           "insert": "In Notiz einfügen",
           "noAnswer": "Keine Antwort. Versuchen Sie, es anders zu formulieren.",
           "newChat": "Neuer Chat",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Dieser Build von Myne wurde ohne lokale KI kompiliert, daher kann hier nichts laufen. Keine Einstellung ändert das — es braucht einen Build mit integrierter KI.",
           "offHint": "Lokale KI ist aus. Schalte sie unter Einstellungen → Developer → KI ein.",
           "send": "Senden",
-          "statusGettingReady": "Wird vorbereitet…",
-          "statusNoSearchModel": "Kein Suchmodell",
           "statusNoModel": "Kein Anbieter",
           "statusUnreachable": "Antwortet nicht",
           "statusUnavailable": "Nicht verfügbar",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Alles, was dieser Lauf lesen konnte, liegt in Ordnern, die die KI nie sieht. Nichts wurde gesendet. Ändern Sie es unter Einstellungen, KI, Ausgeschlossene Ordner."
       },
       "modelChoose": "Datei auswählen…",
-      "modelEmbeddingLabel": "Suchmodell: semantische Suche & Q&A",
       "modelFilter": {
-        "gguf": "GGUF-Modell",
-        "safetensors": "Safetensors-Modell"
+        "gguf": "GGUF-Modell"
       },
       "modelGenerationLabel": "Textmodell: Chat, Zusammenfassungen, Schreiben",
       "modelNone": "Keine Datei ausgewählt",
@@ -3415,7 +3409,6 @@
       "providerNone": "Keiner",
       "providerNothingAnswering": "Es ist noch nichts eingerichtet, das antworten könnte.",
       "modelsLabel": "Modelle",
-      "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
       "title": "KI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Den Speicherort von {{name}} anzeigen",
       "downloadsLabel": "Modelle herunterladen",
       "downloadsHelper": "Ein Modell von Mynes eigener Herkunft holen. Es wird vor der Verwendung gegen einen in die App eingebauten Fingerabdruck geprüft, sodass ein manipulierter Download zurückgewiesen wird. Es wird nichts geholt, solange Sie nicht klicken.",
-      "downloadEmbeddingSize": "Mehrsprachiges Modell, etwa 449 MB.",
       "downloadTagLabel": "Tag-Modell: automatische Tag-Vorschläge",
       "downloadTagSize": "Kleines lokales Modell, etwa 337 MB.",
       "downloadInstalled": "Installiert",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "KI einrichten",
-    "intro": "Myne kann Ihre Notizen nach Bedeutung durchsuchen, Tags vorschlagen und sich mit Ihnen darüber unterhalten. Nichts davon ist erforderlich, und Sie können es später in den Einstellungen einschalten.",
+    "intro": "Myne kann Tags vorschlagen und sich mit Ihnen darüber unterhalten. Nichts davon ist erforderlich, und Sie können es später in den Einstellungen einschalten.",
     "enableLabel": "KI-Funktionen einschalten",
-    "semantic": {
-      "title": "Semantische Suche",
-      "body": "Laden Sie ein mehrsprachiges Einbettungsmodell herunter (etwa 449 MB), damit Sie nach Bedeutung suchen können und nicht nur nach Wörtern."
-    },
     "tag": {
       "title": "Automatische Tags",
       "body": "Laden Sie das Tag-Modell herunter (etwa 337 MB), damit Myne Ihnen beim Schreiben Tags vorschlagen kann."

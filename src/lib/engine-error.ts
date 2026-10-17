@@ -93,9 +93,8 @@ export type ProviderErrorCause =
    *
    *  **Split out of `barred` by myne-md/myne#456, and the split is the point.**
    *  One Rust variant used to carry two unrelated meanings: a rule about a
-   *  request CLASS that no user choice can lift (an ambient request, or any
-   *  embedding, may never use a remote backend) and a permission the user has
-   *  simply not given yet. Collapsed, someone who had never seen the consent
+   *  request CLASS that no user choice can lift (an ambient request may never
+   *  use a remote backend) and a permission the user has simply not given yet. Collapsed, someone who had never seen the consent
    *  screen was told "this kind of request never goes to a provider", which is
    *  false about their request and silent about the one action that fixes it.
    *

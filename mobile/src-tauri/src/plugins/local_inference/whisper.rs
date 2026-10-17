@@ -4,7 +4,7 @@
 //! the log-mel front end, language detection, and the greedy token-decode loop
 //! over 30-second windows — all against candle-transformers 0.8.4's in-tree
 //! `whisper` module (a **quantized GGUF** model + siblings `tokenizer.json` /
-//! `config.json`, side-loaded like the generation/embedding models, SYNC-1/2).
+//! `config.json`, side-loaded like the generation model, SYNC-1/2).
 //!
 //! **Mel filterbank is computed, not shipped.** candle's `pcm_to_mel` needs a
 //! caller-supplied mel-filter matrix; rather than commit an opaque

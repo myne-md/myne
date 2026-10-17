@@ -267,7 +267,6 @@ export const ROSTER = Object.freeze([
       "src/lib/chats.ts",
       "src/lib/memory.ts",
       "src/notes/agent/agentStore.ts",
-      "src/notes/components/AiHydrationProbe.tsx",
       "src/notes/components/MemoryPopover.tsx",
       "src/components/settings/MemorySection.tsx",
       "src-tauri/src/plugins/local_inference/",
@@ -294,7 +293,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-degradation.e2e.ts",
       "e2e/ai-ollama-backend.e2e.ts",
       "e2e/ai-remote-providers.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
       "e2e/chat-history.e2e.ts",
       "e2e/memory.e2e.ts",
       "e2e-web/chat-history-reload.e2e.ts",
@@ -419,7 +417,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-degradation.e2e.ts",
       "e2e/ai-ux-surface.e2e.ts",
       "e2e/ai-chat.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
     ],
     manual: [
       {
@@ -5504,7 +5501,6 @@ export const ROSTER = Object.freeze([
       "e2e/ai-ollama-backend.e2e.ts",
       "e2e/ai-degradation.e2e.ts",
       "e2e/developer-mode.e2e.ts",
-      "e2e/ai-embeddings-persistence.e2e.ts",
       // The in-panel topic strip's own scenario (myne-md/myne#885): selection,
       // the strip's row measured against the search row's, Left/Right, Up/Down
       // left to the rail, the topic held across a close and reopen, and a

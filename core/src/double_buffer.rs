@@ -118,6 +118,9 @@ pub const DOUBLE_BUFFERED: &[&str] = &[
     "vault.agent-memory",
     "vault.personality",
     "vault.graph",
+    // The AI embedding index family is RETIRED, but a vault written by an older
+    // build still carries `vault.embeddings` on disk, so the container must still
+    // tolerate (and double-buffer) the file rather than choke on it.
     "vault.embeddings",
     "vault.quickunlock",
     "vault.head-state",
@@ -1265,6 +1268,8 @@ mod tests {
             "vault.dictionary",
             "vault.themes",
             "vault.graph",
+            // Retired family, kept for an older vault's stray file (see the
+            // roster's own note).
             "vault.embeddings",
             "vault.quickunlock",
             "vault.head-state",

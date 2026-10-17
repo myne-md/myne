@@ -39,17 +39,8 @@ export interface AiCapabilityReport {
   /** `in_process_local` | `loopback_local` | `remote`, or `null`. */
   backendClass: string | null;
   generation: AiFeatureStatus;
-  embedding: AiFeatureStatus;
   transcription: AiFeatureStatus;
   autoTag: AiFeatureStatus;
-  /** Whether the vault's embedding index is BUILT, as distinct from whether an
-   *  embedding model exists at all (myne-md/myne#545).
-   *
-   *  `embedding` says asking can run; this says it can run now. The chat header
-   *  needs both, or "still indexing" and "ready" look identical and it shows
-   *  the provider's name — which reads as ready — for a surface that will
-   *  refuse every turn. */
-  indexReady: boolean;
 }
 
 const UNCOMPILED_FEATURE: AiFeatureStatus = { available: false, cause: null };
@@ -62,10 +53,8 @@ export const UNCOMPILED_REPORT: AiCapabilityReport = {
   backendId: null,
   backendClass: null,
   generation: UNCOMPILED_FEATURE,
-  embedding: UNCOMPILED_FEATURE,
   transcription: UNCOMPILED_FEATURE,
   autoTag: UNCOMPILED_FEATURE,
-  indexReady: false,
 };
 
 interface WireFeature {
@@ -102,10 +91,8 @@ export async function aiCapabilityReport(): Promise<AiCapabilityReport> {
       backendClass:
         typeof raw.backend_class === "string" ? raw.backend_class : null,
       generation: feature(raw.generation),
-      embedding: feature(raw.embedding),
       transcription: feature(raw.transcription),
       autoTag: feature(raw.auto_tag),
-      indexReady: raw.index_ready === true,
     };
   } catch {
     return UNCOMPILED_REPORT;
@@ -172,7 +159,7 @@ export function answeredByOf(
  * Which AI feature a surface is asking about. The names are the report's own,
  * so there is no second vocabulary to keep in step (#191 task 1).
  */
-export type AiFeature = "generation" | "embedding" | "transcription" | "autoTag";
+export type AiFeature = "generation" | "transcription" | "autoTag";
 
 /**
  * What a surface should say about a feature, as a closed set of states.

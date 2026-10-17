@@ -1218,8 +1218,6 @@
           "empty": "요약, 답변, 제안은 요청하는 대로 여기에 표시됩니다.",
           "error": "AI 요청을 완료하지 못했습니다.",
           "errorTurn": "어시스턴트가 답변하지 못했습니다.",
-          "gettingReadyHint": "AI를 위해 노트를 준비하는 중입니다. 잠시만 기다려 주세요.",
-          "noSearchModelHint": "질문하면 이 기기에서 노트를 검색하며, 그러려면 여기에 검색 모델이 필요합니다. 제공업체로는 할 수 없습니다. 설정 → 개발자 → AI에서 선택하세요. AI로 노트를 편집하는 기능은 계속 사용할 수 있습니다.",
           "insert": "노트에 삽입",
           "noAnswer": "답변이 없습니다. 다르게 표현해 보세요.",
           "newChat": "새 대화",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "이 Myne 빌드는 로컬 AI 없이 컴파일되어 여기에서는 아무것도 실행할 수 없습니다. 어떤 설정으로도 바뀌지 않습니다 — AI가 포함된 빌드가 필요합니다.",
           "offHint": "로컬 AI가 꺼져 있습니다. 설정 → 개발자 → AI에서 켜세요.",
           "send": "보내기",
-          "statusGettingReady": "준비 중…",
-          "statusNoSearchModel": "검색 모델 없음",
           "statusNoModel": "제공업체 없음",
           "statusUnreachable": "응답 없음",
           "statusUnavailable": "사용 불가",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "이 실행이 읽을 수 있는 것은 AI가 보지 않는 폴더 안에 있습니다. 아무것도 전송되지 않았습니다. 설정, AI, 제외된 폴더에서 바꾸세요."
       },
       "modelChoose": "파일 선택…",
-      "modelEmbeddingLabel": "검색 모델: 의미 기반 검색 및 Q&A",
       "modelFilter": {
-        "gguf": "GGUF 모델",
-        "safetensors": "Safetensors 모델"
+        "gguf": "GGUF 모델"
       },
       "modelGenerationLabel": "텍스트 모델: 채팅, 요약, 작성",
       "modelNone": "선택된 파일 없음",
@@ -3415,7 +3409,6 @@
       "providerNone": "없음",
       "providerNothingAnswering": "아직 답변할 수 있도록 설정된 것이 없습니다.",
       "modelsLabel": "모델",
-      "recommendedFilesEmbedding": "한 폴더에 model.safetensors + config.json + tokenizer.json이 필요합니다.",
       "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
       "recommendedFilesTranscription": "같은 폴더에 Whisper .gguf 파일 + config.json + tokenizer.json이 필요합니다.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "{{name}}의 위치 보기",
       "downloadsLabel": "모델 내려받기",
       "downloadsHelper": "Myne 자체 오리진에서 모델을 가져옵니다. 사용하기 전에 앱에 내장된 지문과 대조하므로, 변조된 다운로드는 거부됩니다. 클릭하지 않으면 아무것도 내려받지 않습니다.",
-      "downloadEmbeddingSize": "다국어 모델, 약 449MB.",
       "downloadTagLabel": "태그 모델: 자동 태그 제안",
       "downloadTagSize": "작은 로컬 모델, 약 337MB.",
       "downloadInstalled": "설치됨",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "AI 설정",
-    "intro": "Myne는 노트를 의미로 검색하고, 태그를 제안하고, 노트에 대해 대화할 수 있습니다. 모두 필수는 아니며 나중에 설정에서 켤 수 있습니다.",
+    "intro": "Myne는 태그를 제안하고 노트에 대해 대화할 수 있습니다. 모두 필수는 아니며 나중에 설정에서 켤 수 있습니다.",
     "enableLabel": "AI 기능 켜기",
-    "semantic": {
-      "title": "의미 검색",
-      "body": "다국어 임베딩 모델(약 449MB)을 내려받으면 단어뿐 아니라 의미로도 검색할 수 있습니다."
-    },
     "tag": {
       "title": "자동 태그",
       "body": "태그 모델(약 337MB)을 내려받으면 글을 쓰는 동안 Myne가 태그를 제안합니다."

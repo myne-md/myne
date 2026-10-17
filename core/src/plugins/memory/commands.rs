@@ -27,7 +27,7 @@
 //! - **`hooks.bump_local_change()`** after every persisted mutation: every
 //!   blob is synced, so each write opens a push window.
 //! - **`ai_enabled` gate**: the whole surface exists only while the runtime
-//!   beta opt-in is on (the `vault.embeddings` rule); the caller (the Tauri
+//!   beta opt-in is on; the caller (the Tauri
 //!   command layer) re-reads the gate before each command.
 
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
@@ -2708,7 +2708,7 @@ mod tests {
 // ---------------------------------------------------------------------------
 
 /// Host-side `ai_enabled` re-read: the whole surface exists only while the
-/// runtime beta opt-in is on (the `vault.embeddings` rule, myne-md/myne#697).
+/// runtime beta opt-in is on (myne-md/myne#697).
 /// Read off the live `vault.prefs` on every call, like the sync plane's
 /// `memory_sync_enabled`: the WebView hiding the surface is not a gate (TB6),
 /// so the opt-in cannot live only in the page it is meant to constrain.

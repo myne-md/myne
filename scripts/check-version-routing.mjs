@@ -197,16 +197,15 @@ export function callsProtocolName(line, name, imports) {
  */
 const ALLOWED = new Map([
   // ── legitimately v0.1: REBUILDABLE, NEVER-SYNCED CACHES ───────────────────
-  // §10.4.1 point 2 DROPS these rather than re-sealing them. The SHARED
-  // singleton KEKs (prefs, search, workspace, indices, graph, themes,
-  // dictionary, attachments catalog and the attachment-text cache) used to be
-  // recorded here because every reader derived them with the v0.1-only
-  // `derive_subkey`. myne-md/myne#712 task 6 routed them through
-  // `SharedSingletonKey::derive`, which picks the GROUP tier on an `NTV6` vault
-  // and the root tier otherwise, so those v0.1-only calls are gone and their
-  // entries went stale in the same run. What remains here is genuinely
-  // root-only: `AiEmbeddingsKey` is an owner role, not a shared one.
-  ["src-tauri/src/plugins/local_inference/hydrate.rs#kek", [1, "cache: vault.embeddings (AiEmbeddingsKey), owner-only, dropped by the migration"]],
+  // EMPTY. The last entry here was `local_inference/hydrate.rs#kek`, the KEK
+  // for the `vault.embeddings` cache. The AI-embeddings family was retired
+  // (`docs/decisions/ai/0703-*`) and the module went with it, so no root-only
+  // cache derivation is left in the tree. The SHARED singleton KEKs that used
+  // to sit in this section (prefs, search, workspace, indices, graph, themes,
+  // dictionary, attachments catalog, attachment-text) moved to
+  // `SharedSingletonKey::derive` in myne-md/myne#712 task 6, which picks the
+  // GROUP tier on an `NTV6` vault and the root tier otherwise, so their
+  // v0.1-only calls are gone and their entries went stale in the same run.
 
   // ── legitimately v0.1: SYNC-PLANE IDENTITY AND AUTH ───────────────────────
   // The reserved sync-ids (`catalog-`/`prefs-`/`themes-sync-id`) and the SCRAM

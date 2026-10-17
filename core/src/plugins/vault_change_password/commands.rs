@@ -126,8 +126,7 @@ pub async fn change_password_from_host(
         hooks.live_session_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices — note titles,
         // folders, tags, wikilink targets and typed property values
-        // (`spec/protocol.md` §9.8.5) — and, on a `local-inference` desktop
-        // build, the AI embedding vectors the same hook carries (§9.17.5).
+        // (`spec/protocol.md` §9.8.5).
         hooks.zeroize_vault_indices();
         // MYND-169: wipe the plaintext-derived attachment reference graph —
         // its note-ids / attachment-ids are correlation tags (AS3). On the web
@@ -1507,8 +1506,8 @@ mod tests {
 
     /// The credential-rotation force-relock drops `Slot::Unlocked` to `Empty`,
     /// so it owes the SAME teardown as the manual lock: `spec/protocol.md`
-    /// §9.8.5 (`vault.indices`) and §9.17.5 (`vault.embeddings`) both say the
-    /// decrypted material is zeroized at **every** slot-drop site and both name
+    /// §9.8.5 (`vault.indices`) says the
+    /// decrypted material is zeroized at **every** slot-drop site and names
     /// the credential-rotation force-relock among them. Asserts the recorded
     /// call vector equals `lock_from_host`'s teardown list, in its order — a
     /// hook added to one path and not the other fails here rather than leaving

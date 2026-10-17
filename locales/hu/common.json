@@ -1218,8 +1218,6 @@
           "empty": "Az összefoglalók, a válaszok és a javaslatok itt jelennek meg, ahogy kérdezel.",
           "error": "Az AI-kérés nem teljesíthető.",
           "errorTurn": "Az asszisztens nem tudott válaszolni.",
-          "gettingReadyHint": "A jegyzetek előkészítése az AI számára. Egy pillanat.",
-          "noSearchModelHint": "A kérdezés ezen az eszközön keres a jegyzeteid között, ehhez pedig itt helyben keresőmodell kell. Szolgáltató erre nem alkalmas. Válassz egyet a Beállítások → Fejlesztő → AI menüpontban. A jegyzetek AI-val való szerkesztése továbbra is működik.",
           "insert": "Beszúrás a jegyzetbe",
           "noAnswer": "Nincs válasz. Próbáld átfogalmazni.",
           "newChat": "Új beszélgetés",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "A Myne ezen buildje helyi AI nélkül készült, így itt semmi nem tud futni. Ezen semmilyen beállítás nem változtat — ehhez AI-t tartalmazó build kell.",
           "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Fejlesztő → AI menüben.",
           "send": "Küldés",
-          "statusGettingReady": "Előkészítés…",
-          "statusNoSearchModel": "Nincs keresőmodell",
           "statusNoModel": "Nincs szolgáltató",
           "statusUnreachable": "Nem válaszol",
           "statusUnavailable": "Nem érhető el",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Minden, amit ez a futás olvashatott, olyan mappákban van, amelyeket az AI sosem lát. Nem küldött semmit. Módosítsa a Beállítások, AI, Kizárt mappák alatt."
       },
       "modelChoose": "Fájl kiválasztása…",
-      "modelEmbeddingLabel": "Keresőmodell: szemantikus keresés és kérdés-válasz",
       "modelFilter": {
-        "gguf": "GGUF modell",
-        "safetensors": "Safetensors modell"
+        "gguf": "GGUF modell"
       },
       "modelGenerationLabel": "Szövegmodell: csevegés, összefoglalók, írás",
       "modelNone": "Nincs kiválasztott fájl",
@@ -3415,7 +3409,6 @@
       "providerNone": "Nincs",
       "providerNothingAnswering": "Még semmi nincs beállítva, ami válaszolna.",
       "modelsLabel": "Modellek",
-      "recommendedFilesEmbedding": "Szükséges a model.safetensors + config.json + tokenizer.json egy mappában.",
       "recommendedFilesGeneration": "Szükséges a .gguf fájl + tokenizer.json ugyanabban a mappában.",
       "recommendedFilesTranscription": "Szükséges a Whisper .gguf fájl + config.json + tokenizer.json ugyanabban a mappában.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "{{name}} helyének megjelenítése",
       "downloadsLabel": "Modellek letöltése",
       "downloadsHelper": "Modell letöltése a Myne saját eredetéről. Használat előtt a beépített ujjlenyomattal ellenőrzi, ezért a meghamisított letöltést elutasítja. Semmi nem töltődik le, amíg nem kattintasz.",
-      "downloadEmbeddingSize": "Többnyelvű modell, körülbelül 449 MB.",
       "downloadTagLabel": "Címkemodell: automatikus címkejavaslatok",
       "downloadTagSize": "Kis helyi modell, körülbelül 337 MB.",
       "downloadInstalled": "Telepítve",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "AI beállítása",
-    "intro": "A Myne képes jelentés szerint keresni a jegyzeteidben, címkéket javasolni és beszélgetni róluk. Egyik sem kötelező, és később a Beállításokban bármikor bekapcsolhatod.",
+    "intro": "A Myne képes címkéket javasolni és beszélgetni róluk. Egyik sem kötelező, és később a Beállításokban bármikor bekapcsolhatod.",
     "enableLabel": "AI-funkciók bekapcsolása",
-    "semantic": {
-      "title": "Szemantikus keresés",
-      "body": "Tölts le egy többnyelvű beágyazási modellt (körülbelül 449 MB), hogy jelentés szerint is kereshess, ne csak szavak szerint."
-    },
     "tag": {
       "title": "Automatikus címkézés",
       "body": "Töltsd le a címkemodellt (körülbelül 337 MB), hogy a Myne írás közben címkéket javasolhasson."

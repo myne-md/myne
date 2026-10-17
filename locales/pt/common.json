@@ -1275,8 +1275,6 @@
           "empty": "Os resumos, as respostas e as sugestões aparecem aqui à medida que os pede.",
           "error": "Não foi possível concluir o pedido de IA.",
           "errorTurn": "O assistente não conseguiu responder.",
-          "gettingReadyHint": "A preparar as suas notas para a IA. Um momento.",
-          "noSearchModelHint": "Perguntar implica pesquisar as suas notas neste dispositivo, e para isso é preciso um modelo de pesquisa aqui. Um fornecedor não o pode fazer. Escolha um em Definições → Programador → IA. Editar as suas notas com a IA continua a funcionar.",
           "insert": "Inserir na nota",
           "noAnswer": "Sem resposta. Tente reformular.",
           "newChat": "Nova conversa",
@@ -1285,8 +1283,6 @@
           "unavailableHint": "Esta versão do Myne foi compilada sem IA local, por isso nada aqui pode ser executado. Nenhuma definição mudará isso — é preciso uma versão com IA incluída.",
           "offHint": "A IA local está desligada. Ligue-a em Definições → Programador → IA.",
           "send": "Enviar",
-          "statusGettingReady": "A preparar…",
-          "statusNoSearchModel": "Sem modelo de pesquisa",
           "statusNoModel": "Sem fornecedor",
           "statusUnreachable": "Não responde",
           "statusUnavailable": "Indisponível",
@@ -3499,10 +3495,8 @@
         "emptyGrant": "Tudo o que esta execução pôde ler está em pastas que a IA nunca vê. Nada foi enviado. Altere em Definições, IA, Pastas excluídas."
       },
       "modelChoose": "Escolher ficheiro…",
-      "modelEmbeddingLabel": "Modelo de pesquisa: pesquisa semântica e perguntas e respostas",
       "modelFilter": {
-        "gguf": "Modelo GGUF",
-        "safetensors": "Modelo Safetensors"
+        "gguf": "Modelo GGUF"
       },
       "modelGenerationLabel": "Modelo de texto: chat, resumos, escrita",
       "modelNone": "Nenhum ficheiro selecionado",
@@ -3535,7 +3529,6 @@
       "providerNone": "Nenhum",
       "providerNothingAnswering": "Ainda não há nada configurado para responder.",
       "modelsLabel": "Modelos",
-      "recommendedFilesEmbedding": "Precisa de model.safetensors + config.json + tokenizer.json numa pasta.",
       "recommendedFilesGeneration": "Precisa do ficheiro .gguf + tokenizer.json na mesma pasta.",
       "recommendedFilesTranscription": "Precisa do ficheiro .gguf do Whisper + config.json + tokenizer.json na mesma pasta.",
       "title": "IA",
@@ -3563,7 +3556,6 @@
       "modelShowLocation": "Mostrar a localização de {{name}}",
       "downloadsLabel": "Descarregar modelos",
       "downloadsHelper": "Obtém um modelo a partir da própria origem do Myne. É verificado contra uma impressão digital incorporada na aplicação antes de ser usado, por isso uma descarga adulterada é rejeitada. Nada é obtido a menos que clique.",
-      "downloadEmbeddingSize": "Modelo multilingue, cerca de 449 MB.",
       "downloadTagLabel": "Modelo de etiquetas: sugestões automáticas de etiquetas",
       "downloadTagSize": "Modelo local pequeno, cerca de 337 MB.",
       "downloadInstalled": "Instalado",
@@ -5377,12 +5369,8 @@
   },
   "aiOnboarding": {
     "title": "Configurar a IA",
-    "intro": "O Myne pode pesquisar as suas notas por significado, sugerir etiquetas e conversar sobre elas. Nada disto é obrigatório, e pode ligá-lo mais tarde nas Definições.",
+    "intro": "O Myne pode sugerir etiquetas e conversar sobre elas. Nada disto é obrigatório, e pode ligá-lo mais tarde nas Definições.",
     "enableLabel": "Ligar as funcionalidades de IA",
-    "semantic": {
-      "title": "Pesquisa semântica",
-      "body": "Descarregue um modelo de incorporação multilingue (cerca de 449 MB) para poder pesquisar por significado, e não apenas por palavras."
-    },
     "tag": {
       "title": "Etiquetagem automática",
       "body": "Descarregue o modelo de etiquetas (cerca de 337 MB) para o Myne poder sugerir etiquetas enquanto escreve."

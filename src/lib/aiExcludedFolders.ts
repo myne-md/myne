@@ -1,7 +1,7 @@
 // AI excluded-folders filter (local-ai epic, ai-ux-surface MYND-408, task 6,
-// SYNC-14). The queryable predicate the AI capability siblings (semantic
-// search, summarization, auto-tag) consume to skip a note whose folder the user
-// excluded from AI read/index.
+// SYNC-14). The queryable predicate the AI capability siblings (the agent's
+// scope clamp, summarization, auto-tag, the writing assistant) consume to skip a
+// note whose folder the user excluded from AI read.
 //
 // The set (`prefs.ai_excluded_folders`) holds canonical trailing-slash folder
 // paths (NFC-normalized, sorted, deduped by the Rust codec). A note is excluded
@@ -10,15 +10,15 @@
 // sibling whose name merely starts with the excluded name (`Private/` excludes
 // `Private/Notes/` but NOT `PrivateStuff/`).
 //
-// This is the frontend mirror of the Rust `folder_matches_excluded`
-// (`src-tauri/src/plugins/local_inference/vector_store.rs`) — the two MUST agree
-// so a note gated on one path is gated on the other (a divergence is a privacy
-// hole). Both sides: guard against an empty entry (would exclude the whole
-// vault), canonicalize BOTH sides structurally (so every non-empty key ends in
-// `/` and the nesting test is one prefix check that can't reach a sibling), and
-// fold with NFC + case so the comparison is diacritic- and case-insensitive (a
-// note under `Private/` stays excluded when the entry was typed `private/` on a
-// case-insensitive filesystem, SYNC-14).
+// This is the frontend mirror of the Rust `folder_matches_excluded` /
+// `canonical_excluded` (`core/src/folder_key.rs`) — the two MUST agree so a note
+// gated on one path is gated on the other (a divergence is a privacy hole). Both
+// sides: guard against an empty entry (would exclude the whole vault), canonicalize
+// BOTH sides structurally (so every non-empty key ends in `/` and the nesting test
+// is one prefix check that can't reach a sibling), and fold with NFC + case so the
+// comparison is diacritic- and case-insensitive (a note under `Private/` stays
+// excluded when the entry was typed `private/` on a case-insensitive filesystem,
+// SYNC-14).
 
 /**
  * Structural normalization then NFC + case-fold — the Rust `canonical_folder`

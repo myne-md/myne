@@ -132,7 +132,9 @@ pub fn write_extracted(
 /// (voice-to-text, MYND-551; SYNC-V1/V6, Task 2). Builds the
 /// [`SourceFormat::Audio`] [`ExtractedText`] — `Ok` for a non-empty transcript,
 /// `Empty` for silence — binds the producing model's SHA-256 into the inner
-/// payload (`model_hash`, NOT the AAD — mirrors `vault.embeddings` § 9.17.2), and
+/// payload (`model_hash`, NOT the AAD: a model swap invalidates cached
+/// transcripts via a payload-side comparison, while the crypto framing stays
+/// model-agnostic), and
 /// seals it via [`write_extracted`]. Over-cap text is truncated on a char
 /// boundary with `truncated = true` and `char_count` recording the full count
 /// (§ 9.15.2), mirroring the desktop extractor's `finalize`.

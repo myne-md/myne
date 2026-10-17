@@ -19,8 +19,8 @@
 //! write-time gate (schema + 2000-character cap + injection scan,
 //! `decisions/ai/0590`), and every mutation bumps the local-change push
 //! window (`hooks.bump_local_change()`), because every blob is Class-1
-//! synced content. The whole surface exists only while `ai_enabled` is on
-//! (the `vault.embeddings` §9.17 rule); the caller re-reads the gate before
+//! synced content. The whole surface exists only while `ai_enabled` is on;
+//! the caller re-reads the gate before
 //! each command.
 
 pub mod commands;

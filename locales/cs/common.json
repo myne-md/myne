@@ -1332,8 +1332,6 @@
           "empty": "Shrnutí, odpovědi a návrhy se zde zobrazují, jak o ně požádáte.",
           "error": "Požadavek na AI se nepodařilo dokončit.",
           "errorTurn": "Asistent nedokázal odpovědět.",
-          "gettingReadyHint": "Připravuji vaše poznámky pro AI. Okamžik.",
-          "noSearchModelHint": "Dotazování prohledává vaše poznámky na tomto zařízení a k tomu je zde potřeba vyhledávací model. Poskytovatel to udělat nemůže. Vyberte jej v Nastavení → Developer → AI. Úpravy poznámek pomocí AI fungují dál.",
           "insert": "Vložit do poznámky",
           "noAnswer": "Žádná odpověď. Zkuste otázku přeformulovat.",
           "newChat": "Nový chat",
@@ -1342,8 +1340,6 @@
           "unavailableHint": "Toto sestavení Myne bylo zkompilováno bez místní AI, takže tady nic nemůže běžet. Žádné nastavení to nezmění — je potřeba sestavení s AI.",
           "offHint": "Místní AI je vypnutá. Zapnout ji můžete v Nastavení → Developer → AI.",
           "send": "Odeslat",
-          "statusGettingReady": "Připravuji…",
-          "statusNoSearchModel": "Žádný vyhledávací model",
           "statusNoModel": "Žádný poskytovatel",
           "statusUnreachable": "Neodpovídá",
           "statusUnavailable": "Není k dispozici",
@@ -3618,10 +3614,8 @@
         "emptyGrant": "Vše, co tento běh mohl číst, leží ve složkách, které AI nikdy nevidí. Nic nebylo odesláno. Změňte v Nastavení, AI, Vyloučené složky."
       },
       "modelChoose": "Vybrat soubor…",
-      "modelEmbeddingLabel": "Vyhledávací model: sémantické hledání a otázky a odpovědi",
       "modelFilter": {
-        "gguf": "Model GGUF",
-        "safetensors": "Model Safetensors"
+        "gguf": "Model GGUF"
       },
       "modelGenerationLabel": "Textový model: chat, shrnutí, psaní",
       "modelNone": "Není vybrán žádný soubor",
@@ -3655,7 +3649,6 @@
       "providerNone": "Žádný",
       "providerNothingAnswering": "Zatím není nastaveno nic, co by odpovídalo.",
       "modelsLabel": "Modely",
-      "recommendedFilesEmbedding": "Vyžaduje model.safetensors + config.json + tokenizer.json v jedné složce.",
       "recommendedFilesGeneration": "Vyžaduje soubor .gguf + tokenizer.json ve stejné složce.",
       "recommendedFilesTranscription": "Vyžaduje soubor Whisper .gguf + config.json + tokenizer.json ve stejné složce.",
       "title": "AI",
@@ -3684,7 +3677,6 @@
       "modelShowLocation": "Zobrazit umístění souboru {{name}}",
       "downloadsLabel": "Stáhnout modely",
       "downloadsHelper": "Stáhne model z vlastního původu Myne. Před použitím se ověří proti otisku zabudovanému v aplikaci, takže pozměněné stažení je odmítnuto. Nic se nestahuje, dokud nekliknete.",
-      "downloadEmbeddingSize": "Vícejazyčný model, asi 449 MB.",
       "downloadTagLabel": "Model pro štítky: automatické návrhy štítků",
       "downloadTagSize": "Malý místní model, asi 337 MB.",
       "downloadInstalled": "Nainstalováno",
@@ -5524,12 +5516,8 @@
   },
   "aiOnboarding": {
     "title": "Nastavit AI",
-    "intro": "Myne umí prohledávat vaše poznámky podle významu, navrhovat štítky a povídat si o nich. Nic z toho není povinné a můžete to zapnout později v Nastavení.",
+    "intro": "Myne umí navrhovat štítky a povídat si o nich. Nic z toho není povinné a můžete to zapnout později v Nastavení.",
     "enableLabel": "Zapnout funkce AI",
-    "semantic": {
-      "title": "Sémantické vyhledávání",
-      "body": "Stáhněte vícejazyčný model pro vkládání (asi 449 MB) a budete moct hledat podle významu, ne jen podle slov."
-    },
     "tag": {
       "title": "Automatické štítkování",
       "body": "Stáhněte model pro štítky (asi 337 MB) a Myne vám bude při psaní navrhovat štítky."

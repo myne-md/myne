@@ -69,7 +69,6 @@ pub mod color_group;
 pub mod crdt_note_blob;
 pub mod device_binding_blob;
 pub mod dictionary_blob;
-pub mod embeddings_blob;
 pub mod error;
 pub mod graph_layout_blob;
 pub mod hex;
@@ -115,17 +114,17 @@ pub use account_number::{
 };
 pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
-    aad_agent_personality_blob, aad_ai_embeddings_blob, aad_attachment_text_blob,
-    aad_awareness_frame, aad_chats_blob, aad_chats_blob_v0_2, aad_chats_catalog,
-    aad_custom_themes_blob, aad_device_binding_blob, aad_graph_layout_blob, aad_member_names_blob,
-    aad_membership_blob, aad_membership_roster_blob, aad_note_content_encrypt,
-    aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
-    aad_person_member_key_store, aad_person_member_unlock_store, aad_person_profile_blob,
-    aad_person_vault_carrier, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
-    aad_recovery_wrap, aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob,
-    aad_singleton_blob_v0_2, aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob,
-    aad_vault_items_key_wrap, aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx,
-    aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
+    aad_agent_personality_blob, aad_attachment_text_blob, aad_awareness_frame, aad_chats_blob,
+    aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_device_binding_blob,
+    aad_graph_layout_blob, aad_member_names_blob, aad_membership_blob, aad_membership_roster_blob,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
+    aad_person_binding_blob, aad_person_member_key_store, aad_person_member_unlock_store,
+    aad_person_profile_blob, aad_person_vault_carrier, aad_personal_dictionary_blob,
+    aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap, aad_recovery_wrap_v0_2,
+    aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
+    aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
+    aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
 };
 pub use agent_memory_catalog_blob::{
     decode_agent_memory_catalog_blob, decode_agent_memory_catalog_blob_versioned,
@@ -228,12 +227,6 @@ pub use dictionary_blob::{
     DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_V1, DICTIONARY_BLOB_HEADER_LEN,
     DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_PROTOCOL_VERSION, DICTIONARY_BLOB_V0_2_MAGIC,
     MAX_DICTIONARY_PLAINTEXT_LEN,
-};
-pub use embeddings_blob::{
-    decode_embeddings_blob, encode_embeddings_blob, encode_embeddings_blob_raw,
-    EmbeddingsBlobError, EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN, EMBEDDINGS_BLOB_FORMAT_V1,
-    EMBEDDINGS_BLOB_FORMAT_V2, EMBEDDINGS_BLOB_HEADER_LEN, EMBEDDINGS_BLOB_MAGIC,
-    EMBEDDINGS_BLOB_PROTOCOL_VERSION, MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
 pub use graph_layout_blob::{

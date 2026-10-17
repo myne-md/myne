@@ -1218,8 +1218,6 @@
           "empty": "Oppsummeringer, svar og forslag vises her etter hvert som du ber om dem.",
           "error": "AI-forespørselen kunne ikke fullføres.",
           "errorTurn": "Assistenten kunne ikke svare.",
-          "gettingReadyHint": "Forbereder notatene dine for AI. Et øyeblikk.",
-          "noSearchModelHint": "Når du spør, søkes det i notatene dine på denne enheten, og det krever en søkemodell her. En leverandør kan ikke gjøre det. Velg en i Innstillinger → Utvikler → AI. Å redigere notatene dine med AI fungerer fortsatt.",
           "insert": "Sett inn i notat",
           "noAnswer": "Ingen svar. Prøv å omformulere.",
           "newChat": "Ny samtale",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Dette bygget av Myne er kompilert uten lokal AI, så ingenting her kan kjøre. Ingen innstilling endrer det — det krever et bygg med AI inkludert.",
           "offHint": "Lokal AI er av. Slå den på i Innstillinger → Utvikler → AI.",
           "send": "Send",
-          "statusGettingReady": "Forbereder…",
-          "statusNoSearchModel": "Ingen søkemodell",
           "statusNoModel": "Ingen leverandør",
           "statusUnreachable": "Svarer ikke",
           "statusUnavailable": "Utilgjengelig",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Alt denne kjøringen kunne lese er i mapper AI aldri ser. Ingenting ble sendt. Endre det i Innstillinger, AI, Utelatte mapper."
       },
       "modelChoose": "Velg fil…",
-      "modelEmbeddingLabel": "Søkemodell: semantisk søk og spørsmål og svar",
       "modelFilter": {
-        "gguf": "GGUF-modell",
-        "safetensors": "Safetensors-modell"
+        "gguf": "GGUF-modell"
       },
       "modelGenerationLabel": "Tekstmodell: chat, oppsummeringer, skriving",
       "modelNone": "Ingen fil valgt",
@@ -3415,7 +3409,6 @@
       "providerNone": "Ingen",
       "providerNothingAnswering": "Ingenting er satt opp til å svare ennå.",
       "modelsLabel": "Modeller",
-      "recommendedFilesEmbedding": "Trenger model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Trenger .gguf-filen + tokenizer.json i samme mappe.",
       "recommendedFilesTranscription": "Trenger .gguf-filen fra Whisper + config.json + tokenizer.json i samme mappe.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Vis plasseringen til {{name}}",
       "downloadsLabel": "Last ned modeller",
       "downloadsHelper": "Hent en modell fra Mynes eget opphav. Den kontrolleres mot et fingeravtrykk som er innebygd i appen, før den brukes, så en manipulert nedlasting forkastes. Ingenting hentes med mindre du klikker.",
-      "downloadEmbeddingSize": "Flerspråklig modell, omtrent 449 MB.",
       "downloadTagLabel": "Etikettmodell: automatiske etikettforslag",
       "downloadTagSize": "Liten lokal modell, omtrent 337 MB.",
       "downloadInstalled": "Installert",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Sett opp AI",
-    "intro": "Myne kan søke i notatene dine etter betydning, foreslå etiketter og chatte om dem. Ingenting av dette er påkrevd, og du kan slå det på senere fra Innstillinger.",
+    "intro": "Myne kan foreslå etiketter og chatte om dem. Ingenting av dette er påkrevd, og du kan slå det på senere fra Innstillinger.",
     "enableLabel": "Slå på AI-funksjoner",
-    "semantic": {
-      "title": "Semantisk søk",
-      "body": "Last ned en flerspråklig søkemodell (omtrent 449 MB) så du kan søke etter betydning, ikke bare etter ord."
-    },
     "tag": {
       "title": "Automatisk etikettering",
       "body": "Last ned etikettmodellen (omtrent 337 MB) så Myne kan foreslå etiketter mens du skriver."

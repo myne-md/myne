@@ -158,6 +158,26 @@ pub trait ScopeSearcher: Send + Sync {
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, AgentError>;
 }
 
+/// A [`ScopeSearcher`] that finds nothing.
+///
+/// The seam is a required parameter of `step` because it genuinely differs per
+/// client (mobile answers it from the full-text index). Desktop's used to query
+/// the AI embedding index; with the `MYR1` embedding family and the
+/// retrieval-grounded search it fed retired, desktop has no index to search and
+/// supplies this instead. The two search tools (`search_scope`, `search_vault`)
+/// therefore answer an empty result set on that client rather than a run
+/// failing, which is the honest shape for "this client has no searcher": a tool
+/// error would end a run the user could have carried on by asking differently.
+pub struct NoScopeSearch;
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl ScopeSearcher for NoScopeSearch {
+    async fn search(&self, _query: &str, _limit: usize) -> Result<Vec<SearchHit>, AgentError> {
+        Ok(Vec::new())
+    }
+}
+
 /// Tool 1: the run's scope, by title.
 pub async fn list_scope(
     runs: &AgentRunState,
