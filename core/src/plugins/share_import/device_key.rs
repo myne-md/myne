@@ -124,15 +124,18 @@ pub use imp::get_or_create;
 
 /// Android Keystore device wrap key (SYNC-3).
 ///
-/// ⚠️ **NOT YET WIRED — [NEEDS DECISION: Keystore access path].** SYNC-3
-/// ratified building the Android locked path in-epic, but reaching the Android
-/// Keystore from Rust needs either a Kotlin/JNI bridge (the `screen_guard`
-/// precedent) or a vetted Rust Keystore crate that does not break offline /
-/// reproducible builds (NO `ndk-context`). Until that spike lands + a device
-/// verifies the create/no-prompt/device-only behaviour, Android returns
-/// [`ShareImportError::HardwareUnavailable`] so the commands no-op cleanly — the
-/// unlocked direct-ingest path (SF3) still works; only the locked-vault staging
-/// path is gated on this provider. Tracked in the SF1 open questions.
+/// This NO-ARG arm is the fail-closed shape, and the locked-vault share path
+/// does **not** come through it. `seal_share` / `drain_pending_shares` call
+/// [`resolve`], which on Android reads the host-registered
+/// [`AndroidShareDeviceKey`] and reaches the Keystore through
+/// `tauri-plugin-share-intent`'s Kotlin bridge. What still reaches this arm on
+/// Android is a caller that calls it DIRECTLY instead of through [`resolve`]:
+/// today that is `captures`, whose three meeting-capture commands hold an
+/// `AppHandle` yet seal their `MYF1` blobs under this same device key through
+/// the no-arg call, so a meeting chunk no-ops on Android. Nothing else about the
+/// locked path is gated on this provider — the unlocked direct-ingest path (SF3)
+/// never needed it. `tauri-plugin-share-intent/KEYSTORE_TODO.md` carries the
+/// status and the device verification still owed.
 #[cfg(target_os = "android")]
 pub fn get_or_create() -> Result<Zeroizing<[u8; SHARE_WRAP_KEY_LEN]>, ShareImportError> {
     Err(ShareImportError::HardwareUnavailable)

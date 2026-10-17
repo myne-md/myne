@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The beta-terms acceptance gate — command surface (myne-ops#15).
 //!
 //! Two commands over the device-local record in

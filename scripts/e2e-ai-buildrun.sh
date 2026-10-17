@@ -36,7 +36,7 @@ i=0
 for spec in "$@"; do
   i=$((i + 1))
   INNER+=" echo \"==== RUN ${i}: ${spec} ====\";"
-  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${spec}.e2e.ts;"
+  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config .config/vitest/e2e.config.ts e2e/${spec}.e2e.ts;"
   INNER+=" if [ \$? -eq 0 ]; then PASS=\"\$PASS ${i}:${spec}\"; else FAIL=\"\$FAIL ${i}:${spec}\"; fi;"
 done
 INNER+=' echo "________ BATCH SUMMARY ________"; echo "PASS:$PASS"; echo "FAIL:$FAIL";'

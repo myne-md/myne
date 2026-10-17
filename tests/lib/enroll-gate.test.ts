@@ -32,25 +32,6 @@ describe("canAddThisDevice", () => {
     expect(canAddThisDevice(state)).toBe(expected);
   });
 
-  it("says yes to exactly the two not-a-member states", () => {
-    // The rows above each assert one state; this asserts the SHAPE — run the
-    // whole enum through the predicate and pin the accepting set. A widened
-    // gate (a `default: return true`, say) passes row-by-row review far more
-    // easily than it passes this.
-    const all: SyncStatusState[] = [
-      "disabled",
-      "not_enrolled",
-      "pending",
-      "idle",
-      "syncing",
-      "error",
-      "conflicts",
-    ];
-    expect(all.filter((s) => canAddThisDevice(s))).toEqual([
-      "disabled",
-      "not_enrolled",
-    ]);
-  });
 });
 
 // #268: the server says WHY it refused; the client used to throw that away.

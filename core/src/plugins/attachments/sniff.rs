@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Magic-byte content-type sniffer for the attachment allowlist
 //! (MYND-169, sub-feature 2 — `attachments-crypto-pipeline`).
 //!

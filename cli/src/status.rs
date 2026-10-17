@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The CLI's own reader for the desktop's `cli-status` marker
 //! (`src-tauri/src/cli_bridge/status.rs`'s wire shape).
 //!

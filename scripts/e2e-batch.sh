@@ -46,7 +46,7 @@ INNER='set +e; PASS=""; FAIL=""; SKIP="";'
 for spec in "$@"; do
   INNER+=" echo \"==== RUN ${spec} ====\";"
   # Redirect rather than pipe: a pipe would make \$? tee's status, not vitest's.
-  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config vitest.e2e.config.ts e2e/${spec}.e2e.ts > /tmp/e2e-out 2>&1; RC=\$?; cat /tmp/e2e-out;"
+  INNER+=" xvfb-run -a pnpm exec vitest run $RETRY_FLAG --config .config/vitest/e2e.config.ts e2e/${spec}.e2e.ts > /tmp/e2e-out 2>&1; RC=\$?; cat /tmp/e2e-out;"
   INNER+=" if [ \$RC -ne 0 ]; then FAIL=\"\$FAIL ${spec}\";"
   # Double quotes, not single: this whole string ends up inside `su -c '...'`,
   # where a single quote terminates the wrapper and the shell dies with

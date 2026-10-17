@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The ChatML control-marker filter, shared by every engine.
 //!
 //! Lifted out of `engine_candle.rs` (ai-ollama-local task 5) so there is **one**

@@ -61,16 +61,12 @@ export function attachmentSrc(id: string): string {
   return `attachment://${id}`;
 }
 
-/** All attachment ids embedded in a note body (deduped, in first-seen order). */
-export function extractAttachmentIds(body: string): string[] {
-  const re = /!\[\[att:([0-9a-f]{64})(?:\|[^\]\n]*)?\]\]/g;
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (let m = re.exec(body); m !== null; m = re.exec(body)) {
-    if (!seen.has(m[1])) {
-      seen.add(m[1]);
-      out.push(m[1]);
-    }
-  }
-  return out;
-}
+/** All attachment ids embedded in a note body (deduped, in first-seen order).
+ *
+ *  Delegates to the canonical reader rather than carrying a local regex
+ *  (audit T6.13 item 3): this copy used `[^\]\n]` for the alias, so an alias
+ *  spanning a newline was rejected here and accepted there, and it dropped the
+ *  alias entirely where the canonical parses its layout segments. Mobile writes
+ *  those layout segments via the shared emitter, so it has to read what it
+ *  writes. */
+export { extractAttachmentIds } from "@myne/editor/host/notes/attachmentRef";

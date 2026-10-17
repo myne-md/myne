@@ -20,11 +20,6 @@ export function stripNotionId(segment: string): string {
   return segment.replace(SUFFIX, "");
 }
 
-/** Does this segment carry a Notion id? Used to tell an export from a plain folder. */
-export function hasNotionId(segment: string): boolean {
-  return SUFFIX.test(segment);
-}
-
 /** Strip the id from every segment of a relative path. */
 export function stripNotionPath(rel: string): string {
   return rel

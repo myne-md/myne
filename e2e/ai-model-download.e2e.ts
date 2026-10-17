@@ -32,7 +32,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import {
-  FIXTURE_EMBEDDING_BYTES,
+  FIXTURE_TAG_BYTES,
   startFakeModelOrigin,
 } from "./support/model-fixture-origin";
 import type { Session } from "./support/webdriver";
@@ -46,16 +46,16 @@ async function downloadFixture(session: Session, id: string): Promise<string> {
   const out = await ipcOk(
     session,
     "plugin:local-inference|download_model",
-    { artifact: "fixture-embedding", downloadId: id },
+    { artifact: "fixture-tag", downloadId: id },
     60_000,
   );
   return out as string;
 }
 
-/** The stored embedding model path, or `null` when none is registered. */
-async function embeddingPath(session: Session): Promise<string | null> {
+/** The stored tag model path, or `null` when none is registered. */
+async function tagPath(session: Session): Promise<string | null> {
   const out = await ipcOk(session, "plugin:local-inference|get_model_path", {
-    role: "embedding",
+    role: "tag",
   });
   return out as string | null;
 }
@@ -125,14 +125,14 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
           await (await app.session.byTestId("aiOnboarding.skip")).click();
 
           const installed = await downloadFixture(app.session, "mdo2-a");
-          expect(installed.endsWith("model.safetensors")).toBe(true);
+          expect(installed.endsWith("model.gguf")).toBe(true);
           expect(origin.requests()).toBeGreaterThan(0);
 
           // The role now resolves to the installed file.
-          const stored = await embeddingPath(app.session);
+          const stored = await tagPath(app.session);
           expect(stored).not.toBeNull();
-          expect(stored?.endsWith("model.safetensors") ?? false).toBe(true);
-          void FIXTURE_EMBEDDING_BYTES;
+          expect(stored?.endsWith("model.gguf") ?? false).toBe(true);
+          void FIXTURE_TAG_BYTES;
         },
       );
     } finally {
@@ -170,7 +170,7 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
           const rejected = await pageSeatInvoke(
             app.session,
             "plugin:local-inference|download_model",
-            { artifact: "fixture-embedding", downloadId: "mdo3-a" },
+            { artifact: "fixture-tag", downloadId: "mdo3-a" },
             60_000,
           );
           expect(rejected.err).toBeDefined();
@@ -184,12 +184,12 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
           expect(err.detail).toBe("DigestMismatch");
 
           // Nothing was registered: no stored path for the role.
-          expect(await embeddingPath(app.session)).toBeNull();
+          expect(await tagPath(app.session)).toBeNull();
 
           // Retry: restore correct bytes and the same artefact downloads cleanly.
-          origin.serveCorrupt(FIXTURE_EMBEDDING_BYTES);
+          origin.serveCorrupt(FIXTURE_TAG_BYTES);
           const installed = await downloadFixture(app.session, "mdo3-b");
-          expect(installed.endsWith("model.safetensors")).toBe(true);
+          expect(installed.endsWith("model.gguf")).toBe(true);
         },
       );
     } finally {

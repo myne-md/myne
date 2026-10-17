@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `memory` Tauri plugin.
 //!
 //! Owns the six agent-memory storage commands (the `vault.agent-memory`

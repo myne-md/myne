@@ -84,6 +84,14 @@ export interface UnlockFlowProps {
   onUnlocked: () => void;
   onStartRecovery: () => void;
   onBackToPicker?: () => void;
+  /**
+   * Route to the restore-backup flow. Offered on the FAIL-CLOSED corrupted
+   * screen (audit T6.8): the surface showed a restore hint but only a
+   * close-app CTA, so it named a route it did not provide. Mobile has no
+   * restore IPC yet, so the target is the honest placeholder, which says so
+   * and offers the flows that DO work (create / recover).
+   */
+  onRestoreBackup?: () => void;
   onDeleteVaultSuccess: () => void;
 }
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The one report file the bug-report surface can save (myne-md/myne#860).
 //!
 //! # What it is, and why one file rather than an archive

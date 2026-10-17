@@ -52,7 +52,7 @@ export default defineConfig({
     environment: "node",
     globals: false,
     // The story catalogue's render checks live under `tests/stories/` and are
-    // owned by `vitest.stories.config.ts` (myne-md/myne#832): they need the
+    // owned by `.config/vitest/stories.config.ts` (myne-md/myne#832): they need the
     // fake-IPC story host installed before any app module body runs and a jsdom
     // environment, neither of which belongs in this suite's setup. Excluded
     // here explicitly rather than left to fall through `include` above, so the

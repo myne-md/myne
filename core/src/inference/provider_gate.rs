@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The consent gate: whether a remote request may be constructed at all
 //! (ai-remote-providers task 9, SYNC-13/SYNC-18).
 //!

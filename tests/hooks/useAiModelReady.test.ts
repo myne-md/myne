@@ -20,22 +20,7 @@ vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
   aiCapabilityReport: () => reportMock(),
 }));
 
-// The event seam, stubbed so the retrieval hook's subscription can be driven
-// without a Tauri host. The handler is captured on subscribe, which is what
-// lets a test fire the "the walk finished" announcement.
-let hydratedHandler: (() => void) | null = null;
-const unlisten = vi.fn();
-vi.mock("../../src/platform/event", () => ({
-  listen: (_name: string, handler: () => void) => {
-    hydratedHandler = handler;
-    return Promise.resolve(unlisten);
-  },
-}));
-
-import {
-  useAiRetrievalState,
-  useAiSurfaceState,
-} from "../../src/hooks/useAiModelReady";
+import { useAiSurfaceState } from "../../src/hooks/useAiModelReady";
 import { UNCOMPILED_REPORT } from "../../src/lib/ai-capability";
 
 const READY = {
@@ -43,7 +28,6 @@ const READY = {
   backendId: "candle",
   backendClass: "in_process_local",
   generation: { available: true, cause: null },
-  embedding: { available: true, cause: null },
   transcription: { available: false, cause: "no_model" },
   autoTag: { available: true, cause: null },
 };
@@ -101,43 +85,5 @@ describe("useAiSurfaceState", () => {
     await waitFor(() =>
       expect(result.current).toEqual({ kind: "unavailable", cause: "no_model" }),
     );
-  });
-});
-
-describe("useAiRetrievalState", () => {
-  const INDEXING = {
-    ...READY,
-    embedding: { available: true, cause: null },
-    indexReady: false,
-  };
-  const INDEXED = { ...INDEXING, indexReady: true };
-
-  afterEach(() => {
-    hydratedHandler = null;
-    unlisten.mockReset();
-  });
-
-  it("stops saying 'not yet' once the host says the walk finished", async () => {
-    // The defect this closes: the hook read the report on mount and never
-    // again, so a chip that said "Preparing…" said it for the rest of the
-    // session — about a question the host had already answered.
-    reportMock.mockResolvedValueOnce(INDEXING).mockResolvedValueOnce(INDEXED);
-    const { result } = renderHook(() => useAiRetrievalState(true));
-    await waitFor(() => expect(result.current.embedding.kind).toBe("available"));
-    expect(result.current.indexReady).toBe(false);
-
-    // The host announces it. No remount, no user action.
-    expect(hydratedHandler).not.toBeNull();
-    hydratedHandler?.();
-
-    await waitFor(() => expect(result.current.indexReady).toBe(true));
-  });
-
-  it("lets the subscription go when the surface does", async () => {
-    reportMock.mockResolvedValue(INDEXED);
-    const { unmount } = renderHook(() => useAiRetrievalState(true));
-    await waitFor(() => expect(reportMock).toHaveBeenCalled());
-    unmount();
-    await waitFor(() => expect(unlisten).toHaveBeenCalled());
   });
 });

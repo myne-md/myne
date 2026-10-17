@@ -28,6 +28,22 @@
 //   3. No entry is UNCLASSIFIED. A variable in the example file with no `kind:` marker
 //      is indistinguishable from a bundle variable, and that ambiguity is the defect.
 //
+// FOURTH RULE, added with the Kubernetes charts (`myne-server/deploy/`): a DEPLOYMENT
+// artifact may only name documented knobs.
+//
+//   Rule 1 asks what the server reads. This asks what a deployment artifact SETS, which
+//   is a different set and neither direction implies the other: Helm templates name
+//   their variables as strings in YAML, so a chart can set `MYNE_TYPO` that no Go file
+//   reads, the pod starts with a rejected-and-ignored value, every other check here and
+//   every compiler stays green, and the operator's knob quietly does nothing. That is
+//   the same failure as class 2 (a dead knob) arriving through a file the server never
+//   reads, so it is checked against the same roster.
+//
+//   ONE-DIRECTIONAL, deliberately: a documented knob the chart does not set is not a
+//   failure. The charts deliberately expose a subset (an operator adds the rest through
+//   `extraEnv`), and demanding the reverse would force every knob into two places or
+//   force the chart to set ones it has no business setting (`MYNE_SERVER_PORTFILE`).
+//
 // Rule 3 is why the classification lives IN THE FILE rather than in a hardcoded set
 // here. A hardcoded classification cannot express "this one is deliberately absent",
 // so the answer to a legitimate omission would be to delete the documentation, which is
@@ -46,6 +62,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { manifestRepos } from "./lib/repo-manifest.mjs";
 
 /**
  * The repo root, resolved from this file's own directory.
@@ -123,6 +141,44 @@ function serverVars() {
 }
 
 /**
+ * Every MYNE_* name a DEPLOYMENT ARTIFACT under `dir` mentions, mapped to the file that
+ * named it first. The deployment artifacts are the Helm charts — YAML and `.tpl` — and
+ * NOT `.md` files or `NOTES.txt`, because neither SETS anything: a README that explains a
+ * knob in prose is documentation, and NOTES.txt is text the chart prints after install.
+ * Scanning them would make a rule fire on a sentence, and the web chart's notes
+ * legitimately name a SERVER-side knob (`MYNE_ALLOWED_ORIGINS`) that this container never
+ * reads — the instruction "tell the sync server about this origin" has nowhere else to
+ * live. Both exclusions are stated here because they are the width of the rule.
+ *
+ * The token pattern inside an included file is deliberately the loose one
+ * (`MYNE_[A-Z0-9_]+`) rather than a render-shape match: a chart names its variables in a
+ * `values.yaml` map, in a template literal, and (for a knob the template computes) once
+ * in a comment explaining it. All three are places the name is asserted to be a real
+ * knob, and a roster is the one place that decides whether it is.
+ */
+const DEPLOY_EXTS = [".yaml", ".yml", ".tpl"];
+const DEPLOY_SKIP_FILES = ["NOTES.txt"];
+function deployVars(dir) {
+  const out = new Map(); // name -> the file that first named it, relative to dir
+  const walk = (d) => {
+    for (const entry of readdirSync(d)) {
+      const p = join(d, entry);
+      if (statSync(p).isDirectory()) {
+        walk(p);
+        continue;
+      }
+      if (DEPLOY_SKIP_FILES.includes(entry)) continue;
+      if (!DEPLOY_EXTS.some((e) => entry.endsWith(e))) continue;
+      for (const m of readFileSync(p, "utf8").matchAll(/MYNE_[A-Z0-9_]+/g)) {
+        if (!out.has(m[0])) out.set(m[0], p.slice(dir.length + 1));
+      }
+    }
+  };
+  walk(dir);
+  return out;
+}
+
+/**
  * Parse the example file into blank-line-separated blocks.
  *
  * A block is the unit of classification, because one variable's entry is its comment
@@ -192,6 +248,55 @@ const minVarsArg = process.argv.find((a) => a.startsWith("--min-vars="));
 const SERVER_VAR_FLOOR_EFFECTIVE = minVarsArg ? Number(minVarsArg.split("=")[1]) : SERVER_VAR_FLOOR;
 const SERVER_VAR_ROOTS = ["internal", "cmd"];
 
+/** Where the deployment artifacts live, in the same companion. */
+const DEPLOY_DIR = join(SERVER, "deploy");
+const SERVER_CHART_DIR = join(DEPLOY_DIR, "helm", "myne-server");
+const WEB_CHART_DIR = join(DEPLOY_DIR, "helm", "myne-web");
+
+/** The web client's own container sources, in THIS repository (chart rule 4b checks
+ * the web chart against them rather than against the sync server's roster, because the
+ * web chart deploys a different component). */
+const WEB_CONTAINER_DIR = join(ROOT, "web", "container");
+const WEB_CONTAINER_EXTRA = [join(ROOT, "web", "csp.ts")];
+
+/**
+ * The measured non-vacuity floors for the two chart walks, same reasoning as the server
+ * floor above: a walk that finds nothing satisfies its rule trivially, and the way it
+ * finds nothing is a chart directory that was moved or renamed — which is the drift, not
+ * a smaller check. Measured at the branch tip (30 names in the server chart, 1 in the web
+ * chart). The server gate sits below its measurement on purpose: dropping one knob must
+ * not be a failure, losing the walk must be.
+ */
+const DEPLOY_VAR_FLOOR = 26;
+const WEB_DEPLOY_VAR_FLOOR = 1;
+
+/** `--min-deploy=N` / `--min-deploy-web=N` override them, the same named seam. */
+const minDeployArg = process.argv.find((a) => a.startsWith("--min-deploy="));
+const DEPLOY_VAR_FLOOR_EFFECTIVE = minDeployArg ? Number(minDeployArg.split("=")[1]) : DEPLOY_VAR_FLOOR;
+const minDeployWebArg = process.argv.find((a) => a.startsWith("--min-deploy-web="));
+const WEB_DEPLOY_VAR_FLOOR_EFFECTIVE = minDeployWebArg
+  ? Number(minDeployWebArg.split("=")[1])
+  : WEB_DEPLOY_VAR_FLOOR;
+
+/** Every MYNE_* name the web client's own container sources read. */
+function webContainerVars() {
+  const found = new Set();
+  const files = [];
+  if (existsSync(WEB_CONTAINER_DIR)) {
+    for (const entry of readdirSync(WEB_CONTAINER_DIR)) {
+      const p = join(WEB_CONTAINER_DIR, entry);
+      if (statSync(p).isFile()) files.push(p);
+    }
+  } else {
+    missingRoots.push("web/container");
+  }
+  for (const p of WEB_CONTAINER_EXTRA) if (existsSync(p)) files.push(p);
+  for (const file of files) {
+    for (const m of readFileSync(file, "utf8").matchAll(/MYNE_[A-Z0-9_]+/g)) found.add(m[0]);
+  }
+  return found;
+}
+
 const failures = [];
 const notes = [];
 /** What the run actually did, so the closing line cannot claim more than that. */
@@ -205,12 +310,7 @@ const fail = (m) => failures.push(m);
 // against a path nothing will ever populate.
 const MANIFEST = join(ROOT, "workspace", "manifest.txt");
 if (existsSync(MANIFEST)) {
-  const listed = new Set(
-    readFileSync(MANIFEST, "utf8")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("#")),
-  );
+  const listed = new Set(manifestRepos(readFileSync(MANIFEST, "utf8")).map((e) => e.name));
   for (const name of ["myne-server", "myne-ops"]) {
     if (!listed.has(name)) {
       fail(
@@ -353,9 +453,79 @@ if (!serverPresent && !opsPresent) {
       }
     }
 
+    // Rule 4a: the SERVER chart may only set knobs the roster documents.
+    //
+    // A missing chart directory is itself a failure rather than "no artifacts to check":
+    // the charts are committed in this companion, so their absence means they were moved
+    // or deleted, and a rule that reports ok over the hole is the failure mode every
+    // guard in this repository exists to avoid.
+    const serverChart = existsSync(SERVER_CHART_DIR) ? deployVars(SERVER_CHART_DIR) : new Map();
+    if (!existsSync(SERVER_CHART_DIR)) {
+      fail(
+        `no server chart at ${SERVER_CHART_DIR}, so rule 4 was not evaluated. The\n` +
+          `         Kubernetes charts live under deploy/helm/ and are what this rule is about.`,
+      );
+    } else if (serverChart.size < DEPLOY_VAR_FLOOR_EFFECTIVE) {
+      fail(
+        `the server-chart scan found ${serverChart.size} MYNE_* names, below the measured\n` +
+          `         floor of ${DEPLOY_VAR_FLOOR_EFFECTIVE}. Either the chart moved into a file extension this\n` +
+          `         walk skips, or it was renamed away. Both make rule 4a vacuous, so the count\n` +
+          `         is gated rather than printed.`,
+      );
+    }
+    for (const [v, file] of [...serverChart].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+      if (entryKind.has(v) || absent.has(v)) continue;
+      fail(
+        `${v} is set by the server chart (myne-server/${file}) but does not appear in\n` +
+          `         bundle.env.example. A chart can set a variable the server never reads: the pod\n` +
+          `         starts, the value is ignored, and the operator's knob silently does nothing.\n` +
+          `         Add it to the roster as a classified entry, or delete it from the chart.`,
+      );
+    }
+
+    // Rule 4b: the WEB chart may only set MYNE_* names the web client's own container
+    // reads. It is checked against that container's sources rather than against the sync
+    // server's roster, because it deploys a different component: `MYNE_SYNC_ORIGIN` is
+    // read by `web/container/generate-headers.mjs` and by no Go file, so holding the web
+    // chart to the server's roster would demand the wrong edit.
+    //
+    // The container's own non-prefixed settings are out of scope by construction: `PORT`
+    // is not a MYNE_* name, and it is the container's documented contract with its
+    // deployment (`web/container/Caddyfile`). This rule says so rather than pretending
+    // the pattern covers it.
+    const webChart = existsSync(WEB_CHART_DIR) ? deployVars(WEB_CHART_DIR) : new Map();
+    const webReads = webContainerVars();
+    if (!existsSync(WEB_CHART_DIR)) {
+      fail(
+        `no web chart at ${WEB_CHART_DIR}, so rule 4b was not evaluated. The browser\n` +
+          `         client's chart lives beside the server's under deploy/helm/.`,
+      );
+    } else if (webChart.size < WEB_DEPLOY_VAR_FLOOR_EFFECTIVE) {
+      fail(
+        `the web-chart scan found ${webChart.size} MYNE_* names, below the measured floor\n` +
+          `         of ${WEB_DEPLOY_VAR_FLOOR_EFFECTIVE}, so rule 4b is vacuous.`,
+      );
+    }
+    for (const [v, file] of [...webChart].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+      if (webReads.has(v)) continue;
+      fail(
+        `${v} is set by the web chart (myne-web/${file}) but no source under web/container/\n` +
+          `         or web/csp.ts reads it, so the container would ignore it. Point the chart at a\n` +
+          `         name the image actually reads, or remove it.`,
+      );
+    }
+
     notes.push(
       `Compared ${code.size} server-read variables against ${entryKind.size} classified entries ` +
         `and ${absent.size} documented omissions in ${ENV_EXAMPLE}.`,
+    );
+    notes.push(
+      `Compared ${serverChart.size} MYNE_* names from the server chart against that roster, and ` +
+        `${webChart.size} from the web chart against ${webReads.size} names read by web/container/.`,
+    );
+    notes.push(
+      "NOT checked in rule 4: whether a documented knob is SET by a chart, and the web " +
+        "container's non-MYNE_* settings (`PORT`). Both are stated rather than covered.",
     );
   }
 }
@@ -374,6 +544,6 @@ if (failures.length) {
 // what the name claims.
 console.log(
   compared
-    ? "ok: server env roster agrees in both directions, and every entry is classified"
+    ? "ok: server env roster agrees in both directions, every entry is classified, and the charts name only documented knobs"
     : "ok: NOTHING COMPARED (a companion is absent). This line is not a verdict on the roster.",
 );

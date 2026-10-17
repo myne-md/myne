@@ -421,6 +421,25 @@ steps:
     commands:
       - node scripts/check-manual-test-roster.mjs --check
 
+  # ─── F-Droid store metadata against the Android build it describes ───────────
+  # No `when:` filter, and the reason is the same one bundle-record,
+  # twin-inventory and manual-test-roster carry: its inputs include `fastlane/**`,
+  # which no `code-paths` glob covers, so a listing-only commit is exactly when
+  # it can go red. What it catches is arithmetic that no compiler and no test can
+  # see: the version in `mobile/src-tauri/tauri.conf.json` against the four
+  # build blocks in `mobile/fdroid/md.myne.mobile.yml` and the four
+  # `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` file names.
+  # Drift does not fail anything, it just publishes an empty "What's new" tab and
+  # drops three of four architectures from the repository.
+  #
+  # Its own step rather than a line inside `pnpm-build` for the same reason
+  # manual-test-roster is: it needs no `pnpm install`, and it must be able to go
+  # red on a commit that touches nothing else.
+  fdroid-metadata:
+    image: node:25
+    commands:
+      - node scripts/check-fdroid-metadata.mjs
+
   # ─── Every vault.prefs command says which client surfaces it (#880) ──────────
   # No `when:` filter, and it is the same reason bundle-record, twin-inventory and
   # manual-test-roster carry none: the `--check` half compares the GENERATED
@@ -552,6 +571,13 @@ steps:
       # into a message. The DENY list was review-enforced while the sink was a
       # terminal nobody reads; a file the user is invited to send on is the point
       # at which that stops being enough.
+      # Exports with no caller: the layer above the ratchet above, and the third
+      # time the same question has to be asked. `unwired` sees the MODULE and
+      # `ipc-binding-callers` the BINDING; seventeen dead `export function`s were
+      # deleted from files that pass both. Nothing else can see one — the
+      # declaration compiles, the tree has no eslint, and no test can fail on
+      # something nothing calls. Per-file ratchet; `--record` shrinks only.
+      - node scripts/check-export-callers.mjs
       - node scripts/check-tracing-discipline.mjs
       # Playwright image vs lockfile (myne#529): the image bakes browsers for
       # its own version, so a tag behind the lockfile fails every test inside
@@ -589,10 +615,23 @@ steps:
       # push/manual, so on pull_request the stated lock ran green and empty.
       # This one runs on every PR.
       - node scripts/check-embed-layout-drift.mjs
+      # The update channel (one endpoint, one variable name, one manifest file
+      # name per channel). The config's `plugins.updater.endpoints` list is
+      # REPLACED rather than merged by the updater the plugin builds, so a value
+      # there is silently ignored while the file reads as the source of truth;
+      # and each channel's manifest file name is written in Rust and in the
+      # emitter, so moving one stops the channel updating with every other gate
+      # green. The published half is by hand (`check-published-manifests.mjs`,
+      # named in the release runbook), because it needs the network.
+      - node scripts/check-update-channel.mjs
       # Token-adoption ratchet (myne#394): a literal written into an inline style
       # can never be reached by a custom theme, and nothing else in the toolchain
       # reports one. Counts may shrink as each surface is converted, never grow.
       - node scripts/check-token-adoption.mjs
+      # Hex-helper contract ratchet (audit T6.10(c)): `protocol/src/hex.rs` is
+      # the one lowercase-hex encoder and predicate; the hand-copied ones across
+      # the tree had drifted on the empty string and on uppercase. Shrink-only.
+      - node scripts/check-hex-helpers.mjs
       # The pointer-target floor (myne#775, WCAG 2.2 AA SC 2.5.8). axe covers
       # this rule only where a scenario renders the surface; this reads every
       # declaration, including on screens no scenario opens.
@@ -720,6 +759,25 @@ steps:
       # Tauri bundle manifest may reference `stories/`, so "deployable" cannot
       # quietly become "shipped to users".
       - node scripts/check-stories-isolation.mjs
+      # The shipped third-party notice (MYND-504), which the drawing-notes work
+      # left as a known gap: `public/THIRD-PARTY-LICENSES.txt` is now GENERATED
+      # from the production dependency closure, and this holds it byte-equal.
+      # A hand-written notice is correct on the day it is written and silently
+      # incomplete afterwards: a dependency lands, its licence text never does,
+      # and nothing in this tree reads that file to notice.
+      #
+      # Here rather than in a pre-commit hook because it needs the INSTALLED
+      # tree and the pnpm store the install used, which is what the `--store-dir`
+      # passthrough is for (the `licenses` subcommand rejects the option's own
+      # name, so the spelling is `--config.store-dir=`). A run that cannot
+      # evaluate exits 2 instead of reporting a finding it did not find.
+      - node scripts/gen-third-party-licenses.mjs --check --store-dir /cache/cargo/pnpm-store
+      # Private-path references in the published trees (audit T3.7). A path into
+      # `myne-ops/`, `myne-agents/` or `myne-range/` in `docs/`, `src/` or
+      # `mobile/src/` is a dead end for a reader who does not have that
+      # repository, and the reader cannot tell it apart from a stale link. The
+      # recorded SET may shrink and never grow; `--record` refuses a grown set.
+      - node scripts/check-private-path-refs.mjs
 
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
@@ -779,6 +837,52 @@ steps:
       # account-number-shaped string outside a recorded placeholder. A missing
       # dist is a failure, not a skip.
       - node scripts/check-stories-bundle.mjs
+      # The PUBLIC variant, which is what `design.myne.md` serves: it renders
+      # neither the "Show on GitHub" affordance nor the issue form, because every
+      # myne-md repository is private and both URLs are a 404 to a reader who is
+      # not a member. Built here so the property is checked on the ARTEFACT
+      # rather than promised about the source, and built in the SAME step rather
+      # than a second one because it shares this step's `pnpm install` — the
+      # serial-install rule every node step in this chain follows.
+      - pnpm stories:build:public
+      # Fails if a private-repository link reached the public artefact, and
+      # equally if the public SENTINEL is missing — "no GitHub URL" is satisfied
+      # by an empty build too.
+      - node scripts/check-stories-public-bundle.mjs
+
+  # ─── Story catalogue container: headers + the served variant ──────────────
+  # The expensive half of the catalogue's two questions, deliberately narrow-
+  # globbed like `web-container-check` below: a docker build on every UI change
+  # would cost minutes to answer a question that only moves when the CONTAINER
+  # changes. The always-on half is `stories-build` above, which runs on
+  # `*code-paths` and is what a change to the shared trees actually needs.
+  stories-container-check:
+    image: docker:cli
+    when:
+      - path:
+          include:
+            - 'stories/**'
+            - 'scripts/check-stories-container-headers.sh'
+            - 'scripts/check-stories-public-bundle.mjs'
+        status: [success, failure]
+    depends_on:
+      - name: stories-build
+        optional: true
+    environment:
+      # Same reason as `web-container-check`: the check runs INSIDE this step
+      # container, whose 127.0.0.1 is its own netns, so a probe reached over a
+      # published host port answers nothing. Handing the script the step's own
+      # docker network lets it reach the probe by name. Must equal the agent's
+      # WOODPECKER_BACKEND_DOCKER_NETWORK.
+      MYNE_STORIES_TEST_NETWORK: woodpecker-workflows
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      # Asserts the EFFECTS of the image rather than its configuration: the
+      # header set, that `/healthz` answers its own body rather than the page,
+      # that an unknown path is a 404, and that the bundle it actually serves is
+      # the public variant.
+      - ./scripts/check-stories-container-headers.sh
 
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.
@@ -1673,6 +1777,13 @@ steps:
       # pushes a failure to the maintainer, so a step added without a slot here
       # is a gate that goes quiet.
       - name: manual-test-roster
+        optional: true
+      # Unfiltered like `manual-test-roster` above and red for the same shape of
+      # reason: its inputs include `fastlane/**`, which no `code-paths` glob
+      # covers, so a listing-only commit is when it can go red. This file is the
+      # only thing that pushes a failure to the maintainer, so a step added
+      # without a slot here is a gate that goes quiet.
+      - name: fdroid-metadata
         optional: true
       # myne#880. Unfiltered like `twin-inventory` and `manual-test-roster` above
       # and listed for the same reason: a stale generated projection is a

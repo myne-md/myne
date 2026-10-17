@@ -2,10 +2,15 @@
 //! The vault filesystem seam, host-free half.
 //!
 //! Moved out of `myne-core` so the `format/` crate can carry the `VaultIo`
-//! trait (which the export walk takes as `&dyn VaultIo`) without dragging the
-//! `StdVaultIo` implementation, which needs `myne-core`'s `task::run_blocking`
-//! and `atomic_write`. The trait and its supporting types live here; the
-//! native and wasm implementations stay in their host crates.
+//! trait without dragging the `StdVaultIo` implementation, which needs
+//! `myne-core`'s `task::run_blocking` and `atomic_write`. The trait and its
+//! supporting types live here; the native and wasm implementations stay in
+//! their host crates.
+//!
+//! The export walk in this crate does NOT take `&dyn VaultIo` — it is the
+//! native-only `std::fs` path a decrypter can run with no host (see
+//! `export_walk`'s own header). What takes the trait is `myne-core`'s export
+//! command, which stages through the seam and delegates the tree build here.
 //!
 //! # Why it is async, which is forced rather than chosen
 //!

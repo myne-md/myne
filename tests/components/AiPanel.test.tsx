@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 //
 // Component tests for `src/components/settings/AiPanel.tsx` (ai-ux-surface
-// MYND-408 + the model-acquisition "Option A" surface). Focus: the two per-role
-// side-load pickers (generation + embedding) and the "Recommended models"
-// browser links that open in the user's OWN browser via the opener plugin.
-// Since myne-md/myne#805 the panel also fetches a model on explicit user action
-// from Myne's own origin (digest-verified), so Myne no longer never downloads a
-// model; the side-load path remains for user-sourced files. `openUrl` / the file dialog
-// / `ai-model-store` / `usePrefs` / i18n are mocked at their module boundaries.
+// MYND-408 + the model-acquisition "Option A" surface). Focus: the per-role
+// side-load pickers (generation + transcription + tag) and the "Recommended
+// models" browser links that open in the user's OWN browser via the opener
+// plugin. Since myne-md/myne#805 the panel also fetches a model on explicit user
+// action from Myne's own origin (digest-verified), so Myne no longer never
+// downloads a model; the side-load path remains for user-sourced files.
+// `openUrl` / the file dialog / `ai-model-store` / `usePrefs` / i18n are mocked
+// at their module boundaries.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -103,7 +104,6 @@ vi.mock("../../src/lib/ai-capability", async (importOriginal) => ({
       // that wants the remote caption has to say the host resolved remote.
       backendClass,
       generation: { available: false, cause: "no_model" },
-      embedding: { available: false, cause: "no_model" },
       transcription: { available: false, cause: "no_model" },
       autoTag: { available, cause: available ? null : "no_model" },
     })),
@@ -228,16 +228,18 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("AiPanel — models section (Option A: side-load + recommended browser links)", () => {
-  it("renders BOTH role pickers (generation + embedding) and the models section", () => {
+  it("renders the role pickers (generation + transcription + tag) and the models section", () => {
     selectAiTopic("models");
     render(<AiPanel />);
     expect(screen.getByTestId("ai.models-section")).toBeTruthy();
     // Generation picker (the original testids, preserved).
     expect(screen.getByTestId("ai.model-select")).toBeTruthy();
     expect(screen.getByTestId("ai.model-choose")).toBeTruthy();
-    // Embedding picker (the NEW twin — previously missing, blocking search/Q&A).
-    expect(screen.getByTestId("ai.model-select-embedding")).toBeTruthy();
-    expect(screen.getByTestId("ai.model-choose-embedding")).toBeTruthy();
+    // The transcription and tag twins.
+    expect(screen.getByTestId("ai.model-select-transcription")).toBeTruthy();
+    expect(screen.getByTestId("ai.model-choose-transcription")).toBeTruthy();
+    expect(screen.getByTestId("ai.model-select-tag")).toBeTruthy();
+    expect(screen.getByTestId("ai.model-choose-tag")).toBeTruthy();
   });
 
   it("renders the load-bearing invariant and the in-process headline verbatim", () => {
@@ -349,12 +351,12 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     expect(openUrl.mock.calls[0][0]).toContain("Qwen2.5-1.5B-Instruct-GGUF");
   });
 
-  it("opens the recommended EMBEDDING model in the browser", () => {
+  it("opens the recommended TAG model in the browser", () => {
     selectAiTopic("models");
     render(<AiPanel />);
-    fireEvent.click(screen.getByTestId("ai.model-recommend-embedding"));
+    fireEvent.click(screen.getByTestId("ai.model-recommend-tag"));
     expect(openUrl).toHaveBeenCalledTimes(1);
-    expect(openUrl.mock.calls[0][0]).toContain("all-MiniLM-L6-v2");
+    expect(openUrl.mock.calls[0][0]).toContain("Qwen2.5-0.5B-Instruct-GGUF");
   });
 
   it("side-loads a picked file per role and never triggers a network download", async () => {
@@ -375,7 +377,7 @@ describe("AiPanel — models section (Option A: side-load + recommended browser 
     render(<AiPanel />);
     expect((screen.getByTestId("ai.model-choose") as HTMLButtonElement).disabled).toBe(true);
     expect(
-      (screen.getByTestId("ai.model-choose-embedding") as HTMLButtonElement).disabled,
+      (screen.getByTestId("ai.model-choose-transcription") as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 });
@@ -1170,23 +1172,28 @@ describe("AiPanel: an installed model in the catalogue", () => {
   // open and no button to press first. What they assert did not change.
   it("offers no download action, and states which file it is using", async () => {
     loadModelPath.mockImplementation((role?: string) =>
-      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+      Promise.resolve(role === "tag" ? "/models/qwen-tag.gguf" : null),
     );
     selectAiTopic("models");
-    render(<AiPanel />);
+    const { unmount } = render(<AiPanel />);
     await waitFor(() =>
-      expect(screen.queryByTestId("ai.model-provenance-embedding-e5-small")).not.toBeNull(),
+      expect(screen.queryByTestId("ai.model-provenance-tag")).not.toBeNull(),
     );
     // The row that HAS the model: no download control, and a folder button
     // whose accessible name carries the FILE, the short half of the path, and
     // the half a user recognises (myne-md/myne#848).
-    expect(screen.queryByTestId("ai.download-button-embedding-e5-small")).toBeNull();
-    const provenance = screen.getByTestId("ai.model-provenance-embedding-e5-small");
-    expect(provenance.getAttribute("aria-label")).toContain("e5-small.onnx");
+    expect(screen.queryByTestId("ai.download-button-tag")).toBeNull();
+    const provenance = screen.getByTestId("ai.model-provenance-tag");
+    expect(provenance.getAttribute("aria-label")).toContain("qwen-tag.gguf");
     expect(provenance.hasAttribute("disabled")).toBe(false);
-    // The row that does not: the button, and a DISABLED folder button, because
-    // there is no location to show.
-    expect(screen.getByTestId("ai.download-button-tag")).toBeTruthy();
+    unmount();
+
+    // The row that does not, on the same artefact with nothing stored: the
+    // download button, and a DISABLED folder button, because there is no
+    // location to show.
+    loadModelPath.mockImplementation(() => Promise.resolve(null));
+    render(<AiPanel />);
+    await waitFor(() => expect(screen.queryByTestId("ai.download-button-tag")).not.toBeNull());
     expect(
       screen.getByTestId("ai.model-provenance-tag").hasAttribute("disabled"),
     ).toBe(true);
@@ -1196,22 +1203,20 @@ describe("AiPanel: an installed model in the catalogue", () => {
     // The path is what the folder button holds: printed inline it ran past the
     // panel's edge and over the label above it (myne-md/myne#848).
     loadModelPath.mockImplementation((role?: string) =>
-      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+      Promise.resolve(role === "tag" ? "/models/qwen-tag.gguf" : null),
     );
     selectAiTopic("models");
     render(<AiPanel />);
-    const button = await screen.findByTestId("ai.model-provenance-embedding-e5-small");
-    expect(screen.queryByTestId("ai.model-provenance-panel-embedding-e5-small")).toBeNull();
+    const button = await screen.findByTestId("ai.model-provenance-tag");
+    expect(screen.queryByTestId("ai.model-provenance-panel-tag")).toBeNull();
     fireEvent.click(button);
-    await screen.findByTestId("ai.model-provenance-panel-embedding-e5-small");
+    await screen.findByTestId("ai.model-provenance-panel-tag");
     expect(
-      screen.getByTestId("ai.model-provenance-panel-embedding-e5-small-path").textContent,
-    ).toBe("/models/e5-small.onnx");
+      screen.getByTestId("ai.model-provenance-panel-tag-path").textContent,
+    ).toBe("/models/qwen-tag.gguf");
     // The action the location enables, and it calls the host's reveal.
-    fireEvent.click(
-      screen.getByTestId("ai.model-provenance-embedding-e5-small-reveal"),
-    );
-    expect(revealItemInDir).toHaveBeenCalledWith("/models/e5-small.onnx");
+    fireEvent.click(screen.getByTestId("ai.model-provenance-tag-reveal"));
+    expect(revealItemInDir).toHaveBeenCalledWith("/models/qwen-tag.gguf");
   });
 });
 
@@ -1274,13 +1279,13 @@ describe("AiPanel: the panel's grouping (myne-md/myne#867, topics since #885)", 
 
   it("keeps the tag role's row and the switch that uses it together in Models", () => {
     // Tagging folded into Models (myne-md/myne#867, on the user's read: "put
-    // tagging inside models"): the tag role is the fourth row of the
+    // tagging inside models"): the tag role is the last row of the
     // hand-picked table, and the switch is a section of the same topic.
     selectAiTopic("models");
     render(<AiPanel />);
     expect(screen.getByTestId("ai.model-select-tag")).toBeTruthy();
     expect(screen.getByTestId("ai.auto-tag-toggle")).toBeTruthy();
-    for (const id of ["ai.model-select", "ai.model-select-embedding", "ai.model-select-transcription"]) {
+    for (const id of ["ai.model-select", "ai.model-select-transcription", "ai.model-select-tag"]) {
       expect(screen.getByTestId(id)).toBeTruthy();
     }
   });
@@ -1366,24 +1371,28 @@ describe("AiPanel: the model catalogue (myne-md/myne#867, inline since #885)", (
   it("lists every artefact, installed or not, with the action its state enables", async () => {
     selectAiTopic("models");
     loadModelPath.mockImplementation((role?: string) =>
-      Promise.resolve(role === "embedding" ? "/models/e5-small.onnx" : null),
+      Promise.resolve(role === "tag" ? "/models/qwen-tag.gguf" : null),
     );
-    render(<AiPanel />);
+    const { unmount } = render(<AiPanel />);
     // Installed: Remove and no Download. A Download button beside an installed
     // model reads as "this is not installed" on the row saying that it is.
     await waitFor(() =>
-      expect(screen.queryByTestId("ai.remove-button-embedding-e5-small")).not.toBeNull(),
+      expect(screen.queryByTestId("ai.remove-button-tag")).not.toBeNull(),
     );
-    expect(screen.queryByTestId("ai.download-button-embedding-e5-small")).toBeNull();
+    expect(screen.queryByTestId("ai.download-button-tag")).toBeNull();
+    expect(screen.getByTestId("ai.download-state-tag").textContent).toBe(
+      "settings.ai.downloadInstalled",
+    );
+    unmount();
+
     // Not installed, and still listed. A catalogue that shows only what you
     // already have cannot answer "what can I get", which is what it is for.
-    expect(screen.getByTestId("ai.download-row-tag")).toBeTruthy();
+    loadModelPath.mockImplementation(() => Promise.resolve(null));
+    render(<AiPanel />);
+    await waitFor(() => expect(screen.getByTestId("ai.download-row-tag")).toBeTruthy());
     expect(screen.getByTestId("ai.download-button-tag")).toBeTruthy();
     expect(screen.getByTestId("ai.download-state-tag").textContent).toBe(
       "settings.ai.downloadNotInstalled",
-    );
-    expect(screen.getByTestId("ai.download-state-embedding-e5-small").textContent).toBe(
-      "settings.ai.downloadInstalled",
     );
   });
 
@@ -1417,7 +1426,7 @@ describe("AiPanel: the model catalogue (myne-md/myne#867, inline since #885)", (
     // in for the other in every scenario that reaches either.
     selectAiTopic("models");
     render(<AiPanel />);
-    for (const artifact of ["embedding-e5-small", "tag"]) {
+    for (const artifact of ["tag"]) {
       expect(screen.getByTestId(`ai.download-row-${artifact}`)).toBeTruthy();
       expect(screen.getByTestId(`ai.download-state-${artifact}`)).toBeTruthy();
     }
@@ -1437,16 +1446,13 @@ describe("AiPanel: the assignment rows (myne-md/myne#867)", () => {
     // Listed rather than built from a role suffix: the generation row carries
     // the original bare testids (`ai.model-select`, `ai.model-choose`) because
     // scenarios already reach them, while its recommend link is named like the
-    // other three. Deriving the ids would hide that, which is the kind of
+    // other roles. Deriving the ids would hide that, which is the kind of
     // tidying that silently breaks a scenario.
     const idsByTopic: Record<string, string[]> = {
       models: [
         "ai.model-select",
         "ai.model-choose",
         "ai.model-recommend-generation",
-        "ai.model-select-embedding",
-        "ai.model-choose-embedding",
-        "ai.model-recommend-embedding",
         "ai.model-select-transcription",
         "ai.model-choose-transcription",
         "ai.model-recommend-transcription",
@@ -1550,8 +1556,8 @@ describe("AiPanel: the Models table and the Advanced sections", () => {
     for (const child of Array.from(table.children) as HTMLElement[]) {
       expect(child.style.gridTemplateColumns).toBe("subgrid");
     }
-    // Four roles, four rows, plus the header.
-    expect(table.children).toHaveLength(5);
+    // Three roles, three rows, plus the header.
+    expect(table.children).toHaveLength(4);
   });
 
   it("marks each state with a glyph: a cross while no file is chosen", () => {
@@ -1633,7 +1639,7 @@ describe("AiPanel: each hand-picked model row names its role to assistive tech",
   it("describes every Choose button by its own role and file requirement", () => {
     selectAiTopic("models");
     render(<AiPanel />);
-    for (const id of ["ai.model-choose", "ai.model-choose-embedding", "ai.model-choose-transcription", "ai.model-choose-tag"]) {
+    for (const id of ["ai.model-choose", "ai.model-choose-transcription", "ai.model-choose-tag"]) {
       const button = screen.getByTestId(id);
       const ids = (button.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean);
       expect(ids).toHaveLength(2);

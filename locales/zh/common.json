@@ -1218,8 +1218,6 @@
           "empty": "摘要、回答和建议会在你请求时显示在这里。",
           "error": "AI 请求无法完成。",
           "errorTurn": "助手无法回答。",
-          "gettingReadyHint": "正在为 AI 准备你的笔记。请稍候。",
-          "noSearchModelHint": "提问会在此设备上搜索你的笔记，这需要本机的搜索模型。服务商无法代劳。请在设置 → 开发者 → AI 中选择一个。用 AI 编辑笔记仍然可用。",
           "insert": "插入到笔记",
           "noAnswer": "没有答案。请尝试换个说法。",
           "newChat": "新对话",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "此构建版本的 Myne 在编译时未包含本地 AI，因此这里无法运行任何内容。任何设置都无法改变这一点——需要包含 AI 的构建版本。",
           "offHint": "本地 AI 已关闭。请在设置 → 开发者 → AI 中开启。",
           "send": "发送",
-          "statusGettingReady": "正在准备…",
-          "statusNoSearchModel": "无搜索模型",
           "statusNoModel": "无服务商",
           "statusUnreachable": "无响应",
           "statusUnavailable": "不可用",
@@ -2909,9 +2905,6 @@
       "legalLabel": "法律信息",
       "legalHelper": "在浏览器中打开 myne.md 上的页面。界面为德语时显示德语版本。",
       "legalPrivacy": "隐私政策",
-      "legalTerms": "测试版条款",
-      "legalNotice": "举报违法内容",
-      "legalLawEnforcement": "执法请求",
       "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "本次运行能读取的一切都在 AI 永远看不到的文件夹里。没有发送任何内容。可在设置、AI、排除的文件夹中更改。"
       },
       "modelChoose": "选择文件…",
-      "modelEmbeddingLabel": "搜索模型：语义搜索和问答",
       "modelFilter": {
-        "gguf": "GGUF 模型",
-        "safetensors": "Safetensors 模型"
+        "gguf": "GGUF 模型"
       },
       "modelGenerationLabel": "文本模型：聊天、摘要、写作",
       "modelNone": "未选择文件",
@@ -3418,7 +3409,6 @@
       "providerNone": "无",
       "providerNothingAnswering": "尚未设置任何可用于回答的模型或服务商。",
       "modelsLabel": "模型",
-      "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "显示 {{name}} 的位置",
       "downloadsLabel": "下载模型",
       "downloadsHelper": "从 Myne 自己的来源获取模型。使用前会与应用内置的指纹核对，因此被篡改的下载会被拒绝。除非你点击，否则不会获取任何内容。",
-      "downloadEmbeddingSize": "多语言模型，约 449 MB。",
       "downloadTagLabel": "标签模型：自动标签建议",
       "downloadTagSize": "小型本地模型，约 337 MB。",
       "downloadInstalled": "已安装",
@@ -3954,10 +3943,6 @@
       "intro": "同步会将你的笔记加密后发送到服务器。有四件事值得先了解。",
       "whatThisIsLabel": "这是什么",
       "dataLossLabel": "如果两项机密都丢失",
-      "whatHappensNextLabel": "测试版结束时",
-      "whatWeCanSeeLabel": "我们能看到什么",
-      "readFull": "阅读完整条款",
-      "review": "审阅测试版条款",
       "accept": "我已了解，开启同步"
     },
     "materialising": "正在下载你的笔记：第 {{done}} 篇，共 {{total}} 篇。你可以先开始写；其余的会陆续出现。",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "请在每台设备上输入相同的服务器 URL。自托管服务器需要受信任的 HTTPS 证书。",
       "tlsFailure": "无法验证服务器的 HTTPS 证书。请检查服务器地址、证书及其有效期。",
       "inviteLabel": "邀请码（仅当此服务器要求时）",
-      "invitePlaceholder": "服务器运营者给你的代码",
-      "changeInviteCode": "更改邀请码"
+      "invitePlaceholder": "服务器运营者给你的代码"
     },
     "enroll": {
       "accountNumberLabel": "账号",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "设置 AI",
-    "intro": "Myne 可以按含义搜索你的笔记、建议标签，并就它们聊天。这些都不是必需的，你随时可以在“设置”中开启。",
+    "intro": "Myne 可以建议标签，并就它们聊天。这些都不是必需的，你随时可以在“设置”中开启。",
     "enableLabel": "开启 AI 功能",
-    "semantic": {
-      "title": "语义搜索",
-      "body": "下载多语言嵌入模型（约 449 MB），即可按含义而不只是按字词搜索。"
-    },
     "tag": {
       "title": "自动标签",
       "body": "下载标签模型（约 337 MB），让 Myne 在你书写时建议标签。"
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "选择同步服务器",
-      "chooseHeading": "你的笔记应同步到哪里？",
-      "chooseIntro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你可以使用 Myne Sync 服务，或将此设备指向你自己运行的服务器。无论哪种方式，你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
-      "myneSyncHint": "由 Myne 运营的服务器。其 HTTPS 证书会自动核对。",
       "intro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
       "notConfigured": "请在上方输入服务器地址，然后按“连接”继续。",
       "back": "返回",
-      "continue": "继续",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "你自己的服务器",
-      "selfHostedHint": "由你运行的同步服务器。你将在下一个屏幕输入其地址。",
-      "connectAction": "连接",
-      "setUpAction": "设置"
+      "continue": "继续"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "选择同步服务器",
       "lead": "你的笔记在离开本设备之前都保持加密。服务器只存储密文。",
       "urlLabel": "服务器地址",
-      "useMyneSync": "使用 Myne Sync",
-      "selfHostedHint": "或输入你自己运行的服务器地址。",
       "connect": "连接",
       "connecting": "正在连接…"
     },

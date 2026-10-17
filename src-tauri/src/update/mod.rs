@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The desktop self-update domain model.
 //!
 //! This module holds the types the update check speaks in, and nothing that
@@ -20,10 +21,155 @@
 //! toggle. The failure enum carries no `String`, so no OS message and no path
 //! can ride out through it (see `src-tauri/AGENTS.md` "Secret-handling logging
 //! discipline").
+//!
+//! [`Channel`] carries the two manifest URLs on `downloads.myne.md`. That is a
+//! first-party origin address and not a protocol identifier, but the sentence
+//! above is worth being exact about rather than leaving a reader to trip over
+//! it: the module holds the URLs as data and performs no request with them.
 
 use serde::Serialize;
 
 pub mod prefs;
+
+/// The first-party origin every update manifest lives under.
+///
+/// One value, so the per-channel path is the only thing a channel adds. Both
+/// manifests are signed with the same offline release key.
+pub const MANIFEST_ORIGIN: &str = "https://downloads.myne.md/releases/";
+
+/// A release line: the name it is spoken as, and the manifest it reads.
+///
+/// One compile-time value decides BOTH the manifest the client fetches and the
+/// channel the About panel shows. It is resolved once, here, and every reader
+/// asks this type rather than matching the environment variable again: the
+/// readers used to keep private copies of the same `match`, so a channel added
+/// to one of them and not the others was a silent disagreement between the log
+/// header, the About label and the fetched manifest.
+///
+/// Which channel a build follows is NOT a runtime choice
+/// (`decisions/clients/0651`): there is no switcher in the app and no downgrade
+/// path, so a channel is a property of the binary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Channel {
+    name: &'static str,
+    manifest: &'static str,
+}
+
+/// The channels this repository ships, in order.
+///
+/// **The FIRST entry is what an unset `MYNE_UPDATE_CHANNEL` means**, and that
+/// position is the whole reason the list is ordered. Adding a third channel
+/// means adding a row here, a case to the publish procedure in the runbook, a
+/// label in the About panel and a file name to `manifestFilename` in
+/// `scripts/emit-update-manifest.mjs`; `scripts/check-update-channel.mjs`
+/// compares this table against that emitter so a half-added channel fails the
+/// commit rather than shipping a client that fetches a file nobody writes.
+///
+/// `decisions/clients/0651` names the pair; `decisions/clients/0701` is the
+/// rule that the beta document is never older than the stable one, which is why
+/// both are published for every release.
+const CHANNELS: [Channel; 2] = [
+    Channel {
+        name: "stable",
+        manifest: "latest.json",
+    },
+    Channel {
+        name: "beta",
+        manifest: "latest-beta.json",
+    },
+];
+
+/// `true` when two strings are equal, as a `const fn`.
+///
+/// `str` equality is not available in a constant (it is not a const trait yet),
+/// so the comparison is by bytes. This exists only so the channel can be
+/// resolved at COMPILE time, which is what makes an unrecognized value fail the
+/// build instead of a launch.
+const fn str_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// Which row of [`CHANNELS`] this build uses, resolved at COMPILE time.
+///
+/// A `const` ITEM rather than the body of a `const fn`, and that is the whole
+/// mechanism: a constant is evaluated during compilation, so the `panic!` below
+/// is a build failure. Written inside the function instead, an unrecognized
+/// value would only surface when the app happened to call it, and `_ =>` would
+/// be a silent fallback to the wrong channel.
+///
+/// `compile_error!` is deliberately not used: it errors wherever it appears,
+/// taken branch or not, so it cannot express "this value is wrong".
+const CHANNEL_INDEX: usize = match option_env!("MYNE_UPDATE_CHANNEL") {
+    None => 0,
+    Some(value) => {
+        let mut found = usize::MAX;
+        let mut i = 0;
+        while i < CHANNELS.len() {
+            if found == usize::MAX && str_eq(value, CHANNELS[i].name) {
+                found = i;
+            }
+            i += 1;
+        }
+        if found == usize::MAX {
+            panic!("MYNE_UPDATE_CHANNEL must be `stable` or `beta` (or unset for stable)");
+        }
+        found
+    }
+};
+
+impl Channel {
+    /// The channel this build was COMPILED for.
+    ///
+    /// `MYNE_UPDATE_CHANNEL=beta` at build time (the release sets it for the
+    /// beta flavour, together with the matching Vite define that drives the
+    /// About panel's label) selects beta; unset selects the first row of
+    /// [`CHANNELS`].
+    ///
+    /// **An unrecognized value is a compile error, deliberately.** The `_` arm
+    /// this replaced fell back to stable, which meant `MYNE_UPDATE_CHANNEL=Beta`
+    /// or any typo'd channel name produced a build the maintainer believed was
+    /// beta and was not, with nothing anywhere saying so.
+    pub const fn from_env() -> Self {
+        CHANNELS[CHANNEL_INDEX]
+    }
+
+    /// The channel's name, as the user, the log header and the Vite define
+    /// spell it.
+    pub const fn as_str(self) -> &'static str {
+        self.name
+    }
+
+    /// The file name of this channel's manifest, and the URL a client reads.
+    ///
+    /// This is the ONLY place the updater's endpoint is decided. There is no
+    /// second one in `tauri.conf.json`: the plugin is built in
+    /// `plugins::update` with `UpdaterBuilder::endpoints`, which REPLACES the
+    /// config list rather than merging with it
+    /// (`tauri-plugin-updater`'s `UpdaterBuilder::build` reads
+    /// `self.endpoints.unwrap_or_else(|| config.endpoints.clone())`), so a list
+    /// in the config would be a second source of truth that is silently
+    /// overridden. `scripts/check-update-channel.mjs` fails if one reappears.
+    ///
+    /// The file name half is the same string
+    /// `scripts/emit-update-manifest.mjs` writes, compared against it by that
+    /// guard rather than trusted because this sentence says so. There is no
+    /// accessor for the file name alone: nothing in production needs it split,
+    /// and an unused one is dead code in this private module.
+    pub fn endpoint(self) -> String {
+        format!("{MANIFEST_ORIGIN}{}", self.manifest)
+    }
+}
 
 /// The result of a check that did not fail.
 ///
@@ -146,5 +292,50 @@ mod tests {
             UpdateCheckError::Unreachable.to_string(),
             "the update origin could not be reached"
         );
+    }
+
+    #[test]
+    fn every_channel_names_its_own_manifest_under_the_origin() {
+        // Both rows spelled out, so moving either file name fails here rather
+        // than at the first client that cannot find its manifest.
+        // `scripts/check-update-channel.mjs` holds the same pairs against the
+        // emitter that writes the files; this one holds them against
+        // themselves, with no network and no other language.
+        assert_eq!(CHANNELS[0].as_str(), "stable");
+        assert_eq!(CHANNELS[0].manifest, "latest.json");
+        assert_eq!(
+            CHANNELS[0].endpoint(),
+            format!("{MANIFEST_ORIGIN}latest.json")
+        );
+        assert_eq!(CHANNELS[1].as_str(), "beta");
+        assert_eq!(CHANNELS[1].manifest, "latest-beta.json");
+        assert_eq!(
+            CHANNELS[1].endpoint(),
+            format!("{MANIFEST_ORIGIN}latest-beta.json")
+        );
+    }
+
+    #[test]
+    fn the_origin_is_https_and_the_channels_never_share_a_manifest() {
+        // The failure this pins: pointing beta at the stable document, which
+        // compiles, ships, and leaves every beta install reading the wrong
+        // channel's version.
+        assert!(MANIFEST_ORIGIN.starts_with("https://"));
+        assert_ne!(CHANNELS[0].manifest, CHANNELS[1].manifest);
+        assert_ne!(CHANNELS[0].as_str(), CHANNELS[1].as_str());
+    }
+
+    #[test]
+    fn this_build_resolves_to_a_row_of_the_table() {
+        // A test build has `MYNE_UPDATE_CHANNEL` unset on every lane that runs
+        // it, so this is the first row in practice. The expectation is written
+        // against the compile-time value, so a deliberate
+        // `MYNE_UPDATE_CHANNEL=beta cargo test` checks the beta row instead of
+        // failing.
+        let expected = match option_env!("MYNE_UPDATE_CHANNEL") {
+            Some("beta") => CHANNELS[1],
+            _ => CHANNELS[0],
+        };
+        assert_eq!(Channel::from_env(), expected);
     }
 }

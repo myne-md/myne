@@ -139,7 +139,15 @@ export function useDiagnostics(): DiagnosticsState {
     ])
       .then(([flag, record, manifest]) => {
         if (cancelled) return;
-        setEnabledState(flag);
+        // `flag === true` rather than a bare `flag`: `invoke<T>` is an unchecked
+        // cast, so a host that RESOLVES a non-boolean (the catalogue's fake IPC
+        // answers `""` for a command it does not know) put that value into a
+        // state whose type says `boolean`. `aria-checked=""` is not a valid state
+        // token, so axe reported the switch as missing its required attribute and
+        // a screen reader announced no state at all. Same shape as the manifest's
+        // `?? null` below, one field over: coerce the unchecked answer at the
+        // boundary rather than trusting it downstream.
+        setEnabledState(flag === true);
         if (record === undefined) {
           setCrashReadFailed(true);
         } else {

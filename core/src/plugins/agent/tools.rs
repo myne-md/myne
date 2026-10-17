@@ -158,6 +158,26 @@ pub trait ScopeSearcher: Send + Sync {
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, AgentError>;
 }
 
+/// A [`ScopeSearcher`] that finds nothing.
+///
+/// The seam is a required parameter of `step` because it genuinely differs per
+/// client (mobile answers it from the full-text index). Desktop's used to query
+/// the AI embedding index; with the `MYR1` embedding family and the
+/// retrieval-grounded search it fed retired, desktop has no index to search and
+/// supplies this instead. The two search tools (`search_scope`, `search_vault`)
+/// therefore answer an empty result set on that client rather than a run
+/// failing, which is the honest shape for "this client has no searcher": a tool
+/// error would end a run the user could have carried on by asking differently.
+pub struct NoScopeSearch;
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl ScopeSearcher for NoScopeSearch {
+    async fn search(&self, _query: &str, _limit: usize) -> Result<Vec<SearchHit>, AgentError> {
+        Ok(Vec::new())
+    }
+}
+
 /// Tool 1: the run's scope, by title.
 pub async fn list_scope(
     runs: &AgentRunState,
@@ -521,26 +541,6 @@ mod tests {
         ))
         .unwrap();
         assert!(body.contains("body of a"));
-    }
-
-    #[test]
-    fn read_refuses_a_note_moved_into_an_excluded_folder() {
-        // The case the index snapshot cannot see, and the reason the read tool
-        // takes the folder off the BODY rather than off `records`: the note's
-        // folder changed after the run froze its scope.
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let err = block(read_note(
-            &runs,
-            "r",
-            "a",
-            // The body says Archive; the snapshot (unused here) would still say
-            // whatever it said when the run started.
-            &FolderReader("Archive"),
-            &StubExclusions(vec!["Archive".into()]),
-        ))
-        .unwrap_err();
-        assert!(matches!(err, AgentError::ExcludedNow));
     }
 
     #[test]

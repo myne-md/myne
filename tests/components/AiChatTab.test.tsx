@@ -53,18 +53,9 @@ let surfaceState: { kind: string; cause?: string | null } = { kind: "available" 
 // purpose: naming a provider and having one answer are different facts, and the
 // surface must render the second (myne-md/myne#466).
 let backendClass: string | null = "in_process_local";
-// Whether ASKING can answer, which is a second capability the header reads
-// (myne-md/myne#545): retrieval is refused a remote provider outright, and the
-// embedding model is not bundled, so a working provider says nothing about
-// whether a question can be grounded.
-let retrievalState: { embedding: { kind: string }; indexReady: boolean } = {
-  embedding: { kind: "available" },
-  indexReady: true,
-};
 vi.mock("../../src/hooks/useAiModelReady", () => ({
   useAiSurfaceState: () => surfaceState,
   useAiBackendClass: () => backendClass,
-  useAiRetrievalState: () => retrievalState,
 }));
 
 // The agent bindings the folded-in surfaces reach for. Stubbed rather than left
@@ -155,7 +146,6 @@ beforeEach(() => {
   aiProvider = null;
   backendClass = "in_process_local";
   surfaceState = { kind: "available" };
-  retrievalState = { embedding: { kind: "available" }, indexReady: true };
   __resetChatForTest();
   // The mention wiring's two inputs (myne-md/myne#867): no notes, and a fresh
   // spy, so a test that forgets to set them cannot pass on the previous one's
@@ -202,37 +192,13 @@ describe("AiChatTab", () => {
     );
   });
 
-  // myne-md/myne#545. The header used to read the GENERATION row only, so a
-  // configuration where asking can never answer rendered the provider's name,
-  // which reads as ready. The three states below are what it reads now.
-  describe("what the header says about asking", () => {
-    it("says no search model when retrieval cannot run at all", () => {
-      // The reported configuration: a provider named and working, and no local
-      // embedding model. Retrieval is refused a provider outright (SYNC-16), so
-      // no provider setting can make asking work here.
+  // myne-md/myne#466. The chip names what the HOST says is serving rather than
+  // what the user named, so a named provider that is not answering does not
+  // render as ready.
+  describe("what the header says about the backend", () => {
+    it("names the provider the host resolved as serving", () => {
       aiProvider = "openrouter";
       backendClass = "remote";
-      retrievalState = { embedding: { kind: "unavailable" }, indexReady: false };
-      render(<AiChatTab />);
-      const chip = screen.getByTestId("ai.chrome-status").textContent ?? "";
-      expect(chip).toContain("aiChat.statusNoSearchModel");
-      expect(chip).not.toContain("OpenRouter");
-    });
-
-    it("says it is preparing while the index is still being built", () => {
-      // A state the guide documents and production could not reach: the
-      // `gettingReady` prop had no caller, so its `false` default always won.
-      retrievalState = { embedding: { kind: "available" }, indexReady: false };
-      render(<AiChatTab />);
-      expect(screen.getByTestId("ai.chrome-status").textContent).toContain(
-        "aiChat.statusGettingReady",
-      );
-    });
-
-    it("goes back to naming the backend once retrieval is ready", () => {
-      aiProvider = "openrouter";
-      backendClass = "remote";
-      retrievalState = { embedding: { kind: "available" }, indexReady: true };
       render(<AiChatTab />);
       expect(screen.getByTestId("ai.chrome-status").textContent).toContain(
         "OpenRouter",
@@ -1666,14 +1632,14 @@ describe("AiChatTab: the honesty note costs a line, not a third of the panel", (
 });
 
 describe("AiChatTab: the status chip leads somewhere", () => {
-  // It was a `<span>` — a passive label naming a fault with no route out of
-  // it. And the sentence written to GIVE that route was rendered nowhere at
-  // all, in any client: `noSearchModelHint` exists in `locales/en` and in 31
-  // translations and had never been on a screen. `check-i18n.mjs` cannot see
-  // that; it verifies a USED key exists, not that an existing key is used.
+  // It was a `<span>` — a passive label naming a fault with no route out of it.
+  // The degraded chip is a button whose tooltip is the taxonomy's own sentence
+  // and whose press lands on the control that clears it. `check-i18n.mjs` cannot
+  // see a key that is never rendered; it verifies a USED key exists, not that an
+  // existing key is used.
 
   it("is a button with the hint, when the fault has a fix", () => {
-    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    surfaceState = { kind: "absent" };
     const onOpenSettings = vi.fn();
     render(<AiChatTab onOpenSettings={onOpenSettings} />);
     const chip = screen.getByTestId("ai.chrome-status");
@@ -1685,7 +1651,7 @@ describe("AiChatTab: the status chip leads somewhere", () => {
     // The AI panel is a dozen blocks tall. Opening it and leaving the user to
     // find the models block is the failure a deep link exists to prevent, and
     // the machinery was already here with one caller.
-    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    surfaceState = { kind: "absent" };
     const onOpenSettings = vi.fn();
     render(<AiChatTab onOpenSettings={onOpenSettings} />);
     fireEvent.click(screen.getByTestId("ai.chrome-status"));
@@ -1695,7 +1661,7 @@ describe("AiChatTab: the status chip leads somewhere", () => {
   it("stays a plain label when the chip is a statement", () => {
     // A healthy chip names the provider that is answering. A statement with a
     // click target invites a press that would do nothing useful.
-    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
     const chip = screen.getByTestId("ai.chrome-status");
     expect(chip.tagName).toBe("SPAN");
@@ -1705,7 +1671,7 @@ describe("AiChatTab: the status chip leads somewhere", () => {
   it("stays a plain label when nothing can open Settings", () => {
     // Rendered in isolation, and in any surface with no settings shell behind
     // it. A button that goes nowhere is worse than a label.
-    retrievalState = { embedding: { kind: "absent" }, indexReady: false };
+    surfaceState = { kind: "absent" };
     render(<AiChatTab />);
     expect(screen.getByTestId("ai.chrome-status").tagName).toBe("SPAN");
   });
@@ -1730,7 +1696,7 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
   it("answers all four questions, naming the provider that is answering", async () => {
     aiProvider = "openrouter";
     backendClass = "remote";
-    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
 
     // Closed until asked: the notice is the claim, this is the disclosure.
@@ -1748,7 +1714,7 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
 
   it("says nothing leaves the machine when the local arm is answering", async () => {
     backendClass = "in_process_local";
-    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ai.honesty-note"));
     // The other branch, and the one a wrong implementation would get by reusing
@@ -1762,7 +1728,7 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
   it("sends the user to the control, not to the top of the panel", async () => {
     const onOpenSettings = vi.fn();
     backendClass = "in_process_local";
-    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={onOpenSettings} />);
     fireEvent.click(screen.getByTestId("ai.honesty-note"));
     fireEvent.click(screen.getByTestId("ai.notice-settings"));
@@ -1774,7 +1740,7 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
     // literal equality and rendered verbatim in every locale, so the change of
     // element must not have changed a character of it.
     backendClass = "in_process_local";
-    retrievalState = { embedding: { kind: "available" }, indexReady: true };
+    surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
     expect(screen.getByTestId("ai.honesty-note").textContent).toBe(AI_CHAT_HONESTY_NOTE);
   });

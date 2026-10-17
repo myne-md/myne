@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! HTTPS to a **compiled-in** remote AI provider host (ai-remote-providers
 //! task 4, ledger SYNC-23).
 //!

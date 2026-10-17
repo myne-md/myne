@@ -175,7 +175,7 @@ function SyncSettings() {
         <Card>
           <Row>
             <span style={{ fontSize: 16 }}>Endpoint</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>sync.myne.md</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>sync.example</span>
           </Row>
           <Row top>
             <span style={{ fontSize: 16 }}>Status</span>
@@ -247,7 +247,7 @@ function EndpointConfig() {
             padding: "0 14px",
           }}
         >
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg-1)" }}>https://sync.myne.md</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg-1)" }}>https://sync.example</span>
         </div>
 
         <Button style={{ marginTop: 12, height: 48, fontSize: 15 }}>Connect</Button>

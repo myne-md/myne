@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 pub use myne_core::atomic_write;
 pub mod audio_rate;
 mod auto_lock;

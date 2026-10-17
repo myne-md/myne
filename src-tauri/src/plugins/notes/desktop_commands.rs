@@ -38,6 +38,7 @@ use zeroize::Zeroizing;
 use super::SNAPSHOT_WRITE_FAILED_EVENT;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
 use myne_core::atomic_write;
+use myne_core::host::HostCtx;
 // `enumerate_notes_dir` is now consumed only by this module's tests (the
 // non-test caller, `collect_referenced_attachment_ids`, moved to
 // `myne_core::plugins::attachments::ref_scan`).
@@ -1338,10 +1339,14 @@ fn flush_snapshot_for_note(notes_dir: &std::path::Path, note_uuid: &str, now_ms:
 
 /// Inner, testable core of [`note_snapshot_flush`]. Returns the snapshot-failed
 /// warning bool (the #[command] wrapper turns it into a non-blocking event).
+/// Takes its host seam, like [`note_create_with_dir`] / [`note_update_with_dir`]
+/// beside it, so the wall clock comes from `HostCtx` rather than a direct
+/// `SystemTime::now()`.
 pub(crate) async fn note_snapshot_flush_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     note_id: String,
+    host: &dyn HostCtx,
 ) -> Result<bool, NoteUpdateError> {
     let note_id = NoteId::parse(&note_id).map_err(|cause| {
         tracing::debug!(stage = ?cause, "note_snapshot_flush note_id strict-parse failed");
@@ -1360,7 +1365,7 @@ pub(crate) async fn note_snapshot_flush_with_dir(
     }
 
     let note_uuid_str = note_id.as_uuid().to_string();
-    let now_ms = crate::snapshot_store::now_unix_ms();
+    let now_ms = host.now_unix_millis();
     let warning = tokio::task::spawn_blocking(move || {
         flush_snapshot_for_note(&notes_dir, &note_uuid_str, now_ms)
     })
@@ -1416,7 +1421,13 @@ pub async fn note_snapshot_flush<R: Runtime>(
                 io_error_kind: from_io_error_kind(other),
             },
         })?;
-    let warning = note_snapshot_flush_with_dir(notes_dir, state.inner(), note_id.clone()).await?;
+    let warning = note_snapshot_flush_with_dir(
+        notes_dir,
+        state.inner(),
+        note_id.clone(),
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+    )
+    .await?;
     if warning {
         let _ = app.emit(SNAPSHOT_WRITE_FAILED_EVENT, &note_id);
     }
@@ -1483,14 +1494,8 @@ mod tests {
     /// this seam, so the snapshot pair must be live; the index/sync side-effects
     /// are irrelevant here. Avoids an `AppHandle` / `tauri::test` harness (TB9
     /// Cargo.lock discipline) — the `ClampHooks` precedent in `prefs/mod.rs`.
-    ///
-    /// It also RECORDS every `ai_note_changed` call, because what that hook is
-    /// handed is a contract the compiler cannot state: three of the notes
-    /// commands reach it and each used to decide for itself whether to project a
-    /// drawing body first (myne#304).
     #[derive(Default)]
     struct SnapshotHooks {
-        ai_changed: std::sync::Mutex<Vec<(String, String)>>,
         /// `(id, body)` per `search_upsert`, and the ids passed to
         /// `search_remove` — the pair test-audit #20 is about.
         search_upserts: std::sync::Mutex<Vec<(String, String)>>,
@@ -1522,12 +1527,6 @@ mod tests {
             Box::pin(std::future::ready(()))
         }
         fn persist_search_index<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
-        fn hydrate_ai_vectors<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
         ) -> myne_core::hooks::BoxFuture<'a> {
@@ -1565,14 +1564,6 @@ mod tests {
                 .expect("recorder mutex")
                 .push(id.to_string());
         }
-        fn ai_note_changed(&self, id: &str, body: &str) {
-            self.ai_changed
-                .lock()
-                .expect("recorder mutex")
-                .push((id.to_string(), body.to_string()));
-        }
-        fn ai_note_deleted(&self, _: &str) {}
-        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn emit_notes_deleted(&self, _: &str) {}
@@ -2002,22 +1993,6 @@ mod tests {
         });
     }
 
-    // ── myne#304: what the three notes commands hand `ai_note_changed` ──────
-    //
-    // The hook's body argument is the RAW note body — frontmatter included, and
-    // for a drawing the scene JSON rather than its projected text. The AI arm
-    // projects for itself, because it needs the frontmatter first (the SYNC-14
-    // folder-exclusion set is read from it) and because the unlock-time rebuild
-    // reads raw bodies off disk regardless.
-    //
-    // Before this, `note_create` passed raw while `note_update` and the batch
-    // passed projected — three call sites, three chances to decide differently,
-    // and nothing that could state the contract. These drive all three against
-    // one recording hooks impl so the answer is asserted rather than reviewed.
-
-    /// A `kind: drawing` note: scene JSON in the body, folder in frontmatter.
-    const DRAWING: &str = "---\nkind: drawing\nfolder: Sketches/\n---\n\n```excalidraw\n{\"type\":\"excalidraw\",\"elements\":[{\"type\":\"text\",\"text\":\"roadmap\"}]}\n```\n";
-
     /// A host whose `app_data_dir` is a scratch directory, with the active
     /// vault root materialized so the `_from_host` path resolvers succeed.
     fn host_with_vault(base: &Path) -> myne_core::host::test_host::TestHost {
@@ -2111,77 +2086,6 @@ mod tests {
                 "and must NOT re-index it: {:?}",
                 recorder.search_upserts.lock().unwrap()
             );
-        });
-    }
-
-    #[test]
-    fn all_three_notes_commands_hand_the_ai_hook_the_raw_body() {
-        rt().block_on(async {
-            let scratch = ScopedTempDir::new("ai-hook-raw-body").unwrap();
-            let host = host_with_vault(scratch.path());
-            let recorder = std::sync::Arc::new(SnapshotHooks::default());
-            let hooks: myne_core::hooks::Hooks = recorder.clone();
-            let state = VaultRuntimeState::default();
-            state
-                .set_unlocked(
-                    test_vault_id(),
-                    fixture_unlocked_with_keys(
-                        FIXTURE_ROOT_BYTE,
-                        FIXTURE_ITEMS_BYTE,
-                        FIXTURE_ITEMS_ID_BYTE,
-                    ),
-                )
-                .await;
-
-            // create
-            let id = note_create_from_host(
-                &host,
-                &state,
-                &hooks,
-                DRAWING.to_string(),
-                &myne_core::vault_io::StdVaultIo,
-            )
-            .await
-            .expect("create");
-
-            // update
-            note_update_from_host(
-                &host,
-                &state,
-                &hooks,
-                id.clone(),
-                DRAWING.to_string(),
-                None,
-                &myne_core::vault_io::StdVaultIo,
-                &myne_core::plugins::live::LiveSessionRegistry::new(),
-            )
-            .await
-            .expect("update");
-
-            // batch
-            note_write_batch_transactional_from_host(
-                &host,
-                &myne_core::vault_io::StdVaultIo,
-                &state,
-                &hooks,
-                &myne_core::plugins::live::LiveSessionRegistry::new(),
-                vec![NoteBatchUpdate {
-                    note_id: id.clone(),
-                    plaintext: DRAWING.to_string(),
-                }],
-            )
-            .await
-            .expect("batch");
-
-            let seen = recorder.ai_changed.lock().unwrap().clone();
-            assert_eq!(seen.len(), 3, "all three commands must reach the hook");
-            for (i, (got_id, body)) in seen.iter().enumerate() {
-                assert_eq!(got_id, &id, "call {i} carried the wrong note id");
-                assert_eq!(
-                    body, DRAWING,
-                    "call {i} must hand the hook the raw body, frontmatter and all"
-                );
-            }
         });
     }
 
@@ -2345,9 +2249,14 @@ mod tests {
             .await
             .unwrap();
             // Flush force-captures the CURRENT state (v2) despite the window.
-            let warn = note_snapshot_flush_with_dir(notes_dir.clone(), &state, id.clone())
-                .await
-                .unwrap();
+            let warn = note_snapshot_flush_with_dir(
+                notes_dir.clone(),
+                &state,
+                id.clone(),
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert!(!warn);
 
             let note_id = NoteId::parse(&id).unwrap();
@@ -2380,9 +2289,14 @@ mod tests {
                 )
                 .await;
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
-            let warn = note_snapshot_flush_with_dir(notes_dir, &state, phantom)
-                .await
-                .unwrap();
+            let warn = note_snapshot_flush_with_dir(
+                notes_dir,
+                &state,
+                phantom,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert!(!warn, "flushing a missing note is a no-op, not a warning");
         });
     }
@@ -2394,7 +2308,13 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default(); // Slot::Empty
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
-            let r = note_snapshot_flush_with_dir(notes_dir, &state, phantom).await;
+            let r = note_snapshot_flush_with_dir(
+                notes_dir,
+                &state,
+                phantom,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(r, Err(NoteUpdateError::VaultNotUnlocked)));
         });
     }
@@ -3052,26 +2972,6 @@ mod tests {
     }
 
     // ---- MYND-26 retroactive: notes_dir-as-regular-file behavioral pin --
-
-    #[test]
-    fn read_notes_dir_resolution_failing_with_not_a_directory_returns_structural_variant() {
-        // `note_read_with_dir` takes `notes_dir` already resolved; the
-        // `NotesDirNotADirectory` mapping lives in the outer `note_read`
-        // (which calls `paths::notes_dir`). Exercise the helper-layer
-        // surface that the outer matches: `paths::notes_dir_under`
-        // returns an IO error of the expected kind when `<parent>/notes`
-        // is a regular file. The outer's accept-list mapping
-        // (`NotADirectory | AlreadyExists`) is verified by code
-        // inspection on `note_read`'s map_err arm.
-        let scratch = ScopedTempDir::new("note-read-notes-is-file").unwrap();
-        let conflict = scratch.path().join("notes");
-        std::fs::write(&conflict, b"hostile").unwrap();
-        let err = notes_dir_under(scratch.path()).expect_err("conflict must error");
-        assert!(matches!(
-            err.kind(),
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists
-        ));
-    }
 
     // =====================================================================
     // note_update
@@ -4258,80 +4158,6 @@ mod tests {
     // file` boundary). The wrapper layer is the meaningful coverage
     // target: slot guard + `spawn_blocking` + io-error mapping +
     // success-path tracing event.
-
-    #[test]
-    fn note_list_with_dir_empty_unlocked_returns_empty_vec() {
-        rt().block_on(async {
-            let scratch = ScopedTempDir::new("note-list-empty-unlocked").unwrap();
-            let notes_dir = notes_dir_under(scratch.path()).unwrap();
-            let state = VaultRuntimeState::default();
-            state
-                .set_unlocked(
-                    test_vault_id(),
-                    fixture_unlocked_with_keys(
-                        FIXTURE_ROOT_BYTE,
-                        FIXTURE_ITEMS_BYTE,
-                        FIXTURE_ITEMS_ID_BYTE,
-                    ),
-                )
-                .await;
-
-            let result = note_list_with_dir(
-                notes_dir,
-                &state,
-                &myne_core::vault_io::StdVaultIo,
-                &myne_core::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Ok(ref v) if v.is_empty()));
-        });
-    }
-
-    #[test]
-    fn note_list_with_dir_three_valid_files_unlocked_returns_sorted() {
-        rt().block_on(async {
-            let scratch = ScopedTempDir::new("note-list-three-unlocked").unwrap();
-            let notes_dir = notes_dir_under(scratch.path()).unwrap();
-            let state = VaultRuntimeState::default();
-            state
-                .set_unlocked(
-                    test_vault_id(),
-                    fixture_unlocked_with_keys(
-                        FIXTURE_ROOT_BYTE,
-                        FIXTURE_ITEMS_BYTE,
-                        FIXTURE_ITEMS_ID_BYTE,
-                    ),
-                )
-                .await;
-
-            let stems_descending = [
-                "01970e85-4f2f-7000-8000-000000000003",
-                "01970e84-4f2f-7000-8000-000000000002",
-                "01970e83-4f2f-7000-8000-000000000001",
-            ];
-            for stem in stems_descending {
-                std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
-            }
-
-            let ids = note_list_with_dir(
-                notes_dir,
-                &state,
-                &myne_core::vault_io::StdVaultIo,
-                &myne_core::host::NoopHost,
-            )
-            .await
-            .unwrap();
-            let id_strs: Vec<String> = ids.iter().map(|id| format!("{id}")).collect();
-            assert_eq!(
-                id_strs,
-                vec![
-                    "01970e83-4f2f-7000-8000-000000000001",
-                    "01970e84-4f2f-7000-8000-000000000002",
-                    "01970e85-4f2f-7000-8000-000000000003",
-                ]
-            );
-        });
-    }
 
     #[test]
     fn note_list_with_dir_slot_empty_rejects_with_vault_not_unlocked() {

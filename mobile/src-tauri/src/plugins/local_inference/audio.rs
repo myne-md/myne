@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! WAV decode + 16 kHz-mono resample for the transcription front end
 //! (voice-to-text, MYND-550; SYNC-V3).
 //!

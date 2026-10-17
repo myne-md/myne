@@ -22,10 +22,10 @@ import type { AddressInfo, Socket } from "node:net";
 
 /** The exact bytes a correct download serves. Must match the digest compiled
  *  into `FIXTURE_ARTIFACTS` in `download.rs`. */
-export const FIXTURE_EMBEDDING_BYTES = "myne-e2e-fixture-embedding-model-bytes";
+export const FIXTURE_TAG_BYTES = "myne-e2e-fixture-tag-model-bytes";
 
 /** The path the fixture artefact lives at, mirroring `FIXTURE_ARTIFACTS`. */
-const FIXTURE_PATH = "/fixture/embedding/model.safetensors";
+const FIXTURE_PATH = "/fixture/tag/model.gguf";
 
 export interface FakeModelOrigin {
   /** `127.0.0.1:<port>`: what goes into `MYNE_E2E_MODEL_ORIGIN`. */
@@ -59,7 +59,7 @@ export async function startFakeModelOrigin(): Promise<FakeModelOrigin> {
         res.end("not found");
         return;
       }
-      const body = corrupt ?? FIXTURE_EMBEDDING_BYTES;
+      const body = corrupt ?? FIXTURE_TAG_BYTES;
       res.writeHead(200, {
         "content-type": "application/octet-stream",
         "content-length": Buffer.byteLength(body),

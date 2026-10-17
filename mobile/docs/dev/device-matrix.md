@@ -128,7 +128,7 @@ row. A failed row is stop-the-world for the release, same discipline as a failed
 # One-time host setup (JDK 21 keg-only + SDK under ~/Library/Android/sdk):
 export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-export NDK_HOME="$ANDROID_HOME/ndk/29.0.13846066"
+export NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
 export PATH="$ANDROID_HOME/platform-tools:$PATH"
 
 # Tablet: Settings → About → tap Build number ×7 → Developer options → USB debugging.
@@ -167,7 +167,7 @@ means a stale 2021-era WebView can fail to parse the bundle at all).
 |---|---|---|
 | A.1 | **Cold start → create vault → unlock** | Argon2id (m=256 MiB) completes without an OOM kill; record unlock wall-time (calibration data for the mobile-KDF params decision) |
 | A.2 | **PIN quick-unlock** — setup + redeem after auto-lock | works (shared `myne-core` path, same as iOS) |
-| A.3 | **Biometric toggle** | absent/disabled — the backend returns `HardwareUnavailable` (no Keystore provider yet); no misleading affordance is shown |
+| A.3 | **Biometric toggle** | absent/disabled — the backend returns `HardwareUnavailable`, because quick-unlock's biometric provider has no Android backend (the Keystore provider that exists today covers the SHARE-IMPORT device key, not biometrics); no misleading affordance is shown |
 | A.4 | **Note CRUD + attachments + search** | parity with the iOS rows |
 | A.5 | **Voice note** | wry's runtime mic prompt appears on first record; grant → encrypted WAV attachment lands; deny → the "Microphone access is off" (SYS-02) state. Must be on the adb-reverse dev loop or an installed build (see §6.1) |
 | A.6 | **Rotation mid-edit** | no activity recreation (template `configChanges` covers orientation) — editor content, unlock state, and size-class-appropriate layout all survive |

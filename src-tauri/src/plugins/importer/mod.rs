@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `importer` plugin: the import command namespace (MYND-53, SYNC-1;
 //! myne-md/myne#464).
 //!

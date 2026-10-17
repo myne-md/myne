@@ -21,9 +21,11 @@ path at all. A15 does not apply to you.
 
 **Unfavourable, and it is the part people skip.** That exemption is *yours*, not
 your users'. For anyone else using your instance, **you** are the code-delivery
-operator — exactly as the Myne team is for the hosted one. If other people rely
-on your deployment, A15 applies to them with you in the role, and the honest
-thing is to tell them so.
+operator, exactly as whoever serves any bundle is for the people who load it. If
+other people rely on your deployment, A15 applies to them with you in the role,
+and the honest thing is to tell them so. There is no Myne-run instance to compare
+yourself against any more (`decisions/sync/0696`), so "the operator" in this
+document always means you.
 
 Everything else is unchanged. The sync server still sees only opaque ciphertext
 (TB5), and it makes no difference to that whether the client came from us or
@@ -103,7 +105,7 @@ into it would make every self-hoster's bundle unique and that comparison
 impossible, so instead the address is read at container start, and the
 `connect-src` directive of the Content-Security-Policy is **generated from it**.
 Your policy names exactly your sync origin and is otherwise identical to the
-hosted instance's; a test asserts that the two differ in nothing but that one
+reference build's; a test asserts that the two differ in nothing but that one
 origin.
 
 ## Rebuilding and verifying the bundle
@@ -163,10 +165,12 @@ match no row even once it is. Build in the reference
 environment, or tell them plainly that no published row will match what you
 serve.
 
-Two things make that comparison worth making. The record is a **precondition for
-the hosted deploy rather than a log kept afterwards** — `check-bundle-record.mjs`
-refuses an image whose hash is not already in the table, so a substituted bundle
-would have to be published before it could be served. And the reproducibility the
+Two things made that comparison worth making while Myne served a bundle. The
+record was a **precondition for that deploy rather than a log kept afterwards**
+(`check-bundle-record.mjs` refuses an image whose hash is not already in the
+table, so a substituted bundle would have to be published before it could be
+served); that precondition no longer runs, because the deploy it guarded is gone
+(`docs/web-bundle-hashes.md` carries the status). And the reproducibility the
 comparison rests on is itself gated: `version.json` carries the *commit's*
 timestamp rather than a wall clock, the wasm build remaps every machine-specific
 path, and CI rebuilds the wasm artefact twice cold and fails if the two digests
@@ -180,8 +184,8 @@ These are yours to get right; nothing in the client can compensate:
 - **Serving over HTTPS.** The container speaks HTTP to your terminator.
 - **Not co-hosting the app with anything else on the same origin.** OPFS is
   origin-scoped: any script on that origin can reach the vault storage. Give the
-  client its own origin — this is the same reasoning behind the hosted client
-  running on `app.myne.md` rather than a path on the marketing site
+  client its own origin. That is the same reasoning that put the (now closed)
+  hosted client on a dedicated hostname rather than a path on the marketing site
   (`decisions.md` 2026-07-26).
 - **Not weakening the header set.** It is baked in; overriding it at a proxy is
   possible and is your decision to justify.

@@ -113,3 +113,38 @@ describe("initialStageFromProbe()", () => {
     expect(initialStageFromProbe(list, { active: "Unlocked" })).toEqual({ name: "editor" });
   });
 });
+
+describe("restore-backup doors (MYND-56 / audit T6.8)", () => {
+  // The four restore-backup arms were absent from the action-verification walk,
+  // so nothing exercised them. Each of the four doors must land on the
+  // restore-backup stage with its OWN entry (the entry drives the back label).
+  it("welcome → restore-backup (entry welcome)", () => {
+    expect(transition({ name: "welcome" }, { type: "welcome.restore-backup" })).toEqual({
+      name: "restore-backup",
+      entry: "welcome",
+    });
+  });
+
+  it("picker → restore-backup (entry picker)", () => {
+    expect(transition({ name: "picker" }, { type: "picker.restore-backup" })).toEqual({
+      name: "restore-backup",
+      entry: "picker",
+    });
+  });
+
+  it("unlock(corrupted) → restore-backup (entry corrupted)", () => {
+    expect(
+      transition(
+        { name: "unlock", initialStatus: { kind: "Corrupted" } },
+        { type: "unlock.restore-backup" },
+      ),
+    ).toEqual({ name: "restore-backup", entry: "corrupted" });
+  });
+
+  it("editor → restore-backup (entry settings)", () => {
+    expect(transition({ name: "editor" }, { type: "editor.restore-backup" })).toEqual({
+      name: "restore-backup",
+      entry: "settings",
+    });
+  });
+});

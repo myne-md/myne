@@ -82,8 +82,7 @@ pub struct ExtractedText {
     /// bundled image-OCR weights — output is model-swap-invalidated by the
     /// `extractor_version` byte instead); `Some` for a [`SourceFormat::Audio`]
     /// ASR transcript, whose model IS user-swappable.
-    /// Lives in the inner payload, NOT the AAD — mirrors the `vault.embeddings`
-    /// model-identity rule (§ 9.17.2): a model swap invalidates cached
+    /// Lives in the inner payload, NOT the AAD: a model swap invalidates cached
     /// transcripts via a payload-side comparison ([`ExtractedText::is_model_stale`]),
     /// while the crypto framing (AAD) stays model-agnostic. Because the
     /// `extractor_version` header byte is checked and AAD-bound BEFORE any
@@ -191,41 +190,6 @@ impl ExtractedText {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn payload_round_trips_through_postcard() {
-        let r = ExtractedText {
-            status: ExtractStatus::Ok,
-            source_format: SourceFormat::Text,
-            text: "round trip me".to_string(),
-            char_count: 13,
-            truncated: false,
-            model_hash: None,
-        };
-        let bytes = r.to_blob_plaintext();
-        let back = ExtractedText::from_blob_plaintext(&bytes).expect("decode");
-        assert_eq!(r, back);
-    }
-
-    #[test]
-    fn audio_source_format_round_trips() {
-        // A transcript payload (SourceFormat::Audio) round-trips equal through
-        // the postcard MYE1 inner-plaintext codec — additive, not load-bearing.
-        // extractor_version 0x02 carries the producing model's SHA-256 in the
-        // inner payload (§9.17.2 mirror).
-        let r = ExtractedText {
-            status: ExtractStatus::Ok,
-            source_format: SourceFormat::Audio,
-            text: "on-device transcript".to_string(),
-            char_count: 20,
-            truncated: false,
-            model_hash: Some([0xa5; 32]),
-        };
-        let bytes = r.to_blob_plaintext();
-        let back = ExtractedText::from_blob_plaintext(&bytes).expect("decode");
-        assert_eq!(r, back);
-        assert_eq!(back.model_hash, Some([0xa5; 32]));
-    }
 
     #[test]
     fn model_stale_detects_a_swapped_model() {

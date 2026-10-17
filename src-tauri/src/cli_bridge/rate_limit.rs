@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Command-socket rate limit (cli-thin-client task 10; MYND-490).
 //!
 //! **This is a slowdown, not a protection, and that distinction is binding

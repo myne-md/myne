@@ -4,20 +4,49 @@ This repository is **multi-licensed by subtree**. The repo-root [`LICENSE`](LICE
 file carries the default (AGPL-3.0); subtrees with a different license carry their
 own `LICENSE` file, which governs that subtree.
 
+The table is the **whole** repository, not the crates that happened to exist when it was
+written: a subtree that is not listed here has no licence of its own and is governed by the
+root `LICENSE`, which is why a new top-level directory is a licensing question rather than a
+housekeeping one.
+
 | Subtree | License | License file |
 |---|---|---|
 | `src/`, `src-tauri/` (desktop client) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `web/` (Phase 3 browser client: bundle, seam implementation, self-host container) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `mobile/` (Phase 3 iOS + Android client: a second Tauri app, and a pnpm workspace member) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `core/` (myne-core shared backend crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `format/` (myne-format on-disk-format crate) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `decrypt/` (myne-decrypt CLI) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `cli/` (myne-cli terminal client, shipped as a desktop sidecar) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `tor-sidecar/` (the arti-based `myne-tor` sidecar) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `theme-validator/` (the shared custom-theme CSS-value allowlist) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `protocol/` (cryptographic crate) | **AGPL-3.0** | [`protocol/LICENSE`](protocol/LICENSE) |
+| `client-core/`, `dialect/`, `editor/`, `copy/`, `ornaments/`, `preview/` (shared frontend source packages) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `stories/` (the story catalogue, a separate Vite target) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `locales/` (i18n catalogues) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `scripts/`, `tests/`, `e2e/`, `e2e-web/` (repo guards, specs, the E2E lanes) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
+| `packaging/` (Arch PKGBUILDs and the `.desktop` entry) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `docs/` (specifications, threat model) | **CC-BY-4.0** | [`docs/LICENSE`](docs/LICENSE) |
+| `public/fonts/` (the two bundled webfonts) | **SIL OFL-1.1** | [`public/fonts/LICENSE.txt`](public/fonts/LICENSE.txt) |
+| `src-tauri/resources/dictionaries/**`, `src-tauri/resources/models/**` (bundled third-party data) | **per asset** | each dictionary's own `<lang>/license`; the models are listed under "Bundled third-party assets" below |
+
+One thing in this repository is outside that map entirely: the **Myne Marks**, which are
+trademark rather than code or content. [`TRADEMARK.md`](TRADEMARK.md) is the pointer, and the
+policy lives in [`myne-branding`](https://github.com/myne-md/myne-branding).
 
 Application code is licensed under the **GNU Affero General Public License,
-version 3** (AGPL-3.0, not "or-later"). Every source file under `protocol/`
-carries the SPDX header `// SPDX-License-Identifier: AGPL-3.0`, and the crate
-manifests declare `license = "AGPL-3.0"`.
+version 3** (AGPL-3.0, not "or-later").
+
+**SPDX headers.** Every tracked Rust source file carries
+`// SPDX-License-Identifier: AGPL-3.0` on line 1, and every crate manifest
+declares `license = "AGPL-3.0"` (the workspace root is a virtual manifest with
+no `[package]` table, so the only `Cargo.toml` without the field is the one that
+is not a crate). `scripts/check-spdx-headers.mjs` holds that over the whole
+tracked Rust tree: the pre-commit hook passes it the staged paths, and
+`scripts/hooks-parity-check.sh` calls it with none, so `--no-verify` is not a way
+around it either. There is no SPDX header form for Markdown, JSON or CSS; a
+non-Rust file takes its licence from its subtree, which is what the table above
+is for.
 
 The specification subtree (`docs/`) is licensed under the **Creative Commons
 Attribution 4.0 International** license (CC-BY-4.0) so that independent
@@ -58,16 +87,39 @@ mobile client moved in-repo. They had been in a `myne-mobile/LICENSING.md` of
 their own, and they are **not** duplicates of the desktop rows: the two bundles
 ship different Whisper weights.
 
+The **npm** half of this is not hand-maintained. `public/THIRD-PARTY-LICENSES.txt`
+is generated from the production dependency closure by
+`scripts/gen-third-party-licenses.mjs` and held byte-equal in CI, because a
+hand-written notice is correct on the day it is written and silently incomplete
+afterwards. The rows below are the assets no package manager knows about.
+
 | Asset | Where | Upstream | License | AGPL-3.0 compatibility |
 |---|---|---|---|---|
 | Default speech-to-text model (voice-to-text, MYND-270) | `src-tauri/resources/models/whisper/model.gguf` (Git LFS; desktop-only) | [OpenAI Whisper `whisper-base`](https://huggingface.co/openai/whisper-base) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible (Apache-2.0 → AGPL-3.0 is a one-way-compatible direction per the FSF license list). Redistribution requires only preserving the Apache-2.0 license + attribution, both satisfied here. |
 | Tag-suggestion model (auto-tag, MYND-651) | served on demand from `downloads.myne.md` (content-addressed under `/models/tag/<sha256-prefix>/`; no longer bundled since myne-md/myne#805), provenance anchor `src-tauri/resources/models/tag/README.md` | [Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) weights, **a Myne-produced derivative** of the first-party `Q4_K_M` GGUF Qwen publishes (one duplicated tensor removed; no re-quantization) | **Apache-2.0** | Compatible, on the same one-way Apache-2.0 → AGPL-3.0 direction as the Whisper model above. Redistribution requires preserving the Apache-2.0 license + attribution, **and stating the modification**, all three satisfied here. |
-| Hunspell spell-check dictionaries | `src-tauri/resources/dictionaries/**` | per-language upstreams | mixed (LGPL / MPL / BSD / GPL-with-linking-exception, per dictionary) | Compatible; each dictionary keeps its upstream license. |
+| Hunspell spell-check dictionaries | `src-tauri/resources/dictionaries/**` | per-language upstreams | **mixed, per dictionary** (the families are listed in the paragraph below) | Compatible: every dictionary offers at least one arm that reaches AGPL-3.0. Each keeps its upstream licence in tree. |
 | Default speech-to-text model for the **mobile bundle** (voice-to-text, MYND-563) | `models/whisper/model.gguf` in the `.ipa`/`.apk`, from `src-tauri/resources/models/whisper-tiny/` (Git LFS), pulled in by `mobile/src-tauri/tauri.conf.json` `bundle.resources` | [OpenAI Whisper `whisper-tiny`](https://huggingface.co/openai/whisper-tiny) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible, same one-way direction as the desktop row above. |
 | Text-recognition (OCR) models for the **mobile bundle** | `models/ocr/` in the `.ipa`/`.apk`, from `src-tauri/resources/models/ocr/` (Git LFS) | RapidOCR / PP-OCR models via the `rten` runtime | permissive (per upstream) | Compatible; each model keeps its upstream license. |
 | `myne-tor` sidecar binary (desktop Tor routing, MYND-650) | `src-tauri/binaries/myne-tor-<triple>` in the bundle; built from the in-repo `tor-sidecar/` crate | [arti](https://gitlab.torproject.org/tpo/core/arti) (The Tor Project's Rust Tor implementation) + its dependency tree | **MIT OR Apache-2.0** | Compatible (both are one-way-compatible into AGPL-3.0). Unlike every other dependency, this one is redistributed as a **separate executable** rather than linked in, so it is listed here as a bundled artefact too. |
 
-**Whisper model provenance + obligations.** The bundled model is a quantized
+**Dictionary provenance + obligations.** Each bundled dictionary keeps its own upstream
+licence in tree as `<lang>/license` (and, beside `ko`, seven further `LICENSE.*` texts), and
+every one of those files is SHA-256-pinned in `src-tauri/src/spell/dict_manifest.rs` next to
+the speller inputs, so a licence swap is caught the same way a dictionary swap is. The v1
+families are: public domain + BSD (en-US, en-GB), MIT (fa, lt, ru), GPL-2.0-or-later (bg),
+GPL-2.0-or-GPL-3.0 (de), GPL-3.0 (it, and `ko` as a combined work over
+MPL-1.1/GPL-2.0/LGPL-2.1 and two CC licences), GPL-3.0-or-LGPL-3.0-or-MPL-1.1 (es),
+MPL-2.0 (fr), AGPL-3.0 (he), GPL-or-LGPL-or-MPL (hu, sk, ro), GPL/LGPL/MPL/CC-BY-SA (pl),
+LGPL-2.1-or-later (ca, lv, sl), LGPL-3.0 (pt, sv), and BSD-3-Clause-or-CC-BY-3.0 (nl).
+Compatibility holds because each entry offers at least one arm that reaches AGPL-3.0:
+LGPL-2.1-or-later and LGPL-3.0 relicense through GPL, and the permissive arms need no
+relicensing at all. Two languages are worth naming explicitly. `hr` was **dropped**: its
+OpenOffice pair is LGPL/SISSL 2003, and SISSL is FSF- and OSI-approved but retired and
+GPL/AGPL-incompatible, so it could not be relied on. `tr` ships in tree **for a test only**
+and is not in `bundle.resources`, so it is not redistributed; it is absent from
+`BUNDLED_LANGUAGES` because `spellbook` rejects its flag-0.
+
+ The bundled model is a quantized
 derivative of the Apache-2.0 `openai/whisper-base` weights (the OpenAI Whisper
 *code* is MIT; the *weights* are distributed under Apache-2.0 on Hugging Face,
 either way permissive and AGPL-3.0-compatible). Quantization is a format
@@ -125,3 +177,15 @@ pre-existing drift, not something the 2026-08-09 provider work introduced; the
 resource-gating mechanism that would make the original sentence true is owed by
 myne-md/myne#190.
 (`docs/decisions.md` 2026-07-31.)
+
+## Store listing graphics
+
+`fastlane/metadata/android/en-US/images/` holds the Android store listing's icon
+and screenshots for the F-Droid submission. They are the Myne Marks and branding
+renders, generated in the `myne-branding` companion repo, whose
+[`TRADEMARK.md`](https://github.com/myne-md/myne-branding) records that the marks
+are **not** covered by AGPL-3.0 or by that repo's CC-BY-4.0, and that using them
+inside the Myne project's own channels needs no permission. They are listing
+metadata rather than shipped bytes: the icon inside the `.apk` comes from
+`mobile/src-tauri/icons/`, and nothing in this directory is compiled into a
+release.

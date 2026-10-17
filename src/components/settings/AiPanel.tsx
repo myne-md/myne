@@ -35,10 +35,9 @@
 // bringing their own file, which the "Recommended models" links support by
 // opening in the user's OWN browser via the opener plugin (an OS handoff, not a
 // Myne fetch, the same affordance the About panel uses for the threat-model
-// doc). Four roles: a Qwen2-family GGUF for generation (summaries / chat /
-// writing), an all-MiniLM-L6-v2 embedding model for semantic search / Q&A, a
-// Whisper GGUF for speech-to-text transcription (MYND-270), and a small Qwen2
-// GGUF for tag suggestions.
+// doc). Three roles: a Qwen2-family GGUF for generation (summaries / chat /
+// writing), a Whisper GGUF for speech-to-text transcription (MYND-270), and a
+// small Qwen2 GGUF for tag suggestions.
 //
 // Honesty discipline: the trust copy renders the `load-bearing-copy.ts`
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
@@ -179,10 +178,6 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
     name: "Qwen2.5-1.5B-Instruct (GGUF)",
     url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF",
   },
-  embedding: {
-    name: "all-MiniLM-L6-v2",
-    url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
-  },
   transcription: {
     name: "whisper-base (multilingual)",
     url: "https://huggingface.co/openai/whisper-base",
@@ -240,10 +235,6 @@ function providerLabel(wire: string | null): string {
 // scope — src/AGENTS.md i18n discipline); the extensions are stable data.
 const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }> = {
   generation: { nameKey: "settings.ai.modelFilter.gguf", extensions: ["gguf"] },
-  embedding: {
-    nameKey: "settings.ai.modelFilter.safetensors",
-    extensions: ["safetensors"],
-  },
   transcription: {
     // The Whisper engine loads via `WhisperVarBuilder::from_gguf`
     // (`engine_candle.rs::load_transcription`), so the override picker must
@@ -495,7 +486,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
     generation: null,
-    embedding: null,
     transcription: null,
     tag: null,
   });
@@ -686,7 +676,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // and the download rows' `onChanged`, so a completed download updates the
   // installed state without remounting the panel (myne-md/myne#805).
   const reloadModelPaths = useCallback(() => {
-    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
+    (["generation", "transcription", "tag"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => setModelPaths((prev) => ({ ...prev, [role]: p })))
         .catch(() => {
@@ -700,7 +690,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // persisted path — the panel stays usable.
   useEffect(() => {
     let alive = true;
-    (["generation", "embedding", "transcription", "tag"] as const).forEach((role) => {
+    (["generation", "transcription", "tag"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => {
           if (alive) setModelPaths((prev) => ({ ...prev, [role]: p }));
@@ -1633,8 +1623,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       />
       </SettingsSection>
 
-      {/* Roles: text (GGUF), search/embedding (safetensors), speech-to-text
-          (Whisper GGUF) and tagging (GGUF).
+      {/* Roles: text (GGUF), speech-to-text (Whisper GGUF) and tagging (GGUF).
 
           Its own section, titled for what it is (myne-md/myne#885 visual pass):
           the files a role uses when they come from somewhere other than the
@@ -1671,21 +1660,6 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             testIdRecommend="ai.model-recommend-generation"
             testIdSelect="ai.model-select"
             testIdChoose="ai.model-choose"
-          />
-          <SideloadRow
-            roleLabel={t("settings.ai.modelEmbeddingLabel")}
-            filesText={t("settings.ai.recommendedFilesEmbedding")}
-            recommendName={RECOMMENDED_MODEL.embedding.name}
-            onOpenRecommend={() => openRecommend("embedding")}
-            path={modelPaths.embedding}
-            noneLabel={t("settings.ai.modelNone")}
-            chooseLabel={t("settings.ai.modelChoose")}
-            onChoose={() => void chooseModel("embedding")}
-            disabled={!aiEnabled}
-            compact={compact}
-            testIdRecommend="ai.model-recommend-embedding"
-            testIdSelect="ai.model-select-embedding"
-            testIdChoose="ai.model-choose-embedding"
           />
           {/* Speech-to-text (voice-to-text MYND-552, SYNC-V3): the ASR / Whisper
               role (side-load only, disabled when AI is off, distinct testids). */}

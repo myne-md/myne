@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The wire contract with the desktop's CLI bridge command socket
 //! (`src-tauri/src/cli_bridge/dispatch.rs`). This is this crate's own copy
 //! of that shape — deliberately not a shared type (see that module's doc

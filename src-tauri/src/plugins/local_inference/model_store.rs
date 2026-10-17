@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Model side-load + device-local storage-path layer (local-ai epic,
 //! MYND-406, task 2).
 //!
@@ -45,35 +46,25 @@ use crate::paths::VAULTS_DIR_NAME;
 pub const MODELS_DIR_NAME: &str = "models";
 
 /// Marker file (under `models/`) recording the lowercase-hex SHA-256 of the
-/// selected **embedding** model's file bytes — the `model_hash` field of the
-/// `vault.embeddings` model-identity tuple (`protocol.md` §9.17.2, MYND-453).
-/// Only the embedding role has one: the generation model does not feed the
-/// embedding index identity. Computed once at pick-time so the unlock hot path
-/// never re-hashes a hundreds-of-MiB safetensors file.
-const EMBEDDING_HASH_MARKER: &str = "embedding.hash";
-
-/// Marker file (under `models/`) recording the lowercase-hex SHA-256 of the
 /// selected **transcription** (Whisper) model's file bytes — the model-identity
 /// input the transcript `MYE1` cache binds so a model swap invalidates stale
-/// transcripts (voice-to-text, MYND-550; SYNC-V3, mirroring the embedding rule).
+/// transcripts (voice-to-text, MYND-550; SYNC-V3).
 const TRANSCRIPTION_HASH_MARKER: &str = "transcription.hash";
 
 /// Which model a stored path refers to. The generation model (Qwen2.5-1.5B,
-/// task 3) and the embedding model (all-MiniLM-L6-v2, task 4) are side-loaded
+/// task 3) and the transcription model are side-loaded
 /// independently, so each has its own marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum ModelRole {
     /// Text-completion model (`infer`).
     Generation,
-    /// Embedding model (`embed`).
-    Embedding,
     /// Speech-to-text model (`transcribe`) — Whisper, voice-to-text MYND-550
-    /// (SYNC-V3). Side-loaded + swappable independently of the other two.
+    /// (SYNC-V3). Side-loaded + swappable independently of the other roles.
     Transcription,
     /// Tag-suggestion model (auto-tag, MYND-651). Historically **bundled-only**
     /// (no marker file, no picker, no IPC role string). Since myne-md/myne#805
     /// (`decisions/ai/0627`) it is a selectable, user-storable role like the
-    /// other three: a downloaded or side-loaded path (`tag.path`) takes
+    /// other two: a downloaded or side-loaded path (`tag.path`) takes
     /// precedence over the bundled default, and [`ModelRole::parse`] accepts
     /// `"tag"`. The fetch is verified against a SHA-256 compiled into the client
     /// binary before the model is registered; a Developer-mode side-load of a
@@ -88,27 +79,25 @@ impl ModelRole {
     fn marker_file_name(self) -> Option<&'static str> {
         match self {
             ModelRole::Generation => Some("generation.path"),
-            ModelRole::Embedding => Some("embedding.path"),
             ModelRole::Transcription => Some("transcription.path"),
             ModelRole::TagSuggestion => Some("tag.path"),
         }
     }
 
     /// Which hash-marker file (if any) records this role's model SHA-256.
-    /// `Generation` has none (it does not key a persisted index); `Embedding`
-    /// keys `vault.embeddings`, `Transcription` keys the transcript `MYE1` cache.
+    /// `Generation` has none (it does not key a persisted index); `Transcription`
+    /// keys the transcript `MYE1` cache.
     /// `TagSuggestion` has none either — tag suggestions are RAM-only, so no
     /// persisted artefact keys on the model's identity (`decisions.md`
     /// 2026-07-31).
     fn hash_marker_file_name(self) -> Option<&'static str> {
         match self {
             ModelRole::Generation | ModelRole::TagSuggestion => None,
-            ModelRole::Embedding => Some(EMBEDDING_HASH_MARKER),
             ModelRole::Transcription => Some(TRANSCRIPTION_HASH_MARKER),
         }
     }
 
-    /// Parse the IPC role string (`"generation"` / `"embedding"` /
+    /// Parse the IPC role string (`"generation"` /
     /// `"transcription"` / `"tag"`): the command layer's only re-entry point
     /// for a UI-supplied role. `"tag"` joined this set with myne-md/myne#805
     /// (`decisions/ai/0627`), when the auto-tag model became a downloaded,
@@ -116,7 +105,6 @@ impl ModelRole {
     pub fn parse(s: &str) -> Option<ModelRole> {
         match s {
             "generation" => Some(ModelRole::Generation),
-            "embedding" => Some(ModelRole::Embedding),
             "transcription" => Some(ModelRole::Transcription),
             "tag" => Some(ModelRole::TagSuggestion),
             _ => None,
@@ -133,7 +121,8 @@ pub enum ModelStoreError {
     /// with ciphertext.
     #[error("model path is inside the vault tree")]
     InsideVaultTree,
-    /// The IPC role string was not `"generation"` / `"embedding"` (a UI/codegen
+    /// The IPC role string was not `"generation"` /
+    /// `"transcription"` / `"tag"` (a UI/codegen
     /// bug, not user-facing input), or the role names a model with no
     /// user-selectable path.
     #[error("unknown model role")]
@@ -272,7 +261,7 @@ fn file_stat(path: &Path) -> Result<(u64, i128), ModelStoreError> {
 }
 
 /// Stream-hash a file with SHA-256, bounded memory regardless of file size — a
-/// safetensors embedding model can be hundreds of MiB. Rejects a non-regular
+/// safetensors model can be hundreds of MiB. Rejects a non-regular
 /// file first (a FIFO/device would never terminate). Called at model-pick time
 /// (not on the unlock hot path) so a warm unlock never re-hashes.
 fn compute_file_sha256(path: &Path) -> Result<[u8; 32], ModelStoreError> {
@@ -292,12 +281,12 @@ fn compute_file_sha256(path: &Path) -> Result<[u8; 32], ModelStoreError> {
 }
 
 /// Marker line format: `hex_hash\nlen\nmtime_nanos`. Line 1 is the hash (read by
-/// [`selected_embedding_model_hash`]); lines 2–3 are the cheap staleness stat.
-fn embedding_hash_marker_body(hash: &[u8; 32], stat: (u64, i128)) -> String {
+/// [`hash_from_marker_body`]); lines 2–3 are the cheap staleness stat.
+fn hash_marker_body(hash: &[u8; 32], stat: (u64, i128)) -> String {
     format!("{}\n{}\n{}", hex_lower(hash), stat.0, stat.1)
 }
 
-/// Parse the recorded `(len, mtime_nanos)` from an embedding-hash marker body
+/// Parse the recorded `(len, mtime_nanos)` from a hash marker body
 /// (lines 2–3), or `None` if absent/malformed (a marker written before staleness
 /// tracking → treat as unknown, forcing a re-hash).
 fn parse_marker_stat(body: &str) -> Option<(u64, i128)> {
@@ -321,9 +310,9 @@ fn hex_lower(bytes: &[u8]) -> String {
 /// accepted (normalized) path. Does NOT copy the model file — the side-load
 /// semantic records where the user's file already lives.
 ///
-/// For [`ModelRole::Embedding`], this ALSO computes and records the file's
-/// SHA-256 (`embedding.hash` marker) — the `model_hash` of the
-/// `vault.embeddings` model-identity tuple (§9.17.2). Hashing runs BEFORE the
+/// For [`ModelRole::Transcription`], this ALSO computes and records the file's
+/// SHA-256 (`transcription.hash` marker) — the model-identity input the
+/// transcript `MYE1` cache binds (SYNC-V3). Hashing runs BEFORE the
 /// path marker is written, so a hash/IO failure records nothing (a swap either
 /// fully lands or fully rolls back). This is where the (potentially seconds-
 /// long) hash cost is paid, once, so the unlock path stays fast.
@@ -347,53 +336,21 @@ pub fn set_selected_model(
     // path that cannot be opened is never useful, whatever the role.
     //
     // One call, reused below. Adding a second beside the existing one gave
-    // Embedding and Transcription three `metadata()` syscalls per pick (here,
+    // Transcription three `metadata()` syscalls per pick (here,
     // in the hash block, and again inside `compute_file_sha256`) where one
     // result serves all three.
     let stat = file_stat(&accepted)?;
     let dir = ensure_models_dir(base)?;
-    // Roles with a hash marker (Embedding / Transcription) record the file's
+    // Roles with a hash marker (Transcription) record the file's
     // SHA-256 at pick-time — computed BEFORE the path marker so a hash/IO
     // failure records nothing (the swap fully lands or fully rolls back).
     if let Some(marker) = role.hash_marker_file_name() {
         let hash = compute_file_sha256(&accepted)?;
-        std::fs::write(
-            dir.join(marker),
-            embedding_hash_marker_body(&hash, stat).as_bytes(),
-        )?;
+        std::fs::write(dir.join(marker), hash_marker_body(&hash, stat).as_bytes())?;
     }
     let marker = dir.join(marker_name);
     std::fs::write(&marker, accepted.to_string_lossy().as_bytes())?;
     Ok(accepted)
-}
-
-/// The SHA-256 of the selected embedding model, recorded at pick-time
-/// ([`set_selected_model`] for [`ModelRole::Embedding`]). `None` if no embedding
-/// model is selected, no hash was recorded, or the marker is malformed. Read on
-/// the unlock path to build the `vault.embeddings` model-identity tuple WITHOUT
-/// re-hashing the model file.
-pub fn selected_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, ModelStoreError> {
-    let marker = models_dir_from_base(base).join(EMBEDDING_HASH_MARKER);
-    match std::fs::read_to_string(&marker) {
-        Ok(s) => {
-            // Line 1 is the hex hash (lines 2–3, if present, are the staleness
-            // stat read separately).
-            let hex = s.lines().next().unwrap_or("").trim();
-            if hex.len() != 64 {
-                return Ok(None);
-            }
-            let mut out = [0u8; 32];
-            for (i, byte) in out.iter_mut().enumerate() {
-                *byte = match u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16) {
-                    Ok(b) => b,
-                    Err(_) => return Ok(None),
-                };
-            }
-            Ok(Some(out))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e.into()),
-    }
 }
 
 /// Remove the recorded model for `role`, deleting a **downloaded** bundle if the
@@ -508,21 +465,21 @@ pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, M
 /// generic error naming nothing.
 ///
 /// The **generation** role is the only one with this hole, which is why this
-/// wrapper exists rather than a change to `selected_model` itself. Embedding
-/// and transcription both carry a hash marker, and
+/// wrapper exists rather than a change to `selected_model` itself. Transcription
+/// carries a hash marker, and
 /// [`hash_marker_file_name`](ModelRole::hash_marker_file_name) returning `Some`
-/// is exactly what routes them through [`file_stat`] at pick time and again on
+/// is exactly what routes it through [`file_stat`] at pick time and again on
 /// every hash backfill. Generation returns `None` there, so nothing ever opened
 /// its file except the loader.
 ///
 /// **That reasoning is about PICK time, and the loaders are a separate
-/// question.** `load_embed` and `load_transcription` still call plain
-/// `selected_model`, so they are knowingly left on the unverified reader. The
+/// question.** `load_transcription` still calls plain
+/// `selected_model`, so it is knowingly left on the unverified reader. The
 /// consequence is worst for transcription: `Ok(Some(stale_path))` takes the
 /// override arm, so a marker naming a deleted file permanently bypasses the
 /// bundled-default fallback that lives only in the `Ok(None)` arm, and an
 /// install shipping a working Whisper model reports a load failure forever.
-/// Routing those two through this wrapper is a behaviour change (transcription
+/// Routing it through this wrapper is a behaviour change (transcription
 /// would start falling back), which is its own decision rather than a rider on
 /// this one.
 pub fn selected_model_verified(
@@ -663,8 +620,8 @@ fn hex_to_32(hex: &str) -> Option<[u8; 32]> {
 /// Install a downloaded **multi-file** artefact for `role` (myne-md/myne#805).
 ///
 /// A model is rarely one file: the tag loader reads a sibling `tokenizer.json`
-/// and the embedding loader reads a sibling `config.json` + `tokenizer.json`
-/// (`engine_candle.rs`), so all of them must land together in one directory for
+/// (`engine_candle.rs`), so all of a bundle's files must land together in one
+/// directory for
 /// the loader's bare `models/<dir>/<file>` layout to resolve.
 ///
 /// `staged_dir` holds the fetched files, downloaded outside the final location.
@@ -776,17 +733,9 @@ fn find_old_backup(dir: &Path, prefix: &str) -> Option<PathBuf> {
     None
 }
 
-/// Return the embedding model hash, backfilling it (compute + persist) from the
-/// currently-selected embedding model if the pick-time marker is missing — e.g.
-/// a model selected before MYND-453 shipped. `None` if no embedding model is
-/// selected. Thin wrapper over [`ensure_model_hash`].
-pub fn ensure_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, ModelStoreError> {
-    ensure_model_hash(base, ModelRole::Embedding)
-}
-
 /// The transcription (Whisper) model hash for the **effective** model — the
 /// picker override if set, else the `bundled` default (voice-to-text, MYND-270)
-/// — backfilled once if the marker is missing (like [`ensure_embedding_model_hash`]).
+/// — backfilled once if the marker is missing.
 /// A transcript produced by the bundled model gets that model's identity hash
 /// bound into its `MYE1` cache (and swapping to an override correctly re-hashes →
 /// invalidates stale transcripts). `None` when neither an override nor a bundled
@@ -804,23 +753,9 @@ pub fn ensure_transcription_model_hash_with_bundled(
     hash_model_at_path(base, marker_name, &path).map(Some)
 }
 
-/// Shared backfill for any role that has a hash marker ([`ModelRole::Embedding`]
-/// / [`ModelRole::Transcription`]). The hash cost is paid at most ONCE (then
-/// cached), never on every unlock. `None` if the role has no hash marker or no
-/// model is selected.
-fn ensure_model_hash(base: &Path, role: ModelRole) -> Result<Option<[u8; 32]>, ModelStoreError> {
-    let Some(marker_name) = role.hash_marker_file_name() else {
-        return Ok(None);
-    };
-    let Some(path) = selected_model(base, role)? else {
-        return Ok(None);
-    };
-    hash_model_at_path(base, marker_name, &path).map(Some)
-}
-
 /// Compute (or reuse the cached) SHA-256 of the model file at `path`, keyed by
-/// the `<models>/<marker_name>` marker's `(hash, len, mtime)`. Extracted from
-/// [`ensure_model_hash`] so the bundled-default transcription model
+/// the `<models>/<marker_name>` marker's `(hash, len, mtime)`. The bundled-default
+/// transcription model
 /// ([`effective_transcription_model`]) hashes through the SAME cache path as a
 /// picked model. The hash cost is paid at most once per actual file change.
 fn hash_model_at_path(
@@ -836,8 +771,8 @@ fn hash_model_at_path(
     // Fast path: a cached hash whose recorded `(len, mtime)` still matches the
     // file on disk — no re-hash. Detects an IN-PLACE model replacement (same
     // path, new bytes) with a cheap `stat` and re-hashes only then, so the swap
-    // correctly invalidates the persisted index instead of poisoning it with a
-    // stale hash (§9.17.2 for embeddings; the same rule for transcripts).
+    // correctly invalidates the persisted artefact instead of poisoning it with
+    // a stale hash (SYNC-V3 for transcripts).
     let current_stat = file_stat(path)?;
     if let (Some(hash), Some(stat)) = (cached_hash, recorded_stat) {
         if stat == current_stat {
@@ -852,7 +787,7 @@ fn hash_model_at_path(
     let dir = ensure_models_dir(base)?;
     std::fs::write(
         dir.join(marker_name),
-        embedding_hash_marker_body(&hash, stat).as_bytes(),
+        hash_marker_body(&hash, stat).as_bytes(),
     )?;
     Ok(hash)
 }
@@ -868,15 +803,6 @@ fn hash_from_marker_body(body: &str) -> Option<[u8; 32]> {
         *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()?;
     }
     Some(out)
-}
-
-/// Runtime wrapper: resolve the app's `app_data_dir` base and return the
-/// embedding model hash (backfilling once if needed). Best-effort — `None` on
-/// any failure. The unlock path reads this to build the `vault.embeddings`
-/// model-identity tuple (§9.17.2).
-pub fn embedding_model_hash_for<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<[u8; 32]> {
-    let base = crate::paths::app_data_dir(app).ok()?;
-    ensure_embedding_model_hash(&base).ok().flatten()
 }
 
 /// Runtime wrapper: resolve the app's `app_data_dir` base and return the
@@ -971,8 +897,11 @@ mod tests {
             selected_model(base, ModelRole::Generation).unwrap(),
             Some(model.to_path_buf())
         );
-        // Roles are independent — setting generation does not set embedding.
-        assert_eq!(selected_model(base, ModelRole::Embedding).unwrap(), None);
+        // Roles are independent — setting generation does not set transcription.
+        assert_eq!(
+            selected_model(base, ModelRole::Transcription).unwrap(),
+            None
+        );
 
         // The marker lives under models/, outside the vault tree.
         let marker = models_dir_from_base(base).join("generation.path");
@@ -1066,8 +995,8 @@ mod tests {
         }
     }
 
-    /// The half of myne-md/myne#466 that writes. Embedding and transcription got
-    /// an existence check incidentally, through the `file_stat` inside their
+    /// The half of myne-md/myne#466 that writes. Transcription got
+    /// an existence check incidentally, through the `file_stat` inside its
     /// hashing block; `Generation` has no hash marker, so nothing checked its
     /// pick — a path could be recorded that was never openable in the first
     /// place.
@@ -1094,18 +1023,6 @@ mod tests {
         );
         // Nothing was recorded.
         assert_eq!(selected_model(base, ModelRole::Generation).unwrap(), None);
-    }
-
-    #[test]
-    fn error_kind_labels_are_deny_safe() {
-        assert_eq!(ModelStoreError::InsideVaultTree.kind(), "inside_vault_tree");
-        assert_eq!(
-            ModelStoreError::Io {
-                kind: IoFailureKind::NotFound
-            }
-            .kind(),
-            "io"
-        );
     }
 
     #[test]
@@ -1227,40 +1144,50 @@ mod tests {
     }
 
     #[test]
-    fn embedding_model_hash_computed_and_stored_at_pick_time() {
+    fn transcription_model_hash_computed_and_stored_at_pick_time() {
         use sha2::{Digest, Sha256};
-        let tmp = ScopedTempDir::new("local-inf-embed-hash").expect("scoped tempdir");
+        let tmp = ScopedTempDir::new("local-inf-stt-hash").expect("scoped tempdir");
         let base = tmp.path();
         let dl = base.join("downloads");
         std::fs::create_dir_all(&dl).unwrap();
-        let model = dl.join("minilm.safetensors");
-        std::fs::write(&model, b"fake-safetensors-bytes-v1").unwrap();
+        let model = dl.join("whisper.bin");
+        std::fs::write(&model, b"fake-whisper-bytes-v1").unwrap();
 
         // No hash before selection.
-        assert_eq!(selected_embedding_model_hash(base).unwrap(), None);
+        assert_eq!(
+            ensure_transcription_model_hash_with_bundled(base, None).unwrap(),
+            None
+        );
 
-        set_selected_model(base, ModelRole::Embedding, &model).expect("set embedding");
+        set_selected_model(base, ModelRole::Transcription, &model).expect("set transcription");
 
-        let expected: [u8; 32] = Sha256::digest(b"fake-safetensors-bytes-v1").into();
-        assert_eq!(selected_embedding_model_hash(base).unwrap(), Some(expected));
+        let expected: [u8; 32] = Sha256::digest(b"fake-whisper-bytes-v1").into();
+        assert_eq!(
+            ensure_transcription_model_hash_with_bundled(base, None).unwrap(),
+            Some(expected)
+        );
     }
 
     #[test]
-    fn swapping_embedding_model_updates_the_stored_hash() {
+    fn swapping_transcription_model_updates_the_stored_hash() {
         use sha2::{Digest, Sha256};
-        let tmp = ScopedTempDir::new("local-inf-embed-swap").expect("scoped tempdir");
+        let tmp = ScopedTempDir::new("local-inf-stt-swap").expect("scoped tempdir");
         let base = tmp.path();
         let dl = base.join("downloads");
         std::fs::create_dir_all(&dl).unwrap();
-        let a = dl.join("minilm.safetensors");
-        let b = dl.join("multilingual.safetensors");
+        let a = dl.join("whisper-a.bin");
+        let b = dl.join("whisper-b.bin");
         std::fs::write(&a, b"model-A").unwrap();
         std::fs::write(&b, b"model-B-different-content").unwrap();
 
-        set_selected_model(base, ModelRole::Embedding, &a).unwrap();
-        let ha = selected_embedding_model_hash(base).unwrap().unwrap();
-        set_selected_model(base, ModelRole::Embedding, &b).unwrap();
-        let hb = selected_embedding_model_hash(base).unwrap().unwrap();
+        set_selected_model(base, ModelRole::Transcription, &a).unwrap();
+        let ha = ensure_transcription_model_hash_with_bundled(base, None)
+            .unwrap()
+            .unwrap();
+        set_selected_model(base, ModelRole::Transcription, &b).unwrap();
+        let hb = ensure_transcription_model_hash_with_bundled(base, None)
+            .unwrap()
+            .unwrap();
 
         assert_ne!(ha, hb);
         let expected_b: [u8; 32] = Sha256::digest(b"model-B-different-content").into();
@@ -1270,21 +1197,25 @@ mod tests {
     #[test]
     fn in_place_model_replacement_reforces_a_rehash() {
         use sha2::{Digest, Sha256};
-        let tmp = ScopedTempDir::new("local-inf-embed-inplace").expect("scoped tempdir");
+        let tmp = ScopedTempDir::new("local-inf-stt-inplace").expect("scoped tempdir");
         let base = tmp.path();
         let dl = base.join("downloads");
         std::fs::create_dir_all(&dl).unwrap();
-        let model = dl.join("minilm.safetensors");
+        let model = dl.join("whisper.bin");
         std::fs::write(&model, b"weights-v1").unwrap();
-        set_selected_model(base, ModelRole::Embedding, &model).expect("set embedding");
-        let h1 = ensure_embedding_model_hash(base).unwrap().unwrap();
+        set_selected_model(base, ModelRole::Transcription, &model).expect("set transcription");
+        let h1 = ensure_transcription_model_hash_with_bundled(base, None)
+            .unwrap()
+            .unwrap();
         let expected_v1: [u8; 32] = Sha256::digest(b"weights-v1").into();
         assert_eq!(h1, expected_v1);
 
         // Replace the file IN PLACE (same path, different, longer bytes → the
         // len changes even if mtime resolution is coarse).
         std::fs::write(&model, b"weights-v2-different-and-longer").unwrap();
-        let h2 = ensure_embedding_model_hash(base).unwrap().unwrap();
+        let h2 = ensure_transcription_model_hash_with_bundled(base, None)
+            .unwrap()
+            .unwrap();
         let expected_v2: [u8; 32] = Sha256::digest(b"weights-v2-different-and-longer").into();
         assert_eq!(
             h2, expected_v2,
@@ -1294,7 +1225,7 @@ mod tests {
     }
 
     #[test]
-    fn generation_model_records_no_embedding_hash() {
+    fn a_role_with_no_hash_marker_records_none() {
         let tmp = ScopedTempDir::new("local-inf-gen-nohash").expect("scoped tempdir");
         let base = tmp.path();
         let dl = base.join("downloads");
@@ -1303,8 +1234,15 @@ mod tests {
         std::fs::write(&gen, b"gguf-bytes").unwrap();
 
         set_selected_model(base, ModelRole::Generation, &gen).unwrap();
-        // Generation does not feed the embedding identity → no hash recorded.
-        assert_eq!(selected_embedding_model_hash(base).unwrap(), None);
+        // Generation keys no persisted artefact → no hash marker is written, so
+        // the transcription resolver stays `None` with no transcription model.
+        assert!(!models_dir_from_base(base)
+            .join(TRANSCRIPTION_HASH_MARKER)
+            .exists());
+        assert_eq!(
+            ensure_transcription_model_hash_with_bundled(base, None).unwrap(),
+            None
+        );
     }
 
     /// Leak a computed digest into a `&'static str` for an `ArtifactFile` in a
@@ -1401,16 +1339,16 @@ mod tests {
         // A downloaded bundle installed into models/ under the app's control.
         let dl = base.join("downloads");
         std::fs::create_dir_all(&dl).unwrap();
-        let owned_dir = models_dir_from_base(base).join("embedding-abc");
+        let owned_dir = models_dir_from_base(base).join("transcription-abc");
         std::fs::create_dir_all(&owned_dir).unwrap();
-        let owned = owned_dir.join("model.safetensors");
+        let owned = owned_dir.join("model.bin");
         std::fs::write(&owned, b"weights").unwrap();
-        set_selected_model(base, ModelRole::Embedding, &owned).expect("record owned");
+        set_selected_model(base, ModelRole::Transcription, &owned).expect("record owned");
 
-        remove_selected_model(base, ModelRole::Embedding).expect("remove owned");
+        remove_selected_model(base, ModelRole::Transcription).expect("remove owned");
         assert!(!owned.exists(), "the app-owned model file is deleted");
         assert!(
-            selected_model(base, ModelRole::Embedding)
+            selected_model(base, ModelRole::Transcription)
                 .unwrap()
                 .is_none(),
             "the marker is dropped"

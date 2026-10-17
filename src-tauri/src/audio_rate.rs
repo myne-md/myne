@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // The sample-rate window a WAV must fall in, owned by NEITHER the decoder nor
 // the recorder.
 //

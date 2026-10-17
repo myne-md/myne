@@ -152,15 +152,19 @@ describe("AboutPanel — Developer mode toggle", () => {
 });
 
 describe("AboutPanel — legal document links (myne-ops#15)", () => {
-  it("offers all four published documents", () => {
+  it("offers the privacy policy and nothing about the closed offering", () => {
+    // One document. Terms, the DSA notice route and the law-enforcement page
+    // described a service Myne was offering publicly, and it offers none
+    // (`docs/decisions/sync/0696`). The absence assertions are the half that
+    // fails if a row is added back without a decision.
     render(<AboutPanel />);
-    for (const id of [
-      "about.legal-privacy",
+    expect(screen.getByTestId("about.legal-privacy")).toBeTruthy();
+    for (const gone of [
       "about.legal-terms",
       "about.legal-notice",
       "about.legal-law-enforcement",
     ]) {
-      expect(screen.getByTestId(id)).toBeTruthy();
+      expect(screen.queryByTestId(gone)).toBeNull();
     }
   });
 
@@ -175,22 +179,22 @@ describe("AboutPanel — legal document links (myne-ops#15)", () => {
     // slug, and the binding one for a German reader.
     language = "de";
     render(<AboutPanel />);
-    fireEvent.click(screen.getByTestId("about.legal-terms"));
-    expect(openUrl).toHaveBeenCalledWith("https://myne.md/nutzungsbedingungen/");
+    fireEvent.click(screen.getByTestId("about.legal-privacy"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/datenschutz/");
   });
 
   it("treats a regional German tag as German", () => {
     language = "de-DE";
     render(<AboutPanel />);
-    fireEvent.click(screen.getByTestId("about.legal-law-enforcement"));
-    expect(openUrl).toHaveBeenCalledWith("https://myne.md/behoerdenanfragen/");
+    fireEvent.click(screen.getByTestId("about.legal-privacy"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/datenschutz/");
   });
 
   it("falls back to English for a language with no edition of its own", () => {
     language = "tr";
     render(<AboutPanel />);
-    fireEvent.click(screen.getByTestId("about.legal-notice"));
-    expect(openUrl).toHaveBeenCalledWith("https://myne.md/notice/");
+    fireEvent.click(screen.getByTestId("about.legal-privacy"));
+    expect(openUrl).toHaveBeenCalledWith("https://myne.md/privacy/");
   });
 
   it("does not link the Impressum while its address is unpublished", () => {

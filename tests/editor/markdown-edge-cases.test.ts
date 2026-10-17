@@ -156,30 +156,17 @@ describe("B. Marker straddling (existing emphasis inside selection)", () => {
   it("B3: italic toggle wrapping entire `x**ab**y`", () => {
     expect(applyToggle("*", "*", "x**ab**y", 0, 8).doc).toBe("*x****ab****y*");
   });
-  it.skip("B4: bold toggle on `*ab*c` straddling italic close — needs AST awareness", () => {
-    // Selecting `b*c` (positions 1..5) in `*ab*c` and applying bold.
-    // Expected (Obsidian): preserve italic structure, e.g.
-    // `*a*b****c**` analog for the italic case. Currently falls through
-    // to plain wrap → `**ab*c**` which breaks the italic.
-    // Tier-1 fix candidate: extend split-rewrap heuristic to bold + `*`.
-    const r = applyToggle("**", "**", "*ab*c", 1, 5);
-    expect(r.doc).toBe("*a**b****c***"); // placeholder; refine when fix lands
-  });
-  it.skip("B5: italic toggle on space between two bold spans", () => {
-    // `**foo** **bar**` — selecting just the middle space + adjacent
-    // markers. Expected (Obsidian): refuse OR insert markers without
-    // breaking bold parsing.
-    expect(applyToggle("*", "*", "**foo** **bar**", 7, 8).doc).toBe(
-      "**foo** **bar**", // refuse: cursor in marker-adjacent whitespace
-    );
-  });
-  it.skip("B6: underscore-italic toggle on text with `__` bold", () => {
-    // Underscore italic has different flank rules — intraword `_` forbidden.
-    // Naive wrap might produce parser-rejected output.
-    expect(applyToggle("_", "_", "__ab__c", 0, 7).doc).toBe(
-      "___ab____c_", // analog of B2 — verify parses correctly
-    );
-  });
+  // Selecting `b*c` (positions 1..5) in `*ab*c` and applying bold. Expected
+  // (Obsidian): preserve italic structure, e.g. the `*a*b****c**` analog for the
+  // italic case. Currently falls through to plain wrap → `**ab*c**`, which breaks
+  // the italic. Tier-1 fix candidate: extend the split-rewrap heuristic to bold + `*`.
+  it.todo("B4: bold toggle on `*ab*c` straddling italic close — needs AST awareness");
+  // `**foo** **bar**` — selecting just the middle space + adjacent markers.
+  // Expected (Obsidian): refuse, or insert markers without breaking bold parsing.
+  it.todo("B5: italic toggle on space between two bold spans");
+  // Underscore italic has different flank rules — intraword `_` is forbidden, so a
+  // naive wrap can produce parser-rejected output.
+  it.todo("B6: underscore-italic toggle on text with `__` bold");
 });
 
 // =============================================================================
@@ -225,13 +212,10 @@ describe("D. Word boundaries + CommonMark flank rules", () => {
   it("D1: italic toggle on intraword `bar` of `foobar` → `foo*bar*` (asterisk OK)", () => {
     expect(applyToggle("*", "*", "foobar", 3, 6).doc).toBe("foo*bar*");
   });
-  it.skip("D2: underscore-italic on intraword `bar` → refuse OR escape (CommonMark Rule 6 forbids)", () => {
-    // Naive wrap produces `foo_bar_` which @lezer/markdown parses as
-    // literal (no emphasis). Either refuse the toggle or insert
-    // a fallback (`\_bar\_` escapes don't help here — `*` is the safe
-    // fallback). Myne policy: prefer `*` over `_` for italic anyway.
-    expect(applyToggle("_", "_", "foobar", 3, 6).doc).not.toBe("foo_bar_");
-  });
+  // A naive wrap produces `foo_bar_`, which @lezer/markdown parses as literal (no
+  // emphasis). Either refuse the toggle or insert a fallback (`\_bar\_` escapes do not
+  // help here; `*` is the safe fallback). Myne policy: prefer `*` over `_` anyway.
+  it.todo("D2: underscore-italic on intraword `bar` → refuse OR escape (CommonMark Rule 6 forbids)");
   it("D3: bold on whole word with surrounding spaces", () => {
     expect(applyToggle("**", "**", "abc def ghi", 4, 7).doc).toBe(
       "abc **def** ghi",
@@ -273,11 +257,8 @@ describe("E. Adjacent / nested emphasis", () => {
     const r = applyToggle("*", "*", before, 5, 6);
     expect(r.doc).toBe("**a***b***c**"); // verify what @lezer/markdown does
   });
-  it.skip("E4: italic-toggle on space between `**foo** **bar**`", () => {
-    expect(applyToggle("*", "*", "**foo** **bar**", 7, 8).doc).toBe(
-      "**foo***** ****bar**", // unclear; verify Obsidian
-    );
-  });
+  // Same subject as B5, on the adjacent-span shape; the expected output is unresolved.
+  it.todo("E4: italic-toggle on space between `**foo** **bar**`");
   it("E5: parse-only assertion — `*foo**bar**baz*`", () => {
     // CommonMark mod-3: italic outer containing strong inner.
     // Toggle italic on this entire selection should unwrap to
@@ -424,11 +405,9 @@ describe("L. Multi-paragraph / multi-line selections", () => {
 // =============================================================================
 
 describe("M. Escape sequences", () => {
-  it.skip("M2: italic toggle on already-escaped `\\*foo\\*` strips escapes", () => {
-    // Toggle on `\*foo\*` should produce `*foo*` (italic) — i.e.,
-    // recognize the escapes were preventing emphasis and now we want it.
-    expect(applyToggle("*", "*", "\\*foo\\*", 2, 5).doc).toBe("*foo*");
-  });
+  // Toggle on `\*foo\*` should produce `*foo*` (italic): recognize that the escapes
+  // were preventing emphasis and now we want it.
+  it.todo("M2: italic toggle on already-escaped `\\*foo\\*` strips escapes");
   it("M4: backslash-escape inside selection preserved literally", () => {
     expect(applyToggle("**", "**", "foo\\bar", 0, 7).doc).toBe("**foo\\bar**");
   });

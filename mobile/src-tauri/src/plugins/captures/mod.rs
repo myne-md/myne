@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `captures` plugin (mobile) — the pending-capture queue for the Apple Watch
 //! voice-quick-capture companion.
 //!

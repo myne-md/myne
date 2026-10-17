@@ -501,8 +501,8 @@ export async function openSettings(
   // then aims at a button the open modal is covering, and the failure is
   // `waitUntil(element interactable + clicked) timed out after 10000 ms`, which
   // reads like a flake and is not one. `enableAi` chains exactly those two
-  // (developer mode, then `setSettingsSwitch` → here), so ai-chat, ai-summarize,
-  // ai-embeddings-persistence and transcription were all failing in CI on this
+  // (developer mode, then `setSettingsSwitch` → here), so ai-chat, ai-summarize
+  // and transcription were all failing in CI on this
   // one line.
   if ((await session.byTestIdAll("settings.modal")).length === 0) {
     // The gear lives on the BOTTOM BAR, and the bar is removable: hiding every

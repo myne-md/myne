@@ -12,7 +12,7 @@
 // multi-device's own ±(index * PORT_STRIDE=10) per-device offset, so no
 // worker's band ever reaches into the next slot's.
 //
-// Registered as a vitest `setupFiles` entry (vitest.e2e.config.ts). Runs on
+// Registered as a vitest `setupFiles` entry (.config/vitest/e2e.config.ts). Runs on
 // every platform; harmless where the harness self-skips (macOS has no
 // tauri-driver — `harnessSupported()` short-circuits each scenario).
 

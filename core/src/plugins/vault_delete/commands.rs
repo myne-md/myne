@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_delete` Tauri command — one-shot vault destruction.
 //!
 //! Feature `backend-vault-delete` (Plane MYND-105) shipped the initial

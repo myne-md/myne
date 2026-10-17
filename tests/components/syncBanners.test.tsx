@@ -152,12 +152,11 @@ describe("SyncBanners (test-audit #9/#48)", () => {
     render(<SyncBanners />);
     await waitFor(() => expect(handlers.has("sync://integrity-alert")).toBe(true));
     await emit("sync://integrity-alert");
-    const el = await waitFor(() => screen.getByTestId("sync.integrity-alert"));
+    await waitFor(() => screen.getByTestId("sync.integrity-alert"));
     expect(
       screen.queryByTestId("sync.integrity-alert-dismiss"),
       "an alert with no way out becomes chrome",
     ).toBeTruthy();
-    expect(el).toBeTruthy();
   });
 });
 

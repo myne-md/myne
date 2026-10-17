@@ -10,13 +10,15 @@
 //! differs.
 //!
 //! **One thing genuinely differs, and it is the search.** Desktop's
-//! `ScopeSearcher` queries the embedding index: it embeds the query on the
-//! strict local-only accessor and takes the top vector matches. Mobile has no
-//! vector store and no embedder: `embed` is refused for a remote backend by
-//! construction, and on-device inference is out of scope on a phone by decision
-//!: so the same tool is answered from the full-text index instead. That is a
-//! real difference in behaviour rather than a shim, and it is stated on the
-//! implementation rather than hidden inside it.
+//! `ScopeSearcher` used to query the embedding index: it embeds the query on the
+//! strict local-only accessor and takes the top vector matches. That searcher
+//! was retired with the `MYR1` AI-embeddings family, so this client's tool is
+//! now the only one that answers with anything. Mobile has no vector store and
+//! no embedder: `embed` is refused for a remote backend by construction, and
+//! on-device inference is out of scope on a phone by decision: so the same tool
+//! is answered from the full-text index instead. That is a real difference in
+//! behaviour rather than a shim, and it is stated on the implementation rather
+//! than hidden inside it.
 //!
 //! See: src-tauri/AGENTS.md "Secret-handling logging discipline".
 

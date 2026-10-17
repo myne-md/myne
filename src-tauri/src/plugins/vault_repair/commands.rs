@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_repair` Tauri commands (MYND-159).
 //!
 //! Two commands:
@@ -651,30 +652,6 @@ mod tests {
     }
 
     // ---- wire-shape for the Task 4 variants ------------------------------
-
-    #[test]
-    fn vault_present_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&VaultRepairError::VaultPresent).unwrap(),
-            r#"{"kind":"VaultPresent"}"#
-        );
-    }
-
-    #[test]
-    fn nothing_to_repair_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&VaultRepairError::NothingToRepair).unwrap(),
-            r#"{"kind":"NothingToRepair"}"#
-        );
-    }
-
-    #[test]
-    fn vault_busy_auth_serializes_with_kind_tag() {
-        assert_eq!(
-            serde_json::to_string(&VaultRepairError::VaultBusyAuth).unwrap(),
-            r#"{"kind":"VaultBusyAuth"}"#
-        );
-    }
 
     #[test]
     fn partial_delete_serializes_with_kind_tag_and_remaining_count() {

@@ -1,9 +1,18 @@
 # Published web-bundle hashes
 
-Every bundle served from `app.myne.md` appears here **before** it is deployed.
+Every bundle Myne served from `app.myne.md` appears here **before** it was deployed.
 `scripts/check-bundle-record.mjs` refuses a deploy whose hash is absent, so this
-is a precondition rather than a log kept afterwards — a substituted bundle
-cannot reach the origin and then be written up.
+was a precondition rather than a log kept afterwards: a substituted bundle could
+not reach the origin and then be written up.
+
+> **Status (2026-10-16).** The hosted web client is closing and Myne serves no
+> web bundle, so the deploy precondition this file was written for no longer
+> runs. The record is kept, append-only as it always was, for two uses that
+> survive: it is the worked example of the reference build environment described
+> under "Reproducing an entry yourself", and it is what a self-hoster can compare
+> their own `version.json` against if the bundle they built is the one a row was
+> recorded for. `docs/self-host-web.md` carries the obligations that now sit
+> entirely with whoever serves the client.
 
 ## How to read it
 
@@ -15,16 +24,18 @@ Each row is one released bundle:
 | `commit` | the commit the bundle was built from |
 | `bundle_hash` | SHA-256 over every emitted asset, sorted, path-and-content (`scripts/emit-web-version.mjs`) |
 
-The live origin publishes the same value at
-<https://app.myne.md/version.json>, served `no-store`. Comparing the two is one
-command:
+A running deployment publishes the same value at `<origin>/version.json`, served
+`no-store`, so comparing a served bundle against a row is one command against
+whatever origin is serving it:
 
 ```
-curl -s https://app.myne.md/version.json | grep bundle_hash
+curl -s https://example.org/version.json | grep bundle_hash
 ```
 
 If that hash is not in the table below, the origin is serving something that was
-never published. That is the whole point of the file.
+never published. That is the whole point of the file, and it is why a self-hoster
+whose users did not build the bundle themselves should still build in the
+reference environment.
 
 ## Reproducing an entry yourself
 
@@ -191,9 +202,9 @@ HOST, which is the whole subject of this section: the wasm artefact differs per
 architecture, and entry 0498 settled that as a measured scope limit rather than
 as pending work.
 
-**The `linux/amd64` row is the one that ships.** `app.myne.md` runs on an
-x86_64 host and the image is built on that host's own daemon, so amd64 is what
-`/version.json` will report. The other two are left in place rather than edited
+**The `linux/amd64` row is the one that shipped.** `app.myne.md` ran on an
+x86_64 host and the image was built on that host's own daemon, so amd64 is what
+`/version.json` reported there. The other two are left in place rather than edited
 away: rows here are appended, never rewritten, and a row that turned out not to
 be the shipped one is still a true record of what was published in advance.
 

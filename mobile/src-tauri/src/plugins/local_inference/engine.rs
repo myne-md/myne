@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The [`Engine`] trait — the single seam every AI capability sibling reaches
-//! inference through (SYNC-3/7). Two methods, `infer` and `embed`; the impl
+//! inference through (SYNC-3/7). The impl
 //! (a stub now, Candle then a sandboxed sidecar later) is hidden so the
 //! in-host-vs-sidecar process boundary and any future engine swap stay
 //! invisible to callers.
@@ -9,8 +10,8 @@
 //! layer (tasks 3/6), not in the trait. It is `Send + Sync` so one engine
 //! instance can back concurrent commands behind `Arc`.
 
-// The Engine trait is ported whole from desktop, so the generation/embedding/
-// chat surface (infer/embed/chat, ChatMessage, StubEngine) is present but unused
+// The Engine trait is ported whole from desktop, so the generation/chat surface
+// (infer/chat, ChatMessage, StubEngine) is present but unused
 // on this transcription-only mobile port until the UI (task 7) wires cancel. A
 // /simplify pass can strip the chat/gen surface; until then, don't warn.
 #![allow(dead_code, unused_imports)] // MYND-563 scaffolding: unwired until tasks 6/7, dead in test builds too
@@ -18,11 +19,6 @@
 use std::ops::ControlFlow;
 
 use super::error::EngineError;
-
-/// Length of the **stub** embedding vector. The real embedding model
-/// (all-MiniLM-L6-v2, 384-dim, SYNC-1) lands in task 4; the stub returns a
-/// short deterministic zero vector purely to exercise the trait shape.
-pub const STUB_EMBED_DIM: usize = 8;
 
 /// The role of a chat message (conversational-ai-chat task 2). Only
 /// `User`/`Assistant` — the system instruction is a separate TRUSTED field on
@@ -69,18 +65,14 @@ fn flatten_chat_to_prompt(system: &str, messages: &[ChatMessage]) -> String {
     s
 }
 
-/// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`
-/// and `embed(text) -> vector`. No streaming (SYNC-7). Implementors must be
+/// On-device inference surface (SYNC-7): a blocking `infer(prompt) -> result`.
+/// No streaming (SYNC-7). Implementors must be
 /// `Send + Sync` so a single engine instance can back concurrent commands
 /// behind `Arc`.
 pub trait Engine: Send + Sync {
     /// One-shot text completion for `prompt`. Blocking; returns the full
     /// result — no token stream (SYNC-7).
     fn infer(&self, prompt: &str) -> Result<String, EngineError>;
-
-    /// Embedding vector for `text`. Real models return a fixed dimensionality
-    /// (task 4: 384); the stub returns [`STUB_EMBED_DIM`] zeros.
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError>;
 
     /// Streaming text completion for `prompt` (conversational-ai-chat task 1;
     /// SYNC-7 supersede — streaming was deferred in the local-ai spike and is
@@ -128,12 +120,10 @@ pub trait Engine: Send + Sync {
         self.infer_streaming(&prompt, on_token)
     }
 
-    /// Drop any lazily-cached loaded model so the next `infer`/`embed` re-reads
+    /// Drop any lazily-cached loaded model so the next `infer` re-reads
     /// from disk. Called after the user picks a new model file
     /// (`set_model_path`) so a swap takes effect without an app restart —
-    /// otherwise the process keeps serving the previously-loaded weights while a
-    /// freshly persisted embeddings index is (correctly) labeled with the NEW
-    /// model identity, silently poisoning retrieval (§9.17.2/§9.17.4). Default
+    /// otherwise the process keeps serving the previously-loaded weights. Default
     /// no-op — the stub holds no cache.
     fn invalidate_models(&self) {}
 
@@ -149,7 +139,7 @@ pub trait Engine: Send + Sync {
     /// returned transcript is likewise content and is never logged.
     ///
     /// Default: [`EngineError::NotReady`] — an engine with no ASR model (a
-    /// generation/embedding-only build) has no transcription path. The real
+    /// generation-only build) has no transcription path. The real
     /// Candle-Whisper impl and the [`StubEngine`] override this.
     fn transcribe(&self, _pcm: &[f32]) -> Result<String, EngineError> {
         Err(EngineError::NotReady)
@@ -179,8 +169,8 @@ pub trait Engine: Send + Sync {
 
 /// Trivial in-memory engine used before any model lands (the task-1 tracer).
 ///
-/// `infer` echoes the prompt behind a fixed marker; `embed` returns a
-/// [`STUB_EMBED_DIM`]-length zero vector. Deterministic, allocation-only — no
+/// `infer` echoes the prompt behind a fixed marker. Deterministic,
+/// allocation-only — no
 /// model, no network, no file I/O — so it proves the trait shape and the
 /// feature isolation compile and round-trip.
 #[derive(Debug, Default, Clone, Copy)]
@@ -191,10 +181,6 @@ impl Engine for StubEngine {
         // Echo, not a model. The marker lets a test assert the value came
         // through the trait against the stub (not a real completion).
         Ok(format!("stub-infer: {prompt}"))
-    }
-
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        Ok(vec![0.0; STUB_EMBED_DIM])
     }
 
     fn infer_streaming(
@@ -255,13 +241,6 @@ mod tests {
         let out = engine.infer("hello").expect("stub infer never fails");
         assert!(!out.is_empty());
         assert!(out.contains("hello"));
-    }
-
-    #[test]
-    fn stub_embed_returns_fixed_dim_through_trait() {
-        let engine: &dyn Engine = &StubEngine;
-        let v = engine.embed("hello").expect("stub embed never fails");
-        assert_eq!(v.len(), STUB_EMBED_DIM);
     }
 
     #[test]
@@ -372,15 +351,12 @@ mod tests {
 
     #[test]
     fn default_transcribe_is_not_ready() {
-        // An engine that overrides nothing (generation/embedding-only) has no
+        // An engine that overrides nothing (generation-only) has no
         // ASR path: the trait default returns NotReady rather than panicking.
         struct BareEngine;
         impl Engine for BareEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok(String::new())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(Vec::new())
             }
         }
         let engine: &dyn Engine = &BareEngine;

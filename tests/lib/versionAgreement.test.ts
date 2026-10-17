@@ -50,6 +50,22 @@ function readJson(relative: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(REPO_ROOT, relative), "utf8")) as Record<string, unknown>;
 }
 
+/**
+ * The comparison the agreement assertion makes: everything that disagrees with
+ * the first declaration, which is the one the failure message quotes.
+ *
+ * Extracted so the synthetic case below drives THE SAME function. It used to
+ * inline `fake.filter((d) => d.version !== fake[0].version)` in its own body, so
+ * the case titled "the comparison would notice a disagreement" verified
+ * `Array.prototype.filter` and nothing the guard does — and an edit to the real
+ * comparison could not have failed it.
+ */
+function disagreements<T extends { version: string | null }>(seen: T[]): T[] {
+  const reference = seen[0];
+  if (!reference) return seen;
+  return seen.filter((d) => d.version !== reference.version);
+}
+
 /** The `version = "x.y.z"` at the top of a Cargo manifest — the crate's own,
  *  not a dependency's, so only the first occurrence before any `[section]`
  *  other than `[package]` counts. */
@@ -114,7 +130,7 @@ describe("the version is declared once, in six places, and they agree", () => {
   it("declares the same version everywhere", () => {
     const seen = DECLARATIONS.map((d) => ({ ...d, version: d.read() }));
     const reference = seen[0]!;
-    const wrong = seen.filter((d) => d.version !== reference.version);
+    const wrong = disagreements(seen);
     expect(
       wrong.map((d) => `${d.where} says ${d.version} (drives ${d.drives})`),
       `${reference.where} says ${reference.version}, and these disagree. A build ` +
@@ -175,10 +191,12 @@ describe("the version is declared once, in six places, and they agree", () => {
     // that returned the same constant for every file would pass the test above
     // no matter what the files said.
     const fake = [
-      { where: "a", drives: "x", version: "1.2.3" },
-      { where: "b", drives: "y", version: "1.2.4" },
+      { where: "a", version: "1.2.3" },
+      { where: "b", version: "1.2.4" },
     ];
-    expect(fake.filter((d) => d.version !== fake[0]!.version)).toHaveLength(1);
+    // The real comparison, not a copy of it, and it NAMES the offender.
+    expect(disagreements(fake)).toEqual([{ where: "b", version: "1.2.4" }]);
+    expect(disagreements([{ where: "a", version: "1.2.3" }, { where: "b", version: "1.2.3" }])).toEqual([]);
     // …and the Cargo parser really reads the PACKAGE version, not the first
     // `version = ` it sees (every manifest here has dependency versions below).
     expect(cargoVersion("src-tauri/Cargo.toml")).toBe(

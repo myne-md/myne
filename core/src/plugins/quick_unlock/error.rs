@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-layer error type for the quick-unlock plugin (MYND-329, task 6).
 //!
 //! Closed, `serde`-tagged set hand-mirrored on the TS side. No `String` field
@@ -76,6 +77,16 @@ pub enum QuickUnlockError {
     /// Filesystem failure (bounded kind; no path string leaked).
     #[error("quick-unlock io failure")]
     Io(IoFailureKind),
+    /// `disable` could NOT remove the device-local credential file, so
+    /// quick-unlock is STILL configured and the credential still unwraps the
+    /// live `root_key`. Fail-closed: the caller surfaces this rather than
+    /// reporting "turned off" over a file that remains on disk. Distinct from
+    /// [`QuickUnlockError::Io`] because the user-facing advice differs — retry
+    /// the toggle or check the vault directory's permissions, rather than the
+    /// generic "io failure" copy — and because the frontend gate reads it to
+    /// keep the toggle ON.
+    #[error("quick-unlock credential could not be removed")]
+    WipeFailed { io_error_kind: IoFailureKind },
     /// Opaque provider/codec backend failure (keychain API, CSPRNG, Argon2id).
     #[error("quick-unlock backend failure")]
     Backend,

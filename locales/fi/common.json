@@ -1218,8 +1218,6 @@
           "empty": "Tiivistelmät, vastaukset ja ehdotukset ilmestyvät tähän sitä mukaa, kun pyydät niitä.",
           "error": "Tekoälypyyntöä ei voitu suorittaa loppuun.",
           "errorTurn": "Avustaja ei voinut vastata.",
-          "gettingReadyHint": "Valmistellaan muistiinpanojasi tekoälyä varten. Hetki.",
-          "noSearchModelHint": "Kysyminen hakee muistiinpanoistasi tällä laitteella, ja se vaatii hakumallin tänne. Palveluntarjoaja ei voi tehdä sitä. Valitse malli kohdasta Asetukset → Kehittäjä → Tekoäly. Muistiinpanojen muokkaus tekoälyllä toimii silti.",
           "insert": "Lisää muistiinpanoon",
           "noAnswer": "Ei vastausta. Kokeile muotoilla uudelleen.",
           "newChat": "Uusi keskustelu",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Tämä Mynen kooste on käännetty ilman paikallista tekoälyä, joten täällä ei voi suorittaa mitään. Mikään asetus ei muuta sitä — tarvitaan kooste, jossa tekoäly on mukana.",
           "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Kehittäjä → Tekoäly.",
           "send": "Lähetä",
-          "statusGettingReady": "Valmistellaan…",
-          "statusNoSearchModel": "Ei hakumallia",
           "statusNoModel": "Ei palveluntarjoajaa",
           "statusUnreachable": "Ei vastaa",
           "statusUnavailable": "Ei käytettävissä",
@@ -2909,9 +2905,6 @@
       "legalLabel": "Juridiset tiedot",
       "legalHelper": "Avautuu osoitteessa myne.md selaimessasi. Saksaksi siellä, missä käyttöliittymä on saksankielinen.",
       "legalPrivacy": "Tietosuojaseloste",
-      "legalTerms": "Beetan käyttöehdot",
-      "legalNotice": "Ilmoita laittomasta sisällöstä",
-      "legalLawEnforcement": "Viranomaispyynnöt",
       "licenseBody": "Esialfa · CC-BY-4.0-asiakirjat · AGPL-3.0-sovelluskoodi vaiheen 1 julkaisussa.",
       "licenseLabel": "Lisenssi",
       "tagline": "Esialfa · Vaiheen 1 työpöytäsovellus",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "Kaikki, mitä tämä suoritus voi lukea, on kansioissa, joita AI ei näe. Mitään ei lähetetty. Muuta se Asetukset, AI, Suljetut kansiot."
       },
       "modelChoose": "Valitse tiedosto…",
-      "modelEmbeddingLabel": "Hakumalli: semanttinen haku sekä kysymykset ja vastaukset",
       "modelFilter": {
-        "gguf": "GGUF-malli",
-        "safetensors": "Safetensors-malli"
+        "gguf": "GGUF-malli"
       },
       "modelGenerationLabel": "Tekstimalli: keskustelu, tiivistelmät, kirjoittaminen",
       "modelNone": "Ei valittua tiedostoa",
@@ -3418,7 +3409,6 @@
       "providerNone": "Ei mitään",
       "providerNothingAnswering": "Mitään ei ole vielä määritetty vastaamaan.",
       "modelsLabel": "Mallit",
-      "recommendedFilesEmbedding": "Tarvitsee tiedostot model.safetensors + config.json + tokenizer.json samassa kansiossa.",
       "recommendedFilesGeneration": "Tarvitsee .gguf-tiedoston + tokenizer.json samassa kansiossa.",
       "recommendedFilesTranscription": "Tarvitsee Whisperin .gguf-tiedoston + config.json + tokenizer.json samassa kansiossa.",
       "title": "Tekoäly",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "Näytä kohteen {{name}} sijainti",
       "downloadsLabel": "Lataa mallit",
       "downloadsHelper": "Hae malli Mynen omasta lähteestä. Se tarkistetaan sovellukseen sisäänrakennettua sormenjälkeä vasten ennen käyttöä, joten peukaloitu lataus hylätään. Mitään ei haeta, ellet napsauta.",
-      "downloadEmbeddingSize": "Monikielinen malli, noin 449 Mt.",
       "downloadTagLabel": "Tunnistemalli: automaattiset tunnisteehdotukset",
       "downloadTagSize": "Pieni paikallinen malli, noin 337 Mt.",
       "downloadInstalled": "Asennettu",
@@ -3954,10 +3943,6 @@
       "intro": "Synkronointi lähettää muistiinpanosi salattuina palvelimelle. Neljä asiaa kannattaa tietää ensin.",
       "whatThisIsLabel": "Mistä on kyse",
       "dataLossLabel": "Jos menetät molemmat salaisuudet",
-      "whatHappensNextLabel": "Kun beeta päättyy",
-      "whatWeCanSeeLabel": "Mitä me näemme",
-      "readFull": "Lue käyttöehdot kokonaan",
-      "review": "Tarkista beetan käyttöehdot",
       "accept": "Ymmärrän, ota synkronointi käyttöön"
     },
     "materialising": "Ladataan muistiinpanojasi: {{done}} / {{total}}. Voit aloittaa työskentelyn; loput ilmestyvät sitä mukaa kuin ne saapuvat.",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "Syötä sama palvelimen URL jokaisella laitteella. Itse ylläpidetty palvelin tarvitsee luotetun HTTPS-varmenteen.",
       "tlsFailure": "Palvelimen HTTPS-varmennetta ei voitu varmistaa. Tarkista palvelimen osoite, varmenne ja sen voimassaolo.",
       "inviteLabel": "Kutsukoodi (vain jos tämä palvelin vaatii sellaisen)",
-      "invitePlaceholder": "Koodi, jonka palvelimen ylläpitäjä antoi sinulle",
-      "changeInviteCode": "Vaihda kutsukoodi"
+      "invitePlaceholder": "Koodi, jonka palvelimen ylläpitäjä antoi sinulle"
     },
     "enroll": {
       "accountNumberLabel": "Tilinumero",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Määritä tekoäly",
-    "intro": "Myne voi etsiä muistiinpanojasi merkityksen perusteella, ehdottaa tunnisteita ja keskustella niistä. Mikään tästä ei ole pakollista, ja voit ottaa sen käyttöön myöhemmin Asetuksista.",
+    "intro": "Myne voi ehdottaa tunnisteita ja keskustella niistä. Mikään tästä ei ole pakollista, ja voit ottaa sen käyttöön myöhemmin Asetuksista.",
     "enableLabel": "Ota tekoälyominaisuudet käyttöön",
-    "semantic": {
-      "title": "Semanttinen haku",
-      "body": "Lataa monikielinen upotusmalli (noin 449 Mt), jotta voit hakea merkityksen, et vain sanojen perusteella."
-    },
     "tag": {
       "title": "Automaattinen tunnistus",
       "body": "Lataa tunnistemalli (noin 337 Mt), jotta Myne voi ehdottaa tunnisteita kirjoittaessasi."
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "Valitse synkronointipalvelin",
-      "chooseHeading": "Minne muistiinpanosi synkronoidaan?",
-      "chooseIntro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Käytä Myne Sync -palvelua tai osoita tämä laite itse ylläpitämääsi palvelimeen. Kummassakin tapauksessa muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
-      "myneSyncHint": "Mynen ylläpitämä palvelin. Sen HTTPS-varmenne tarkistetaan automaattisesti.",
       "intro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
       "notConfigured": "Syötä palvelimen osoite ylle ja paina Yhdistä jatkaaksesi.",
       "back": "Takaisin",
-      "continue": "Jatka",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Oma palvelimesi",
-      "selfHostedHint": "Itse ylläpitämäsi synkronointipalvelin. Syötät sen osoitteen seuraavalla näytöllä.",
-      "connectAction": "Yhdistä",
-      "setUpAction": "Määritä"
+      "continue": "Jatka"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "Valitse synkronointipalvelin",
       "lead": "Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät. Palvelin tallentaa vain salatekstiä.",
       "urlLabel": "Palvelimen osoite",
-      "useMyneSync": "Käytä Myne Synciä",
-      "selfHostedHint": "Tai syötä itse ylläpitämäsi palvelimen osoite.",
       "connect": "Yhdistä",
       "connecting": "Yhdistetään…"
     },

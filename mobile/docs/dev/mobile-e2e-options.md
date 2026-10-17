@@ -8,7 +8,7 @@
 
 (Full detail: main repo `docs/dev/e2e.md` + `e2e/AGENTS.md`.)
 
-- **Runner**: Vitest (`vitest run --config vitest.e2e.config.ts`), serial
+- **Runner**: Vitest (`vitest run --config .config/vitest/e2e.config.ts`), serial
   (`fileParallelism:false`), 180 s/test, 2 retries.
 - **Driver**: `tauri-driver` 2.0.6 + a **hand-rolled, zero-dependency W3C
   WebDriver client** (`e2e/support/webdriver.ts`) that talks to the WebView.

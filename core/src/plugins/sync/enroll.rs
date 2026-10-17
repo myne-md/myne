@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Deterministic device-enrollment orchestration (MYND-425 task 3).
 //!
 //! Drives the SCRAM-SHA-256-PLUS handshake against the server auth surface

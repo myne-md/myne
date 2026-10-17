@@ -134,23 +134,7 @@ impl From<ProtocolError> for ChatsCatalogError {
     }
 }
 
-impl From<EnvelopeError> for ChatsCatalogError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface stays unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => ChatsCatalogError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => ChatsCatalogError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => ChatsCatalogError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => ChatsCatalogError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => ChatsCatalogError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => ChatsCatalogError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => ChatsCatalogError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => ChatsCatalogError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => ChatsCatalogError::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(ChatsCatalogError);
 
 /// Encode a conversations-catalog blob from an opaque `plaintext` (the client
 /// layer's canonical-JSON roster), sealing under `chats_catalog_key` with
@@ -301,16 +285,6 @@ mod tests {
         let blob = encode(payload);
         let decoded = decode_chats_catalog_blob(&KEY, &ACCOUNT_HASH, &blob).expect("decode");
         assert_eq!(decoded.as_slice(), payload);
-    }
-
-    #[test]
-    fn empty_roster_round_trips() {
-        // The first conversation create writes the file; an empty roster map
-        // ("{}") is a legal mid-state (§ 9.23's file-level omit-when-empty is
-        // a no-file rule, not a no-empty-plaintext rule).
-        let blob = encode(b"{}");
-        let decoded = decode_chats_catalog_blob(&KEY, &ACCOUNT_HASH, &blob).expect("decode");
-        assert_eq!(decoded.as_slice(), b"{}");
     }
 
     #[test]

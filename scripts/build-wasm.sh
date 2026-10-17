@@ -111,7 +111,7 @@ fi
 # ── Reproducibility: strip machine-specific paths (task 16) ──────────────────
 #
 # A release build embeds ABSOLUTE source paths in its panic locations. Measured
-# on this very artefact before the change: **37 occurrences of `/Users/omer`**,
+# on this very artefact before the change: **37 occurrences of `/Users/<builder>`**,
 # across 19 distinct `$CARGO_HOME/registry/...` paths from dependencies
 # (argon2, blake2, cipher, js-sys, …). Those differ per machine — different
 # `$HOME`, different checkout directory — so two people building the same commit
@@ -214,7 +214,30 @@ echo "== wasm-bindgen --target web -> ${OUT} =="
 # on a clean clone where `pkg/` does not exist yet. A generated `.d.ts` would
 # make the typecheck depend on having run this script first.
 rm -rf "$OUT"
-wasm-bindgen "$WASM" --out-dir "$OUT" --target web --no-typescript
+# The `name` section is debug metadata: the Rust name of every function in the
+# artefact. Measured on the shipped release wasm before this was added:
+# **703,441 raw bytes, 174,817 of them under gzip** — 7.9% of the transfer,
+# carried by a build nobody debugs. Stripped rather than trimmed, because the
+# loader is `--target web` and nothing in the runtime path reads the section.
+#
+# Safe because the panic path does not resolve symbols from it. The Worker's
+# fatal report carries `file!()`/`line!()` (see `web/src/worker/worker.ts`,
+# `reportWasmPanic`), which are compile-TIME strings embedded in the panic
+# message rather than names looked up in this section.
+#
+# What it does cost is a readable Rust frame in a devtools stack trace, which is
+# the whole reason `--dev` keeps the section: that build exists to be debugged,
+# and it is never shipped. `--verify` runs the release path twice, so the
+# determinism check covers the flag.
+#
+# No `SubkeyRole`, magic or AAD prefix moves: this is codegen metadata, not a
+# load-bearing identifier. The artefact BYTES do change, which is why
+# `web/wasm/pkg/artefact-hashes.txt` is regenerated below rather than compared.
+WASM_BINDGEN_FLAGS=()
+if [ "$PROFILE" = "release" ]; then
+  WASM_BINDGEN_FLAGS+=(--remove-name-section)
+fi
+wasm-bindgen "$WASM" --out-dir "$OUT" --target web --no-typescript "${WASM_BINDGEN_FLAGS[@]}"
 
 ls -la "$OUT"
 

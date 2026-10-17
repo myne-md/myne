@@ -318,7 +318,7 @@ The server keeps a **per-account device registry** — one record per enrolled d
 
 ### 5.1 Quota
 
-Storage is bounded by a **per-account quota**: aggregate **deduplicated** ciphertext bytes (AS17), counted once per stored blob (not once per referencing note — dedup is intra-vault, §2.1). The counter is **one number per account** across note blobs *and* attachment bodies (§3.2) — the attachment path has no separate budget. Reclamation decrements it: when horizon-GC drops a tombstoned body (`sync-protocol.md` §11.2/§11.4), the reclaimed bytes leave the counter. On the hosted tier this is the paid-plan ceiling; a self-host operator sets their own (the protocol exposes the byte counter, the operator sets the policy — §6, TB5).
+Storage is bounded by a **per-account quota**: aggregate **deduplicated** ciphertext bytes (AS17), counted once per stored blob (not once per referencing note — dedup is intra-vault, §2.1). The counter is **one number per account** across note blobs *and* attachment bodies (§3.2) — the attachment path has no separate budget. Reclamation decrements it: when horizon-GC drops a tombstoned body (`sync-protocol.md` §11.2/§11.4), the reclaimed bytes leave the counter. On a paid tier this is the plan ceiling; an operator sets their own (the protocol exposes the byte counter, the operator sets the policy — §6, TB5).
 
 ### 5.2 Rate-limit, never IP
 
@@ -334,9 +334,9 @@ The per-account limit covers **authenticated** requests. A few operations run **
 
 ### 5.3 Sybil posture
 
-Sybil resistance is **reframed** as an operator resource/availability problem, not a user-security one: vaults are independent and zero-knowledge, so a Sybil account reaches no one else's data. On the hosted tier, the **payment-gate is the primary Sybil resistance** (no free anonymous registration surface ⇒ 10k Sybils = 10k subscriptions); per-account quota (§5.1) + rate-limit (§5.2) bound the damage. **Until the payment gate ships (MYND-430), the registration surface is open**, bounded only by the §5.2 pre-auth global limiter, the registered-account cap, and the request body-size limit. Enough to keep the server from being exhausted, not to prevent Sybil registration itself (that is the payment gate's job). Proof-of-work is **not** in v1. The payment system itself is a separate epic (MYND-430); only the posture is recorded here. Self-host Sybil is the operator's policy problem.
+Sybil resistance is **reframed** as an operator resource/availability problem, not a user-security one: vaults are independent and zero-knowledge, so a Sybil account reaches no one else's data. On a paid tier, the **payment-gate is the primary Sybil resistance** (no free anonymous registration surface ⇒ 10k Sybils = 10k subscriptions); per-account quota (§5.1) + rate-limit (§5.2) bound the damage. **Until the payment gate ships (MYND-430), the registration surface is open**, bounded only by the §5.2 pre-auth global limiter, the registered-account cap, and the request body-size limit. Enough to keep the server from being exhausted, not to prevent Sybil registration itself (that is the payment gate's job). Proof-of-work is **not** in v1. The payment system itself is a separate epic (MYND-430); only the posture is recorded here. Self-host Sybil is the operator's policy problem.
 
-**A server may additionally gate new-account registration behind a shared invite code** (`MYNE_INVITE_CODE`; `decisions/sync/0627`). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching `invite_code`, compared in constant time, never logged, and never associated with the account (a pure door, no code-to-account record). An account that already exists is unaffected: its later devices return `409 already_registered` before the gate runs and need no code. Unset is open, so self-host and a fresh clone are unchanged, and a code below 32 characters is refused at startup. This is admission control for the hosted closed beta, not Sybil resistance; the payment gate remains that.
+**A server may additionally gate new-account registration behind a shared invite code** (`MYNE_INVITE_CODE`; `decisions/sync/0627`). With it set, `POST /auth/register` refuses an account the server has never seen unless the request carries the matching `invite_code`, compared in constant time, never logged, and never associated with the account (a pure door, no code-to-account record). An account that already exists is unaffected: its later devices return `409 already_registered` before the gate runs and need no code. Unset is open, so self-host and a fresh clone are unchanged, and a code below 32 characters is refused at startup. This is admission control for an operator who wants a closed group, not Sybil resistance; the payment gate remains that on a paid tier.
 
 ## 6. Protocol-level vs policy-level (self-host)
 
@@ -457,7 +457,7 @@ anyone who can reach both the panel and the public sync API can mount an offline
 campaign against every account on the deployment without any further access. On this
 surface the hash is the account number for every purpose the pre-auth route cares about.
 
-**Deferred:** whether anything panel-shaped is reachable from the *hosted* origin is an
+**Deferred:** whether anything panel-shaped is reachable from a public origin is an
 open `myne-ops` decision (public aggregates, or nothing). This spec places the panel off
 the public edge so that decision has something to add to rather than something to
 rewrite.

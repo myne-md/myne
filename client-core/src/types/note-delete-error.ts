@@ -42,10 +42,3 @@ export type NoteDeleteError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /** `tokio::task::spawn_blocking` panic / runtime shutdown. */
   | { kind: "JoinFailure" };
-
-/** Type-narrowing helper for the `Io` variant. */
-export function isDeleteIoError(
-  e: NoteDeleteError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}

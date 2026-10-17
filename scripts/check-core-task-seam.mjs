@@ -73,8 +73,9 @@ const BANNED = [
 // a debug wasm build and a browser stack trace each time. A grep would have
 // caught both in `pre-commit`.
 //
-// A RATCHET, like `check-core-io-seam.mjs`: 13 files still call one, and moving
-// them is the body of the port tasks. A file not on the list may not start.
+// A RATCHET, like `check-core-io-seam.mjs`: the files still calling one are
+// listed in `CLOCK_ALLOWED` below and moving them is the body of the port
+// tasks. A file not on the list may not start.
 const CLOCK_BANNED = [
   ["Instant::now(", "panics on wasm32 — use `HostCtx::monotonic_millis()`"],
   ["SystemTime::now(", "panics on wasm32 — use `HostCtx::now_unix_millis()`"],
@@ -119,7 +120,9 @@ const CLOCK_ALLOWED = new Map([
   ["core/src/plugins/vault_creation/commands.rs", "decided absent on web; port not owed"],
   ["core/src/plugins/vault_creation/state.rs", "decided absent on web; port not owed"],
   ["core/src/search/bench.rs", "a benchmark, never compiled into a client"],
-  ["core/src/snapshot_store.rs", "task 83 (snapshots — the capture hook decides first)"],
+  // `core/src/snapshot_store.rs` was here ("task 83 (snapshots — the capture hook
+  // decides first)") and is ported: the subsystem's clock now comes from
+  // `HostCtx::now_unix_millis()` at each call site, so no std clock is read here.
   // `std::thread::sleep` sites, all inside the sync engine. Two of these files
   // are already listed above for the clocks; the rest join for the sleep alone.
   // Every remaining occurrence in this file is inside `#[cfg(test)] mod tests`:

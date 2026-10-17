@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-creation Tauri plugin.
 //!
 //! Owns the three-command flow (`begin` / `commit` / `cancel`) and the

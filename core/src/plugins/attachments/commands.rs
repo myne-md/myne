@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `attachments` Tauri command handlers (MYND-169 — the
 //! `attachments-crypto-pipeline` sub-feature, SYNC-8).
 //!
@@ -33,6 +34,8 @@ use crate::host::HostCtx;
 use crate::io_failure_kind::IoFailureKind;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_io::{VaultIo, WriteOpts};
+use base64::engine::general_purpose::STANDARD as B64;
+use base64::Engine as _;
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
     encode_attachments_catalog_versioned, meta_version_of, parse_vault_meta_any,
@@ -85,10 +88,11 @@ fn vault_dir_from_host(
 /// The `source` argument to [`attachment_import`].
 ///
 /// `Bytes` is the paste / drop path: the WebView hands the raw file
-/// bytes inline (base64-decoded by Tauri's IPC layer into a `Vec<u8>`)
-/// plus the caller-claimed `filename` (for the catalog display name; the
-/// actual content-type is always re-sniffed, never trusted from here).
-/// `Path` is the picker / OS-drop path: the host reads the file itself.
+/// bytes inline (as a JSON array of numbers, one per byte — see
+/// [`ImportSource::BytesB64`] for why that is the slow arm and which one to
+/// reach for) plus the caller-claimed `filename` (for the catalog display
+/// name; the actual content-type is always re-sniffed, never trusted from
+/// here). `Path` is the picker / OS-drop path: the host reads the file itself.
 ///
 /// Serde is internally tagged (`{"kind":"bytes","bytes":[..],"filename":".."}`
 /// / `{"kind":"path","path":".."}`) so the TS side is a discriminated
@@ -99,8 +103,45 @@ pub enum ImportSource {
     /// Inline bytes (paste / in-WebView drop). `filename` is the
     /// caller-supplied display name; if `None`, a name is auto-generated
     /// from the sniffed content-type.
+    ///
+    /// Reaches Rust as a JSON array with one number per byte, so the WebView
+    /// must materialize that array before anything is sent. Reach for
+    /// [`ImportSource::BytesB64`] instead for anything the user could have
+    /// picked at size.
     Bytes {
         bytes: Vec<u8>,
+        filename: Option<String>,
+    },
+    /// Inline bytes, base64-encoded. The same payload as
+    /// [`ImportSource::Bytes`] and the arm the mobile file picker uses.
+    ///
+    /// # Why base64 rather than the number array above
+    ///
+    /// `Bytes` costs the WebView one JS number per byte before the request
+    /// exists: a 5 MiB file becomes roughly 40 MiB of transient heap, and a file
+    /// at the 64 MiB cap reaches into the hundreds of MB — in a WebView that iOS
+    /// kills rather than warns about. Base64 costs one string of ~1.34 bytes per
+    /// input byte *after* the source buffer, which is a rounding error beside it.
+    ///
+    /// # Why not Tauri's raw request body instead
+    ///
+    /// It is faster still, and it is what `tauri::ipc::InvokeBody::Raw` exists
+    /// for — but Tauri's own documentation for that enum states the limit
+    /// plainly: **on Android `InvokeBody::Raw` is not supported and the enum
+    /// always contains `Json`**. A command that read a raw body would therefore
+    /// refuse every import on Android, the one mobile platform with no automated
+    /// UI coverage in this repository, while working on iOS. The same
+    /// documentation recommends base64 for exactly this case, and this arm is
+    /// that recommendation.
+    ///
+    /// # The encoding is `STANDARD`, and a bad payload is refused
+    ///
+    /// `STANDARD` is what the WebView's `btoa` produces. An undecodable payload
+    /// is an error rather than an empty import: a zero-byte attachment would be a
+    /// silent success at the wrong size.
+    #[serde(rename = "bytes_b64")]
+    BytesB64 {
+        bytes_b64: String,
         filename: Option<String>,
     },
     /// A filesystem path (native picker / OS drag-drop). The host reads
@@ -470,6 +511,22 @@ where
     //     attachment bytes are AS-sensitive plaintext until encrypted).
     let (file_bytes, claimed_filename): (Zeroizing<Vec<u8>>, Option<String>) = match source {
         ImportSource::Bytes { bytes, filename } => (Zeroizing::new(bytes), filename),
+        ImportSource::BytesB64 {
+            bytes_b64,
+            filename,
+        } => (
+            Zeroizing::new(
+                // `STANDARD` is what the WebView's `btoa` produces. A payload that
+                // will not decode is refused rather than imported empty: an
+                // attachment at zero bytes is a silent success at the wrong size.
+                // The tag is the contract's retained one — see
+                // `AttachmentImportError::UnsupportedType` — so no new wire variant
+                // is owed for it.
+                B64.decode(bytes_b64.as_bytes())
+                    .map_err(|_| AttachmentImportError::UnsupportedType)?,
+            ),
+            filename,
+        ),
         ImportSource::Path { path } => {
             let p = PathBuf::from(path);
             // Bound the allocation BEFORE reading the whole file: a huge picked /
@@ -2305,7 +2362,23 @@ pub async fn attachment_export_from_host(
 ) -> Result<(), AttachmentExportError> {
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
         .map_err(AttachmentExportError::from)?;
-    attachment_export_with_dir(io, &dir, state, &id, PathBuf::from(destination), overwrite).await
+    // The guarded roots: the whole app-data tree — which covers a SIBLING
+    // vault's blobs, a target this vault's own root does not — plus this vault's
+    // root. An `app_data_dir` resolution failure is passed through as an
+    // unresolved root rather than dropped, because the containment predicate
+    // refuses that state instead of skipping the comparison.
+    let guarded_roots: Vec<crate::paths::ResolvedRoot> =
+        vec![host.app_data_dir().map_err(|_| ()), Ok(dir.clone())];
+    attachment_export_with_dir(
+        io,
+        &dir,
+        &guarded_roots,
+        state,
+        &id,
+        PathBuf::from(destination),
+        overwrite,
+    )
+    .await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -2336,6 +2409,7 @@ pub async fn attachment_export<R: Runtime>(
 pub(crate) async fn attachment_export_with_dir(
     io: &dyn VaultIo,
     vault_dir: &Path,
+    guarded_roots: &[crate::paths::ResolvedRoot],
     state: &VaultRuntimeState,
     id: &str,
     destination: PathBuf,
@@ -2345,12 +2419,25 @@ pub(crate) async fn attachment_export_with_dir(
     //     a bug-canary — the UI only exports ids it rendered.
     let id_bytes = hex_decode_id(id).ok_or(AttachmentExportError::InvalidId)?;
 
-    // (1b) Destination sanity (export-suite parity, mirrors
+    // (1b) Destination sanity (export-suite parity with
     //      `vault_export::validate_destination`): the parent must exist and be
-    //      a directory, and the destination must not itself be an existing
-    //      directory. Reject a malformed target cleanly rather than surfacing a
-    //      raw filesystem error deep in the write.
-    if !crate::paths::parent_dir_ok(&destination) || destination.is_dir() {
+    //      a directory, the destination must not itself be an existing
+    //      directory, and it must resolve outside every guarded root. Reject a
+    //      malformed or hostile target cleanly rather than surfacing a raw
+    //      filesystem error deep in the write.
+    //
+    //      The containment half was MISSING here while this comment claimed
+    //      parity: `destination` is WebView-supplied and the writer renames
+    //      over an existing path, so a page that skipped the save dialog could
+    //      overwrite `vault.meta` — in this vault or a sibling one — with
+    //      attachment bytes (TB6, the same arbitrary-write the removed fs scope
+    //      allowed). It is the ONE shared predicate now
+    //      (`myne_format::dest_guard`), not a fourth copy.
+    if destination.is_dir() {
+        tracing::debug!(stage = "dest_check", error_kind = "InvalidDestination");
+        return Err(AttachmentExportError::InvalidDestination);
+    }
+    if crate::paths::containment_refused(&destination, guarded_roots).is_err() {
         tracing::debug!(stage = "dest_check", error_kind = "InvalidDestination");
         return Err(AttachmentExportError::InvalidDestination);
     }
@@ -2759,7 +2846,20 @@ mod tests {
         destination: PathBuf,
         overwrite: bool,
     ) -> Result<(), AttachmentExportError> {
-        super::attachment_export_with_dir(io(), vault_dir, state, id, destination, overwrite).await
+        // The vault's own root as the single guarded root: enough for every
+        // assertion the suite makes, and the app-data root the host command adds
+        // only widens the refusal.
+        let roots = [Ok(vault_dir.to_path_buf())];
+        super::attachment_export_with_dir(
+            io(),
+            vault_dir,
+            &roots,
+            state,
+            id,
+            destination,
+            overwrite,
+        )
+        .await
     }
 
     async fn rewrite_catalog_dropping_unused(
@@ -2878,6 +2978,81 @@ mod tests {
                 &catalog[0..4],
                 protocol::CATALOG_BLOB_V0_2_MAGIC.as_slice(),
                 "the catalog of a migrated vault must be MYC5"
+            );
+        });
+    }
+
+    // ---- ImportSource::BytesB64 (the mobile file picker's arm) --------
+
+    /// The base64 arm must store BYTE-IDENTICAL bytes to the array arm.
+    ///
+    /// The two arms are one payload in two encodings, and the encoding is the
+    /// part no type checks: the array arm arrives as a `Vec<u8>` by
+    /// deserialization, this one as a `String` this module decodes. A decoder
+    /// that dropped or padded a byte would produce a different content-addressed
+    /// id — that is, a different attachment, silently, and one the user's next
+    /// import of the same file would not dedup against.
+    #[test]
+    fn the_base64_arm_stores_the_same_bytes_as_the_array_arm() {
+        rt().block_on(async {
+            let (tmp_a, state_a) = temp_vault().await;
+            let array_arm = attachment_import_with_dir(
+                tmp_a.path(),
+                &state_a,
+                ImportSource::Bytes {
+                    bytes: PNG_BYTES.to_vec(),
+                    filename: Some("shot.png".to_string()),
+                },
+            )
+            .await
+            .expect("the array arm imports");
+
+            let (tmp_b0, state_b) = temp_vault().await;
+            let base64_arm = attachment_import_with_dir(
+                tmp_b0.path(),
+                &state_b,
+                ImportSource::BytesB64 {
+                    bytes_b64: B64.encode(PNG_BYTES),
+                    filename: Some("shot.png".to_string()),
+                },
+            )
+            .await
+            .expect("the base64 arm imports");
+
+            assert_eq!(
+                array_arm.id, base64_arm.id,
+                "the same bytes must content-address to the same id"
+            );
+            assert_eq!(array_arm.size, base64_arm.size);
+        });
+    }
+
+    /// A payload that will not decode is REFUSED, not imported as zero bytes.
+    ///
+    /// The failure this pins: a decode that answered an empty `Vec` for a bad
+    /// input would store a zero-byte attachment under a valid content-addressed
+    /// id — a "success" indistinguishable from a broken file, and one the real
+    /// bytes would not dedup against on the next import.
+    #[test]
+    fn the_base64_arm_refuses_an_undecodable_payload() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let err = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::BytesB64 {
+                    bytes_b64: "not base64!!!".to_string(),
+                    filename: Some("shot.png".to_string()),
+                },
+            )
+            .await
+            .expect_err("an undecodable payload is not an import");
+            assert!(matches!(err, AttachmentImportError::UnsupportedType));
+            // The refusal happens while materializing the source, before the
+            // pipeline writes anything, so the vault has no attachment blob.
+            assert!(
+                !tmp.path().join("attachments").exists(),
+                "a refused payload must leave no blob behind"
             );
         });
     }
@@ -3029,6 +3204,47 @@ mod tests {
                 result,
                 Err(AttachmentExportError::InvalidDestination)
             ));
+        });
+    }
+
+    #[test]
+    fn export_rejects_a_destination_inside_a_guarded_root() {
+        // The containment half, which this command did not have while its own
+        // comment claimed export-suite parity. The destination is
+        // WebView-supplied and the writer renames over an existing path, so
+        // without this a page that skipped the save dialog could overwrite
+        // `vault.meta` with attachment bytes.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"bytes".to_vec(),
+                    filename: Some("f.bin".to_string()),
+                },
+            )
+            .await
+            .expect("import");
+            let before = std::fs::read(tmp.path().join("vault.meta")).expect("meta on disk");
+
+            let result = attachment_export_with_dir(
+                tmp.path(),
+                &state,
+                &imported.id,
+                tmp.path().join("vault.meta"),
+                true,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(AttachmentExportError::InvalidDestination)
+            ));
+            assert_eq!(
+                std::fs::read(tmp.path().join("vault.meta")).expect("meta still on disk"),
+                before,
+                "the refused destination must be untouched"
+            );
         });
     }
 

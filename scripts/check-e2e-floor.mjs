@@ -77,7 +77,7 @@ if (!["stable", "quarantine"].includes(lane)) {
   process.exit(2);
 }
 
-// Where the vitest json reporter writes. Kept in step with vitest.e2e.config.ts;
+// Where the vitest json reporter writes. Kept in step with .config/vitest/e2e.config.ts;
 // a mismatch surfaces as the missing-report failure below rather than silently.
 const REPORT = join(ROOT, `.e2e-report/${lane}.json`);
 

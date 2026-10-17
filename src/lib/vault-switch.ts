@@ -31,7 +31,6 @@
 
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAwareness } from "../notes/collab/awarenessStore";
-import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
@@ -140,10 +139,6 @@ export async function leaveActiveVault(deps: {
   // (`lockVault()` above clears both too; this call is asserted separately
   // for the same reason `clearChat()`'s own call here is.)
   clearChatPersistForLock();
-  // The rendered AI output, on the same reasoning: a summary of a note in the
-  // vault being left, and the Q and A answers over its content, are as
-  // vault-specific as the conversation above.
-  clearAiOutput();
   // The per-note scroll positions and the picker's recency order, on the same
   // reasoning one step weaker: both are keyed by note id, so the next vault
   // would not READ either of them, but both are a live record of what the vault

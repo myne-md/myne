@@ -63,28 +63,12 @@ const NOTE_BLOCK: CSSProperties = {
 export function EndpointConfig({
   onConnected,
   onEdit,
-  initialUrl,
-  lockedUrl = false,
 }: {
   onConnected?: () => void;
   onEdit?: () => void;
-  /**
-   * Seed the address on mount, for the first-run HOSTED door (myne-md/myne#800):
-   * the hosted server is the gated one, so its one-tap connection needs the
-   * invite-code field the self-hosted form already has. Seeding the SAME control
-   * rather than adding a second one is the file's own rule — "a second endpoint
-   * control would be a second contract".
-   */
-  initialUrl?: string;
-  /**
-   * Render the address read-only. The hosted door fixes the origin (`the browser
-   * fixes the origin`, and the desktop hosted door writes `HOSTED_SYNC_ORIGIN`
-   * for the same reason), so the user may enter only the invite code.
-   */
-  lockedUrl?: boolean;
 } = {}) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState(initialUrl ?? "");
+  const [url, setUrl] = useState("");
   // The endpoint this device is currently connected to (loaded, or set on a
   // successful connect). When the input still equals it, there is nothing to do
   // and the button rests as a disabled "Connected" (E4c).
@@ -97,11 +81,6 @@ export function EndpointConfig({
   const [inviteCode, setInviteCode] = useState("");
   // `null` means loopback HTTP, never an unverified remote TLS session.
   const [pinSource, setPinSource] = useState<PinSource>(null);
-  // On the LOCKED hosted door the address is read-only, so editing it can never
-  // fire the address `onChange` that re-reveals the invite field. This flag is
-  // the manual escape hatch for that door (myne-md/myne#822).
-  const [revealCode, setRevealCode] = useState(false);
-
   useEffect(() => {
     // `cert_pin_hex` is on the wire and is always `null` since 0620. It is not
     // declared here: this type describes what THIS component reads, and a
@@ -112,17 +91,6 @@ export function EndpointConfig({
       invite_code: string | null;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
-        // A seeded hosted door keeps its fixed origin; only the invite code is
-        // hydrated (and only if the stored code belongs to that same origin,
-        // which `set_endpoint`'s read-modify-write already enforces).
-        if (lockedUrl) {
-          if (initialUrl && c.endpoint_url === initialUrl) {
-            setConnectedUrl(initialUrl);
-          }
-          setInviteCode(c.invite_code ?? "");
-          setPinSource(c.pin_source);
-          return;
-        }
         if (c.endpoint_url) {
           setUrl(c.endpoint_url);
           setConnectedUrl(c.endpoint_url);
@@ -131,7 +99,7 @@ export function EndpointConfig({
         setPinSource(c.pin_source);
       })
       .catch(() => {
-        /* unconfigured — leave the field empty */
+        /* unconfigured, leave the field empty */
       });
   }, []);
 
@@ -149,7 +117,6 @@ export function EndpointConfig({
     })
       .then((r) => {
         setConnectedUrl(trimmed);
-        setRevealCode(false);
         onConnected?.();
         setPinSource(r.pin_source);
         // The Tor posture is endpoint-aware (MYND-650 task 8): repointing a
@@ -184,11 +151,10 @@ export function EndpointConfig({
     connectedUrl !== null &&
     trimmedUrl.length > 0 &&
     trimmedUrl === connectedUrl;
-  // The invite field shows while unconnected, OR when the user asked to
-  // re-enter it on the locked hosted door (myne-md/myne#822). On that door the
-  // address is read-only and the code is the ONLY thing that can be wrong, so
-  // without this a wrong/rotated code is uncorrectable.
-  const showInviteField = !isConnectedUnedited || revealCode;
+  // The invite field shows while unconnected, and hides once the server has
+  // accepted the address and the code with it. Editing the address clears the
+  // code and re-reveals the field, which is the one path back to it.
+  const showInviteField = !isConnectedUnedited;
 
   return (
     <div
@@ -220,7 +186,6 @@ export function EndpointConfig({
       <div style={ROW}>
         <Input
           value={url}
-          readOnly={lockedUrl}
           onChange={(e) => {
             setUrl(e.target.value);
             // Changing the address invalidates a code issued for the old server;
@@ -232,10 +197,10 @@ export function EndpointConfig({
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
-          style={lockedUrl ? { ...FIELD_FILL, color: "var(--fg-3)" } : FIELD_FILL}
+          style={FIELD_FILL}
           data-testid="sync.endpoint-input"
         />
-        {isConnectedUnedited && !revealCode ? (
+        {isConnectedUnedited ? (
           <Button variant="secondary" disabled data-testid="sync.endpoint-connect">
             {t("sync.endpoint.connected")}
           </Button>
@@ -258,14 +223,11 @@ export function EndpointConfig({
           Hidden once the server is connected (myne-md/myne#815): the code is
           only for admission, so asking for it again on an already-connected
           endpoint reads as if it were still required. The value stays hydrated
-          from `sync_get_endpoint`, and on the self-hosted door editing the
-          address clears it and re-reveals the field (a code issued for the old
-          server must not go to the new one). On the LOCKED hosted door the
-          address is read-only, so that path cannot fire; there the "Change
-          invite code" control below re-reveals the field instead
-          (myne-md/myne#822). It is NOT true that the code is still sent on a
-          reconnect: every reconnect requires an address change (or a deliberate
-          re-entry here), and both re-send whatever is in the field. */}
+          from `sync_get_endpoint`, and editing the address clears it and
+          re-reveals the field, so a code issued for the old server never goes
+          to the new one. It is NOT true that the code is still sent on a
+          reconnect: every reconnect requires an address change, and that
+          re-send carries whatever is in the field. */}
       {showInviteField && (
         <>
           <label
@@ -291,20 +253,6 @@ export function EndpointConfig({
             />
           </div>
         </>
-      )}
-      {/* The locked hosted door has no way to re-reveal the invite field by
-          editing the read-only address, so it gets an explicit control
-          (myne-md/myne#822). Hidden on the self-hosted door, where editing the
-          address already re-reveals the field. */}
-      {lockedUrl && isConnectedUnedited && !revealCode && (
-        <Button
-          variant="ghost"
-          onClick={() => setRevealCode(true)}
-          style={{ alignSelf: "flex-start" }}
-          data-testid="sync.endpoint-change-invite"
-        >
-          {t("sync.endpoint.changeInviteCode")}
-        </Button>
       )}
       {/* The instructional helper sits directly under the input (E4a). */}
       <p style={HELP} data-testid="sync.endpoint-help">

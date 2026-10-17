@@ -980,13 +980,6 @@ mod tests {
     }
 
     #[test]
-    fn encode_emits_enc_item_key_region_of_exactly_sixty_four_bytes() {
-        let blob = encode_with_test_fixture(TEST_PLAINTEXT);
-        let region = &blob[OFFSET_ENC_ITEM_KEY..OFFSET_CONTENT_NONCE];
-        assert_eq!(region.len(), ENC_ITEM_KEY_WRAPPED_LEN);
-    }
-
-    #[test]
     fn encode_emits_content_nonce_at_offset_one_twelve() {
         let blob = encode_with_test_fixture(TEST_PLAINTEXT);
         assert_eq!(

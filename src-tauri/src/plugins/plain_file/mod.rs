@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `plain_file` Tauri plugin (myne-md/myne#788): the sandboxed editor for the
 //! user's own on-disk markdown files.
 //!

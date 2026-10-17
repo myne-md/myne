@@ -249,12 +249,8 @@
   },
   "aiOnboarding": {
     "title": "Set up AI",
-    "intro": "Myne can search your notes by meaning, suggest tags, and chat about them. None of it is required, and you can turn it on later from Settings.",
+    "intro": "Myne can suggest tags and chat about them. None of it is required, and you can turn it on later from Settings.",
     "enableLabel": "Turn on AI features",
-    "semantic": {
-      "title": "Semantic search",
-      "body": "Download a multilingual embedding model (about 449 MB) so you can search by meaning, not just by words."
-    },
     "tag": {
       "title": "Auto-tagging",
       "body": "Download the tag model (about 337 MB) so Myne can suggest tags as you write."
@@ -665,6 +661,12 @@
       },
       "openAttachments": {
         "label": "Open attachments…"
+      },
+      "attachFile": {
+        "label": "Attach file…"
+      },
+      "convertImportedAttachments": {
+        "label": "Convert imported attachments…"
       },
       "openInNewWindow": {
         "label": "Open note in new window"
@@ -1325,16 +1327,12 @@
           "noticeReceiverLocal": "It is answering: a program running on this device. Nothing leaves the machine, but that program is not part of Myne and Myne cannot see what it does with them.",
           "noticeRevoke": "To stop it, switch AI off in Settings, or change what is answering there. Revoking a provider key stops that provider immediately.",
           "noticeSettingsCta": "Open AI settings",
-          "gettingReadyHint": "Preparing your notes for AI. One moment.",
-          "noSearchModelHint": "Asking searches your notes on this device, and that needs a search model here. A provider cannot do it. Choose one in Settings → Developer → AI. Editing your notes with the AI still works.",
           "insert": "Insert into note",
           "noAnswer": "No answer. Try rephrasing.",
           "newChat": "New chat",
           "unavailableHint": "This build of Myne was compiled without local AI, so nothing here can run. No setting will change that — it takes a build with AI included.",
           "offHint": "Local AI is off. Turn it on in Settings → Developer → AI.",
           "send": "Send",
-          "statusGettingReady": "Preparing…",
-          "statusNoSearchModel": "No search model",
           "statusNoModel": "No provider",
           "statusNoModelChosen": "No model",
           "statusNoCredential": "No API key",
@@ -3023,9 +3021,6 @@
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
       "legalPrivacy": "Privacy policy",
-      "legalTerms": "Beta terms",
-      "legalNotice": "Report illegal content",
-      "legalLawEnforcement": "Law enforcement requests",
       "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
       "licenseLabel": "License",
       "tagline": "Pre-alpha · Phase 1 desktop client",
@@ -3606,10 +3601,8 @@
         "noModel": "There is no model here to run. Add one under Settings, AI, Models: download one from Myne's own origin, or point Myne at a file you already have."
       },
       "modelChoose": "Choose file…",
-      "modelEmbeddingLabel": "Search model: semantic search & Q&A",
       "modelFilter": {
-        "gguf": "GGUF model",
-        "safetensors": "Safetensors model"
+        "gguf": "GGUF model"
       },
       "modelGenerationLabel": "Text model: chat, summaries, writing",
       "modelNone": "No file selected",
@@ -3623,7 +3616,6 @@
       "downloadsHelper": "Fetch a model from Myne's own origin. It is checked against a fingerprint built into the app before it is used, so a tampered download is rejected. Nothing is fetched unless you click.",
       "catalogueColModel": "Model",
       "catalogueColState": "State",
-      "downloadEmbeddingSize": "Multilingual model, about 449 MB.",
       "downloadTagLabel": "Tag model: automatic tag suggestions",
       "downloadTagSize": "Small local model, about 337 MB.",
       "downloadInstalled": "Installed",
@@ -3674,15 +3666,14 @@
       "providerOnDevice": "On this device",
       "providerNothingAnswering": "Nothing is set up to answer yet.",
       "modelsLabel": "Outsourced models",
-      "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
       "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
       "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
       "title": "AI",
       "sections": {
         "catalogue": "Verified downloadable models",
         "outsourced": "Outsourced models",
-      "preferences": "Preferences",
-      "memory": "Memory",
+        "preferences": "Preferences",
+        "memory": "Memory",
         "excluded": "What AI can read",
         "history": "Chat history"
       }
@@ -4200,10 +4191,9 @@
       "intro": "Sync sends your notes, encrypted, to a server. Four things are worth knowing first.",
       "whatThisIsLabel": "What this is",
       "dataLossLabel": "If you lose both secrets",
-      "whatHappensNextLabel": "When the beta ends",
-      "whatWeCanSeeLabel": "What we can see",
-      "readFull": "Read the full terms",
-      "review": "Review the beta terms",
+      "whatHappensNextLabel": "If the server goes away",
+      "whatWeCanSeeLabel": "What the server's operator can see",
+      "review": "Review what sync means",
       "accept": "I understand, turn on sync"
     },
     "materialising": "Downloading your notes: {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
@@ -4342,8 +4332,7 @@
       "tlsHelp": "Enter the same server URL on every device. A self-hosted server needs a trusted HTTPS certificate.",
       "tlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address, certificate and its validity.",
       "inviteLabel": "Invite code (only if this server asks for one)",
-      "invitePlaceholder": "The code the server’s operator gave you",
-      "changeInviteCode": "Change invite code"
+      "invitePlaceholder": "The code the server’s operator gave you"
     },
     "enroll": {
       "accountNumberLabel": "Account number",
@@ -4889,7 +4878,9 @@
     "deleteConfirmTitle": "Delete this vault?",
     "deletePartialError": "Some files couldn't be removed. The vault is no longer usable. Continue to start over.",
     "failClosedEyebrow": "Can't open vault",
-    "restoreHint": "Restore from a backup to continue."
+    "restoreHint": "Restoring from a backup isn't available on mobile yet.",
+    "restoreCta": "Restore from a backup",
+    "ioErrorHint": "Try again, or reopen Myne."
   },
   "vault": {
     "ioBanner": {
@@ -5190,18 +5181,10 @@
   "firstRun": {
     "server": {
       "heading": "Choose a sync server",
-      "chooseHeading": "Where should your notes sync?",
-      "chooseIntro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Use the Myne Sync service, or point this device at a server you run yourself. Either way your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "myneSyncHint": "The Myne-operated server. Its HTTPS certificate is checked automatically.",
       "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
       "notConfigured": "Enter a server address above and press Connect to continue.",
       "back": "Back",
-      "continue": "Continue",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Your own server",
-      "selfHostedHint": "A sync server you run. You enter its address on the next screen.",
-      "connectAction": "Connect",
-      "setUpAction": "Set up"
+      "continue": "Continue"
     }
   },
   "identityFlow": {
@@ -5216,8 +5199,6 @@
       "title": "Choose a sync server",
       "lead": "Your notes stay encrypted on this device before they leave it. The server only stores ciphertext.",
       "urlLabel": "Server address",
-      "useMyneSync": "Use Myne Sync",
-      "selfHostedHint": "Or enter the address of a server you run yourself.",
       "connect": "Connect",
       "connecting": "Connecting…"
     },

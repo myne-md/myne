@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Closed error taxonomy for the local-inference engine (local-ai epic,
 //! MYND-406, task 1).
 //!
 //! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging
-//! discipline": every variant is a bounded, content-free kind — a prompt, a
-//! note body, or an embedding vector never appears in an error value or its
+//! discipline": every variant is a bounded, content-free kind — a prompt or a
+//! note body never appears in an error value or its
 //! `Display`. Callers log [`EngineError::kind`] (a `&'static str`), never any
 //! inner data (there is none).
 
@@ -22,7 +23,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, thiserror::Error)]
 pub enum EngineError {
     /// Generic "engine not initialised / no model" — retained for the
-    /// GENERATION and EMBEDDING load paths (`load_gen` / `load_embed`) and any
+    /// GENERATION load path (`load_gen`) and any
     /// non-transcription trait caller. The transcribe path (MYND-591) no
     /// longer produces this: it splits into the four cause variants below so a
     /// failure renders the truthful reason instead of a hardcoded "no model".
@@ -53,9 +54,6 @@ pub enum EngineError {
     /// `infer` failed inside the model runtime.
     #[error("local-inference inference failed")]
     InferenceFailed,
-    /// `embed` failed inside the model runtime.
-    #[error("local-inference embedding failed")]
-    EmbeddingFailed,
     /// `transcribe` failed inside the model runtime (voice-to-text, MYND-550).
     /// Content-free like its siblings — the decoded transcript never appears in
     /// an error value or its `Display`.
@@ -99,9 +97,8 @@ pub enum EngineError {
     #[error("local-inference backend refused the connection")]
     Refused,
     /// The seam refused to hand this request a **remote-class** backend
-    /// (`sync-ledger` SYNC-14 / SYNC-16). Two cases produce it: an *ambient*
-    /// request — one that fires without the user asking — and **any** embedding
-    /// request, unconditionally.
+    /// (`sync-ledger` SYNC-14 / SYNC-16): an *ambient*
+    /// request — one that fires without the user asking.
     ///
     /// NOT a failure of the backend: nothing was attempted. The request was
     /// routed nowhere because Myne's own code declines to route it there.
@@ -112,8 +109,8 @@ pub enum EngineError {
     ///
     /// Split out of [`EngineError::RemoteBarred`] by myne-md/myne#456, and the
     /// reason is that one variant was carrying two unrelated meanings. The
-    /// other is a rule Myne applies to a request CLASS: an ambient request or
-    /// any embedding may not use a remote backend, ever, whatever the user
+    /// other is a rule Myne applies to a request CLASS: an ambient request
+    /// may not use a remote backend, whatever the user
     /// says. This one is a permission the user has simply not given yet, and
     /// the difference is the whole of what the user does next. Collapsed
     /// together, someone who had never seen the consent screen was told "this
@@ -221,7 +218,6 @@ impl EngineError {
             EngineError::NoModel => "no_model",
             EngineError::ModelLoadFailed => "model_load_failed",
             EngineError::InferenceFailed => "inference_failed",
-            EngineError::EmbeddingFailed => "embedding_failed",
             EngineError::TranscriptionFailed => "transcription_failed",
             EngineError::AudioTooLong => "audio_too_long",
             EngineError::Timeout => "timeout",

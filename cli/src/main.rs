@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `myne` — the CLI thin client (cli-thin-client feature; MYND-490).
 //!
 //! Never opens the vault, never holds a key, never prompts for a password.

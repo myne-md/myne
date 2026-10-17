@@ -70,6 +70,10 @@ function errorMessage(e: unknown): string {
         return i18n.t("settings.quickUnlock.errorBusy");
       case "NotUnlocked":
         return i18n.t("settings.quickUnlock.errorNotUnlocked");
+      // Disable only. The credential file survived its own deletion, so the
+      // feature is still on; the copy must not read as "turned off".
+      case "WipeFailed":
+        return i18n.t("settings.quickUnlock.turnOffError");
       default:
         return i18n.t("settings.quickUnlock.errorGeneric");
     }

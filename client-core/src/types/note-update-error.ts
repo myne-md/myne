@@ -69,13 +69,6 @@ export type NoteUpdateError =
    */
   | { kind: "LiveSessionOpen" };
 
-/** Type-narrowing helper for the `Io` variant. */
-export function isUpdateIoError(
-  e: NoteUpdateError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
-
 /** Type-narrowing helper for the expected-base guard rejection. */
 export function isBaseMismatchError(e: unknown): e is { kind: "BaseMismatch" } {
   return (

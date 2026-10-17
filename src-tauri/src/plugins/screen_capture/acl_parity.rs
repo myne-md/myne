@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The four registration sites of the `screen-capture` plugin, compared.
 //!
 //! `permissions/screen-capture/default.toml`'s own header says an ACL entry does

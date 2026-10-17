@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The agent's setting intents (myne-md/myne#850).
 //!
 //! The agent may change a **closed set of named settings**, not preferences in

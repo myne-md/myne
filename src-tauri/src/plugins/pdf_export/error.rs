@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Closed error enum for the `pdf-export` plugin (MYND-255 task 4).
 //!
 //! Hand-mirrored on the TS side at `src/types/pdf-export-error.ts` —

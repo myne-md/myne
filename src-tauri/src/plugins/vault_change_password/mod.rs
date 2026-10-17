@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-change-password Tauri plugin.
 //!
 //! Owns the standalone `vault_change_password::commit` command —

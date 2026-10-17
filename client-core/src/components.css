@@ -1202,20 +1202,10 @@
   height: auto;
 }
 
-.myne-drop-row[data-edge="before"] {
-  box-shadow: inset 0 2px 0 0 var(--accent);
-  background: var(--accent-soft);
-}
-.myne-drop-row[data-edge="after"] {
-  box-shadow: inset 0 -2px 0 0 var(--accent);
-  background: var(--accent-soft);
-}
-
 /* Under forced colours the accent becomes the system canvas and the indicator
    disappears — on feedback whose entire job is to be seen mid-gesture. */
 @media (forced-colors: active) {
-  .myne-drop-line,
-  .myne-drop-row[data-edge] {
+  .myne-drop-line {
     forced-color-adjust: none;
     background: Highlight;
   }

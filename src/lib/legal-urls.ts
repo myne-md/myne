@@ -17,15 +17,25 @@
 // instrument (§ 5 DDG) published only in German. Publishing an "English
 // version" of it would raise the question of which one is binding.
 
-/** A published legal document. */
-export type LegalDoc = "privacy" | "terms" | "lawEnforcement" | "notice" | "impressum";
+/**
+ * A published legal document.
+ *
+ * **Two documents left the union on 2026-10-17**: `lawEnforcement` and `notice`.
+ * They were the DSA contact/notice pages and the law-enforcement inventory, and
+ * both were published to describe a server Myne operated and offered. Myne
+ * operates none (`docs/decisions/sync/0696`), the pages are deleted from the
+ * website, and a slug that resolves to a deleted page is worse than no entry:
+ * the app would link a 404 and claim a document that does not exist. The
+ * "never have" inventory the law-enforcement page carried has moved to
+ * `docs/self-host-policy.md`, where it belongs — it is a statement about a
+ * server, and the reader who runs one is the operator.
+ */
+export type LegalDoc = "privacy" | "terms" | "impressum";
 
 /** The two slugs each bilingual document is published under. */
 const SLUGS: Record<Exclude<LegalDoc, "impressum">, { en: string; de: string }> = {
   privacy: { en: "privacy", de: "datenschutz" },
   terms: { en: "terms", de: "nutzungsbedingungen" },
-  lawEnforcement: { en: "law-enforcement", de: "behoerdenanfragen" },
-  notice: { en: "notice", de: "meldung" },
 };
 
 /**
@@ -49,14 +59,30 @@ export function legalUrl(doc: LegalDoc, locale: string): string {
  * them, with their label key and test id.
  *
  * Shared rather than declared per client so the desktop, the web client and
- * mobile show the same four documents in the same order under the same test
+ * mobile show the same documents in the same order under the same test
  * ids — a second copy is how one client quietly ends up offering three.
  *
- * **The Impressum is deliberately not in this list.** `legalUrl` can produce
- * it and the page exists, but nothing links it until its address is filled in
- * (myne-ops#9): in Germany an incomplete Impressum is a worse position than
- * none, because it reads as compliant. Adding the entry here is all it takes
- * the day that closes — and it lands on all three clients at once.
+ * **One document, and it is the only one left that a client links.** The list
+ * carried four until 2026-10-16: privacy, the beta terms, the DSA notice route
+ * and the law-enforcement page. The other three describe a service Myne was
+ * offering to the public, and Myne offers none (`docs/decisions/sync/0696`), so
+ * a client linking them was pointing readers at documents about an offering
+ * that no longer exists. All four pages are now gone from the website, and
+ * `legalUrl` can no longer produce their slugs at all: a type that names a
+ * document the site does not publish is a link to a 404 wearing a legal label.
+ *
+ * **The Impressum is deliberately not in this list.** `legalUrl` can still
+ * produce it and the page exists, but nothing links it until its address is
+ * filled in (myne-ops#9): in Germany an incomplete Impressum is a worse
+ * position than none, because it reads as compliant. Adding the entry here is
+ * all it takes the day that closes — and it lands on all three clients at once.
+ *
+ * **`terms` is still in `LegalDoc` and still not in this list.** The page is
+ * published and the German twin links it, but it is the beta terms of the
+ * closed offering, nothing in the app points at it, and the pre-sync dialog
+ * stopped opening it on 2026-10-16 (`docs/decisions/sync/0696`). It stays
+ * reachable by URL until the offering's paperwork is settled, and an entry here
+ * would advertise it again.
  */
 export const LEGAL_LINKS: ReadonlyArray<{
   doc: LegalDoc;
@@ -64,11 +90,4 @@ export const LEGAL_LINKS: ReadonlyArray<{
   testId: string;
 }> = [
   { doc: "privacy", labelKey: "settings.about.legalPrivacy", testId: "about.legal-privacy" },
-  { doc: "terms", labelKey: "settings.about.legalTerms", testId: "about.legal-terms" },
-  { doc: "notice", labelKey: "settings.about.legalNotice", testId: "about.legal-notice" },
-  {
-    doc: "lawEnforcement",
-    labelKey: "settings.about.legalLawEnforcement",
-    testId: "about.legal-law-enforcement",
-  },
 ];

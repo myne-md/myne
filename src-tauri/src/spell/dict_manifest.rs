@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Reproducible-build hash-pins for the bundled dictionaries (MYND-263 t5).
 //!
 //! Every Hunspell file we ship is pinned to its exact SHA-256. The verification
@@ -23,11 +24,14 @@ pub struct PinnedDictFile {
     pub sha256_hex: &'static str,
 }
 
-/// Every shipped dictionary file, pinned to its SHA-256. v1: 23 languages
-/// (en-US + 22 verified-loadable, AGPL-compatible wooorm dicts; TR/da/gl/uk/el
+/// Every shipped dictionary file, pinned to its SHA-256. v1: 22 languages
+/// (en-US + 21 verified-loadable, AGPL-compatible wooorm dicts; TR/da/gl/uk/el/hr
 /// excluded — see `commands::BUNDLED_LANGUAGES`). `index.dic` + `index.aff` are
 /// the speller inputs; `license` is the in-tree provenance (font-license
-/// precedent) and is pinned too so a license swap is also caught.
+/// precedent) and is pinned too so a license swap is also caught. `ko` ships
+/// seven further licence texts beside them (its pair is a GPL-3.0 combined
+/// work over MPL-1.1/GPL-2.0/LGPL-2.1 and two CC licences); those are pinned
+/// here as well, because the claim this roster makes is about every shipped byte.
 pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
     PinnedDictFile {
         lang: "en-US",
@@ -121,7 +125,7 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
     PinnedDictFile {
         lang: "bg",
         file: "license",
-        sha256_hex: "04f8571e50b57ddcd93e74416e1949325c899b902af36e83fa669b6205f56b2e",
+        sha256_hex: "49d7594ad2681a019e00c984dcb1faec29f60018e17c28097eb25c17f7243093",
     },
     PinnedDictFile {
         lang: "ca",
@@ -184,21 +188,6 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
         sha256_hex: "bb0a75c473e49224e0428b95c17ad90f1774a7f6cb97be921f9d6a93a3af80d7",
     },
     PinnedDictFile {
-        lang: "hr",
-        file: "index.aff",
-        sha256_hex: "230a7f0ca65159ecf8f3eea4afd79f7436415e83129b1d6b2424892074d8194d",
-    },
-    PinnedDictFile {
-        lang: "hr",
-        file: "index.dic",
-        sha256_hex: "fb436f3a758cd4faf9ef4cd5c2e6e2a1e3abe535ee183095a2f59fd18dad0731",
-    },
-    PinnedDictFile {
-        lang: "hr",
-        file: "license",
-        sha256_hex: "4edabc6989973eea67423ff9dedd133b33d032a09d821c70acaa43f49184e96c",
-    },
-    PinnedDictFile {
         lang: "hu",
         file: "index.aff",
         sha256_hex: "da5cecde3c1afb67990030f1ffe8fb9859983c9305fc207abeb5475f8f002237",
@@ -227,6 +216,41 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
         lang: "ko",
         file: "license",
         sha256_hex: "3e81dd90f6d8877ccb2ed2b262ce72ee8a6ccf3a21179a8949abf0d85ac7fda0",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.GPL-3.0",
+        sha256_hex: "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.MPL-1.1",
+        sha256_hex: "c4be8e0ae5c90ef46c5c3365fdf336b4d622dfce3ad01ef5895aa372698716c5",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.GPL-2",
+        sha256_hex: "ab15fd526bd8dd18a9e77ebc139656bf4d33e97fc7238cd11bf60e2b9b8666c6",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.LGPL-2.1",
+        sha256_hex: "a9bdde5616ecdd1e980b44f360600ee8783b1f99b8cc83a2beb163a0a390e861",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-SA-2.0-KR",
+        sha256_hex: "58a3e17c039200e1d9edda01b3e4040a45e85eedbffefb868c37552bb7f5eec4",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-4.0",
+        sha256_hex: "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-SA-4.0",
+        sha256_hex: "9348ddfd44da5a127c59141981954746a860ec8e03e0412cf3af7134af0f97e2",
     },
     PinnedDictFile {
         lang: "lt",

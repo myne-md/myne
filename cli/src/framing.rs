@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Length-prefixed frame reader/writer for the CLI bridge command socket —
 //! the CLI's own copy, mirroring `src-tauri/src/cli_bridge/framing.rs`
 //! exactly (a 4-byte little-endian length prefix, the cap enforced BEFORE

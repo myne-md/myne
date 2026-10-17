@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-layer error types for the `notes` plugin.
 //!
 //! Mirrors the `vault_unlock::error::VaultUnlockError` discipline (no

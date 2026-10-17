@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Attachment reference-graph reconcile (MYND-169, SYNC-6) — in-RAM,
 //! rebuildable, zeroized-on-lock.
 //!
@@ -36,37 +37,13 @@
 //!   ([`AttachmentRefsState::referencing_notes`]);
 //! - the zeroize-on-lock wipe.
 //!
-//! TODO(attachments reconcile): the *wiring* that drives `apply` from the
-//! live note lifecycle + the unlock-time full rebuild is NOT wired here.
-//! Per the `vault_indices` Build-B design (TS owns dialect extraction and
-//! pushes parsed records to the host via an `apply` IPC command), the
-//! intended production path is:
-//!   (a) extend the TS note-parse pass to also emit `att:<id>` targets
-//!   alongside wikilinks/tags; (b) add a thin
-//!   `attachment_refs_apply(note_id, ids)` /
-//!   `attachment_refs_remove(note_id)` IPC pair plus an
-//!   `attachment_refs_referencing(id)` query command that delegate to
-//!   this state; (c) drive a rebuild-on-unlock from the TS-orchestrated
-//!   note sweep (the same sweep that rebuilds `vault_indices`).
-//!
-//! Those steps are frontend-coupled (the dialect parser is the single TS
-//! source of truth, TB9 minimal-Rust-surface) and are deferred to the
-//! consumer sub-features (3 library / 4 editor) that actually need the
-//! query surface. The host-side primitive (tokenizer + graph + query +
-//! wipe) is complete and unit-tested so those sub-features wire to a
-//! finished core rather than a stub.
-
-// The tokenizer + the graph's apply/remove/query surface have NO
-// production caller yet — task 6 (SYNC-6) is scaffolded here, but the
-// IPC wiring (an `attachment_refs_apply/remove/referencing` command set
-// driven by the TS note-parse pass + an unlock-time rebuild) is deferred
-// to the consumer sub-features per the module-level
-// `TODO(attachments reconcile)`. The host-side primitive is complete and
-// unit-tested so those sub-features wire to a finished core. Until then,
-// the public items are dead-code-allowed (same posture as
-// `vault_indices`'s not-yet-read query helpers). `AttachmentRefsState`
-// itself IS live (managed in `lib.rs` + cleared on every lock path).
-#![allow(dead_code)]
+//! All of it is wired: the trio `attachment_refs_apply` / `_remove` /
+//! `_referencing` is registered by both hosts and driven from
+//! `src/notes/attachmentRefs.ts`; `extract_att_ids` feeds the text cache, and
+//! `extract_att_embed_spans` / `ATT_ID_HEX_LEN` feed the cleanup ref-scan and
+//! the desktop embed-span reader. The `#![allow(dead_code)]` this module used
+//! to carry was the scaffold-era posture (audit T6.13 item 7): the module is
+//! live, so a dead item must now be a real finding rather than a silenced one.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;

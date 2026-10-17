@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_label` Tauri plugin: the hide-vault-names option (myne-md/myne#411).
 //!
 //! Owns `hide_vault_names` + `set_hide_vault_names`: the device-local flag that

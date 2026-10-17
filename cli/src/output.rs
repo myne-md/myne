@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! CLI output: the stable `--json` envelope (PRD story 11 — "a scripter
 //! wants a structured envelope with a stable shape") and the
 //! human-readable rendering.

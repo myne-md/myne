@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 
-//! Shared 34-byte-header AEAD envelope for the six vault-singleton
+//! Shared 34-byte-header AEAD envelope for the five vault-singleton
 //! "opaque inner plaintext" blob codecs: `vault.search` (`MYS1`, §9.6),
 //! `vault.workspace` (`MYW1`, §9.7), `vault.indices` (`MYI1`, §9.8),
-//! `vault.dictionary` (`MYD1`, §9.13), `vault.embeddings` (`MYR1`, §9.17), and
+//! `vault.dictionary` (`MYD1`, §9.13), and
 //! `vault.themes` (`MYT1`, §9.21).
 //!
-//! All six share a BYTE-IDENTICAL framing:
+//! All five share a BYTE-IDENTICAL framing:
 //!
 //! ```text
 //! Offset  Size  Field              Notes
@@ -72,6 +72,57 @@ impl From<ProtocolError> for EnvelopeError {
         EnvelopeError::CannotDecrypt
     }
 }
+
+/// Generate a blob family's `From<EnvelopeError>` — ONE implementation of the
+/// nine-arm mapping every codec shares, instead of thirteen hand-copied ones
+/// (audit T6.10(e)).
+///
+/// Two arms are NOT identity, so each is an explicit, named parameter rather
+/// than a special case buried in a copy:
+///
+///   * `format:` — the `FormatUnsupported` target variant. Three families spell
+///     it with a family prefix (`DictFormatUnsupported` §9.13,
+///     `IndexFormatUnsupported` §9.6, `ThemesFormatUnsupported` §9.21) because
+///     the `parse_fail` vector string is part of their spec spelling. Name the
+///     variant at the call site and carry the §-reference there, where a reader
+///     of that family meets it.
+///   * `plaintext_too_large:` — the `PlaintextTooLarge` target. The two
+///     `NTV6`-only group-tier families (`MYO5`, `MYU5`) collapse it into
+///     `CiphertextLenOverflow`, and that collapse is DELIBERATE: their
+///     `parse_fail` surface must not widen, because a widened reject would break
+///     the companion vector expectations. Making the parameter explicit is what
+///     keeps a future generic rewrite from silently widening either family.
+macro_rules! impl_from_envelope_error {
+    // Identity form: `FormatUnsupported` and `PlaintextTooLarge` kept as-is.
+    ($target:ty) => {
+        $crate::blob_envelope::impl_from_envelope_error!(
+            $target,
+            format: FormatUnsupported,
+            plaintext_too_large: PlaintextTooLarge
+        );
+    };
+    ($target:ty, format: $fmt:ident, plaintext_too_large: $ptl:ident) => {
+        impl From<EnvelopeError> for $target {
+            /// Map the shared-envelope error into this codec's public variant so
+            /// the distinguishable-reject surface (and its vectors) stay
+            /// unchanged.
+            fn from(e: EnvelopeError) -> Self {
+                match e {
+                    EnvelopeError::HeaderTooShort => Self::HeaderTooShort,
+                    EnvelopeError::MagicMismatch => Self::MagicMismatch,
+                    EnvelopeError::ProtocolVersionMismatch => Self::ProtocolVersionMismatch,
+                    EnvelopeError::FormatUnsupported => Self::$fmt,
+                    EnvelopeError::CiphertextLenOverflow => Self::CiphertextLenOverflow,
+                    EnvelopeError::CiphertextTruncated => Self::CiphertextTruncated,
+                    EnvelopeError::CannotDecrypt => Self::CannotDecrypt,
+                    EnvelopeError::PlaintextTooLarge => Self::$ptl,
+                    EnvelopeError::RandomnessUnavailable => Self::RandomnessUnavailable,
+                }
+            }
+        }
+    };
+}
+pub(crate) use impl_from_envelope_error;
 
 /// Seal `plaintext` into the shared envelope under `key` with a caller-supplied
 /// `nonce`. `magic` + `format_version` are written verbatim; `aad` is the

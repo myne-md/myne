@@ -110,21 +110,7 @@ impl From<ProtocolError> for PersonProfileBlobError {
     }
 }
 
-impl From<EnvelopeError> for PersonProfileBlobError {
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => Self::HeaderTooShort,
-            EnvelopeError::MagicMismatch => Self::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => Self::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => Self::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => Self::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => Self::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => Self::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => Self::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => Self::RandomnessUnavailable,
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(PersonProfileBlobError);
 
 /// Seal `plaintext` as a `MYY5` profile with a caller-supplied nonce.
 pub fn encode_person_profile_blob_raw(

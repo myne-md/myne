@@ -32,17 +32,29 @@ describe("serializeClipMarkdown — single shared parser", () => {
   });
 
   it("never constructs a second parser (configure is not called)", () => {
-    // The module imports the prebuilt singleton; nothing in the serializer
-    // re-configures @lezer/markdown. Spying on the singleton's `parse` and
-    // confirming it is the sole parse authority is the structural guarantee.
-    const spy = vi.spyOn(parserModule.parser, "parse");
+    // `MarkdownParser.configure` RETURNS A NEW PARSER, so a serializer that
+    // re-configured the grammar would leave the module's singleton unused for
+    // its own text — and the singleton is what `dialect/`'s visitors and the
+    // editor's decorations are built from. This case used to spy on `parse` and
+    // assert it was CALLED, which the case above already does: it passed whatever
+    // `configure` did, and its title claimed the opposite.
+    //
+    // Reached through the prototype of the module's own singleton, so no new
+    // import is needed: `parser` is a `MarkdownParser` instance, and any second
+    // construction goes through this same method.
+    const proto = Object.getPrototypeOf(parserModule.parser) as {
+      configure: (...args: unknown[]) => unknown;
+    };
+    const configure = vi.spyOn(proto, "configure");
     try {
       serializeClipMarkdown("x\n");
-      // Every parse the serializer performs goes through this one instance.
-      expect(spy.mock.calls.length).toBeGreaterThan(0);
+      expect(configure).not.toHaveBeenCalled();
     } finally {
-      spy.mockRestore();
+      configure.mockRestore();
     }
+    // Non-vacuity: the spy is on a method that EXISTS, so a rename cannot make
+    // this case pass by spying on nothing.
+    expect(typeof proto.configure).toBe("function");
   });
 });
 

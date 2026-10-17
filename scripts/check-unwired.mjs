@@ -133,7 +133,6 @@ const EXEMPT = new Map([
   // outside WATCHED, so nobody was told. Recorded rather than fixed here for
   // the same reason as the list above: wiring each is its own change with its
   // own reasoning, and recording them is what makes the rule enforceable today.
-  ["src/notes/ai/runSummarizeToStore.ts", "UNWIRED — the summarize → render-store orchestration. Production calls `runSummarizeToChat` (`aiToChat.ts`) out of `Editor.tsx`'s `onSummarizeNote` instead; `Editor.tsx:3176` names this module only in a comment. Its test still pins the orchestration shape."],
   ["src/notes/graphLayoutProtocol.ts", "UNWIRED — a pure `export * from \"@myne/editor/host/notes/graphLayout\"` shim; every consumer imports the shared module directly. Dead rather than dangerous; the fix is deleting it."],
   ["src/notes/wordCount.ts", "UNWIRED as production code — `documentStats.ts`'s `computeDocStats` is the live bottom-bar counter (MYND-339). `countBodyWords` survives as the parity oracle `tests/notes/documentStats.test.ts` pins `.words` against, so the fix is moving the oracle INTO that test rather than deleting the guarantee."],
   ["src/notes/workspaceBuffers.tsx", "UNWIRED — the multi-buffer residency layer (MYND-166 task 2). Zero production importers; whether the pane architecture it was written for shipped around it is its own question, and this entry is the question being on the record."],

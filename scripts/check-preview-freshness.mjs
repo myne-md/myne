@@ -132,12 +132,32 @@ if (!existsSync(META)) {
   process.exit(0);
 }
 
-let meta;
+let raw;
 try {
-  meta = JSON.parse(readFileSync(META, "utf8"));
+  raw = readFileSync(META, "utf8");
 } catch (e) {
+  // ABSENT is legitimate: a fresh clone has not captured yet, and the warning
+  // above is the whole answer.
   console.warn(`⚠ preview-freshness: preview/src/meta.json is unreadable (${e.message}).`);
   process.exit(0);
+}
+
+let meta;
+try {
+  meta = JSON.parse(raw);
+} catch (e) {
+  // PRESENT but broken is not legitimate, and it used to be the same warning and
+  // the same exit 0, which is how a merge commit shipped this file with its
+  // conflict markers intact and every gate stayed green (myne-md/myne#890). The
+  // file is committed, generated, and consumed by the website's theme builder
+  // and the myne-themes gallery, so a broken one ships a broken preview.
+  console.error(
+    `preview-freshness: preview/src/meta.json is present but is not valid JSON (${e.message}).\n` +
+      "  That file is committed and consumed by the theme builder, so this is a defect\n" +
+      "  rather than a missing capture: resolve it, then re-record with\n" +
+      "    node scripts/check-preview-freshness.mjs --record",
+  );
+  process.exit(1);
 }
 
 const recorded = String(meta.surfaceHash ?? "").trim();

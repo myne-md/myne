@@ -1218,8 +1218,6 @@
           "empty": "Sammanfattningar, svar och förslag visas här när du ber om dem.",
           "error": "AI-begäran kunde inte slutföras.",
           "errorTurn": "Assistenten kunde inte svara.",
-          "gettingReadyHint": "Förbereder dina anteckningar för AI. Ett ögonblick.",
-          "noSearchModelHint": "När du ställer en fråga söks dina anteckningar igenom på den här enheten, och det kräver en sökmodell här. En leverantör kan inte göra det. Välj en i Inställningar → Utvecklare → AI. Att redigera dina anteckningar med AI:n fungerar fortfarande.",
           "insert": "Infoga i anteckning",
           "noAnswer": "Inget svar. Prova att formulera om.",
           "newChat": "Ny chatt",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Den här versionen av Myne kompilerades utan lokal AI, så ingenting här kan köras. Ingen inställning ändrar det — det krävs en version med AI inkluderad.",
           "offHint": "Lokal AI är av. Slå på den i Inställningar → Utvecklare → AI.",
           "send": "Skicka",
-          "statusGettingReady": "Förbereder…",
-          "statusNoSearchModel": "Ingen sökmodell",
           "statusNoModel": "Ingen leverantör",
           "statusUnreachable": "Svarar inte",
           "statusUnavailable": "Otillgänglig",
@@ -2909,9 +2905,6 @@
       "legalLabel": "Juridik",
       "legalHelper": "Öppnas på myne.md i din webbläsare. På tyska där gränssnittet är på tyska.",
       "legalPrivacy": "Integritetspolicy",
-      "legalTerms": "Betavillkor",
-      "legalNotice": "Anmäl olagligt innehåll",
-      "legalLawEnforcement": "Förfrågningar från brottsbekämpande myndigheter",
       "licenseBody": "Pre-alpha · CC-BY-4.0-dokument · AGPL-3.0 för programkoden vid fas 1-lansering.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alpha · Fas 1 skrivbordsklient",
@@ -3383,10 +3376,8 @@
         "emptyGrant": "Allt denna körning kunde läsa finns i mappar AI aldrig ser. Inget skickades. Ändra det i Inställningar, AI, Undantagna mappar."
       },
       "modelChoose": "Välj fil…",
-      "modelEmbeddingLabel": "Sökmodell: semantisk sökning och frågor och svar",
       "modelFilter": {
-        "gguf": "GGUF-modell",
-        "safetensors": "Safetensors-modell"
+        "gguf": "GGUF-modell"
       },
       "modelGenerationLabel": "Textmodell: chatt, sammanfattningar, skrivande",
       "modelNone": "Ingen fil vald",
@@ -3418,7 +3409,6 @@
       "providerNone": "Ingen",
       "providerNothingAnswering": "Ingenting är konfigurerat att svara ännu.",
       "modelsLabel": "Modeller",
-      "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
       "title": "AI",
@@ -3445,7 +3435,6 @@
       "modelShowLocation": "Visa platsen för {{name}}",
       "downloadsLabel": "Ladda ner modeller",
       "downloadsHelper": "Hämta en modell från Mynes egen server. Den kontrolleras mot ett fingeravtryck inbyggt i appen innan den används, så en manipulerad nedladdning avvisas. Inget hämtas om du inte klickar.",
-      "downloadEmbeddingSize": "Flerspråkig modell, cirka 449 MB.",
       "downloadTagLabel": "Taggmodell: automatiska taggförslag",
       "downloadTagSize": "Liten lokal modell, cirka 337 MB.",
       "downloadInstalled": "Installerad",
@@ -3954,10 +3943,6 @@
       "intro": "Synkronisering skickar dina anteckningar, krypterade, till en server. Fyra saker är värda att veta först.",
       "whatThisIsLabel": "Vad det här är",
       "dataLossLabel": "Om du förlorar båda hemligheterna",
-      "whatHappensNextLabel": "När betan tar slut",
-      "whatWeCanSeeLabel": "Vad vi kan se",
-      "readFull": "Läs de fullständiga villkoren",
-      "review": "Granska betavillkoren",
       "accept": "Jag förstår, slå på synkronisering"
     },
     "materialising": "Hämtar dina anteckningar: {{done}} av {{total}}. Du kan börja arbeta; resten dyker upp allteftersom de kommer in.",
@@ -4077,8 +4062,7 @@
       "tlsHelp": "Ange samma server-URL på varje enhet. En egenhostad server behöver ett betrott HTTPS-certifikat.",
       "tlsFailure": "Det gick inte att verifiera serverns HTTPS-certifikat. Kontrollera serveradressen, certifikatet och dess giltighet.",
       "inviteLabel": "Inbjudningskod (endast om servern begär en)",
-      "invitePlaceholder": "Koden som serverns operatör gav dig",
-      "changeInviteCode": "Ändra inbjudningskod"
+      "invitePlaceholder": "Koden som serverns operatör gav dig"
     },
     "enroll": {
       "accountNumberLabel": "Kontonummer",
@@ -5238,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Ställ in AI",
-    "intro": "Myne kan söka i dina anteckningar efter betydelse, föreslå taggar och chatta om dem. Inget av det är obligatoriskt, och du kan slå på det senare i Inställningar.",
+    "intro": "Myne kan föreslå taggar och chatta om dem. Inget av det är obligatoriskt, och du kan slå på det senare i Inställningar.",
     "enableLabel": "Slå på AI-funktioner",
-    "semantic": {
-      "title": "Semantisk sökning",
-      "body": "Ladda ner en flerspråkig inbäddningsmodell (cirka 449 MB) så att du kan söka efter betydelse, inte bara efter ord."
-    },
     "tag": {
       "title": "Automatisk taggning",
       "body": "Ladda ner taggmodellen (cirka 337 MB) så att Myne kan föreslå taggar medan du skriver."
@@ -5310,18 +5290,10 @@
   "firstRun": {
     "server": {
       "heading": "Välj en synkserver",
-      "chooseHeading": "Var ska dina anteckningar synkroniseras?",
-      "chooseIntro": "Myne behöver en server för att lagra dina krypterade anteckningar och för att nå dig med inbjudningar. Använd tjänsten Myne Sync, eller peka den här enheten mot en server du kör själv. Hur du än gör förblir dina anteckningar krypterade på den här enheten innan de lämnar den; servern lagrar bara chiffertext.",
-      "myneSyncHint": "Servern som drivs av Myne. Dess HTTPS-certifikat kontrolleras automatiskt.",
       "intro": "Myne behöver en server för att lagra dina krypterade anteckningar och för att nå dig med inbjudningar. Dina anteckningar förblir krypterade på den här enheten innan de lämnar den; servern lagrar bara chiffertext.",
       "notConfigured": "Ange en serveradress ovan och tryck på Anslut för att fortsätta.",
       "back": "Tillbaka",
-      "continue": "Fortsätt",
-      "myneSyncTitle": "Myne Sync",
-      "selfHostedTitle": "Din egen server",
-      "selfHostedHint": "En synkserver du kör själv. Du anger dess adress på nästa skärm.",
-      "connectAction": "Anslut",
-      "setUpAction": "Ställ in"
+      "continue": "Fortsätt"
     }
   },
   "identityFlow": {
@@ -5336,8 +5308,6 @@
       "title": "Välj en synkserver",
       "lead": "Dina anteckningar förblir krypterade på den här enheten innan de lämnar den. Servern lagrar bara chiffertext.",
       "urlLabel": "Serveradress",
-      "useMyneSync": "Använd Myne Sync",
-      "selfHostedHint": "Eller ange adressen till en server du kör själv.",
       "connect": "Anslut",
       "connecting": "Ansluter…"
     },

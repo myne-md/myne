@@ -547,8 +547,10 @@ const LEGACY_RESTORE_FILES: &[&str] = &[
 
 /// Singletons sealed under a `root_key` that is being replaced, by name.
 ///
-/// Every one is either rebuildable from the notes (search, indices, graph,
-/// embeddings), device-local editor state (workspace), a credential wrapping a
+/// Every one is either rebuildable from the notes (search, indices, graph), a
+/// retired cache an older build may have written (the AI embedding index,
+/// `vault.embeddings`), device-local editor state (workspace), a credential
+/// wrapping a
 /// now-stale `root_key` copy (`vault.quickunlock` + its attempt counter), or the
 /// sync baseline whose integrity is the old head's own MAC (`vault.head-state`).
 /// Left in place they are undecryptable bytes their readers already fall back
@@ -569,6 +571,9 @@ const STALE_UNDER_REPLACED_ROOT: &[&str] = &[
     "vault.workspace",
     "vault.indices",
     "vault.graph",
+    // A retired family, kept because an older v0.2 session really did build this
+    // file: it answers "what did the OLD root seal", and a migration meeting one
+    // still has to drop it.
     "vault.embeddings",
     "vault.quickunlock",
     "vault.quickunlock.attempts",
@@ -680,6 +685,8 @@ pub async fn vault_migrate_abort_from_host(
         "vault.search",
         "vault.indices",
         "vault.graph",
+        // A retired family, kept: a v0.2 session on an older build really did
+        // build `vault.embeddings`, and a roll-back has to drop it.
         "vault.embeddings",
         "vault.head-state",
     ] {
@@ -1396,7 +1403,7 @@ pub async fn migrate_vault_notes_on_disk(
 
     // (5c) Drop the rebuildable / device-local caches and the quick-unlock
     //      credential. Each is either reconstructable from the notes (search,
-    //      indices, graph, embeddings), device-local editor state (workspace), or
+    //      indices, graph), device-local editor state (workspace), or
     //      a PIN/biometric credential wrapping a NOW-STALE `root_key` copy
     //      (`vault.quickunlock`). Leaving them would only be stale bytes the
     //      readers already fall back over; deleting them keeps the migrated vault

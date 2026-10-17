@@ -39,7 +39,7 @@ import i18n from "../../i18n";
 import { parser } from "../lezer/parser";
 import { locateFrontmatter } from "../lezer/frontmatter";
 import { readCoverFromFmBody, readTitleFromFmBody } from "../surgery";
-import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
+import { foldLabel } from "@myne/editor/decorations/reference-label";
 import { SANITIZE_CONFIG } from "@myne/editor/html/sanitize";
 import {
   attachmentUrl,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The one crash record the desktop leaves behind (myne-md/myne#860).
 //!
 //! # Why this exists while the log toggle is off

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault-indices` plugin — mobile host (MYND-31 / A11 — VaultIndices).
 //!
 //! Owns the in-RAM wikilink graph + backlinks + tag index + typed-property
@@ -55,7 +56,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_indices_backlink_candidates,
             commands::vault_indices_by_tag,
             commands::vault_indices_tag_tree,
-            commands::vault_indices_note_properties,
             commands::vault_indices_property_values,
             commands::vault_indices_property_keys,
             commands::vault_indices_persist,

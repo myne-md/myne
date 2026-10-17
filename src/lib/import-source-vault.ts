@@ -16,7 +16,6 @@
 // standing caveat `src/lib/attachments.ts` carries.
 
 import { invoke } from "../platform/core";
-import type { VaultUnlockError } from "../types/vault-unlock-error";
 
 /**
  * Open one of the user's other LOCAL vaults as a read-only import source.
@@ -182,11 +181,4 @@ export async function importSourceMergeDictionary(
     "plugin:importer|import_source_merge_dictionary",
     { sourceVaultId },
   );
-}
-
-/** Narrow an unknown rejection from {@link importSourceOpen} to the enum. */
-export function asVaultUnlockError(e: unknown): VaultUnlockError | null {
-  return typeof e === "object" && e !== null && "kind" in e
-    ? (e as VaultUnlockError)
-    : null;
 }

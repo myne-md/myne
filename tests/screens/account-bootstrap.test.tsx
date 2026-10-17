@@ -563,7 +563,7 @@ describe("web first-run bootstrap — beta terms gate", () => {
     expect(screen.getByTestId("sync.beta-terms.what-happens-next").textContent).toBe(
       BETA_TERMS_WHAT_HAPPENS_NEXT,
     );
-    expect(screen.getByTestId("sync.beta-terms.what-we-can-see").textContent).toBe(
+    expect(screen.getByTestId("sync.beta-terms.what-the-operator-can-see").textContent).toBe(
       BETA_TERMS_WHAT_WE_CAN_SEE,
     );
   });

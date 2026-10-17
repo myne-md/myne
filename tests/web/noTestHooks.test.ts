@@ -52,12 +52,12 @@ describe("check-web-no-test-hooks", () => {
     expect(out).toContain("__myneOpfsDebug");
   });
 
-  it("still passes the real bundle", () => {
-    // Non-vacuity, and the thing that would break if the allowlist drifted from
-    // the bridges the wasm module actually installs. Skipped when the bundle is
-    // absent — this needs `pnpm web:build`, which is why the guard lives in the
-    // CI web lane rather than in a pre-commit hook.
-    if (!existsSync("web/dist")) return;
+  // `skipIf`, not an early `return`. A test that returns before its assertions
+  // reports as PASSED, which is the shape this whole file exists to refuse: the
+  // run says the served bundle was checked when nothing read it. Skipping is
+  // visible in the reporter and in the count. It needs `pnpm web:build`, which is
+  // why the guard lives in the CI web lane rather than in a pre-commit hook.
+  it.skipIf(!existsSync("web/dist"))("still passes the real bundle", () => {
     const { out, status } = run("web/dist");
     expect(status).toBe(0);
     expect(out).toContain("ok");

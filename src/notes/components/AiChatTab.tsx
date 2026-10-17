@@ -40,7 +40,6 @@ import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
   useAiBackendClass,
-  useAiRetrievalState,
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
 import { useChat } from "../ai/chatStore";
@@ -166,20 +165,6 @@ export function AiChatTab({
   const backendClass = useAiBackendClass(aiEnabled);
   const activeProviderName =
     backendClass === "remote" ? (providerLabelOf(prefs.ai_provider) ?? null) : null;
-  // **Asking needs a second capability, and the header used to read only the
-  // first** (myne-md/myne#545). `backend` above is the GENERATION row; asking is
-  // retrieval-grounded, retrieval is refused a remote provider outright
-  // (SYNC-16), and the embedding model is not bundled. So a user with a working
-  // provider and no local search model saw the provider's name — which reads as
-  // ready — on a surface that refused every turn.
-  const retrieval = useAiRetrievalState(aiEnabled);
-  const noSearchModel =
-    retrieval.embedding.kind === "unavailable" ||
-    retrieval.embedding.kind === "absent";
-  const gettingReady =
-    !noSearchModel &&
-    retrieval.embedding.kind === "available" &&
-    !retrieval.indexReady;
   // **The host names the cause; this only decides whether there is one.** Every
   // arm reaches `restingCause.ts`, which the chip, its tooltip and the
   // transcript's empty state all share, so they cannot name the same fault two
@@ -236,11 +221,7 @@ export function AiChatTab({
   // The sentence for a host cause is the taxonomy's own (`providerError.*`),
   // and it is the SAME one the transcript renders, so the tooltip and the
   // transcript are one statement rather than two that have to be kept in step.
-  const STATUS_HINT = noSearchModel
-    ? t("editor.chrome.rightPanel.aiChat.noSearchModelHint")
-    : degraded
-      ? restingBody(restingId, t)
-      : "";
+  const STATUS_HINT = degraded ? restingBody(restingId, t) : "";
   // `unavailable` is a build without local AI and `off` is the user's own
   // switch: neither has a setting that would change it, so neither gets a
   // click target. Offering one would be a control that goes somewhere and
@@ -373,19 +354,16 @@ export function AiChatTab({
               (myne-md/myne#771).
 
               It was a `<span>`: a passive label naming a fault with no route
-              out of it. Worse, the sentence that WAS written to give that
-              route — `noSearchModelHint`, "Asking searches your notes on this
-              device, and that needs a search model here… Choose one in
-              Settings → Developer → AI" — was rendered nowhere at all, in any
-              client. Somebody wrote it, 31 locales translated it, and it has
-              never been on a screen. `check-i18n.mjs` cannot see that: it
-              verifies a USED key exists, not that an existing key is used.
+              out of it. The degraded chip is now a button carrying the
+              taxonomy's own sentence as its tooltip and opening Settings on the
+              models block. `check-i18n.mjs` cannot see a key that is never
+              rendered — it verifies a USED key exists, not that an existing key
+              is used — so the sentence and the control that clears the fault it
+              names are one surface.
 
-              So the degraded chip is a button carrying that sentence as its
-              tooltip and opening Settings on the models block. The healthy
-              chip stays a `<span>`: naming the provider that is answering is a
-              statement, and a statement with a click target invites a press
-              that would do nothing useful. */}
+              The healthy chip stays a `<span>`: naming the provider that is
+              answering is a statement, and a statement with a click target
+              invites a press that would do nothing useful. */}
           {actionableStatus ? (
             <Tooltip label={STATUS_HINT}>
               <button
@@ -402,12 +380,8 @@ export function AiChatTab({
               >
                 {restingId !== "ready"
                   ? restingLabel(restingId, t)
-                  : noSearchModel
-                    ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
-                    : gettingReady
-                      ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                      : (activeProviderName ??
-                        t("editor.chrome.rightPanel.aiChat.statusReady"))}
+                  : (activeProviderName ??
+                    t("editor.chrome.rightPanel.aiChat.statusReady"))}
               </button>
             </Tooltip>
           ) : (
@@ -421,12 +395,8 @@ export function AiChatTab({
             >
               {restingId !== "ready"
                 ? restingLabel(restingId, t)
-                : noSearchModel
-                  ? t("editor.chrome.rightPanel.aiChat.statusNoSearchModel")
-                  : gettingReady
-                    ? t("editor.chrome.rightPanel.aiChat.statusGettingReady")
-                    : (activeProviderName ??
-                      t("editor.chrome.rightPanel.aiChat.statusReady"))}
+                : (activeProviderName ??
+                  t("editor.chrome.rightPanel.aiChat.statusReady"))}
             </span>
           )}
         </div>

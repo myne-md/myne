@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Host-side clipboard auto-clear for the vault-creation secret handoff
 //! (myne#379).
 //!

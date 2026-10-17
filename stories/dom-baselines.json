@@ -272,5 +272,11 @@
   "settings/settingssearchresults/default": "e3724dc2f17c4ea5",
   "settings/barcustomizesettings/default": "39bd1609c309b2b9",
   "settings/recoverydrillrow/default": "761d6c3145550c6b",
-  "settings/customizelist/default": "d71d4f231243d5be"
+  "settings/customizelist/default": "d71d4f231243d5be",
+  "components/devicejoinqr/member": "fcd65684f85462f4",
+  "components/devicemanagementpanel/member-vault": "46a5b3ae36e75a5a",
+  "settings/aimodelcatalogue/default": "93e51f2580220289",
+  "settings/modelpathbutton/default": "e6a203221ae91e77",
+  "settings/helperdisclosure/default": "338b1749c9d188ed",
+  "settings/settingstabs/default": "f52c28f9f3f4ea50"
 }

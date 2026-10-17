@@ -6,8 +6,7 @@
 // exactly once per device. It is fully skippable: the app works without AI, and
 // every AI feature shows an actionable "download to enable" state later.
 //
-// Three independent cards on desktop:
-//   * Semantic search: downloads the multilingual embedding model.
+// Two independent cards on desktop:
 //   * Auto-tagging: downloads the tag model.
 //   * Chat: no download; routes into the existing provider setup.
 // On mobile the surface shows only the opt-in and the Chat card (`downloads`
@@ -62,7 +61,7 @@ const CARD_FOOTER_STYLE: CSSProperties = {
   flexWrap: "wrap",
 };
 
-/** One downloadable feature card (semantic search / auto-tag). */
+/** One downloadable feature card (auto-tag). */
 function DownloadCard(props: {
   title: string;
   body: string;
@@ -229,12 +228,6 @@ export function AiOnboardingSurface({
 
       {downloads && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          <DownloadCard
-            title={t("aiOnboarding.semantic.title")}
-            body={t("aiOnboarding.semantic.body")}
-            artifact="embedding-e5-small"
-            disabled={!aiEnabled}
-          />
           <DownloadCard
             title={t("aiOnboarding.tag.title")}
             body={t("aiOnboarding.tag.body")}

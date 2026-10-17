@@ -84,21 +84,6 @@ export type NoteExportError =
   | { kind: "JoinFailure" };
 
 /**
- * Type-narrowing helper for the `Io` variant.
- *
- * ```ts
- * if (isExportIoError(e)) {
- *   switch (e.detail.io_error_kind) { ... }
- * }
- * ```
- */
-export function isExportIoError(
-  e: NoteExportError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
-
-/**
  * Single error type returned across the IPC boundary by the `notes`
  * plugin's `note_export_attachments` command (MYND-115 task 4) — the
  * opt-in attachments-included export sibling. Rust source:
@@ -162,10 +147,3 @@ export type NoteExportAttachmentsError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /** spawn_blocking join failure — "try again". */
   | { kind: "JoinFailure" };
-
-/** Type-narrowing helper for the `Io` variant (attachments sibling). */
-export function isExportAttachmentsIoError(
-  e: NoteExportAttachmentsError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}

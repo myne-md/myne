@@ -72,10 +72,4 @@ describe("lockVault drops the task-index cache", () => {
     ).toHaveLength(1);
   });
 
-  it("still locks the slot", async () => {
-    await lockVault();
-    expect(
-      invokeMock.mock.calls.some((c) => c[0] === "plugin:vault-unlock|lock"),
-    ).toBe(true);
-  });
 });

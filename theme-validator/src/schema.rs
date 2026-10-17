@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Theme schema: the required-core token set, the parsed-theme type, and the
 //! JSON parse + required-key validation pass (custom-themes epic, MYND-111,
 //! task 1).

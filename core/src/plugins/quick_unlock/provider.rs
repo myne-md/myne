@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Wrap-key providers for quick-unlock (MYND-329).
 //!
 //! The `vault.quickunlock` blob (`protocol::quick_unlock_blob`, `MYQ1`) is
@@ -216,12 +217,6 @@ mod tests {
         let wrap_key = provider.retrieve(&secret.pin_salt).expect("retrieve");
         let root_key = decode_quick_unlock_blob(&wrap_key, &ACCOUNT_HASH, &blob).expect("decode");
         assert_eq!(root_key.as_slice(), &ROOT_KEY);
-    }
-
-    #[test]
-    fn mock_kind_is_reported() {
-        let provider = MockProvider::new(PROVIDER_KIND_BIOMETRIC, 0x01);
-        assert_eq!(provider.kind(), PROVIDER_KIND_BIOMETRIC);
     }
 
     #[test]

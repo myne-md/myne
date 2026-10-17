@@ -104,9 +104,6 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
-    fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        Box::pin(std::future::ready(()))
-    }
     fn index_note_attachments<'a>(
         &'a self,
         _: &'a VaultRuntimeState,
@@ -145,9 +142,6 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     }
     fn zeroize_spell(&self) {}
     fn zeroize_vault_indices(&self) {
-        // No AI arm, unlike the desktop twin: mobile `local_inference` is
-        // transcription-only (no embedding role), so there is no vector store
-        // to wipe on this leg.
         match self
             .app
             .try_state::<crate::plugins::vault_indices::VaultIndicesState>()
@@ -219,9 +213,6 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     // ---- Group 4: note-CRUD index/sync side-effects -----------------------
     fn search_upsert(&self, _: &str, _: &str, _: &str) {}
     fn search_remove(&self, _: &str) {}
-    fn ai_note_changed(&self, _: &str, _: &str) {}
-    fn ai_note_deleted(&self, _: &str) {}
-    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {
         // A local note edit nudges the coalesced-push counter so that when the
         // background sync loop lands (MYND-460) its push window actually opens.

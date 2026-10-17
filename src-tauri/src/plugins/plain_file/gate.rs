@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The device-local gate for the plain-file editor (myne-md/myne#788).
 //!
 //! One JSON file under `<app_config_dir>`, sibling of `tor-routing.json`, and

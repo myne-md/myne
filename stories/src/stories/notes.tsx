@@ -56,7 +56,6 @@ import {
 import { foldSegment } from "@app/dialect/folderPath";
 import { emitStoryEvent } from "../host/internals";
 
-import { AiHydrationProbe } from "@app/notes/components/AiHydrationProbe";
 import { BacklinksTab } from "@app/notes/components/BacklinksTab";
 import { WhoIsHereTab } from "@app/notes/components/WhoIsHereTab";
 import { setAwareness } from "@app/notes/collab/awarenessStore";
@@ -1433,36 +1432,6 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         <EmitStoryEvent name="snapshot://write-failed">
           <SnapshotFailedIndicator />
         </EmitStoryEvent>
-      </Frame>
-    ),
-  },
-  {
-    id: "notes/aihydrationprobe/hydrate-hit",
-    group: "components",
-    surface: "AiHydrationProbe",
-    state: "hydrate-hit",
-    description: "The hidden AI hydration probe after a persistence hit, reported on data attributes.",
-    tags: ["notes", "ai", "embeddings", "observability", "probe"],
-    render: () => (
-      <Frame>
-        <div style={{ maxWidth: 420, color: "var(--fg-2)", fontSize: "var(--text-sm)" }}>
-          {/* The probe is a zero-chrome E2E observability marker: it renders a
-              `display:none` element and puts its outcome on `data-*`, so it has
-              no visible state of its own. The story fires the hydrate event so
-              the marker really exists in this DOM, and names what it reports. */}
-          <EmitStoryEvent
-            name="ai://vectors-hydrated"
-            payload={{ embedded: 3, loaded_from_blob: true, reembedded: 0 }}
-          >
-            <AiHydrationProbe />
-          </EmitStoryEvent>
-          <p style={{ margin: 0 }}>
-            AiHydrationProbe draws nothing: it is a hidden marker whose state
-            lives on data-embedded, data-loaded-from-blob, data-reembedded and
-            data-seq, read by the AI-embeddings E2E scenario. This story has the
-            persistence-HIT event fired.
-          </p>
-        </div>
       </Frame>
     ),
   },

@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Plugin state: the backend registry and the active [`Engine`].
 //!
 //! Each engine is held as `Arc<dyn Engine>` so it can back concurrent
-//! `infer`/`embed` commands across the async runtime — the trait is
+//! `infer` commands across the async runtime — the trait is
 //! `Send + Sync`, so this is too. (The header used to describe a "task-1 stub"
 //! with no mutable model state; Candle shipped, and it keeps its own lock.)
 //!
@@ -61,7 +62,7 @@ pub type PrefsReader =
 ///
 /// **This is the load-bearing field, not the backend's name.** Every policy in
 /// the provider epic is stated against the class — "ambient surfaces never
-/// reach a remote backend", "embeddings never leave the device", "only a
+/// reach a remote backend", "only a
 /// user-named provider may open a socket" (`decisions.md` 2026-08-09). A rule
 /// written against a *list of names* is a rule the next backend forgets to
 /// join; a rule written against the class covers a backend nobody has added
@@ -353,7 +354,8 @@ impl LocalInferenceState {
     /// than failing.
     ///
     /// It is deliberately **one function**: the SYNC-14 ambient bar and the
-    /// SYNC-16 embedding bar both key on this value, and two independent
+    /// local-only door (`local_engine`) both key on this value, and two
+    /// independent
     /// notions of "is remote active" is how a bar comes to report as enforced
     /// while requests route past it.
     fn active(&self) -> usize {
@@ -531,9 +533,8 @@ impl LocalInferenceState {
     /// the command that records it used to invalidate `engine_unclassified()` —
     /// the ACTIVE arm. With a provider active that is `RemoteEngine`, whose
     /// `invalidate_models` is the trait no-op, so the in-process arm went on
-    /// serving the previously-loaded weights while the persisted embedding index
-    /// carried the NEW model's identity (§9.17.2). Two model identities, one
-    /// store, and nothing able to tell them apart afterwards.
+    /// serving the previously-loaded weights while the user believed the new
+    /// model was in effect.
     ///
     /// Every arm rather than "the local one": a no-op on a remote backend costs
     /// nothing, and picking a target would put a second copy of "which arms
@@ -576,15 +577,14 @@ impl LocalInferenceState {
     /// when this registry has none.
     ///
     /// This is what "barred from the remote arm" means once the remote arm can
-    /// actually be active. SYNC-14 and SYNC-16 bar these surfaces from *the
+    /// actually be active. SYNC-14 bars these surfaces from *the
     /// remote arm* — not from working. Refusing outright looked equivalent
     /// while nothing could ever select remote, and it is not: it would mean
-    /// that naming a provider for chat silently disables ghost text, auto-tag,
-    /// every embedding, and with them semantic search and the whole RAG path,
-    /// on a vault whose local model is sitting right there. Both of
-    /// [`Self::embedding_engine`]'s stated reasons — an uncapped metered bill,
-    /// and vectors from two embedders not being comparable — argue against
-    /// embedding REMOTELY, and are satisfied exactly by staying local.
+    /// that naming a provider for chat silently disables ghost text, auto-tag
+    /// and speech-to-text,
+    /// on a vault whose local model is sitting right there. The reason
+    /// a bar exists at all — an uncapped metered bill against a metered API —
+    /// is satisfied exactly by staying local.
     ///
     /// The refusal survives for the case that really has nowhere to go: a
     /// registry whose only backend is remote. That is not reachable in a
@@ -598,18 +598,18 @@ impl LocalInferenceState {
             .ok_or(EngineError::RemoteBarred)
     }
 
-    /// The active engine for an **embedding** request. Refuses a remote backend
-    /// unconditionally (SYNC-16) — there is no request class that unlocks it.
+    /// The active engine for a **local-only** request. Refuses a remote backend
+    /// unconditionally.
     ///
-    /// Two independent reasons, and the second one holds even if someone stops
-    /// caring about the first. (1) Embedding fires on unlock and on save, so it
-    /// is ambient by nature and is the highest-volume operation in the AI
-    /// surface — against a metered API that is an uncapped bill. (2) **Vectors
-    /// from two different embedders are not comparable.** An index built
-    /// locally and a query embedded remotely produce silently wrong retrieval,
-    /// not an error. Mixing embedders is a correctness bug before it is a
-    /// privacy one.
-    pub fn embedding_engine(&self) -> Result<Arc<dyn Engine>, EngineError> {
+    /// This is the door the transcription path (`transcribe`) and the capability
+    /// report's transcription row use: the ASR model is bundled and local, so a
+    /// named text-generation provider neither serves it nor should be asked to.
+    /// (It was named `embedding_engine` and carried the SYNC-16 bar an embedding
+    /// request needed — "an embedding request must never be served by a remote
+    /// provider, because that is background egress". The embedding family is
+    /// retired with `MYR1`, and the one remaining consumer is transcription,
+    /// which needs the same local-only door and supplies its own reason for it.)
+    pub fn local_engine(&self) -> Result<Arc<dyn Engine>, EngineError> {
         if self.active_class() == BackendClass::Remote {
             return self.non_remote_engine();
         }
@@ -650,10 +650,6 @@ pub struct NoLocalEngine;
 
 impl Engine for NoLocalEngine {
     fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
-        Err(EngineError::NoModel)
-    }
-
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
         Err(EngineError::NoModel)
     }
 }
@@ -722,10 +718,6 @@ mod tests {
     impl Engine for MarkerEngine {
         fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
             Ok("marker".to_string())
-        }
-
-        fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-            Ok(vec![1.0])
         }
     }
 
@@ -890,15 +882,16 @@ mod tests {
         assert_eq!(err.unwrap().kind(), "remote_barred");
     }
 
-    /// SYNC-16: embedding is refused unconditionally — there is no request
-    /// class that unlocks it.
+    /// The local-only door (`local_engine`) refuses a remote backend
+    /// unconditionally — there is no request class that unlocks it, which is
+    /// what the transcription path needs.
     #[test]
-    fn embedding_is_refused_a_remote_backend_unconditionally() {
+    fn the_local_only_door_is_refused_a_remote_backend_unconditionally() {
         let state = fake_remote();
         assert_eq!(
-            state.embedding_engine().err(),
+            state.local_engine().err(),
             Some(EngineError::RemoteBarred),
-            "embedding must never reach a remote backend"
+            "a local-only request must never reach a remote backend"
         );
     }
 
@@ -916,11 +909,11 @@ mod tests {
     /// A local backend refuses nothing — the bar keys off the backend's class,
     /// not off the request class alone.
     #[test]
-    fn a_local_backend_serves_every_class_including_ambient_and_embedding() {
+    fn a_local_backend_serves_every_class_including_the_local_only_door() {
         let state = LocalInferenceState::new(Arc::new(MarkerEngine));
         assert!(state.engine_for(RequestClass::Ambient).is_ok());
         assert!(state.engine_for(RequestClass::UserInitiated).is_ok());
-        assert!(state.embedding_engine().is_ok());
+        assert!(state.local_engine().is_ok());
     }
 
     /// Compute serialization is **declared**, not inferred from the class — an
@@ -981,10 +974,6 @@ mod remote_bar_proof {
         fn infer(&self, _p: &str) -> Result<String, EngineError> {
             self.touch();
             Ok(String::from("reached the engine"))
-        }
-        fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-            self.touch();
-            Ok(vec![0.0])
         }
     }
 
@@ -1057,34 +1046,6 @@ mod remote_bar_proof {
         );
     }
 
-    /// Embedding is refused **unconditionally** — there is no request class
-    /// that unlocks it (SYNC-16), and the second reason outlives the first:
-    /// vectors from two different embedders are not comparable, so an index
-    /// built locally and a query embedded remotely is silently wrong retrieval
-    /// rather than an error.
-    #[test]
-    fn embedding_never_reaches_a_remote_backend_under_any_class() {
-        let (port, accepts) = counting_listener();
-        let state = remote_state(port);
-        assert_eq!(
-            state.embedding_engine().err(),
-            Some(EngineError::RemoteBarred)
-        );
-        assert_eq!(accepts.load(Ordering::SeqCst), 0);
-        // …and there is no class-taking variant that would let one through.
-        for class in [RequestClass::Ambient, RequestClass::UserInitiated] {
-            let _ = state.engine_for(class);
-        }
-        // The user-initiated `engine_for` above DID hand out an engine, but it
-        // is not the embedding path — `embedding_engine` is the only door
-        // `embed` uses, and it has no class parameter to pass the wrong value
-        // to. That absence is the structural half of SYNC-16.
-        assert_eq!(
-            state.embedding_engine().err(),
-            Some(EngineError::RemoteBarred)
-        );
-    }
-
     /// A LOOPBACK-class backend is not barred: nothing leaves the device, so
     /// SYNC-14's reasoning does not apply to it. Without this, the bar could be
     /// "refuse everything that is not in-process" and every test above would
@@ -1101,8 +1062,8 @@ mod remote_bar_proof {
             "test-loopback",
         );
         assert!(state.engine_for(RequestClass::Ambient).is_ok());
-        assert!(state.embedding_engine().is_ok());
-        let _ = state.embedding_engine().unwrap().embed("x");
+        assert!(state.local_engine().is_ok());
+        let _ = state.local_engine().unwrap().infer("x");
         assert!(wait_for_accept(&accepts));
     }
 
@@ -1144,14 +1105,14 @@ mod remote_bar_proof {
         // The doors' signatures carry no bypass parameter.
         assert!(production.contains("pub fn engine_for(&self, class: RequestClass)"));
         assert!(production
-            .contains("pub fn embedding_engine(&self) -> Result<Arc<dyn Engine>, EngineError>"));
+            .contains("pub fn local_engine(&self) -> Result<Arc<dyn Engine>, EngineError>"));
 
         // And the doors themselves consult NO preference. Sliced by body rather
         // than asserted over the whole file, because `active()` legitimately
         // reads one and a file-wide ban can no longer tell the two apart.
         for door in [
             "pub fn engine_for(&self, class: RequestClass)",
-            "pub fn embedding_engine(&self) -> Result<Arc<dyn Engine>, EngineError>",
+            "pub fn local_engine(&self) -> Result<Arc<dyn Engine>, EngineError>",
             "fn non_remote_engine(&self)",
         ] {
             let start = production.find(door).expect(door);
@@ -1175,7 +1136,7 @@ mod remote_bar_proof {
 /// Task 10's `default_off_proof` asks the gate directly, with a hand-built
 /// mirror of what a request would do. This module asks the **wired** seam: a
 /// registry with a real local arm and a Remote-class arm that opens a socket
-/// when reached, driven through `engine_for` / `embedding_engine` exactly as a
+/// when reached, driven through `engine_for` / `local_engine` exactly as a
 /// command drives them. A zero here means the selection did not route there,
 /// which is a stronger claim than "the gate returned Err".
 #[cfg(test)]
@@ -1195,22 +1156,12 @@ mod selection_proof {
             let _ = std::net::TcpStream::connect(("127.0.0.1", self.port));
             Ok(String::from("remote answered"))
         }
-        /// It CONNECTS rather than refusing, deliberately: a fake that refused
-        /// would make "embedding opened no socket" true of the fake instead of
-        /// true of the seam.
-        fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-            let _ = std::net::TcpStream::connect(("127.0.0.1", self.port));
-            Ok(vec![9.0])
-        }
     }
 
     struct LocalEngine;
     impl Engine for LocalEngine {
         fn infer(&self, _p: &str) -> Result<String, EngineError> {
             Ok(String::from("local answered"))
-        }
-        fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-            Ok(vec![0.0])
         }
     }
 
@@ -1495,9 +1446,8 @@ mod selection_proof {
     /// `set_model_path` used to invalidate `engine_unclassified()` — the ACTIVE
     /// arm — and with a provider named that is the remote one, whose
     /// `invalidate_models` is the trait no-op. So the in-process arm went on
-    /// serving the previously-loaded weights while the persisted embedding index
-    /// was relabelled with the NEW model's identity: two identities, one store,
-    /// and no way to tell them apart afterwards.
+    /// serving the previously-loaded weights while the user believed the new
+    /// model was in effect.
     #[test]
     fn a_model_swap_invalidates_every_arm_not_just_the_active_one() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1506,9 +1456,6 @@ mod selection_proof {
         impl Engine for Counting {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 Ok(String::new())
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                Ok(vec![0.0])
             }
             fn invalidate_models(&self) {
                 self.0.fetch_add(1, Ordering::SeqCst);
@@ -1621,7 +1568,7 @@ mod selection_proof {
     /// — the distinction only becomes observable once the arm can be active,
     /// which is why it could not be tested before this task.
     #[test]
-    fn ambient_and_embedding_fall_back_to_the_local_arm_rather_than_failing() {
+    fn ambient_and_local_only_requests_fall_back_to_the_local_arm_rather_than_failing() {
         let (port, accepts) = counting_listener();
         let state = wired(port);
         put(&state, Some(snap(configured())));
@@ -1634,12 +1581,12 @@ mod selection_proof {
             .expect("locally");
         assert_eq!(ghost, "local answered");
 
-        let vector = state
-            .embedding_engine()
-            .expect("embedding still works")
-            .embed("x")
+        let local = state
+            .local_engine()
+            .expect("the local-only door still works")
+            .infer("x")
             .expect("locally");
-        assert_eq!(vector, vec![0.0]);
+        assert_eq!(local, "local answered");
 
         assert_eq!(
             accepts.load(Ordering::SeqCst),

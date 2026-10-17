@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Opening a SOURCE vault for reading, while a different vault stays unlocked.
 //!
 //! This is the key-lifetime half of vault import (myne-md/myne#464). The

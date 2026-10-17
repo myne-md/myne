@@ -89,13 +89,6 @@ export type VaultExportError =
   /** `spawn_blocking` join failure — "try again". */
   | { kind: "JoinFailure" };
 
-/** Type-narrowing helper for the `Io` variant. */
-export function isVaultExportIoError(
-  e: VaultExportError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
-
 /**
  * Counts-only summary resolved by `vault_export_markdown` — mirror of
  * the Rust `VaultExportSummary` (`format/src/export_walk.rs`). The

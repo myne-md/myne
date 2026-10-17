@@ -122,24 +122,8 @@ impl From<ProtocolError> for SearchBlobError {
     }
 }
 
-impl From<EnvelopeError> for SearchBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
-    /// `FormatUnsupported` → `IndexFormatUnsupported` rename (§9.6 spelling).
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => SearchBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => SearchBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => SearchBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => SearchBlobError::IndexFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => SearchBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => SearchBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => SearchBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => SearchBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => SearchBlobError::RandomnessUnavailable,
-        }
-    }
-}
+// §9.6 spells the format hook `IndexFormatUnsupported`.
+crate::blob_envelope::impl_from_envelope_error!(SearchBlobError, format: IndexFormatUnsupported, plaintext_too_large: PlaintextTooLarge);
 
 /// Encode a `vault.search` blob from an opaque `plaintext` (the desktop
 /// layer's serialized index + manifest), sealing under `search_index_key`

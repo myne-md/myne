@@ -10,9 +10,11 @@ publish = false
 
 # Native-only by design: consumed by the desktop client and the `myne-decrypt`
 # CLI. It carries the on-disk format with no TLS stack and no ML runtime, so the
-# decrypter's `cargo tree` stays auditable. The "no std::fs" purity applies to
-# the export walk (which takes `&dyn VaultIo`); the MYB1 container parser is a
-# seek-based reader and takes `&mut (dyn Read + Seek)` instead.
+# decrypter's `cargo tree` stays auditable. There is no `std::fs` purity here:
+# the export walk uses `std::fs` directly (its own module doc says so) and the
+# MYB1 container parser is a seek-based reader taking `&mut (dyn Read + Seek)`.
+# Both are `#[cfg(not(target_arch = "wasm32"))]`; `VaultIo` is carried for the
+# clients' host-side implementations, not for the walk.
 [dependencies]
 protocol = { path = "../protocol" }
 # The Automerge CRDT (myne-md/myne#417): the NC05 note-type's single-`Text`

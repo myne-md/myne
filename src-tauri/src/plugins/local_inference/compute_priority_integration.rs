@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Integration proof of the lowest-priority compute policy (MYND-651 task 11).
 //!
 //! [`super::compute_priority`]'s own tests cover the register in isolation, and
@@ -113,10 +114,6 @@ impl Engine for SerializedEngine {
         // is the whole reason the test is an integration test.
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         Ok(format!("user-infer: {prompt}"))
-    }
-
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        unreachable!("tag/infer contention only")
     }
 
     fn infer_tags(

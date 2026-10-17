@@ -50,15 +50,10 @@
 set -u
 fail=0
 
-echo "== SPDX header on every tracked protocol/ source file =="
-while IFS= read -r f; do
-  [ -f "$f" ] || continue
-  if ! head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0'; then
-    echo "  missing SPDX header: $f"
-    fail=1
-  fi
-done < <(git ls-files -- 'protocol' | grep '\.rs$')
-[ "$fail" -eq 0 ] && echo "  ok"
+echo "== SPDX header on every tracked Rust source file =="
+if ! node scripts/check-spdx-headers.mjs; then
+  fail=1
+fi
 
 echo "== EOF newline (tracked tree; hook exclusions) =="
 eof_fail=0

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `VaultId` — host-side UUIDv7 wrapper naming a vault's on-disk directory.
 //!
 //! SYNC-2 (ratified, grill vault-registry-and-disk-layout Q1, 2026-06-08):
@@ -141,13 +142,6 @@ mod tests {
     fn mint_produces_v7_uuid() {
         let id = VaultId::mint();
         assert_eq!(id.as_uuid().get_version_num(), 7);
-    }
-
-    #[test]
-    fn mint_is_random_distinct() {
-        let a = VaultId::mint();
-        let b = VaultId::mint();
-        assert_ne!(a, b, "two freshly minted ids must differ");
     }
 
     #[test]

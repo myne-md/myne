@@ -18,7 +18,7 @@ import { invoke } from "../platform/core";
  * (`src-tauri/src/plugins/local_inference/download.rs::ARTIFACTS`); the UI
  * never constructs a URL or a digest.
  */
-export type DownloadArtifactId = "embedding-e5-small" | "tag";
+export type DownloadArtifactId = "tag";
 
 /**
  * The closed failure taxonomy, mirroring the Rust `ModelDownloadCommandError`

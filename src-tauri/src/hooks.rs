@@ -92,21 +92,6 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         ))
     }
 
-    fn hydrate_ai_vectors<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        // semantic-search-qa task 3: embed-on-unlock. Feature-gated so the
-        // default auditable build carries no AI trigger; the walk itself is
-        // opt-in (`ai_enabled`) + best-effort + off the unlock hot path.
-        #[cfg(feature = "local-inference")]
-        {
-            Box::pin(crate::plugins::local_inference::hydrate::hydrate_ai_vectors(&self.app, state))
-        }
-        #[cfg(not(feature = "local-inference"))]
-        {
-            let _ = state;
-            Box::pin(std::future::ready(()))
-        }
-    }
-
     fn index_note_attachments<'a>(
         &'a self,
         state: &'a VaultRuntimeState,
@@ -169,12 +154,11 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     }
     fn zeroize_vault_indices(&self) {
         crate::plugins::vault_indices::zeroize_vault_indices(&self.app);
-        // semantic-search-qa task 2: the AI vector store is a plaintext-derived
-        // RAM index wiped on the SAME leg as vault.indices (manual lock / relock
-        // / delete route through here). Feature-gated so the default auditable
-        // build carries no AI teardown.
+        // Abort every in-flight inference request and drop the cached provider
+        // authorization (which holds a plaintext API key). Feature-gated so the
+        // default auditable build carries no AI teardown.
         #[cfg(feature = "local-inference")]
-        crate::plugins::local_inference::zeroize_ai_vectors(&self.app);
+        crate::plugins::local_inference::teardown_on_lock(&self.app);
     }
     fn zeroize_attachment_refs(&self) {
         crate::plugins::attachments::zeroize_attachment_refs(&self.app);
@@ -255,47 +239,6 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
             // MYND-448a: a note delete drops its body doc AND its separate
             // attachment docs (`att:*:<id>`).
             s.remove_note_and_attachments(id);
-        }
-    }
-    fn ai_note_changed(&self, id: &str, body: &str) {
-        // MYND-453: eager per-note re-embed into the RAM vector store so a
-        // this-session save is searchable without a re-unlock. Feature-gated;
-        // the target is detached + best-effort, so the save path never blocks.
-        #[cfg(feature = "local-inference")]
-        crate::plugins::local_inference::hydrate::reembed_one_note(&self.app, id, body);
-        #[cfg(not(feature = "local-inference"))]
-        {
-            let _ = (id, body);
-        }
-    }
-    fn ai_note_deleted(&self, id: &str) {
-        #[cfg(feature = "local-inference")]
-        crate::plugins::local_inference::hydrate::drop_one_note(&self.app, id);
-        #[cfg(not(feature = "local-inference"))]
-        {
-            let _ = id;
-        }
-    }
-    fn ai_policy_changed(&self, enabled: bool, excluded: &[String]) {
-        // SYNC-14: apply the just-written opt-in + exclusion set to the resident
-        // store so it takes effect against ALREADY-embedded notes. Turning AI off
-        // zeroizes the whole store (and bumps the teardown generation so any
-        // in-flight embed walk's publish is a no-op); an exclusion change refreshes
-        // the query-time policy and purges the now-excluded notes.
-        #[cfg(feature = "local-inference")]
-        {
-            use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
-            if !enabled {
-                crate::plugins::local_inference::zeroize_ai_vectors(&self.app);
-            } else if let Some(vs) = self.app.try_state::<LocalInferenceVectorState>() {
-                let mut store = vs.lock();
-                store.set_policy(true, excluded);
-                store.purge_excluded();
-            }
-        }
-        #[cfg(not(feature = "local-inference"))]
-        {
-            let _ = (enabled, excluded);
         }
     }
     fn bump_local_change(&self) {

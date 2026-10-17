@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-data-dir + command-socket/status-marker path resolution for the CLI
 //! (cli-thin-client task 4; MYND-490).
 //!
@@ -12,9 +13,11 @@ use std::path::{Path, PathBuf};
 /// `dirs::data_dir().join(identifier)` exactly (verified against the
 /// vendored `tauri` crate's `src/path/desktop.rs::PathResolver::app_data_dir`)
 /// — this constant is the ONE place this crate hardcodes that identifier.
-/// Nothing checks automatically that it still matches `tauri.conf.json`; a
-/// changed identifier there needs the same change here (task 11's sidecar
-/// packaging is the natural place to revisit this with a shared source).
+/// `scripts/check-cli-sidecar.mjs` re-reads it and fails, naming the file,
+/// when it stops matching `tauri.conf.json` or `src-tauri/src/cli_bridge/`;
+/// a changed identifier there needs the same change here. (The check is a
+/// guard, not a shared source: this crate deliberately depends on neither
+/// `myne-desktop` nor `myne-core`, see the workspace `Cargo.toml`.)
 const BUNDLE_IDENTIFIER: &str = "md.myne.desktop";
 
 /// Basename of the command socket inside the app-data dir — matches

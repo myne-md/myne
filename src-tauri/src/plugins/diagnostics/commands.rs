@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! IPC surface of the `diagnostics` plugin (myne-md/myne#860).
 //!
 //! Desktop-only. Every command resolves `app_config_dir` and delegates to a
@@ -286,7 +287,13 @@ fn guarded_stores<R: Runtime>(app: &AppHandle<R>) -> Vec<Result<PathBuf, ()>> {
 /// containment half cannot be evaluated, and a guard that disables itself in the
 /// one state where it is still needed is not a guard. A root that is resolved
 /// but cannot be canonicalized is treated the same way, because a comparison
-/// against a path that does not exist cannot prove anything.
+/// against a path that does not exist cannot prove anything. The one exemption
+/// is a root that does not exist YET (`NotFound`), stated where it is
+/// implemented, in `myne-core`'s re-export of this predicate.
+///
+/// The predicate itself is `myne_format::dest_guard::containment_refused`,
+/// reached here through `myne_core::paths` so this is no longer a third copy
+/// with its own opinion about the failure arms.
 ///
 /// Pure and testable with temp roots, so the refusal is pinned by a test rather
 /// than by the dialog's good behaviour.
@@ -294,39 +301,8 @@ fn validate_report_destination(
     destination: &Path,
     guarded_roots: &[Result<PathBuf, ()>],
 ) -> Result<(), DiagnosticLogError> {
-    // Parent must exist and be a directory, which also excludes an
-    // empty or filename-less path.
-    if !myne_core::paths::parent_dir_ok(destination) {
-        return Err(DiagnosticLogError::InvalidDestination);
-    }
-    // Canonicalize the parent (resolving symlinks and `..`) BEFORE the
-    // containment test, or a path that reaches a guarded root through either
-    // would pass a lexical comparison.
-    let canon_parent = destination
-        .parent()
-        .and_then(|p| p.canonicalize().ok())
-        .ok_or(DiagnosticLogError::InvalidDestination)?;
-    for root in guarded_roots {
-        let root = root
-            .as_ref()
-            .map_err(|_| DiagnosticLogError::InvalidDestination)?;
-        let canon_root = match root.canonicalize() {
-            Ok(canon) => canon,
-            // A root that does NOT EXIST cannot be a component prefix of a
-            // parent that did canonicalize, so refusing here buys no protection
-            // and costs the whole feature: `app_log_dir` is created lazily, so
-            // on a fresh profile with logging off it is absent and every save
-            // would be refused in the default configuration. Any OTHER failure
-            // still refuses, because a comparison that cannot be made must not
-            // pass (myne#860 review).
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(_) => return Err(DiagnosticLogError::InvalidDestination),
-        };
-        if canon_parent.starts_with(&canon_root) {
-            return Err(DiagnosticLogError::InvalidDestination);
-        }
-    }
-    Ok(())
+    myne_core::paths::containment_refused(destination, guarded_roots)
+        .map_err(|_| DiagnosticLogError::InvalidDestination)
 }
 
 #[cfg(test)]

@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Candle-backed Whisper transcription engine — the mobile port of the desktop
 //! local_inference engine (MYND-563), **transcription ONLY**. The desktop engine
-//! also carries generation (Qwen2) and embedding (Bert) roles; those are out of
-//! scope on mobile, so `infer`/`embed` return `NotReady` and only the Whisper
+//! also carries a generation (Qwen2) role; that is out of
+//! scope on mobile, so `infer` returns `NotReady` and only the Whisper
 //! path is real. CPU device (Metal-on-iOS is a later optimization). The heavy
 //! lifting — the mel front end + the decode loop — lives in [`super::whisper`];
 //! this file is model load + lazy-cache + the [`Engine`] impl.
@@ -220,11 +221,6 @@ fn run_transcribe(
 impl Engine for CandleEngine {
     fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
         // Generation (Qwen2) is out of scope on mobile — transcription-only port.
-        Err(EngineError::NotReady)
-    }
-
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        // Embedding (Bert) is out of scope on mobile.
         Err(EngineError::NotReady)
     }
 

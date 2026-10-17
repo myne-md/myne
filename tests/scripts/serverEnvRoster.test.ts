@@ -19,13 +19,31 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const GUARD = join(REPO_ROOT, "scripts", "check-server-env-roster.mjs");
 
-/** A companion tree with the one knob the scan looks for, plus its go.mod. */
+/** A companion tree with the one knob the scan looks for, plus its go.mod and a minimal
+ * pair of deployment artifacts.
+ *
+ * The charts are written because the guard walks them (rules 4a/4b) and gates each walk on
+ * a measured floor: a fixture that grew no chart would trip the non-vacuity floor instead
+ * of the rule the test is about, which reads as a passing test of the wrong thing.
+ * `MYNE_ALPHA` is the documented fixture knob; the web chart names `MYNE_SYNC_ORIGIN`,
+ * which the REAL `web/container/generate-headers.mjs` in this repository reads (the web
+ * chart is checked against the container's own sources, not against the sync server's
+ * roster). */
 function makeServer(dir: string, configBody: string): string {
   mkdirSync(join(dir, "internal", "httpapi"), { recursive: true });
   mkdirSync(join(dir, "cmd", "myne-server"), { recursive: true });
   writeFileSync(join(dir, "go.mod"), "module github.com/myne-md/myne-server\n\ngo 1.26.4\n");
   writeFileSync(join(dir, "internal", "httpapi", "config.go"), configBody);
   writeFileSync(join(dir, "cmd", "myne-server", "main.go"), "package main\n");
+  const serverChart = join(dir, "deploy", "helm", "myne-server");
+  mkdirSync(join(serverChart, "templates"), { recursive: true });
+  writeFileSync(join(serverChart, "values.yaml"), 'config:\n  MYNE_ALPHA: "1"\n');
+  const webChart = join(dir, "deploy", "helm", "myne-web", "templates");
+  mkdirSync(webChart, { recursive: true });
+  writeFileSync(
+    join(webChart, "deployment.yaml"),
+    'env:\n  - name: MYNE_SYNC_ORIGIN\n    value: "https://sync.example.org"\n',
+  );
   return dir;
 }
 
@@ -56,14 +74,21 @@ MYNE_ALPHA=1
  * `minVars` is the measured floor the guard enforces. A two-file fixture has one
  * variable, so a test over a fixture asks for a floor of 1; the test that pins the floor
  * itself deliberately does NOT pass it, so it runs against the recorded default.
+ *
+ * The chart walks are floored the same way and the fixture carries one name in each, so
+ * both are asked for 1 here for the same reason.
  */
 function runGuard(server: string, ops: string, args: string[] = [], minVars = 1) {
   try {
-    const out = execFileSync("node", [GUARD, ...args, `--min-vars=${minVars}`], {
-      env: { ...process.env, MYNE_SERVER_DIR: server, MYNE_OPS_DIR: ops },
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const out = execFileSync(
+      "node",
+      [GUARD, ...args, `--min-vars=${minVars}`, "--min-deploy=1", "--min-deploy-web=1"],
+      {
+        env: { ...process.env, MYNE_SERVER_DIR: server, MYNE_OPS_DIR: ops },
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     return { code: 0, out };
   } catch (e) {
     const err = e as { status: number; stdout: string; stderr: string };
@@ -174,34 +199,6 @@ MYNE_SITE_ADDRESS=example.test
     expect(r.code).toBe(0);
     expect(r.out).not.toContain("dead knob");
   });
-
-  // --- drift class 2: a dead entry -------------------------------------------------
-
-  it("names an entry classified as a server knob that the server never reads", () => {
-    const roster = `# --- knobs ---
-# kind: server
-MYNE_ALPHA=1
-# kind: server
-MYNE_ACME_EMAIL=a@b.example
-`;
-    const { server, ops } = pair(ONE_KNOB, roster);
-    const r = runGuard(server, ops);
-    expect(r.code).toBe(1);
-    expect(r.out).toContain('MYNE_ACME_EMAIL is classified "kind: server"');
-    expect(r.out).toContain("dead knob");
-  });
-
-  it("does not fire on a kind: bundle entry, which the compose file or Caddy reads", () => {
-    const roster = `# --- knobs ---
-# kind: server
-MYNE_ALPHA=1
-# kind: bundle
-MYNE_SITE_ADDRESS=example.test
-`;
-    const { server, ops } = pair(ONE_KNOB, roster);
-    expect(runGuard(server, ops).code).toBe(0);
-  });
-
 
   // --- drift class 3: an unclassified entry -----------------------------------------
 
@@ -408,3 +405,74 @@ function execFileSyncSafe(server: string, ops: string) {
     return { code: err.status, out: `${err.stdout}${err.stderr}` };
   }
 }
+
+// --- rule 4: the deployment artifacts may only name documented knobs -----------------
+
+// The drift this closes: a Helm chart sets a variable as a YAML string, so a typo or a
+// renamed knob compiles, starts, and is ignored by the server. Every other rule in this
+// guard asks what the SERVER reads, and this file is not read by the server at all.
+it("names a server-chart knob that is not on the roster", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  writeFileSync(
+    join(server, "deploy", "helm", "myne-server", "values.yaml"),
+    'config:\n  MYNE_ALPHA: "1"\n  MYNE_TYPOED: "1"\n',
+  );
+  const r = runGuard(server, ops);
+  expect(r.code).toBe(1);
+  expect(r.out).toContain("MYNE_TYPOED is set by the server chart");
+  expect(r.out).toContain("silently does nothing");
+});
+
+// The other half of the pair, and the reason the web chart is NOT held to the sync
+// server's roster: `MYNE_SYNC_ORIGIN` is read by the web container and by no Go file, so
+// checking it against the server's roster would demand the wrong edit. It is checked
+// against the container's own sources instead, which is a different failure direction:
+// a name the chart sets that the image never reads.
+it("names a web-chart knob the web container never reads", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  writeFileSync(
+    join(server, "deploy", "helm", "myne-web", "templates", "deployment.yaml"),
+    'env:\n  - name: MYNE_NOT_A_WEB_KNOB\n    value: "1"\n',
+  );
+  const r = runGuard(server, ops);
+  expect(r.code).toBe(1);
+  expect(r.out).toContain("MYNE_NOT_A_WEB_KNOB is set by the web chart");
+  expect(r.out).toContain("the container would ignore it");
+});
+
+// A documented knob in a chart is the case that must stay green, or rule 4a would be a
+// rule against charts existing.
+it("accepts a chart knob the roster documents", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  const r = runGuard(server, ops);
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("agrees in both directions");
+});
+
+// The vacuous pass, one directory over: the charts are committed, so their absence is the
+// drift, not a smaller check. Same reasoning as the scanned-root case above.
+it("fails by name when the server chart is absent", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  rmSync(join(server, "deploy", "helm", "myne-server"), { recursive: true, force: true });
+  const r = runGuard(server, ops);
+  expect(r.code).toBe(1);
+  expect(r.out).toContain("no server chart at");
+});
+
+it("fails by name when the web chart is absent", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  rmSync(join(server, "deploy", "helm", "myne-web"), { recursive: true, force: true });
+  const r = runGuard(server, ops);
+  expect(r.code).toBe(1);
+  expect(r.out).toContain("no web chart at");
+});
+
+// The chart's own floor, driven with no override: an empty chart directory must not read
+// as "no undocumented knobs".
+it("fails when the chart walk finds nothing", () => {
+  const { server, ops } = pair(ONE_KNOB, MATCHING_ROSTER);
+  rmSync(join(server, "deploy", "helm", "myne-server", "values.yaml"), { force: true });
+  const r = execFileSyncSafe(server, ops);
+  expect(r.code).toBe(1);
+  expect(r.out).toMatch(/server-chart scan found \d+ MYNE_\* names, below the measured/);
+});

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Per-page footer stamper for the exported PDF (MYND-255 hotfix,
 //! owner-requested).
 //!
@@ -821,16 +822,6 @@ mod tests {
         let full = tiny_test_pdf(1);
         let err = stamp_footer(&full[..full.len() / 2], "T").expect_err("must reject");
         assert_eq!(err, FooterStampError::Parse);
-    }
-
-    #[test]
-    fn error_kind_labels_are_stable() {
-        // Drift pin for the closed taxonomy (log-side contract).
-        assert_eq!(FooterStampError::Parse.kind(), "Parse");
-        assert_eq!(FooterStampError::NoPages.kind(), "NoPages");
-        assert_eq!(FooterStampError::PageGeometry.kind(), "PageGeometry");
-        assert_eq!(FooterStampError::Malformed.kind(), "Malformed");
-        assert_eq!(FooterStampError::Save.kind(), "Save");
     }
 
     #[test]

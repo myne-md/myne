@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-managed live spell state (MYND-262 task 5 + MYND-266 tasks 4-5).
 //!
 //! Holds the in-RAM [`SpellEngine`] (active-language dictionaries + folded

@@ -332,12 +332,6 @@ export interface AgentHubListProps {
   activeConversationId?: string | null;
   /** Open the note a conversation is anchored to, in the workspace. */
   onOpenNote?: (noteId: string) => void;
-  /** Folders the composer can attach as a run scope (passed through to Focus). */
-  folders?: readonly string[];
-  /** Called with the ids of notes an apply wrote, so panes re-read them. */
-  onNotesWritten?: (noteIds: readonly string[]) => void;
-  /** Called after a run undo reverted notes on disk. */
-  onRunUndone?: (noteIds: readonly string[]) => void;
 }
 
 export function AgentHubList({

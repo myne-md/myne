@@ -71,6 +71,6 @@ exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a -s \"-screen 0 $SCREEN\" pnpm exec vitest run --config vitest.capture.config.ts e2e/capture/theme-preview.capture.ts
+    xvfb-run -a -s \"-screen 0 $SCREEN\" pnpm exec vitest run --config .config/vitest/capture.config.ts e2e/capture/theme-preview.capture.ts
   '
 "

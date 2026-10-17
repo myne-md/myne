@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-side keyed ingest of a relayed clip frame (TB10, task 6).
 //!
 //! This is the **security climax** of the foundation: the native-messaging

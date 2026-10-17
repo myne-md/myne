@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! End-to-end logging discipline for the real `myne` binary
 //! (cli-thin-client task 13; MYND-490).
 //!

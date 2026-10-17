@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! One implementation of "a socket read that observes cancellation and bounds
 //! silence", shared by both AI network arms (ai-remote-providers task 6).
 //!

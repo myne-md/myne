@@ -22,6 +22,10 @@ node_modules
 dist/
 dist-ssr/
 *.local
+# The story catalogue's public variant (`pnpm stories:build:public`). A separate
+# directory rather than a flag on `dist/` so the two builds cannot clobber each
+# other and a reviewer can tell which one they are looking at.
+stories/dist-public/
 
 # Coverage reports (Vitest v8 → ./coverage; cargo-llvm-cov → /target/llvm-cov,
 # already covered by /target/ below).

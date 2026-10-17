@@ -28,7 +28,12 @@
 // mean writing per-note UI state into `vault.workspace` (§9.7). Nothing here is
 // persisted, so nothing here reaches the vault.
 
-import { EditorView } from "@codemirror/view";
+// TYPE-only, deliberately: this module is imported by the vault-LEAVING paths
+// (`src/lib/vault-unlock.ts`, `src/lib/vault-switch.ts`) for `resetScrollMemory`,
+// and a value import of `@codemirror/view` here put the whole CodeMirror view
+// stack into first load for a map clear. The one function that needs the
+// `EditorView` value, `applyScrollAnchor`, lives in `./scrollAnchorApply`.
+import type { EditorView } from "@codemirror/view";
 
 /** A remembered reading position. */
 export type ScrollAnchor = {
@@ -212,38 +217,12 @@ export function evictClosedTabs(
 }
 
 /**
- * Put `anchor`'s line back where it was.
- *
- * Dispatched as CodeMirror's own `scrollIntoView` effect rather than assigned to
- * `scrollTop`: CM re-measures before scrolling and walks the scrollable
- * ancestors, so this lands after layout instead of racing one frame, and it
- * finds the pane's OUTER scroller (the editor itself never scrolls, see
- * `editor/src/scroll-slack.ts`).
- *
- * `y: "start"` puts the line at the top of the viewport and `yMargin` restores
- * the fraction of it that was scrolled off, so the restore is exact when nothing
- * changed and still on the right LINE when the pane's width did.
- *
- * `noteId` is what suppresses the write-back this scroll would otherwise cause
- * (see {@link beginScrollRestore}). It is **required**, deliberately: an
- * optional one would let the next caller reintroduce myne#651 by omitting it,
- * and a default is the arm that never fires.
+ * Put `anchor`'s line back where it was — moved to `./scrollAnchorApply`, which
+ * is the only module here allowed to value-import `EditorView`, because this one
+ * is on the pre-unlock path (see the import note at the top). The doc comment
+ * explaining the `scrollIntoView` dispatch and the required `noteId` moved with
+ * it.
  */
-export function applyScrollAnchor(
-  view: EditorView,
-  anchor: ScrollAnchor,
-  noteId: string,
-): void {
-  const pos = Math.min(anchor.pos, view.state.doc.length);
-  // BEFORE the dispatch: the scroll it causes can land in the same frame.
-  beginScrollRestore(noteId);
-  view.dispatch({
-    effects: EditorView.scrollIntoView(pos, {
-      y: "start",
-      yMargin: anchor.offsetPx,
-    }),
-  });
-}
 
 /** Forget every remembered position.
  *

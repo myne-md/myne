@@ -86,18 +86,3 @@ export type NoteReadError =
    * User-facing CTA is "try again".
    */
   | { kind: "JoinFailure" };
-
-/**
- * Type-narrowing helper for the `Io` variant.
- *
- * ```ts
- * if (isReadIoError(e)) {
- *   switch (e.detail.io_error_kind) { ... }
- * }
- * ```
- */
-export function isReadIoError(
-  e: NoteReadError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
