@@ -4884,7 +4884,9 @@
     "deleteConfirmTitle": "Delete this vault?",
     "deletePartialError": "Some files couldn't be removed. The vault is no longer usable. Continue to start over.",
     "failClosedEyebrow": "Can't open vault",
-    "restoreHint": "Restore from a backup to continue."
+    "restoreHint": "Restoring from a backup isn't available on mobile yet.",
+    "restoreCta": "Restore from a backup",
+    "ioErrorHint": "Try again, or reopen Myne."
   },
   "vault": {
     "ioBanner": {
