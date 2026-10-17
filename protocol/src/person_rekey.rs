@@ -45,6 +45,7 @@ use crate::aead::{AAD_PREFIX_V0_2, AEAD_KEY_LEN, AEAD_NONCE_LEN, PROTOCOL_VERSIO
 use crate::blob::{decode_note, ENC_ITEM_KEY_WRAPPED_LEN};
 use crate::person_key::PersonPublicHalf;
 use alloc::vec::Vec;
+use zeroize::Zeroizing;
 
 /// The rekey result for ONE note blob: the rewritten bytes (content
 /// ciphertext preserved byte-identical) + the note uuid + the per-note
@@ -56,7 +57,12 @@ pub struct RekeyedNote {
     /// The note's uuid (16 B).
     pub note_uuid: [u8; 16],
     /// The per-note `item_key` (unchanged, re-wrapped, not re-minted).
-    pub item_key: [u8; AEAD_KEY_LEN],
+    ///
+    /// [`Zeroizing`], like the copy [`crate::blob::DecryptedNote`] hands back:
+    /// this is the same per-note key, and it used to leave `rekey_note_blob` as a
+    /// bare array that nothing wiped — the one secret this function produces
+    /// outliving the call by however long the caller's `RekeyedNote` lives.
+    pub item_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     /// Fresh `item_key_nonce` for the new wrap.
     pub item_key_nonce: [u8; AEAD_NONCE_LEN],
 }
@@ -81,7 +87,11 @@ pub fn rekey_note_blob(
     // share the §9.2 three-level envelope at identical offsets, so the
     // splice below is magic-agnostic; only the wrap AAD differs.
     let is_nc05 = old_blob.get(0..4) == Some(crate::crdt_note_blob::NC05_MAGIC.as_slice());
-    let item_key: [u8; AEAD_KEY_LEN] = if is_nc05 {
+    // `Zeroizing` from the moment the key is recovered: both arms hand back a
+    // bare array (the v0.1 arm copies out of `DecryptedNote`'s wrapper, the NC05
+    // arm builds one from the opened plaintext), so this local — and the field it
+    // is moved into — was the only unwiped copy of the per-note key on the path.
+    let item_key: Zeroizing<[u8; AEAD_KEY_LEN]> = Zeroizing::new(if is_nc05 {
         open_nc05_item_key(old_blob, note_uuid, old_items_key, items_key_id)?
     } else {
         // Open the old blob: recovers the per-note item_key + the plaintext
@@ -89,7 +99,7 @@ pub fn rekey_note_blob(
         let handle = decode_note(old_blob, note_uuid, old_items_key, items_key_id)
             .map_err(|_| RekeyError::CannotDecrypt)?;
         *handle.item_key()
-    };
+    });
 
     // Re-wrap the SAME item_key under the NEW itemsKey. The AAD keeps the
     // SAME items_key_id and the family's own wrap role: the content AAD
@@ -101,7 +111,7 @@ pub fn rekey_note_blob(
         crate::aead::aad_note_item_key_wrap(items_key_id, note_uuid)
     };
     let enc_item_key =
-        crate::aead::aead_seal_ctx(new_items_key, new_item_key_nonce, &item_key, &aad_wrap)
+        crate::aead::aead_seal_ctx(new_items_key, new_item_key_nonce, &*item_key, &aad_wrap)
             .map_err(|_| RekeyError::AeadFailure)?;
     debug_assert_eq!(enc_item_key.len(), ENC_ITEM_KEY_WRAPPED_LEN);
 

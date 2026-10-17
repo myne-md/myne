@@ -336,8 +336,14 @@ impl PersonKeyPair {
             .map_err(|_| PersonKeyError::KemFailure)?;
 
         let ephemeral_mont = member_montgomery(&sealed.ed_ephemeral_pk)?;
-        let recipient_scalar = ed25519_dh_scalar(&self.ed25519_seed);
-        let classical_ss: [u8; 32] = ephemeral_mont.mul_clamped(recipient_scalar).to_bytes();
+        // The clamped scalar AND the raw ECDH output are key material: both are
+        // `Zeroizing` so Drop wipes them. `ed25519_dh_scalar` is the
+        // X25519-equivalent secret scalar derived from our Ed25519 seed, and
+        // `classical_ss` is the shared secret that half of the hybrid combiner
+        // is built from — an unwiped copy of either is a copy of a wrap-key
+        // input.
+        let recipient_scalar = Zeroizing::new(ed25519_dh_scalar(&self.ed25519_seed));
+        let classical_ss = Zeroizing::new(ephemeral_mont.mul_clamped(*recipient_scalar).to_bytes());
 
         let wrap_key = hybrid_wrap_key(&classical_ss, ml_ss.as_slice());
 
@@ -691,13 +697,16 @@ impl PersonPublicHalf {
             .map_err(|_| PersonKeyError::KemFailure)?;
         let (ml_ct, ml_ss) = ek.encapsulate_with_rng(rng);
 
-        let mut ed_secret_bytes = [0u8; 32];
-        rng.fill_bytes(&mut ed_secret_bytes);
+        let mut ed_secret_bytes = Zeroizing::new([0u8; 32]);
+        rng.fill_bytes(&mut *ed_secret_bytes);
         let ed_signing = ed25519_dalek::SigningKey::from_bytes(&ed_secret_bytes);
         let ed_ephemeral_pk = ed_signing.verifying_key().to_bytes();
         let member_mont = member_montgomery(&self.ed25519_pk)?;
-        let sender_scalar = ed25519_dh_scalar(&ed_secret_bytes);
-        let classical_ss: [u8; 32] = member_mont.mul_clamped(sender_scalar).to_bytes();
+        // Same three secrets as `open_sealed_with_aad`: the ephemeral Ed25519
+        // SECRET seed (not just its public half), the clamped scalar derived from
+        // it, and the ECDH output. All three are wrap-key inputs.
+        let sender_scalar = Zeroizing::new(ed25519_dh_scalar(&ed_secret_bytes));
+        let classical_ss = Zeroizing::new(member_mont.mul_clamped(*sender_scalar).to_bytes());
 
         let wrap_key = hybrid_wrap_key(&classical_ss, ml_ss.as_slice());
 
