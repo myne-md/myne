@@ -680,14 +680,32 @@ pub fn remote_backend(cell: PrefsCell, cancelled: super::cancellable_io::Cancell
     Backend::new(
         "remote",
         BackendClass::Remote,
-        Arc::new(super::provider_registry::RemoteEngine::new(
-            Box::new(move || {
-                cell.read()
-                    .ok()
-                    .and_then(|s| s.as_ref().map(|s| s.prefs.clone()))
-            }),
-            cancelled,
-        )),
+        Arc::new(remote_engine(cell, cancelled)),
+    )
+}
+
+/// The engine [`remote_backend`] registers, built apart so the wiring is
+/// testable WITHOUT opening a socket (myne-md/myne#894).
+///
+/// The claim worth pinning is that the source handed to `remote_backend` is the
+/// one the engine's own arms (`infer`, `chat_streaming`) actually pass to the
+/// transport. That is only observable on the type that stores it, and the
+/// previous home of this test — driving `infer` from `myne-desktop` and counting
+/// polls — was the shape `provider_transport.rs` warns against in its own words:
+/// "a poll count of zero means 'this machine is offline', not 'the wrong
+/// predicate was wired'". On an offline runner it fails permanently while
+/// proving nothing, which it did.
+fn remote_engine(
+    cell: PrefsCell,
+    cancelled: super::cancellable_io::CancelledFn,
+) -> super::provider_registry::RemoteEngine {
+    super::provider_registry::RemoteEngine::new(
+        Box::new(move || {
+            cell.read()
+                .ok()
+                .and_then(|s| s.as_ref().map(|s| s.prefs.clone()))
+        }),
+        cancelled,
     )
 }
 
@@ -721,6 +739,38 @@ mod tests {
         assert!(
             infer(state.engine().as_ref()).starts_with("stub-infer:"),
             "default() must install StubEngine"
+        );
+    }
+
+    /// **The WIRING, not the primitive** (myne-md/myne#440).
+    ///
+    /// `cancel::any_cancelled` has its own test, and `provider_registry`'s
+    /// `the_transport_polls_this_requests_predicate_not_the_construction_one`
+    /// covers the per-request hand-off, and BOTH stay green if `remote_backend`
+    /// dropped this source and installed `|| false` — that regression compiles
+    /// cleanly and no type checks it, which is how the original defect shipped:
+    /// a request that Stop cannot stop and, on a metered API, that keeps
+    /// billing.
+    ///
+    /// **Asserted without a socket, deliberately** (myne-md/myne#894). This
+    /// claim lived in `myne-desktop`, driving `infer` and counting polls, which
+    /// `provider_transport.rs` warns against in its own words: "a poll count of
+    /// zero means 'this machine is offline', not 'the wrong predicate was
+    /// wired'". `remote_engine` is split out of `remote_backend` so the source
+    /// can be read from the engine that stores it.
+    #[test]
+    fn remote_backend_threads_its_cancel_source_into_the_engine() {
+        let given: super::super::cancellable_io::CancelledFn = Arc::new(|| true);
+        let cell: PrefsCell = Arc::new(std::sync::RwLock::new(Some(PrefsSnapshot {
+            prefs: protocol::PrefsView::default(),
+            vault_id: None,
+        })));
+        let engine = remote_engine(cell, Arc::clone(&given));
+        assert!(
+            Arc::ptr_eq(engine.construction_cancel_source(), &given),
+            "remote_backend must hand the engine the source it was given; a \
+             dropped or replaced source is the fleet-wide `|| false` that makes \
+             Stop do nothing"
         );
     }
 

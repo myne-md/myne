@@ -681,8 +681,17 @@ export function MyneVaultSetup({
           // function return the title unchanged, which makes the rename a no-op,
           // which sends the collision back down the skip path: the silent
           // mis-link the whole rule exists to prevent.
+          // **The gate is the SAME predicate `submit` uses, and it was not.**
+          // In `backupMode` the source is a `.myne-backup`, so the vault-list
+          // selection is never made (`chosen` stays `NO_VAULT`, and the effect
+          // that would set it returns early) — the button was therefore disabled
+          // for the whole backup path, whatever path and password were entered,
+          // and the import could not be started at all. `submit` already asked
+          // the right question; this now asks it too.
           disabled={
-            chosen === NO_VAULT || !secretReady || labelIllegal
+            (backupMode ? backupPath === undefined : chosen === NO_VAULT) ||
+            !secretReady ||
+            labelIllegal
           }
           onClick={submit}
           data-testid="import-myne.continue"

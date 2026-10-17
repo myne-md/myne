@@ -59,6 +59,7 @@ import {
   unlockToEditor,
   waitForSaved,
   createNote,
+  selectSettingsTopic,
 } from "./support/flows";
 import { syncConfigSeed } from "./support/multi-device";
 import { testIdSelector, type Element, type Session } from "./support/webdriver";
@@ -172,6 +173,12 @@ describeE2E("vd1 conflict compare → split → resolve (MYND-334)", () => {
 
         await openSettings(s, "sync");
         await s.byTestId("settings.sync-panel", { timeoutMs: 20_000 });
+        // **The conflict list lives on the panel's CONFLICTS topic** since the
+        // settings overhaul split Sync into connection / devices / conflicts
+        // (myne-md/myne#885), and only the active topic's body is mounted. The
+        // panel opens on Connection, so a document-wide wait for the copy row
+        // was waiting for a subtree no view had rendered.
+        await selectSettingsTopic(s, "sync", "conflicts");
 
         // The copy is listed under its original's group; Compare is per-copy, so
         // scope the lookup to that row rather than taking a document-wide hit.

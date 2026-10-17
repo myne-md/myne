@@ -136,10 +136,10 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   notifyNoteWritten,
-  pageSeatInvoke,
   dismissImporterOffer,
   runPaletteAction,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { KEY } from "./support/keyboard";
 import { type Session } from "./support/webdriver";
@@ -335,13 +335,8 @@ async function preseedLines(s: Session, noteId: string, n: number): Promise<void
     ...Array.from({ length: n }, (_, i) => `preseed ${i}`),
     "first line",
   ].join("\n");
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:notes|note_update",
-    { noteId, plaintext: body },
-    15_000,
-  );
-  expect(r.err, "preseed note_update should succeed").toBeUndefined();
+  const r = await writeNoteBody(s, noteId, body, 15_000);
+  expect(r.err, "the preseed write should succeed").toBeUndefined();
   await notifyNoteWritten(s, noteId);
 }
 

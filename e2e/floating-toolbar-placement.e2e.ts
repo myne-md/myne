@@ -85,8 +85,8 @@ import {
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
-  pageSeatInvoke,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -292,13 +292,8 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
           ...Array.from({ length: 30 }, (_, i) => `dolgu ${i + 30}`),
           `${WIDE_LINE} sonuncu`,
         ].join("\n");
-        const wrote = await pageSeatInvoke(
-          s,
-          "plugin:notes|note_update",
-          { noteId, plaintext: body },
-          15_000,
-        );
-        expect(wrote.err, "note_update should succeed").toBeUndefined();
+        const wrote = await writeNoteBody(s, noteId, body, 15_000);
+        expect(wrote.err, "the body write should succeed").toBeUndefined();
 
         // REFRESH AND REOPEN. A backend write made outside the pane's autosave
         // loop leaves that pane holding its stale buffer — `src/AGENTS.md` states

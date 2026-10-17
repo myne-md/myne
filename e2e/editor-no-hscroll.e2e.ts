@@ -50,6 +50,7 @@ import {
   selectedNoteId,
   settleOn,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -161,13 +162,8 @@ describeE2E("hs1 the editor never scrolls horizontally in a narrow split (#630)"
           IPC_TIMEOUT,
         );
         const base = typeof cur.ok === "string" ? cur.ok : "";
-        const up = await pageSeatInvoke(
-          s,
-          "plugin:notes|note_update",
-          { noteId: wideId, plaintext: `${BODY}\n${base}` },
-          IPC_TIMEOUT,
-        );
-        expect(up.err, "note_update should succeed").toBeUndefined();
+        const up = await writeNoteBody(s, wideId, `${BODY}\n${base}`, IPC_TIMEOUT);
+        expect(up.err, "the wide body write should succeed").toBeUndefined();
 
         // Reload so the editor reads the note from disk rather than its own
         // buffer, then rebuild the layout: the fixture note plus one split, so

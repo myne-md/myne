@@ -3,14 +3,57 @@
 // Deliberately a SEPARATE config from `vitest.config.ts`: `pnpm test`
 // (the unit/component suite, `tests/**`) must stay hermetic and fast,
 // while E2E specs (`e2e/**/*.e2e.ts`) drive the real production binary
-// through tauri-driver — Linux-only (SYNC-1), up to MYNE_E2E_SHARDS apps
-// in parallel (default 2), with wall-clock budgets that include Argon2id
+// through tauri-driver — Linux-only (SYNC-1), up to `shardCount` apps in
+// parallel (see its own comment for the measurement), with wall-clock budgets
+// that include Argon2id
 // at production parameters (the VR-1 recovery-drill scenario, SYNC-9).
 //
 // Run via `pnpm test:e2e` (locally inside the container — see
 // docs/dev/e2e.md — or in the Woodpecker E2E step).
 
+import { cpus } from "node:os";
+
 import { defineConfig } from "vitest/config";
+
+/**
+ * How many file-workers to run.
+ *
+ * `MYNE_E2E_SHARDS` wins when set. Otherwise the MACHINE decides, because a flat
+ * 2 left a 16-core box running 7 of the suite's slowest files in 371 s that it
+ * finishes in 137 s.
+ *
+ * **Measured (2026-10-17, this 16-core box, the 7 slowest files, 37 scenarios),
+ * against this pipeline's own criterion** — `docs/dev/e2e.md`: "the reading that
+ * would justify raising this is a run at N+1 whose SUMMED FILE TIME is unchanged
+ * from N":
+ *
+ *   | shards | wall  | summed file time | failures (`--retry=0`) |
+ *   |    2   | 371 s |      650 s       |          0            |
+ *   |    4   | 168 s |      559 s       |          2            |
+ *   |    6   | 163 s |      528 s       |          2            |
+ *
+ * So the summed time did not expand (it fell), and the wall clock fell 2.7x. The
+ * two failures at 4 and 6 are the contention class this file's retry exists for:
+ * a `waitForElement` 45 s default that expires under several concurrent WebKit
+ * apps. With the repo's own retry policy in place the same 6-shard run was 137 s
+ * and 37/37 GREEN (2 tests needed a retry).
+ *
+ * **What this formula protects.** A small runner keeps today's behaviour: 4 cores
+ * or fewer yields 2, exactly as before, so the 2 -> 3 experiment this file records
+ * (1627 s on a CI runner, worse than 2) cannot be reopened by this change on that
+ * runner. The cap of 6 is where the measurement stops, not a claim about more.
+ *
+ * **What bounds the win.** Not the shard count: `maxConcurrency: 1` keeps a file's
+ * scenarios sequential, so the floor is the LONGEST SINGLE FILE — `vault-creation`
+ * measured 156-161 s alone, and every shard waits for it. The next lever therefore
+ * lives inside the long files, which is what `scripts/e2e-wait-profile.mjs`
+ * (`MYNE_E2E_WAIT_PROFILE=1`) is for.
+ */
+const shardCount = ((): number => {
+  const explicit = process.env.MYNE_E2E_SHARDS;
+  if (explicit !== undefined) return Number(explicit);
+  return Math.max(2, Math.min(6, Math.floor(cpus().length / 2)));
+})();
 
 export default defineConfig({
   test: {
@@ -28,9 +71,9 @@ export default defineConfig({
     // against a 180 s `testTimeout`, which is the whole of the "nav1 is flaky"
     // story and of several others. The file's header carries the measurement.
     globalSetup: ["./e2e/support/global-setup.ts"],
-    // Parallelise across worker PROCESSES: N = MYNE_E2E_SHARDS (default 2) file
-    // workers run concurrently, each driving its own tauri-driver + app on its
-    // own port pair. `forks` (not threads) so each worker has its own
+    // Parallelise across worker PROCESSES: N = `shardCount` (above) file workers
+    // run concurrently, each driving its own tauri-driver + app on its own port
+    // pair. `forks` (not threads) so each worker has its own
     // process.env for the port; within a worker `maxConcurrency: 1` keeps ONE
     // app at a time (a file's scenarios stay sequential). The concurrent apps
     // share the single CI Xvfb display — the pattern multi-device.ts already
@@ -38,7 +81,7 @@ export default defineConfig({
     // WebView, not the X-focused window).
     pool: "forks",
     fileParallelism: true,
-    maxWorkers: Number(process.env.MYNE_E2E_SHARDS ?? "2"),
+    maxWorkers: shardCount,
     maxConcurrency: 1,
     // Production-KDF unlocks (m=256 MiB, t=3) and full create flows run
     // inside scenarios; budget generously, fail loudly.

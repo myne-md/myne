@@ -629,6 +629,19 @@ impl RemoteEngine {
         }
     }
 
+    /// Test-only: the source the engine's OWN arms hand the transport.
+    ///
+    /// `infer` and `chat_streaming` reach for `self.cancelled`; the per-request
+    /// arms take the caller's instead (myne-md/myne#445). Exposed so the
+    /// construction wiring can be asserted without a socket — the alternative
+    /// (drive a request, count polls) makes the answer depend on reaching the
+    /// provider, which is what `provider_transport.rs` warns against. Callers:
+    /// `state::tests::remote_backend_threads_its_cancel_source_into_the_engine`.
+    #[cfg(test)]
+    pub(super) fn construction_cancel_source(&self) -> &super::cancellable_io::CancelledFn {
+        &self.cancelled
+    }
+
     /// Resolve the authorization and the transport for this call, or the
     /// distinguishable refusal the UI renders (task 7's taxonomy).
     ///

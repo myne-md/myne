@@ -43,6 +43,7 @@ import {
   reopenNoteAfterReload,
   runPaletteAction,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
@@ -102,13 +103,13 @@ async function embedAudioAndReopen(s: Session, id: string): Promise<void> {
   const noteId = await selectedNoteId(s);
   const cur = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
   const base = typeof cur.ok === "string" ? cur.ok : "";
-  const up = await pageSeatInvoke(
+  const up = await writeNoteBody(
     s,
-    "plugin:notes|note_update",
-    { noteId, plaintext: `${base}\n![[att:${id}|Voice note tr.wav]]` },
+    noteId,
+    `${base}\n![[att:${id}|Voice note tr.wav]]`,
     IPC_TIMEOUT,
   );
-  expect(up.err, "note_update should embed the audio attachment").toBeUndefined();
+  expect(up.err, "the audio embed write should succeed").toBeUndefined();
   await s.refresh();
   await reopenNoteAfterReload(s);
   // The inline audio player resolves once the catalog re-read completes.

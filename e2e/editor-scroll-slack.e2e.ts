@@ -32,6 +32,7 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -184,7 +185,7 @@ describeE2E("ss1 the last line can be scrolled clear of the bottom edge (#375)",
         );
         const noteId = (await row.attribute("data-note-id")) ?? "";
         // `createNote` waits for the title badge, but a latest-wins follow-up can
-        // still be in flight; `note_update` under it is rejected or overwritten
+        // still be in flight; a write under it is rejected or overwritten
         // and the post-refresh tail never appears.
         await s.waitUntil(
           async () => {
@@ -195,13 +196,8 @@ describeE2E("ss1 the last line can be scrolled clear of the bottom edge (#375)",
         );
         const cur = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
         const base = typeof cur.ok === "string" ? cur.ok : "";
-        const up = await pageSeatInvoke(
-          s,
-          "plugin:notes|note_update",
-          { noteId, plaintext: `${base}\n${BODY}` },
-          IPC_TIMEOUT,
-        );
-        expect(up.err, "note_update should succeed").toBeUndefined();
+        const up = await writeNoteBody(s, noteId, `${base}\n${BODY}`, IPC_TIMEOUT);
+        expect(up.err, "the long body write should succeed").toBeUndefined();
         // Prove the bytes are on disk BEFORE the reload. A title autosave that
         // lands after this write would strip them; polling here catches that
         // while a post-refresh settledTail would just time out on a missing tail.

@@ -23,6 +23,24 @@ import type { CSSProperties } from "react";
 import { ICON_PATHS } from "../../lib/icons";
 
 /**
+ * Frozen `{__html}` objects, one per side — **identity, not immutability**
+ * (myne-md/myne#894). React 19 compares `dangerouslySetInnerHTML` by object
+ * identity, so a fresh literal per render re-assigns `innerHTML` and replaces
+ * the nodes under it; the browser then fires no `click` when a mousedown and
+ * mouseup straddle that render. `Icon.tsx` carries the full account and the
+ * measurement.
+ */
+const PANEL_INNER_HTML = new Map<string, { __html: string }>();
+function panelInnerHtmlFor(name: "panel-left" | "panel-right"): { __html: string } {
+  let cached = PANEL_INNER_HTML.get(name);
+  if (cached === undefined) {
+    cached = { __html: ICON_PATHS[name]! };
+    PANEL_INNER_HTML.set(name, cached);
+  }
+  return cached;
+}
+
+/**
  * @param collapsed whether the pane this toggles is currently collapsed. Drives
  *   the fill: empty while collapsed, filled while open.
  *
@@ -87,11 +105,7 @@ export function PanelToggleGlyph({
         stroke="none"
         style={fillStyle}
       />
-      <g
-        dangerouslySetInnerHTML={{
-          __html: ICON_PATHS[side === "left" ? "panel-left" : "panel-right"]!,
-        }}
-      />
+      <g dangerouslySetInnerHTML={panelInnerHtmlFor(side === "left" ? "panel-left" : "panel-right")} />
     </svg>
   );
 }

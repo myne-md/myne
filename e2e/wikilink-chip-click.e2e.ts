@@ -48,6 +48,7 @@ import {
   pageSeatInvoke,
   selectedNoteId,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -57,7 +58,7 @@ const TARGET_TITLE = "Target note";
 /**
  * APPEND to a note, never replace it.
  *
- * `createNote` writes a title and frontmatter, and `note_update` takes the whole
+ * `createNote` writes a title and frontmatter, and the body write takes the whole
  * plaintext, so passing a bare body drops both. That is not cosmetic here: the
  * note-set resolves `[[Target note]]` by TITLE, and a target whose frontmatter
  * has been deleted is a different note with a different name, so the link
@@ -68,13 +69,8 @@ const TARGET_TITLE = "Target note";
 async function appendBody(s: Session, noteId: string, body: string): Promise<void> {
   const cur = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
   const base = typeof cur.ok === "string" ? cur.ok : "";
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:notes|note_update",
-    { noteId, plaintext: `${base}\n${body}` },
-    IPC_TIMEOUT,
-  );
-  expect(r.err, "note_update should accept the body").toBeUndefined();
+  const r = await writeNoteBody(s, noteId, `${base}\n${body}`, IPC_TIMEOUT);
+  expect(r.err, "the body write should succeed").toBeUndefined();
 }
 
 /**

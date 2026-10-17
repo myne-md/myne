@@ -55,6 +55,32 @@ function makeCloseIcon(): SVGSVGElement {
 }
 
 /**
+ * Wire the lightbox's keyboard: `+`/`=` zoom in, `−`/`_` zoom out, `0` resets to
+ * fit. Bound to the element that actually HOLDS FOCUS, which is the backdrop
+ * (focus is trapped on the close button, then the zoom row), never the picture's
+ * mat. Both the image and the PDF surface call this, so the keymap has one
+ * definition: the two arms drifted apart once already, and the image half's
+ * keyboard zoom was unreachable for as long as it took `za1` to say so.
+ */
+function bindZoomKeys(
+  target: HTMLElement,
+  keys: { zoomIn: () => void; zoomOut: () => void; reset: () => void },
+): void {
+  target.addEventListener("keydown", (e) => {
+    if (e.key === "+" || e.key === "=") {
+      e.preventDefault();
+      keys.zoomIn();
+    } else if (e.key === "-" || e.key === "_") {
+      e.preventDefault();
+      keys.zoomOut();
+    } else if (e.key === "0") {
+      e.preventDefault();
+      keys.reset();
+    }
+  });
+}
+
+/**
  * Build the floating − / percentage / + zoom controls (ED-08). The percentage
  * doubles as a reset-to-fit button. Shared by the image and PDF surfaces; the
  * caller wires the three handlers and pushes updates through `setPercent`.
@@ -235,11 +261,25 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
       rest: "contain",
       wheel: "always",
       doubleClick: true,
-      keyboard: true,
+      // The KEYBOARD is bound to the backdrop below, not to the controller's
+      // own `stage`. The controller listens on whatever element it is given as
+      // `stage`, which here is the picture's mat, and no keydown ever passes
+      // through it: focus is trapped on the backdrop's own controls (the close
+      // button, then the zoom row). Before the mat existed the mat WAS the
+      // backdrop, so the two coincided and `+`/`−`/`0` worked; splitting them
+      // silently made the image lightbox's keyboard zoom unreachable while the
+      // buttons kept driving the same API. `za1` is the scenario that caught
+      // it. The PDF arm below states the contract this restores.
+      keyboard: false,
     });
     zoomRef = zoom;
     activeImageZoom = zoom;
     backdrop.appendChild(controls.el);
+    bindZoomKeys(backdrop, {
+      zoomIn: () => zoom.zoomIn(),
+      zoomOut: () => zoom.zoomOut(),
+      reset: () => zoom.reset(),
+    });
   }
 
   // Vault-wide Export (Save As) affordance (MYND-173): present whenever the
@@ -334,19 +374,12 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     });
     setPdfPercent = pdfControls.setPercent;
     backdrop.appendChild(pdfControls.el);
-    // Keyboard parity with the image reader: +/− scale, 0 resets to fit. Bound to
-    // the backdrop (focus-trapped), removed with it on dismiss.
-    backdrop.addEventListener("keydown", (e) => {
-      if (e.key === "+" || e.key === "=") {
-        e.preventDefault();
-        mountAtScale(pdfScale * ZOOM_STEP);
-      } else if (e.key === "-" || e.key === "_") {
-        e.preventDefault();
-        mountAtScale(pdfScale / ZOOM_STEP);
-      } else if (e.key === "0") {
-        e.preventDefault();
-        mountAtScale(1);
-      }
+    // Keyboard parity with the image reader: +/− scale, 0 resets to fit. One
+    // keymap, bound to the backdrop (focus-trapped), removed with it on dismiss.
+    bindZoomKeys(backdrop, {
+      zoomIn: () => mountAtScale(pdfScale * ZOOM_STEP),
+      zoomOut: () => mountAtScale(pdfScale / ZOOM_STEP),
+      reset: () => mountAtScale(1),
     });
     mountAtScale(1);
   }

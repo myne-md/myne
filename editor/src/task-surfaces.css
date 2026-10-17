@@ -775,6 +775,20 @@
   border: none;
   background: transparent;
   box-shadow: none;
+  /* **The pane owns the minimum width, so the editor must not impose a second
+     one.** The editor's base rule carries `min-width: 220px`, and the pane
+     spends 9px of its own 228px border box on a 1px left border and 8px left
+     padding, so the content box is 219px and the editor stuck out by exactly
+     1px. On an `overflow-y: auto` container that is not cosmetic: the computed
+     `overflow-x` becomes `auto` too, the pane grows a HORIZONTAL scrollbar
+     across its bottom edge, and that scrollbar lands on the Cancel/Save row,
+     which is the last 32px of the editor. Measured (myne-md/myne#894): the Save
+     button's own centre answered `elementFromPoint` with the pane, and
+     `elementsFromPoint` did not list the button OR its row at all, so the click
+     was refused as "element not interactable" and the anchored popover could
+     not be committed with a pointer at all. The calendar above it hit-tested
+     normally, which is what made this look like a driver problem. */
+  min-width: 0;
 }
 
 .cm-task-field-menu-row {

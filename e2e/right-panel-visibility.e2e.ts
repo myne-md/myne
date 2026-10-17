@@ -62,27 +62,34 @@ describeE2E("rp1 right-panel tab hide/restore persists (right-panel tabs)", () =
         await dismissImporterOffer(s);
         await createNote(s, "rp1notealfa7k2m9qx4w8e5rj0aa");
 
-        // Baseline: the four tabs a FRESH VAULT renders, which is this
+        // Baseline: the five tabs a FRESH VAULT renders, which is this
         // scenario's declared precondition.
         //
         // `ai-chat` is in the tab vocabulary (`rightPanelTabs.ts`) but the
         // Editor hides it while `ai_enabled` is off — AI ships in the default
         // build behind a runtime beta opt-in (decisions.md 2026-07-02), and a
-        // fresh vault has it off. The list here asserted five for long enough
-        // that the fifth had stopped being true; it is the gate that moved, not
-        // the tab.
+        // fresh vault has it off.
         //
-        // Turning AI on to keep the literal five was tried and is NOT what this
-        // spec should do. It is off-story — nothing below is about AI — and it
-        // moved the failure rather than removing it: with five tabs the
-        // right-click target this scenario uses (`editor.right-panel-tabs-rest`,
-        // the strip's trailing `flex: 1` spacer) stopped yielding a menu in
-        // three consecutive runs. Whether that is the spacer squeezed to zero
-        // width, and therefore something a USER with AI on also loses, is a
-        // separate question with its own answer to measure — not something to
-        // decide inside a tab-visibility spec.
+        // The fifth is `who-is-here`, the live-presence roster the live-collab
+        // epic added to the same vocabulary, and it is NOT gated on anything: a
+        // fresh vault shows it. The list here asserted four for as long as that
+        // was true, and the assertion is what caught the change.
+        //
+        // The paragraph this replaces warned that with five tabs the right-click
+        // target this scenario uses (`editor.right-panel-tabs-rest`, the strip's
+        // trailing `flex: 1` spacer) had stopped yielding a menu in three
+        // consecutive runs, and called that a separate question with its own
+        // answer to measure rather than something to decide here. Five is now the
+        // DEFAULT state, so the question is live for every user who never hides a
+        // tab; this scenario going red at the checklist step is that measurement.
         await s.byTestId("editor.right-panel-tabs");
-        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "outline", "tasks"]);
+        expect(await tabIds(s)).toEqual([
+          "backlinks",
+          "unlinked",
+          "outline",
+          "tasks",
+          "who-is-here",
+        ]);
 
         // Right-click the strip → the "Outline" item shows as checked (visible).
         const outlineItem = await openTabChecklistItem(s, "outline");
@@ -104,7 +111,12 @@ describeE2E("rp1 right-panel tab hide/restore persists (right-panel tabs)", () =
         await unlockToEditor(s, password);
         await dismissImporterOfferIfPresent(s);
         await s.byTestId("editor.right-panel-tabs");
-        expect(await tabIds(s)).toEqual(["backlinks", "unlinked", "tasks"]);
+        expect(await tabIds(s)).toEqual([
+          "backlinks",
+          "unlinked",
+          "tasks",
+          "who-is-here",
+        ]);
 
         // The reopened checklist reflects the persisted state: "Outline" unchecked.
         const outlineItemAfter = await openTabChecklistItem(s, "outline");

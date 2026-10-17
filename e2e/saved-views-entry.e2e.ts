@@ -187,11 +187,13 @@ describeE2E("sv2 Views feature toggle gates the sidebar entry (#230)", () => {
         // against a MOUNTED sidebar, not a race where nothing has rendered yet.
         //
         // #275: the `+` menu BUTTON, not one of its entries. #230 folded the
-        // new-note control into that menu, so `notes.create` renders only while
-        // the dropdown is open — waiting for it here waits for something that
-        // is not on screen, and the anchor that was meant to remove a race
-        // became a timeout.
-        await s.byTestId("notes.new-menu");
+        // new-note control into a DROPDOWN, so `notes.create` rendered only
+        // while that dropdown was open, and the anchor that was meant to remove a
+        // race became a timeout. That dropdown is gone: the new-note control is a
+        // direct icon button again and the dropdown's entries became the new-tab
+        // chooser (`notes.newTab`). `notes.create` IS the button this anchor
+        // wants, and `notes.new-menu` no longer exists anywhere in the tree.
+        await s.byTestId("notes.create");
 
         // The entry point is the rail button now, not a sidebar nav row
         // (myne-md/myne#762), so that is what the toggle has to govern: the

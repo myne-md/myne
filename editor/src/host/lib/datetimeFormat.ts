@@ -479,12 +479,18 @@ export function formatInstant(
     // Reduce the instant to its civil date IN THE DISPLAY ZONE, then hand it to
     // the same civil-date printer every other surface uses — so an explicit
     // preset applies here too instead of quietly falling back to the locale.
-    const parts = intl("en-CA", {
-      timeZone: zone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
+    // `civilDateIn`, not `.format(…)`: see its own doc for the runtime where the
+    // layout-based read handed `formatCivilDate` a string it could not match,
+    // which made this comment false.
+    const parts = civilDateIn(
+      intl("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+      d,
+    );
     const printed = formatCivilDate(parts, display);
     if (opts.withTime !== true) return printed;
     const clock = intl("en-GB", {
@@ -503,6 +509,44 @@ export function formatInstant(
 }
 
 /**
+ * The `YYYY-MM-DD` civil date an `Intl.DateTimeFormat` probe renders, assembled
+ * from `formatToParts` rather than from `format()`'s LAYOUT.
+ *
+ * **Three call sites used to write `Intl.DateTimeFormat("en-CA", …).format(…)`
+ * and each carried a comment saying en-CA renders `YYYY-MM-DD` "so no
+ * part-by-part reassembly is needed". That is a property of the ICU DATA, not of
+ * the API, and it is not true everywhere.** Measured on the WebKitGTK the desktop
+ * E2E runs against (2026-10-17): `Intl.DateTimeFormat("en-CA", {year:"numeric",
+ * month:"2-digit", day:"2-digit", timeZone:"UTC"}).format(2026-10-17)` answers
+ * `10/17/2026`, byte-identical to `en-US`, and `formatToParts` reports the US
+ * order. The three consequences were all silent, and all of them landed in
+ * STORED or COMPARED values rather than in pixels:
+ *
+ *   - the task-field date picker seeds its selection from {@link todayIn}, so
+ *     every date it committed reached the note as `[due:: 10/17/2026]`. The
+ *     dialect's `DATE_ONLY` then refused to parse it and the value arrived as
+ *     MALFORMED, i.e. the on-disk contract (`markdown-dialect.md` §3.6.4's
+ *     `YYYY-MM-DD`) was broken by the runtime's locale data. Caught by
+ *     `task-panel` tp5, which asserts the note's bytes;
+ *   - {@link formatInstant}'s civil-date reduction produced a string no
+ *     `CIVIL_DATE` matches, so `formatCivilDate` returned it verbatim and the
+ *     user's `date_format` preset was silently not applied;
+ *   - `todayLocal` (`src/notes/taskFilters.ts`) handed the date filters a value
+ *     no stored ISO date equals, so a "today" filter matched nothing.
+ *
+ * `formatToParts` names every field, so the layout cannot decide what is stored.
+ */
+export function civilDateIn(format: Intl.DateTimeFormat, when: Date): string {
+  const parts = format.formatToParts(when);
+  const field = (type: "year" | "month" | "day"): string =>
+    (parts.find((p) => p.type === type)?.value ?? "").padStart(
+      type === "year" ? 4 : 2,
+      "0",
+    );
+  return `${field("year")}-${field("month")}-${field("day")}`;
+}
+
+/**
  * Today as `YYYY-MM-DD` in the DISPLAY zone.
  *
  * The zone-aware replacement for a bare local-calendar read: with an override
@@ -510,14 +554,15 @@ export function formatInstant(
  * follows the zone the user chose rather than the machine's.
  */
 export function todayIn(display: DateTimeDisplay, now: Date = new Date()): string {
-  // `en-CA` renders `YYYY-MM-DD`, which is exactly the civil-date shape, so no
-  // part-by-part reassembly is needed.
-  return intl("en-CA", {
-    timeZone: display.timeZone ?? undefined,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  return civilDateIn(
+    intl("en-CA", {
+      timeZone: display.timeZone ?? undefined,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }),
+    now,
+  );
 }
 
 // ── the ambient current settings ────────────────────────────────────────────

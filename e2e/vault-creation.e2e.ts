@@ -19,6 +19,7 @@ import {
   selectPickerRow,
   switchToVault,
   unlockToEditor,
+  waitForBannerText,
 } from "./support/flows";
 import { seedVault, vaultMetaPath, type SeededVault } from "./support/fixtures";
 import { saveRealisticFixture } from "./support/realistic-fixture";
@@ -172,8 +173,19 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       // The vault's own name heads its kit, which is half of why the name step
       // exists. Its other half — the label reaching `vault.prefs` — is asserted
       // after the unlock, further down.
-      expect(await (await app.session.byTestId("create.kit-meta")).text()).toContain(
-        VC_VAULT_NAME,
+      //
+      // Polled through `textContent()`, NOT read once with `text()`. A one-shot
+      // `GET /text` on a node the render tree has only just received can answer
+      // `""` while the DOM is already correct (the trap `waitForBannerText`'s
+      // header documents, measured on a just-inserted banner), and `kit-meta` is
+      // exactly that case: it mounts with the kit sheet.
+      await app.session.waitUntil(
+        async () => {
+          const el = await app.session.byTestId("create.kit-meta");
+          const text = (await el.textContent()) ?? "";
+          return text.includes(VC_VAULT_NAME) ? true : null;
+        },
+        { label: "the kit names the vault", timeoutMs: 15_000 },
       );
 
       // Reveal + scrape the 24 words (the fixture's ONLY capture point —
@@ -488,7 +500,7 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
     });
   });
 
-  it("Back-from-Phrase is a clean restart; Back-from-password returns to Welcome", async () => {
+  it("Back-from-Phrase is a clean restart; Back-from-password steps back to the name step", async () => {
     // Vault-count precondition: 0. Two begins (the restart proof needs a
     // fresh begin to succeed — arm 4b).
     await scenario("vc4-clean-restart", {}, async (app) => {
@@ -509,9 +521,18 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
       await (await app.session.byTestId("create.phrase-back")).click();
       await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
 
-      // Arm 6: Back from the password step (entered from Welcome) →
-      // Welcome (MYND-219 reprobe: 0 vaults on disk).
+      // Arm 6: Back from the password step (entered from Welcome) → the NAME
+      // step, one back-step rather than an exit, which is what myne-md/myne#468
+      // made it ("One step BACK, to the vault-name step — not out of the flow"),
+      // with the typed name kept. Then Back again → Welcome (MYND-219 reprobe:
+      // 0 vaults on disk, so the entry surface is the welcome screen).
       await (await app.session.byTestId("create.secondary")).click();
+      const backAtName = await app.session.byTestId("create.name-input", { timeoutMs: 15_000 });
+      expect(
+        await backAtName.property<string>("value"),
+        "the back-step must keep the name the user already typed",
+      ).toBe(VC_VAULT_NAME);
+      await (await app.session.byTestId("create.name-back")).click();
       await app.session.byTestId("welcome.root", { timeoutMs: 15_000 });
     });
   });
@@ -530,16 +551,26 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
       async (app) => {
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
         await (await app.session.byTestId("picker.create-cta")).click();
-        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+        // The NAME step first, on every entry (myne-md/myne#468): only the
+        // safety briefing is first-run-only, so "create another" lands on the
+        // name step and this walk reaches the password step.
+        await nameVaultStep(app.session);
 
         // First-run-only scoping (MYND-114): the picker "create another"
-        // entry lands DIRECTLY on password — no safety briefing (a
-        // returning user has acknowledged the recovery model once).
+        // entry shows NO safety briefing (a returning user has acknowledged
+        // the recovery model once).
         expect(await app.session.byTestIdAll("create.briefing")).toHaveLength(0);
 
-        // Arm 5: Back → reprobe → ≥2 vaults → picker (the pre-MYND-219
-        // behavior stranded this path on Welcome).
+        // Arm 5: Back from the password step → the NAME step, which is the
+        // back-step myne-md/myne#468 gave it ("One step BACK, to the vault-name
+        // step — not out of the flow"), and then Back again → the entry surface,
+        // which here is the picker (the pre-MYND-219 behavior stranded this path
+        // on Welcome). Asserted in two hops rather than one, because a single
+        // click that left creation entirely would satisfy the old form and
+        // report nothing about the name step's existence.
         await (await app.session.byTestId("create.secondary")).click();
+        await app.session.byTestId("create.name-input", { timeoutMs: 15_000 });
+        await (await app.session.byTestId("create.name-back")).click();
         await app.session.byTestId("picker.root", { timeoutMs: 15_000 });
       },
     );
@@ -658,8 +689,15 @@ describeE2E("VC-6 auto-unlock-failure fallback (MYND-124 task 5)", () => {
       // banner (full literal) rather than a wrong-vault attempt.
       await (await app.session.byTestId("unlock.password-input")).sendKeys(VC1_PASSWORD);
       await (await app.session.byTestId("unlock.submit")).click();
-      const banner = await app.session.byTestId("unlock.error-banner", { timeoutMs: 15_000 });
-      expect(await banner.text()).toBe("Vault file not found. Please restart the app.");
+      // Full-literal equality, POLLED (`waitForBannerText`): a one-shot
+      // `GET /text` on a banner the render tree has just received can answer
+      // `""` while the DOM already holds the copy (that helper's header records
+      // the measurement), and the failure then reads as a wrong banner.
+      await waitForBannerText(
+        app.session,
+        "unlock.error-banner",
+        "Vault file not found. Please restart the app.",
+      );
     });
   });
 });
@@ -684,7 +722,8 @@ describeE2E("VC-9/VC-10 create-second-vault entries (MYND-124 task 6)", () => {
         const metaBefore = readFileSync(vaultMetaPath(app.appDataDir, a.vaultId));
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
         await (await app.session.byTestId("picker.create-cta")).click();
-        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+        // Name step first: only the briefing is first-run-only (myne-md/myne#468).
+        await nameVaultStep(app.session);
         await createToReadyStep(app.session, PASSWORD_NEW);
         await (await app.session.byTestId("create.ready-done")).click();
         await app.session.byTestId("editor.root", { timeoutMs: 120_000 });
@@ -724,7 +763,8 @@ describeE2E("VC-9/VC-10 create-second-vault entries (MYND-124 task 6)", () => {
         // of the NEW vault (auto-unlock evicts A per SYNC-1).
         await (await app.session.byTestId("switcher.chip")).click();
         await (await app.session.byTestId("switcher.create-cta")).click();
-        await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+        // Same name step as the picker entry (myne-md/myne#468).
+        await nameVaultStep(app.session);
         await createToReadyStep(app.session, PASSWORD_NEW);
         await (await app.session.byTestId("create.ready-done")).click();
         await app.session.byTestId("editor.root", { timeoutMs: 120_000 });
@@ -787,9 +827,13 @@ describeE2E("MYND-114 first-run safety briefing (pre-vault-create contract)", ()
         timeoutMs: 10_000,
       });
 
-      // Continue → password step (the briefing is forward-only into the flow).
+      // Continue → the NAME step, then the password step. Before myne-md/myne#468
+      // the briefing was forward-only straight into the password; a name step
+      // now sits between them, so the claim "Continue moves the flow on" is
+      // asserted through the step that is actually next.
       await cont.click();
-      await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
+      await app.session.byTestId("create.name-input", { timeoutMs: 15_000 });
+      await nameVaultStep(app.session);
     });
   });
 });

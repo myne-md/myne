@@ -154,32 +154,75 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
     }
 
     async fn write_batch(&self, notes: Vec<(String, String)>) -> Result<(), AgentError> {
-        let updates: Vec<NoteBatchUpdate> = notes
-            .into_iter()
-            .map(|(note_id, plaintext)| NoteBatchUpdate { note_id, plaintext })
-            .collect();
         // The REAL live-session registry, not a throwaway: this is the write path
         // that authors an agent's edits (a batch, not the guarded `note_update`), so
-        // a note a live session owns must be refused here or the agent write lands
-        // behind the session's single durable writer (`SYNC-33`). An absent registry
-        // is a host misconfiguration (the desktop plugin manages it in `lib.rs`), so
-        // it fails the write rather than silently skipping the guard.
+        // a note a live session owns must be written THROUGH that session rather
+        // than refused. An absent registry is a host misconfiguration (the desktop
+        // plugin manages it in `lib.rs`), so it fails the write rather than
+        // silently skipping the guard.
         use tauri::Manager as _;
         let registry = self
             .host
             .app()
             .try_state::<crate::plugins::live::LiveSessionRegistry>()
             .ok_or(AgentError::WriteFailed)?;
-        note_write_batch_transactional_from_host(
-            &self.host,
-            &StdVaultIo,
-            self.state,
-            &self.hooks,
-            registry.inner(),
-            updates,
-        )
-        .await
-        .map_err(|_| AgentError::WriteFailed)
+
+        // **Partitioned, because one note can be owned by a live session and its
+        // neighbours not.** `SYNC-33` makes an open session the SINGLE durable
+        // writer for its note, and `note_write_batch_transactional_from_host`
+        // enforces exactly that by refusing the whole batch with
+        // `NoteBatchError::LiveSessionOpen`. Until this partition existed, every
+        // apply that touched a note the user had open failed: the adapter maps the
+        // refusal to a bare `WriteFailed`, the screen says only "The changes could
+        // not be applied", and the flow the feature exists for — approve an edit on
+        // the note you are reading — was the one that could not work.
+        //
+        // The session's own whole-markdown patch is the write the editor's save
+        // funnel already uses (`src/notes/liveNote.ts`), so the agent's edit takes
+        // the same door rather than a second one beside it.
+        let (live, plain): (Vec<(String, String)>, Vec<(String, String)>) = notes
+            .into_iter()
+            .partition(|(note_id, _)| registry.is_note_open(note_id));
+
+        // **The transactional half FIRST, and the order is the most this can
+        // promise.** A failure there returns before anything is written, so every
+        // live-owned note is still untouched. Once the live half starts, each of
+        // its writes is its own durable flush (the session patch flushes per note),
+        // so a later failure is REPORTED rather than rolled back: on a batch that
+        // mixes the two, `WriteFailed` means "the apply did not complete", not
+        // "nothing landed". The run's restore point was taken before any of this
+        // (see `apply_approved` step 4), so the notes that did land stay undoable.
+        if !plain.is_empty() {
+            let updates: Vec<NoteBatchUpdate> = plain
+                .into_iter()
+                .map(|(note_id, plaintext)| NoteBatchUpdate { note_id, plaintext })
+                .collect();
+            note_write_batch_transactional_from_host(
+                &self.host,
+                &StdVaultIo,
+                self.state,
+                &self.hooks,
+                registry.inner(),
+                updates,
+            )
+            .await
+            .map_err(|_| AgentError::WriteFailed)?;
+        }
+
+        for (note_id, plaintext) in live {
+            crate::plugins::live::commands::live_session_patch_frontmatter_from_host(
+                &self.host,
+                self.state,
+                registry.inner(),
+                &self.hooks,
+                &StdVaultIo,
+                note_id,
+                plaintext,
+            )
+            .await
+            .map_err(|_| AgentError::WriteFailed)?;
+        }
+        Ok(())
     }
 }
 

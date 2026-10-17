@@ -6,6 +6,7 @@
 
 import { afterEach, describe } from "vitest";
 import { harnessSupported, launchApp, type AppSession, type LaunchOptions } from "./session";
+import { recordWait } from "./webdriver";
 import { vaultDirState } from "./fixtures";
 
 const support = harnessSupported();
@@ -73,7 +74,14 @@ export async function scenario(
   opts: LaunchOptions,
   body: (app: AppSession) => Promise<void>,
 ): Promise<void> {
+  // The per-scenario FIXED cost (seed the fixture vault, spawn the driver and
+  // the app, wait for the handshake), recorded as a wait so the profiler can put
+  // it beside the in-test waits it competes with. With 466 executed scenarios
+  // this is the suite's floor and the first thing to look at when asking whether
+  // a shard count is the lever or the waits are.
+  const launchStarted = Date.now();
   const app = await launchApp(opts);
+  recordWait(`[launch] ${label}`, Date.now() - launchStarted, false);
   current = app;
   try {
     await body(app);

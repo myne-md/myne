@@ -28,6 +28,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
+import { testIdSelector } from "./support/webdriver";
 import { KEY, pressKey } from "./support/keyboard";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { httpsConfigSeed, syncConfigSeed } from "./support/multi-device";
@@ -67,13 +68,27 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await unlockToEditor(app.session, fixture.password);
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
-        // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
-        await selectSettingsTopic(app.session, "sync", "devices");
-        // The panel mounts with the person-identity step first: the invite
-        // path needs a held identity, so the phrase form is what a fresh
-        // process shows.
-        await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
+        // **Two topics, and the split is the panel's own** (myne-md/myne#885).
+        // The Identity block leads the CONNECTION topic, because the panel's
+        // header states the reason: whether this device holds a person identity
+        // decides what the rest of the panel can do. The rosters live on DEVICES,
+        // with the members that need one. This scenario used to assume one view
+        // carried both, which no view does since the split.
+        await selectSettingsTopic(app.session, "sync", "connection");
+        // The phrase form is what a fresh process shows, and it is a dialog
+        // behind the row's own action (myne-md/myne#831, myne-md/myne#885): the
+        // grid is no longer inlined under the row, so the affordance is the
+        // trigger and the form is one click in.
+        await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
         await app.session.byTestId("sync.panel.identity-unlock");
+        await (await app.session.byTestId("sync.panel.identity-unlock.cancel")).click();
+        await app.session.waitForGone(
+          testIdSelector("sync.panel.identity-unlock"),
+          { timeoutMs: 10_000 },
+        );
+
+        await selectSettingsTopic(app.session, "sync", "devices");
+        await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         const invitationObservationEndsAt = Date.now() + 1_000;
         await app.session.waitUntil(
           async () => {
@@ -107,13 +122,15 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await unlockToEditor(app.session, fixture.password);
         await dismissImporterOffer(app.session);
         await openSettings(app.session, "sync");
-        // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
-        await selectSettingsTopic(app.session, "sync", "devices");
-        await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
-        // The identity unlock is the Sync panel's Identity block, collapsed by
-        // default; the member roster no longer carries its own grid
+        // **The identity is unlocked on CONNECTION, the roster is on DEVICES**
+        // (myne-md/myne#885). The two are one click apart, which is the panel's
+        // design: the identity question leads the topic about this device's
+        // account, and the rosters sit with the members that need one.
+        // The phrase form is behind the row's action, not inlined under it
         // (myne-md/myne#831).
+        await selectSettingsTopic(app.session, "sync", "connection");
         await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
+        await app.session.byTestId("sync.panel.identity-unlock");
         // Unlock the person identity; first enrolment mints the owner.
         for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
@@ -123,6 +140,8 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           await (await app.session.byTestId(testId)).replaceText(word);
         }
         await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
+        // Unlocked: back to the roster's own topic.
+        await selectSettingsTopic(app.session, "sync", "devices");
         await app.session.byTestId("member-roster.person-ready");
         await (await app.session.byTestId("member-roster.copy-owner-code")).click();
         await app.session.waitUntil(

@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 // Minimal W3C WebDriver client for the Myne E2E harness.
 //
 // Hand-rolled instead of the `webdriver` npm package by deliberate
@@ -482,6 +483,45 @@ export interface FindOptions {
 const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_INTERVAL_MS = 100;
 
+/**
+ * Opt-in wait profiler (`MYNE_E2E_WAIT_PROFILE=1`).
+ *
+ * A scenario's wall clock is dominated by its WAITS, and the suite's JSON
+ * reporter gives per-TEST durations, which cannot separate "the app was slow"
+ * from "this wait was long". So with the flag set every `waitUntil` appends
+ * `{label, ms, timedOut}` to `MYNE_E2E_WAIT_PROFILE_OUT` (default
+ * `/tmp/myne-e2e-waits.jsonl`) and `scripts/e2e-wait-profile.mjs` ranks it
+ * across shards, which is what turns "tighten the budgets" from a guess into a
+ * list.
+ *
+ * **Written per record rather than on `process.on("exit")`.** The first version
+ * flushed on exit and wrote nothing at all: a vitest fork worker does not
+ * reliably reach its own `exit` handler, so the profile was silently empty,
+ * which reads exactly like "nothing was waiting". An `appendFileSync` per wait
+ * costs microseconds against the driver round trips the wait is made of.
+ *
+ * It lives in the harness, never in the binary under test, so the
+ * zero-test-hooks rule (`e2e/AGENTS.md`) is untouched: nothing here can change
+ * what the app does.
+ */
+const WAIT_PROFILE_ON = process.env.MYNE_E2E_WAIT_PROFILE === "1";
+const WAIT_PROFILE_OUT =
+  process.env.MYNE_E2E_WAIT_PROFILE_OUT ?? "/tmp/myne-e2e-waits.jsonl";
+
+/** Record one wait. Exported for `scenario()`'s launch timing, which is a wait
+ *  in everything but name. */
+export function recordWait(label: string, ms: number, timedOut: boolean): void {
+  if (!WAIT_PROFILE_ON) return;
+  try {
+    appendFileSync(
+      WAIT_PROFILE_OUT,
+      `${JSON.stringify({ label, ms, timedOut, pid: process.pid })}\n`,
+    );
+  } catch {
+    // Best-effort: a profile that cannot be written must never fail a run.
+  }
+}
+
 /** One WebDriver session against a running tauri-driver. */
 /** A toplevel window's geometry, as W3C `GET/POST /window/rect` reports it. */
 export interface WindowRect {
@@ -577,6 +617,14 @@ export class Session {
     const timeout = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
     const deadline = Date.now() + timeout;
+    const started = WAIT_PROFILE_ON ? Date.now() : 0;
+    // The label is a THUNK on purpose (see `FindOptions`'s note: it is read only
+    // on the timeout path, where the polls have something to report). The
+    // profile needs a name on the passing path too, and calling a lazy label
+    // early is exactly what its own design forbids, so a thunk records this
+    // placeholder rather than being asked at the start of the wait.
+    const profileLabel =
+      typeof opts?.label === "string" ? opts.label : "<lazy label>";
     let lastStale: WebDriverError | undefined;
     for (;;) {
       let result: T | null | undefined | false;
@@ -590,8 +638,12 @@ export class Session {
           throw e;
         }
       }
-      if (result) return result;
+      if (result) {
+        recordWait(profileLabel, Date.now() - started, false);
+        return result;
+      }
       if (Date.now() >= deadline) {
+        recordWait(profileLabel, Date.now() - started, true);
         const label =
           typeof opts?.label === "function" ? opts.label() : opts?.label ?? "predicate";
         throw new Error(

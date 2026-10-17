@@ -68,7 +68,14 @@ import {
   planRenameBatch,
 } from "./renameInbound";
 import { renameFlushHooks } from "./renameFlushHook";
-import { noteWriteBatchTransactional } from "./noteWriteBatch";
+import {
+  noteWriteBatchTransactional,
+  type NoteBatchEntry,
+} from "./noteWriteBatch";
+// The live-note funnel (`patchLiveNote`), imported for the RENAME path: the
+// batch command refuses the whole set over any note a session owns, so the
+// session half has to be routed here instead. See `commitRename`'s own comment.
+import { patchLiveNote } from "./liveNote";
 import { isBatchCommitted } from "../types/note-batch-error";
 import {
   hydrateVaultIndicesOnUnlock,
@@ -941,7 +948,39 @@ export function SidebarStateProvider({
         );
         let pendingPublish = false;
         try {
-          await noteWriteBatchTransactional(plan.batch);
+          // ── The single-writer funnel, on the TS side ───────────────────────
+          //
+          // `note_write_batch_transactional` REFUSES the whole batch with
+          // `NoteBatchError::LiveSessionOpen` when ANY item is owned by a live
+          // session (`SYNC-33`), and it checks that over every item before any
+          // filesystem touch. The renamed note is very often the OPEN one (you
+          // click a note, then rename it), so the batch refused it, the rename
+          // failed behind the "couldn't save that name" toast, and NOTHING was
+          // written. Measured: `rename-inbound-links` ril1 renamed an open note
+          // and the app's own toast named the failure while the sidebar kept the
+          // old title.
+          //
+          // The design already says these writers funnel through the session
+          // (`live_session_patch_frontmatter_from_host`'s own doc: "task 7 funnels
+          // the rename/move/delete writers here so exactly one change graph writes
+          // the note"); this is that funnel where the batch is composed. It
+          // partitions by ATTEMPT rather than by a predicate: `patchLiveNote`
+          // answers false when no session owns the note, which is exactly the
+          // case the batch must handle, and it also releases a session it finds
+          // already closed.
+          //
+          // **The residual, stated rather than discovered.** The session half
+          // flushes per note and the batch half is transactional, so a failure
+          // here means "did not complete" rather than "nothing landed" — the same
+          // residual `host_adapters.rs` records for the agent's batch. It is
+          // narrower than the bug: before this, a rename of an open note could
+          // not land at all.
+          const remaining: NoteBatchEntry[] = [];
+          for (const entry of plan.batch) {
+            const routed = await patchLiveNote(entry.noteId, entry.plaintext);
+            if (!routed) remaining.push(entry);
+          }
+          if (remaining.length > 0) await noteWriteBatchTransactional(remaining);
         } catch (err) {
           // myne#300 — a post-commit failure is not "nothing happened". The
           // `.rename-journal` marker is durable, so the backend publishes the
