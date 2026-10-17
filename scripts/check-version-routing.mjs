@@ -60,7 +60,8 @@
 // a dependency is a security decision).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // `mobile/src-tauri/src` joined on myne-md/myne#479, and its absence had cost
 // exactly what this guard exists to prevent. Mobile's local `workspace` plugin
@@ -155,7 +156,7 @@ const CLASSES = {
 };
 
 /** Names a file imports from `protocol` (`use protocol::{a, b}` / `use protocol::a;`). */
-function protocolImports(text) {
+export function protocolImports(text) {
   const names = new Set();
   for (const m of text.matchAll(/use\s+protocol::\{([^}]*)\}/gs)) {
     for (const part of m[1].split(",")) {
@@ -168,7 +169,7 @@ function protocolImports(text) {
 }
 
 /** Does `line` call `protocol::name`, given what the file imports? */
-function callsProtocolName(line, name, imports) {
+export function callsProtocolName(line, name, imports) {
   if (new RegExp(`\\bfn\\s+${name}\\s*[(<]`).test(line)) return false; // a definition is not a call
   if (new RegExp(`\\bprotocol::${name}\\s*\\(`).test(line)) return true;
   if (!imports.has(name)) return false;
@@ -253,11 +254,50 @@ const ALLOWED = new Map([
   // test, since it is the absence of v0.1 writes rather than the presence of
   // v0.2 ones. Do not re-add an entry here without the flip being reversed.
 
-  // ── DEBT: not yet routed ───────────────────────────────────────────────────
-  // EMPTY, and that is the point: #432/#433 drove it to zero. A new entry here
-  // needs an argument for why the surface may stay broken on a migrated vault.
+  // ── DEBT lives in its own table below ──────────────────────────────────────
+  // It used to be a section at the end of THIS table, and the count was derived
+  // from a reason string (`why.startsWith("debt")`) that no entry in this file
+  // has ever carried — so the run printed "0 still debt" while the section it
+  // was describing held a live entry. The figure is now a property of the
+  // STRUCTURE (`DEBT` below) rather than of prose in a reason.
+]);
+
+// The other half of the ratchet's subject, and the reason the count is worth
+// printing: these sites have no argument for staying on a v0.1-only helper.
+// Membership is the debt; the comment above each entry says why it is recorded
+// and the entry leaves this table (or moves up into `ALLOWED` with a real
+// argument) when it stops being true.
+const DEBT = new Map([
+  // The `is_nc05_blob` dispatch: the v0.1 leg of an explicit branch, which is
+  // the SHAPE the "v0.1 arm of an explicit branch" group in `ALLOWED` already
+  // covers. It is recorded as debt rather than as that group because the two
+  // differ in one way a reader should decide deliberately rather than inherit:
+  // those sites branch on the VAULT generation (`is_v0_2`), while this one
+  // branches on the BLOB's magic, so a `MY01` blob inside a v0.2 vault takes the
+  // v0.1 decoder with no `version` in hand. Moving this entry up into `ALLOWED`
+  // is the deliberate act of accepting that; leaving it here is what keeps the
+  // debt figure honest until somebody does.
   ["core/src/plugins/notes/commands.rs#note", [3, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_write_batch"]],
 ]);
+
+// The lookup the budget check and the staleness check both use. Built here so
+// the two directions cannot disagree about what is permitted, and checked for
+// overlap: a key in BOTH tables would silently resolve to whichever object
+// spread last, which is the shape that made the old reason-prefix filter pass.
+const PERMITTED = new Map([...ALLOWED, ...DEBT]);
+
+/** Keys recorded in BOTH tables. Non-empty means the lookup resolves by object
+ *  spread order, which is the shape that let the old reason-prefix filter pass. */
+export function overlappingKeys(a = ALLOWED, b = DEBT) {
+  return [...a.keys()].filter((k) => b.has(k));
+}
+
+/** The debt figure, a property of the DEBT table rather than of prose. */
+export function debtTotal() {
+  return [...DEBT.values()].reduce((a, [n]) => a + n, 0);
+}
+
+export { ALLOWED, DEBT };
 
 const SKIP_DIRS = new Set(["target"]);
 
@@ -277,6 +317,16 @@ function walk(dir, out = []) {
   return out;
 }
 
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+const overlapping = overlappingKeys();
+if (overlapping.length) {
+  console.error(
+    `check-version-routing: ${overlapping.join(", ")} appear in both ALLOWED and DEBT.\n` +
+      "  A key is either legitimately v0.1-only or it is debt, never both: the\n" +
+      "  lookup would then resolve to whichever table the spread put last.",
+  );
+  process.exit(1);
+}
 const argv = process.argv.slice(2);
 const all = argv.length ? argv.filter((f) => f.endsWith(".rs")) : ROOTS.flatMap((r) => walk(r));
 const files = all.filter((f) => {
@@ -343,7 +393,7 @@ for (const file of files) {
   for (const [name, { line, count }] of hits) {
     const key = `${rel}#${name}`;
     touching.set(key, count);
-    const allowed = ALLOWED.get(key);
+    const allowed = PERMITTED.get(key);
     const budget = allowed ? allowed[0] : 0;
     if (count > budget) {
       offenders.push({ key, file: rel, line, class: name, count, budget });
@@ -358,7 +408,7 @@ for (const file of files) {
 // budget is now larger than the population. Both make the number a lie.
 const stale = argv.length
   ? []
-  : [...ALLOWED].filter(([k, [n]]) => (touching.get(k) ?? 0) < n);
+  : [...PERMITTED].filter(([k, [n]]) => (touching.get(k) ?? 0) < n);
 
 if (offenders.length || stale.length) {
   if (offenders.length) {
@@ -394,9 +444,10 @@ that reason.`);
 }
 
 const total = [...touching.values()].reduce((a, b) => a + b, 0);
-const debt = [...ALLOWED].filter(([, [, why]]) => why.startsWith("debt")).reduce((a, [, [n]]) => a + n, 0);
+const debt = debtTotal();
 console.log(`version-routing: ok (${files.length} file(s) checked)`);
 console.log(
   `  ${total} v0.1-only call site(s) across ${touching.size} (file, class) pair(s); ` +
     `${debt} still debt. This number must only go down.`,
 );
+}
