@@ -111,6 +111,8 @@ describe("Command palette action registry", () => {
       "appearance.theme-system",
       "appearance.toggle-timestamps",
       "archive.open",
+      "attachments.attach-file",
+      "attachments.convert-imported",
       "attachments.open",
       "daily.open-today",
       "editor.cycle-content-width",
@@ -784,4 +786,20 @@ describe("app.toggle-screen-capture visibility", () => {
       find("app.toggle-screen-capture").visibility(makeContext({ stageName: "editor" })),
     ).toBe("hidden");
   });
+});
+
+describe("attachment palette actions (audit T6.13 item 1)", () => {
+  // Both functions were exported and had NO palette entry, so "attach a file"
+  // was reachable only from `/attach` and "convert imported attachments" from
+  // nothing at all. Registry presence is what makes either reachable.
+  const ids = ["attachments.attach-file", "attachments.convert-imported"];
+  for (const id of ids) {
+    it(`${id} is registered, editor-categorised and editor-only`, () => {
+      const action = COMMAND_ACTIONS.find((a) => a.id === id);
+      expect(action, `${id} is missing from COMMAND_ACTIONS`).toBeTruthy();
+      expect(action?.category).toBe("Editor");
+      expect(action?.visibility(makeContext({ stageName: "editor" }))).toBe("show");
+      expect(action?.visibility(makeContext({ stageName: "unlock" }))).toBe("hidden");
+    });
+  }
 });

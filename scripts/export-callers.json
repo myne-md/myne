@@ -2,7 +2,6 @@
   "copy/src/index.ts": 2,
   "dialect/src/civilDate.ts": 2,
   "dialect/src/surgery.ts": 1,
-  "editor/src/attachments/convert-command.ts": 1,
   "editor/src/attachments/image-zoom.ts": 1,
   "editor/src/attachments/widgets.ts": 2,
   "editor/src/decorations/attachment-embed.ts": 1,
