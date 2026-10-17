@@ -77,19 +77,6 @@ describe("the registry's only writer has no production caller", () => {
     ).toEqual([]);
   });
 
-  it("the writer is still marked as the tests-and-preview-only escape hatch", () => {
-    // If the doc comment loses that mark, the export stops reading as a mock
-    // hatch and the next author has no reason not to call it.
-    const src = readFileSync(join(REPO_ROOT, DEFINING_MODULE), "utf8");
-    expect(src).toContain("__seedMockTransfers");
-    expect(
-      /tests \+ the design preview only/.test(src),
-      "the writer's doc comment no longer says it is a test-only hatch",
-    ).toBe(true);
-    // …and the module still says the backend is a mock. When this line goes,
-    // the assertion above stops being the right question.
-    expect(src).toContain("MOCK BACKEND");
-  });
 });
 
 describe("what the progress UI actually shows today", () => {

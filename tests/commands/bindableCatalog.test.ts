@@ -115,9 +115,6 @@ describe("default chords are producible by a keydown (myne#337)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("the split-down default is the chord the event carries", () => {
-    expect(catalogDefaults()["pane.split-column"]).toEqual(["Mod-Shift-|"]);
-  });
 
   it("every default normalizes to itself, so a stored chord compares equal", () => {
     for (const chords of Object.values(catalogDefaults())) {

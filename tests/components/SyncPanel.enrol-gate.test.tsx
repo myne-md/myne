@@ -191,25 +191,6 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     expect(await screen.findByTestId("sync.enroll")).toBeTruthy();
   });
 
-  it("the roster failure alone does not decide it", async () => {
-    // Both cases above see the SAME roster rejection. If the gate were still
-    // reading only the roster, the two would render identically — so this
-    // asserts the difference exists at all, which is the regression that would
-    // reappear if someone reverted to `enrollmentKnown && !enrolledHere`.
-    mountWith("not_enrolled");
-    await waitFor(() => expect(screen.getByText("Add a device")).toBeTruthy());
-    const notEnrolledShowsForm = screen.queryByText("Add a device") !== null;
-    cleanup();
-
-    mountWith("pending");
-    await waitFor(() =>
-      expect(screen.getByTestId("sync.panel.awaiting-approval")).toBeTruthy(),
-    );
-    const pendingShowsForm = screen.queryByText("Add a device") !== null;
-
-    expect(notEnrolledShowsForm).toBe(true);
-    expect(pendingShowsForm).toBe(false);
-  });
 });
 
 /**

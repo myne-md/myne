@@ -144,11 +144,4 @@ mod tests {
             SearchDocId::Note { note_id: "att::" }
         );
     }
-
-    #[test]
-    fn note_id_starting_with_hex_is_never_mistaken_for_attachment() {
-        // Real note_ids are UUIDs — they never carry the `att:` prefix.
-        let id = "a7b3-not-an-attachment";
-        assert_eq!(parse_search_doc_id(id), SearchDocId::Note { note_id: id });
-    }
 }

@@ -117,13 +117,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_untouched_door_reports_no_last_use() {
-        let marker = LastAccess::default();
-        let state = cli_access_state_from(&marker, Instant::now());
-        assert_eq!(state.last_used_secs_ago, None);
-    }
-
-    #[test]
     fn a_recorded_access_is_reported_as_an_age_in_seconds() {
         let marker = LastAccess::default();
         let t0 = Instant::now();

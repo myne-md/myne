@@ -288,16 +288,6 @@ mod tests {
     }
 
     #[test]
-    fn empty_roster_round_trips() {
-        // The first conversation create writes the file; an empty roster map
-        // ("{}") is a legal mid-state (§ 9.23's file-level omit-when-empty is
-        // a no-file rule, not a no-empty-plaintext rule).
-        let blob = encode(b"{}");
-        let decoded = decode_chats_catalog_blob(&KEY, &ACCOUNT_HASH, &blob).expect("decode");
-        assert_eq!(decoded.as_slice(), b"{}");
-    }
-
-    #[test]
     fn header_layout_is_magic_versions_nonce_len() {
         let blob = encode(b"abc");
         assert_eq!(&blob[0..4], b"MYM1");

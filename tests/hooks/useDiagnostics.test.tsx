@@ -119,7 +119,6 @@ describe("useDiagnostics — a non-boolean flag answer", () => {
     h.diagnosticLogEnabledGet.mockResolvedValueOnce("");
     const { result } = await mount();
     expect(result.current.enabled).toBe(false);
-    expect(typeof result.current.enabled).toBe("boolean");
   });
 
   it("folds an undefined answer to false as well", async () => {

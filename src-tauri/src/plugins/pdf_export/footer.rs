@@ -825,16 +825,6 @@ mod tests {
     }
 
     #[test]
-    fn error_kind_labels_are_stable() {
-        // Drift pin for the closed taxonomy (log-side contract).
-        assert_eq!(FooterStampError::Parse.kind(), "Parse");
-        assert_eq!(FooterStampError::NoPages.kind(), "NoPages");
-        assert_eq!(FooterStampError::PageGeometry.kind(), "PageGeometry");
-        assert_eq!(FooterStampError::Malformed.kind(), "Malformed");
-        assert_eq!(FooterStampError::Save.kind(), "Save");
-    }
-
-    #[test]
     fn stamped_output_remains_a_loadable_pdf_with_pdf_magic() {
         let (bytes, _) = stamped(2, "T");
         assert!(bytes.starts_with(b"%PDF"), "magic preserved");

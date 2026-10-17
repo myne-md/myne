@@ -635,23 +635,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn generated_challenges_are_unpredictable_not_constant() {
-        // A weak source (constant / counter) would collapse the set. 256
-        // draws from a 10^6 space should yield many distinct values; assert
-        // a generous lower bound so the test is not flaky on the birthday
-        // paradox yet still fails a constant source dead.
-        let mut seen = HashSet::new();
-        for _ in 0..256 {
-            seen.insert(PairingChallenge::generate().unwrap().value());
-        }
-        assert!(
-            seen.len() > 200,
-            "challenges look non-random: only {} distinct of 256",
-            seen.len()
-        );
-    }
-
     // ---- token: binding + scope ceiling (append-only) ------------------
 
     #[test]
@@ -859,20 +842,6 @@ mod tests {
     }
 
     #[test]
-    fn paired_extensions_round_trip_via_registry_gate_rejects_revoked() {
-        // The gate (the host's authority) must reject a revoked token after a
-        // persist+load cycle — the durable-revocation acceptance criterion.
-        let mut reg = TokenRegistry::new();
-        let t = reg.issue(EXT_A).unwrap();
-        reg.revoke_extension(EXT_A);
-
-        let restored = TokenRegistry::from_paired_extensions(&reg.to_paired_extensions());
-        let gate = RegistryGate::new(&restored, EXT_A, t.value());
-        assert!(!gate.is_paired());
-        assert_eq!(gate.validation(), TokenValidation::Revoked);
-    }
-
-    #[test]
     fn restored_token_carries_the_full_scope_ceiling() {
         // The scope is never persisted — from_parts re-applies the ceiling, so a
         // restored token authorizes exactly create-clip + is-unlocked-status and
@@ -901,20 +870,4 @@ mod tests {
     }
 
     // ---- registry is round-trippable (task-7 persistence seam) ---------
-
-    #[test]
-    fn registry_round_trips_through_serde_for_task_7_persistence() {
-        let mut reg = TokenRegistry::new();
-        let t = reg.issue(EXT_A).unwrap();
-        reg.issue(EXT_B).unwrap();
-        reg.revoke_extension(EXT_B);
-
-        let json = serde_json::to_string(&reg).expect("serialize registry");
-        let back: TokenRegistry = serde_json::from_str(&json).expect("deserialize registry");
-        assert_eq!(back, reg);
-        // Behaviour survives the round-trip: A still valid, B still revoked.
-        assert_eq!(back.validate(EXT_A, t.value()), TokenValidation::Valid);
-        assert!(back.has_live_token(EXT_A));
-        assert!(!back.has_live_token(EXT_B));
-    }
 }

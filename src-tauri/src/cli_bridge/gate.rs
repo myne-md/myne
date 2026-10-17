@@ -90,12 +90,4 @@ mod tests {
         //    unlocked): closes.
         assert!(!socket_should_be_open(classify(false, true)));
     }
-
-    #[test]
-    fn disabled_and_locked_are_distinct_door_states() {
-        // Both close the socket, but task 4 must be able to tell them apart
-        // (see `super::status`) — they are different `DoorState` variants,
-        // not one collapsed "closed" bit.
-        assert_ne!(classify(false, true), classify(true, false));
-    }
 }

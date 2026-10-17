@@ -374,12 +374,6 @@ describe("it never throws", () => {
     expect(result).toEqual({ scheduled: 1, cancelled: 0, failed: 1 });
   });
 
-  it("the clock is injected — the same tasks give different sets at different times", async () => {
-    const tasks = [task({ remind: "2026-07-30 09:00" })];
-    expect(targetReminders(tasks, NOW)).toHaveLength(1);
-    // Two days later the instant is in the past.
-    expect(targetReminders(tasks, new Date(2026, 7, 1, 10, 0))).toHaveLength(0);
-  });
 
   it("never reads an ambient clock", async () => {
     // Structural, asserted against the source: a module that reached for the

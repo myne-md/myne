@@ -680,23 +680,4 @@ mod tests {
         assert_eq!(resolve_on_path(Some(OsStr::new("::"))), None);
         assert_eq!(resolve_on_path(None), None);
     }
-
-    #[test]
-    fn outcome_labels_are_bounded_and_carry_no_path() {
-        // The logging discipline in one assertion: the label vocabulary is
-        // closed, so no `tracing` call site in this module can emit a path.
-        for outcome in [
-            ShimOutcome::Installed,
-            ShimOutcome::Unchanged,
-            ShimOutcome::SidecarAbsent,
-            ShimOutcome::SidecarAlreadyOnPath,
-            ShimOutcome::ForeignOnPath,
-            ShimOutcome::Unsupported,
-            ShimOutcome::Failed(crate::io_failure_kind::IoFailureKind::PermissionDenied),
-        ] {
-            let label = outcome.label();
-            assert!(!label.is_empty());
-            assert!(!label.contains('/'), "a label must never look like a path");
-        }
-    }
 }

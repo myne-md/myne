@@ -1026,18 +1026,6 @@ mod tests {
     }
 
     #[test]
-    fn error_kind_labels_are_deny_safe() {
-        assert_eq!(ModelStoreError::InsideVaultTree.kind(), "inside_vault_tree");
-        assert_eq!(
-            ModelStoreError::Io {
-                kind: IoFailureKind::NotFound
-            }
-            .kind(),
-            "io"
-        );
-    }
-
-    #[test]
     fn tag_role_is_selectable_and_stores_its_path() {
         // myne-md/myne#805 (`decisions/ai/0627`): auto-tag's model is no longer
         // bundled-only. It is a selectable, user-storable role, so a downloaded

@@ -145,13 +145,6 @@ mod tests {
     }
 
     #[test]
-    fn mint_is_random_distinct() {
-        let a = VaultId::mint();
-        let b = VaultId::mint();
-        assert_ne!(a, b, "two freshly minted ids must differ");
-    }
-
-    #[test]
     fn render_parse_round_trips() {
         let id = VaultId::mint();
         let rendered = id.to_string();

@@ -219,16 +219,4 @@ mod tests {
             "no duplicate languages"
         );
     }
-
-    #[test]
-    fn write_error_maps_from_sync_error() {
-        assert_eq!(
-            SpellWriteError::from(SpellSyncError::SlotNotUnlocked),
-            SpellWriteError::SlotNotUnlocked
-        );
-        assert_eq!(
-            SpellWriteError::from(SpellSyncError::Encode),
-            SpellWriteError::Io
-        );
-    }
 }

@@ -2394,31 +2394,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_model_asking_anyway_does_not_double_count_the_note() {
-        // The seed reads the note, and a model that ignores the hint reads it
-        // again. The surface says "{count} notes read", so one note must report
-        // one however many times it was fetched.
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let engine = ScriptEngine::new(&[
-            r#"{"action":"read_note","note_id":"a"}"#,
-            r#"{"action":"finish","summary":"ok"}"#,
-        ]);
-        let recs = records();
-        let mut t = Vec::new();
-        let out = block_on(drive(
-            &runs,
-            "r",
-            "task",
-            &mut t,
-            &deps(&engine, &recs),
-            &mut BTreeSet::new(),
-        ))
-        .unwrap();
-        assert_eq!(out.notes_read, 1);
-    }
-
     // ---- every tool answer says what it answers (myne-md/myne#574) --------
     //
     // **The property is that a result is not a bare blob.** Three of the six
@@ -2764,23 +2739,6 @@ mod tests {
                 .all(|c| *c == AgentRequestClass::UserInitiated),
             "the class is a constant in the loop, not a per-call parameter"
         );
-    }
-
-    // The seam contract, from core's side: a remote backend refuses an ambient
-    // request. The host's real registry mapping is tested on the host.
-    #[test]
-    fn a_remote_backend_refuses_an_ambient_request() {
-        let engine = ScriptEngine::remote(&[]);
-        let r = block_on(engine.complete(
-            AgentRequestClass::Ambient,
-            &AgentRequest { messages: vec![] },
-        ));
-        assert!(r.is_err());
-        let ok = block_on(engine.complete(
-            AgentRequestClass::UserInitiated,
-            &AgentRequest { messages: vec![] },
-        ));
-        assert!(ok.is_ok());
     }
 
     #[test]

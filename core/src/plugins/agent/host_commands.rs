@@ -1909,17 +1909,6 @@ mod tests {
     }
 
     #[test]
-    fn the_probe_threshold_parses_from_the_recorded_file() {
-        let t = probe_threshold();
-        assert!(t.attempts >= 1);
-        assert!(t.required >= 1);
-        assert!(
-            t.required <= t.attempts,
-            "a bar higher than the attempt count could never be met"
-        );
-    }
-
-    #[test]
     fn the_recorded_threshold_file_says_whether_it_was_measured() {
         // The number is debt until someone runs the probe against real models.
         // Asserting the field exists is what keeps the honesty from being

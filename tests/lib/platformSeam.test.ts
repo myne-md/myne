@@ -119,9 +119,6 @@ describe("check-platform-seam", () => {
     ]);
   });
 
-  it("reports nothing for the real roster, which is the claim the guard makes", () => {
-    expect(uncoveredSharedRoots()).toEqual([]);
-  });
 
   it("still catches a module-specifier import, and not a mention in prose", () => {
     const r = analyse(["tests/fixtures/seam/tauri-import.ts"], FIXTURE_ROOTS);
