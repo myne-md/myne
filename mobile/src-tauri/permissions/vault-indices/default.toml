@@ -23,7 +23,6 @@ permissions = [
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
   "allow-vault-indices-tag-tree",
-  "allow-vault-indices-note-properties",
   "allow-vault-indices-property-values",
   "allow-vault-indices-property-keys",
   "allow-vault-indices-persist",
@@ -72,11 +71,6 @@ commands.allow = ["vault_indices_by_tag"]
 identifier = "allow-vault-indices-tag-tree"
 description = "Allow invoking vault-indices:vault_indices_tag_tree (Slot::Unlocked-gated read of the full tag tree — nodes with direct + subtree counts and a deterministic display, derived from the stored exact folded tags)."
 commands.allow = ["vault_indices_tag_tree"]
-
-[[permission]]
-identifier = "allow-vault-indices-note-properties"
-description = "Allow invoking vault-indices:vault_indices_note_properties (Slot::Unlocked-gated read of a note's typed frontmatter properties — the opaque pre-typed values TS stored on apply, MYND-271; pure accessor, type-aware filter/sort happens TS-side, no expression eval). Returns per-note property metadata (AS3/AS4-Sensitive) -> main-window-only."
-commands.allow = ["vault_indices_note_properties"]
 
 [[permission]]
 identifier = "allow-vault-indices-property-values"

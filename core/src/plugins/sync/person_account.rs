@@ -3156,46 +3156,6 @@ fn owner_pin_from_profile_plaintext(plaintext: &[u8]) -> Result<String, SyncDevi
         })
 }
 
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn sync_person_profile_write<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, VaultRuntimeState>,
-    plaintext_b64: String,
-) -> Result<(), SyncDeviceError> {
-    let plaintext = {
-        use base64::Engine as _;
-        base64::engine::general_purpose::STANDARD
-            .decode(plaintext_b64)
-            .map_err(|_| SyncDeviceError::BadRequest)?
-    };
-    person_profile_write_from_host(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
-        &crate::vault_io::StdVaultIo,
-        state.inner(),
-        &plaintext,
-    )
-    .await
-}
-
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn sync_person_profile_read<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, VaultRuntimeState>,
-) -> Result<Option<String>, SyncDeviceError> {
-    let plaintext = person_profile_read_from_host(
-        &crate::host::tauri_host::TauriHost::new(app.clone()),
-        &crate::vault_io::StdVaultIo,
-        state.inner(),
-    )
-    .await?;
-    Ok(plaintext.map(|bytes| {
-        use base64::Engine as _;
-        base64::engine::general_purpose::STANDARD.encode(&*bytes)
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -48,8 +48,6 @@ permissions = [
     "allow-sync-person-unlock-member-vault-with-biometric",
     "allow-sync-member-unlock-status",
     "allow-sync-person-clear-member-unlock",
-    "allow-sync-person-profile-write",
-    "allow-sync-person-profile-read",
     "allow-sync-list-roster",
     "allow-sync-remove-member",
     "allow-sync-list-devices",
@@ -190,16 +188,6 @@ commands.allow = ["sync_member_unlock_status"]
 identifier = "allow-sync-person-clear-member-unlock"
 description = "Allow invoking sync:sync_person_clear_member_unlock (B2B: remove the device-local member fast-unlock credential for the active vault)."
 commands.allow = ["sync_person_clear_member_unlock"]
-
-[[permission]]
-identifier = "allow-sync-person-profile-write"
-description = "Allow invoking sync:sync_person_profile_write (B2B: seal this person's private MYY5 AI profile for the active vault under the held person-profile key and PUT it to the vault-scoped person-authorized namespace)."
-commands.allow = ["sync_person_profile_write"]
-
-[[permission]]
-identifier = "allow-sync-person-profile-read"
-description = "Allow invoking sync:sync_person_profile_read (B2B: read this person's private MYY5 AI profile for the active vault, or null when none exists)."
-commands.allow = ["sync_person_profile_read"]
 
 [[permission]]
 identifier = "allow-sync-list-roster"
