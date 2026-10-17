@@ -28,6 +28,20 @@
 //   4. and, on a machine where the generated project exists, it has actually
 //      been synced — the exact "I ran `tauri ios init` and forgot" state.
 //
+//   5. the App-Group identifier `group.md.myne.mobile` is byte-identical across
+//      its three committed carriers: `share_import_ffi::APP_GROUP_ID`,
+//      `ShareViewController.appGroupID` and the Share Extension's
+//      `com.apple.security.application-groups` entitlement. The OS resolves the
+//      shared container from this one string, so a drift makes the app and the
+//      extension read two different directories and the shared file just
+//      vanishes, with no build error on either side. The share extension itself
+//      is deliberately unwired (needs the App Group capability on the App ID,
+//      see `mobile/ios-share/README.md`), but these three strings ship in the
+//      tree today and would be used the moment it is wired. When the extension
+//      IS wired into `project.yml`, the app target must carry the group in
+//      `entitlements.properties` — a `path`-only block overwrites the generated
+//      entitlements with an empty `<dict/>` and the app silently loses it.
+//
 // Zero dependencies, hand-runnable: node scripts/check-ios-extensions.mjs
 
 import { existsSync, readFileSync } from "node:fs";
@@ -130,6 +144,63 @@ for (const rel of PLISTS) {
         `$(MARKETING_VERSION)/$(CURRENT_PROJECT_VERSION), not a hardcoded number. A ` +
         `hardcoded value drifts from the app's version and App Store validation ` +
         `rejects the bundle.`,
+    );
+  }
+}
+
+// ── 5. The App-Group identifier across its committed carriers ──────────────
+// One string, three files, no compiler between them. See the header (clause 5).
+const APP_GROUP_CARRIERS = [
+  [
+    "mobile/src-tauri/src/share_import_ffi.rs",
+    /pub const APP_GROUP_ID: &str = "([^"]+)"/,
+    "`pub const APP_GROUP_ID: &str`",
+  ],
+  [
+    "mobile/ios-share/ShareExtension/ShareViewController.swift",
+    /static let appGroupID = "([^"]+)"/,
+    "`static let appGroupID`",
+  ],
+  [
+    "mobile/ios-share/ShareExtension/ShareExtension.entitlements",
+    /<key>com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>([^<]+)<\/string>/,
+    "the `com.apple.security.application-groups` string",
+  ],
+];
+const appGroups = [];
+for (const [rel, re, what] of APP_GROUP_CARRIERS) {
+  const text = read(rel);
+  if (text === null) continue;
+  const m = text.match(re);
+  if (!m) {
+    failures.push(
+      `${rel}: could not find ${what} — did the App-Group identifier get renamed? ` +
+        `The app and the Share Extension resolve their shared container from it.`,
+    );
+    continue;
+  }
+  appGroups.push([rel, m[1]]);
+}
+const groupId = appGroups.length > 0 ? appGroups[0][1] : null;
+for (const [rel, value] of appGroups) {
+  if (groupId !== null && value !== groupId) {
+    failures.push(
+      `App-Group drift: ${rel} has "${value}" but ${appGroups[0][0]} has "${groupId}". ` +
+        `The OS resolves the shared container from this exact string, so the app and ` +
+        `the extension would read two different directories and the shared file would ` +
+        `vanish with no error on either side.`,
+    );
+  }
+}
+// The latent fourth carrier: only checked once the extension is actually wired
+// into the committed spec (it is deliberately unwired today).
+if (spec !== null && targetRe("MyneShareExtension").test(spec) && groupId !== null) {
+  if (!stripComments(spec).includes(groupId)) {
+    failures.push(
+      `${SPEC}: wires \`MyneShareExtension\` but the app target does not declare the ` +
+        `App-Group (${groupId}) in \`entitlements.properties\`. A \`path\`-only ` +
+        `entitlements block makes xcodegen emit an empty <dict/> and the app silently ` +
+        `loses the App-Group — see mobile/ios-share/README.md.`,
     );
   }
 }
