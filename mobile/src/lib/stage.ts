@@ -895,6 +895,14 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "picker.select-vault", vaultId: "00000000-0000-7000-8000-000000000000" },
   { type: "unlock.back-to-picker" },
   { type: "picker.create-vault" },
+  // The four restore-backup doors (MYND-56 / MYND-218). They were absent from
+  // this walk, so the transition table's four restore-backup arms went
+  // unverified by the very harness meant to verify it. `entry` is payload, and
+  // the walk inspects `name` only, so the arms are exercised by type.
+  { type: "welcome.restore-backup" },
+  { type: "picker.restore-backup" },
+  { type: "unlock.restore-backup" },
+  { type: "editor.restore-backup" },
 ];
 
 /**
