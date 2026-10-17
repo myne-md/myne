@@ -995,7 +995,7 @@ pre-commit:
       # do this properly with a maintained ruleset; that is a dependency
       # decision (see docs/dependency-policy.md), not a hook edit.
       run: |
-        vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}'
+        vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}|plane_api_[A-Za-z0-9_-]{20,}'
         fail=0
         for f in {staged_files}; do
           [ -f "$f" ] || continue
