@@ -395,8 +395,8 @@ this change did not want to spend silently:
    exists in the config schema; the default formula is only a default). Then
    `UpdateCheckData` can read both fields out of that one file, with no second
    source of truth. The cost is a new hand-maintained number, in a repository
-   whose release process already bumps **eight** version fields per release
-   (`myne-ops/runbooks/release-checklist.md`).
+   whose release process already bumps **eight** version fields per release (the
+   internal release checklist counts them, and every one is a place to forget).
 2. Add a committed `version.properties` holding `versionCode=` and
    `versionName=`, and `sed` it into `tauri.conf.json` during `init`. This is
    what the shipping Tauri app on F-Droid does. The cost is a ninth version
@@ -419,9 +419,9 @@ F-Droid signs with its own key. That makes a third signing identity for
 - The only way through is an uninstall, and an uninstall deletes the app's
   private storage, which is where the on-device vault lives.
 
-This is not hypothetical: `myne-ops/runbooks/android-release-key-custody.md`
-records that the same break already happened twice here, at v0.1.0 to v0.2.0 and
-again at v0.9.0, and that local-only notes were lost both times.
+This is not hypothetical: the internal key-custody runbook records that the same
+break already happened twice here, at v0.1.0 to v0.2.0 and again at v0.9.0, and
+that local-only notes were lost both times.
 
 So the announcement, the user guide and the store listing all have to say
 "export your notes first". The store listing already does (see
@@ -447,9 +447,8 @@ Procedure:
    the two unsigned APKs.
 2. If they match: add `Binaries:` (a URL to the APK we publish) and
    `AllowedAPKSigningKeys:` (the release certificate's SHA-256 fingerprint,
-   recorded in `myne-ops/runbooks/android-release-key-custody.md`) to the
-   recipe. F-Droid then verifies our build against source and signs with our
-   key.
+   recorded in the internal key-custody runbook) to the recipe. F-Droid then
+   verifies our build against source and signs with our key.
 3. If they differ: name the source before concluding anything. The usual ones
    are paths embedded in the Rust binary, Gradle's archive ordering and
    timestamps, and generated build metadata. `--remap-path-prefix` and
@@ -511,12 +510,13 @@ asking instead of two weeks being told during review.
   funding channel. Adding one to satisfy a field would be inventing it.
 - **No feature graphic.** None exists in the branding repo, and a promo banner is
   a designed asset rather than a crop of one.
-- **No companion-repo work in this directory.** The runbook is
-  `myne-ops/runbooks/fdroid-release.md`, the per-release checklist row is in
-  `myne-ops/runbooks/release-checklist.md`, and the user-facing migration warning
-  is in `myne-website`'s
-  `src/content/user-guide/getting-started/install.md`. All three are separate
-  pull requests against their own repositories; none of them is committed through
-  the main one.
+- **No companion-repo work in this directory.** The runbook and the per-release
+  checklist row are in the internal ops repository, which is not published and
+  therefore not followable from here, and the user-facing migration warning is in
+  `myne-website`'s `src/content/user-guide/getting-started/install.md`, which
+  publishes at
+  [myne.md/user-guide/getting-started/install](https://myne.md/user-guide/getting-started/install/).
+  All three are separate pull requests against their own repositories; none of
+  them is committed through the main one.
 - **No decision entry here.** The channel, the private-source blocker and the
   reproducibility precondition are `docs/decisions/ops/0698`.
