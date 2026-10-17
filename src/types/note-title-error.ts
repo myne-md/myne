@@ -61,13 +61,6 @@ export type NoteTitleBatchError =
   /** Batch-coordinator-level `spawn_blocking` panic. Reserved for forward-compat. */
   | { kind: "JoinFailure" };
 
-/** Type-narrowing helper for the per-item `Io` variant. */
-export function isTitleIoError(
-  e: NoteTitleError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
-
 /** Type-narrowing helper for the batch-level `BatchTooLarge` variant. */
 export function isBatchTooLarge(
   e: NoteTitleBatchError,

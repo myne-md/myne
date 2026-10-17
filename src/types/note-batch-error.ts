@@ -59,13 +59,6 @@ export type NoteBatchError =
   | { kind: "JoinFailure" }
   | { kind: "LiveSessionOpen" };
 
-/** Type-narrowing helper for the `Io` variant. */
-export function isBatchIoError(
-  e: NoteBatchError,
-): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
-  return e.kind === "Io";
-}
-
 /**
  * Did this rejection leave the vault CHANGED? True only for
  * `CommittedPendingPublish` (myne#300).

@@ -179,6 +179,19 @@ pre-commit:
       # nothing called it. A RATCHET with reason-carrying exemptions.
       run: node scripts/check-ipc-binding-callers.mjs
 
+    export-callers:
+      # The layer above `ipc-binding-callers`, and the third time the same
+      # question has to be asked. `unwired` asks whether a MODULE has a
+      # production importer; `ipc-binding-callers` whether a BINDING has a
+      # caller. A single dead `export function` inside an otherwise live module
+      # is below both, and the audit that produced this guard deleted seventeen
+      # of them from files that pass the other two. Nothing else can see it: the
+      # declaration compiles, this tree has no eslint (and an unused EXPORT is
+      # not lintable in principle, since the file cannot know who imports it),
+      # and no test can fail on something nothing calls. A per-file RATCHET whose
+      # `--record` may only shrink.
+      run: node scripts/check-export-callers.mjs
+
     tracing-discipline:
       # myne-md/myne#860: the diagnostic log's content claim, machine-checked.
       # `src-tauri/AGENTS.md`'s DENY list says about itself that it is

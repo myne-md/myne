@@ -30,7 +30,6 @@
 // worst failure available here. A genuinely empty query — no clauses written at
 // all — is a different case and legitimately means unfiltered.
 
-import type { TaskFilter } from "./taskFilters";
 import { shiftDay } from "./taskFilters";
 
 /** The five priority levels, shared with the dialect's typing. */
@@ -307,12 +306,4 @@ export function parseTaskQuery(body: string): ParsedQuery {
 /** How many clauses were dropped — the tally the widget shows. */
 export function droppedCount(query: ParsedQuery): number {
   return query.warnings.length;
-}
-
-/** The equivalent panel filter for a query, when it has one. Display only. */
-export function queryFilterHint(query: ParsedQuery): TaskFilter | null {
-  for (const clause of query.clauses) {
-    if (clause.kind === "done" && !clause.done) return "all";
-  }
-  return null;
 }
