@@ -11,12 +11,12 @@
 //! The crate is `#![no_std]` + `alloc`, hence the explicit `alloc::` paths.
 
 /// Render `bytes` as a lowercase hex string (two chars per byte, no separator).
+///
+/// Delegates to the crate's one encoder ([`crate::hex::encode_lower`]) rather
+/// than carrying a second `alloc::format!("{:02x}")` implementation: two copies
+/// of a rendering helper are two places to be wrong for no gain.
 pub(crate) fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-    let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&alloc::format!("{:02x}", b));
-    }
-    s
+    crate::hex::encode_lower(bytes)
 }
 
 /// JSON-escape `input` per RFC 8259 (quote, backslash, the named control

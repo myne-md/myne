@@ -205,10 +205,11 @@ fn class_message(prefix: &[u8], payload: &[u8]) -> Vec<u8> {
     message
 }
 
-fn is_lower_hex(s: &str, byte_len: usize) -> bool {
-    s.len() == byte_len * 2
-        && s.bytes()
-            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+/// Strict lowercase hex of an exact byte length (the length-scoped spelling of
+/// [`crate::hex::is_lower_hex`]; `protocol.md` §3.1's ids travel as one
+/// lowercase spelling).
+fn is_lower_hex_of_len(s: &str, byte_len: usize) -> bool {
+    s.len() == byte_len * 2 && crate::hex::is_lower_hex(s)
 }
 
 fn encode_wrapped_key(wrapped: &crate::person_key::PersonWrappedKey) -> String {
@@ -217,7 +218,7 @@ fn encode_wrapped_key(wrapped: &crate::person_key::PersonWrappedKey) -> String {
     bytes.extend_from_slice(&wrapped.ml_kem_ct);
     bytes.extend_from_slice(&wrapped.nonce);
     bytes.extend_from_slice(&wrapped.wrapped_key);
-    hex_lower(&bytes)
+    crate::hex::encode_lower(&bytes)
 }
 
 /// Encode, sort and validate a canonical NTV6 group roster payload.
@@ -243,8 +244,8 @@ pub fn parse_group_roster(bytes: &[u8]) -> Option<GroupRosterPayload> {
 
 fn validate_group_roster(payload: &GroupRosterPayload) -> Option<()> {
     if payload.group_key_epoch == 0
-        || !is_lower_hex(&payload.account_number_hash_hex, 16)
-        || !is_lower_hex(&payload.owner_fingerprint_hex, 32)
+        || !is_lower_hex_of_len(&payload.account_number_hash_hex, 16)
+        || !is_lower_hex_of_len(&payload.owner_fingerprint_hex, 32)
         || payload.members.is_empty()
     {
         return None;
@@ -252,11 +253,11 @@ fn validate_group_roster(payload: &GroupRosterPayload) -> Option<()> {
     let mut previous: Option<&str> = None;
     let mut owner_count = 0usize;
     for member in &payload.members {
-        if !is_lower_hex(&member.fingerprint_hex, 32)
+        if !is_lower_hex_of_len(&member.fingerprint_hex, 32)
             || member
                 .person_id_hex
                 .as_deref()
-                .is_some_and(|p| !is_lower_hex(p, 16))
+                .is_some_and(|p| !is_lower_hex_of_len(p, 16))
             || previous.is_some_and(|p| p >= member.fingerprint_hex.as_str())
         {
             return None;
@@ -268,7 +269,7 @@ fn validate_group_roster(payload: &GroupRosterPayload) -> Option<()> {
             &member.member_mldsa_vk_hex,
         )
         .ok()?;
-        if hex_lower(public.fingerprint()) != member.fingerprint_hex {
+        if crate::hex::encode_lower(public.fingerprint()) != member.fingerprint_hex {
             return None;
         }
         if member.role == GroupRosterRole::Owner {
@@ -281,13 +282,13 @@ fn validate_group_roster(payload: &GroupRosterPayload) -> Option<()> {
         }
         match (member.role, member.state, &member.wrapped_group_key_hex) {
             (GroupRosterRole::Member, GroupMemberState::Live, Some(wrapped))
-                if is_lower_hex(wrapped, WRAPPED_32_BYTE_KEY_LEN) => {}
+                if is_lower_hex_of_len(wrapped, WRAPPED_32_BYTE_KEY_LEN) => {}
             (GroupRosterRole::Owner, GroupMemberState::Live, None)
             | (_, GroupMemberState::Tombstone, None) => {}
             _ => return None,
         }
         if let Some(old) = &member.previous_fingerprint_hex {
-            if !is_lower_hex(old, 32) || old == &member.fingerprint_hex {
+            if !is_lower_hex_of_len(old, 32) || old == &member.fingerprint_hex {
                 return None;
             }
         }
@@ -330,8 +331,8 @@ pub fn verify_group_roster(
     )?;
     let payload = parse_group_roster(&envelope.payload)
         .ok_or(crate::person_key::PersonKeyError::SignatureVerify)?;
-    if hex_lower(owner.fingerprint()) != payload.owner_fingerprint_hex
-        || payload.account_number_hash_hex != hex_lower(expected_account_number_hash)
+    if crate::hex::encode_lower(owner.fingerprint()) != payload.owner_fingerprint_hex
+        || payload.account_number_hash_hex != crate::hex::encode_lower(expected_account_number_hash)
     {
         return Err(crate::person_key::PersonKeyError::SignatureVerify);
     }
@@ -352,9 +353,9 @@ pub fn create_group_package(
     }
     let wrapped = recipient.wrap_key(group_key, account_number_hash, rng)?;
     let payload = GroupPackagePayload {
-        account_number_hash_hex: hex_lower(account_number_hash),
+        account_number_hash_hex: crate::hex::encode_lower(account_number_hash),
         group_key_epoch,
-        recipient_fingerprint_hex: hex_lower(recipient.fingerprint()),
+        recipient_fingerprint_hex: crate::hex::encode_lower(recipient.fingerprint()),
         wrapped_group_key_hex: encode_wrapped_key(&wrapped),
     };
     let payload =
@@ -377,9 +378,9 @@ pub fn verify_group_package(
         .map_err(|_| crate::person_key::PersonKeyError::AeadFailure)?;
     if serde_json::to_vec(&payload).ok().as_deref() != Some(package.payload.as_slice())
         || payload.group_key_epoch == 0
-        || !is_lower_hex(&payload.account_number_hash_hex, 16)
-        || !is_lower_hex(&payload.recipient_fingerprint_hex, 32)
-        || !is_lower_hex(&payload.wrapped_group_key_hex, WRAPPED_32_BYTE_KEY_LEN)
+        || !is_lower_hex_of_len(&payload.account_number_hash_hex, 16)
+        || !is_lower_hex_of_len(&payload.recipient_fingerprint_hex, 32)
+        || !is_lower_hex_of_len(&payload.wrapped_group_key_hex, WRAPPED_32_BYTE_KEY_LEN)
     {
         return Err(crate::person_key::PersonKeyError::AeadFailure);
     }
@@ -396,8 +397,8 @@ pub fn open_group_package(
 ) -> Result<zeroize::Zeroizing<[u8; 32]>, crate::person_key::PersonKeyError> {
     let payload = verify_group_package(owner, package)?;
     if payload.group_key_epoch != expected_epoch
-        || payload.account_number_hash_hex != hex_lower(expected_account_number_hash)
-        || payload.recipient_fingerprint_hex != hex_lower(recipient.fingerprint())
+        || payload.account_number_hash_hex != crate::hex::encode_lower(expected_account_number_hash)
+        || payload.recipient_fingerprint_hex != crate::hex::encode_lower(recipient.fingerprint())
     {
         return Err(crate::person_key::PersonKeyError::AeadFailure);
     }
@@ -976,18 +977,18 @@ pub fn encode_invite_payload(payload: &InvitePayload) -> Vec<u8> {
 pub fn vault_invite_to_wire(invite: &VaultInvite) -> String {
     let sig = &invite.signature;
     let obj = serde_json::json!({
-        "enc_payload_hex": hex_lower(&invite.enc_payload),
-        "nonce_hex": hex_lower(&invite.nonce),
-        "env_ml_kem_ct_hex": hex_lower(&invite.env_ml_kem_ct),
-        "env_ed_ephemeral_pk_hex": hex_lower(&invite.env_ed_ephemeral_pk),
+        "enc_payload_hex": crate::hex::encode_lower(&invite.enc_payload),
+        "nonce_hex": crate::hex::encode_lower(&invite.nonce),
+        "env_ml_kem_ct_hex": crate::hex::encode_lower(&invite.env_ml_kem_ct),
+        "env_ed_ephemeral_pk_hex": crate::hex::encode_lower(&invite.env_ed_ephemeral_pk),
         "account_number_hash_hex": invite.account_number_hash_hex,
         "owner_kem_ek_hex": invite.owner_kem_ek_hex,
         "owner_mldsa_vk_hex": invite.owner_mldsa_vk_hex,
         "owner_ed25519_pk_hex": invite.owner_ed25519_pk_hex,
         "owner_fingerprint_hex": invite.owner_fingerprint_hex,
         "member_fingerprint_hex": invite.member_fingerprint_hex,
-        "signature_ed25519_hex": hex_lower(&sig.ed25519_sig),
-        "signature_mldsa_hex": hex_lower(&sig.mldsa_sig),
+        "signature_ed25519_hex": crate::hex::encode_lower(&sig.ed25519_sig),
+        "signature_mldsa_hex": crate::hex::encode_lower(&sig.mldsa_sig),
     });
     serde_json::to_string(&obj).expect("canonical-JSON invite wire serialization is infallible")
 }
@@ -1020,17 +1021,6 @@ pub fn vault_invite_from_wire(s: &str) -> Option<VaultInvite> {
             mldsa_sig: dec("signature_mldsa_hex")?,
         },
     })
-}
-
-/// Lowercase hex, no separator.
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push(HEX[(b >> 4) as usize] as char);
-        s.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    s
 }
 
 /// Decode lowercase hex only (uppercase is rejected, matching the crate-wide
