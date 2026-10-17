@@ -95,31 +95,26 @@ impl RateLimiter {
     /// A throttled handoff does NOT consume budget (it is rejected before
     /// the write), so the count only ever reflects accepted handoffs.
     ///
-    /// The window rolls forward when `now` is at or past
-    /// `window_start + window`: the counter resets and the new handoff
-    /// starts a fresh window.
+    /// The window is opened (or rolled) first and the cap is applied
+    /// second, deliberately: writing it the other way round lets the first
+    /// handoff of a window through unconditionally, so a cap of 0 would
+    /// serve one handoff per window instead of none. The window rolls
+    /// forward when `now` is at or past `window_start + window`; the new
+    /// handoff then starts a fresh window, subject to the same cap.
     pub fn check(&mut self, now: Instant) -> RateDecision {
-        match self.window_start {
-            // Roll the window forward if the current one has elapsed.
-            Some(start) if now.duration_since(start) >= self.window => {
-                self.window_start = Some(now);
-                self.count = 1;
-                RateDecision::Allowed
-            }
-            Some(_) => {
-                if self.count < self.max_per_window {
-                    self.count += 1;
-                    RateDecision::Allowed
-                } else {
-                    RateDecision::Throttled
-                }
-            }
-            // First handoff ever — open the first window.
-            None => {
-                self.window_start = Some(now);
-                self.count = 1;
-                RateDecision::Allowed
-            }
+        let window_elapsed = match self.window_start {
+            Some(start) => now.duration_since(start) >= self.window,
+            None => true, // first handoff ever — open the first window
+        };
+        if window_elapsed {
+            self.window_start = Some(now);
+            self.count = 0;
+        }
+        if self.count < self.max_per_window {
+            self.count += 1;
+            RateDecision::Allowed
+        } else {
+            RateDecision::Throttled
         }
     }
 }
@@ -237,6 +232,20 @@ mod tests {
         // 1ms before the window closes — still the same window.
         let almost = t0 + Duration::from_millis(59_999);
         assert_eq!(rl.check(almost), RateDecision::Throttled);
+    }
+
+    #[test]
+    fn a_zero_cap_never_allows_anything() {
+        // The cap is applied after the window opens, so "0 per window"
+        // means zero — not "one, then zero" (see `check`'s doc comment and
+        // its twin at `cli_bridge/rate_limit.rs`).
+        let mut rl = RateLimiter::new(0, Duration::from_secs(60));
+        let t0 = Instant::now();
+        assert_eq!(rl.check(t0), RateDecision::Throttled);
+        assert_eq!(
+            rl.check(t0 + Duration::from_secs(120)),
+            RateDecision::Throttled
+        );
     }
 
     #[test]
