@@ -146,13 +146,6 @@ export type AppError =
   | { kind: "WeakNewPassword" };
 
 /**
- * Type-narrowing helper. `if (isProtocolError(e)) { e.detail.kind ... }`.
- */
-export function isProtocolError(e: AppError): e is { kind: "Protocol"; detail: ProtocolError } {
-  return e.kind === "Protocol";
-}
-
-/**
  * Type-narrowing helper. `if (isIoError(e)) { e.detail.kind ... }`.
  */
 export function isIoError(e: AppError): e is { kind: "Io"; detail: IoErrorKind } {

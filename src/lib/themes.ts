@@ -10,8 +10,6 @@
 // types in lockstep with the Rust `ThemesError` / `ThemeError` serde shapes.
 
 import { invoke } from "../platform/core";
-import { importReadFile } from "../notes/import/ports";
-import { splitExportPath } from "../notes/exportFlow";
 
 /** Mirror of Rust `theme_validator::ThemeErrorKind`. */
 export type ThemeErrorKind =
@@ -141,18 +139,6 @@ export function nextAvailableThemeName(name: string, taken: readonly string[]): 
 /** Delete one custom theme by name. Idempotent (absent → success). */
 export async function deleteCustomTheme(name: string): Promise<void> {
   await invoke<void>("plugin:themes|themes_delete", { name });
-}
-
-/**
- * Read a user-picked `.json` theme file's UTF-8 contents via the importer
- * read-seam (`import_read_file`, root-confined; the WebView holds NO general
- * fs-read scope — least-privilege, TB6). The picked path's parent directory is
- * the confining root — `splitExportPath` is the one separator scanner, and it
- * keeps the separator when the parent IS a filesystem root (`/theme.json` → `/`,
- * `C:\theme.json` → `C:\`) so a root-level pick still confines to its directory.
- */
-export async function readPickedThemeFile(absolutePath: string): Promise<string> {
-  return importReadFile(splitExportPath(absolutePath).dir, absolutePath);
 }
 
 /**
