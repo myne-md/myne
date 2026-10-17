@@ -70,8 +70,10 @@ describe("when it cannot", () => {
 
   /** Safari is a macOS gate, and the reason says so rather than pretending the
    *  browser is unknown — the distinction a contributor on Linux needs. */
-  it("explains the Safari seat rather than rejecting it as unknown", () => {
-    if (process.platform === "darwin") return;
+  // `skipIf`, not an early `return`: a returning test reports as PASSED, so a
+  // Linux-only observation would read as a macOS assertion that held. The
+  // reason string is what this case is about, and it is unreachable on macOS.
+  it.skipIf(process.platform === "darwin")("explains the Safari seat rather than rejecting it as unknown", () => {
     const r = reasonFor({ browser: "safari" });
     expect(r).toContain("macOS");
     expect(r).not.toContain("is not one of");
