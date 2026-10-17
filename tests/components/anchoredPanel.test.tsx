@@ -26,6 +26,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useRef } from "react";
 
 import { AnchoredPanel } from "../../src/components/primitives/AnchoredPanel";
+import { UsedInNotesPopover } from "../../src/components/attachments/UsedInNotesPopover";
 
 vi.mock("../../src/lib/memory", () => ({
   // The list command answers `{ rows, cap }` since myne-md/myne#867: the cap
@@ -77,26 +78,42 @@ function placement(el: HTMLElement): { left: number; right: number } {
   return { left, right: left + width };
 }
 
+/** A panel on a trigger inside a clipping ancestor: the shape both defects need. */
+function Harness({
+  children,
+  onClose = () => {},
+  point = null,
+  align,
+  maxWidth,
+}: {
+  children?: React.ReactNode;
+  onClose?: () => void;
+  point?: { x: number; y: number } | null;
+  align?: "start" | "end";
+  maxWidth?: number;
+}) {
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  return (
+    <div data-testid="narrow" style={{ overflow: "hidden", width: 200 }}>
+      <span ref={anchorRef} data-testid="anchor" style={{ display: "inline-flex" }}>
+        trigger
+      </span>
+      <AnchoredPanel
+        open
+        onClose={onClose}
+        anchorRef={anchorRef}
+        point={point}
+        align={align}
+        maxWidth={maxWidth}
+        testId="panel"
+      >
+        {children}
+      </AnchoredPanel>
+    </div>
+  );
+}
+
 describe("AnchoredPanel: where the panel is drawn", () => {
-  function Harness({
-    children,
-    onClose = () => {},
-  }: {
-    children?: React.ReactNode;
-    onClose?: () => void;
-  }) {
-    const anchorRef = useRef<HTMLSpanElement | null>(null);
-    return (
-      <div data-testid="narrow" style={{ overflow: "hidden", width: 200 }}>
-        <span ref={anchorRef} data-testid="anchor" style={{ display: "inline-flex" }}>
-          trigger
-        </span>
-        <AnchoredPanel open onClose={onClose} anchorRef={anchorRef} testId="panel">
-          {children}
-        </AnchoredPanel>
-      </div>
-    );
-  }
 
   it("draws in the body, outside the ancestor whose overflow used to clip it", async () => {
     render(<Harness>body text</Harness>);
@@ -138,6 +155,47 @@ describe("AnchoredPanel: where the panel is drawn", () => {
       restore();
     }
   });
+
+  it("caps the panel at the caller's maxWidth rather than at the window's", async () => {
+    // The caller's cap travels as a PROP, not through `style`: the placement
+    // writes its own `maxWidth` last, so a `style` value would be dropped and a
+    // long note title would stretch the popover to the window's width.
+    render(<Harness maxWidth={320}>wide</Harness>);
+    const panel = await screen.findByTestId("panel");
+    expect(Number.parseFloat(panel.style.maxWidth)).toBe(320);
+  });
+});
+
+describe("AnchoredPanel: a cursor point (a context menu)", () => {
+  // The shape the attachments library's right-click menu uses: the point is a
+  // zero-size trigger, so it gets the same flip and the same edge clamp as an
+  // anchored panel instead of a second copy of that arithmetic.
+  it("opens with its left edge at the pointer, not at the anchor", async () => {
+    render(
+      <Harness point={{ x: 400, y: 200 }} align="start">
+        item
+      </Harness>,
+    );
+    const panel = await screen.findByTestId("panel");
+    // The anchor is at the document's origin (jsdom lays nothing out), so an
+    // ANCHORED panel would land at EDGE; only the point can put it at 400.
+    expect(Number.parseFloat(panel.style.left)).toBe(400);
+    // `placeMenu` keeps its gap below the trigger, and here the point is the
+    // trigger.
+    expect(Number.parseFloat(panel.style.top)).toBe(204);
+  });
+
+  it("clamps a point near the right edge back inside the window", async () => {
+    const innerWidth = window.innerWidth;
+    render(
+      <Harness point={{ x: innerWidth - 10, y: 200 }} align="start">
+        item
+      </Harness>,
+    );
+    const panel = await screen.findByTestId("panel");
+    // Default `minWidth` is 160, so the clamp caps `left` at innerWidth - 168.
+    expect(Number.parseFloat(panel.style.left)).toBe(innerWidth - 160 - 8);
+  });
 });
 
 describe("MemoryPopover: it uses the primitive", () => {
@@ -177,5 +235,40 @@ describe("MemoryPopover: it uses the primitive", () => {
     // Its roster really rendered inside it.
     expect(await screen.findByTestId("ai.memory-popover-empty")).toBeTruthy();
     expect(screen.getByTestId("ai.memory-popover-close")).toBeTruthy();
+  });
+});
+
+describe("UsedInNotesPopover: it uses the primitive", () => {
+  function Harness() {
+    const anchorRef = useRef<HTMLButtonElement | null>(null);
+    return (
+      <div data-testid="tile" style={{ overflow: "hidden", width: 120 }}>
+        <button ref={anchorRef} data-testid="attachments.used-in-notes-trigger">
+          Used in 0 notes
+        </button>
+        <UsedInNotesPopover
+          noteIds={[]}
+          cache={new Map()}
+          onJump={() => {}}
+          onClose={() => {}}
+          anchorRef={anchorRef}
+        />
+      </div>
+    );
+  }
+
+  it("draws its list in the body, outside the tile that would clip it", async () => {
+    render(<Harness />);
+    const menu = await screen.findByRole("menu");
+    // The tile clips (`overflow: hidden`) and the grid scrolls; both are why the
+    // panel is portaled rather than positioned inside its trigger.
+    expect(screen.getByTestId("tile").contains(menu)).toBe(false);
+    expect(document.body.contains(menu)).toBe(true);
+    // The panel is the primitive's, and it carries THIS caller's cap (320)
+    // rather than the window's — the maxWidth the popover names as a prop.
+    const panel = menu.parentElement as HTMLElement;
+    expect(Number.parseFloat(panel.style.maxWidth)).toBe(320);
+    // The empty state is the locale's own copy, so the list is really rendered.
+    expect(menu.textContent).toBe("Not used in any note.");
   });
 });
