@@ -24,7 +24,7 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## How was this tested?
 
-<!-- Commands run, platforms covered. A new user-facing flow ships WITH its E2E coverage — see CLAUDE.md. -->
+<!-- Commands run, platforms covered. A new user-facing flow ships WITH its E2E coverage — see AGENTS.md. -->
 
 ## Checklist
 
@@ -37,4 +37,7 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## Developer Certificate of Origin
 
-- [ ] I certify the [DCO](https://developercertificate.org/): this contribution is mine to give under the repository's license (AGPL-3.0).
+- [ ] Every commit carries a `Signed-off-by:` trailer (`git commit -s`), and I certify the
+      [DCO](https://developercertificate.org/): this contribution is mine to give under the
+      repository's license (AGPL-3.0) or, for `docs/`, CC-BY-4.0. The `commit-msg` hook enforces
+      the trailer; see [CONTRIBUTING.md](../CONTRIBUTING.md).
