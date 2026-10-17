@@ -131,29 +131,7 @@ impl From<ProtocolError> for AgentPersonalityBlobError {
     }
 }
 
-impl From<EnvelopeError> for AgentPersonalityBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface stays unchanged.
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => AgentPersonalityBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => AgentPersonalityBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => {
-                AgentPersonalityBlobError::ProtocolVersionMismatch
-            }
-            EnvelopeError::FormatUnsupported => AgentPersonalityBlobError::FormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => {
-                AgentPersonalityBlobError::CiphertextLenOverflow
-            }
-            EnvelopeError::CiphertextTruncated => AgentPersonalityBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => AgentPersonalityBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => AgentPersonalityBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => {
-                AgentPersonalityBlobError::RandomnessUnavailable
-            }
-        }
-    }
-}
+crate::blob_envelope::impl_from_envelope_error!(AgentPersonalityBlobError);
 
 /// Encode an agent-personality blob from an opaque `plaintext` (the client
 /// layer's canonical-JSON directives block), sealing under

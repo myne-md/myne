@@ -241,21 +241,9 @@ pub enum DeviceBindingBlobError {
     ConflictingBinding,
 }
 
-impl From<EnvelopeError> for DeviceBindingBlobError {
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => Self::HeaderTooShort,
-            EnvelopeError::MagicMismatch => Self::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => Self::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => Self::DeviceBindingFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => Self::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => Self::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => Self::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => Self::CiphertextLenOverflow,
-            EnvelopeError::RandomnessUnavailable => Self::RandomnessUnavailable,
-        }
-    }
-}
+// MYU5: the format hook is family-prefixed, and PlaintextTooLarge collapses
+// into CiphertextLenOverflow so this family's parse_fail surface does not widen.
+crate::blob_envelope::impl_from_envelope_error!(DeviceBindingBlobError, format: DeviceBindingFormatUnsupported, plaintext_too_large: CiphertextLenOverflow);
 
 fn is_device_id_hex(s: &str) -> bool {
     s.len() == DEVICE_ID_HEX_LEN && crate::hex::is_lower_hex(s)

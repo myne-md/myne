@@ -144,24 +144,8 @@ impl From<ProtocolError> for ThemesBlobError {
     }
 }
 
-impl From<EnvelopeError> for ThemesBlobError {
-    /// Map the shared-envelope error into this codec's public variant so the
-    /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
-    /// `FormatUnsupported` → `ThemesFormatUnsupported` rename (§9.21 spelling).
-    fn from(e: EnvelopeError) -> Self {
-        match e {
-            EnvelopeError::HeaderTooShort => ThemesBlobError::HeaderTooShort,
-            EnvelopeError::MagicMismatch => ThemesBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => ThemesBlobError::ProtocolVersionMismatch,
-            EnvelopeError::FormatUnsupported => ThemesBlobError::ThemesFormatUnsupported,
-            EnvelopeError::CiphertextLenOverflow => ThemesBlobError::CiphertextLenOverflow,
-            EnvelopeError::CiphertextTruncated => ThemesBlobError::CiphertextTruncated,
-            EnvelopeError::CannotDecrypt => ThemesBlobError::CannotDecrypt,
-            EnvelopeError::PlaintextTooLarge => ThemesBlobError::PlaintextTooLarge,
-            EnvelopeError::RandomnessUnavailable => ThemesBlobError::RandomnessUnavailable,
-        }
-    }
-}
+// §9.21 spells the format hook `ThemesFormatUnsupported`.
+crate::blob_envelope::impl_from_envelope_error!(ThemesBlobError, format: ThemesFormatUnsupported, plaintext_too_large: PlaintextTooLarge);
 
 /// Encode a `vault.themes` blob from an opaque `plaintext` (the client layer's
 /// serialized `{name → palette}` map), sealing under `custom_themes_key` with
