@@ -121,7 +121,7 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
     PinnedDictFile {
         lang: "bg",
         file: "license",
-        sha256_hex: "04f8571e50b57ddcd93e74416e1949325c899b902af36e83fa669b6205f56b2e",
+        sha256_hex: "49d7594ad2681a019e00c984dcb1faec29f60018e17c28097eb25c17f7243093",
     },
     PinnedDictFile {
         lang: "ca",
