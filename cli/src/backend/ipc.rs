@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! [`IpcBackend`] — the Phase 1 [`MyneBackend`]: talks to the desktop's
 //! already-running, already-unlocked CLI bridge command socket
 //! (`src-tauri/src/cli_bridge/`). Never opens the vault, never holds a

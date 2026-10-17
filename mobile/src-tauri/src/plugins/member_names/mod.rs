@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `member-names` plugin: mobile shim over the shared
 //! [`myne_core::plugins::member_names`] store.
 //!

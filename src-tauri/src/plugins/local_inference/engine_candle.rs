@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Real on-device [`Engine`] backed by Candle (local-ai epic, MYND-406 tasks
 //! 3/4). `infer` runs a **quantized Qwen2 GGUF** generation model. It is
 //! **side-loaded** from

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-layer error type for the vault-recover plugin.
 //!
 //! Closed set; no `String` field reaches the frontend. TS hand-mirror

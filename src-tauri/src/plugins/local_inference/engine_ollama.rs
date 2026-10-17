@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! An [`Engine`] that speaks HTTP to a user-named loopback model runtime
 //! (ai-ollama-local task 5).
 //!

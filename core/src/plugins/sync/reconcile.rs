@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Full-reconcile primitive (MYND-424 task 8; MYND-426 invokes it).
 //!
 //! Triggered when the incremental cursor is no longer trustworthy — a

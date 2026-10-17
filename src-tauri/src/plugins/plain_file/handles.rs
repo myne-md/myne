@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The handle registry and the file IO for the plain-file editor
 //! (myne-md/myne#788).
 //!

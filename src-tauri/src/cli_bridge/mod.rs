@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The CLI terminal-access door: a local socket bound to the running,
 //! unlocked desktop (cli-thin-client task 3; MYND-490).
 //!

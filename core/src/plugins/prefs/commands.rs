@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `prefs` Tauri command handlers (MYND-160 Task 9).
 //!
 //! - [`prefs_read`] — Slot::Unlocked-gated read of the `vault.prefs`

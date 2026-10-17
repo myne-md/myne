@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Durable per-attachment extracted-text cache (`MYE1`, MYND-328;
 //! `protocol.md` § 9.15). One encrypted file per attachment at
 //! `<vault-root>/attachments-text/<attachment-id-hex>`, mirroring the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! On-device speech-to-text (Whisper) — the mobile port of the desktop
 //! `local_inference` engine, **transcription-only** (MYND-563).
 //!

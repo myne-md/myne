@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The device-local record of which beta terms this device accepted
 //! (operations#15).
 //!

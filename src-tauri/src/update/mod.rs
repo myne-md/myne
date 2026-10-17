@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The desktop self-update domain model.
 //!
 //! This module holds the types the update check speaks in, and nothing that

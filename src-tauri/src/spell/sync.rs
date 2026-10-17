@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Personal-dictionary persistence + lifecycle (MYND-266 tasks 4-5).
 //!
 //! Bridges the encrypted `vault.dictionary` blob (`protocol::dictionary_blob`,

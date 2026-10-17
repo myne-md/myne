@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The sidecar's lifecycle state machine — pure, so the interesting
 //! transitions can be asserted without a Tor network, a subprocess, or a clock.
 //!

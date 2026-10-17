@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `share-import` plugin (mobile) — the share-import staging queue for files
 //! shared into Myne via the OS share sheet (iOS Share Extension / Android
 //! `ACTION_SEND`).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-global no-egress invariant: the single source of truth + pure
 //! predicates + static scanners (local-ai epic, ai-egress-guardrail MYND-407,
 //! tasks 1–3).

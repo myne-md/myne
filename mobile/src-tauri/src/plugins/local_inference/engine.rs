@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The [`Engine`] trait — the single seam every AI capability sibling reaches
 //! inference through (SYNC-3/7). The impl
 //! (a stub now, Candle then a sandboxed sidecar later) is hidden so the

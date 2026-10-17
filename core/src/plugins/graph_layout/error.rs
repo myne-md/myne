@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `graph_layout` plugin IPC error enums.
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Pairing challenge + scoped revocable token registry (TB10, task 4).
 //!
 //! This is the desktop side of the browser-extension **pairing handshake**

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `.myne-backup` container codec — spec `docs/spec/protocol.md` §9.11.
 //!
 //! Single home for the vault-backup container's byte layout: the streaming

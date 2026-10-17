@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // Without `InlinedPlugin`, permissions under `permissions/<plugin>/`
 // silently flatten into `__app-acl__` and the ACL resolver registers the
 // `commands.allow` entries as bare names that never match the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Device-local sync state (SYNC-12, MYND-424 task 4).
 //!
 //! Three things persist **device-local, never synced** (AS6/A13 — sync state

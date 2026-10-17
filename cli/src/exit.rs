@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Exit-code map (cli-thin-client task 4; PRD story 12 — "a script can
 //! branch on 'vault locked' vs 'not found' vs 'access disabled' without
 //! parsing text"). This mapping is as load-bearing as the `--json` envelope

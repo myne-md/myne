@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `diagnostics` Tauri plugin (myne-md/myne#860): the opt-in device-local
 //! diagnostic log and the bug-report surface's host side.
 //!

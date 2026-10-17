@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! JSON command dispatch for the CLI bridge command socket (cli-thin-client
 //! task 4; MYND-490).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri commands for the vault-unlock plugin.
 //!
 //! - [`unlock`] — read `vault.meta`, derive `password_wrap_key`

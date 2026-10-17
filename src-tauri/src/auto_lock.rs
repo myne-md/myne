@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Auto-lock-on-idle protective envelope (MYND-121).
 //!
 //! **The protective ENVELOPE is not here any more** (myne-md/myne#479): the

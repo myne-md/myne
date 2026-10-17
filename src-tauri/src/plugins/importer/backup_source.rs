@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Open a `.myne-backup` container as a read-only import source
 //! (myne-md/myne#816).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! How the host talks to the `myne-tor` sidecar: the config file it is given,
 //! the argv it is launched with, and the one stderr line that means
 //! "bootstrapped".

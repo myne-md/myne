@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Device-management client (MYND-425 tasks 6 + 9): the authed device roster +
 //! approval gate + token revocation over the server auth surface.
 //!

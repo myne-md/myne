@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // Capability-shape test for the detached (pop-out) note window (myne-md/myne#677, epic #173).
 //
 // A text grep over the capability JSON is fooled by its own description prose (which names

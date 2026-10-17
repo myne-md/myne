@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The desktop diagnostic log's runtime (myne-md/myne#860).
 //!
 //! # The one subscriber, and why the switch cannot be a second `try_init`

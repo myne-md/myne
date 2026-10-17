@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Per-page footer stamper for the exported PDF (MYND-255 hotfix,
 //! owner-requested).
 //!

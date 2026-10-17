@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Central `cli_excluded_folders` enforcement (cli-thin-client task 5;
 //! MYND-490).
 //!

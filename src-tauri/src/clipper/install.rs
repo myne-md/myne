@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Native-messaging host-manifest **install wiring** (TB10).
 //!
 //! [`super::manifest`] GENERATES the per-browser native-host manifest JSON; this

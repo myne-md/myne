@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `backup` plugin — whole-vault backup export (MYND-32; restore joins in
 //! MYND-218). Spec: `docs/spec/protocol.md` §9.11; epic MYND-217.
 //!

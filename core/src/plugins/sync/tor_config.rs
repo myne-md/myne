@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The device-local `tor_routing_enabled` preference (MYND-650 task 6).
 //!
 //! One boolean, persisted at `<app_config_dir>/tor-routing.json`. It is the

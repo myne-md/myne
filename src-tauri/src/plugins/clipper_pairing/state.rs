@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Pairing-session + token-registry runtime state (TB10, task 4).
 //!
 //! This is the Tauri-managed state the WebView pairing dialog drives. It

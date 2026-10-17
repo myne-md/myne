@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! App-data-dir + command-socket/status-marker path resolution for the CLI
 //! (cli-thin-client task 4; MYND-490).
 //!

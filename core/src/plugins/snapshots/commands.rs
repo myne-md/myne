@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `snapshots` plugin commands (MYND-96, SYNC-9): the read/management surface
 //! for encrypted per-note snapshots. The creation hook + prune-on-create +
 //! purge-on-delete live in the `notes` plugin (the `note_update`/`note_delete`

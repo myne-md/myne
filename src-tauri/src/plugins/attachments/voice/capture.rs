@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Microphone capture for voice notes (MYND-259).
 //!
 //! Native Rust capture via `cpal`, NOT the WebView's MediaRecorder: captured

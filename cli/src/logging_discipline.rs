@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Test-only: the CLI half of the door's logging discipline
 //! (cli-thin-client task 13; MYND-490).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Offline spell-checking engine (spell-checker epic, MYND-262).
 //!
 //! Rust-core engine (SYNC-1) wrapping the pure-Rust `spellbook` Hunspell-format

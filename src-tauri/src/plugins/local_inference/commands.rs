@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `infer` Tauri commands (local-ai epic, MYND-406, task 6).
 //!
 //! The `#[tauri::command]`s are thin wrappers that extract the shared engine

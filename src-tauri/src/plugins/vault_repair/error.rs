@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_repair` IPC error enum (MYND-159).
 //!
 //! Closed taxonomy, DENY-list clean (no path strings, no kernel-error

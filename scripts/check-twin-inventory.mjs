@@ -1179,7 +1179,7 @@ const ROSTER = [
     verdict: "screen",
     destination: "undecided",
     reason:
-      "The binary entry point, 15 lines against 6. Each client's `main` starts a different host.",
+      "The binary entry point, 16 lines against 7. Each client's `main` starts a different host.",
   },
   {
     a: "src-tauri/src/hooks.rs",
@@ -1307,7 +1307,7 @@ const ROSTER = [
     verdict: "delegated",
     destination: "myne-core",
     reason:
-      "Host-registration shim. Both sides carry `pub use myne_core::plugins::<flow>` and keep only the Tauri plugin builder plus its capability grant, so the divergence is the wiring and it is correct by construction. Measured, not inferred: the `pub use` is on both sides. This is the canonical example of the pattern working: 52 lines against 53, both delegating, and the recursive unlink goes through the shared `myne_core::vault_sweep`.",
+      "Host-registration shim. Both sides carry `pub use myne_core::plugins::<flow>` and keep only the Tauri plugin builder plus its capability grant, so the divergence is the wiring and it is correct by construction. Measured, not inferred: the `pub use` is on both sides. This is the canonical example of the pattern working: 53 lines against 54, both delegating, and the recursive unlink goes through the shared `myne_core::vault_sweep`.",
   },
   {
     a: "src-tauri/src/plugins/vault_indices/mod.rs",
@@ -1355,7 +1355,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "The `attachment://` URI-scheme handler. No `pub use` on either side, so both hold real logic, and what a scheme request is allowed to read out of a vault is one answer rather than two. 261 lines against 84.",
+      "The `attachment://` URI-scheme handler. No `pub use` on either side, so both hold real logic, and what a scheme request is allowed to read out of a vault is one answer rather than two. 262 lines against 85.",
   },
   {
     a: "src-tauri/src/plugins/workspace/mod.rs",
@@ -1411,7 +1411,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Model resolution and integrity checking, 1384 lines against 715. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
+      "Model resolution and integrity checking, 1385 lines against 716. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
     a: "core/src/inference/engine.rs",
@@ -1419,7 +1419,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2284 lines against 364 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
+      "The engine trait and its shared implementation. The verdict is no longer a prediction: myne-md/myne#456 MOVED the desktop side into `myne-core`, so `a` is the shared answer and 2285 lines against 365 now measures how far mobile's copy trails it rather than how much the two clients differ. Mobile still declares its own `mod engine;` and compiles against that copy, which is a live duplication rather than a narrowing: `transcribe` is real there while `infer` and `embed` return `NotReady`, and the same shape now exists once in core. Deleting mobile's copy is the follow-up this row exists to keep visible; #456 stopped at the remote arm because that is what it needed and pulling the transcription path across would have been a second migration inside one PR.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/engine_candle.rs",
@@ -1443,7 +1443,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine error enum, 237 lines against 125. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
+      "The engine error enum, 238 lines against 126. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1459,7 +1459,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1185 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1186 lines against 113, and mobile's is independently written rather than a trimmed copy.",
   },
   {
     a: "src/lib/agent-run.ts",
@@ -1499,7 +1499,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The inference state machine, 1593 lines against 40 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. The 1647 figure this line carried until the AI embedding index was retired (`design-notes/ai/0703-*`) counted the `embedding_engine` accessor and its docs, which that removal deleted. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
+      "The inference state machine, 1594 lines against 41 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. The 1647 figure this line carried until the AI embedding index was retired (`design-notes/ai/0703-*`) counted the `embedding_engine` accessor and its docs, which that removal deleted. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
   {
     a: "src-tauri/src/plugins/member_names/mod.rs",

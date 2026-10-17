@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Host-side commands for the `importer` read-seam (MYND-53, SYNC-1).
 //!
 //! `import_read_dir` and `import_read_file` are the ONLY path by which the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-repair Tauri plugin (MYND-159).
 //!
 //! In-app cleanup of orphan vault artefacts left under

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri commands for the `vault-change-password` plugin.
 //!
 //! [`change_password`] is the standalone password-rotation flow: user

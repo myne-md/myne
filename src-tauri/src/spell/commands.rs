@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Spell-check Tauri commands + bundled-dictionary loader (MYND-262 t5,
 //! MYND-263 t3-4, MYND-266 t5).
 //!

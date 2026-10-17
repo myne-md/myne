@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-layer error type for the vault-unlock plugin.
 //!
 //! Mirrors `vault_creation::error::AppError` in spirit (no `String`

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_delete` IPC error enum.
 //!
 //! Closed taxonomy mirroring the `NoteDeleteError` shape — DENY-list

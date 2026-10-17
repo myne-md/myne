@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The device-local AI provider endpoint (ai-ollama-local task 3, SYNC-12).
 //!
 //! One JSON file under `<app_config_dir>`, sibling of `tor-routing.json`, and

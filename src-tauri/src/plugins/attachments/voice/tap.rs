@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! macOS system-audio capture via a CoreAudio process tap
 //! (myne-md/myne#789).
 //!
