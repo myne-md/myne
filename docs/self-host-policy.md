@@ -127,9 +127,20 @@ abuse, not confidentiality** — none of them can weaken the zero-knowledge prot
   window past what you disclose re-creates the hoarding §3 forbids** — if you must, re-disclose it
   (threat-model §7 + this section) as §3 requires.
 
-This document gives you the **mechanism**, and you choose the number for your deployment. There is no
-Myne-set recommended value to defer to, because Myne operates no service of its own
-(`decisions/sync/0696`).
+- **Member data after a removal** (`store.DefaultRetirementGrace`, **a code constant and not a knob: 7
+  days**). When an owner removes a member, the rotated group key is posted once for each remaining
+  member (see the privacy network table) and the retired namespace is scheduled for reclamation after a
+  **seven-day grace**: long enough for an in-flight rotation to finish, short enough that a departed
+  member's sealed packages and per-person profile do not accumulate. There is **no environment variable
+  for this window** — the value lives in `internal/store/retirement.go`, and an operator who changes it is
+  changing the software. If you do, §3's disclosure rule applies to the new number the same way it applies
+  to the backup window. What matters is that the shipped default is **bounded**: nothing here is reclaimed
+  "never", which is the shape that would leave a departed member's key material on your disk forever.
+
+This document gives you the **mechanism**, and for almost every number you choose the value yourself,
+because Myne operates no service of its own (`decisions/sync/0696`). The exception is a value the software
+fixes rather than exposes — the member-data grace above — and it is named as a constant precisely so that
+nobody goes looking for a knob that does not exist.
 
 ## 5. Verifying the server image
 
@@ -335,3 +346,45 @@ the two questions it leaves open are the ones to put to a lawyer. The summary is
 statements cover the practical load, and the whole list is a day's work for a deployment that has a
 contact address, a notice route, honest terms, and a decision recorded about which exemption it is
 claiming.
+
+## 10. What a Myne server holds, and what a request can therefore produce
+
+This section is the operator-facing copy of the inventory, and it is **new here because the page it used to
+live on is gone**. Until 2026-10-17 `myne.md/law-enforcement/` (and its German twin) published this list to
+authorities and their counsel. It was deleted with the rest of the DSA roster, because it described a
+server Myne operated and Myne operates none (`decisions/sync/0696`); a request now arrives at *you*. The
+wording below is the same inventory stated to that reader, and it agrees with the processing record
+(`myne-ops/legal/vvt.md` §5) and with the privacy policy's stored list, which are its two other copies.
+
+**What a deployment of this software holds.** A server that has been run for a while will have, per
+account:
+
+| Stored | What it is |
+|---|---|
+| `account_number_hash` | A 16-byte hash. Not the account number itself. |
+| SCRAM verifier | What a login is checked against. Not a password, and not reversible into one. |
+| Encrypted blobs | Notes and attachments as ciphertext. The server holds no key. Producible only in that form. |
+| Device registry | One record per enrolled device: a client-generated device id and enrolment/activity state. No device names, no hardware identifiers, no addresses. |
+| Counters | Total bytes stored, number of devices. |
+| Account policy | A freeze flag and any per-account storage or device limit. Server-side plain text. |
+
+**What it never has.** None of the following is collected, at any layer, by any deployment of this
+software — this is a property of the protocol rather than a setting an operator can change (§2):
+
+- Email address — none is collected at signup, and there is no field for one
+- Name, postal address, telephone number
+- Payment details — the software takes none
+- IP addresses — not logged, in any persisted form, at any layer
+- Connection logs, access times, session history
+- Readable content — note text, titles, folder names, tags
+- Timestamps that mean anything — they exist only inside the ciphertext
+
+**What follows for a request, and this is the part worth stating plainly.** A request can be answered with
+an account identifier, a login verifier, counters and ciphertext; it **cannot** be answered with content,
+because there is none to produce. The data is not withheld — it does not exist. An operator who wants a
+public address for such requests should publish one, state the languages they answer in, and keep this list
+in front of it, exactly as the deleted page did.
+
+**One thing this section does not settle.** Whether a given deployment is a hosting service under the DSA,
+and therefore whether it owes the Art. 16 and 18 duties §9 lists, is the question for a lawyer that §9
+already says it is. This section is the factual half of that answer, not the legal one.
