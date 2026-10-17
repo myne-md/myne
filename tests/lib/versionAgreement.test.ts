@@ -60,7 +60,7 @@ function readJson(relative: string): Record<string, unknown> {
  * `Array.prototype.filter` and nothing the guard does — and an edit to the real
  * comparison could not have failed it.
  */
-function disagreements(seen: Array<{ where: string; version: string | null }>) {
+function disagreements<T extends { version: string | null }>(seen: T[]): T[] {
   const reference = seen[0];
   if (!reference) return seen;
   return seen.filter((d) => d.version !== reference.version);

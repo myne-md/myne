@@ -42,8 +42,10 @@ describe("serializeClipMarkdown — single shared parser", () => {
     // Reached through the prototype of the module's own singleton, so no new
     // import is needed: `parser` is a `MarkdownParser` instance, and any second
     // construction goes through this same method.
-    const proto = Object.getPrototypeOf(parserModule.parser) as { configure: unknown };
-    const configure = vi.spyOn(proto as never, "configure" as never);
+    const proto = Object.getPrototypeOf(parserModule.parser) as {
+      configure: (...args: unknown[]) => unknown;
+    };
+    const configure = vi.spyOn(proto, "configure");
     try {
       serializeClipMarkdown("x\n");
       expect(configure).not.toHaveBeenCalled();
