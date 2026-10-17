@@ -1270,6 +1270,21 @@ pre-push:
 # file path as {1}.
 commit-msg:
   commands:
+    require-signoff:
+      # DCO (CONTRIBUTING.md): every commit carries a `Signed-off-by:` trailer, which
+      # is what makes the certification in the pull-request template a statement the
+      # contributor actually made. Merge commits are exempt: git writes their message
+      # and there is no authorship decision in it.
+      run: |
+        if head -1 "{1}" | grep -q '^Merge '; then exit 0; fi
+        if sed -e '/^#.*>8/,$d' "{1}" | git stripspace --strip-comments | grep -qE '^Signed-off-by: .+ <.+@.+>'; then
+          exit 0
+        fi
+        echo "commit message has no 'Signed-off-by:' trailer. This project uses the DCO (CONTRIBUTING.md)."
+        echo "  Fix the last commit:   git commit --amend -s"
+        echo "  Fix the whole branch:  git rebase --signoff origin/develop"
+        exit 1
+
     no-ai-coauthor:
       run: |
         # The message file still holds git's `#` comment block at hook time,
