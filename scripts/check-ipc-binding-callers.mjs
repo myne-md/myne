@@ -392,7 +392,25 @@ export function readTree() {
   const callerFiles = [...new Set(CALLER_ROOTS.flatMap((r) => walk(join(ROOT, r))))].filter(
     (f) => !IS_TEST.test(relative(ROOT, f)),
   );
-  const read = (fs) => new Map(fs.map((f) => [relative(ROOT, f), readFileSync(f, "utf8")]));
+  // A file that VANISHED between the walk and the read is skipped rather than
+  // fatal. That is not defensive padding: another test in this repository injects a
+  // probe file into a denominator and deletes it again (`manualTestRosterCli.test.ts`
+  // writes `src/screens/ZzGuardProbe.tsx` for one assertion), and vitest runs test
+  // files in parallel, so this read raced that delete and the guard died with ENOENT
+  // instead of producing a verdict. Reported twice from a full-suite run as an
+  // unrelated-looking failure in `prefs-parity`, which imports this measurement.
+  // A vanished file is also simply not in this run's denominator.
+  const read = (fs) => {
+    const out = new Map();
+    for (const f of fs) {
+      try {
+        out.set(relative(ROOT, f), readFileSync(f, "utf8"));
+      } catch {
+        /* removed between the walk and the read */
+      }
+    }
+    return out;
+  };
   return {
     bindings: read(bindingFiles),
     callers: read(callerFiles),
