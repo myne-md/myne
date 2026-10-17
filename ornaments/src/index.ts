@@ -21,7 +21,6 @@ export {
   ornamentRole,
   ornamentToken,
   ORNAMENT_PRIMITIVES,
-  ORNAMENT_PRIMITIVE_NAMES,
   ORNAMENT_ROLES,
   ROLE_PRIMITIVES,
   roleAccepts,

@@ -52,9 +52,9 @@ export function ornamentRole(role: OrnamentRole): Record<string, string> {
  * **Mirrors `theme-validator/src/ornament.rs`'s `PRIMITIVES`.** The Rust side
  * decides whether a theme's value is *recognized*; this side is what the
  * stylesheet and any builder UI enumerate. Neither can be derived from the other
- * at build time, so they are kept in step by review — and by
- * {@link ORNAMENT_PRIMITIVE_NAMES} being asserted against the CSS in this
- * package's tests, which is the half a reviewer would otherwise miss.
+ * at build time, so they are kept in step by review — and by {@link
+ * ORNAMENT_PRIMITIVES} being enumerated against the CSS in this package's
+ * tests, which is the half a reviewer would otherwise miss.
  *
  * Values carry no hyphens because the theme value allowlist's bare-keyword arm
  * is ASCII letters only; see the Rust module's header for why that is deliberate
@@ -104,9 +104,6 @@ export function roleAccepts(role: string, primitive: string): boolean {
  * theme file, validated and synced, drawing nothing.
  */
 export const TINT_KEYS = ["--tint", "--tint-strength"] as const;
-
-/** The primitive names, in declaration order. */
-export const ORNAMENT_PRIMITIVE_NAMES = Object.keys(ORNAMENT_PRIMITIVES);
 
 /**
  * The CSS custom-property name a role/primitive pair reads.
