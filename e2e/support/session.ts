@@ -21,6 +21,7 @@ import {
   driverStatus,
   newSession,
   type Session,
+  recordWait,
 } from "./webdriver";
 
 const DRIVER_HOST = "127.0.0.1";
@@ -32,6 +33,22 @@ const DRIVER_READY_TIMEOUT_MS = 15_000;
  *  `waitForDriverGone` documents; a scenario that pays ten seconds here is far
  *  cheaper than one that burns its whole budget on the wrong app. */
 const DRIVER_FREE_TIMEOUT_MS = 10_000;
+/**
+ * How long a LAUNCH gives the configured port pair before stepping to an
+ * alternate.
+ *
+ * It was {@link DRIVER_FREE_TIMEOUT_MS} (10 s), which a stray driver made every
+ * scenario pay IN FULL, because `waitForDriverGone` can only return "free" or
+ * "still answering" and the fallback is deterministic anyway. Measured
+ * (2026-10-17, 2 shards, the 7 slowest files, 37 scenarios) with one stray
+ * `tauri-driver` on the worker's band: `[launch:ports]` summed to **393 s over 39
+ * launches, 10.1 s each, a third of all wait time in the run**. Waiting buys only
+ * "the port we were configured with", and a worker's band is 100 wide with the
+ * fallbacks 1000 apart, so it is not worth ten seconds. A driver killed as a
+ * process group releases its socket immediately; the grace is for one that is
+ * mid-shutdown.
+ */
+const PORT_HANDOVER_MS = 1_000;
 
 /** Repo root (this file lives at e2e/support/). */
 export const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
@@ -160,6 +177,21 @@ export interface LaunchOptions {
   seedConfig?: (appConfigDir: string) => void | Promise<void>;
   /** Keep the temp data dir on teardown (debugging). */
   keepDataDir?: boolean;
+  /**
+   * Leave the DEVICE-LOCAL first-run flags as the app would find them on a
+   * fresh machine, instead of seeding them.
+   *
+   * `myne.aiOnboardingSeen` is written for every session below, because
+   * `AiOnboardingSurface`'s full-viewport backdrop swallows every click and no
+   * suite dismisses it. That made the surface unreachable for the ONE suite
+   * whose subject it is: `ai-model-download` waited 45 s for
+   * `aiOnboarding.screen` in all three of its scenarios while the harness had
+   * already marked it seen, and the comment on the seeding loop promised that
+   * "a scenario whose SUBJECT is the onboarding clears the key itself" while
+   * nothing did. A flag rather than a per-scenario `removeItem` so the intent
+   * is stated once, where the seeding is.
+   */
+  firstRunSurfaces?: boolean;
   /**
    * Command-line arguments handed to the app binary at launch.
    *
@@ -306,21 +338,33 @@ const PORT_FALLBACK_ATTEMPTS = 4;
 export async function freeDriverPorts(
   driverPort: number,
   nativePort: number,
-  // Both injectable for the unit test only; production probes for real and
-  // waits the full budget on the port it was actually configured with.
+  // Both injectable for the unit test only; production probes for real and gives
+  // the configured pair a SHORT grace period before stepping to an alternate.
   probe: (url: string) => Promise<unknown> = driverStatus,
-  firstWaitMs: number = DRIVER_FREE_TIMEOUT_MS,
+  firstWaitMs: number = PORT_HANDOVER_MS,
 ): Promise<{ driverPort: number; nativePort: number; movedFrom?: number }> {
   for (let attempt = 0; attempt < PORT_FALLBACK_ATTEMPTS; attempt += 1) {
     const candidate = driverPort + attempt * PORT_FALLBACK_STRIDE;
-    const budget = attempt === 0 ? firstWaitMs : 500;
-    if (await waitForDriverGone(`http://${DRIVER_HOST}:${candidate}`, budget, probe)) {
-      return {
-        driverPort: candidate,
-        nativePort: nativePort + attempt * PORT_FALLBACK_STRIDE,
-        movedFrom: attempt === 0 ? undefined : driverPort,
-      };
+    const candidateNative = nativePort + attempt * PORT_FALLBACK_STRIDE;
+    const budget = attempt === 0 ? firstWaitMs : PORT_HANDOVER_MS;
+    if (!(await waitForDriverGone(`http://${DRIVER_HOST}:${candidate}`, budget, probe))) {
+      continue;
     }
+    // **The NATIVE port too, and it is not belt-and-braces.** A leftover
+    // `WebKitWebDriver` holds the native port while the driver port is free (they
+    // are separate listeners), and a `tauri-driver` started with `--native-port`
+    // already taken does not fail loudly: the app ends up on that other WebKit
+    // session, against another data directory, and the scenario hangs until its
+    // own budget. Measured: agent-hub ah1 timed out at 180 s with a stray on 4445
+    // and nothing on 4444. The pair moves together or not at all.
+    if (!(await waitForDriverGone(`http://${DRIVER_HOST}:${candidateNative}`, PORT_HANDOVER_MS, probe))) {
+      continue;
+    }
+    return {
+      driverPort: candidate,
+      nativePort: candidateNative,
+      movedFrom: attempt === 0 ? undefined : driverPort,
+    };
   }
   throw new Error(
     `every candidate WebDriver port from ${driverPort} in steps of ` +
@@ -361,8 +405,10 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   chmodSync(runtimeDir, 0o700);
   const tmpDir = join(dataHome, ".tmp");
   mkdirSync(tmpDir, { recursive: true });
+  let phase = Date.now();
   if (opts.seed) await opts.seed(appDataDir);
   if (opts.seedConfig) await opts.seedConfig(appConfigDir);
+  recordWait("[launch:fixture]", Date.now() - phase, false);
 
   // **Never start on a port somebody else is still holding.** See
   // `waitForDriverGone`: attaching to a previous scenario's dying driver hands
@@ -370,7 +416,9 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   // symptom is a screen that says the vault does not exist. Resolving here
   // rather than only in `teardown` covers the paths a teardown cannot: a worker
   // that died mid-scenario, a driver whose child outlived it, a stray manual run.
+  phase = Date.now();
   const ports = await freeDriverPorts(wantedDriverPort, wantedNativePort);
+  recordWait("[launch:ports]", Date.now() - phase, false);
   const driverPort = ports.driverPort;
   const nativePort = ports.nativePort;
   const baseUrl = `http://${DRIVER_HOST}:${driverPort}`;
@@ -420,12 +468,19 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   proc.stderr?.on("data", (d: Buffer) => (driverLog += d.toString()));
 
   try {
+    phase = Date.now();
     await waitForDriver(baseUrl, proc);
+    recordWait("[launch:driver-ready]", Date.now() - phase, false);
+    phase = Date.now();
     const session = await newSession({
       baseUrl,
       application: defaultAppPath(),
       args: opts.args,
     });
+    // The app's WebView is up when this resolves, so this phase is the
+    // WebKitGTK boot itself: the thing no harness change can shorten, and worth
+    // separating from the harness's own overhead beside it.
+    recordWait("[launch:app-boot]", Date.now() - phase, false);
 
     // Seed the device-local first-run flags BEFORE any scenario reaches the
     // editor. `AiOnboardingSurface` (myne#805) opens whenever
@@ -435,17 +490,22 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
     // mount, which is always after this, so one write here clears it for every
     // scenario. Key literal matches `src/lib/aiOnboardingSeen.ts` (`SEEN_KEY`).
     // Retried because `execute` can race the first document; a scenario whose
-    // SUBJECT is the onboarding clears the key itself.
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      try {
-        await session.execute<void>(
-          'window.localStorage.setItem("myne.aiOnboardingSeen", "1");',
-        );
-        break;
-      } catch {
-        await sleep(100);
+    // SUBJECT is the onboarding sets `firstRunSurfaces` and gets an untouched
+    // machine instead.
+    phase = Date.now();
+    if (opts.firstRunSurfaces !== true) {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          await session.execute<void>(
+            'window.localStorage.setItem("myne.aiOnboardingSeen", "1");',
+          );
+          break;
+        } catch {
+          await sleep(100);
+        }
       }
     }
+    recordWait("[launch:first-run-flags]", Date.now() - phase, false);
 
     const teardown = async () => {
       try {

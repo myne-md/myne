@@ -33,13 +33,26 @@ async fn unlocked_state() -> (
     (state, test_vault_id().to_string())
 }
 
-/// `collab-verification` D7: the single-writer refusal covers the OTHER two write
+/// `collab-verification` D7: the single-writer discipline covers the OTHER write
 /// paths, not only `note_update`. A note a live session owns is refused by the
-/// rename/move BATCH writer and by the snapshot RESTORE, so neither writes behind
-/// the session. Both guards run before any vault work, so a default (locked) state
-/// is enough to reach them.
+/// rename/move BATCH writer, so it never writes behind the session.
+///
+/// **The RESTORE half of this test changed sides, deliberately.** It used to assert
+/// that the snapshot restore refuses a live-owned note too. That refusal is what
+/// made the user's own undo — and the revision restore beside it — impossible on
+/// any note that was open, so the restore now ROUTES THROUGH the session instead
+/// (step 3 of `snapshot_restore_in`), keeping the session the writer while letting
+/// the restore happen. The behavioural half lives in the two E2E scenarios that
+/// measured the refusal: `e2e/agent-run.e2e.ts` (ag4, the run's revert) and
+/// `e2e/crdt-history.e2e.ts` (ch1, revision restore). What is pinned HERE is that
+/// the up-front refusal is gone, which is the assertion that flips if somebody
+/// reinstates it.
+///
+/// Both guards used to run before any vault work, so a default (locked) state was
+/// enough. That is still true of the batch half; the restore half now needs the
+/// registry only, and a bogus revision id keeps it from doing vault work.
 #[test]
-fn a_live_note_is_refused_by_the_batch_writer_and_the_restore() {
+fn a_live_note_is_refused_by_the_batch_writer_but_not_by_the_restore() {
     block_on(async {
         use zeroize::Zeroizing;
         let host = TestHost::new("/base");
@@ -91,6 +104,10 @@ fn a_live_note_is_refused_by_the_batch_writer_and_the_restore() {
         );
 
         let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+        // A BOGUS revision id, so the restore cannot succeed. What matters here is
+        // that it now gets as far as LOOKING for the revision: the up-front refusal
+        // of a live-owned note is gone (see this test's own doc), and the write that
+        // follows routes through the session instead.
         let restored = crate::plugins::snapshots::commands::snapshot_restore_in(
             notes_dir.clone(),
             &state,
@@ -103,11 +120,11 @@ fn a_live_note_is_refused_by_the_batch_writer_and_the_restore() {
         )
         .await;
         assert!(
-            matches!(
+            !matches!(
                 restored,
                 Err(crate::plugins::snapshots::error::SnapshotError::LiveSessionOpen)
             ),
-            "the snapshot restore must refuse a live note, got {restored:?}"
+            "the restore must no longer refuse a live-owned note up front, got {restored:?}"
         );
     });
 }

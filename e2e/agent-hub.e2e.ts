@@ -35,7 +35,9 @@ import {
   enableAi,
   enableDeveloperMode,
   runPaletteAction,
+  typeIntoEditor,
   unlockToEditor,
+  waitForSaved,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
@@ -52,12 +54,32 @@ const AGENT_TAB_KEY = "agent:agent";
  */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
-/** One message, then the review screen it raises closed again. The stub proposes
- *  for any task, so every send takes the screen (`design-notes/ai/0524`). */
+/** One message, then the review screen it raises closed again.
+ *
+ *  **The stub proposes where it has an ANCHOR, not for any task**, which the
+ *  scenario has to supply: its script reads the note body out of the framed turn
+ *  and proposes one edit per eligible line, and a note holding only frontmatter
+ *  leaves it silent — the run settles with an empty proposal and no review screen
+ *  opens. `agent-run` and `ai-chat` type a line into their notes for the same
+ *  reason. It DOES propose for a vault-general run too, once its scope listing has
+ *  led it to read a note, which is what lets `ah5`'s second conversation settle. */
 async function sendAndDismiss(s: Session, message: string): Promise<void> {
   const composer = await s.byTestId("ai.composer-input", { timeoutMs: 15_000 });
   await composer.sendKeys(message);
-  await (await s.byTestId("ai.composer-send")).click();
+  // **Send has to ARM first, and on this surface that is the only gate there is.**
+  // The anchored Focus view PINS its scope and renders no picker
+  // (`ConversationSurface`), so the readiness gate the panel's callers use
+  // (`ai.composer-scope`, see `agent-run.e2e.ts::openComposer`) does not exist
+  // here — measured: `ai.composer-scope` absent and `send.disabled === true` for the
+  // first ~seconds after the pane appears. Clicking into that window is a no-op, and
+  // the run then never starts: `ah5` waited out its whole review-screen budget on a
+  // Send that had never been armed.
+  const send = await s.byTestId("ai.composer-send");
+  await s.waitUntil(() => send.enabled(), {
+    label: "the agent composer's Send to arm",
+    timeoutMs: 20_000,
+  });
+  await send.click();
   await s.waitForElement(testIdSelector("agentReview.screen"), { timeoutMs: 30_000 });
   await (await s.byTestId("agentReview.close")).click();
   await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
@@ -71,6 +93,32 @@ async function agentTabCount(session: Session): Promise<number> {
     testIdSelector("editor.tab", { "data-tab-id": AGENT_TAB_KEY }),
   );
   return els.length;
+}
+
+/**
+ * Pin the agent tab through its own tab menu, so that a palette "open a view"
+ * afterwards APPENDS a tab instead of reusing (and so closing) the agent's slot
+ * (`openInFocusedTab`'s pin-aware arm, tab-modes / MYND-320).
+ *
+ * The same two steps `tab-modes.e2e.ts` uses: right-click the tab, click the
+ * menu's Pin item. Doing it through the menu rather than by writing the
+ * workspace blob keeps the scenario on production UI.
+ */
+async function pinAgentTab(s: Session): Promise<void> {
+  const tab = await s.waitForElement(
+    testIdSelector("editor.tab", { "data-tab-id": AGENT_TAB_KEY }),
+    { timeoutMs: 15_000 },
+  );
+  await tab.rightClick();
+  const item = await s.waitForElement(
+    testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
+    { timeoutMs: 10_000 },
+  );
+  await item.click();
+  await s.waitUntil(
+    async () => ((await tab.attribute("data-pinned")) === "true" ? true : null),
+    { label: "the agent tab reports pinned", timeoutMs: 10_000 },
+  );
 }
 
 /** Unlock, clear the importer offer, and open both AI gates. */
@@ -206,10 +254,18 @@ describeE2E("ah4 the tab remembers which conversation it was left on", () => {
         await readyWithAi(s, password);
         await createNote(s, TITLE);
 
-        // Anchor the tab to the note, then go elsewhere so the reveal is a
-        // real reveal rather than a no-op on an already-active tab.
         await runPaletteAction(s, "ai.open-agent-note", "agent");
         await s.byTestId("agent.focus-open-note", { timeoutMs: 15_000 });
+        // **PINNED before leaving, and that is not decoration.** A palette "open a
+        // view" reuses the focused pane's ACTIVE SLOT, so `graph.show` on an
+        // unpinned agent tab REPLACES it: the tab leaves the strip, and the later
+        // reveal then opens a FRESH agent tab whose conversation has no note at
+        // all. That is what this scenario measured before the pin was added (the
+        // anchor was gone, `agent.focus-open-note` with it), and the scenario's
+        // premise was what was wrong rather than the reveal: a pinned tab
+        // suppresses the reuse path, so the graph is APPENDED and the agent tab
+        // survives to be revealed.
+        await pinAgentTab(s);
         await runPaletteAction(s, "graph.show", "graph");
         await s.byTestId("editor.graph-pane", { timeoutMs: 15_000 });
 
@@ -249,6 +305,15 @@ aiDescribe("ah5 a conversation card is one target with its own controls", () => 
         const s = app.session;
         await readyWithAi(s, password);
         await createNote(s, TITLE);
+        // A BODY, and it is the stub's requirement rather than the scenario's
+        // subject: `createNote` leaves a note holding nothing but its frontmatter,
+        // and the fixture engine's script derives its anchors from the body, so on
+        // an empty note it answers nothing at all. The run then settles with an
+        // EMPTY proposal, which opens no review screen, and `sendAndDismiss` waits
+        // out its budget on a screen that was never coming. `agent-run` and
+        // `ai-chat` type a line for exactly this reason.
+        await typeIntoEditor(s, "a line the fixture engine can anchor on");
+        await waitForSaved(s);
         await runPaletteAction(s, "ai.open-agent-note", "agent");
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
 

@@ -115,7 +115,13 @@ describeE2E("acl1 the capability ACL refuses a withheld command (test-audit #42/
         //    and waiting for it timed out for a reason that had nothing to do
         //    with the ACL. The sidebar's `+` is present on every unlocked
         //    vault, notes or not.
-        await s.byTestId("notes.new-menu");
+        //
+        //    `notes.create` is that `+` today. It used to be `notes.new-menu`,
+        //    a dropdown the button opened (#230); the new-note control is a
+        //    direct icon button again (the dropdown's entries became the new-tab
+        //    chooser, `notes.newTab`), so the dropdown testid no longer exists in
+        //    the tree and the anchor was waiting for nothing.
+        await s.byTestId("notes.create");
         const stillThere = await pageSeatInvoke(s, GRANTED, {}, 20_000);
         expect(
           stillThere.err,

@@ -39,6 +39,7 @@ import {
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -198,13 +199,8 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
             IPC_TIMEOUT,
           );
           const base = typeof cur.ok === "string" ? cur.ok : "";
-          const up = await pageSeatInvoke(
-            s,
-            "plugin:notes|note_update",
-            { noteId, plaintext: `${base}\n${append}` },
-            IPC_TIMEOUT,
-          );
-          expect(up.err, "note_update should succeed").toBeUndefined();
+          const up = await writeNoteBody(s, noteId, `${base}\n${append}`, IPC_TIMEOUT);
+          expect(up.err, "the note body write should succeed").toBeUndefined();
         };
 
         // Target body is LARGE (120 filler lines push the deep heading well below

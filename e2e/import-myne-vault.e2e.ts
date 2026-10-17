@@ -95,7 +95,15 @@ async function waitForPhase(
  */
 async function patchDialogOpen(s: Session, chosen: string): Promise<boolean> {
   return await s.execute<boolean>(
-    "(() => {" +
+    // **`return`, and its absence is why this scenario never passed.** W3C's
+    // `execute/sync` evaluates the script as a FUNCTION BODY, so the result is
+    // whatever the script RETURNS and a bare expression's completion value is
+    // discarded: without the leading `return` the driver hands back nothing,
+    // `patched` is `null`, and the assertion reads as "the patch did not take"
+    // while the patch was never asked whether it had. Every other
+    // result-reading script in this harness starts with `return`; this one was
+    // the exception.
+    "return (() => {" +
       "  const url = window.__TAURI_INTERNALS__.convertFileSrc('plugin:dialog|open', 'ipc');" +
       "  const origFetch = window.fetch.bind(window);" +
       "  window.__e2eDialogOpenPath = arguments[0];" +

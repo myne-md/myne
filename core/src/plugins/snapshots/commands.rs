@@ -415,15 +415,17 @@ pub(crate) async fn snapshot_restore_in(
     registry: Option<&crate::plugins::live::LiveSessionRegistry>,
 ) -> Result<(), SnapshotError> {
     let note_id_parsed = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
-    // Single-writer refusal (`SYNC-33`): while a live session owns this note it IS
-    // the only durable writer, so restoring would write behind it and the session's
-    // next flush (or the pane's next save) would silently discard the restore.
-    // `None` means the caller has NO registry in hand (the agent undo on a host that
-    // does not manage one), which skips the check: the type says so rather than a
-    // throwaway registry hiding it.
-    if registry.is_some_and(|r| r.is_note_open(&note_id_parsed.to_string())) {
-        return Err(SnapshotError::LiveSessionOpen);
-    }
+    // Single-writer discipline (`SYNC-33`): while a live session owns this note it
+    // IS the only durable writer, so nothing may write the note's blob behind it —
+    // the session's next flush (or the pane's next save) would silently discard the
+    // write. **This used to REFUSE outright**, which made the user's own undo (and
+    // the revision restore beside it) impossible on any note that was open. The
+    // refusal is gone; the DISCIPLINE is not: step 3 routes a live-owned note through
+    // `live_session_patch_frontmatter_from_host`, the session's own whole-markdown
+    // write, so the session stays the writer and the restored bytes are the ones
+    // `note_update` would have produced. `None` means the caller has NO registry in
+    // hand (the agent undo on a host that does not manage one), which skips the
+    // check: the type says so rather than a throwaway registry hiding it.
     // A CRDT revision id is a change hash rather than a UUIDv7 — same per-source
     // shape rule as `snapshot_preview_in`.
     let crdt_candidate = !valid_v7(&snapshot_uuid);
@@ -572,6 +574,33 @@ pub(crate) async fn snapshot_restore_in(
     // Step 3: overwrite the live note with the snapshot content. The creation
     // hook inside note_update is coalesced (within the window of step 2's forced
     // capture) → no double snapshot.
+    //
+    // **A live-owned note is restored THROUGH its session, not instead of it.**
+    // `note_update_with_dir` refuses such a note (`LiveSessionOpen`, SYNC-33: the
+    // session is its single durable writer), which is right for a write that would
+    // otherwise land BEHIND the session and be discarded by its next flush. It was
+    // wrong for a restore, because refusing leaves the user's own undo unable to
+    // revert a note that was open: `ag4` (the run's revert) and `ch1` (revision
+    // restore) both measured that, and the agent's apply had the identical hole one
+    // command over. The session's whole-markdown patch is the same door the
+    // editor's save funnel uses, and the plaintext being restored is the note's own
+    // previous revision, so the bytes that land are the bytes `note_update` would
+    // have written. Its flush also fires the live-index side effects step 4 below
+    // would have duplicated, so the patch is the whole of the restore.
+    if let Some(reg) = registry.filter(|r| r.is_note_open(&note_id_parsed.to_string())) {
+        crate::plugins::live::commands::live_session_patch_frontmatter_from_host(
+            host,
+            state,
+            reg,
+            hooks,
+            io,
+            note_id_parsed.to_string(),
+            (*plaintext).clone(),
+        )
+        .await
+        .map_err(|_| SnapshotError::LiveSessionOpen)?;
+        return Ok(());
+    }
     note_update_with_dir(
         notes_dir,
         state,

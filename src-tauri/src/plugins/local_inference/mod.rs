@@ -1169,55 +1169,15 @@ mod resolve_backends_tests {
         assert_eq!(engine.infer("x").err(), Some(error::EngineError::NotReady));
     }
 
-    #[cfg(test)]
-    mod cancel_wiring_tests {
-        use super::*;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        /// The WIRING, not the primitive (myne-md/myne#440).
-        ///
-        /// `cancel::any_cancelled` has its own test, and it would stay green if
-        /// someone re-hardcoded the engines' source back to `|| false` — that
-        /// regression compiles cleanly and no type checks it, which is how the
-        /// original defect shipped. So this drives the engine that `remote_backend`
-        /// builds and asserts the source it was handed is actually consulted.
-        #[test]
-        fn the_remote_backend_consults_the_cancel_source_it_was_given() {
-            let polls = std::sync::Arc::new(AtomicUsize::new(0));
-            let counted = {
-                let polls = std::sync::Arc::clone(&polls);
-                let f: cancellable_io::CancelledFn = std::sync::Arc::new(move || {
-                    polls.fetch_add(1, Ordering::SeqCst);
-                    true
-                });
-                f
-            };
-
-            // A fully-authorized snapshot, so the engine gets past the gate and
-            // reaches its transport — without it the call would refuse for an
-            // unrelated reason and the poll count would prove nothing.
-            let cell: state::PrefsCell =
-                std::sync::Arc::new(std::sync::RwLock::new(Some(state::PrefsSnapshot {
-                    prefs: protocol::PrefsView {
-                        ai_enabled: true,
-                        ai_provider: Some("openrouter".into()),
-                        ai_provider_consent: Some("openrouter@device".into()),
-                        ai_provider_key: Some(zeroize::Zeroizing::new("sk-test".into())),
-                        ai_provider_model: Some("some/model".into()),
-                        ..protocol::PrefsView::default()
-                    },
-                    vault_id: None,
-                })));
-
-            let backend = remote_backend(cell, counted);
-            // The call fails — there is no provider to reach — and that is fine.
-            // What is asserted is that the cancel source was CONSULTED on the way.
-            let _ = backend.engine().infer("hello");
-            assert!(
-                polls.load(Ordering::SeqCst) > 0,
-                "the remote engine must poll the cancel source it was constructed \
-             with; a source that is never asked is the inert wiring this fixes"
-            );
-        }
-    }
+    // `cancel_wiring_tests` lived here and drove `remote_backend(cell, source)`
+    // through a real `infer`, counting polls on the source to prove the wiring
+    // (myne-md/myne#440). It is gone, and its claim moved to
+    // `myne_core::inference::state::tests::remote_backend_threads_its_cancel_source_into_the_engine`
+    // (myne-md/myne#894), for the reason the transport itself states: "a poll
+    // count of zero means `this machine is offline`, not `the wrong predicate
+    // was wired`". Offline it failed permanently while proving nothing, and on
+    // any machine it read the source only after a socket was reached. The core
+    // test reads the engine's own stored source and opens no socket; nothing
+    // about the desktop call site is lost, because the deleted test called
+    // `remote_backend` directly rather than this crate's `resolve_backends`.
 }

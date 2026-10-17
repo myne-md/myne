@@ -17,6 +17,7 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
@@ -369,7 +370,12 @@ describeE2E("tp5 a task's fields are editable from the list (myne-md/myne#884 ta
         await (await s.byTestId("editor.task-field-menu-due")).click();
         const quickPick = await s.waitForElement(".cm-date-quick button");
         await quickPick.clickOnce();
-        await (await s.byTestId("editor.task-field-commit")).click();
+        // `clickByTestId` rather than `Element.click()`: the plain click timed
+        // out on "element interactable + clicked" for its whole budget, and that
+        // message cannot say whether the control is disabled, zero-sized,
+        // scrolled out of its own container or covered. The helper re-locates,
+        // scrolls, and on a refusal reports what is AT the centre.
+        await clickByTestId(s, "editor.task-field-commit");
 
         // The bytes: the note the task came from now carries a due field on that
         // exact line. Read through the same IPC the app reads with, so this is

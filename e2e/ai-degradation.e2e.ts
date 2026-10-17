@@ -41,7 +41,12 @@ import { type Session } from "./support/webdriver";
  *  the fault lever does not exist in any other binary. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
-/** Turn the AI beta on through the real toggle, then open the chat tab. */
+/** Turn the AI beta on through the real toggle, then open the chat tab.
+ *
+ *  No note is opened first, and that is deliberate: the panel is one of the two
+ *  note-FREE tabs, so the palette action must reveal it on a stage where no note
+ *  is focused. It did not when the pane's mount gate was `focusedTab.kind ===
+ *  "note"` alone; see `Editor.tsx`'s right-panel gate comment. */
 async function openChatWithAiOn(s: Session): Promise<void> {
   await enableDeveloperMode(s);
   await (await s.byTestId("settings.tab-ai")).click();

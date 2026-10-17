@@ -35,6 +35,39 @@ interface IconProps {
   style?: CSSProperties;
 }
 
+/**
+ * One frozen `{__html}` object per icon NAME, and **the identity is the whole
+ * point** (myne-md/myne#894).
+ *
+ * React 19's reconciler compares `dangerouslySetInnerHTML` by OBJECT identity,
+ * not by the `__html` string: `updateProperties`' default arm skips a prop only
+ * when `nextValue === prevValue` (`react-dom-client`, the
+ * `for (lastProp in nextProps)` loop). A fresh literal on every render therefore
+ * makes React re-assign `domElement.innerHTML` on every render, which REPLACES
+ * the `<path>` nodes. Nothing the user can see changes, and one thing breaks
+ * completely silently: the browser dispatches no `click` when the mousedown and
+ * mouseup targets are different nodes, so a control whose icon re-renders
+ * between press and release does NOTHING.
+ *
+ * Measured, not reasoned, on the agent hub's "New conversation" (`agent-hub`
+ * ah5): pointerdown landed on the icon's `<path>`, the Tooltip's own
+ * mousedown/focus state change re-rendered the icon, the path node was
+ * replaced, and no click event was dispatched at all. A scripted
+ * `element.click()` still worked, which is exactly why this read as a
+ * test-harness problem and cost an afternoon. Every button in the app is one
+ * re-render away from the same dead control.
+ */
+const ICON_INNER_HTML = new Map<IconName, { __html: string }>();
+
+function innerHtmlFor(name: IconName): { __html: string } {
+  let cached = ICON_INNER_HTML.get(name);
+  if (cached === undefined) {
+    cached = { __html: ICON_PATHS[name] };
+    ICON_INNER_HTML.set(name, cached);
+  }
+  return cached;
+}
+
 export function Icon({
   name,
   size = 16,
@@ -55,7 +88,7 @@ export function Icon({
       strokeLinejoin="round"
       {...(mirror ? { "data-flip": "" } : {})}
       style={{ flexShrink: 0, ...style }}
-      dangerouslySetInnerHTML={{ __html: ICON_PATHS[name] }}
+      dangerouslySetInnerHTML={innerHtmlFor(name)}
     />
   );
 }

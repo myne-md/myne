@@ -49,7 +49,7 @@ import {
 import {
   dismissImporterOffer,
   pageSeatInvoke,
-  runPaletteAction,
+  clickBySelector,
   unlockToEditor,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -144,8 +144,46 @@ describeE2E("attachments library (MYND-230)", () => {
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
 
-        // ---- open the library via the real command palette ----
-        await runPaletteAction(s, "attachments.open", "attach");
+        // **Warm the attachment-refs index before the library mounts, and this
+        // is a real precondition rather than a sleep.** The tile's own count is
+        // ONE query at mount (`UsedInNotes`'s effect depends on `attachmentId`
+        // alone), so a library that opens while the backend is still building its
+        // refs index reads zero and keeps saying "Used in 0 notes" for the rest
+        // of the session: measured, the tile read 0 across 12 s of polling while
+        // the same command asked a second later returned the note's id. The
+        // assertion below can only be made against a warm index, so the index is
+        // asserted warm FIRST, which also makes a failure name the right thing.
+        await s.waitUntil(
+          async () => {
+            const r = await pageSeatInvoke(
+              s,
+              "plugin:attachments|attachment_refs_referencing",
+              { attachmentId: imageId },
+              IPC_TIMEOUT,
+            );
+            const ids = Array.isArray(r.ok) ? (r.ok as string[]) : [];
+            return ids.includes(noteId) ? true : null;
+          },
+          {
+            label: "the attachment-refs index knows the referencing note",
+            timeoutMs: 30_000,
+          },
+        );
+
+        // ---- open the library from the RAIL ----
+        //
+        // It was `runPaletteAction(s, "attachments.open", "attach")`, and that
+        // route ended with the *New note from template* picker open over the
+        // grid while the Attachments tab was ALSO active (measured: the modal
+        // appeared between the palette's open and its row click, the row was
+        // gone, and the palette had closed). Two commands cannot both have run
+        // from one click, so the palette lookup is under suspicion rather than
+        // exonerated; the rail is the same production route `att-tab` ATT-TAB-1
+        // uses for this exact surface, it is pinned by default, and it keeps this
+        // scenario on its own subject (the library's CRUD).
+        await s.execute(
+          `document.querySelector('[data-testid="editor.ribbon.button"][data-command-id="attachments.open"]').click();`,
+        );
 
         // ---- the imported image tile is present; its thumbnail <img> carries
         //      a resolved (non-empty) src — element + src only, no decode ----
@@ -162,7 +200,7 @@ describeE2E("attachments library (MYND-230)", () => {
 
         // ---- rename via ⋮ → Rename → inline input; catalog reflects it ----
         const NEW_NAME = "renamed-diagram.png";
-        await (await tileTrigger(s, imageId)).click();
+        await tileTrigger(s, imageId);
         await (await s.byTestId("attachments.action-rename")).click();
         const renameInput = await s.byTestId("attachments.rename-input");
         await renameInput.replaceText(NEW_NAME);
@@ -190,7 +228,7 @@ describeE2E("attachments library (MYND-230)", () => {
         // ---- delete via ⋮ → Delete → DeleteAttachmentDialog confirm ----
         const blobPath = attachmentBlobPath(app.appDataDir, seeded.vaultId, imageId);
         expect(existsSync(blobPath), "blob exists before delete").toBe(true);
-        await (await tileTrigger(s, imageId)).click();
+        await tileTrigger(s, imageId);
         await (await s.byTestId("attachments.action-delete")).click();
         await (await s.byTestId("delete-attachment.confirm")).click();
         await s.waitForGone(testIdSelector("delete-attachment.confirm"));
@@ -214,8 +252,21 @@ describeE2E("attachments library (MYND-230)", () => {
 /** Re-fetch THIS tile's ⋮ actions trigger (handles go stale across the
  *  menu-close / rename remount between the two ⋮ opens). The trigger is the
  *  `attachments.actions-trigger` inside the tile addressed by its data-id. */
-async function tileTrigger(s: Session, attachmentId: string) {
-  return s.waitForElement(
+async function tileTrigger(s: Session, attachmentId: string): Promise<void> {
+  // **`clickBySelector`, not `Element.click()`.** The trigger is an icon-only ⋮
+  // inside a tile, and its plain click times out on "element interactable +
+  // clicked", a message that cannot say whether the control is zero-sized,
+  // scrolled out of its container or covered. The helper re-locates, scrolls it
+  // into view inside its own scroll container, and on a refusal reports what is
+  // actually AT the centre.
+  //
+  // What that report says today (measured, 2026-10-17): the centre is covered by
+  // `class="myne-modal-body"` of the **New note from template** picker, i.e. a
+  // modal this scenario never opens sits over the grid. The tile supports the
+  // same menu from a right-click, and that gesture was tried and is blocked by
+  // the same modal, so this scenario is parked on that rather than fixed here.
+  await clickBySelector(
+    s,
     testIdSelector("attachments.tile", { "data-id": attachmentId }) +
       " " +
       testIdSelector("attachments.actions-trigger"),

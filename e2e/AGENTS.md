@@ -423,7 +423,20 @@
   waiting is not enough: something held 4544 more than twenty seconds after
   being SIGKILLed as a group. Measured either side of the fix, same warm
   container: 2 failures then 0, and the suite got 62 s FASTER (758 s → 696 s),
-  because a burned 45 s budget costs more than the fix does.
+  because a burned 45 s budget costs more than the fix does. **Two refinements
+  measured later (2026-10-17), both from profiling rather than reasoning**, and
+  `MYNE_E2E_WAIT_PROFILE=1` (with `node scripts/e2e-wait-profile.mjs`) is what
+  found them. First, the launch gave the CONFIGURED port ten seconds before
+  stepping to an alternate, and a stray driver made every scenario pay it in
+  full: `[launch:ports]` summed to 393 s over 39 launches (10.1 s each, a third of
+  all wait time in a 37-scenario profile) while the fallback port was free in
+  ~100 ms. It is 1 s now (`PORT_HANDOVER_MS`); waiting buys only "the port we were
+  configured with", and the band is 100 wide with fallbacks 1000 apart. Second,
+  the check probed only the DRIVER port, and a leftover `WebKitWebDriver` holds
+  the NATIVE one independently: a `tauri-driver` handed an occupied
+  `--native-port` does not fail loudly, it leaves the app on that other WebKit
+  session against another data directory, and the scenario burns its whole budget
+  (agent-hub ah1, 180 s, measured). Driver and native now move together.
 - **Every one of those failures was a permanent state a bigger budget cannot
   reach, and the family is larger than the port.** The same shape turned up
   seven times in one pass: an event emitted before its listener existed (Tauri

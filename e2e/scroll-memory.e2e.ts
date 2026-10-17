@@ -35,6 +35,7 @@ import {
   pageSeatInvoke,
   selectedNoteId,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
 
@@ -247,13 +248,8 @@ async function writeBody(s: Session, noteId: string, body: string): Promise<void
     },
     { label: "autosave idle before out-of-band write", timeoutMs: 15_000 },
   );
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:notes|note_update",
-    { noteId, plaintext: body },
-    IPC_TIMEOUT,
-  );
-  expect(r.err, "note_update should accept the long body").toBeUndefined();
+  const r = await writeNoteBody(s, noteId, body, IPC_TIMEOUT);
+  expect(r.err, "the long body write should succeed").toBeUndefined();
   // The write is out of band (page-seat IPC, not the pane's autosave loop), so
   // the open pane owes a reload - see the helper's header.
   await notifyNoteWritten(s, noteId);

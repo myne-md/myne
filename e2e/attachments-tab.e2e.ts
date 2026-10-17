@@ -23,7 +23,12 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, unlockToEditor } from "./support/flows";
+import {
+  createNote,
+  dismissImporterOffer,
+  lockAndReunlock,
+  unlockToEditor,
+} from "./support/flows";
 import type { Session } from "./support/webdriver";
 
 const RAIL_BUTTON = '[data-testid="editor.ribbon.button"]';
@@ -55,6 +60,13 @@ describeE2E("ATT-TAB-1 the attachment library opens as a tab", () => {
         const s = app.session;
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
+        // **A note, because the last claim is about one.** `seedVault` with no
+        // options seeds a vault with NO notes: the sidebar lands on
+        // `notes.empty-state`, and the closing step of this scenario ("opening a
+        // note replaces the library tab") then waits for a `notes.row` that the
+        // fixture never had. Measured: the first isolated run timed out on
+        // exactly that row with the empty state on screen.
+        await createNote(s, "atttab1notealfa7k2m9qx4w8e");
 
         expect(
           await currentRailCommand(s),
@@ -107,13 +119,31 @@ describeE2E("ATT-TAB-2 the library survives a reload as a tab", () => {
 
         // The singleton is persisted in `vault.workspace` (MYW1) like the graph
         // and the task list. A CenterView was React state and could not be.
-        await s.execute(`window.location.reload();`);
-        await unlockToEditor(s, seeded.password);
+        //
+        // **The primitive is the lock/unlock round trip, not a WebView reload,
+        // and the difference is the store's own cadence.** A layout change STAGES
+        // the descriptor (`workspaceStage`, `Editor.tsx`) and the blob is written
+        // on the graceful-exit paths: lock, close, quit and the coalesced
+        // five-minute flush. A reload is none of those, so it reads the last
+        // written blob and loses the tab (measured: the rail reported nothing
+        // while the library was still on screen, and polling
+        // `plugin:workspace|workspace_read` for 15 s never returned a descriptor
+        // naming it). Locking IS one of those paths, so the round trip is what a
+        // user's "I locked and came back" actually does, and it re-mounts the
+        // editor from disk the way the guarantee describes.
+        await lockAndReunlock(s, seeded.password);
 
-        expect(
-          await currentRailCommand(s),
-          "the library tab is restored, so the rail is current again",
-        ).toBe("attachments.open");
+        // The editor mounts and the descriptor loads asynchronously, so the
+        // rail's `aria-current` is not there on the first frame: poll rather
+        // than sampling once.
+        await s.waitUntil(
+          async () =>
+            (await currentRailCommand(s)) === "attachments.open" ? true : null,
+          {
+            label: "the library tab is restored, so the rail is current again",
+            timeoutMs: 20_000,
+          },
+        );
       },
     );
   });

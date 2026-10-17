@@ -37,6 +37,42 @@ export async function pageSeatInvoke(
   );
 }
 
+/**
+ * Write a note's WHOLE body through whichever durable writer owns it.
+ *
+ * A note shown in a pane is owned by a `LiveSession`, which is its SINGLE
+ * durable writer (`SYNC-33`), so the backend REFUSES a stateless
+ * `plugin:notes|note_update` for it with `NoteUpdateError::LiveSessionOpen`.
+ * That was invisible when these scenarios were written, because nothing owned a
+ * note; the live-collab epic made every open note live-owned on this client.
+ * The app routes around it exactly this way (`src/notes/liveNote.ts`'s
+ * `patchLiveNote` falling back to the stateless path on `NotOpen`), and this is
+ * that same funnel for the page seat: the session patch first, the stateless
+ * update only for a note no session owns.
+ *
+ * `NotOpen` is the ONE error that means "no session", so it is the only one
+ * that falls through. Anything else is returned to the caller, whose
+ * `expect(res.err).toBeUndefined()` then fails with the real refusal instead of
+ * it being swallowed by a second write attempt.
+ */
+export async function writeNoteBody(
+  session: Session,
+  noteId: string,
+  plaintext: string,
+  timeoutMs = 30_000,
+): Promise<{ ok?: unknown; err?: unknown }> {
+  const live = await pageSeatInvoke(
+    session,
+    "plugin:live|live_session_patch_frontmatter",
+    { noteId, markdown: plaintext },
+    timeoutMs,
+  );
+  if (live.err === undefined) return live;
+  const kind = (live.err as { kind?: unknown } | null)?.kind;
+  if (kind !== "NotOpen") return live;
+  return pageSeatInvoke(session, "plugin:notes|note_update", { noteId, plaintext }, timeoutMs);
+}
+
 /** Signal that a note was written OUT OF BAND, so every open pane re-reads it.
  *
  *  A page-seat `note_update`/`note_create` is not the pane's own autosave loop,
@@ -474,8 +510,20 @@ export async function openSettings(
     // with it (myne-md/myne#773). The keyboard route is the app's second entry
     // point and the only one left in that state, so fall back to it rather than
     // waiting the full budget for a control the user deliberately removed.
-    const [cta] = await session.byTestIdAll("editor.settings-cta");
-    if (cta !== undefined) {
+    //
+    // **But wait for the chrome before concluding the gear is gone.** After an
+    // `s.refresh()` the document is new and the chrome paints a beat later, so
+    // a bare `byTestIdAll` here reads a half-mounted editor as "the user removed
+    // the gear" and takes the keyboard route, whose chord is then pressed into a
+    // window with no listener attached yet. Measured in `hk2`: the CTA was on
+    // screen when the keyboard route's 15 s budget expired, so the spec failed
+    // on a control that had been there all along. The wait is bounded because
+    // the gear really can be absent (the branch below is the point), and it
+    // costs nothing in the ordinary case: the element is already there.
+    const cta = await session
+      .byTestId("editor.settings-cta", { timeoutMs: 5_000 })
+      .catch(() => null);
+    if (cta !== null) {
       await cta.click();
     } else {
       // `app.open-settings`'s default binding (`Mod-,`; Mod is Ctrl here). The
@@ -981,7 +1029,8 @@ export async function waitForInlineImage(
  * different fixes — a zero-sized box is a render bug, an out-of-viewport box
  * wants a scroll, and a different node at the centre names the overlay to close
  * — and the driver's error code distinguishes none of them. Reports the covering
- * node by tag plus its testid where it has one, never by its text.
+ * node by tag, its testid where it has one, its class, a layout summary and its
+ * parent's testid, never by its text.
  */
 async function hitTest(session: Session, selector: string): Promise<string> {
   try {
@@ -997,9 +1046,26 @@ async function hitTest(session: Session, selector: string): Promise<string> {
         "var at = document.elementFromPoint(cx, cy);" +
         "if (!at) return 'nothing is at its centre';" +
         "if (at === el || el.contains(at)) return 'its centre is clear, so the refusal is not an overlay';" +
+        // **What the cover IS, structurally.** The tag plus a testid was the
+        // first version and it was not enough: two live cases both reported
+        // "covered by <div> with no testid", which is one sentence for an
+        // app-owned wrapper, an inline-styled footer and a layout container. A
+        // class, a position/display/overflow/z-index/box summary and the
+        // PARENT's testid separate them in the same round trip, and none of
+        // that can carry note content into a log.
+        "var cls = at.getAttribute('class') || '';" +
+        "var cs = getComputedStyle(at);" +
+        "var ar = at.getBoundingClientRect();" +
+        "var shape = cs.position + '/' + cs.display + '/' + cs.overflow + '/z' + (cs.zIndex || 'auto') +" +
+        "  '/' + Math.round(ar.width) + 'x' + Math.round(ar.height) + ' at ' +" +
+        "  Math.round(ar.left) + ',' + Math.round(ar.top);" +
+        "var parent = at.parentElement;" +
+        "var pid = parent ? (parent.getAttribute('data-testid') || parent.tagName.toLowerCase()) : 'none';" +
         "var id = at.getAttribute('data-testid');" +
         "return 'covered at its centre by <' + at.tagName.toLowerCase() + '>' +" +
-        "  (id ? ' [' + id + ']' : ' with no testid');",
+        "  (id ? ' [' + id + ']' : ' with no testid') +" +
+        "  (cls ? ' class=' + JSON.stringify(cls) : '') +" +
+        "  ' shape=' + shape + ' parent=' + pid;",
       [selector],
     );
   } catch (raw) {
@@ -2006,6 +2072,13 @@ export async function typeIntoEditor(
  * IPC through the page seat, which `e2e/AGENTS.md` sanctions explicitly, and it
  * is NOT a test hook.
  *
+ * **The write goes through `writeNoteBody`, not straight at `note_update`.** The
+ * note is OPEN in a pane, so this client has a `LiveSession` on it and that
+ * session is the note's single durable writer (`SYNC-33`): a stateless
+ * `note_update` for it is refused with `NoteUpdateError::LiveSessionOpen`. Every
+ * scenario below that seeds an OPEN note therefore failed on develop, naming a
+ * write that used to work, until the funnel was introduced.
+ *
  * **What this gives up, stated rather than glossed:** the scenarios no longer
  * prove that a user can type an embed. They never meant to. `eo1` is about the
  * overflow menu, `eo2` about the layout segments the menu writes, `za1` about
@@ -2034,13 +2107,8 @@ export async function seedEmbedIntoNote(
   // a scenario that silently dropped them would be testing a different note.
   const cur = await pageSeatInvoke(session, "plugin:notes|note_read", { noteId }, timeoutMs);
   const base = typeof cur.ok === "string" ? cur.ok : "";
-  const up = await pageSeatInvoke(
-    session,
-    "plugin:notes|note_update",
-    { noteId, plaintext: `${base}\n${embed}` },
-    timeoutMs,
-  );
-  expect(up.err, "note_update should accept the embed").toBeUndefined();
+  const up = await writeNoteBody(session, noteId, `${base}\n${embed}`, timeoutMs);
+  expect(up.err, "the embed write should succeed").toBeUndefined();
 
   await session.refresh();
   await session.byTestId("editor.root", { timeoutMs });

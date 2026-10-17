@@ -21,6 +21,7 @@ import {
   createNote,
   dismissImporterOffer,
   seedEmbedIntoNote,
+  typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
 
@@ -352,6 +353,92 @@ describeE2E("mv3 a bare wheel over the diagram zooms it (#742)", () => {
           afterExpand,
         );
         expect(expandZoomed).toBeGreaterThan(afterExpand);
+      },
+    );
+  });
+});
+
+// The diagram's OWN keyboard, and the reason it is bound where it is.
+//
+// `mountZoom` binds its keydown to the element it was handed as `stage`, which
+// for the inline case is the viewport. That viewport carries `tabIndex = 0`, so
+// clicking the diagram focuses it and the keys are reachable — which is why this
+// is a SCENARIO rather than a fix: the image lightbox's equivalent binding was
+// unreachable because a modal TRAPS focus on its own chrome, while a diagram
+// inside the note is something the user can put the caret on (and the expand
+// overlay focuses its stage on open for the same reason). What had never been
+// asserted is that the affordance works, in either mount.
+//
+// The second half is the property that keeps the binding safe, and it is the
+// reason the binding is where it is rather than on the editor. The widget lives
+// INSIDE CodeMirror's content DOM, so a listener that also saw the editor's
+// keystrokes would zoom a diagram out from under someone typing `+` into the
+// note. It does not. Both halves are asserted, because either alone is vacuous:
+// the key has to LAND (the note gains the character) and the scale has to stay
+// put.
+describeE2E("mv4 the diagram's keyboard is reachable, and typing cannot touch it", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("zooms from + once the diagram holds focus, and leaves the editor's typing alone", async () => {
+    let password = "";
+    await scenario(
+      "mv4-keyboard-zoom",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Klavye Diyagrami");
+        await seedEmbedIntoNote(s, DIAGRAM);
+
+        const viewportSel = `${EDITOR} [data-testid="editor.mermaid.viewport"]`;
+        await s.waitForElement(viewportSel, { timeoutMs: MERMAID_TIMEOUT });
+        const svgSel = `[data-testid="editor.mermaid.viewport"] svg`;
+        await s.waitForElement(svgSel, { timeoutMs: MERMAID_TIMEOUT });
+
+        // The committed transform, not a computed style: `render()` writes
+        // `translate(…) scale(k)` inline, so this reads the controller's own state.
+        const readScale = (): Promise<number | null> =>
+          s.execute<number | null>(
+            "var el = document.querySelector(" +
+              JSON.stringify(svgSel) +
+              ");" +
+              "if (!el) return null;" +
+              "var m = /scale\\(([0-9.]+)\\)/.exec(el.style.transform || '');" +
+              "return m ? Number(m[1]) : 0;",
+          );
+
+        // Focus it the way a user does: click the diagram.
+        await (await s.byTestId("editor.mermaid.viewport")).click();
+        const focused = await s.execute<string | null>(
+          "var el = document.activeElement;" +
+            "return el ? el.getAttribute('data-testid') : null;",
+        );
+        expect(
+          focused,
+          "the click has to reach the element the keydown listener sits on, or the keypress below proves nothing",
+        ).toBe("editor.mermaid.viewport");
+
+        const beforeKey = (await readScale()) ?? 0;
+        await (await s.byTestId("editor.mermaid.viewport")).sendKeys("+");
+        const afterKey = await s.waitUntil(
+          async () => {
+            const k = await readScale();
+            return k !== null && k > beforeKey ? k : null;
+          },
+          { label: () => "the diagram's own + to zoom it" },
+        );
+
+        // The other direction: the same character, typed into the note.
+        await typeIntoEditor(s, "+");
+        const afterTyping = await readScale();
+        // Not an equality: the controller re-derives its committed scale on the
+        // next measure, so the value can settle by a fraction of a percent after
+        // the key press. A zoom would move it by a WHOLE STEP (×1.25), which is two
+        // orders of magnitude away from this bound.
+        expect(
+          Math.abs((afterTyping ?? 0) - afterKey),
+          "typing + into the note must not zoom the inline diagram",
+        ).toBeLessThan(0.01);
       },
     );
   });

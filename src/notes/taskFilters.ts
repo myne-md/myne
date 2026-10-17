@@ -18,6 +18,7 @@
 // (task 6), which is the mechanism that answers the concern rather than the
 // word "today" quietly absorbing it.
 
+import { civilDateIn } from "@myne/editor/host/lib/datetimeFormat";
 import type { VaultTask } from "./taskIndex";
 
 // Re-exported so a consumer of this module needs only this module. Mobile
@@ -200,13 +201,20 @@ export function overdueCount(tasks: readonly VaultTask[], today: string): number
 export function todayLocal(now: Date = new Date(), zone: string | null = null): string {
   if (zone !== null) {
     try {
-      // `en-CA` renders `YYYY-MM-DD` - the civil-date shape, no reassembly.
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: zone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(now);
+      // `civilDateIn`, not `.format(…)`: the layout of an `en-CA` formatter is a
+      // property of the runtime's ICU data, and on the WebKitGTK the desktop E2E
+      // runs against it is `10/17/2026` rather than `2026-10-17`. A filter
+      // comparing against that matches no stored date, and this one failed
+      // SILENTLY: "today" simply listed nothing.
+      return civilDateIn(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: zone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }),
+        now,
+      );
     } catch {
       // An unsupported zone falls through to the machine's own calendar rather
       // than throwing - the pref carries a free string, and "what day is it" is

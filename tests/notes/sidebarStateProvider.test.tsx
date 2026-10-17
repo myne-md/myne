@@ -32,6 +32,11 @@ const planRenameBatch = vi.fn();
 const reindexNote = vi.fn();
 const vaultIndicesRemove = vi.fn();
 const hydrateVaultIndicesOnUnlock = vi.fn();
+// The live session's transport (`src/lib/live.ts`). `src/notes/liveNote.ts`
+// itself stays REAL, because the routing decision under test IS its refcount.
+const liveSessionOpen = vi.fn();
+const liveSessionPatchFrontmatter = vi.fn();
+const liveSessionClose = vi.fn();
 
 vi.mock("../../src/notes/createNote", () => ({
   createNote: (...a: unknown[]) => createNote(...a),
@@ -78,6 +83,14 @@ vi.mock("../../src/notes/renameInbound", () => ({
 vi.mock("../../src/notes/renameFlushHook", () => ({
   renameFlushHooks: () => ({ openNoteIds: () => [], flushOpenPanes: vi.fn() }),
 }));
+vi.mock("../../src/lib/live", () => ({
+  liveSessionOpen: (...a: unknown[]) => liveSessionOpen(...a),
+  liveSessionPatchFrontmatter: (...a: unknown[]) =>
+    liveSessionPatchFrontmatter(...a),
+  liveSessionClose: (...a: unknown[]) => liveSessionClose(...a),
+  liveSessionSetPresence: vi.fn(),
+  liveSessionTakeRemoteSplices: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("../../src/notes/vaultIndices", () => ({
   reindexNote: (...a: unknown[]) => reindexNote(...a),
   vaultIndicesRemove: (...a: unknown[]) => vaultIndicesRemove(...a),
@@ -90,6 +103,7 @@ import {
   useSelectedNote,
 } from "../../src/notes/sidebarState";
 import type { TitleRecord } from "../../src/notes/loadNoteBatch";
+import { closeLiveNote, openLiveNote } from "../../src/notes/liveNote";
 
 function rec(id: string, over: Partial<TitleRecord> = {}): TitleRecord {
   return {
@@ -131,6 +145,9 @@ beforeEach(() => {
     hydrateVaultIndicesOnUnlock,
     mutateDeliberateFolders,
     prefsRead,
+    liveSessionOpen,
+    liveSessionPatchFrontmatter,
+    liveSessionClose,
   ]) {
     m.mockReset();
   }
@@ -405,7 +422,14 @@ describe("useSelectedNote — rename re-sync", () => {
     act(() => result.current.select("rn-1")); // it's the open note
     const before = result.current.contentReloadNonce;
 
-    planRenameBatch.mockResolvedValue({ batch: [], inboundIds: [] });
+    // A ONE-ENTRY batch, not an empty one: `commitRename` routes live-owned
+    // entries through the session and sends the REST to the batch, so an empty
+    // batch now means "nothing to write" and the mock under test is never
+    // called. The fixture has to hold the state the assertion is about.
+    planRenameBatch.mockResolvedValue({
+      batch: [{ noteId: "rn-1", plaintext: "# New\n" }],
+      inboundIds: [],
+    });
     noteWriteBatchTransactional.mockResolvedValue(undefined);
     // The post-write refreshOne() round-trip returns the canonical new title.
     loadNoteBatch.mockResolvedValue([rec("rn-1", { title: "New" })]);
@@ -419,13 +443,60 @@ describe("useSelectedNote — rename re-sync", () => {
     expect(result.current.cache.get("rn-1")?.title).toBe("New");
   });
 
+  it("routes a live-owned note through its session, not the refused batch (SYNC-33)", async () => {
+    const { result } = renderHook(() => useSelectedNote(), { wrapper });
+    loadNoteBatch.mockResolvedValue([rec("rn-live", { title: "Old" })]);
+    await act(async () => {
+      await result.current.refreshAll(["rn-live"]);
+    });
+    act(() => result.current.select("rn-live"));
+
+    // The renamed note is OPEN in a pane, so a live session owns it. `SYNC-33`
+    // makes that session the single durable writer, and the batch command
+    // refuses the WHOLE set over such a note (`NoteBatchError::LiveSessionOpen`),
+    // checked before any filesystem touch. Renaming an open note therefore
+    // failed outright with nothing written: `rename-inbound-links` ril1 renamed
+    // its target in exactly this state and the app's own toast said so.
+    liveSessionOpen.mockResolvedValue(undefined);
+    await act(async () => {
+      await openLiveNote("rn-live");
+    });
+
+    planRenameBatch.mockResolvedValue({
+      batch: [{ noteId: "rn-live", plaintext: "# New\n" }],
+      inboundIds: [],
+    });
+    liveSessionPatchFrontmatter.mockResolvedValue(undefined);
+    noteWriteBatchTransactional.mockResolvedValue(undefined);
+    await act(async () => {
+      await result.current.commitRename("rn-live", "# Old\n", "New");
+    });
+
+    expect(
+      liveSessionPatchFrontmatter,
+      "a live-owned note must be written THROUGH its session",
+    ).toHaveBeenCalledWith("rn-live", "# New\n");
+    expect(
+      noteWriteBatchTransactional,
+      "and must not be handed to the batch that refuses it",
+    ).not.toHaveBeenCalled();
+
+    // The refcount is module scope: leave it as this test found it.
+    await act(async () => {
+      await closeLiveNote("rn-live");
+    });
+  });
+
   it("commitRename rolls the title back when the batch write rejects", async () => {
     const { result } = renderHook(() => useSelectedNote(), { wrapper });
     loadNoteBatch.mockResolvedValue([rec("rn-2", { title: "Original" })]);
     await act(async () => {
       await result.current.refreshAll(["rn-2"]);
     });
-    planRenameBatch.mockResolvedValue({ batch: [], inboundIds: [] });
+    planRenameBatch.mockResolvedValue({
+      batch: [{ noteId: "rn-2", plaintext: "# Renamed\n" }],
+      inboundIds: [],
+    });
     noteWriteBatchTransactional.mockRejectedValue(new Error("disk full"));
     await act(async () => {
       await expect(

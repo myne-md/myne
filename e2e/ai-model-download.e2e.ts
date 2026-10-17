@@ -70,6 +70,11 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
         {
           seed: (dir) => void (password = seedVault(dir).password),
           env: { MYNE_E2E_MODEL_ORIGIN: origin.origin },
+          // **The onboarding IS this suite's subject**, so the harness must not
+          // have marked it seen before the app mounts (`session.ts` seeds
+          // `myne.aiOnboardingSeen` for every other scenario, because the
+          // surface's backdrop swallows every click and nothing dismisses it).
+          firstRunSurfaces: true,
         },
         async (app) => {
           await unlockToEditor(app.session, password);
@@ -77,9 +82,17 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
           await app.session.byTestId("aiOnboarding.screen");
           // The trust invariant is rendered verbatim (load-bearing copy).
           await app.session.byTestId("aiOnboarding.trust-invariant");
+          // **Dismiss the importer offer FIRST, and the order is not cosmetic.**
+          // Both first-run surfaces are open at once, and each is a `ModalShell`
+          // whose backdrop is `useOverlayInert`'s target: the LATER one in the
+          // DOM is the top layer and marks everything under it inert, so the
+          // onboarding's own buttons stop being clickable while the offer's
+          // backdrop covers them. Measured: the Skip click timed out with
+          // "element interactable + clicked" while the Skip button sat in the
+          // page source, enabled, under the offer's backdrop.
+          await dismissImporterOffer(app.session);
           // Skip writes the device-local seen flag and closes it.
           await (await app.session.byTestId("aiOnboarding.skip")).click();
-          await dismissImporterOffer(app.session);
           // Nothing was fetched by merely showing the surface.
           expect(origin.requests()).toBe(0);
         },
@@ -98,11 +111,18 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
         {
           seed: (dir) => void (password = seedVault(dir).password),
           env: { MYNE_E2E_MODEL_ORIGIN: origin.origin },
+          // **The onboarding IS this suite's subject**, so the harness must not
+          // have marked it seen before the app mounts (`session.ts` seeds
+          // `myne.aiOnboardingSeen` for every other scenario, because the
+          // surface's backdrop swallows every click and nothing dismisses it).
+          firstRunSurfaces: true,
         },
         async (app) => {
           await unlockToEditor(app.session, password);
-          await (await app.session.byTestId("aiOnboarding.skip")).click();
+          // Offer first, then the onboarding: both are `ModalShell`s and the
+          // top one marks the other inert (see mdo1).
           await dismissImporterOffer(app.session);
+          await (await app.session.byTestId("aiOnboarding.skip")).click();
 
           const installed = await downloadFixture(app.session, "mdo2-a");
           expect(installed.endsWith("model.safetensors")).toBe(true);
@@ -129,11 +149,18 @@ aiDescribe("mdo AI model download (on-demand, fixture origin)", () => {
         {
           seed: (dir) => void (password = seedVault(dir).password),
           env: { MYNE_E2E_MODEL_ORIGIN: origin.origin },
+          // **The onboarding IS this suite's subject**, so the harness must not
+          // have marked it seen before the app mounts (`session.ts` seeds
+          // `myne.aiOnboardingSeen` for every other scenario, because the
+          // surface's backdrop swallows every click and nothing dismisses it).
+          firstRunSurfaces: true,
         },
         async (app) => {
           await unlockToEditor(app.session, password);
-          await (await app.session.byTestId("aiOnboarding.skip")).click();
+          // Offer first, then the onboarding: both are `ModalShell`s and the
+          // top one marks the other inert (see mdo1).
           await dismissImporterOffer(app.session);
+          await (await app.session.byTestId("aiOnboarding.skip")).click();
 
           // The origin now serves bytes that do NOT match the compiled-in digest.
           origin.serveCorrupt("tampered bytes served by a hostile origin");

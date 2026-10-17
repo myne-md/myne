@@ -1459,7 +1459,7 @@ const ROSTER = [
     verdict: "absent",
     destination: "undecided",
     reason:
-      "Plugin registration for a surface mobile ships a two-command slice of. 1223 lines against 112, and mobile's is independently written rather than a trimmed copy.",
+      "Plugin registration for a surface mobile ships a two-command slice of. 1183 lines against 112, and mobile's is independently written rather than a trimmed copy.",
   },
   {
     a: "src/lib/agent-run.ts",
@@ -1499,7 +1499,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The inference state machine, 1647 lines against 40 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
+      "The inference state machine, 1697 lines against 40 (the +140 is `remote_refusal`, which the capability report needs so a named-but-inactive provider reports the gate's own cause rather than the local arm's `NoModel`, together with the per-state table test the review of myne-md/myne#867 asked for: the function was a unit no test could fail, since answering `None` unconditionally left the whole local_inference suite green). Re-pointed AND re-verdicted by myne-md/myne#456, and the re-verdict is the point: `absent` rested on mobile not shipping chat or embedding sessions, and #456 ships chat on mobile through the remote arm, so the premise is gone. `a` moved into `myne-core` in the same change and mobile now reaches its remote half through the core registry, while these 40 lines remain wiring for the transcription path. What the pair records today is that mobile holds a second, unrelated `state.rs` under the same name in the same plugin, which is exactly the confusion a verdict is for.",
   },
   {
     a: "src-tauri/src/plugins/member_names/mod.rs",

@@ -22,6 +22,7 @@ import {
   setDateTimeDisplay,
   splitStoredValue,
   subscribeDateTimeDisplay,
+  civilDateIn,
   dateTimeDisplay,
   todayIn,
   type DateTimeDisplay,
@@ -187,6 +188,31 @@ describe("todayIn", () => {
 
   it("emits the normative civil-date shape", () => {
     expect(todayIn(display({ timeZone: "UTC" }))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  /// The regression that `todayIn`'s own cases cannot catch on a machine whose
+  /// ICU happens to render `en-CA` as `YYYY-MM-DD` (Node's does; the WebKitGTK
+  /// the desktop E2E runs against does NOT, and there it rendered
+  /// `10/17/2026`). Three call sites read a civil date out of `.format(…)` and
+  /// leaned on that locale's LAYOUT, so the value they stored or compared was a
+  /// display string: the task-field picker committed `[due:: 10/17/2026]` and
+  /// the dialect refused it as MALFORMED, `formatInstant` handed its printer a
+  /// string it could not match (so the user's `date_format` preset was dropped),
+  /// and `todayLocal` made every "today" filter match nothing. `en-US` is the
+  /// fixed point: its layout is US-ordered on every ICU, so a layout-based read
+  /// fails here on ANY machine, which is what a regression test has to do.
+  it("takes the civil date from the PARTS, not from a locale's layout", () => {
+    const us = new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "UTC",
+    });
+    expect(civilDateIn(us, new Date(Date.UTC(2026, 7, 1)))).toBe("2026-08-01");
+    // Same instant through the real formatter, so the two readings cannot drift.
+    expect(todayIn(display({ timeZone: "UTC" }), new Date(Date.UTC(2026, 7, 1)))).toBe(
+      "2026-08-01",
+    );
   });
 });
 

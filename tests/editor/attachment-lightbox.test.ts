@@ -186,6 +186,35 @@ describe("attachment lightbox", () => {
     expect(alpha === undefined || Number(alpha) === 1, bg).toBe(true);
   });
 
+  it("reaches the zoom keymap from the control the user actually has focused", () => {
+    // The keyboard is bound to the BACKDROP, which is where focus lives: the
+    // trap puts it on the close button and the next Tab lands in the zoom row.
+    // It used to be bound to the picture's mat, whose subtree no keydown ever
+    // passes through, so `+`/`−`/`0` did nothing in the IMAGE lightbox while the
+    // buttons drove the same API perfectly - the shape `za1` failed on, and the
+    // split that caused it was the mat's arrival (the PDF arm below still says
+    // "keyboard parity with the image reader, bound to the backdrop").
+    //
+    // jsdom computes no layout and loads no image, so what is pinned here is the
+    // REACHABILITY of the keymap (`defaultPrevented`), which is the thing that
+    // drifted; the zoom itself is asserted against the real bundle by `za1`.
+    showAttachmentLightbox({ url: URL_A, alt: "x" });
+    const zoomIn = backdrop()!.querySelector(
+      '[data-testid="attachment-lightbox.zoom-in"]',
+    ) as HTMLButtonElement;
+    const onControl = new KeyboardEvent("keydown", { key: "+", bubbles: true, cancelable: true });
+    zoomIn.dispatchEvent(onControl);
+    expect(
+      onControl.defaultPrevented,
+      "the keymap never reached the control the user has focused",
+    ).toBe(true);
+
+    // Non-vacuity: the same key outside the lightbox is nobody's to consume.
+    const outside = new KeyboardEvent("keydown", { key: "+", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(outside);
+    expect(outside.defaultPrevented).toBe(false);
+  });
+
   it("Escape listener is removed after close (no leak on second Esc)", () => {
     showAttachmentLightbox({ url: URL_A, alt: "x" });
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

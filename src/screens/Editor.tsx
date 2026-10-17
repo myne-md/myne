@@ -195,6 +195,7 @@ import {
 import { vaultIndicesPersist } from "../notes/vaultIndices";
 import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
+import type { ResolverNote } from "../notes/resolveWikilink";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
 import { AiChatTab } from "../notes/components/AiChatTab";
 // myne#529: the agent surface. The composer rides the AI tab, so a run starts
@@ -222,6 +223,9 @@ import {
   RIGHT_PANEL_TABS,
   RIGHT_PANEL_DEFAULT_ORDER,
   resolveActiveTab,
+  resolveVisibleRightPanelTab,
+  rightPanelEffectiveHidden,
+  rightPanelTabNeedsNote,
 } from "../notes/rightPanelTabs";
 import { linkMention } from "../notes/linkMention";
 import type { UnlinkedMention } from "../notes/unlinkedMentions";
@@ -2295,6 +2299,54 @@ function EditorChrome({
     );
   }
 
+  // ── Right-panel mount gate (myne-md/myne#656 review + `decisions/ai/0634`) ──
+  //
+  // The pane used to be gated on `focusedTab.kind === "note"` alone, because a
+  // non-note tab has no note for the backlinks/outline tabs to describe. The panel
+  // also hosts two tabs that describe NO note — `ai-chat` (which `decisions/ai/0634`
+  // keeps "in the right panel's vocabulary") and `who-is-here` (the vault's
+  // presence roster) — and the agent hub is a main TAB, so the panel's own exit
+  // control (`agent-hub` ah3) landed the workspace on a non-note tab and unmounted
+  // the panel the user had just used. Measured, not reasoned: the palette action
+  // ran, the pref moved, and `ai.chat-tab` never appeared.
+  //
+  // So: a note tab, OR an active right-panel tab that needs no note. Resolved
+  // through the SAME primitives `RightSidebar` uses, so the gate cannot disagree
+  // with the body about which tab is active.
+  const rightPanelActive = resolveVisibleRightPanelTab({
+    stored: barPrefs.right_panel_active_tab,
+    order: resolveBarOrder(barPrefs.right_panel_tab_order, RIGHT_PANEL_DEFAULT_ORDER),
+    hidden: barPrefs.right_panel_hidden_tabs,
+    aiEnabled: barPrefs.ai_enabled,
+  });
+  const rightPanelShown =
+    ws.focusedLeaf.activeTab?.kind === "note" ||
+    (rightPanelActive !== null && !rightPanelTabNeedsNote(rightPanelActive));
+
+  // ── The agent review takeover mounts HERE, not in the right panel ──────────
+  //
+  // It used to be a child of `RightSidebar`, which is mounted only when
+  // `rightPanelShown` above is true. The agent hub is a MAIN TAB, so a run
+  // started there had its proposal rendered into an unmounted subtree: the
+  // transcript said "Proposed 1 change" and no review screen ever opened
+  // (`agent-hub` ah5, measured). Its own file states the intent it was not
+  // getting — "rendered unconditionally and self-gating" — and that only holds
+  // if the parent mounts with the Editor rather than with the panel.
+  //
+  // The note lookup and the apply handler are the SAME two the panel uses, and
+  // they are lifted rather than copied: `notesWritten` exists precisely because
+  // the panel's auto-apply and this screen's approved apply were two inline
+  // arrows that had already drifted once (myne-md/myne#848). A second copy here
+  // would reopen exactly that.
+  const resolverNotes = useResolverNotes();
+  const notesWritten = useCallback(
+    (ids: readonly string[]) => {
+      ctx.reloadOpenNote();
+      for (const id of ids) void ctx.refreshOne(id as NoteId);
+    },
+    [ctx],
+  );
+
   return (
     <div
       data-focus-active={focusActive ? "true" : undefined}
@@ -2449,12 +2501,15 @@ function EditorChrome({
           rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
         />
         </div>
-        {/* A non-note tab has no note for the backlinks/outline sidebar to
-            describe, so it is not shown - and the sidebar can never be left
-            open with its toggle gone (myne-md/myne#656 review). The attachment
-            library used to need a second clause here; as a tab its kind is
-            simply not "note" (myne-md/myne#773). */}
-        {ws.focusedLeaf.activeTab?.kind === "note" && (
+        {/* A non-note tab has no note for the NOTE-SCOPED tabs to describe, so the
+            pane is hidden unless the focused tab is a note OR the right panel is
+            sitting on a tab that needs none (`ai-chat`, `who-is-here`). Resolved
+            from the roster (`rightPanelTabNeedsNote`) rather than by name here, so
+            adding a note-free tab does not cost an edit to this gate. See the
+            computation above for the measurement behind it (myne-md/myne#656
+            review; `decisions/ai/0634`; myne-md/myne#773 for the attachment
+            library, which needed no second clause once it became a tab). */}
+        {rightPanelShown && (
           <SidebarPane
             side="right"
             width={layout.rightWidth}
@@ -2467,6 +2522,9 @@ function EditorChrome({
             resizeLabel={t("editor.chrome.resizeBacklinksSidebar")}
           >
             <RightSidebar
+              stripClearance={topRightFloatsShown ? RIGHT_CLEARANCE : 0}
+              notes={resolverNotes}
+              notesWritten={notesWritten}
               onOpenSettings={(panel, anchor) =>
                 openSettings(
                   (panel as PanelId | undefined) ?? null,
@@ -2477,6 +2535,21 @@ function EditorChrome({
             />
           </SidebarPane>
         )}
+        {/* Full-screen, self-gating, and deliberately NOT inside the pane above:
+            see the computation before `return` for the measurement behind it. */}
+        <AgentReviewTakeover
+          titleOf={(noteId) =>
+            resolverNotes.find((n) => n.noteUuid === noteId)?.title ?? null
+          }
+          // The folder a move row shows as its starting point. Resolved from the
+          // same list `titleOf` reads, so the two can never describe different
+          // notes (and `null` when the list does not know the note, which makes a
+          // move row show the destination alone rather than inventing a source).
+          folderOf={(noteId) =>
+            resolverNotes.find((n) => n.noteUuid === noteId)?.folder ?? null
+          }
+          onNotesWritten={notesWritten}
+        />
       </div>
       {/* Sidebar toggles, floated into the editor's top corners (the title-bar
           row), level with the macOS traffic lights. Faded in focus mode. */}
@@ -4694,17 +4767,31 @@ const EMPTY_FOLDERS: readonly string[] = [];
 function RightSidebar({
   onOpenSettings,
   onShowToast,
+  stripClearance = 0,
+  notes,
+  notesWritten,
 }: {
   // Optionally on a panel and scrolled to a setting: the AI status chip names
   // a fault and lands ON the control that clears it rather than at the top of
   // a panel (myne-md/myne#771).
   onOpenSettings?: (panel?: string, anchor?: string) => void;
   onShowToast?: (message: string) => void;
+  /** Room kept clear at the strip's inline END, for the controls that float in
+   *  the window's top-right corner (`RIGHT_CLEARANCE`, computed by the caller
+   *  because only it knows whether they are shown). See the strip's own comment
+   *  for the measurement that made it necessary. */
+  stripClearance?: number;
+  /** The resident resolver note-set, and the out-of-band-write handler. Both
+   *  come from `EditorChrome` rather than from hooks here because the agent
+   *  review takeover mounts beside the panel and shares them: ONE
+   *  `notesWritten`, so the panel's auto-apply and the review screen's approved
+   *  apply cannot drift apart (myne-md/myne#848). */
+  notes: ResolverNote[];
+  notesWritten: (ids: readonly string[]) => void;
 }) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const ws = useWorkspace();
-  const notes = useResolverNotes();
   const {
     prefs,
     setRightPanelActiveTab,
@@ -4748,13 +4835,9 @@ function RightSidebar({
   // its tree is derived from its own title/folder cache, which nothing here
   // touched, so an agent that moved notes left them appearing under their OLD
   // folders until something else re-read them.
-  const notesWritten = useCallback(
-    (ids: readonly string[]) => {
-      ctx.reloadOpenNote();
-      for (const id of ids) void ctx.refreshOne(id as NoteId);
-    },
-    [ctx],
-  );
+  //
+  // It arrives as a prop now, from `EditorChrome`, for the reason stated there:
+  // the review screen mounts beside the panel and must not own a second copy.
 
   const tabOrder = prefs.right_panel_tab_order;
   const hidden = prefs.right_panel_hidden_tabs;
@@ -4767,11 +4850,10 @@ function RightSidebar({
   // Gated on `ai_enabled` (the feature state), NOT `developer_mode` - turning
   // Developer mode off must never disable a running feature (#181 cli6/vm4), and
   // on web `ai_enabled` is always false (no localAi capability), so the tab is
-  // absent there too. Folded into `hidden` so BOTH the strip AND the active-tab
-  // resolution treat it as absent (else the active pointer could still land on a
-  // now-hidden ai-chat and show its body with no tab).
+  // absent there too. The fold itself lives in `rightPanelTabs.ts` because the
+  // panel's MOUNT GATE has to reach the same answer.
   const effectiveHidden = useMemo(
-    () => (prefs.ai_enabled ? hidden : [...new Set([...hidden, "ai-chat"])]),
+    () => rightPanelEffectiveHidden(hidden, prefs.ai_enabled),
     [hidden, prefs.ai_enabled],
   );
   const visible = useMemo(
@@ -4861,7 +4943,16 @@ function RightSidebar({
           display: "flex",
           alignItems: "stretch",
           gap: 2,
-          padding: "0 8px",
+          paddingInlineStart: 8,
+          // `stripClearance` is the same room the note pane's tab strip reserves
+          // for the two controls that float in the window's top-right corner (the
+          // note-actions "…" menu and the right-sidebar toggle beside it). Without
+          // it the strip's trailing spacer extends UNDER both: measured in
+          // `rp1`, the spacer's own centre answered `elementFromPoint` with the
+          // note-actions menu's glyph, and its right end with the toggle button,
+          // so the strip-wide restore checklist — the only path back for a hidden
+          // tab — could not be opened at all.
+          paddingInlineEnd: 8 + stripClearance,
           // Match every other top-chrome strip (note pane tab strip, sidebar
           // clearance rows) so the bottom hairline lines up across the window.
           height: STRIP_HEIGHT,
@@ -5026,31 +5117,6 @@ function RightSidebar({
           <WhoIsHereTab />
         ) : null}
       </div>
-
-      {/* myne#529: the agent review takeover. Full screen rather than a panel:
-          approving is meant to be a deliberate act, and a surface at the edge of
-          the editor makes it a thing beside the work. Rendered unconditionally
-          and self-gating: whether it is on screen is DERIVED from the run rather
-          than held as a second Editor boolean somebody has to set. Its own file
-          states why. */}
-      <AgentReviewTakeover
-        titleOf={(noteId) =>
-          notes.find((n) => n.noteUuid === noteId)?.title ?? null
-        }
-        // The folder a move row shows as its starting point. Resolved from the
-        // same list `titleOf` reads, so the two can never describe different
-        // notes, and `null` when the list does not know the note (a move row then
-        // shows the destination alone rather than inventing a source).
-        folderOf={(noteId) =>
-          notes.find((n) => n.noteUuid === noteId)?.folder ?? null
-        }
-        // An apply writes through the backend, out of band of any pane's own
-        // autosave loop, so without this the editor keeps showing the pre-apply
-        // text AND the pane's next autosave writes that stale buffer back over
-        // the edit the user just approved. Same two halves as the panel's
-        // handler above, and now literally the same handler.
-        onNotesWritten={notesWritten}
-      />
 
       {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}
       {tabMenu &&

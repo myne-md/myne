@@ -39,6 +39,7 @@ import {
   selectedNoteId,
   settleOn,
   unlockToEditor,
+  writeNoteBody,
 } from "./support/flows";
 import { KEY, pressKey } from "./support/keyboard";
 import { type Session } from "./support/webdriver";
@@ -128,13 +129,8 @@ describeE2E("vc1 vertical motion keeps the column across a short line (#631)", (
         const noteId = await selectedNoteId(s);
         const cur = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
         const base = typeof cur.ok === "string" ? cur.ok : "";
-        const up = await pageSeatInvoke(
-          s,
-          "plugin:notes|note_update",
-          { noteId, plaintext: `${base}\n${BODY}` },
-          IPC_TIMEOUT,
-        );
-        expect(up.err, "note_update should succeed").toBeUndefined();
+        const up = await writeNoteBody(s, noteId, `${base}\n${BODY}`, IPC_TIMEOUT);
+        expect(up.err, "the body write should succeed").toBeUndefined();
 
         await s.refresh();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });

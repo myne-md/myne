@@ -106,6 +106,16 @@ describe("freeDriverPorts", () => {
     expect(got.movedFrom, "a move is reported, never absorbed silently").toBe(4544);
   });
 
+  it("moves when only the NATIVE port is held by a stray WebKitWebDriver", async () => {
+    // Measured: a leftover `WebKitWebDriver` on 4445 with 4444 free. A
+    // `tauri-driver` handed an occupied `--native-port` does not fail loudly,
+    // it leaves the app on that other WebKit session and the scenario hangs to
+    // its own budget (agent-hub ah1, 180 s). Driver and native move together.
+    const got = await freeDriverPorts(4444, 4445, busy([4445]), 200);
+    expect(got.driverPort).toBe(5444);
+    expect(got.nativePort).toBe(5445);
+  });
+
   it("keeps stepping past several held ports", async () => {
     const got = await freeDriverPorts(4444, 4445, busy([4444, 5444]), 200);
     expect(got.driverPort).toBe(6444);
