@@ -10,6 +10,7 @@
 
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -23,12 +24,12 @@ import { useTranslation } from "react-i18next";
 import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwapApi } from "../../editor/CMEditor";
 import { noteBecameActive, recentNoteIds } from "../recentNotes";
 import {
-  applyScrollAnchor,
   evictClosedTabs,
   isRestoringScroll,
   recallScroll,
   rememberScroll,
 } from "../scrollMemory";
+import { applyScrollAnchor } from "../scrollAnchorApply";
 import type { EditorState } from "@codemirror/state";
 import { resolveDefaultViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
@@ -642,7 +643,25 @@ export function PaneView({
   // store, so the tab can highlight the current section and keep it in view.
   // Heading positions come from the SAME `headingSections` parser the tab uses,
   // so the `from` offsets join exactly once the buffer matches disk.
-  const headingFroms = useMemo(() => headingSections(content).map((h) => h.from), [content]);
+  //
+  // DEFERRED because this is the whole document parsed on every keystroke.
+  // `CMEditor`'s `onChange` mirrors each keystroke straight back into `content`,
+  // so a bare `[content]` dep re-parsed the entire note inside the urgent render
+  // pass: measured 19.2 ms at 100 KB, 91.5 ms at 531 KB, 406 ms at 2 MB on the
+  // typing path, plus the effect below's DOM reads on each of those passes.
+  // `useDeferredValue` leaves the urgent render on the previous value and
+  // coalesces the parses into one background pass, so the keystroke no longer
+  // waits for it. The cost is that the outline highlight can lag the caret by
+  // one pass, which is a highlight, not the buffer.
+  //
+  // Do NOT replace this with a line regex: the parser excludes headings inside
+  // frontmatter bodies (the Setext trap `title: … \n ---`) and inside fenced
+  // code, which a line scan cannot.
+  const deferredContent = useDeferredValue(content);
+  const headingFroms = useMemo(
+    () => headingSections(deferredContent).map((h) => h.from),
+    [deferredContent],
+  );
   const headingFromsRef = useRef<number[]>(headingFroms);
   const outlineViewRef = useRef<OutlineTrackView>(null);
   // The same view as `outlineViewRef`, in state - see `handleEditorReady`.
