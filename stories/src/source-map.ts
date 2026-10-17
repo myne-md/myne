@@ -164,7 +164,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ProvisioningStep": { file: "src/screens/vault-creation/ProvisioningStep.tsx", line: 30 },
   "QuickPicker": { file: "src/components/QuickPicker.tsx", line: 124 },
   "QuickUnlockEntry": { file: "src/components/QuickUnlockEntry.tsx", line: 77 },
-  "QuickUnlockSettings": { file: "src/components/settings/QuickUnlockSettings.tsx", line: 80 },
+  "QuickUnlockSettings": { file: "src/components/settings/QuickUnlockSettings.tsx", line: 84 },
   "ReadyLocalArtefacts": { file: "src/screens/vault-creation/ReadyLocalArtefacts.tsx", line: 45 },
   "ReadyStep": { file: "src/screens/vault-creation/ReadyStep.tsx", line: 46 },
   "ReconcileBanner": { file: "src/components/sync/ReconcileBanner.tsx", line: 44 },
