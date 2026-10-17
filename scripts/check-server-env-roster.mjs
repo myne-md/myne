@@ -63,6 +63,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { manifestRepos } from "./lib/repo-manifest.mjs";
+
 /**
  * The repo root, resolved from this file's own directory.
  *
@@ -308,12 +310,7 @@ const fail = (m) => failures.push(m);
 // against a path nothing will ever populate.
 const MANIFEST = join(ROOT, "workspace", "manifest.txt");
 if (existsSync(MANIFEST)) {
-  const listed = new Set(
-    readFileSync(MANIFEST, "utf8")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("#")),
-  );
+  const listed = new Set(manifestRepos(readFileSync(MANIFEST, "utf8")).map((e) => e.name));
   for (const name of ["myne-server", "myne-ops"]) {
     if (!listed.has(name)) {
       fail(
