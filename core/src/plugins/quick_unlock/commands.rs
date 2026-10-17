@@ -51,7 +51,7 @@ use super::attempt::{
 use super::error::QuickUnlockError;
 use super::pin::{validate_pin, PinProvider, PinValidationError};
 use super::provider::QuickUnlockProvider;
-use crate::io_failure_kind::from_io_error_kind;
+use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::plugins::vault_unlock::state::{UnlockedVault, VaultRuntimeState};
 use crate::vault_id::VaultId;
 
@@ -133,13 +133,46 @@ fn persist_attempt_state(dir: &Path, state: &AttemptState) -> Result<(), QuickUn
         .map_err(io)
 }
 
-/// Remove the device-local credential files. The OS-side credential deletion
-/// (keychain item, for the biometric provider) is the caller's job — the
-/// failure path holds a `provider` and calls `provider.delete()`; the explicit
-/// `disable` path builds the matching provider (task 7 for biometric).
-pub fn wipe_files(dir: &Path) {
-    let _ = std::fs::remove_file(blob_path(dir));
-    let _ = std::fs::remove_file(attempt_path(dir));
+/// Remove the device-local credential files, reporting the first failure.
+///
+/// The OS-side credential deletion (keychain item, for the biometric provider)
+/// is the caller's job — the failure path holds a `provider` and calls
+/// `provider.delete()`; the explicit `disable` path builds the matching provider
+/// (task 7 for biometric).
+///
+/// **It returns the failure rather than swallowing it, and each caller decides.**
+/// It used to be `-> ()` with a `let _ =` on both removals, which made "the user
+/// turned quick-unlock off" and "the credential file is still on disk and still
+/// unwraps the live `root_key`" indistinguishable — the same fail-open shape
+/// `disable_with_dir`'s `auth_permits` comment warns about one screen up. A
+/// `NotFound` is success: the file the caller wanted gone is gone, and `disable`
+/// on a vault whose attempt file was never written must not fail.
+pub fn wipe_files(dir: &Path) -> Result<(), IoFailureKind> {
+    let mut first_failure = None;
+    for path in [blob_path(dir), attempt_path(dir)] {
+        if let Err(e) = std::fs::remove_file(&path) {
+            if e.kind() != std::io::ErrorKind::NotFound && first_failure.is_none() {
+                first_failure = Some(from_io_error_kind(e.kind()));
+            }
+        }
+    }
+    match first_failure {
+        Some(kind) => Err(kind),
+        None => Ok(()),
+    }
+}
+
+/// [`wipe_files`] on a path whose caller cannot act on a failure: log the
+/// bounded kind rather than discard it, so a credential that outlived its own
+/// deletion is at least visible in the diagnostic log.
+fn wipe_files_best_effort(dir: &Path, stage: &'static str) {
+    if let Err(io_error_kind) = wipe_files(dir) {
+        tracing::warn!(
+            stage,
+            io_failure_kind = ?io_error_kind,
+            "quick-unlock credential file could not be removed"
+        );
+    }
 }
 
 /// Best-effort removal of the Apple-Keychain biometric credential for the
@@ -178,10 +211,14 @@ fn cleanup_os_credential(dir: &Path) {
 /// already removes the files, and unlock reads the blob first, so an orphaned
 /// keychain item already forces the password path.
 ///
+/// Best-effort, but no longer silent: a removal that fails is logged with its
+/// bounded `IoFailureKind`, because a credential that outlived the rotation is
+/// still able to unwrap the live `root_key` and nothing else would say so.
+///
 /// Both hosts' `VaultLifecycleHooks::invalidate_quick_unlock` delegate here.
 pub fn invalidate_credential(dir: &Path) {
     cleanup_os_credential(dir);
-    wipe_files(dir);
+    wipe_files_best_effort(dir, "invalidate_credential");
 }
 
 /// Configure quick-unlock for the (currently Unlocked) vault: wrap `root_key`
@@ -341,7 +378,11 @@ pub fn disable_with_dir(dir: &Path, state: &VaultRuntimeState) -> Result<(), Qui
     if !blob_path(dir).exists() {
         return Err(QuickUnlockError::NotConfigured);
     }
-    wipe_files(dir);
+    // Fail-CLOSED on a failed removal: the caller must not report "turned off"
+    // over a credential file that is still on disk and still unwraps the live
+    // `root_key`. `NotFound` inside `wipe_files` counts as success, so a vault
+    // whose attempt file was never written still disables.
+    wipe_files(dir).map_err(|io_error_kind| QuickUnlockError::WipeFailed { io_error_kind })?;
     Ok(())
 }
 
@@ -445,7 +486,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
         Ok(h) => h,
         Err(_) => {
             let _ = provider.delete();
-            wipe_files(dir);
+            wipe_files_best_effort(dir, "corrupt_blob");
             return Err(QuickUnlockError::NotConfigured);
         }
     };
@@ -455,7 +496,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     let mut attempts = read_attempt_state(dir);
     if attempts.must_wipe() {
         let _ = provider.delete();
-        wipe_files(dir);
+        wipe_files_best_effort(dir, "attempts_over_cap");
         return Err(QuickUnlockError::AttemptsExhausted);
     }
 
@@ -591,7 +632,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
         Err(_) => match attempts.record_failure() {
             AttemptOutcome::Wipe => {
                 let _ = provider.delete();
-                wipe_files(dir);
+                wipe_files_best_effort(dir, "attempts_exhausted");
                 Err(QuickUnlockError::AttemptsExhausted)
             }
             AttemptOutcome::Allowed { remaining } => {
@@ -1872,6 +1913,63 @@ mod tests {
         assert!(!attempt_path(dir).exists());
         // Idempotent on an already-clean vault.
         invalidate_credential(dir);
+    }
+
+    #[test]
+    fn disable_reports_a_credential_file_that_survived_removal() {
+        // Fail-closed. `wipe_files` used to be `-> ()` with a `let _ =` on both
+        // removals, so `disable_with_dir` returned `Ok(())` — and the UI showed
+        // "Quick unlock turned off" — while the credential blob was still on
+        // disk and still unwrapped the live `root_key`. A non-empty DIRECTORY at
+        // the blob path is the portable way to make `remove_file` fail without
+        // touching permissions (macOS gives EPERM, Linux EISDIR).
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-disable-wipe-fail").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let state = unlocked_state();
+            seed_unlocked(&state, dir).await;
+
+            // The blob path exists (so the `NotConfigured` precondition passes)
+            // but cannot be unlinked.
+            std::fs::create_dir_all(blob_path(dir).join("occupied")).unwrap();
+
+            let err = disable_with_dir(dir, &state).expect_err("disable must fail closed");
+            assert!(
+                matches!(err, QuickUnlockError::WipeFailed { .. }),
+                "expected WipeFailed, got {err:?}"
+            );
+            assert!(
+                blob_path(dir).exists(),
+                "the surviving credential is exactly what the error is about"
+            );
+        });
+    }
+
+    #[test]
+    fn disable_succeeds_when_only_the_blob_was_written() {
+        // The non-vacuity half of the test above: `NotFound` on the attempt file
+        // is success, not a failure, so a vault whose attempt file was never
+        // written still disables.
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("qu-disable-no-attempt").unwrap();
+            let dir = tmp.path();
+            write_sealed_meta(dir);
+            let state = unlocked_state();
+            seed_unlocked(&state, dir).await;
+            setup_with_dir(
+                dir,
+                &state,
+                MockProvider::new(PROVIDER_KIND_PIN, 0x11),
+                &ACCOUNT_HASH,
+            )
+            .await
+            .expect("setup");
+            std::fs::remove_file(attempt_path(dir)).unwrap();
+
+            disable_with_dir(dir, &state).expect("disable without an attempt file");
+            assert!(!blob_path(dir).exists());
+        });
     }
 
     #[test]

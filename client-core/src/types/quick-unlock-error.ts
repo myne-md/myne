@@ -38,6 +38,11 @@ export type QuickUnlockError =
   | { kind: "PinNotDigits" }
   | { kind: "InvalidVaultMeta" }
   | { kind: "Io"; detail: IoFailureKind }
+  /** `disable` could not remove the device-local credential file, so quick
+   *  unlock is STILL configured and the credential still unwraps the live
+   *  `root_key`. Fail-closed: the toggle must stay ON and the copy must say so,
+   *  rather than reporting "turned off" over a file that remains on disk. */
+  | { kind: "WipeFailed"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "Backend" };
 
 /** Narrowing helper: is this a `QuickUnlockError`-shaped value? */
