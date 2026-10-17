@@ -772,6 +772,12 @@ steps:
       # name, so the spelling is `--config.store-dir=`). A run that cannot
       # evaluate exits 2 instead of reporting a finding it did not find.
       - node scripts/gen-third-party-licenses.mjs --check --store-dir /cache/cargo/pnpm-store
+      # Private-path references in the published trees (audit T3.7). A path into
+      # `operations/`, `agent-tooling/` or `internal-service/` in `docs/`, `src/` or
+      # `mobile/src/` is a dead end for a reader who does not have that
+      # repository, and the reader cannot tell it apart from a stale link. The
+      # recorded SET may shrink and never grow; `--record` refuses a grown set.
+      - node scripts/check-private-path-refs.mjs
 
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
