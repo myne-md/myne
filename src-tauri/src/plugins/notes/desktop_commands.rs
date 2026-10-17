@@ -38,6 +38,7 @@ use zeroize::Zeroizing;
 use super::SNAPSHOT_WRITE_FAILED_EVENT;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
 use myne_core::atomic_write;
+use myne_core::host::HostCtx;
 // `enumerate_notes_dir` is now consumed only by this module's tests (the
 // non-test caller, `collect_referenced_attachment_ids`, moved to
 // `myne_core::plugins::attachments::ref_scan`).
@@ -1338,10 +1339,14 @@ fn flush_snapshot_for_note(notes_dir: &std::path::Path, note_uuid: &str, now_ms:
 
 /// Inner, testable core of [`note_snapshot_flush`]. Returns the snapshot-failed
 /// warning bool (the #[command] wrapper turns it into a non-blocking event).
+/// Takes its host seam, like [`note_create_with_dir`] / [`note_update_with_dir`]
+/// beside it, so the wall clock comes from `HostCtx` rather than a direct
+/// `SystemTime::now()`.
 pub(crate) async fn note_snapshot_flush_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     note_id: String,
+    host: &dyn HostCtx,
 ) -> Result<bool, NoteUpdateError> {
     let note_id = NoteId::parse(&note_id).map_err(|cause| {
         tracing::debug!(stage = ?cause, "note_snapshot_flush note_id strict-parse failed");
@@ -1360,7 +1365,7 @@ pub(crate) async fn note_snapshot_flush_with_dir(
     }
 
     let note_uuid_str = note_id.as_uuid().to_string();
-    let now_ms = crate::snapshot_store::now_unix_ms();
+    let now_ms = host.now_unix_millis();
     let warning = tokio::task::spawn_blocking(move || {
         flush_snapshot_for_note(&notes_dir, &note_uuid_str, now_ms)
     })
@@ -1416,7 +1421,13 @@ pub async fn note_snapshot_flush<R: Runtime>(
                 io_error_kind: from_io_error_kind(other),
             },
         })?;
-    let warning = note_snapshot_flush_with_dir(notes_dir, state.inner(), note_id.clone()).await?;
+    let warning = note_snapshot_flush_with_dir(
+        notes_dir,
+        state.inner(),
+        note_id.clone(),
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+    )
+    .await?;
     if warning {
         let _ = app.emit(SNAPSHOT_WRITE_FAILED_EVENT, &note_id);
     }
@@ -2345,9 +2356,14 @@ mod tests {
             .await
             .unwrap();
             // Flush force-captures the CURRENT state (v2) despite the window.
-            let warn = note_snapshot_flush_with_dir(notes_dir.clone(), &state, id.clone())
-                .await
-                .unwrap();
+            let warn = note_snapshot_flush_with_dir(
+                notes_dir.clone(),
+                &state,
+                id.clone(),
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert!(!warn);
 
             let note_id = NoteId::parse(&id).unwrap();
@@ -2380,9 +2396,14 @@ mod tests {
                 )
                 .await;
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
-            let warn = note_snapshot_flush_with_dir(notes_dir, &state, phantom)
-                .await
-                .unwrap();
+            let warn = note_snapshot_flush_with_dir(
+                notes_dir,
+                &state,
+                phantom,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert!(!warn, "flushing a missing note is a no-op, not a warning");
         });
     }
@@ -2394,7 +2415,13 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default(); // Slot::Empty
             let phantom = "01970e83-4f2f-7000-8000-000000000000".to_string();
-            let r = note_snapshot_flush_with_dir(notes_dir, &state, phantom).await;
+            let r = note_snapshot_flush_with_dir(
+                notes_dir,
+                &state,
+                phantom,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(r, Err(NoteUpdateError::VaultNotUnlocked)));
         });
     }
