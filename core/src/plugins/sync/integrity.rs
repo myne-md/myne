@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Integrity-alert classification (MYND-427 task 2).
 //!
 //! Decides when the engine must raise the hard, honest integrity alert

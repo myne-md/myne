@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! QR device-join payload codec (MYND-466).
 //!
 //! A **versioned, scanner-only** blob the trusted desktop renders into a QR and

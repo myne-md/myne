@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Closed error taxonomy for the local-inference engine (local-ai epic,
 //! MYND-406, task 1).
 //!

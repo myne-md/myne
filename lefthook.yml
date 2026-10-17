@@ -19,18 +19,14 @@ pre-commit:
       run: cargo fmt --all -- --check
 
     spdx-header:
-      # Every protocol/ source file MUST carry the AGPL-3.0 SPDX header on line 1
-      # (root AGENTS.md "License" + protocol/AGENTS.md). This is the machine-readable
-      # anchor of the file-level licensing claim; drift here is a normative violation.
-      # Fix: add `// SPDX-License-Identifier: AGPL-3.0` as the first line.
-      run: |
-        fail=0
-        for f in {staged_files}; do
-          case "$f" in protocol/*.rs) ;; *) continue ;; esac
-          [ -f "$f" ] || continue
-          head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0' || { echo "missing SPDX header: $f"; fail=1; }
-        done
-        exit $fail
+      # Every tracked Rust source file MUST carry the AGPL-3.0 SPDX header on
+      # line 1 (root AGENTS.md "License" + LICENSING.md). This is the
+      # machine-readable anchor of the file-level licensing claim; drift here is
+      # a normative violation. The rule itself lives in
+      # `scripts/check-spdx-headers.mjs`: this hook calls it with the staged
+      # paths, and `scripts/hooks-parity-check.sh` calls it with none, so the
+      # pre-commit gate and its `--no-verify` backstop cannot drift apart.
+      run: node scripts/check-spdx-headers.mjs {staged_files}
 
     tsc:
       glob: "*.{ts,tsx}"

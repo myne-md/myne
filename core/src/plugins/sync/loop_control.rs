@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Sync-loop scheduling (MYND-424 task 9).
 //!
 //! The background loop is a `tokio` task gated on `Slot::Unlocked` (the

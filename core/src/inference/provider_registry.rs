@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The closed set of remote AI providers, and the wire codec for each
 //! (ai-remote-providers task 5, ledger SYNC-20/SYNC-24).
 //!

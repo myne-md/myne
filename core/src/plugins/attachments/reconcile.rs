@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Attachment reference-graph reconcile (MYND-169, SYNC-6) — in-RAM,
 //! rebuildable, zeroized-on-lock.
 //!

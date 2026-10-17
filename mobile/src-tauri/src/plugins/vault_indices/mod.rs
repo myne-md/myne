@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault-indices` plugin — mobile host (MYND-31 / A11 — VaultIndices).
 //!
 //! Owns the in-RAM wikilink graph + backlinks + tag index + typed-property

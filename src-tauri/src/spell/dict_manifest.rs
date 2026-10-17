@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Reproducible-build hash-pins for the bundled dictionaries (MYND-263 t5).
 //!
 //! Every Hunspell file we ship is pinned to its exact SHA-256. The verification

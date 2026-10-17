@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri 2 in-app plugins for vault flows.
 //!
 //! Each plugin is a self-contained module under `plugins/` with its

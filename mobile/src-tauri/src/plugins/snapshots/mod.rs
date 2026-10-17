@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `snapshots` plugin — mobile host (MYND-96, SYNC-9).
 //!
 //! The read/management surface for encrypted per-note version history:

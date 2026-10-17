@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 // Myne mobile — Tauri 2 host. Phase-1 vault + notes + prefs backend that
 // consumes the shared `myne-core` crate (the single source of truth for the
 // vault / notes / prefs plugin cores, extracted from the desktop crate) and the

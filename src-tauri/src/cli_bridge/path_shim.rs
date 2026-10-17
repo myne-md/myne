@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The `myne` PATH shim — how the bundled sidecar becomes a command the user
 //! can type (cli-thin-client task 11; MYND-490).
 //!

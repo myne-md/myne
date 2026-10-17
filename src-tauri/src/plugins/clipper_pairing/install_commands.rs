@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! WebView IPC commands for the **browser-clipper host install** toggle (TB10).
 //!
 //! The Settings "Connected extensions" section drives these to register /

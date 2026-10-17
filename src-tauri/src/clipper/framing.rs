@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Native-messaging length-prefixed framing reader/writer (TB10).
 //!
 //! The Chrome/Firefox native-messaging wire format is a 4-byte

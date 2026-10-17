@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! State for the in-flight vault-creation flow.
 //!
 //! Holds [`VaultCreationSession`] entries keyed by an opaque session

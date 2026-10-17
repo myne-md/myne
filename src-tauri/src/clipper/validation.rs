@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Untrusted-input validation for the native-messaging host (TB10).
 //!
 //! Every byte handed to the host is hostile (A14 — a compromised

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Encrypted persistence + Build-B reconcile-delta for the VaultIndices
 //! (`vault.indices` / `MYI1`, MYND-271 Task 8; design MYND-31).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Device-local update preferences: `<app_config_dir>/update-prefs.json`.
 //!
 //! One field today: whether this device checks for updates automatically. It is

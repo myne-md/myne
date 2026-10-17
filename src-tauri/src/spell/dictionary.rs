@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Host-side personal-dictionary payload + persistence (MYND-266 tasks 4-5).
 //!
 //! The `vault.dictionary` inner plaintext (the `dict_format_version 0x01` format,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `theme-validator` — the Myne custom-theme shape allowlist, extracted
 //! from the desktop `themes` plugin (`myne_desktop_lib`) into a shared crate so
 //! that BOTH the desktop client and the `myne-themes` marketplace CI run the

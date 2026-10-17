@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `prefs` plugin IPC error enums (MYND-160 Task 9).
 //!
 //! Two closed taxonomies — one for read, one for write — both

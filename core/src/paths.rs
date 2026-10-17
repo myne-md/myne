@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Filesystem path resolution for vault data.
 //!
 //! Spec / decisions: see

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `core::http` — the ONE HTTP/1.1 codec in the tree.
 //!
 //! **Why it is here and not in `plugins::sync`.** The sync client owned the only

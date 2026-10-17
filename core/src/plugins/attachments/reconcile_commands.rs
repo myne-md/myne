@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `attachments` reconcile IPC command set (MYND-169 / MYND-170, SYNC-6).
 //!
 //! The IPC surface over the in-RAM attachment reference graph

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Eager boot migration: legacy `<app_data_dir>/vault/` → `vaults/<id>/`.
 //!
 //! SAFETY-CRITICAL. This is the one-shot, idempotent migration that runs at

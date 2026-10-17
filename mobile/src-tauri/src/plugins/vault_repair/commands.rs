@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_repair` Tauri commands (MYND-159) — mobile port.
 //!
 //! Two commands, identical in logic to the desktop plugin (only the

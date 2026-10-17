@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `sync` Tauri plugin (MYND-424, the Phase 2 client sync engine namespace).
 //!
 //! This is the shared plugin namespace that MYND-424 (engine) + MYND-425

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `secret-export` Tauri plugin.
 //!
 //! Owns the single `save_secret_text` IPC command — the narrow-seam file write

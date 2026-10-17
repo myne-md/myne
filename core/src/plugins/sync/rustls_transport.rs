@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The raw-rustls sync transport (MYND-424 task 2, SYNC-3).
 //!
 //! One TLS path shared by SCRAM auth (MYND-425) and sync push/pull: a rustls

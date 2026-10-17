@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Post-decrypt field/set merge of two `vault.prefs` views (MYND-478;
 //! `sync-protocol.md` §10.2).
 //!

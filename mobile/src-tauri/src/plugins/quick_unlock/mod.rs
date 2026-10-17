@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Quick-unlock (PIN + biometric) plugin — mobile host.
 //!
 //! Quick-unlock stores a third wrapped copy of `root_key` in the device-local

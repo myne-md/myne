@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Pure classification of the CLI door's state (cli-thin-client task 3;
 //! MYND-490; `docs/decisions.md` "CLI terminal access is a default-off,
 //! unlock-gated local socket with a folder exclusion list (MYND-490)";

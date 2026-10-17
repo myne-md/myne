@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `search` plugin — mobile host (MYS1 full-text search, frontend-fed).
 //!
 //! Drives the shared BM25 full-text search engine (`myne_core::search`:

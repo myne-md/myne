@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Screen-capture protection — startup default-ON + runtime override.
 //!
 //! The original two-function public API, per `decisions.md` 2026-05-27

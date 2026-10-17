@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! PIN wrap-key provider for quick-unlock (MYND-329, task 4).
 //!
 //! Derives the 32-byte `wrap_key` from a user PIN via the vault's existing

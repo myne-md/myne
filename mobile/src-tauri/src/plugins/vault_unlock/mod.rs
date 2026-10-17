@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-unlock Tauri plugin.
 //!
 //! Owns the singleton `UnlockedVault` slot and the `unlock` + `lock`

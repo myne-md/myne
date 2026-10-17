@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `prefs` Tauri plugin (MYND-160 Task 9).
 //!
 //! Owns the `prefs_read` + `set_screen_capture_protection` IPC

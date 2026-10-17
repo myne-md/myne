@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri commands for the vault-creation flow.
 //!
 //! - [`begin`]  → session creation (Task 12).

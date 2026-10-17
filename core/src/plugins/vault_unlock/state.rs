@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Runtime state for the vault auth domain (vault-unlock + vault-recover).
 //!
 //! Holds a [`HashMap<VaultId, Slot>`] of per-vault [`Slot`]s for the running

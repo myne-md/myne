@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `clipper` — the keyless native-messaging host (browser↔desktop, TB10).
 //!
 //! This module is the desktop side of the browser-extension clip channel

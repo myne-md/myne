@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `sync` plugin — mobile shim over the shared [`myne_core::plugins::sync`] core.
 //!
 //! The Phase-2 client sync engine (MYND-424–427) — commands, engine,

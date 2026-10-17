@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Plugin state: the shared [`Engine`] instance.
 //!
 //! Held as `Arc<dyn Engine>` so the (single) engine can back concurrent

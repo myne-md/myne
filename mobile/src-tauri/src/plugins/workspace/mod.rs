@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `workspace` Tauri plugin (MYND-561, mobile).
 //!
 //! Owns `workspace_read` + `workspace_write` — the persistence side of the

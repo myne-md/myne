@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The sync transport seam (SYNC-3, MYND-424 task 3; real impl is task 2).
 //!
 //! A blind relay (TB5) speaks a deliberately tiny contract: send opaque bytes

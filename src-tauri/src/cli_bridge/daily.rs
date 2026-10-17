@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `myne daily` / `myne daily:append` (cli-thin-client task 9; MYND-490).
 //!
 //! Resolves "today's daily note" through the SAME rules the app's own "open

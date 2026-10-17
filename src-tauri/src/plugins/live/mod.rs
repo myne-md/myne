@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `live` Tauri plugin, the collaborative-editor live-session commands (epic
 //! live-collab, `collab-editor-bridge` task 3).
 //!

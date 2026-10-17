@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The CLI bridge command-socket transport (cli-thin-client task 3).
 //!
 //! A Unix domain socket on macOS/Linux, owner-only (0600) — the exact

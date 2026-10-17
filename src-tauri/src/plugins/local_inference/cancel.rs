@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Streaming cancellation (conversational-ai-chat task 4).
 //!
 //! A single [`CancelToken`] shared between the active streaming generation and

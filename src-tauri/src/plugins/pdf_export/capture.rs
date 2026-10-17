@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Per-OS native print-to-PDF arms (MYND-255 task 4).
 //!
 //! Tauri 2 / wry expose no print-to-PDF API (wry #707, tauri #12284 —

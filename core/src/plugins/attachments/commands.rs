@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `attachments` Tauri command handlers (MYND-169 — the
 //! `attachments-crypto-pipeline` sub-feature, SYNC-8).
 //!

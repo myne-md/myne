@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! On-demand AI model downloads (myne-md/myne#805, `decisions/ai/0627`).
 //!
 //! This is the **orchestration** half: the compiled-in artefact table (the sole

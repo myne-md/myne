@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `account` Tauri plugin: the account-record command surface (the account/vault
 //! split, `decisions.md` 2026-09-07).
 //!

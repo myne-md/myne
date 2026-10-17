@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Sync orchestration — the production glue (MYND-424 R3) that drives the
 //! [`super::engine`] primitives over a real transport against the **real local
 //! vault**. The engine functions move bytes but have no production caller; this

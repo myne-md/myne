@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Voice notes — native mic capture submodule of `attachments` (MYND-259).
 //!
 //! Voice notes are ordinary attachments: a recording is captured natively (no

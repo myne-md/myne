@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Host-side lifecycle for the `myne-tor` sidecar — device-local Tor routing
 //! (MYND-650 task 2).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri-layer error type for the quick-unlock plugin (MYND-329, task 6).
 //!
 //! Closed, `serde`-tagged set hand-mirrored on the TS side. No `String` field

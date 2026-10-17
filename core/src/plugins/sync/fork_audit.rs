@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Cross-read VV-convergence tracker (MYND-427 task 1; SYNC-10 + SYNC-12).
 //!
 //! A fork is distinguished from mere concurrency by **convergence over time**

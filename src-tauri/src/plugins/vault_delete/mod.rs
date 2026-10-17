@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-delete Tauri plugin (MYND-105).
 //!
 //! Owns the standalone `vault_delete::vault_delete` IPC command —

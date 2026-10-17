@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Account-number → vault selection (host-side, header-only, no decrypt).
 //!
 //! Multi-vault recovery lets the user OPTIONALLY type their account-number to

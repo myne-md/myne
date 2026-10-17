@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Cross-plugin test fixtures.
 //!
 //! The vault-creation, vault-unlock, and vault-recover plugins each

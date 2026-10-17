@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Desktop-only QR device-join generation (MYND-466).
 //!
 //! Two producers, both rendering a scanner-only payload from

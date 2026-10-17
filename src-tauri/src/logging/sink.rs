@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The rotating file writer behind the diagnostic log (myne-md/myne#860).
 //!
 //! # Why this is hand-rolled rather than `tracing-appender`

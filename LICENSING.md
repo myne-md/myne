@@ -33,14 +33,14 @@ housekeeping one.
 Application code is licensed under the **GNU Affero General Public License,
 version 3** (AGPL-3.0, not "or-later").
 
-**SPDX headers.** Every crate manifest declares `license = "AGPL-3.0"` (the
-workspace root is a virtual manifest with no `[package]` table, so the only
-`Cargo.toml` without the field is the one that is not a crate). Rust source files
-carry an `// SPDX-License-Identifier: AGPL-3.0` header, and the `spdx-header`
-pre-commit hook holds that over the staged Rust files it matches, so the header
-applies to whatever a change adds rather than to a hand-kept roster; the backfill
-across the older crates is tracked as its own item and is deliberately not
-claimed complete here. There is no SPDX header form for Markdown, JSON or CSS; a
+**SPDX headers.** Every tracked Rust source file carries
+`// SPDX-License-Identifier: AGPL-3.0` on line 1, and every crate manifest
+declares `license = "AGPL-3.0"` (the workspace root is a virtual manifest with
+no `[package]` table, so the only `Cargo.toml` without the field is the one that
+is not a crate). `scripts/check-spdx-headers.mjs` holds that over the whole
+tracked Rust tree: the pre-commit hook passes it the staged paths, and
+`scripts/hooks-parity-check.sh` calls it with none, so `--no-verify` is not a way
+around it either. There is no SPDX header form for Markdown, JSON or CSS; a
 non-Rust file takes its licence from its subtree, which is what the table above
 is for.
 

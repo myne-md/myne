@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Synchronous `vault.meta` + `MYC1` catalog reads for the desktop-only paths
 //! that cannot await the storage seam (phase3-web-client task 44).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Tauri commands for the `notes` plugin.
 //!
 //! `note_create` mints a backend-side [`NoteId::new_v7`], AEAD-encrypts

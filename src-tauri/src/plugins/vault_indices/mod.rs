@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault_indices` Tauri plugin (MYND-31 / A11 — VaultIndices).
 //!
 //! Owns the in-RAM wikilink graph + backlinks + tag index for the open

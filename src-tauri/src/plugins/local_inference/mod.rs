@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `local-inference` plugin — on-device LLM engine behind an
 //! [`Engine`] trait (local-ai epic, MYND-406).
 //!

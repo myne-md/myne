@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! The four registration sites of the `vault-recover` plugin, compared.
 //!
 //! Added with the recovery drill (myne-md/myne#468), which is the fourth command

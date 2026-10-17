@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Unix-domain-socket plumbing shared by every local ingress this crate
 //! binds — the browser clipper's relay (`clipper::relay`, TB10) and the CLI
 //! terminal-access door (`cli_bridge::socket`, MYND-490).

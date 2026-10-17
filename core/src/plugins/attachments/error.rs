@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `attachments` plugin IPC error enums (MYND-169).
 //!
 //! Closed taxonomies for `attachment_import`, `catalog_list`, and
