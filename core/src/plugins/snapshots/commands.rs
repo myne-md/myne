@@ -609,13 +609,6 @@ pub(crate) async fn snapshot_restore_in(
             .index_note_attachments(state, &note_id, &title, &plaintext)
             .await;
     }
-    // MYND-453: keep the live AI embedding index correct too — `note_update`
-    // does not fire the re-index hooks itself (its callers do), and this restore
-    // path re-indexed search directly above but left the AI vectors stale
-    // (pre-restore content). Re-embed the restored note over its prose (parity
-    // with the create/update path — 448a); feature/ai-gated + detached, no-op
-    // when AI is off.
-    hooks.ai_note_changed(&note_id, &plaintext);
 
     Ok(())
 }
@@ -843,12 +836,6 @@ mod tests {
         ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn hydrate_ai_vectors<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> crate::hooks::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
         fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -871,9 +858,6 @@ mod tests {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
-        fn ai_note_changed(&self, _: &str, _: &str) {}
-        fn ai_note_deleted(&self, _: &str) {}
-        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn emit_notes_deleted(&self, _: &str) {}

@@ -1218,8 +1218,6 @@
           "empty": "Özetler, yanıtlar ve öneriler istediğinizde burada görünür.",
           "error": "Yapay zeka isteği tamamlanamadı.",
           "errorTurn": "Asistan yanıt veremedi.",
-          "gettingReadyHint": "Notlarınız yapay zeka için hazırlanıyor. Bir dakika.",
-          "noSearchModelHint": "Soru sormak notlarınızı bu cihazda arar ve bunun için burada bir arama modeli gerekir. Bir sağlayıcı bunu yapamaz. Ayarlar → Geliştirici → Yapay Zeka bölümünden bir tane seçin. Notlarınızı yapay zekayla düzenlemek yine de çalışır.",
           "insert": "Nota ekle",
           "noAnswer": "Yanıt yok. Farklı ifade etmeyi deneyin.",
           "newChat": "Yeni sohbet",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Myne’in bu yapısı yerel yapay zeka olmadan derlendi, bu yüzden burada hiçbir şey çalışamaz. Hiçbir ayar bunu değiştirmez — yapay zekanın dahil olduğu bir yapı gerekir.",
           "offHint": "Yerel yapay zeka kapalı. Ayarlar → Geliştirici → Yapay Zeka bölümünden açın.",
           "send": "Gönder",
-          "statusGettingReady": "Hazırlanıyor…",
-          "statusNoSearchModel": "Arama modeli yok",
           "statusNoModel": "Sağlayıcı yok",
           "statusUnreachable": "Yanıt vermiyor",
           "statusUnavailable": "Kullanılamıyor",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Bu çalıştırmanın okuyabileceği her şey, yapay zekânın asla görmediği klasörlerde. Hiçbir şey gönderilmedi. Bunu Ayarlar, Yapay Zekâ, Hariç Tutulan Klasörler'den değiştirin."
       },
       "modelChoose": "Dosya seç…",
-      "modelEmbeddingLabel": "Arama modeli: anlamsal arama ve Soru-Cevap",
       "modelFilter": {
-        "gguf": "GGUF modeli",
-        "safetensors": "Safetensors modeli"
+        "gguf": "GGUF modeli"
       },
       "modelGenerationLabel": "Metin modeli: sohbet, özetler, yazma",
       "modelNone": "Dosya seçilmedi",
@@ -3415,7 +3409,6 @@
       "providerNone": "Yok",
       "providerNothingAnswering": "Henüz yanıt verecek bir şey kurulmadı.",
       "modelsLabel": "Modeller",
-      "recommendedFilesEmbedding": "Tek bir klasörde model.safetensors + config.json + tokenizer.json gerektirir.",
       "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
       "title": "Yapay Zeka",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "{{name}} konumunu göster",
       "downloadsLabel": "Modelleri indir",
       "downloadsHelper": "Bir modeli Myne'in kendi kaynağından alın. Kullanılmadan önce uygulamaya gömülü bir parmak iziyle karşılaştırılır, bu yüzden kurcalanmış bir indirme reddedilir. Siz tıklamadıkça hiçbir şey getirilmez.",
-      "downloadEmbeddingSize": "Çok dilli model, yaklaşık 449 MB.",
       "downloadTagLabel": "Etiket modeli: otomatik etiket önerileri",
       "downloadTagSize": "Küçük yerel model, yaklaşık 337 MB.",
       "downloadInstalled": "Kurulu",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Yapay zekayı kurun",
-    "intro": "Myne notlarınızı anlama göre arayabilir, etiket önerebilir ve onlar hakkında sohbet edebilir. Hiçbiri zorunlu değildir ve daha sonra Ayarlar'dan açabilirsiniz.",
+    "intro": "Myne etiket önerebilir ve onlar hakkında sohbet edebilir. Hiçbiri zorunlu değildir ve daha sonra Ayarlar'dan açabilirsiniz.",
     "enableLabel": "Yapay zeka özelliklerini aç",
-    "semantic": {
-      "title": "Anlamsal arama",
-      "body": "Anlama göre, yalnızca sözcüklere göre değil, arama yapabilmeniz için çok dilli bir gömme modeli indirin (yaklaşık 449 MB)."
-    },
     "tag": {
       "title": "Otomatik etiketleme",
       "body": "Siz yazarken Myne etiket önerebilsin diye etiket modelini indirin (yaklaşık 337 MB)."

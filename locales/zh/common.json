@@ -1218,8 +1218,6 @@
           "empty": "摘要、回答和建议会在你请求时显示在这里。",
           "error": "AI 请求无法完成。",
           "errorTurn": "助手无法回答。",
-          "gettingReadyHint": "正在为 AI 准备你的笔记。请稍候。",
-          "noSearchModelHint": "提问会在此设备上搜索你的笔记，这需要本机的搜索模型。服务商无法代劳。请在设置 → 开发者 → AI 中选择一个。用 AI 编辑笔记仍然可用。",
           "insert": "插入到笔记",
           "noAnswer": "没有答案。请尝试换个说法。",
           "newChat": "新对话",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "此构建版本的 Myne 在编译时未包含本地 AI，因此这里无法运行任何内容。任何设置都无法改变这一点——需要包含 AI 的构建版本。",
           "offHint": "本地 AI 已关闭。请在设置 → 开发者 → AI 中开启。",
           "send": "发送",
-          "statusGettingReady": "正在准备…",
-          "statusNoSearchModel": "无搜索模型",
           "statusNoModel": "无服务商",
           "statusUnreachable": "无响应",
           "statusUnavailable": "不可用",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "本次运行能读取的一切都在 AI 永远看不到的文件夹里。没有发送任何内容。可在设置、AI、排除的文件夹中更改。"
       },
       "modelChoose": "选择文件…",
-      "modelEmbeddingLabel": "搜索模型：语义搜索和问答",
       "modelFilter": {
-        "gguf": "GGUF 模型",
-        "safetensors": "Safetensors 模型"
+        "gguf": "GGUF 模型"
       },
       "modelGenerationLabel": "文本模型：聊天、摘要、写作",
       "modelNone": "未选择文件",
@@ -3415,7 +3409,6 @@
       "providerNone": "无",
       "providerNothingAnswering": "尚未设置任何可用于回答的模型或服务商。",
       "modelsLabel": "模型",
-      "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
       "recommendedFilesTranscription": "需要 Whisper 的 .gguf 文件 + config.json + tokenizer.json 位于同一文件夹中。",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "显示 {{name}} 的位置",
       "downloadsLabel": "下载模型",
       "downloadsHelper": "从 Myne 自己的来源获取模型。使用前会与应用内置的指纹核对，因此被篡改的下载会被拒绝。除非你点击，否则不会获取任何内容。",
-      "downloadEmbeddingSize": "多语言模型，约 449 MB。",
       "downloadTagLabel": "标签模型：自动标签建议",
       "downloadTagSize": "小型本地模型，约 337 MB。",
       "downloadInstalled": "已安装",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "设置 AI",
-    "intro": "Myne 可以按含义搜索你的笔记、建议标签，并就它们聊天。这些都不是必需的，你随时可以在“设置”中开启。",
+    "intro": "Myne 可以建议标签，并就它们聊天。这些都不是必需的，你随时可以在“设置”中开启。",
     "enableLabel": "开启 AI 功能",
-    "semantic": {
-      "title": "语义搜索",
-      "body": "下载多语言嵌入模型（约 449 MB），即可按含义而不只是按字词搜索。"
-    },
     "tag": {
       "title": "自动标签",
       "body": "下载标签模型（约 337 MB），让 Myne 在你书写时建议标签。"

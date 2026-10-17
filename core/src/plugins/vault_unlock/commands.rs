@@ -415,15 +415,6 @@ pub(crate) async fn run_post_unlock_pipeline(
     // personal/ignore sets from vault.dictionary. Best-effort, like search.
     hooks.hydrate_spell(state).await;
 
-    // MYND-412 (semantic-search-qa task 3): embed-on-unlock trigger for the
-    // local-AI semantic index. Unlike the search/spell hydrates this is NOT
-    // awaited to completion — the desktop hook gates on the `ai_enabled` opt-in
-    // (default OFF → an immediate no-op) and, when on, spawns the model-bound
-    // embed walk detached so it never blocks unlock. Mobile + the default
-    // (feature-off) desktop build install a no-op. Best-effort: it can never
-    // block or fail the unlock the user just completed.
-    hooks.hydrate_ai_vectors(state).await;
-
     // ---- myne-md/myne#684: stamp the sealed membership field, lazily ----
     //
     // On every natural unlock, write the membership field when absent and skip
@@ -3101,6 +3092,10 @@ mod tests {
             stage(scratch.path(), &staged_bytes);
 
             let root = scratch.path().parent().expect("vault root").to_path_buf();
+            // The artefacts the OLD root sealed. `vault.embeddings` stays on this
+            // list although its family is retired: a vault written by an older
+            // build still carries the file, and this proves the unlock tolerates
+            // (and drops) an old stray alongside the live caches.
             let stale = [
                 "vault.search",
                 "vault.workspace",

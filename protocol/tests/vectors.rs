@@ -362,11 +362,6 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/device-binding/v0.2/cases.json"),
         ),
         (
-            "embeddings",
-            "v0.1",
-            include_str!("../../myne-test-vectors/vectors/embeddings/v0.1/cases.json"),
-        ),
-        (
             "graph-layout",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/graph-layout/v0.1/cases.json"),
@@ -1317,7 +1312,6 @@ fn hkdf_sha256_vectors() {
                 "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
                 "vault-indices-key" => SubkeyRole::VaultIndicesKey,
                 "attachment-text-key" => SubkeyRole::AttachmentTextKey,
-                "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
                 "catalog-sync-id" => SubkeyRole::CatalogSyncId,
                 "prefs-sync-id" => SubkeyRole::PrefsSyncId,
                 "custom-themes-key" => SubkeyRole::CustomThemesKey,
@@ -2123,11 +2117,10 @@ fn password_policy_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn ctx_aead_vectors() {
     use protocol::{
-        aad_ai_embeddings_blob, aad_graph_layout_blob, aad_note_content_encrypt,
-        aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
-        aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
-        aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, KdfParams,
-        ProtocolError,
+        aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+        aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+        aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_workspace_blob, aead_open_ctx, aead_seal_ctx, KdfParams, ProtocolError,
     };
 
     let Some(raw) = cases_json("ctx-aead") else {
@@ -2390,14 +2383,6 @@ fn ctx_aead_vectors() {
                         );
                         aad_vault_indices_blob(&account_number_hash)
                     }
-                    "aad_ai_embeddings_blob" => {
-                        let account_number_hash: [u8; 16] = hex_decode_array(
-                            case["input_account_number_hash_hex"].as_str().unwrap_or_else(
-                                || panic!("[{id}] missing input_account_number_hash_hex"),
-                            ),
-                        );
-                        aad_ai_embeddings_blob(&account_number_hash)
-                    }
                     "aad_personal_dictionary_blob" => {
                         let account_number_hash: [u8; 16] = hex_decode_array(
                             case["input_account_number_hash_hex"].as_str().unwrap_or_else(
@@ -2447,7 +2432,7 @@ fn ctx_aead_vectors() {
     // (aad_capture_blob / aad_share_import_blob) sit outside the vault-scoped
     // enumeration entirely. The exhaustive decomposition family is
     // aad-construction; this one pins the AEAD round-trip.
-    let required: [&str; 13] = [
+    let required: [&str; 12] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2458,7 +2443,6 @@ fn ctx_aead_vectors() {
         "aad_workspace_blob",
         "aad_graph_layout_blob",
         "aad_vault_indices_blob",
-        "aad_ai_embeddings_blob",
         "aad_personal_dictionary_blob",
         "aad_quick_unlock_blob",
     ];
@@ -3184,11 +3168,11 @@ fn bip39_recovery_vectors() {
 fn aad_construction_vectors() {
     use protocol::{
         aad_agent_memory_blob, aad_agent_memory_catalog, aad_agent_personality_blob,
-        aad_ai_embeddings_blob, aad_attachment_text_blob, aad_chats_blob, aad_chats_catalog,
-        aad_custom_themes_blob, aad_graph_layout_blob, aad_note_content_encrypt,
-        aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
-        aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
-        aad_vault_items_key_wrap, aad_workspace_blob,
+        aad_attachment_text_blob, aad_chats_blob, aad_chats_catalog, aad_custom_themes_blob,
+        aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+        aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+        aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_workspace_blob,
     };
 
     let Some(raw) = cases_json("aad-construction") else {
@@ -3288,7 +3272,6 @@ fn aad_construction_vectors() {
             "aad_workspace_blob" => aad_workspace_blob(&account_number_hash()),
             "aad_graph_layout_blob" => aad_graph_layout_blob(&account_number_hash()),
             "aad_vault_indices_blob" => aad_vault_indices_blob(&account_number_hash()),
-            "aad_ai_embeddings_blob" => aad_ai_embeddings_blob(&account_number_hash()),
             "aad_personal_dictionary_blob" => {
                 aad_personal_dictionary_blob(&account_number_hash())
             }
@@ -3369,7 +3352,7 @@ fn aad_construction_vectors() {
     // outside this family's enumeration. Their canonical bytes are pinned by
     // the aad_*_default_matches_pinned_hex unit tests in aead.rs plus the
     // pending-capture / share-import encrypt cases.
-    let required: [&str; 20] = [
+    let required: [&str; 19] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -3379,7 +3362,6 @@ fn aad_construction_vectors() {
         "aad_workspace_blob",
         "aad_graph_layout_blob",
         "aad_vault_indices_blob",
-        "aad_ai_embeddings_blob",
         "aad_personal_dictionary_blob",
         "aad_quick_unlock_blob",
         "aad_note_content_encrypt",
@@ -11067,233 +11049,6 @@ fn vault_head_state_vectors() {
         assert!(
             seen_parse_errors.contains(err),
             "vault-head-state missing parse_fail coverage for VaultHeadError '{err}' — every pre-MAC structural reject must be pinned"
-        );
-    }
-}
-
-#[cfg_attr(not(target_arch = "wasm32"), test)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-fn embeddings_vectors() {
-    use protocol::{
-        decode_embeddings_blob, derive_subkey, encode_embeddings_blob_raw, EmbeddingsBlobError,
-        SubkeyRole,
-    };
-
-    let Some(raw) = cases_json("embeddings") else {
-        return;
-    };
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[embeddings] parse cases.json: {e}"));
-
-    assert_eq!(doc["schema"], "embeddings");
-    assert_eq!(doc["protocol_version"], "v0.1");
-
-    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
-    assert!(
-        cases.len() >= 13,
-        "embeddings must carry at least 13 vectors (3 encrypt + 1 decrypt_ok + 2 decrypt_aead_fail + 7 parse_fail — the 7th being the superseded-0x01 reject added with the model-identity tagged union); found {}",
-        cases.len()
-    );
-    assert_unique_vector_ids("embeddings", cases);
-
-    // Coverage guards (vault-search / vault-indices parity — MYR1 is their
-    // structural twin: opaque inner plaintext, model identity rides inside the
-    // payload rather than the AAD).
-    let mut seen_kinds = std::collections::HashSet::new();
-    let mut seen_parse_errors = std::collections::HashSet::new();
-
-    for case in cases {
-        let id = case["vector_id"]
-            .as_str()
-            .expect("vector_id must be a string");
-        let case_kind = case["case_kind"]
-            .as_str()
-            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
-        seen_kinds.insert(case_kind.to_string());
-
-        match case_kind {
-            "encrypt" => {
-                let root_key: [u8; 32] = hex_decode_array(
-                    case["input_root_key_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
-                );
-                let account_hash: [u8; 16] = hex_decode_array(
-                    case["input_account_number_hash_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
-                );
-                let plaintext = hex_decode(
-                    case["input_plaintext_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
-                );
-                let nonce: [u8; 24] = hex_decode_array(
-                    case["input_nonce_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_nonce_hex")),
-                );
-                let expected = hex_decode(
-                    case["expected_embeddings_blob_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing expected_embeddings_blob_hex")),
-                );
-
-                let ai_embeddings_key = derive_subkey(&root_key, SubkeyRole::AiEmbeddingsKey);
-
-                // Defensive cross-check: the optional
-                // `informational_ai_embeddings_key_hex` must match the helper's
-                // own derivation. The HKDF role "ai-embeddings-key" is DISTINCT
-                // from the AAD role "ai-embeddings-blob".
-                if let Some(info_hex) = case
-                    .get("informational_ai_embeddings_key_hex")
-                    .and_then(|v| v.as_str())
-                {
-                    let info_bytes: [u8; 32] = hex_decode_array(info_hex);
-                    assert_eq!(
-                        ai_embeddings_key.as_slice(),
-                        info_bytes.as_slice(),
-                        "[{id}] informational_ai_embeddings_key_hex disagrees with derive_subkey(root_key, AiEmbeddingsKey)",
-                    );
-                }
-
-                let actual = encode_embeddings_blob_raw(
-                    &ai_embeddings_key,
-                    &account_hash,
-                    &plaintext,
-                    &nonce,
-                )
-                .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
-
-                assert_eq!(
-                    actual.as_slice(),
-                    expected.as_slice(),
-                    "[{id}] embeddings encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
-                    expected.len(),
-                    hex_encode(&expected),
-                    hex_encode(&actual),
-                );
-            }
-            "decrypt_ok" => {
-                let blob = hex_decode(
-                    case["input_blob_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
-                );
-                let root_key: [u8; 32] = hex_decode_array(
-                    case["input_root_key_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
-                );
-                let account_hash: [u8; 16] = hex_decode_array(
-                    case["input_account_number_hash_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
-                );
-                let expected_plaintext = hex_decode(
-                    case["expected_plaintext_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
-                );
-
-                let ai_embeddings_key = derive_subkey(&root_key, SubkeyRole::AiEmbeddingsKey);
-                let decoded = decode_embeddings_blob(&ai_embeddings_key, &account_hash, &blob)
-                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
-
-                assert_eq!(
-                    decoded.as_slice(),
-                    expected_plaintext.as_slice(),
-                    "[{id}] embeddings decrypt plaintext mismatch ({} bytes)",
-                    expected_plaintext.len(),
-                );
-            }
-            "decrypt_aead_fail" => {
-                let blob = hex_decode(
-                    case["input_blob_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
-                );
-                let root_key: [u8; 32] = hex_decode_array(
-                    case["input_root_key_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_root_key_hex")),
-                );
-                let account_hash: [u8; 16] = hex_decode_array(
-                    case["input_account_number_hash_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_account_number_hash_hex")),
-                );
-
-                let ai_embeddings_key = derive_subkey(&root_key, SubkeyRole::AiEmbeddingsKey);
-                match decode_embeddings_blob(&ai_embeddings_key, &account_hash, &blob) {
-                    Err(EmbeddingsBlobError::CannotDecrypt) => {}
-                    Err(other) => panic!(
-                        "[{id}] expected EmbeddingsBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
-                    ),
-                    Ok(plaintext) => panic!(
-                        "[{id}] expected aead_fail, decode_embeddings_blob returned Ok ({} byte plaintext)",
-                        plaintext.len()
-                    ),
-                }
-            }
-            "parse_fail" => {
-                let blob = hex_decode(
-                    case["input_blob_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
-                );
-                let expected_error = case["expected_error"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
-                seen_parse_errors.insert(expected_error.to_string());
-
-                let expected_variant = match expected_error {
-                    "magic_mismatch" => EmbeddingsBlobError::MagicMismatch,
-                    "protocol_version_mismatch" => EmbeddingsBlobError::ProtocolVersionMismatch,
-                    "format_unsupported" => EmbeddingsBlobError::FormatUnsupported,
-                    "header_too_short" => EmbeddingsBlobError::HeaderTooShort,
-                    "ciphertext_truncated" => EmbeddingsBlobError::CiphertextTruncated,
-                    "ciphertext_len_overflow" => EmbeddingsBlobError::CiphertextLenOverflow,
-                    other => panic!(
-                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with EmbeddingsBlobError"
-                    ),
-                };
-
-                let dummy_key = [0u8; 32];
-                let dummy_hash = [0u8; 16];
-                match decode_embeddings_blob(&dummy_key, &dummy_hash, &blob) {
-                    Err(e) if e == expected_variant => {}
-                    Err(other) => panic!(
-                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
-                    ),
-                    Ok(_) => panic!(
-                        "[{id}] expected parse_fail '{expected_error}', decode_embeddings_blob returned Ok"
-                    ),
-                }
-            }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
-        }
-    }
-
-    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
-    for kind in required_kinds {
-        assert!(
-            seen_kinds.contains(kind),
-            "embeddings missing every case of case_kind '{kind}' — coverage regression"
-        );
-    }
-    let required_parse_errors: [&str; 6] = [
-        "magic_mismatch",
-        "protocol_version_mismatch",
-        "format_unsupported",
-        "header_too_short",
-        "ciphertext_truncated",
-        "ciphertext_len_overflow",
-    ];
-    for err in required_parse_errors {
-        assert!(
-            seen_parse_errors.contains(err),
-            "embeddings missing parse_fail coverage for EmbeddingsBlobError '{err}' — every structural reject must be pinned"
         );
     }
 }

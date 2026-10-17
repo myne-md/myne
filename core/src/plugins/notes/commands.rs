@@ -132,11 +132,6 @@ pub async fn note_create_from_host(
                 .index_note_attachments(state, id, &title, &plaintext)
                 .await;
         }
-        // MYND-453: eager per-note AI re-embed over the note prose (attachments
-        // carry their own search docs now — 448a; detached, no-op unless the
-        // local-inference feature + ai_enabled are on). The RAW body, matching
-        // both twins and the `ai_note_changed` contract (myne#304).
-        hooks.ai_note_changed(id, &plaintext);
         // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
         hooks.bump_local_change();
     }
@@ -878,12 +873,6 @@ pub async fn note_update_from_host(
                     .index_note_attachments(state, &note_id, &title, &plaintext)
                     .await;
             }
-            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
-            // The RAW body, outside the drawing branch (myne#304) — the AI arm
-            // needs the frontmatter to resolve the note's folder for the SYNC-14
-            // exclusion set, and does its own drawing projection.
-            hooks.ai_note_changed(&note_id, &plaintext);
-
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
@@ -1516,10 +1505,6 @@ pub async fn note_write_batch_transactional_from_host(
                 .index_note_attachments(state, note_id, &title, plaintext)
                 .await;
         }
-        // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated). The
-        // RAW body, outside the drawing branch — see `note_update`'s twin above
-        // and the `ai_note_changed` doc (myne#304).
-        hooks.ai_note_changed(note_id, plaintext);
     }
     tracing::debug!(
         stage = "success",
@@ -1916,13 +1901,10 @@ pub async fn note_delete_from_host(
     let result = note_delete_with_dir(notes_dir, state, hooks, note_id.clone(), io, host).await;
     if result.is_ok() {
         hooks.search_remove(&note_id);
-        // MYND-453: drop the deleted note's vectors from the RAM store
-        // (feature/ai-gated; the durable blob is reconciled on next unlock).
-        hooks.ai_note_deleted(&note_id);
         // myne#681: notify any window (the detached one holding this note) that it
         // was deleted, so a pop-out shows the terminal "deleted elsewhere" state
-        // rather than autosaving its stale buffer back. Same call site as the two
-        // hook side-effects above; emit is desktop-only, mobile/web no-op.
+        // rather than autosaving its stale buffer back. Same call site as the
+        // hook side-effect above; emit is desktop-only, mobile/web no-op.
         hooks.emit_notes_deleted(&note_id);
     }
     result

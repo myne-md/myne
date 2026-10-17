@@ -57,11 +57,11 @@ use myne_core::search::SearchIndexState;
 use myne_core::vault_io::VaultIo;
 
 /// The canonical trailing-slash folder read from a decrypted note body's
-/// frontmatter (`""`/absent = root). Pure; mirrors
-/// `local_inference::hydrate::folder_of` exactly (same scanner, same
-/// precedent), kept as an independent copy for the same reason
-/// `folder_scope`'s predicate is: `cli_bridge` must keep working in a
-/// `--no-default-features` build that compiles `local_inference` out.
+/// frontmatter (`""`/absent = root). Pure. An independent copy rather than a
+/// shared helper, for the same reason `folder_scope`'s predicate is:
+/// `cli_bridge` must keep working in a
+/// `--no-default-features` build, and this is four lines over
+/// `title_extract`'s own frontmatter slice + `fm_folder`.
 pub fn folder_of(body: &str) -> Option<String> {
     extract_title_slices(body.as_bytes())
         .frontmatter_bytes

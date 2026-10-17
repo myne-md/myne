@@ -790,9 +790,10 @@ pub async fn step<R: Runtime>(
     //
     // Everything else on this path is identical between the Tauri clients, and
     // these two are not. The engine is built from each client's own inference
-    // state, and the searcher genuinely differs: desktop queries an embedding
-    // index, mobile has no vector store and answers from the full-text index
-    // instead. Taken as trait objects rather than as concrete states, which is
+    // state, and the searcher genuinely differs: mobile answers it from the
+    // full-text index, and desktop now finds nothing ([`NoScopeSearch`], its
+    // embedding-index searcher having been retired with the `MYR1` family).
+    // Taken as trait objects rather than as concrete states, which is
     // what let this whole function move here rather than be copied.
     engine: &dyn AgentEngine,
     searcher: &dyn ScopeSearcher,

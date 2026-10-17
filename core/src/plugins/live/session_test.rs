@@ -240,8 +240,8 @@ fn a_flush_feeds_the_live_indexes_for_every_caller() {
         let calls = rec.index_calls();
         assert_eq!(
             calls.len(),
-            3,
-            "a flush owes search_upsert + index_note_attachments + ai_note_changed, got {calls:?}"
+            2,
+            "a flush owes search_upsert + index_note_attachments, got {calls:?}"
         );
         match &calls[0] {
             IndexCall::SearchUpsert {
@@ -256,11 +256,6 @@ fn a_flush_feeds_the_live_indexes_for_every_caller() {
             matches!(&calls[1], IndexCall::IndexAttachments { note_id: id, .. } if id == &note_id),
             "second call must be index_note_attachments for the note, got {:?}",
             calls[1]
-        );
-        assert!(
-            matches!(&calls[2], IndexCall::AiNoteChanged { note_id: id, .. } if id == &note_id),
-            "third call must be ai_note_changed for the note, got {:?}",
-            calls[2]
         );
 
         // A second flush with nothing dirty must NOT re-index: the disk did not
@@ -282,7 +277,7 @@ fn a_flush_feeds_the_live_indexes_for_every_caller() {
         .expect("second flush");
         assert_eq!(
             rec.index_calls().len(),
-            3,
+            2,
             "a no-op flush (nothing dirty) must not re-index"
         );
     });
@@ -1197,96 +1192,9 @@ fn a_flush_that_outlives_a_lock_does_not_reindex_the_note() {
         assert!(
             !calls.iter().any(|c| matches!(
                 c,
-                IndexCall::SearchUpsert { .. }
-                    | IndexCall::IndexAttachments { .. }
-                    | IndexCall::AiNoteChanged { .. }
+                IndexCall::SearchUpsert { .. } | IndexCall::IndexAttachments { .. }
             )),
             "a flush that outlives a lock must not index the note, got {calls:?}"
-        );
-    });
-}
-
-/// The re-check after the attachment await (myne-md/myne#867 review). A lock that
-/// lands while the flush awaits `index_note_attachments` must stop the AI re-embed
-/// that follows it, because that await is the widest window in the indexing and a
-/// check taken before it says nothing about the state after it.
-#[test]
-fn a_lock_during_the_attachment_await_stops_the_ai_reembed() {
-    use crate::plugins::vault_unlock::state::test_vault_id;
-    use crate::test_support::{IndexCall, RecordingHooks};
-    block_on(async {
-        let host = TestHost::new("/base");
-        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
-        let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
-            .as_uuid()
-            .as_bytes();
-        let note_id = uuid::Uuid::from_bytes(uuid).to_string();
-        let base = encode_note_blob(
-            "---\ntitle: T\n---\nbody\n",
-            &ik,
-            &ikid,
-            &uuid,
-            &[0xAAu8; 16],
-            &host,
-        )
-        .expect("seal");
-        let tmp = ScopedTempDir::new("live-index-lock-await").unwrap();
-        let notes_dir = tmp.path().join("notes");
-        IO.create_dir_all(&notes_dir).await.expect("mkdir");
-        let (state, vault_id) = unlocked_state().await;
-
-        let mut session = LiveSession::open_from_blob(
-            &base,
-            vault_id.clone(),
-            note_id.clone(),
-            uuid,
-            None,
-            &ik,
-            &ikid,
-        )
-        .expect("open");
-        session
-            .apply_body_markdown("---\ntitle: T\n---\nbody edited\n", 5_000)
-            .expect("edit");
-        let reg = LiveSessionRegistry::new();
-        assert!(reg.insert(session), "the session is open for the note");
-
-        let rec = RecordingHooks::locking_on_attachments(test_vault_id());
-        let hooks: crate::hooks::Hooks = rec.clone();
-        crate::plugins::live::commands::flush_live_session_to_dir(
-            &IO,
-            &notes_dir,
-            &reg,
-            crate::plugins::live::commands::LiveIndexCtx {
-                state: &state,
-                hooks: &hooks,
-            },
-            &ik,
-            &ikid,
-            &note_id,
-        )
-        .await
-        .expect("flush");
-
-        let calls = rec.index_calls();
-        // The upsert and the attachment call happened while the vault was
-        // unlocked, which is what puts the fixture inside the window rather than
-        // before it.
-        assert!(
-            matches!(calls.first(), Some(IndexCall::SearchUpsert { .. })),
-            "the upsert runs before the lock, got {calls:?}"
-        );
-        assert!(
-            calls
-                .iter()
-                .any(|c| matches!(c, IndexCall::IndexAttachments { .. })),
-            "the attachment hook must have run (it is what locks), got {calls:?}"
-        );
-        assert!(
-            !calls
-                .iter()
-                .any(|c| matches!(c, IndexCall::AiNoteChanged { .. })),
-            "a lock inside the attachment await must stop the re-embed, got {calls:?}"
         );
     });
 }

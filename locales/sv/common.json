@@ -1218,8 +1218,6 @@
           "empty": "Sammanfattningar, svar och förslag visas här när du ber om dem.",
           "error": "AI-begäran kunde inte slutföras.",
           "errorTurn": "Assistenten kunde inte svara.",
-          "gettingReadyHint": "Förbereder dina anteckningar för AI. Ett ögonblick.",
-          "noSearchModelHint": "När du ställer en fråga söks dina anteckningar igenom på den här enheten, och det kräver en sökmodell här. En leverantör kan inte göra det. Välj en i Inställningar → Utvecklare → AI. Att redigera dina anteckningar med AI:n fungerar fortfarande.",
           "insert": "Infoga i anteckning",
           "noAnswer": "Inget svar. Prova att formulera om.",
           "newChat": "Ny chatt",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Den här versionen av Myne kompilerades utan lokal AI, så ingenting här kan köras. Ingen inställning ändrar det — det krävs en version med AI inkluderad.",
           "offHint": "Lokal AI är av. Slå på den i Inställningar → Utvecklare → AI.",
           "send": "Skicka",
-          "statusGettingReady": "Förbereder…",
-          "statusNoSearchModel": "Ingen sökmodell",
           "statusNoModel": "Ingen leverantör",
           "statusUnreachable": "Svarar inte",
           "statusUnavailable": "Otillgänglig",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Allt denna körning kunde läsa finns i mappar AI aldrig ser. Inget skickades. Ändra det i Inställningar, AI, Undantagna mappar."
       },
       "modelChoose": "Välj fil…",
-      "modelEmbeddingLabel": "Sökmodell: semantisk sökning och frågor och svar",
       "modelFilter": {
-        "gguf": "GGUF-modell",
-        "safetensors": "Safetensors-modell"
+        "gguf": "GGUF-modell"
       },
       "modelGenerationLabel": "Textmodell: chatt, sammanfattningar, skrivande",
       "modelNone": "Ingen fil vald",
@@ -3415,7 +3409,6 @@
       "providerNone": "Ingen",
       "providerNothingAnswering": "Ingenting är konfigurerat att svara ännu.",
       "modelsLabel": "Modeller",
-      "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
       "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Visa platsen för {{name}}",
       "downloadsLabel": "Ladda ner modeller",
       "downloadsHelper": "Hämta en modell från Mynes egen server. Den kontrolleras mot ett fingeravtryck inbyggt i appen innan den används, så en manipulerad nedladdning avvisas. Inget hämtas om du inte klickar.",
-      "downloadEmbeddingSize": "Flerspråkig modell, cirka 449 MB.",
       "downloadTagLabel": "Taggmodell: automatiska taggförslag",
       "downloadTagSize": "Liten lokal modell, cirka 337 MB.",
       "downloadInstalled": "Installerad",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Ställ in AI",
-    "intro": "Myne kan söka i dina anteckningar efter betydelse, föreslå taggar och chatta om dem. Inget av det är obligatoriskt, och du kan slå på det senare i Inställningar.",
+    "intro": "Myne kan föreslå taggar och chatta om dem. Inget av det är obligatoriskt, och du kan slå på det senare i Inställningar.",
     "enableLabel": "Slå på AI-funktioner",
-    "semantic": {
-      "title": "Semantisk sökning",
-      "body": "Ladda ner en flerspråkig inbäddningsmodell (cirka 449 MB) så att du kan söka efter betydelse, inte bara efter ord."
-    },
     "tag": {
       "title": "Automatisk taggning",
       "body": "Ladda ner taggmodellen (cirka 337 MB) så att Myne kan föreslå taggar medan du skriver."

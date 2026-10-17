@@ -2504,14 +2504,10 @@ pub async fn set_ai_enabled_from_host(
 ) -> Result<(), PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
+    // Disk-side commit, under the mutex. The new policy needs no runtime push:
+    // the inference seam re-reads `vault.prefs` at request time, and
+    // `ai_excluded_folders` no longer has a resident index to purge.
     set_ai_enabled_with_dir(&dir, state, hooks, enabled, io, host).await?;
-    // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
-    // no-op). Read back the authoritative post-write policy so both the opt-in
-    // and the current exclusion set are consistent (SYNC-14).
-    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
     Ok(())
 }
 
@@ -2861,14 +2857,10 @@ pub async fn set_ai_excluded_folders_from_host(
 ) -> Result<u32, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
+    // Disk-side commit, under the mutex. The new policy needs no runtime push:
+    // the inference seam re-reads `vault.prefs` at request time, and
+    // `ai_excluded_folders` no longer has a resident index to purge.
     let refused = set_ai_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await?;
-    // Reflect the new exclusion set into the AI runtime SECOND: purge any
-    // now-excluded note from the resident store + persisted blob (SYNC-14).
-    // Read back the authoritative policy (opt-in may be off).
-    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
     Ok(refused)
 }
 

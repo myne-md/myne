@@ -2,8 +2,8 @@
 //! MYND-406, task 1).
 //!
 //! DENY-list clean per `src-tauri/AGENTS.md` "Secret-handling logging
-//! discipline": every variant is a bounded, content-free kind — a prompt, a
-//! note body, or an embedding vector never appears in an error value or its
+//! discipline": every variant is a bounded, content-free kind — a prompt or a
+//! note body never appears in an error value or its
 //! `Display`. Callers log [`EngineError::kind`] (a `&'static str`), never any
 //! inner data (there is none).
 
@@ -28,9 +28,6 @@ pub enum EngineError {
     /// `infer` failed inside the model runtime.
     #[error("local-inference inference failed")]
     InferenceFailed,
-    /// `embed` failed inside the model runtime.
-    #[error("local-inference embedding failed")]
-    EmbeddingFailed,
     /// `transcribe` failed inside the model runtime (voice-to-text, MYND-550).
     /// Content-free like its siblings — the decoded transcript never appears in
     /// an error value or its `Display`.
@@ -84,7 +81,6 @@ impl EngineError {
         match self {
             EngineError::NotReady => "not_ready",
             EngineError::InferenceFailed => "inference_failed",
-            EngineError::EmbeddingFailed => "embedding_failed",
             EngineError::TranscriptionFailed => "transcription_failed",
             EngineError::AudioTooLong => "audio_too_long",
         }

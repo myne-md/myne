@@ -50,7 +50,6 @@ function rustTaxonomy(): { variant: string; tag: string }[] {
 const NOT_APPLICABLE: Record<string, Record<string, string>> = {
   transcribe: {
     inference_failed: "generation-only; transcription reports its own failure",
-    embedding_failed: "embedding-only; never reached from the transcribe path",
     deferred:
       "the compute-priority stand-down is an auto-tag concept; transcription is user-initiated and never yields",
     transcription_failed:
@@ -98,8 +97,6 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
     model_load_failed: "same — nothing is loaded on this side",
     inference_failed:
       "a provider failure arrives as a status, which maps to unauthorized / quota_exhausted / the catch-all; this variant is the in-process runtime's",
-    embedding_failed:
-      "embedding is barred from a remote backend unconditionally (SYNC-16), so it never fails this way",
     transcription_failed: "no provider accepts audio (decisions.md 2026-08-09)",
     deferred:
       "only a backend that serializes compute can defer, and this one runs out of process — Backend::serializes_compute is false for it",
@@ -114,7 +111,6 @@ const NOT_APPLICABLE: Record<string, Record<string, string>> = {
       "collapses into not_ready for this surface — the band simply does not appear",
     model_load_failed: "same collapse; the band does not appear",
     inference_failed: "collapses into the catch-all; there is no distinct UI",
-    embedding_failed: "embedding-only; never reached from the tag path",
     transcription_failed: "transcription-only",
     timeout:
       "auto-tag runs on the bundled task-model with no override picker, so it has no provider to time out against (threat-model.md, decisions.md 2026-08-09)",

@@ -1,8 +1,8 @@
-//! `infer` / `embed` Tauri commands (local-ai epic, MYND-406, task 6).
+//! `infer` Tauri commands (local-ai epic, MYND-406, task 6).
 //!
 //! The `#[tauri::command]`s are thin wrappers that extract the shared engine
 //! from state and delegate to the testable async cores
-//! [`infer_with_engine`] / [`embed_with_engine`]. The cores hold the
+//! [`infer_with_engine`]. The cores hold the
 //! Plaintext-IPC discipline in exactly one place:
 //!   - the prompt/text is `Zeroizing`-wrapped on the first statement, so every
 //!     early-return path zeroes the bytes (`src-tauri/AGENTS.md` "Plaintext IPC
@@ -39,13 +39,13 @@ use super::download::{self, DownloadCancels, ModelDownloadCommandError};
 use super::endpoint_config;
 use super::engine::Engine;
 use super::error::EngineError;
-use super::hydrate::{folder_is_excluded, folder_of};
 use super::model_store::{self, ModelRole, ModelStoreError};
 use super::state::LocalInferenceState;
 use super::state::RequestClass;
-use super::vector_store::LocalInferenceVectorState;
 use crate::plugins::attachments::scheme_core::{decode_attachment_plaintext, ServeKeys};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use myne_core::plugins::agent::frontmatter::folder_of;
+use myne_core::plugins::prefs::folder_scope::folder_is_excluded;
 
 /// DENY-list-safe static label for structured logging (mirrors
 /// `protocol_error_kind`): a new [`EngineError`] variant compile-fails
@@ -250,31 +250,18 @@ pub struct AiCapabilityReport {
     pub backend_id: &'static str,
     pub backend_class: &'static str,
     pub generation: FeatureStatus,
-    pub embedding: FeatureStatus,
     pub transcription: FeatureStatus,
     pub auto_tag: FeatureStatus,
-    /// Whether the vault's embedding index is BUILT, as distinct from whether
-    /// an embedding model exists (myne-md/myne#545).
-    ///
-    /// Two facts, and the chat header needs both: `embedding` says the feature
-    /// can run at all, this says it can run *now*. Without it the header had no
-    /// way to tell "still indexing" from "ready", so it showed the provider's
-    /// name — which reads as ready — for a surface that would refuse every turn,
-    /// and the "Preparing…" state the user guide documents was unreachable in
-    /// production.
-    pub index_ready: bool,
 }
 
 /// Build the report from resolved values — no `AppHandle`, so it is testable.
 pub(super) fn capability_report_from(
     state: &LocalInferenceState,
     generation_model: bool,
-    embedding_model: bool,
     transcription_model: bool,
-    index_ready: bool,
 ) -> AiCapabilityReport {
-    // Generation and transcription are user-initiated; embedding and auto-tag
-    // carry the SYNC-14/16 bars, so ask the seam rather than re-deriving them
+    // Generation and transcription are user-initiated; auto-tag carries the
+    // SYNC-14 bar, so ask the seam rather than re-deriving the policy
     // here — a policy restated at a second site is a policy that will disagree.
     //
     // Each row asks the SAME engine its command will actually use
@@ -283,10 +270,10 @@ pub(super) fn capability_report_from(
     // added: the ambient/user-initiated split means the arm that answers
     // auto-tag is not the arm that answers generation.
     //
-    // The three disk-resolved rows also ask the engine whether it carries its
+    // The disk-resolved rows also ask the engine whether it carries its
     // own weights (`Engine::carries_own_models`). A model file is evidence that
-    // a role can be served, not the definition of it: the E2E stub answers all
-    // three from code with no file anywhere, and asking only the disk reported
+    // a role can be served, not the definition of it: the E2E stub answers
+    // both from code with no file anywhere, and asking only the disk reported
     // `NoModel` for a build whose AI demonstrably works — which is what left
     // every AI scenario driving a surface stuck in its empty state. `auto_tag`
     // below is the row that already asked the engine, and the row that already
@@ -336,19 +323,12 @@ pub(super) fn capability_report_from(
             None => local_generation,
         }
     };
-    let embedding = match state.embedding_engine() {
-        Err(cause) => FeatureStatus::blocked(cause),
-        Ok(engine) if !embedding_model && !engine.carries_own_models() => {
-            FeatureStatus::blocked(EngineError::NoModel)
-        }
-        Ok(_) => FeatureStatus::ok(),
-    };
     // Transcription reads the LOCAL door, because that is the door the
     // `transcribe` command itself uses: speech-to-text is a bundled local
     // model, and a named text-generation provider neither serves it nor should
     // make the report claim it is gone. A report that answers a different
     // question than the command is worse than no report.
-    let transcription = match state.embedding_engine() {
+    let transcription = match state.local_engine() {
         Err(cause) => FeatureStatus::blocked(cause),
         Ok(engine) if !transcription_model && !engine.carries_own_models() => {
             FeatureStatus::blocked(EngineError::NoModel)
@@ -368,10 +348,8 @@ pub(super) fn capability_report_from(
         backend_id: state.active_id(),
         backend_class: state.active_class().as_str(),
         generation,
-        embedding,
         transcription,
         auto_tag,
-        index_ready,
     }
 }
 
@@ -382,7 +360,6 @@ pub(super) fn capability_report_from(
 pub async fn ai_capability_report<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, LocalInferenceState>,
-    vector_state: State<'_, LocalInferenceVectorState>,
 ) -> Result<AiCapabilityReport, EngineError> {
     // The report describes the selection as it is NOW, so it refreshes like
     // every other surface that can route remote — #191 task 1 reads this to
@@ -405,26 +382,10 @@ pub async fn ai_capability_report<R: Runtime>(
             .ok()
             .flatten()
             .is_some();
-    // **Embedding asks the VERIFIED reader**, unlike the other two rows.
-    // A recorded-but-deleted model reported the feature as available, so the
-    // chat header rendered the provider's name on a surface that could not
-    // answer a single question (myne-md/myne#545 follow-up). Generation and
-    // transcription keep the recorded reader deliberately: generation's marker
-    // is checked by its own loader, and transcription falls back to the bundled
-    // default rather than reporting a gone override.
-    let embedding_present = model_store::selected_model_verified(&base, ModelRole::Embedding)
-        .ok()
-        .flatten()
-        .is_some();
     Ok(capability_report_from(
         &state,
         has(ModelRole::Generation),
-        embedding_present,
         transcription_model,
-        // The same flag the retrieval-grounded commands gate on, read through
-        // the same lock. A header derived from anything else would be a second
-        // opinion about whether asking can answer.
-        vector_state.lock().is_enabled(),
     ))
 }
 
@@ -532,21 +493,6 @@ pub async fn set_ai_endpoint<R: Runtime>(
     endpoint_config::write_endpoint(&path, url.trim(), model.trim()).map(|e| Some(e.url))
 }
 
-/// Embedding vector for `text`.
-///
-/// Deliberately NOT registered as interactive compute: this command is the
-/// primitive the background embed-walk drives, and a walk that counted as
-/// user-initiated would starve auto-tag for the whole of a large re-index. The
-/// user-initiated embeds are the ones inside [`semantic_search`], which
-/// registers there.
-#[tauri::command]
-pub async fn embed(
-    text: String,
-    state: State<'_, LocalInferenceState>,
-) -> Result<Vec<f32>, EngineError> {
-    embed_with_engine(state.embedding_engine()?, text).await
-}
-
 /// Transcribe an audio attachment to text (voice-to-text, MYND-550; SYNC-V3/V5/V6).
 ///
 /// Decrypts the `MYA1` blob in RAM (the `attachment://` serve seam's
@@ -554,8 +500,8 @@ pub async fn embed(
 /// ([`super::audio::wav_to_mono_16k`]), then runs the ASR engine under
 /// `spawn_blocking`, streaming each newly-decoded segment over `on_segment` and
 /// returning the full transcript. Host-side `transcription_enabled`-gated (a
-/// compromised WebView is not trusted to stop calling — same posture as
-/// [`semantic_search`], but a different switch: speech-to-text is a product
+/// compromised WebView is not trusted to stop calling — the same posture as
+/// [`transcribe`]'s own switch: speech-to-text is a product
 /// feature with a bundled model, not part of the AI beta opt-in (MYND-592)).
 ///
 /// DENY-list logging only: the decrypted WAV, the derived PCM, and the transcript
@@ -580,8 +526,8 @@ pub async fn transcribe<R: Runtime>(
     // when speech-to-text is off. A compromised WebView is not trusted to stop
     // calling, so this is re-read here rather than taken on the caller's word.
     //
-    // MYND-592: this used to consult the AI vector store's `is_enabled()`, i.e.
-    // the *embedding / semantic-search* opt-in, which transcription has nothing
+    // MYND-592: this used to consult the AI beta opt-in
+    // (`ai_enabled`), which transcription has nothing
     // to do with — it was simply hanging off the nearest available flag, so
     // turning off the AI beta silently killed speech-to-text.
     //
@@ -630,10 +576,10 @@ pub async fn transcribe<R: Runtime>(
     let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
         .map_err(|_| EngineError::TranscriptionFailed)?;
 
-    // Embedding path (SYNC-16): the strict accessor, which never hands back a
-    // remote backend. This surface only embeds — there is no generation here to
-    // split off (#415 task 18 split the two handles where there was one).
-    let engine = engine_state.embedding_engine()?;
+    // Transcription is LOCAL only: the strict accessor never hands back a
+    // remote backend, because the ASR model is bundled and a named
+    // text-generation provider neither serves it nor should be asked to.
+    let engine = engine_state.local_engine()?;
     let cancel_token: CancelToken = cancel_guard.token().clone();
     // Kept for the out-of-band search refresh below (the closure consumes the id).
     let attachment_id_hex = attachment_id.clone();
@@ -835,8 +781,8 @@ pub(crate) enum TagGate {
 
 /// The auto-tag decision. Every input is read HERE, on the Rust side — none of
 /// it is taken on the WebView's word, because a compromised WebView is not
-/// trusted to stop calling (the same posture as [`semantic_search`]'s opt-in
-/// check and [`transcribe`]'s `transcription_enabled` re-read).
+/// trusted to stop calling (the same posture as [`transcribe`]'s opt-in
+/// check).
 ///
 /// `ai_enabled` is the AI beta opt-in and `auto_tag_enabled` the auto-tag switch
 /// (both `vault.prefs`, §9.5.2); `folder` is the note's own `folder:` value
@@ -860,7 +806,7 @@ pub(crate) fn tag_gate(
     if !(ai_enabled && auto_tag_enabled) {
         return TagGate::OptedOut;
     }
-    if folder_is_excluded(folder, excluded) {
+    if folder_is_excluded(Some(folder), excluded) {
         return TagGate::Excluded;
     }
     TagGate::Allowed
@@ -1098,7 +1044,7 @@ pub async fn remove_model<R: Runtime>(
     let base = crate::paths::app_data_dir(&app).map_err(|_| ModelStoreError::Io {
         kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
-    // Invalidate BEFORE deleting: the embedding model is memory-mapped
+    // Invalidate BEFORE deleting: a model may be memory-mapped
     // (`VarBuilder::from_mmaped_safetensors`), so on a platform that refuses to
     // delete a file that is still mapped the delete would fail and leave the
     // engine cached on the stale weights. Dropping the cache first releases the
@@ -1195,7 +1141,7 @@ pub async fn download_model<R: Runtime>(
         })
     };
     // Drop the cached engine models BEFORE the install renames the previous
-    // bundle aside: a memory-mapped embedding model can make the OS refuse the
+    // bundle aside: a memory-mapped model can make the OS refuse the
     // rename on some platforms, so release the mapping first, exactly as
     // `remove_model` does.
     engine_state.invalidate_all_models();
@@ -1304,16 +1250,6 @@ pub(crate) async fn infer_batch_with_engine(
     Ok(out)
 }
 
-/// Testable core of [`embed`].
-pub(crate) async fn embed_with_engine(
-    engine: Arc<dyn Engine>,
-    text: String,
-) -> Result<Vec<f32>, EngineError> {
-    let text = Zeroizing::new(text);
-    let joined = tokio::task::spawn_blocking(move || engine.embed(&text)).await;
-    unwrap_join(joined, EngineError::EmbeddingFailed, "embed")
-}
-
 /// Collapse a `spawn_blocking` join into the engine result, logging (DENY-safe)
 /// on failure. A join error (panicked/cancelled blocking task) maps to
 /// `on_join_err`.
@@ -1341,7 +1277,7 @@ fn unwrap_join<T>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::engine::{StubEngine, STUB_EMBED_DIM};
+    use super::super::engine::StubEngine;
     use super::*;
 
     /// The two states the one `NotReady` refusal used to cover
@@ -1424,9 +1360,6 @@ mod tests {
             *self.seen.lock().expect("seen") = Some(Some(max_new_tokens));
             Ok(String::new())
         }
-        fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-            unreachable!("infer routing only")
-        }
     }
 
     #[test]
@@ -1503,9 +1436,6 @@ mod tests {
         fn infer(&self, _prompt: &str) -> Result<String, EngineError> {
             Err(EngineError::NoModel)
         }
-        fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-            unreachable!("infer routing only")
-        }
     }
 
     #[test]
@@ -1521,15 +1451,6 @@ mod tests {
             ))
             .expect_err("NoModel must propagate rather than read as a stop");
         assert_eq!(err, EngineError::NoModel);
-    }
-
-    #[test]
-    fn embed_command_core_round_trips_text_to_vector() {
-        let engine: Arc<dyn Engine> = Arc::new(StubEngine);
-        let v = rt()
-            .block_on(embed_with_engine(engine, "hello".to_string()))
-            .expect("stub embed never fails");
-        assert_eq!(v.len(), STUB_EMBED_DIM);
     }
 
     #[test]
@@ -1650,9 +1571,6 @@ mod tests {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 panic!("gated-off pass must not reach the engine");
             }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                panic!("gated-off pass must not reach the engine");
-            }
             fn infer_tags(
                 &self,
                 _p: &str,
@@ -1718,9 +1636,6 @@ mod tests {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
                 panic!("a deferred pass must not reach the engine");
             }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
-                panic!("a deferred pass must not reach the engine");
-            }
             fn infer_tags(
                 &self,
                 _p: &str,
@@ -1775,9 +1690,6 @@ mod tests {
         }
         impl Engine for GreedyEngine {
             fn infer(&self, _p: &str) -> Result<String, EngineError> {
-                unreachable!("tag pass only")
-            }
-            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
                 unreachable!("tag pass only")
             }
             fn infer_tags(

@@ -39,7 +39,6 @@ const OUTBOUND: Record<string, { help: boolean; what: string }> = {
   "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF": { help: false, what: "a model card, shown beside the AI model picker" },
   "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF": { help: false, what: "a model card for the on-demand tag model, shown beside the AI model picker" },
   "https://huggingface.co/openai/whisper-base": { help: false, what: "a model card, shown beside the transcription model" },
-  "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2": { help: false, what: "a model card, shown beside the search-embedding model" },
   "https://ollama.com": { help: false, what: "a third-party runtime's home page" },
   "https://sync.example": { help: false, what: "the example sync-server address shown as an input placeholder on the identity-first server step, not an outbound link" },
 };

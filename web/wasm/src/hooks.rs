@@ -136,13 +136,6 @@ impl VaultLifecycleHooks for WebHooks {
         })
     }
 
-    /// **Decided absent.** On-device AI cannot exist here: no Metal in wasm, a
-    /// 4 GiB address ceiling, and multi-GB models (`decisions.md` 2026-07-26).
-    /// `vault.embeddings` is never written by this client.
-    fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        Box::pin(std::future::ready(()))
-    }
-
     /// **Owed — task 14** (it writes attachment docs into the same index).
     fn index_note_attachments<'a>(
         &'a self,
@@ -246,15 +239,6 @@ impl VaultLifecycleHooks for WebHooks {
     fn search_remove(&self, id: &str) {
         crate::session::search().remove_note_and_attachments(id);
     }
-
-    /// **Decided absent** — see `hydrate_ai_vectors`.
-    fn ai_note_changed(&self, _: &str, _: &str) {}
-
-    /// **Decided absent** — see `hydrate_ai_vectors`.
-    fn ai_note_deleted(&self, _: &str) {}
-
-    /// **Decided absent** — see `hydrate_ai_vectors`.
-    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
 
     /// **IMPLEMENTED, and this is the one that makes sync two-way.**
     ///

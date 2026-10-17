@@ -39,10 +39,6 @@
 //! be coalesced away by the snapshot window, because the interface has told the
 //! user the whole run can be undone.
 
-use myne_core::plugins::agent::error::AgentError;
-use myne_core::plugins::agent::tools::{ScopeSearcher, SearchHit};
-use std::collections::BTreeMap;
-
 // The engine adapter moved to `myne-core` (myne-md/myne#456), with the four
 // pure helpers it is built from. Re-exported here so every `adapters::…` path
 // in this tree, and the tests below, keep resolving: and so a reader who comes
@@ -68,63 +64,8 @@ pub use myne_core::inference::agent_adapter::{
 // The three Tauri-host adapters moved with it, for the same reason: both
 // clients build them out of the same `TauriHost` + `VaultRuntimeState` + notes
 // cores, so a second copy would have differed only in which crate it sat in.
-//
-// `SearchAdapter` stayed, and that is the interesting half of the split: it
-// queries the embedding index, and mobile has no vector store to query. Each
-// client implements `ScopeSearcher` for itself.
 #[allow(unused_imports)]
 pub use myne_core::plugins::agent::host_adapters::{NoteReadAdapter, RestoreAdapter, WriteAdapter};
-
-use crate::plugins::local_inference::retrieval;
-use crate::plugins::local_inference::state::LocalInferenceState;
-use crate::plugins::local_inference::vector_store::LocalInferenceVectorState;
-
-/// Search, through the existing embedding index.
-///
-/// Scope filtering is NOT done here; core does it. What is done here is the
-/// store's own `ai_excluded_folders` filter, a second and independent control on
-/// a different axis, which stays exactly where it already was.
-pub struct SearchAdapter<'a> {
-    pub state: &'a LocalInferenceState,
-    pub vectors: &'a LocalInferenceVectorState,
-}
-
-#[async_trait::async_trait]
-impl ScopeSearcher for SearchAdapter<'_> {
-    async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, AgentError> {
-        // The strict embedding accessor, which never hands back a remote backend
-        // (SYNC-16). The index stays on the device even when generation does not.
-        let engine = self.state.embedding_engine().map_err(agent_error_of)?;
-        let owned = zeroize::Zeroizing::new(query.to_string());
-        let vector = tokio::task::spawn_blocking(move || engine.embed_query(&owned))
-            .await
-            .map_err(|_| AgentError::ReadFailed)?
-            .map_err(agent_error_of)?;
-        let hits = {
-            let store = self.vectors.lock();
-            if !store.is_enabled() {
-                return Ok(Vec::new());
-            }
-            retrieval::top_k_matches(&vector, &store, limit, |id| store.is_note_excluded(id))
-        };
-        // Collapse chunk hits to one row per note, keeping the best score: the
-        // agent reads whole notes, so N chunks of one note are one candidate.
-        let mut best: BTreeMap<String, f32> = BTreeMap::new();
-        for hit in hits {
-            let note_id = hit.key.note_id.to_string();
-            let entry = best.entry(note_id).or_insert(hit.score);
-            if hit.score > *entry {
-                *entry = hit.score;
-            }
-        }
-        let mut out: Vec<SearchHit> = best
-            .into_iter()
-            .map(|(note_id, score)| SearchHit { note_id, score })
-            .collect();
-        out.sort_by(|a, b| b.score.total_cmp(&a.score));
-        Ok(out)
-    }
-}
 
 #[cfg(test)]
 mod tests {

@@ -82,8 +82,7 @@ pub struct ExtractedText {
     /// bundled image-OCR weights — output is model-swap-invalidated by the
     /// `extractor_version` byte instead); `Some` for a [`SourceFormat::Audio`]
     /// ASR transcript, whose model IS user-swappable.
-    /// Lives in the inner payload, NOT the AAD — mirrors the `vault.embeddings`
-    /// model-identity rule (§ 9.17.2): a model swap invalidates cached
+    /// Lives in the inner payload, NOT the AAD: a model swap invalidates cached
     /// transcripts via a payload-side comparison ([`ExtractedText::is_model_stale`]),
     /// while the crypto framing (AAD) stays model-agnostic. Because the
     /// `extractor_version` header byte is checked and AAD-bound BEFORE any

@@ -1,6 +1,6 @@
 //! `transcribe` / `read_transcript` Tauri commands — the mobile port of the
 //! desktop local_inference transcription commands (MYND-563). **Transcription
-//! only** — the desktop infer/embed/chat/semantic-search commands are out of
+//! only** — the desktop infer/chat/semantic-search commands are out of
 //! scope on mobile.
 //!
 //! Discipline (`src-tauri/AGENTS.md`, normative here too): the decrypted WAV, the
@@ -37,7 +37,7 @@ pub fn local_inference_error_kind(e: &EngineError) -> &'static str {
 
 /// Transcribe an audio attachment on-device, streaming each ~30 s segment through
 /// `on_segment` and returning the full transcript. Gated host-side on
-/// `transcription_enabled` (default ON; MYND-592 — NOT the `ai_enabled` embedding
+/// `transcription_enabled` (default ON; MYND-592 — NOT the `ai_enabled` beta
 /// opt-in). Seals the transcript into the attachment's MYE1 cache.
 #[tauri::command]
 pub async fn transcribe<R: Runtime>(
@@ -117,7 +117,7 @@ pub async fn transcribe<R: Runtime>(
     .await
     .map_err(|_| EngineError::TranscriptionFailed)??;
 
-    // NOTE (mobile): desktop live-refreshes the AI-embedding `att:` search docs
+    // NOTE (mobile): desktop live-refreshes the AI search docs
     // here (`notes::search_sync`), which is out of scope on mobile — MYS1 search
     // is frontend-fed and the sealed MYE1 transcript is folded into the owning
     // note's searchable content on the next index build. No refresh call here.

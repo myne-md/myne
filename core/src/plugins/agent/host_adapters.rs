@@ -2,13 +2,14 @@
 //! The Tauri-host adapters an agent run needs: reading a note, taking its
 //! restore point, and writing the approved batch (myne-md/myne#456).
 //!
-//! **Shared rather than per-client, and the split from `SearchAdapter` is the
+//! **Shared rather than per-client, and the split from the searcher is the
 //! interesting part.** These three are written entirely against things both
 //! Tauri clients already have, `TauriHost`, `VaultRuntimeState`, the notes
 //! command cores, the snapshot store, `StdVaultIo`: so a second copy would
 //! have differed only in which crate it sat in. Searching a scope is the one
-//! that genuinely differs: desktop queries an embedding index, and mobile has
-//! no vector store to query, so each client implements
+//! that genuinely differs: mobile answers it from the full-text index and
+//! desktop supplies [`crate::plugins::agent::tools::NoScopeSearch`], so each
+//! client implements
 //! [`crate::plugins::agent::tools::ScopeSearcher`] for itself.
 //!
 //! **The restore point is the reason two of these exist at all.**

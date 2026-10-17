@@ -53,10 +53,8 @@ const AI_FIXTURE: Fixture = {
       backendId: "in-process",
       backendClass: "in_process_local",
       generation: { available: true, cause: null },
-      embedding: { available: true, cause: null },
       transcription: { available: true, cause: null },
       autoTag: { available: true, cause: null },
-      indexReady: true,
     }),
     "plugin:chats|chats_list": () => [
       { id: "c1", created_at: 100, title: "Chat", updated_at: 100, version: 1 },

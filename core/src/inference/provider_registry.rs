@@ -547,7 +547,7 @@ impl RemoteProvider {
             // not model. Myne's bug, not the user's wording.
             None => Err(ProviderCodecError::Malformed),
             // An empty completion is a failure, not an empty answer — the same
-            // rule the loopback arm applies to a zero-length embedding.
+            // rule the loopback arm applies to a zero-length reply.
             Some(_) => Err(ProviderCodecError::Empty),
         }
     }
@@ -594,8 +594,8 @@ impl RemoteProvider {
 /// would keep sending until the app restarted.
 ///
 /// Ambient requests never arrive here: the seam refuses a `Remote`-class
-/// backend before the engine is handed over (`state.rs::engine_for`), and
-/// embeddings are refused unconditionally. This type therefore implements only
+/// backend before the engine is handed over (`state.rs::engine_for`). This type
+/// therefore implements only
 /// the user-initiated surface, and the defaults it inherits from [`Engine`]
 /// answer `NoModel` / `NotReady` for everything else — which is the honest
 /// answer, not a silent no-op.
@@ -761,15 +761,6 @@ impl Engine for RemoteEngine {
             }],
             &mut |_| ControlFlow::Continue(()),
         )
-    }
-
-    /// **Unconditionally refused** (SYNC-16). Not reachable through the seam
-    /// either — `embedding_engine()` bars a `Remote` backend with no class
-    /// parameter to pass the wrong value to — but implemented as a refusal
-    /// here as well, so a future caller that obtained this engine some other
-    /// way still cannot embed through it.
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        Err(EngineError::RemoteBarred)
     }
 
     /// The cancellable counterpart of [`Engine::infer`] — same single-turn-chat
@@ -1808,7 +1799,7 @@ mod tests {
 
     /// Ollama publishes no modality, so the family is what answers. Both places
     /// it appears are read — a runtime that fills only `families` would
-    /// otherwise pass an embedding model through.
+    /// otherwise pass an embedding-only model through as text-capable.
     #[test]
     fn ollama_embedding_families_are_not_text_models() {
         let raw = br#"{"models":[
@@ -1855,15 +1846,6 @@ mod remote_engine_tests {
             Box::new(move || prefs.clone()),
             std::sync::Arc::new(|| false),
         )
-    }
-
-    /// Embedding is refused **at the engine too**, not only at the seam. The
-    /// seam is the real bar; this is the belt-and-braces one, so a caller that
-    /// obtained this engine some other way still cannot embed through it.
-    #[test]
-    fn embedding_is_refused_by_the_engine_itself() {
-        let e = engine_with(Some(ready_prefs()), "some/model");
-        assert_eq!(e.embed("x").err(), Some(EngineError::RemoteBarred));
     }
 
     /// No model named → `NotReady`, never a default (SYNC-24).

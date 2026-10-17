@@ -2104,7 +2104,6 @@ pub async fn sync_restore_quarantine<R: Runtime>(
             .index_note_attachments(state.inner(), &new_id, &title, &body)
             .await;
     }
-    hooks.ai_note_changed(&new_id, &body);
     hooks.bump_local_change();
     Ok(new_id)
 }

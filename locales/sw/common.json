@@ -1218,8 +1218,6 @@
           "empty": "Muhtasari, majibu na mapendekezo yanaonekana hapa unapoyaomba.",
           "error": "Ombi la AI halikuweza kukamilika.",
           "errorTurn": "Msaidizi hakuweza kujibu.",
-          "gettingReadyHint": "Inaandaa madokezo yako kwa AI. Subiri kidogo.",
-          "noSearchModelHint": "Kuuliza hutafuta madokezo yako kwenye kifaa hiki, na hilo linahitaji modeli ya utafutaji hapa. Mtoa huduma hawezi kufanya hivyo. Chagua moja katika Mipangilio → Msanidi → AI. Kuhariri madokezo yako kwa AI bado kunafanya kazi.",
           "insert": "Weka kwenye dokezo",
           "noAnswer": "Hakuna jibu. Jaribu kuuliza kwa njia nyingine.",
           "newChat": "Gumzo jipya",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Toleo hili la Myne lilijengwa bila AI ya ndani, hivyo hakuna kinachoweza kufanya kazi hapa. Hakuna mpangilio utakaobadilisha hilo — linahitaji toleo lenye AI.",
           "offHint": "AI ya kifaa hiki imezimwa. Iwashe katika Mipangilio → Msanidi → AI.",
           "send": "Tuma",
-          "statusGettingReady": "Inaandaa…",
-          "statusNoSearchModel": "Hakuna modeli ya utafutaji",
           "statusNoModel": "Hakuna mtoa huduma",
           "statusUnreachable": "Hajibu",
           "statusUnavailable": "Haipatikani",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Kila kitu ambacho kifurushi hiki kingeweza kusoma kiko kwenye fulda ambazo AI haioni kamwe. Hakuna kilichotumwa. Badilisha kwenye Mipangilio, AI, Fulda zilizoachwa nje."
       },
       "modelChoose": "Chagua faili…",
-      "modelEmbeddingLabel": "Modeli ya utafutaji: utafutaji wa kimaana na maswali na majibu",
       "modelFilter": {
-        "gguf": "Modeli ya GGUF",
-        "safetensors": "Modeli ya Safetensors"
+        "gguf": "Modeli ya GGUF"
       },
       "modelGenerationLabel": "Modeli ya maandishi: gumzo, muhtasari, uandishi",
       "modelNone": "Hakuna faili lililochaguliwa",
@@ -3415,7 +3409,6 @@
       "providerNone": "Hakuna",
       "providerNothingAnswering": "Bado hakuna kilichowekwa kujibu.",
       "modelsLabel": "Modeli",
-      "recommendedFilesEmbedding": "Inahitaji model.safetensors + config.json + tokenizer.json katika folda moja.",
       "recommendedFilesGeneration": "Inahitaji faili la .gguf + tokenizer.json katika folda ile ile.",
       "recommendedFilesTranscription": "Inahitaji faili la Whisper la .gguf + config.json + tokenizer.json katika folda ile ile.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Onyesha mahali pa {{name}}",
       "downloadsLabel": "Pakua modeli",
       "downloadsHelper": "Chukua modeli kutoka chanzo cha Myne chenyewe. Hukaguliwa dhidi ya alama ya kidole iliyojengwa ndani ya programu kabla ya kutumika, hivyo upakuaji uliodukuliwa hukataliwa. Hakuna kinachochukuliwa bila wewe kubofya.",
-      "downloadEmbeddingSize": "Modeli ya lugha nyingi, takriban 449 MB.",
       "downloadTagLabel": "Modeli ya lebo: mapendekezo ya lebo kiotomatiki",
       "downloadTagSize": "Modeli ndogo ya ndani, takriban 337 MB.",
       "downloadInstalled": "Imesakinishwa",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Sanidi AI",
-    "intro": "Myne inaweza kutafuta madokezo yako kwa maana, kupendekeza lebo, na kuzungumza kuyahusu. Hakuna kinacholazimika, na unaweza kukiwasha baadaye kutoka Mipangilio.",
+    "intro": "Myne inaweza kupendekeza lebo na kuzungumza kuzihusu. Hakuna kinacholazimika, na unaweza kukiwasha baadaye kutoka Mipangilio.",
     "enableLabel": "Washa vipengele vya AI",
-    "semantic": {
-      "title": "Utafutaji wa kimaana",
-      "body": "Pakua modeli ya uingizaji ya lugha nyingi (takriban 449 MB) ili uweze kutafuta kwa maana, si kwa maneno pekee."
-    },
     "tag": {
       "title": "Kuweka lebo kiotomatiki",
       "body": "Pakua modeli ya lebo (takriban 337 MB) ili Myne ipendekeze lebo unapoandika."

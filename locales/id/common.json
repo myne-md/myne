@@ -1218,8 +1218,6 @@
           "empty": "Ringkasan, jawaban, dan saran muncul di sini saat Anda memintanya.",
           "error": "Permintaan AI tidak dapat diselesaikan.",
           "errorTurn": "Asisten tidak dapat menjawab.",
-          "gettingReadyHint": "Menyiapkan catatan Anda untuk AI. Mohon tunggu.",
-          "noSearchModelHint": "Bertanya berarti mencari catatan Anda di perangkat ini, dan itu membutuhkan model pencarian di sini. Penyedia tidak dapat melakukannya. Pilih satu di Pengaturan → Developer → AI. Menyunting catatan dengan AI tetap bisa.",
           "insert": "Sisipkan ke catatan",
           "noAnswer": "Tidak ada jawaban. Coba ubah kalimatnya.",
           "newChat": "Obrolan baru",
@@ -1228,8 +1226,6 @@
           "unavailableHint": "Build Myne ini dikompilasi tanpa AI lokal, jadi tidak ada yang dapat dijalankan di sini. Tidak ada pengaturan yang dapat mengubahnya — dibutuhkan build yang menyertakan AI.",
           "offHint": "AI lokal mati. Nyalakan di Pengaturan → Developer → AI.",
           "send": "Kirim",
-          "statusGettingReady": "Menyiapkan…",
-          "statusNoSearchModel": "Tidak ada model pencarian",
           "statusNoModel": "Tidak ada penyedia",
           "statusUnreachable": "Tidak merespons",
           "statusUnavailable": "Tidak tersedia",
@@ -3380,10 +3376,8 @@
         "emptyGrant": "Semua yang dapat dibaca proses ini ada di folder yang tidak pernah dilihat AI. Tidak ada yang dikirim. Ubah di Pengaturan, AI, Folder dikecualikan."
       },
       "modelChoose": "Pilih berkas…",
-      "modelEmbeddingLabel": "Model pencarian: pencarian semantik & Tanya-Jawab",
       "modelFilter": {
-        "gguf": "Model GGUF",
-        "safetensors": "Model Safetensors"
+        "gguf": "Model GGUF"
       },
       "modelGenerationLabel": "Model teks: obrolan, ringkasan, penulisan",
       "modelNone": "Tidak ada berkas terpilih",
@@ -3415,7 +3409,6 @@
       "providerNone": "Tidak ada",
       "providerNothingAnswering": "Belum ada yang disiapkan untuk menjawab.",
       "modelsLabel": "Model",
-      "recommendedFilesEmbedding": "Membutuhkan model.safetensors + config.json + tokenizer.json dalam satu folder.",
       "recommendedFilesGeneration": "Membutuhkan berkas .gguf + tokenizer.json dalam folder yang sama.",
       "recommendedFilesTranscription": "Membutuhkan berkas Whisper .gguf + config.json + tokenizer.json dalam folder yang sama.",
       "title": "AI",
@@ -3442,7 +3435,6 @@
       "modelShowLocation": "Tampilkan lokasi {{name}}",
       "downloadsLabel": "Unduh model",
       "downloadsHelper": "Ambil model dari origin Myne sendiri. Model itu diperiksa terhadap sidik jari yang tertanam di aplikasi sebelum dipakai, sehingga unduhan yang diubah akan ditolak. Tidak ada yang diambil kecuali Anda mengklik.",
-      "downloadEmbeddingSize": "Model multibahasa, sekitar 449 MB.",
       "downloadTagLabel": "Model tag: saran tag otomatis",
       "downloadTagSize": "Model lokal kecil, sekitar 337 MB.",
       "downloadInstalled": "Terpasang",
@@ -5230,12 +5222,8 @@
   },
   "aiOnboarding": {
     "title": "Siapkan AI",
-    "intro": "Myne dapat menelusuri catatan Anda berdasarkan makna, menyarankan tag, dan membicarakannya. Semuanya tidak wajib, dan Anda dapat menyalakannya nanti dari Pengaturan.",
+    "intro": "Myne dapat menyarankan tag dan membicarakannya. Semuanya tidak wajib, dan Anda dapat menyalakannya nanti dari Pengaturan.",
     "enableLabel": "Nyalakan fitur AI",
-    "semantic": {
-      "title": "Pencarian semantik",
-      "body": "Unduh model embedding multibahasa (sekitar 449 MB) agar Anda dapat menelusuri berdasarkan makna, bukan hanya kata."
-    },
     "tag": {
       "title": "Penandaan otomatis",
       "body": "Unduh model tag (sekitar 337 MB) agar Myne dapat menyarankan tag saat Anda menulis."

@@ -77,13 +77,6 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn hydrate_attachment_refs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
     fn persist_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
 
-    /// Embed-on-unlock trigger for the local-AI semantic index (semantic-search-
-    /// qa task 3). Desktop, when the `local-inference` feature is on AND the
-    /// vault opted in (`ai_enabled`), walks the resident notes and populates the
-    /// RAM vector store off the unlock hot path; the default build and mobile
-    /// install a no-op. Best-effort — never blocks or fails unlock.
-    fn hydrate_ai_vectors<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
-
     /// MYND-448a: index each attachment embedded in `note_body` as its OWN
     /// search doc (`att:<attachment>:<note_id>`), REPLACING the note's prior
     /// attachment docs (so an un-embedded attachment's doc is dropped). The
@@ -152,42 +145,6 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// Replaces the old `search: State<'_, SearchIndexState>` command param.
     fn search_upsert(&self, id: &str, title: &str, body: &str);
     fn search_remove(&self, id: &str);
-    /// Eager per-note AI re-embed on save (MYND-453): (re-)embed this note's
-    /// chunks into the RAM vector store so a this-session create/edit is
-    /// searchable without a re-unlock. Detached + best-effort in the desktop
-    /// impl; the save critical path NEVER blocks on the model-bound embed. A
-    /// no-op unless the `local-inference` feature is built and `ai_enabled` is
-    /// on. The durable `vault.embeddings` blob is refreshed by the next unlock's
-    /// reconcile (§9.17.4), so this hook only touches RAM.
-    ///
-    /// **`body` is the RAW note body — frontmatter included, and for a drawing
-    /// the `kind: drawing` scene JSON, not its projected text** (myne#304).
-    /// Unlike `search_upsert`, whose caller projects, the projection belongs to
-    /// the implementation here for two reasons:
-    ///
-    ///   - it needs the frontmatter. The desktop arm resolves the note's folder
-    ///     from it to apply the SYNC-14 AI exclusion set, and a projected body
-    ///     has no frontmatter — so a drawing inside an excluded folder read as
-    ///     root and was embedded anyway;
-    ///   - the unlock-time rebuild reads raw bodies off disk and has to project
-    ///     for itself regardless. Projecting at the call sites left the two
-    ///     paths disagreeing: the eager one embedded scene text, the durable
-    ///     one embedded JSON, and every unlock replaced the first with the
-    ///     second.
-    ///
-    /// Three of the five call sites already passed the raw body; the contract
-    /// is now that all of them do.
-    fn ai_note_changed(&self, id: &str, body: &str);
-    /// Drop a deleted note's vectors from the RAM vector store (MYND-453).
-    /// Cheap + synchronous — no model call.
-    fn ai_note_deleted(&self, id: &str);
-    /// Reflect an `ai_enabled` / `ai_excluded_folders` change into the live AI
-    /// runtime (SYNC-14): refresh the query-time policy and immediately purge any
-    /// resident vector for a now-excluded note, and zeroize the whole store when
-    /// AI is turned off — so a control the user just changed takes effect against
-    /// ALREADY-embedded notes, not only future embeds. Desktop-only; mobile
-    /// no-op. Called AFTER the `vault.prefs` write succeeds.
-    fn ai_policy_changed(&self, enabled: bool, excluded: &[String]);
     /// Soft `SyncLocalChange.bump()` — no-op if the sync plugin is unmanaged.
     fn bump_local_change(&self);
     /// `app.emit(SNAPSHOT_WRITE_FAILED_EVENT, note_id)`.
@@ -287,9 +244,6 @@ impl VaultLifecycleHooks for NoopHooks {
     fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
-    fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        Box::pin(std::future::ready(()))
-    }
     fn index_note_attachments<'a>(
         &'a self,
         _: &'a VaultRuntimeState,
@@ -314,9 +268,6 @@ impl VaultLifecycleHooks for NoopHooks {
 
     fn search_upsert(&self, _: &str, _: &str, _: &str) {}
     fn search_remove(&self, _: &str) {}
-    fn ai_note_changed(&self, _: &str, _: &str) {}
-    fn ai_note_deleted(&self, _: &str) {}
-    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
     fn emit_notes_deleted(&self, _: &str) {}
@@ -414,9 +365,6 @@ pub mod test_hooks {
         fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> super::BoxFuture<'a> {
-            Box::pin(std::future::ready(()))
-        }
         fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -439,9 +387,6 @@ pub mod test_hooks {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
-        fn ai_note_changed(&self, _: &str, _: &str) {}
-        fn ai_note_deleted(&self, _: &str) {}
-        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {
             self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }

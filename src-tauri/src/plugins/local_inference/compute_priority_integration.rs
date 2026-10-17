@@ -115,10 +115,6 @@ impl Engine for SerializedEngine {
         Ok(format!("user-infer: {prompt}"))
     }
 
-    fn embed(&self, _text: &str) -> Result<Vec<f32>, EngineError> {
-        unreachable!("tag/infer contention only")
-    }
-
     fn infer_tags(
         &self,
         _prompt: &str,
