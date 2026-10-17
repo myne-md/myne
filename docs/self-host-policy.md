@@ -2,8 +2,10 @@
 
 > **Status:** normative operator contract for the Phase 2 sync server (MYND-413). This document is the
 > operator-facing projection of `spec/server-protocol.md` §6 and `threat-model.md` TB5/§7. The
-> *mechanical* HOW (compose, env vars, snapshot commands) lives in the `operations` runbooks; this is the
-> WHAT-you-are-obligated-to. License: CC-BY-4.0 (like all of `docs/`), so independent server implementations'
+> *mechanical* HOW (compose, env vars, snapshot commands) lives in the user guide at
+> [myne.md/user-guide/sync-and-devices/run-your-own-sync-server](https://myne.md/user-guide/sync-and-devices/run-your-own-sync-server/);
+> this is the WHAT-you-are-obligated-to. That page is the how and this is the contract, and neither is a
+> copy of the other. License: CC-BY-4.0 (like all of `docs/`), so independent server implementations'
 > operators can rely on the same contract.
 
 ## 1. Self-host = the same trust boundary as hosted
@@ -81,7 +83,7 @@ they are violations:
 
 ## 4. Policy knobs you control
 
-Set via env vars in the bundle (see the `operations` bundle README for syntax). These bound **storage and
+Set via env vars in the bundle (the [user guide](https://myne.md/user-guide/sync-and-devices/run-your-own-sync-server/) lists every one with its syntax). These bound **storage and
 abuse, not confidentiality** — none of them can weaken the zero-knowledge protocol.
 
 - **Quota ceiling** (`MYNE_QUOTA_CEILING_BYTES`, per-account deduplicated ciphertext bytes). Default `0` =
@@ -165,7 +167,9 @@ Both of the unshipped two are deferred beta work rather than dropped commitments
 signing half of the compensating-controls set in `threat-model.md` §6 and they are expected before v1.
 Until they land, verify the reproducibility and do not assume the other two.
 
-The mechanical commands for the part that works are in the `operations` reproducible-build runbook.
+The mechanical command for the part that works is `myne-server`'s own `scripts/repro-gate.sh`, named
+above: it rebuilds the image and compares the digest on every push, so it is the gate rather than a
+procedure to follow by hand. It lives with the server, which is the repository you are deploying.
 
 ## 6. Certificate trust
 
@@ -289,8 +293,15 @@ Kubernetes path inherited it exactly as the Compose path did (`myne-server/KNOWN
 (`linux/amd64` + `linux/arm64`) manifest list is what both the Compose bundle and the charts pin; the
 **tagged** builds have not all been published that way, so a tag-pinned deployment on an arm64 node
 may need emulation or fail with `exec format error`. Verify any reference before you pin or run it:
-`operations/scripts/check-image-multiarch.sh ghcr.io/myne-md/myne-server:<tag>` prints the index digest
-and the architectures it carries, and fails by name when one is missing. A digest pin is also what
+
+```sh
+docker manifest inspect ghcr.io/myne-md/myne-server:<tag>
+```
+
+That prints the index digest and the architectures the reference carries, so you can see whether both
+`linux/amd64` and `linux/arm64` are there; a single-platform reference prints one entry rather than a
+list. `docker buildx imagetools inspect <ref>` gives the same answer in a friendlier shape, and neither
+needs credentials for a public image. A digest pin is also what
 §5's rebuild-and-compare check can be performed against.
 
 ## 9. If you run it for other people, some duties move from "ours" to yours
@@ -339,10 +350,11 @@ monitor what you transmit or store is expressly ruled out. What you must not do 
 no persistent IP logging, no retaining deleted ciphertext past the horizon you disclosed, no metadata
 correlation. Those are the promises your users are trusting you for.
 
-**Where the analysis behind this section lives.** `operations/research/alman-hukuku-sifreli-hizmet.md` is a
-sourced study of these questions for a German operator of a free, zero-knowledge service, written before
-the offering changed and still the best starting material; it explicitly is not legal advice either, and
-the two questions it leaves open are the ones to put to a lawyer. The summary is: four mechanisms and two
+**Where the analysis behind this section comes from.** A sourced study of these questions for a German
+operator of a free, zero-knowledge service, written before the offering changed and still the best
+starting material found here. It is internal rather than published, for the reason the rest of the ops
+repository is: it names hosts. It is not legal advice either, and the two questions it leaves open are the
+ones to put to a lawyer. The summary is: four mechanisms and two
 statements cover the practical load, and the whole list is a day's work for a deployment that has a
 contact address, a notice route, honest terms, and a decision recorded about which exemption it is
 claiming.
@@ -353,8 +365,9 @@ This section is the operator-facing copy of the inventory, and it is **new here 
 live on is gone**. Until 2026-10-17 `myne.md/law-enforcement/` (and its German twin) published this list to
 authorities and their counsel. It was deleted with the rest of the DSA roster, because it described a
 server Myne operated and Myne operates none (`decisions/sync/0696`); a request now arrives at *you*. The
-wording below is the same inventory stated to that reader, and it agrees with the processing record
-(`operations/legal/vvt.md` §5) and with the privacy policy's stored list, which are its two other copies.
+wording below is the same inventory stated to that reader, and it agrees with the privacy policy's stored
+list, which is its other copy. Myne's own processing record says the same for the deployment it used to
+operate, and that record is not yours to inherit.
 
 **What a deployment of this software holds.** A server that has been run for a while will have, per
 account:
