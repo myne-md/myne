@@ -27,7 +27,10 @@ pub struct PinnedDictFile {
 /// (en-US + 21 verified-loadable, AGPL-compatible wooorm dicts; TR/da/gl/uk/el/hr
 /// excluded — see `commands::BUNDLED_LANGUAGES`). `index.dic` + `index.aff` are
 /// the speller inputs; `license` is the in-tree provenance (font-license
-/// precedent) and is pinned too so a license swap is also caught.
+/// precedent) and is pinned too so a license swap is also caught. `ko` ships
+/// seven further licence texts beside them (its pair is a GPL-3.0 combined
+/// work over MPL-1.1/GPL-2.0/LGPL-2.1 and two CC licences); those are pinned
+/// here as well, because the claim this roster makes is about every shipped byte.
 pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
     PinnedDictFile {
         lang: "en-US",
@@ -212,6 +215,41 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
         lang: "ko",
         file: "license",
         sha256_hex: "3e81dd90f6d8877ccb2ed2b262ce72ee8a6ccf3a21179a8949abf0d85ac7fda0",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.GPL-3.0",
+        sha256_hex: "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.MPL-1.1",
+        sha256_hex: "c4be8e0ae5c90ef46c5c3365fdf336b4d622dfce3ad01ef5895aa372698716c5",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.GPL-2",
+        sha256_hex: "ab15fd526bd8dd18a9e77ebc139656bf4d33e97fc7238cd11bf60e2b9b8666c6",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.LGPL-2.1",
+        sha256_hex: "a9bdde5616ecdd1e980b44f360600ee8783b1f99b8cc83a2beb163a0a390e861",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-SA-2.0-KR",
+        sha256_hex: "58a3e17c039200e1d9edda01b3e4040a45e85eedbffefb868c37552bb7f5eec4",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-4.0",
+        sha256_hex: "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+    },
+    PinnedDictFile {
+        lang: "ko",
+        file: "LICENSE.CC-BY-SA-4.0",
+        sha256_hex: "9348ddfd44da5a127c59141981954746a860ec8e03e0412cf3af7134af0f97e2",
     },
     PinnedDictFile {
         lang: "lt",
