@@ -538,7 +538,6 @@ function healthyFiles(): Record<string, string> {
     "src/notes/ai/chatStore.ts": `export function clearChat(): void {}\n`,
     "src/notes/ai/chatPersist.ts": `export function clearChatPersistForLock(): void {}\n`,
     "mobile/src/lib/chatHistory.ts": `export function clearChatHistoryPersistForLock(): void {}\n`,
-    "src/notes/ai/aiOutputStore.ts": `export function clearAiOutput(): void {}\n`,
     "editor/src/decorations/spell.ts": `export function resetSessionIgnored(): void {}\n`,
     "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
     "src/components/sync/personIdentityState.ts": `export function resetPersonIdentityState(): void {}\n`,
@@ -576,7 +575,6 @@ export function resetMermaidZoom(): void {}\n`,
   clearAwareness();
   clearChat();
   clearChatPersistForLock();
-  clearAiOutput();
   await invoke("plugin:vault_unlock|vault_lock");
   resetScrollMemory();
   resetRecentNotes();
@@ -597,7 +595,6 @@ export function resetMermaidZoom(): void {}\n`,
   clearAwareness();
   clearChat();
   clearChatPersistForLock();
-  clearAiOutput();
   resetSessionIgnored();
   await lockVault();
   resetScrollMemory();
@@ -784,22 +781,6 @@ describe("check-frontend-lock-teardown: the cross product", () => {
       "could not extract lockVault's body in src/lib/vault-unlock.ts",
       "could not extract lockVault's body in src/lib/vault-unlock.ts",
     ]);
-  });
-
-  it("names the rendered AI output left on the old teardown", () => {
-    // `clearAiOutput` sits one line above `clearChat` in the Editor's unmount
-    // effect and was left there when the transcript moved onto the two leaving
-    // paths. It had no roster entry either, so this cross product reported ok
-    // about it by never naming it, while the store holds a note's summary and
-    // every Q and A answer over note content.
-    const files = healthyFiles();
-    for (const f of ["src/lib/vault-unlock.ts", "src/lib/vault-switch.ts"]) {
-      files[f] = files[f].replace("  clearAiOutput();\n", "");
-    }
-    const errors = run(files);
-    expect(errors).toHaveLength(2);
-    expect(errors[0]).toContain("lockVault does not call clearAiOutput()");
-    expect(errors[1]).toContain("leaveActiveVault does not call clearAiOutput()");
   });
 
   it("names the myne#533 defect: the chat transcript cleared on neither path", () => {
