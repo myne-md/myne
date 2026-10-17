@@ -221,7 +221,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ThemeInstallDialog": { file: "src/components/ThemeInstallDialog.tsx", line: 336 },
   "Toast": { file: "src/components/Toast.tsx", line: 34 },
   "Toaster": { file: "src/components/toast/Toaster.tsx", line: 43 },
-  "ToolbarCustomizeSettings": { file: "src/components/settings/ToolbarCustomizeSettings.tsx", line: 125 },
+  "ToolbarCustomizeSettings": { file: "src/components/settings/ToolbarCustomizeSettings.tsx", line: 123 },
   "Tooltip": { file: "src/components/primitives/Tooltip.tsx", line: 151 },
   "TorStatusBanner": { file: "src/components/sync/TorStatusBanner.tsx", line: 74 },
   "TranscriptionModal": { file: "src/components/attachments/TranscriptionModal.tsx", line: 67 },
