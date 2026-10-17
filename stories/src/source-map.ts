@@ -18,7 +18,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ActionStatus": { file: "src/components/ActionStatus.tsx", line: 153 },
   "AgentConversationView": { file: "src/notes/agent/AgentConversationView.tsx", line: 64 },
   "AgentFootprint": { file: "src/notes/agent/components/AgentFootprint.tsx", line: 132 },
-  "AgentHubList": { file: "src/notes/agent/AgentHubList.tsx", line: 343 },
+  "AgentHubList": { file: "src/notes/agent/AgentHubList.tsx", line: 337 },
   "AgentPane": { file: "src/notes/agent/AgentPane.tsx", line: 68 },
   "AgentProgress": { file: "src/notes/agent/components/AgentProgress.tsx", line: 89 },
   "AgentReview": { file: "src/screens/AgentReview.tsx", line: 123 },
