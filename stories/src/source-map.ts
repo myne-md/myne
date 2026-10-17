@@ -200,7 +200,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "SkipToContent": { file: "src/components/SkipToContent.tsx", line: 63 },
   "SnapshotFailedIndicator": { file: "src/notes/components/SnapshotFailedIndicator.tsx", line: 52 },
   "SnapshotsPanel": { file: "src/notes/components/SnapshotsPanel.tsx", line: 267 },
-  "SpellSettings": { file: "src/components/settings/SpellSettings.tsx", line: 74 },
+  "SpellSettings": { file: "src/components/settings/SpellSettings.tsx", line: 73 },
   "Spinner": { file: "src/components/Spinner.tsx", line: 30 },
   "StartupOpenSettings": { file: "src/components/settings/StartupOpenSettings.tsx", line: 36 },
   "StorageLost": { file: "src/screens/StorageLost.tsx", line: 96 },
