@@ -27,13 +27,15 @@ use tauri::{AppHandle, Manager, Runtime, State};
 /// (permissive — MIT/BSD/Apache-2.0; or GPL-3.0 / LGPL-2.1+ / LGPL-3.0 / MPL-2.0;
 /// or AGPL-3.0 native for he). Excluded: TR (`MalformedFlag(ZeroFlag)`), da + gl
 /// (spellbook parse failure), uk (over-accepts arbitrary tokens), el (Greek —
-/// loads, but the 19 MB dict is held back on bundle-size grounds), and the
+/// loads, but the 19 MB dict is held back on bundle-size grounds), hr (the
+/// OpenOffice Croatian dict is LGPL/SISSL 2003; SISSL is FSF- and OSI-approved
+/// but retired and GPL/AGPL-incompatible, so it was dropped 2026-10-17), and the
 /// GPL-2.0-only / CC-BY-SA / LPPL / EUPL dicts (AGPL-incompatible). The settings
 /// picker (MYND-267) renders exactly this set; each entry is hash-pinned in
 /// `dict_manifest::PINNED_DICT_FILES`.
 pub const BUNDLED_LANGUAGES: &[&str] = &[
-    "en-US", "bg", "ca", "de", "en-GB", "es", "fa", "fr", "he", "hr", "hu", "it", "ko", "lt", "lv",
-    "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv",
+    "en-US", "bg", "ca", "de", "en-GB", "es", "fa", "fr", "he", "hu", "it", "ko", "lt", "lv", "nl",
+    "pl", "pt", "ro", "ru", "sk", "sl", "sv",
 ];
 
 /// Closed, serde-serializable write-error for the personal-dictionary commands.
@@ -195,12 +197,12 @@ mod tests {
 
     #[test]
     fn bundled_languages_set_v1() {
-        // 23 languages: en-US + 22 that load in spellbook + are AGPL-compatible.
-        assert_eq!(BUNDLED_LANGUAGES.len(), 23);
+        // 22 languages: en-US + 21 that load in spellbook + are AGPL-compatible.
+        assert_eq!(BUNDLED_LANGUAGES.len(), 22);
         assert!(BUNDLED_LANGUAGES.contains(&"en-US"));
         assert!(BUNDLED_LANGUAGES.contains(&"de") && BUNDLED_LANGUAGES.contains(&"ru"));
         // Deferred / excluded never sneak in.
-        for excluded in ["tr", "da", "gl", "uk", "el"] {
+        for excluded in ["tr", "da", "gl", "uk", "el", "hr"] {
             assert!(
                 !BUNDLED_LANGUAGES.contains(&excluded),
                 "{excluded} must not be bundled"

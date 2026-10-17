@@ -52,13 +52,14 @@ describe("spell IPC wrappers", () => {
 });
 
 describe("bundled-language manifest + defaults (SYNC-6/12/15)", () => {
-  it("v1 bundles 23 languages incl. en-US/de/ru; TR/el excluded", () => {
-    expect(BUNDLED_SPELL_LANGUAGES).toHaveLength(23);
+  it("v1 bundles 22 languages incl. en-US/de/ru; TR/el/hr excluded", () => {
+    expect(BUNDLED_SPELL_LANGUAGES).toHaveLength(22);
     expect([...BUNDLED_SPELL_LANGUAGES]).toContain("en-US");
     expect([...BUNDLED_SPELL_LANGUAGES]).toContain("de");
     expect([...BUNDLED_SPELL_LANGUAGES]).toContain("ru");
     expect([...BUNDLED_SPELL_LANGUAGES]).not.toContain("tr"); // ZeroFlag, deferred
     expect([...BUNDLED_SPELL_LANGUAGES]).not.toContain("el"); // 19MB, held back
+    expect([...BUNDLED_SPELL_LANGUAGES]).not.toContain("hr"); // SISSL, AGPL-incompatible
     // No duplicates.
     expect(new Set(BUNDLED_SPELL_LANGUAGES).size).toBe(BUNDLED_SPELL_LANGUAGES.length);
   });

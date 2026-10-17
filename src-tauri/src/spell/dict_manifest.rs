@@ -23,8 +23,8 @@ pub struct PinnedDictFile {
     pub sha256_hex: &'static str,
 }
 
-/// Every shipped dictionary file, pinned to its SHA-256. v1: 23 languages
-/// (en-US + 22 verified-loadable, AGPL-compatible wooorm dicts; TR/da/gl/uk/el
+/// Every shipped dictionary file, pinned to its SHA-256. v1: 22 languages
+/// (en-US + 21 verified-loadable, AGPL-compatible wooorm dicts; TR/da/gl/uk/el/hr
 /// excluded — see `commands::BUNDLED_LANGUAGES`). `index.dic` + `index.aff` are
 /// the speller inputs; `license` is the in-tree provenance (font-license
 /// precedent) and is pinned too so a license swap is also caught.
@@ -182,21 +182,6 @@ pub const PINNED_DICT_FILES: &[PinnedDictFile] = &[
         lang: "he",
         file: "license",
         sha256_hex: "bb0a75c473e49224e0428b95c17ad90f1774a7f6cb97be921f9d6a93a3af80d7",
-    },
-    PinnedDictFile {
-        lang: "hr",
-        file: "index.aff",
-        sha256_hex: "230a7f0ca65159ecf8f3eea4afd79f7436415e83129b1d6b2424892074d8194d",
-    },
-    PinnedDictFile {
-        lang: "hr",
-        file: "index.dic",
-        sha256_hex: "fb436f3a758cd4faf9ef4cd5c2e6e2a1e3abe535ee183095a2f59fd18dad0731",
-    },
-    PinnedDictFile {
-        lang: "hr",
-        file: "license",
-        sha256_hex: "4edabc6989973eea67423ff9dedd133b33d032a09d821c70acaa43f49184e96c",
     },
     PinnedDictFile {
         lang: "hu",
