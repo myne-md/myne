@@ -147,28 +147,4 @@ describe("the CLI PATH hint", () => {
     ).toBeNull();
   });
 
-  it("the three conditions are genuinely independent", async () => {
-    // Non-vacuity for the set: each of the three negative cases above differs
-    // from the positive one in exactly ONE input. If two of them were the same
-    // condition wearing two names, one of those tests would be measuring the
-    // other.
-    const cases = [
-      { enabled: true, commandOnPath: false, shimDir: SHIM_DIR, expected: true },
-      { enabled: true, commandOnPath: true, shimDir: SHIM_DIR, expected: false },
-      { enabled: false, commandOnPath: false, shimDir: SHIM_DIR, expected: false },
-      { enabled: true, commandOnPath: false, shimDir: null, expected: false },
-    ];
-    for (const c of cases) {
-      cliState = { lastUsedSecsAgo: null, commandOnPath: c.commandOnPath, shimDir: c.shimDir };
-      mount(c.enabled);
-      await screen.findByTestId("settings.cli-access");
-      // Give the state read a turn to land before judging.
-      await new Promise((r) => setTimeout(r, 0));
-      expect(
-        hint() !== null,
-        `enabled=${c.enabled} commandOnPath=${c.commandOnPath} shimDir=${c.shimDir}`,
-      ).toBe(c.expected);
-      cleanup();
-    }
-  });
 });

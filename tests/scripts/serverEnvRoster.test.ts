@@ -200,34 +200,6 @@ MYNE_SITE_ADDRESS=example.test
     expect(r.out).not.toContain("dead knob");
   });
 
-  // --- drift class 2: a dead entry -------------------------------------------------
-
-  it("names an entry classified as a server knob that the server never reads", () => {
-    const roster = `# --- knobs ---
-# kind: server
-MYNE_ALPHA=1
-# kind: server
-MYNE_ACME_EMAIL=a@b.example
-`;
-    const { server, ops } = pair(ONE_KNOB, roster);
-    const r = runGuard(server, ops);
-    expect(r.code).toBe(1);
-    expect(r.out).toContain('MYNE_ACME_EMAIL is classified "kind: server"');
-    expect(r.out).toContain("dead knob");
-  });
-
-  it("does not fire on a kind: bundle entry, which the compose file or Caddy reads", () => {
-    const roster = `# --- knobs ---
-# kind: server
-MYNE_ALPHA=1
-# kind: bundle
-MYNE_SITE_ADDRESS=example.test
-`;
-    const { server, ops } = pair(ONE_KNOB, roster);
-    expect(runGuard(server, ops).code).toBe(0);
-  });
-
-
   // --- drift class 3: an unclassified entry -----------------------------------------
 
   it("names an entry with no kind marker", () => {

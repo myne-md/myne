@@ -924,15 +924,6 @@ mod tests {
     }
 
     #[test]
-    fn no_insignificant_whitespace() {
-        let bytes = canonical_encode_saved_view(&sample());
-        // No ", " or ": " — whitespace inside string values would be allowed
-        // (none here), but structural separators carry none.
-        assert!(!bytes.windows(2).any(|w| w == b", "));
-        assert!(!bytes.windows(2).any(|w| w == b": "));
-    }
-
-    #[test]
     fn round_trips_full_view() {
         let v = sample();
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();

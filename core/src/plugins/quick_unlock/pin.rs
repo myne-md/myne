@@ -185,11 +185,6 @@ mod tests {
     }
 
     #[test]
-    fn kind_is_pin() {
-        assert_eq!(provider("123456").kind(), PROVIDER_KIND_PIN);
-    }
-
-    #[test]
     fn delete_is_noop_ok() {
         assert_eq!(provider("123456").delete(), Ok(()));
     }

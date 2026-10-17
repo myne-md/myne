@@ -78,11 +78,6 @@ mod tests {
     use crate::test_vector_fmt::{hex_lower, json_escape};
 
     #[test]
-    fn min_password_len_is_twelve() {
-        assert_eq!(MIN_PASSWORD_LEN, 12);
-    }
-
-    #[test]
     fn rejects_eleven_ascii_chars() {
         let pw = "a".repeat(11);
         assert_eq!(

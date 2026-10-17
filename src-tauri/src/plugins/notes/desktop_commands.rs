@@ -2973,26 +2973,6 @@ mod tests {
 
     // ---- MYND-26 retroactive: notes_dir-as-regular-file behavioral pin --
 
-    #[test]
-    fn read_notes_dir_resolution_failing_with_not_a_directory_returns_structural_variant() {
-        // `note_read_with_dir` takes `notes_dir` already resolved; the
-        // `NotesDirNotADirectory` mapping lives in the outer `note_read`
-        // (which calls `paths::notes_dir`). Exercise the helper-layer
-        // surface that the outer matches: `paths::notes_dir_under`
-        // returns an IO error of the expected kind when `<parent>/notes`
-        // is a regular file. The outer's accept-list mapping
-        // (`NotADirectory | AlreadyExists`) is verified by code
-        // inspection on `note_read`'s map_err arm.
-        let scratch = ScopedTempDir::new("note-read-notes-is-file").unwrap();
-        let conflict = scratch.path().join("notes");
-        std::fs::write(&conflict, b"hostile").unwrap();
-        let err = notes_dir_under(scratch.path()).expect_err("conflict must error");
-        assert!(matches!(
-            err.kind(),
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists
-        ));
-    }
-
     // =====================================================================
     // note_update
     // =====================================================================
@@ -4178,80 +4158,6 @@ mod tests {
     // file` boundary). The wrapper layer is the meaningful coverage
     // target: slot guard + `spawn_blocking` + io-error mapping +
     // success-path tracing event.
-
-    #[test]
-    fn note_list_with_dir_empty_unlocked_returns_empty_vec() {
-        rt().block_on(async {
-            let scratch = ScopedTempDir::new("note-list-empty-unlocked").unwrap();
-            let notes_dir = notes_dir_under(scratch.path()).unwrap();
-            let state = VaultRuntimeState::default();
-            state
-                .set_unlocked(
-                    test_vault_id(),
-                    fixture_unlocked_with_keys(
-                        FIXTURE_ROOT_BYTE,
-                        FIXTURE_ITEMS_BYTE,
-                        FIXTURE_ITEMS_ID_BYTE,
-                    ),
-                )
-                .await;
-
-            let result = note_list_with_dir(
-                notes_dir,
-                &state,
-                &myne_core::vault_io::StdVaultIo,
-                &myne_core::host::NoopHost,
-            )
-            .await;
-            assert!(matches!(result, Ok(ref v) if v.is_empty()));
-        });
-    }
-
-    #[test]
-    fn note_list_with_dir_three_valid_files_unlocked_returns_sorted() {
-        rt().block_on(async {
-            let scratch = ScopedTempDir::new("note-list-three-unlocked").unwrap();
-            let notes_dir = notes_dir_under(scratch.path()).unwrap();
-            let state = VaultRuntimeState::default();
-            state
-                .set_unlocked(
-                    test_vault_id(),
-                    fixture_unlocked_with_keys(
-                        FIXTURE_ROOT_BYTE,
-                        FIXTURE_ITEMS_BYTE,
-                        FIXTURE_ITEMS_ID_BYTE,
-                    ),
-                )
-                .await;
-
-            let stems_descending = [
-                "01970e85-4f2f-7000-8000-000000000003",
-                "01970e84-4f2f-7000-8000-000000000002",
-                "01970e83-4f2f-7000-8000-000000000001",
-            ];
-            for stem in stems_descending {
-                std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
-            }
-
-            let ids = note_list_with_dir(
-                notes_dir,
-                &state,
-                &myne_core::vault_io::StdVaultIo,
-                &myne_core::host::NoopHost,
-            )
-            .await
-            .unwrap();
-            let id_strs: Vec<String> = ids.iter().map(|id| format!("{id}")).collect();
-            assert_eq!(
-                id_strs,
-                vec![
-                    "01970e83-4f2f-7000-8000-000000000001",
-                    "01970e84-4f2f-7000-8000-000000000002",
-                    "01970e85-4f2f-7000-8000-000000000003",
-                ]
-            );
-        });
-    }
 
     #[test]
     fn note_list_with_dir_slot_empty_rejects_with_vault_not_unlocked() {

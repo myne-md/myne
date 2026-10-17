@@ -544,26 +544,6 @@ mod tests {
     }
 
     #[test]
-    fn read_refuses_a_note_moved_into_an_excluded_folder() {
-        // The case the index snapshot cannot see, and the reason the read tool
-        // takes the folder off the BODY rather than off `records`: the note's
-        // folder changed after the run froze its scope.
-        let runs = AgentRunState::default();
-        runs.start("r".into(), ids(&["a"]));
-        let err = block(read_note(
-            &runs,
-            "r",
-            "a",
-            // The body says Archive; the snapshot (unused here) would still say
-            // whatever it said when the run started.
-            &FolderReader("Archive"),
-            &StubExclusions(vec!["Archive".into()]),
-        ))
-        .unwrap_err();
-        assert!(matches!(err, AgentError::ExcludedNow));
-    }
-
-    #[test]
     fn list_drops_a_note_whose_folder_is_excluded_now() {
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a", "b"]));

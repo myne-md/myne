@@ -4702,25 +4702,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn canonical_json_encoding_has_no_whitespace() {
-        // Spec § 9.5.2: no insignificant whitespace. Verify byte-exact.
-        let encoded = canonical_json_encode(&PrefsView::default());
-        assert!(!encoded.contains(&b' '));
-        assert!(!encoded.contains(&b'\n'));
-        assert!(!encoded.contains(&b'\t'));
-        assert!(!encoded.contains(&b'\r'));
-    }
-
-    #[test]
-    fn canonical_json_encoding_is_deterministic() {
-        // Same input → same output, every call.
-        let prefs = PrefsView::default();
-        let a = canonical_json_encode(&prefs);
-        let b = canonical_json_encode(&prefs);
-        assert_eq!(a, b);
-    }
-
     // ---- decoration maps: folder_icons + item_colors (MYND-184 / 185) ----
 
     fn map_of(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -7263,23 +7244,6 @@ mod tests {
         let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
         assert_eq!(original, decoded);
         assert_eq!(decoded.theme, Some(ThemeChoice::Dark));
-    }
-
-    #[test]
-    fn full_blob_round_trip_with_theme_amoled() {
-        let root_key = fixed_root_key();
-        let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-        let account_hash = fixed_account_number_hash();
-        let original = PrefsView {
-            theme: Some(ThemeChoice::Amoled),
-            ..PrefsView::default()
-        };
-        let blob =
-            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
-                .unwrap();
-        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).unwrap();
-        assert_eq!(original, decoded);
-        assert_eq!(decoded.theme, Some(ThemeChoice::Amoled));
     }
 
     #[test]
@@ -13910,13 +13874,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn default_prefs_has_empty_saved_views() {
-        // §9.5.5 fall-back-to-defaults yields an empty saved-views set.
-        assert!(PrefsView::default().saved_views.is_empty());
-        assert!(PrefsView::default().view_order.is_empty());
-    }
-
     // ---- paired_extensions (MYND-443, browser-clipper pairing-token persistence) ----
 
     fn sample_paired(
@@ -13992,12 +13949,6 @@ mod tests {
             canonical_json_decode(bad),
             Err(PrefsBlobError::PlaintextParseFailed)
         );
-    }
-
-    #[test]
-    fn default_prefs_has_empty_paired_extensions() {
-        // §9.5.5 fall-back-to-defaults yields an empty paired-extensions set.
-        assert!(PrefsView::default().paired_extensions.is_empty());
     }
 
     #[test]

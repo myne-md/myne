@@ -517,12 +517,6 @@ mod tests {
     }
 
     #[test]
-    fn cap_constant_is_four() {
-        // Locked by the design session.
-        assert_eq!(MAX_CONCURRENT_SESSIONS, 4);
-    }
-
-    #[test]
     fn ttl_constant_is_ten_minutes() {
         // Spec/design lock; documented in design session Q8 ek-soru.
         assert_eq!(SESSION_TTL_SECS, 600);

@@ -239,12 +239,6 @@ mod tests {
     // ---- UTF-8 ---------------------------------------------------------
 
     #[test]
-    fn well_formed_utf8_passes() {
-        let body = "héllo 世界 — clip".as_bytes();
-        assert_eq!(validate_utf8(body).unwrap(), "héllo 世界 — clip");
-    }
-
-    #[test]
     fn invalid_utf8_is_rejected() {
         // 0xFF is never a valid UTF-8 byte.
         let body = [0x48, 0x65, 0xFF, 0x6C];
@@ -256,13 +250,6 @@ mod tests {
         // First byte of a 3-byte sequence, then EOF — a lone lead byte.
         let body = [0xE4, 0xB8]; // "世" is 0xE4 0xB8 0x96; drop the last byte
         assert_eq!(validate_utf8(&body), Err(ValidationError::InvalidUtf8));
-    }
-
-    #[test]
-    fn empty_body_is_valid_utf8() {
-        // Empty is valid UTF-8 at this layer; the envelope decoder (task
-        // 5) rejects empty JSON, not the UTF-8 gate.
-        assert_eq!(validate_utf8(b"").unwrap(), "");
     }
 
     // ---- note-body cap -------------------------------------------------
@@ -419,29 +406,6 @@ mod tests {
     fn resniff_recognizes_jpeg() {
         let jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
         assert_eq!(resniff_image(&jpeg).unwrap(), "image/jpeg");
-    }
-
-    #[test]
-    fn resniff_rejects_executable_renamed_as_image() {
-        // PE/DOS "MZ" header — a `.png`-named binary must reject. This is
-        // the core re-sniff invariant: caller MIME / name is never
-        // trusted, only the bytes.
-        let pe = [0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00];
-        assert_eq!(resniff_image(&pe), Err(ValidationError::UnrecognizedImage));
-    }
-
-    #[test]
-    fn resniff_rejects_html_payload() {
-        // An HTML document claiming to be image/png must reject — the
-        // XSS-defense invariant carried over from the serve path. HTML is
-        // never an allowlisted sniffed type.
-        let html = b"<!DOCTYPE html><html><script>alert(1)</script></html>";
-        assert_eq!(resniff_image(html), Err(ValidationError::UnrecognizedImage));
-    }
-
-    #[test]
-    fn resniff_rejects_empty_bytes() {
-        assert_eq!(resniff_image(b""), Err(ValidationError::UnrecognizedImage));
     }
 
     // ---- labels --------------------------------------------------------

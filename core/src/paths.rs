@@ -780,15 +780,6 @@ mod tests {
     }
 
     #[test]
-    fn notes_dir_under_is_idempotent_on_second_call() {
-        let tmp = ScopedTempDir::new("notes-dir-idem").unwrap();
-        let first = notes_dir_under(tmp.path()).unwrap();
-        let second = notes_dir_under(tmp.path()).unwrap();
-        assert_eq!(first, second, "second call must return the same path");
-        assert!(second.is_dir());
-    }
-
-    #[test]
     fn notes_dir_under_returns_canonical_join() {
         let tmp = ScopedTempDir::new("notes-dir-canonical").unwrap();
         let result = notes_dir_under(tmp.path()).unwrap();

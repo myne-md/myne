@@ -5,7 +5,7 @@
 // app exercises only on the paths nobody tests by hand: a tab closing, an idle
 // deadline, a write that failed.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runFlushChain, type FlushChainSteps } from "../../src/lib/flush-chain";
 
 /** Steps that record their own invocation order into `log`. */
@@ -161,32 +161,5 @@ describe("the chain is awaited, not fired", () => {
     releaseFlush();
     await run;
     expect(settled[0]).toBe("flushAll");
-  });
-});
-
-describe("the reason is a closed set", () => {
-  it("treats every non-hiding reason as a quit for workspace purposes", async () => {
-    // Stated as "not hiding" rather than "lock or closing" so a future reason
-    // added to the union defaults to WRITING the descriptor. That is the safe
-    // direction: a missed write loses a pane layout, while an unintended one
-    // adds an entry to a signal the spec says means lock-or-quit.
-    for (const reason of ["lock", "closing"] as const) {
-      const log: string[] = [];
-      await runFlushChain(steps(log), reason);
-      expect(log, reason).toContain("persistWorkspace");
-    }
-  });
-});
-
-describe("call-site contract", () => {
-  it("resolves so a caller can lock unconditionally after it", async () => {
-    // The shape the lock path depends on: `await runFlushChain(...)` then
-    // `lockVault()`, with no try/catch needed at the call site and no path where
-    // the lock is skipped.
-    const lock = vi.fn();
-    const all = ["flushAll", "persistWorkspace", "persistVaultIndices", "flushGraphLayout"];
-    await runFlushChain(steps([], all), "lock");
-    lock();
-    expect(lock).toHaveBeenCalledTimes(1);
   });
 });

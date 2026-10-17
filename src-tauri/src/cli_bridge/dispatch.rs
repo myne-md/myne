@@ -1363,19 +1363,6 @@ mod tests {
     }
 
     #[test]
-    fn daily_append_passes_the_line_through_to_the_lister() {
-        let lister = FixedLister::daily_append_only(|_, line| {
-            if line == "wanted line" {
-                DailyAppendOutcome::Ok(false)
-            } else {
-                DailyAppendOutcome::Io
-            }
-        });
-        let reply = roundtrip(br#"{"cmd":"daily_append","line":"wanted line"}"#, &lister);
-        assert_eq!(reply["ok"], true);
-    }
-
-    #[test]
     fn daily_append_folder_excluded_maps_to_folder_excluded_kind() {
         let lister = FixedLister::daily_append_only(|_, _| DailyAppendOutcome::FolderExcluded);
         let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);

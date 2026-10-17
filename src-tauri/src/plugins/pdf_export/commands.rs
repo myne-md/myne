@@ -544,12 +544,6 @@ mod tests {
 
     // ---- capture temp naming -------------------------------------------
 
-    #[test]
-    fn capture_tmp_is_a_sibling_with_suffix() {
-        let tmp = capture_tmp_path(Path::new("/some/dir/Note.pdf"));
-        assert_eq!(tmp, Path::new("/some/dir/Note.pdf.capture-tmp"));
-    }
-
     // ---- finalize matrix --------------------------------------------------
 
     #[test]

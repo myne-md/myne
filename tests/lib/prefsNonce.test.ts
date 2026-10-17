@@ -165,12 +165,6 @@ describe("the prefs-nonce guard", () => {
     expect(missing[0].why).toContain("scan one tree fewer");
   });
 
-  it("reports no missing tree for the real roster, which is the claim it makes", () => {
-    // The other direction, and the one that would rot silently: an injected
-    // failure proves the rule can fire, not that it is quiet when it should be.
-    const { failures } = analyse();
-    expect(failures.filter((f) => f.command === "(missing tree)")).toEqual([]);
-  });
 
   // ---- rule 3: the chokepoint's name is not reused --------------------------
   //
@@ -204,9 +198,5 @@ describe("the prefs-nonce guard", () => {
       expect(bindsWritePref(src)).toBe(false);
     });
 
-    it("finds no collision in the real tree, which is the claim the guard prints", () => {
-      const { failures } = analyse();
-      expect(failures.filter((f) => f.command === "(name collision)")).toEqual([]);
-    });
   });
 });

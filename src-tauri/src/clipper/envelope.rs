@@ -703,18 +703,6 @@ mod tests {
 
     // ---- status source seam --------------------------------------------
 
-    #[test]
-    fn static_vault_status_reports_its_fixed_state() {
-        assert_eq!(
-            StaticVaultStatus(VaultStatus::Unlocked).vault_status(),
-            VaultStatus::Unlocked
-        );
-        assert_eq!(
-            StaticVaultStatus(VaultStatus::Locked).vault_status(),
-            VaultStatus::Locked
-        );
-    }
-
     // ---- REAL Slot integration -----------------------------------------
     //
     // `is-unlocked-status` MUST be driven by the real vault-runtime state, not

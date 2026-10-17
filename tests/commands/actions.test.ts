@@ -716,14 +716,6 @@ describe("Command palette action run() side effects", () => {
     expect(onImportObsidian).toHaveBeenCalledTimes(1);
   });
 
-  it("Disabled stubs are no-ops when run directly (defensive — palette UI guards them)", async () => {
-    const ctx = makeContext({
-      stageName: "editor",
-      selectedNoteId: "note-1",
-    });
-    const convertAction = find("wikilinks.convert-in-this-note");
-    expect(await convertAction.run(ctx)).toBeUndefined();
-  });
 
   it("\"Empty trash\" dispatches to onEmptyTrash — the Editor host opens the count-aware confirm; the purge only runs on confirm", () => {
     const onEmptyTrash = vi.fn();

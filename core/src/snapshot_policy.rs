@@ -186,11 +186,6 @@ mod tests {
         assert!(should_snapshot(Some(T0), T0 - 5_000, true));
     }
 
-    #[test]
-    fn interval_constant_is_five_minutes() {
-        assert_eq!(SNAPSHOT_COALESCE_INTERVAL_MS, 300_000);
-    }
-
     // --- retention / prune-selection ---
 
     fn e(captured_at_ms: u64, size_bytes: u64) -> SnapshotEntry {

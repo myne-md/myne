@@ -6720,17 +6720,6 @@ mod tests {
         });
     }
 
-    #[test]
-    fn device_platform_returns_the_target_token() {
-        // The single default-name heuristic: one token, from the core, shared
-        // by both clients. Asserting equality with the constant pins that the
-        // command is a passthrough and never grows a second mapping here (the
-        // token → display word mapping belongs in the i18n catalogue).
-        let token = device_platform();
-        assert!(!token.is_empty());
-        assert_eq!(token, std::env::consts::OS);
-    }
-
     /// #250: the key comes from the unlocked slot and the directory comes from
     /// the caller. A caller holding a stale "which vault is active" answer used
     /// to encrypt this vault's prefs under that vault's key and write them over

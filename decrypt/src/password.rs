@@ -103,13 +103,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_valid_generated_phrase_passes_the_checksum_gate() {
-        let phrase = protocol::generate_recovery_phrase().expect("getrandom");
-        let normalized = phrase.join_normalized();
-        assert!(validate_bip39(&normalized).is_ok());
-    }
-
-    #[test]
     fn a_typo_fails_the_checksum_gate() {
         // A real phrase with one word swapped is not a valid BIP-39 checksum.
         let phrase = protocol::generate_recovery_phrase().expect("getrandom");

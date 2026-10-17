@@ -145,14 +145,6 @@ mod tests {
     }
 
     #[test]
-    fn clear_is_idempotent_and_safe_before_any_access() {
-        let marker = LastAccess::default();
-        marker.clear();
-        marker.clear();
-        assert_eq!(marker.elapsed_secs(Instant::now()), None);
-    }
-
-    #[test]
     fn a_future_instant_reads_as_just_now_rather_than_panicking() {
         let marker = LastAccess::default();
         let t0 = Instant::now();

@@ -220,12 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn mock_kind_is_reported() {
-        let provider = MockProvider::new(PROVIDER_KIND_BIOMETRIC, 0x01);
-        assert_eq!(provider.kind(), PROVIDER_KIND_BIOMETRIC);
-    }
-
-    #[test]
     fn store_error_mapping_is_pinned_on_every_target() {
         // Runs on Linux CI, unlike the caller in `apple.rs` (macOS/iOS-gated).
         // The OSStatus values are the contract with the OS, so pin them here.

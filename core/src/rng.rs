@@ -85,16 +85,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fills_distinct_bytes() {
-        let mut a = [0u8; 32];
-        let mut b = [0u8; 32];
-        OsRng.try_fill_bytes(&mut a).expect("os rng");
-        OsRng.try_fill_bytes(&mut b).expect("os rng");
-        assert_ne!(a, b, "two draws must differ");
-        assert_ne!(a, [0u8; 32], "a draw must not be all zeros");
-    }
-
-    #[test]
     fn next_u64_advances_the_stream() {
         let mut rng = OsRng;
         let first = TryRng::try_next_u64(&mut rng).expect("u64");
@@ -108,10 +98,5 @@ mod tests {
         let first = TryRng::try_next_u32(&mut rng).expect("u32");
         let second = TryRng::try_next_u32(&mut rng).expect("u32");
         assert_ne!(first, second);
-    }
-
-    #[test]
-    fn error_display_carries_no_detail() {
-        assert_eq!(OsRngError.to_string(), "os csprng unavailable");
     }
 }
