@@ -34,10 +34,11 @@ export interface ImportedAttachment {
 }
 
 /** The `source` arg to {@link attachmentImport} — mirror of Rust `ImportSource`.
- *  Mobile always uses the `bytes` path (the file bytes are read in the WebView
- *  via a file `<input>`; the host re-sniffs the type, never trusts `filename`). */
+ *  Mobile always uses a bytes arm (the file bytes are read in the WebView via a
+ *  file `<input>`; the host re-sniffs the type, never trusts `filename`). */
 export type ImportSource =
   | { kind: "bytes"; bytes: number[]; filename: string | null }
+  | { kind: "bytes_b64"; bytes_b64: string; filename: string | null }
   | { kind: "path"; path: string };
 
 /** Outcome of {@link attachmentCleanUnused} — mirror of Rust `CleanResult`. */
@@ -60,10 +61,39 @@ export function attachmentImport(source: ImportSource): Promise<ImportedAttachme
   return invoke<ImportedAttachment>("plugin:attachments|attachment_import", { source });
 }
 
-/** Read a picked `File` into bytes and import it. */
+/** STANDARD base64 of `bytes`, built in blocks.
+ *
+ *  `String.fromCharCode(...bytes)` spreads one argument per byte and throws a
+ *  `RangeError` once the buffer is past roughly a hundred kilobytes, so the
+ *  buffer is walked in 8 KiB blocks. `btoa` is the WebView's own encoder, and
+ *  what it emits is exactly what the Rust `bytes_b64` arm decodes. */
+function toBase64(bytes: Uint8Array): string {
+  const BLOCK = 0x2000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += BLOCK) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + BLOCK) as unknown as number[],
+    );
+  }
+  return btoa(binary);
+}
+
+/** Read a picked `File` into bytes and import it.
+ *
+ *  Base64 rather than a JSON number array, and the reason is a memory one: see
+ *  the Rust `ImportSource::BytesB64` doc. At the 64 MiB cap the array form asks
+ *  the WebView for hundreds of megabytes of transient heap before a byte leaves
+ *  the page, which is how an import becomes a jetsam kill on iOS instead of an
+ *  error the user can read. Raw request bodies are not the answer here — Tauri
+ *  does not deliver them on Android at all. */
 export async function importFile(file: File): Promise<ImportedAttachment> {
   const buf = new Uint8Array(await file.arrayBuffer());
-  return attachmentImport({ kind: "bytes", bytes: Array.from(buf), filename: file.name || null });
+  return attachmentImport({
+    kind: "bytes_b64",
+    bytes_b64: toBase64(buf),
+    filename: file.name || null,
+  });
 }
 
 /** Delete one attachment (unlink blob + catalog entry). Idempotent. */
