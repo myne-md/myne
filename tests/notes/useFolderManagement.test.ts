@@ -453,6 +453,34 @@ describe("rename folder", () => {
       await result.current.commitRenameFolder(node, "Workspace");
     });
     expect(setItemColors).not.toHaveBeenCalled();
+    // And it is not silent: an invalid rename reported as a value used to close
+    // the input on the old name with nothing on screen.
+    expect(result.current.blockNotice).toMatch(/Couldn't rename the folder/);
+  });
+
+  // The refused-batch arm, which is the one that reaches a user in ordinary use:
+  // `renameFolder` returns `failed` (NOT `invalid`) when the transactional batch
+  // is refused — `LiveSessionOpen` for a note open in a pane is the live case —
+  // and the hook ignored that field entirely, so the input closed, the folder
+  // kept its old name, and nothing was said. The other half: the re-rooting below
+  // used to run on this arm too (gated on `!result.invalid`), re-pointing the
+  // folder's colour and icon at a path no note carries.
+  it("reports a refused batch instead of silently keeping the old name", async () => {
+    renameFolder.mockResolvedValue({
+      moved: [],
+      failed: [{ noteId: "n1", error: { kind: "LiveSessionOpen" } }],
+      deliberateRewritten: 0,
+      nextDeliberate: ["Work/"],
+    });
+    prefs.item_colors = { "work/": "rose" };
+    const { result, ctx } = mount([rec("n1", "Work/")]);
+    const node = findNode(result.current.treeRef.current.roots, "work/")!;
+    await act(async () => {
+      await result.current.commitRenameFolder(node, "Workspace");
+    });
+    expect(result.current.blockNotice).toMatch(/Couldn't rename the folder/);
+    expect(setItemColors).not.toHaveBeenCalled();
+    expect(ctx.refreshOne).not.toHaveBeenCalled();
   });
 });
 

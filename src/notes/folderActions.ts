@@ -15,6 +15,7 @@ import { patchFolderField, patchUpdatedField } from "../dialect";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { mutateDeliberateFolders, type SetMutation } from "../lib/prefs";
 import { isBatchCommitted } from "../types/note-batch-error";
+import { patchLiveNote } from "./liveNote";
 import {
   noteWriteBatchTransactional,
   type NoteBatchEntry,
@@ -508,7 +509,31 @@ export async function renameFolder(
 
   if (plan.batch.length > 0) {
     try {
-      await noteWriteBatchTransactional(plan.batch);
+      // ── The single-writer funnel, on the TS side ──────────────────────────
+      //
+      // `note_write_batch_transactional` REFUSES the whole batch with
+      // `NoteBatchError::LiveSessionOpen` when ANY item is owned by a live
+      // session (`SYNC-33`), checked over every item before any filesystem
+      // touch. A note OPEN in a pane is exactly that: `PaneView` opens the
+      // session when a note becomes a pane's active note. So the batch refused
+      // a folder rename whose subtree contains the note the user is looking at,
+      // which is the ordinary case — nothing was written, and the caller had no
+      // signal to show. `sidebarState.commitRename` has partitioned its own
+      // batch this way since the note-title rename hit the identical refusal;
+      // this path was left calling the batch directly and is the same fix.
+      //
+      // **The residual, stated rather than discovered.** The session half is
+      // per-note and the batch half is transactional, so a failure after some
+      // entries were routed means "did not complete" rather than "nothing
+      // landed" — the same residual `sidebarState` and `host_adapters.rs`
+      // record. It is strictly narrower than the defect: before this, a rename
+      // of a folder holding an open note could not land at all.
+      const remaining: NoteBatchEntry[] = [];
+      for (const entry of plan.batch) {
+        const routed = await patchLiveNote(entry.noteId, entry.plaintext);
+        if (!routed) remaining.push(entry);
+      }
+      if (remaining.length > 0) await noteWriteBatchTransactional(remaining);
     } catch (error) {
       // myne#300 — "the vault is unchanged" is true for every rejection EXCEPT
       // a post-commit one. Past the `.rename-journal` marker the batch is
