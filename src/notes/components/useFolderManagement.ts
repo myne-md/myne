@@ -555,39 +555,55 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         return;
       }
       setDeliberate(result.nextDeliberate);
+      // A rename that did not land must not fall through as a success. Two arms
+      // report it as a VALUE rather than throwing (`invalid` before any work,
+      // `failed` after a refused batch), and neither was read here, so the input
+      // closed on the old name with nothing said: the "I typed a name, pressed
+      // Enter, and nothing saved" report. The note-title twin reports every arm;
+      // this path reported only the thrown one.
+      //
+      // Bailing HERE, before the re-rooting below, is the other half: that block
+      // is the post-commit work of a rename that happened. Running it on a
+      // refused rename re-pointed the folder's colour, its icon and its
+      // `archived_folders` entry at a path no note carries, so a rename that
+      // failed also silently stripped the folder's colour and un-archived its
+      // subtree. Gated on the rename having LANDED rather than on `!invalid`,
+      // which is true for the refused arm too.
+      if (result.invalid === true || result.failed.length > 0) {
+        setBlockNotice(i18n.t("notes.folderManagement.renameFailed"));
+        return;
+      }
       // Re-root the folder's color + icon onto the new path (and any descendant
       // folder's, since the rename re-roots the whole subtree) so a rename
       // never silently strips a decoration (MYND-184/185 durability).
-      if (!result.invalid) {
-        applyDecorationRemap((m) => rewriteFolderPrefix(m, node.path, newPath));
-        // Re-root the archived_folders set too (folder-archive) — else renaming
-        // an ancestor of an archived folder would leave a stale entry and the
-        // subtree would silently un-archive. Folded-prefix, same subtree as the
-        // deliberate re-root inside `renameFolder`.
-        const reroot = rerootArchivedFolders(node.path, newPath, archivedFolders);
-        const oldKey = foldSegment(normalizeFolderPath(node.path) ?? "");
-        if (oldKey !== "") {
-          // #259: revert the optimistic state when the disk write fails —
-          // otherwise the UI shows the re-rooted set for the rest of the
-          // session while `vault.prefs` still holds paths under the OLD name,
-          // and at the next unlock the whole subtree silently un-archives.
-          // Same shape as `performFolderArchive` below, which had it already.
-          //
-          // The WRITE states the subtree as one prefix verb and lets the core
-          // resolve it against the stored set (myne#613 review round 2); only
-          // the optimistic state uses `reroot.next`. The `rewritten > 0` guard
-          // is gone with it, because it read the same local set: it can only
-          // under-report, and under-reporting here skips a re-root that was
-          // needed. `reroot` is still what the UI renders, which is the half a
-          // local set is allowed to decide.
-          const prevArchived = archivedFolders;
-          setArchivedFoldersState(reroot.next);
-          void mutateArchivedFolders({
-            renamePrefix: [{ from: oldKey, to: newPath }],
-          }).catch(() => {
-            setArchivedFoldersState(prevArchived);
-          });
-        }
+      applyDecorationRemap((m) => rewriteFolderPrefix(m, node.path, newPath));
+      // Re-root the archived_folders set too (folder-archive) — else renaming
+      // an ancestor of an archived folder would leave a stale entry and the
+      // subtree would silently un-archive. Folded-prefix, same subtree as the
+      // deliberate re-root inside `renameFolder`.
+      const reroot = rerootArchivedFolders(node.path, newPath, archivedFolders);
+      const oldKey = foldSegment(normalizeFolderPath(node.path) ?? "");
+      if (oldKey !== "") {
+        // #259: revert the optimistic state when the disk write fails —
+        // otherwise the UI shows the re-rooted set for the rest of the
+        // session while `vault.prefs` still holds paths under the OLD name,
+        // and at the next unlock the whole subtree silently un-archives.
+        // Same shape as `performFolderArchive` below, which had it already.
+        //
+        // The WRITE states the subtree as one prefix verb and lets the core
+        // resolve it against the stored set (myne#613 review round 2); only
+        // the optimistic state uses `reroot.next`. The `rewritten > 0` guard
+        // is gone with it, because it read the same local set: it can only
+        // under-report, and under-reporting here skips a re-root that was
+        // needed. `reroot` is still what the UI renders, which is the half a
+        // local set is allowed to decide.
+        const prevArchived = archivedFolders;
+        setArchivedFoldersState(reroot.next);
+        void mutateArchivedFolders({
+          renamePrefix: [{ from: oldKey, to: newPath }],
+        }).catch(() => {
+          setArchivedFoldersState(prevArchived);
+        });
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
       // Last, and deliberately AFTER the re-rooting above. The rename committed

@@ -13,6 +13,7 @@ const writeBatchMock = vi.fn();
 const reindexMock = vi.fn();
 const setDeliberateFoldersMock = vi.fn();
 const flushMock = vi.fn();
+const patchLiveMock = vi.fn();
 vi.mock("../../src/notes/renameFlushHook", () => ({
   renameFlushHooks: () => ({
     openNoteIds: () => new Set<string>(),
@@ -24,6 +25,12 @@ vi.mock("../../src/notes/readNote", () => ({
 }));
 vi.mock("../../src/notes/noteWriteBatch", () => ({
   noteWriteBatchTransactional: (...a: unknown[]) => writeBatchMock(...a),
+}));
+// Default: no note is owned by a live session, so every entry stays in the
+// batch. That keeps the batch assertions below meaningful — a mock that routed
+// everything by default would have made them pass over an empty batch.
+vi.mock("../../src/notes/liveNote", () => ({
+  patchLiveNote: (...a: unknown[]) => patchLiveMock(...a),
 }));
 vi.mock("../../src/notes/vaultIndices", () => ({
   reindexNoteFromBody: (...a: unknown[]) => reindexMock(...a),
@@ -54,6 +61,7 @@ beforeEach(() => {
   setDeliberateFoldersMock.mockReset();
   flushMock.mockReset();
   flushMock.mockResolvedValue(undefined);
+  patchLiveMock.mockReset();
 });
 afterEach(() => {
   noteReadMock.mockReset();
@@ -61,6 +69,7 @@ afterEach(() => {
   reindexMock.mockReset();
   setDeliberateFoldersMock.mockReset();
   flushMock.mockReset();
+  patchLiveMock.mockReset();
 });
 
 describe("planFolderRenameBatch — pure (MYND-370 transactional plan)", () => {
@@ -305,6 +314,51 @@ describe("renameFolder — async apply (transactional)", () => {
     expect(order[0]).toBe("flush");
     expect(order).toContain("read");
     expect(order.indexOf("flush")).toBeLessThan(order.indexOf("read"));
+  });
+
+  // ── The live-session funnel (SYNC-33) ────────────────────────────────────
+  //
+  // `note_write_batch_transactional` refuses the WHOLE batch with
+  // `LiveSessionOpen` when ANY item is owned by a live session, and a note open
+  // in a pane is exactly that (`PaneView` opens the session when a note becomes
+  // a pane's active note). So a folder rename whose subtree held the note the
+  // user was looking at was refused before any write, and the caller had no
+  // signal to show: the input closed on the old name and nothing was said.
+  // `sidebarState.commitRename` has partitioned its own batch this way since the
+  // note-title rename hit the identical refusal; this is the same fix one
+  // function over.
+  it("routes a live-session note through its session and batches only the rest", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    patchLiveMock.mockImplementation((id: string) => Promise.resolve(id === "live"));
+    const notes: Note[] = [
+      { noteUuid: "live", folder: "P/" },
+      { noteUuid: "closed", folder: "P/" },
+    ];
+
+    const result = await renameFolder("P/", "Q/", notes, ["P/"]);
+
+    expect(patchLiveMock).toHaveBeenCalledTimes(2);
+    // The batch must carry ONLY the notes no session owns: sending the live one
+    // would refuse the whole batch again and undo the funnel.
+    expect(writeBatchMock).toHaveBeenCalledTimes(1);
+    const batch = writeBatchMock.mock.calls[0]![0] as Array<{ noteId: string }>;
+    expect(batch.map((e) => e.noteId)).toEqual(["closed"]);
+    // Both notes moved as far as the caller is concerned: the session is the
+    // durable writer for the routed one, so its `folder:` went through it.
+    expect(result.failed).toEqual([]);
+    expect(result.moved.sort()).toEqual(["closed", "live"]);
+  });
+
+  it("sends no batch at all when every note in the subtree is live", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    patchLiveMock.mockResolvedValue(true);
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], []);
+
+    expect(patchLiveMock).toHaveBeenCalledTimes(1);
+    expect(writeBatchMock).not.toHaveBeenCalled();
+    expect(result.failed).toEqual([]);
+    expect(result.moved).toEqual(["n"]);
   });
 
   it("on a transactional failure reports all-as-failed and writes nothing else", async () => {
