@@ -17,9 +17,17 @@ const WEEK = 7 * DAY;
 
 /** Format a Date (or null fallback) as a sidebar/BottomBar suffix. */
 export function formatRelativeTime(when: Date | null, now: Date = new Date()): string {
-  if (when === null) return "";
+  // `null` and an unparseable Date are the same answer: there is nothing to say.
+  // The NaN arm arrived with the mobile twin's unification (Aşama 3, R1.5) —
+  // mobile had it and this file did not, so an `Invalid Date` rendered
+  // "NaN-NaN-NaN" here. Returning the empty string is what the `null` arm
+  // already meant.
+  if (when === null || Number.isNaN(when.getTime())) return "";
   const delta = now.getTime() - when.getTime();
-  if (delta < 0) return i18n.t("notes.relativeTime.justNow");
+  // A NEGATIVE delta is a future-dated note, which on a synced vault means clock
+  // skew rather than anything the user did. It reads "just now" on both clients:
+  // mobile used to fall through to the absolute date here, so the same note said
+  // "just now" on a computer and "2026-10-19" on a phone (R1.5).
   if (delta < MINUTE) return i18n.t("notes.relativeTime.justNow");
   if (delta < HOUR) {
     const m = Math.floor(delta / MINUTE);

@@ -903,46 +903,20 @@ pub enum OnDiskMigrationError {
     Crypto(MigrationError),
 }
 
-/// Run the notes + key-hierarchy leg of the §10.4.1 migration **on disk**, in the
-/// commit-safe order: scan and read every `MY01` note, run the crypto core, stage
-/// a `legacy/` snapshot of EVERY artifact (old `vault.meta`, note blobs, and each
-/// re-sealed singleton) BEFORE overwriting it, write every re-keyed artifact in
-/// place, then write the `NTV5` `vault.meta` **LAST** as the atomic commit point.
+/// Decode a 32-hex conversation filename to its 16 bytes.
 ///
-/// **What NTV5-last actually guarantees (§10.4.1).** It is a completion *marker*,
-/// not in-place crash safety: notes, prefs, themes, dictionary and attachments are
-/// all overwritten with their v0.2 forms BEFORE the meta commits, so a crash
-/// between the first overwrite and the `NTV5` write leaves a vault whose meta still
-/// reads `MYV1` while its blobs are v0.2 — NOT an openable v0.1 vault. No data is
-/// lost (every original is in `legacy/`), but recovery is a `legacy/`-restore, not
-/// a resume-where-it-crashed. The `NTV5` marker lets the next boot DETECT a
-/// completed vs. torn migration; wiring the `legacy/`-restore is follow-on work.
-///
-/// Scoped to notes + `vault.meta`. The attachment re-seal
-/// ([`protocol::reseal_attachment_v0_2`], stable id) and the KEK-singleton re-seal
-/// ([`protocol::reseal_kek_envelope_v0_2`]) are the composed remaining legs; the
-/// caller derives the new-vs-old KEKs (`derive_subkey`/`derive_subkey_v0_2`) and
-/// threads catalog `content_type`s. `old_items_key` comes from a completed v0.1
-/// unlock; crypto-erase of `legacy/` + the old `root_key` is a post-confirm step.
-/// Decode a 32-char lowercase-hex `<conversation-id-hex>` filename
-/// (`chats/<id>`, § 9.24) to its 16 bytes. The chats plugin's own helper is
-/// module-private; this duplicates the small shape rather than widening a
-/// plugin API for one migration caller.
+/// **Lenient** (`protocol::hex::decode_ci`), unlike the chats helper that decodes
+/// the same shape strictly, and the difference is the INPUT rather than the id: a
+/// filename is attacker-renameable on-disk state (A5), so the migration has to
+/// answer for whatever spelling is there rather than refuse a vault because a
+/// name came back uppercase. The ASCII gate `decode_ci` carries is load-bearing
+/// for the same reason the old one was: `s.len()` counts BYTES and the decoder
+/// indexes bytes, so a 32-byte name containing a multibyte character would put a
+/// slice boundary mid-character and panic, stranding a half-rewritten vault.
+/// `is_ascii_hex_ci` rejects every byte above `0x7f` before a slice is taken.
+/// Aşama 3, R1.2.
 fn hex_decode_16_conversation(s: &str) -> Option<[u8; 16]> {
-    // The ASCII gate is load-bearing, not a nicety: `s.len()` counts BYTES
-    // and the slices below index bytes, so a 32-BYTE name containing a
-    // multi-byte character would put a slice boundary mid-character and
-    // panic (`byte index N is not a char boundary`). A filename is
-    // attacker-renameable input (A5), and a panic inside the migration
-    // would strand the whole half-rewritten vault.
-    if s.len() != 32 || !s.is_ascii() {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_ci(s)
 }
 
 #[allow(clippy::too_many_arguments)]

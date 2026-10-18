@@ -15,9 +15,9 @@
 // only a running WebView can verify — flagged for dev-server QA. WKWebView
 // (macOS) renders `<foreignObject>`-in-SVG-to-canvas less reliably than
 // Chromium; if a platform taints the canvas, `toBlob` yields null and the
-// export surfaces a coarse "error" outcome rather than a broken file.
+// export surfaces a coarse "failed" outcome rather than a broken file.
 
-import { save } from "../platform/dialog";
+import { openSaveDialog, type SaveOutcome } from "./save-dialog";
 import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
 import { deliverFile } from "../platform/download";
@@ -34,7 +34,7 @@ export const SELECTION_CARD_PADDING = 32;
 const RASTER_SCALE = 2;
 
 /** The coarse, non-throwing outcome of an export attempt (drives a toast). */
-export type ImageExportOutcome = "ok" | "no-selection" | "cancelled" | "error";
+export type ImageExportOutcome = SaveOutcome | "no-selection";
 
 /** The measured, serialized selection. */
 export interface SerializedSelection {
@@ -197,7 +197,7 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
       selection.height + SELECTION_CARD_PADDING * 2,
     );
   } catch {
-    return "error";
+    return "failed";
   }
 
   // The download arm (phase3-web-client tasks 48 + 97). Nothing about the
@@ -217,35 +217,30 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
   if (!has("nativeSaveAs")) {
     try {
       await deliverFile("myne-selection.png", bytes, "image/png");
-      return "ok";
+      return "saved";
     } catch {
-      return "error";
+      return "failed";
     }
   }
 
-  let targetPath: string | null;
-  try {
-    targetPath = await save({
-      defaultPath: "myne-selection.png",
-      filters: [{ name: "PNG image", extensions: ["png"] }],
-    });
-  } catch {
-    return "error";
-  }
-  if (targetPath === null) return "cancelled"; // user dismissed the dialog
+  const target = await openSaveDialog("myne-selection.png", [
+    { name: "PNG image", extensions: ["png"] },
+  ]);
+  if (target.kind === "failed") return "failed";
+  if (target.kind === "cancelled") return "cancelled"; // user dismissed the dialog
 
   try {
     await invoke("plugin:notes|note_image_export", {
       // A plain number array deserializes into the Rust `Vec<u8>` arg. A shared
       // note-selection card is small (KBs), so the JSON-array transit is fine.
       imageBytes: Array.from(bytes),
-      targetPath,
+      targetPath: target.path,
       // The OS save dialog already collected the user's replace consent when
       // they chose an existing filename, so honor it (SYNC-2).
       overwrite: true,
     });
-    return "ok";
+    return "saved";
   } catch {
-    return "error";
+    return "failed";
   }
 }

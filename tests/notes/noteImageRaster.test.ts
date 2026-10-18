@@ -219,7 +219,7 @@ describe("a tainted canvas is reported, not written", () => {
 
     const outcome = await exportSelectionAsImage();
 
-    expect(outcome).toBe("error");
+    expect(outcome).toBe("failed");
     // The load-bearing half: no zero-byte file. The write is a separate IPC
     // AFTER the raster, so a failure that still reached it would leave a file
     // the user then opens and finds empty.
@@ -237,7 +237,7 @@ describe("a tainted canvas is reported, not written", () => {
     selectRealRange();
     stubCanvas(null);
 
-    expect(await exportSelectionAsImage()).toBe("error");
+    expect(await exportSelectionAsImage()).toBe("failed");
     expect(deliverFileMock).not.toHaveBeenCalled();
   });
 
@@ -248,7 +248,7 @@ describe("a tainted canvas is reported, not written", () => {
     selectRealRange();
     stubImageDecode(false);
     stubCanvas(new Blob([new Uint8Array([1])]));
-    expect(await exportSelectionAsImage()).toBe("error");
+    expect(await exportSelectionAsImage()).toBe("failed");
     expect(invokeMock).not.toHaveBeenCalled();
   });
 });
@@ -260,7 +260,7 @@ describe("the happy path still reaches the writer, so the negatives are not vacu
     saveMock.mockResolvedValue("/tmp/card.png");
     invokeMock.mockResolvedValue(undefined);
 
-    expect(await exportSelectionAsImage()).toBe("ok");
+    expect(await exportSelectionAsImage()).toBe("saved");
     expect(invokeMock).toHaveBeenCalledTimes(1);
     const [cmd, args] = invokeMock.mock.calls[0] as [string, Record<string, unknown>];
     expect(cmd).toBe("plugin:notes|note_image_export");
@@ -286,7 +286,7 @@ describe("the happy path still reaches the writer, so the negatives are not vacu
     selectRealRange(); // rect is 184x84; see selectRealRange
     const probe = stubCanvas(new Blob([new Uint8Array([1])]));
     saveMock.mockResolvedValue("/tmp/card.png");
-    expect(await exportSelectionAsImage()).toBe("ok");
+    expect(await exportSelectionAsImage()).toBe("saved");
 
     const cardSide = (content: number): number => content + SELECTION_CARD_PADDING * 2;
     const svgBlob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0] as Blob;
@@ -388,7 +388,7 @@ describe("every outcome the export can return has a toast key", () => {
     );
     const fn = src.slice(src.indexOf("export function exportSelectionImageWithToast"));
     const body = fn.slice(0, fn.indexOf("\n}"));
-    for (const outcome of ["ok", "no-selection", "error"]) {
+    for (const outcome of ["saved", "no-selection", "failed"]) {
       expect(
         body.includes(`"${outcome}"`),
         `exportSelectionImageWithToast does not mention the ${outcome} outcome`,

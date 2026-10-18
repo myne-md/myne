@@ -60,6 +60,58 @@ pub fn is_ascii_hex_ci(s: &str) -> bool {
     s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Decode exactly `N` bytes of hex, **strictly** (lowercase only).
+///
+/// # Why the decoders are here and not beside their callers
+///
+/// The two predicates above were unified and the DECODERS were not, so four
+/// hand-written `fn hex_decode_16`-shaped helpers grew across `core/` and two of
+/// them disagreed about the case of the same 32-character id space. Measured
+/// (Aşama 3, R1.2): `sync::devices::hex16` accepted `A`–`F` while
+/// `sync::orchestrator::from_hex16` rejected it, so one id was recognised on one
+/// path and read as absent on the other. Nothing panicked and nothing errored:
+/// the caller got `None`, which reads as "no such thing" rather than as "your
+/// spelling is wrong".
+///
+/// The pair is named, so a call site that picks one says so. `_lower` is the
+/// strict spelling and is what own-writer data wants — an id this client minted
+/// travels lowercase, and a second accepted spelling is a second identity for one
+/// blob. `_ci` is for a value that arrived from elsewhere and whose case is not
+/// this client's to fix.
+pub fn decode_lower<const N: usize>(s: &str) -> Option<[u8; N]> {
+    if s.len() != N * 2 || !is_lower_hex(s) {
+        return None;
+    }
+    decode_pairs(s)
+}
+
+/// Decode exactly `N` bytes of hex, **leniently** (`A`–`F` accepted).
+///
+/// The lenient half of [`decode_lower`], and its name says which policy a caller
+/// chose. See that function for why both exist.
+pub fn decode_ci<const N: usize>(s: &str) -> Option<[u8; N]> {
+    if s.len() != N * 2 || !is_ascii_hex_ci(s) {
+        return None;
+    }
+    decode_pairs(s)
+}
+
+/// The shared body, reached only after a predicate and a byte-length gate have
+/// passed.
+///
+/// **The length gate is also the panic guard, and it is why this is not folded
+/// into the two callers:** a name whose bytes are hex but whose UTF-8 is not
+/// ASCII (a multibyte character cannot be, so this is defensive) would land an
+/// index mid-character. `is_lower_hex`/`is_ascii_hex_ci` reject any byte above
+/// `0x7f` before a slice is taken.
+fn decode_pairs<const N: usize>(s: &str) -> Option<[u8; N]> {
+    let mut out = [0u8; N];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +148,50 @@ mod tests {
         assert!(is_ascii_hex_ci("0123456789abcdefABCDEF"));
         assert!(!is_ascii_hex_ci("0g"));
         assert!(!is_ascii_hex_ci("0x00"));
+    }
+}
+
+#[cfg(test)]
+mod decode_tests {
+    use super::*;
+    use alloc::format;
+
+    /// The two policies, side by side, on the same input. This is the assertion
+    /// Aşama 3's R1.2 exists for: an id one decoder accepts and the other refuses
+    /// is a silent `None` on one path, not an error.
+    #[test]
+    fn the_two_decoders_disagree_about_case_on_purpose() {
+        let upper = "AABBCCDDEEFF00112233445566778899";
+        let lower = "aabbccddeeff00112233445566778899";
+        let expected: [u8; 16] = [
+            0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99,
+        ];
+        assert_eq!(decode_ci::<16>(upper), Some(expected));
+        assert_eq!(decode_ci::<16>(lower), Some(expected));
+        assert_eq!(decode_lower::<16>(lower), Some(expected));
+        assert_eq!(
+            decode_lower::<16>(upper),
+            None,
+            "the strict spelling is the point of having two"
+        );
+    }
+
+    #[test]
+    fn a_wrong_length_is_none_for_both() {
+        assert_eq!(decode_lower::<16>("aabb"), None);
+        assert_eq!(decode_ci::<16>("aabb"), None);
+        // Empty passes both PREDICATES (vacuously) and fails both length gates.
+        assert_eq!(decode_lower::<16>(""), None);
+        assert_eq!(decode_ci::<16>(""), None);
+    }
+
+    #[test]
+    fn a_non_hex_byte_is_none_and_never_panics() {
+        // The panic guard: a multibyte name must fail the predicate before any
+        // slice is taken. `é` is two bytes, both above 0x7f.
+        let multibyte = format!("{}é", "a".repeat(30));
+        assert_eq!(decode_lower::<16>(&multibyte), None);
+        assert_eq!(decode_ci::<16>(&multibyte), None);
     }
 }

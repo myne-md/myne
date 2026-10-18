@@ -263,6 +263,52 @@ describe("web first-run bootstrap", () => {
     expect(onBootstrapped).not.toHaveBeenCalled();
   });
 
+  it("a FAILED start-over keeps the pending wait up and says the device is still enrolled", async () => {
+    // The defect this covers, and it is the same one the SAS arm further down
+    // records: this door used to `.catch(() => {})` and then reset the screen in
+    // `finally`, so a REFUSED un-enrol cleared the wait and said nothing. The
+    // enrolment stays in place on a refusal, the enrol-gate treats `pending` as
+    // already-enrolled and hides the form, so the next reload lands the user back
+    // on this screen having been told they had left it. Its own comment claimed
+    // it was "the same handler as the SAS-mismatch escape above, deliberately";
+    // it was a second copy, and the copy was the one that swallowed the error.
+    const onBootstrapped = vi.fn();
+    const resetLocal = vi.fn(async () => {
+      throw { kind: "Io" };
+    });
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "cc".repeat(16),
+          vault_id: "00000000-0000-7000-8000-ebebebebebeb",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return [];
+      if (cmd === "plugin:sync|sync_reset_local") return resetLocal();
+      if (cmd === "plugin:sync|sync_now") return null;
+      if (cmd === "plugin:sync|sync_head_fingerprint") return null;
+      throw new Error(`unexpected ${cmd}`);
+    });
+    render(<AccountBootstrap onBootstrapped={onBootstrapped} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.pending-notice");
+
+    fireEvent.click(screen.getByTestId("account-bootstrap.pending-reset"));
+
+    await waitFor(() => expect(resetLocal).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("account-bootstrap.error")).toBeTruthy());
+    expect(
+      screen.getByTestId("account-bootstrap.pending-notice"),
+      "the wait must stay up — clearing it would claim the un-enrol worked",
+    ).toBeTruthy();
+    expect(onBootstrapped).not.toHaveBeenCalled();
+  });
+
   it("a pending join explains the wait, names who can approve, and offers no manual continue", async () => {
     const onBootstrapped = vi.fn();
     invokeMock.mockImplementation(async (cmd) => {

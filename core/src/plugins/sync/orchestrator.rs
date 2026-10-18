@@ -257,24 +257,15 @@ async fn server_meta_of_newer_generation(
 
 /// Parse a 32-hex blob-id key from `state.blobs` back to its 16 bytes. `None`
 /// for anything malformed (defensive — the state file is device-local JSON).
-/// Lowercase-only, like its `is_32_hex` / `is_lower_hex` twins: conversation
-/// ids are minted lowercase, and every caller passes own-writer data (catalog
-/// keys, scan names). (The byte-length gate before the slices is also the
-/// panic guard: a multibyte name fails the hex check before any index lands
-/// mid-character.)
+///
+/// **Strict**, through `protocol::hex::decode_lower`: conversation ids are minted
+/// lowercase and every caller passes own-writer data (catalog keys, scan names),
+/// so an uppercase spelling is a second identity for one blob rather than a
+/// variant to accept. Aşama 3's R1.2 made the choice explicit — this helper and
+/// `sync::devices::hex16` disagreed about case on the same 32-hex shape, and the
+/// loser was a silent `None`.
 fn from_hex16(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 /// The `<vault>/notes/<uuid>.myn` path for a 16-byte blob id.

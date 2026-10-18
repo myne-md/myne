@@ -325,6 +325,14 @@ const V = {
   // screen is substituted, and `check-web-no-phrase.mjs` asserts its grid's
   // absence") is itself retired: entry 0704 ships the enrolment grid too, deletes
   // that guard, and leaves no phrase path absent from served code.
+  "src/lib/save-dialog.ts": [
+    "ported",
+    "Opens a native save dialog through the seam and classifies the result. Both halves exist on web: `platform/dialog`'s `save` is the browser download arm and `deliverFile` is what the two savers call, so a web caller gets the same three-way answer (`path` / `cancelled` / `failed`) rather than a fourth spelling of it.",
+  ],
+  "src/lib/reset-local.ts": [
+    "ported",
+    "One call to `plugin:sync|sync_reset_local`, which the web router dispatches (`web/wasm/src/dispatch.rs`). It exists so the three surfaces that un-enrol a device agree that a REFUSAL is reported rather than swallowed; on web it is the only exit from the pending wait, so a silent refusal stranded a browser with no route back.",
+  ],
   "src/lib/bip39-normalize.ts": [
     "ported",
     "Pure NFKD/whitespace normalisation, and it now has a real import edge from served code: `EnrollDeviceForm` and the recovery entry screen both feed it, since phrase entry ships on web (`decisions.md` 2026-08-15, entry 0514). No host call anywhere in it.",

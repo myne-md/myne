@@ -1,5 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { strengthLevel } from "../../lib/password-strength";
+import { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Screen,
@@ -41,7 +43,6 @@ import type { RecoverFlowProps } from "./types";
  */
 
 const WORD_COUNT = 24;
-const MIN_PASSWORD_LEN = 12;
 
 // Shared editable-input reset (the visible border lives on the wrapper).
 const inputReset: CSSProperties = {
@@ -57,16 +58,6 @@ const inputReset: CSSProperties = {
  *  runs, drops empties, caps at 24 (paste-to-grid helper). */
 function splitWords(text: string): string[] {
   return text.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, WORD_COUNT);
-}
-
-/** Length-bucket strength label for the meter (presentational only —
- *  the backend `MIN_PASSWORD_LEN` floor is the real gate). */
-function strengthLevel(pw: string): "Weak" | "Fair" | "Good" | "Strong" {
-  const n = [...pw].length;
-  if (n >= 20) return "Strong";
-  if (n >= 16) return "Good";
-  if (n >= MIN_PASSWORD_LEN) return "Fair";
-  return "Weak";
 }
 
 // Small uppercase field label (12px / 600 / 0.06em) — mirrors the static.
@@ -465,7 +456,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
 
   async function onPasswordContinue() {
     const pw = state.newPassword;
-    if ([...pw].length < MIN_PASSWORD_LEN) {
+    if (passwordLength(pw) < MIN_PASSWORD_LEN) {
       dispatch({ type: "pw.error", message: t("recover.weakPassword", { min: MIN_PASSWORD_LEN }) });
       return;
     }

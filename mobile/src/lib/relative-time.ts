@@ -26,8 +26,16 @@ function isoDate(d: Date): string {
 }
 
 export function formatRelativeTime(date: Date, now: Date = new Date()): string {
+  // `null` is not this signature's business, but an unparseable Date is the same
+  // answer desktop gives it: nothing to say (Aşama 3, R1.5 — the two clients
+  // agreed on the buckets and disagreed here, where mobile returned
+  // "NaN-NaN-NaN").
+  if (Number.isNaN(date.getTime())) return "";
   const diff = now.getTime() - date.getTime();
-  if (diff < 0 || Number.isNaN(diff)) return isoDate(date);
+  // A NEGATIVE delta is a future-dated note, i.e. clock skew on a synced vault,
+  // and it reads "just now" on BOTH clients. This file used to fall through to
+  // the absolute date, so the same note said "just now" on a computer and an ISO
+  // date on a phone (R1.5). The buckets below are the desktop file's, unchanged.
   if (diff < MIN) return i18n.t("notes.relativeTime.justNow");
   if (diff < HOUR) return i18n.t("notes.relativeTime.minutesAgo", { m: Math.floor(diff / MIN) });
   if (diff < DAY) return i18n.t("notes.relativeTime.hoursAgo", { h: Math.floor(diff / HOUR) });

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
 import {
   Screen,
   ScreenScroll,
@@ -86,7 +87,6 @@ const PHRASE_WORDS = 24;
  *  rather than UTF-16 units, the difference a passphrase with an emoji in it
  *  would otherwise hit. `RecoverFlow` and `MemberUnlockBlock` carry the same
  *  local mirror. */
-const MIN_PASSWORD_LEN = 12;
 
 /**
  * Map a failed `sync_set_endpoint` invoke to user copy. The gated-server
@@ -736,7 +736,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
   const acceptReady =
     acceptOwnerReady &&
     acceptPhraseReady &&
-    [...password].length >= MIN_PASSWORD_LEN &&
+    passwordLength(password) >= MIN_PASSWORD_LEN &&
     password === confirmPassword;
 
   /** The join's gate: the same phrase completeness and the same device-password
@@ -745,7 +745,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
   const joinPhraseReady = joinWords.every((word) => word.length > 0);
   const joinReady =
     joinPhraseReady &&
-    [...joinPassword].length >= MIN_PASSWORD_LEN &&
+    passwordLength(joinPassword) >= MIN_PASSWORD_LEN &&
     joinPassword === joinConfirmPassword;
 
   /** The recover step's gate, and it is the phrase alone: there is no second

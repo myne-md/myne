@@ -448,20 +448,12 @@ fn hex_encode_16(bytes: &[u8; 16]) -> String {
     s
 }
 
+/// Parse a 32-hex memory id. **Strict** (`protocol::hex::decode_lower`): memory
+/// ids are minted lowercase, so an uppercase id decodes nowhere — the same policy
+/// as the chats and sync helpers, and now the same implementation (Aşama 3,
+/// R1.2).
 fn hex_decode_16(s: &str) -> Option<[u8; 16]> {
-    // Lowercase-only, matching `from_hex16` (sync orchestrator) and the chats
-    // helper: memory ids are minted lowercase, so an uppercase id decodes
-    // nowhere.
-    if s.len() != 32 || s.chars().any(|c| c.is_ascii_uppercase()) {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (slot, byte) in out.iter_mut().zip(s.as_bytes().chunks(2)) {
-        let hi = (byte[0] as char).to_digit(16)?;
-        let lo = byte.get(1).and_then(|c| (*c as char).to_digit(16))?;
-        *slot = ((hi << 4) | lo) as u8;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 fn hex_decode_24(s: &str) -> Option<[u8; 24]> {

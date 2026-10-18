@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
 import {
   clearMemberUnlock,
   memberUnlockStatus,
@@ -25,7 +26,6 @@ import { Button } from "./Button";
 
 /** Mirror of the Rust `pin::MIN_PIN_LEN` / `MIN_PASSWORD_LEN`. */
 const MIN_PIN_LEN = 6;
-const MIN_PASSWORD_LEN = 12;
 
 const CARD = {
   border: "1px solid var(--line-1)",
@@ -88,7 +88,7 @@ export function MemberUnlockBlock() {
 
   if (!isMember) return null;
 
-  const passwordValid = [...password].length >= MIN_PASSWORD_LEN;
+  const passwordValid = passwordLength(password) >= MIN_PASSWORD_LEN;
   const pinValid = /^\d+$/.test(pin) && pin.length >= MIN_PIN_LEN;
 
   async function run(action: () => Promise<void>): Promise<void> {

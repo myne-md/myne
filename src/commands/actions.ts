@@ -991,11 +991,11 @@ const exportSelectionImageAction: CommandAction = {
 export function exportSelectionImageWithToast(): void {
   void exportSelectionAsImage().then((outcome) => {
     const key =
-      outcome === "ok"
+      outcome === "saved"
         ? "commands.actions.exportSelectionImage.saved"
         : outcome === "no-selection"
           ? "commands.actions.exportSelectionImage.noSelection"
-          : outcome === "error"
+          : outcome === "failed"
             ? "commands.actions.exportSelectionImage.failed"
             : null;
     if (key !== null) showAttachmentToast(i18n.t(key));

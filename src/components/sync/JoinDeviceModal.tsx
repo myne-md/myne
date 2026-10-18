@@ -50,6 +50,7 @@ import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare
 import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
+import { resetLocalOrReport } from "../../lib/reset-local";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
@@ -417,15 +418,21 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
   // failed, they were left enrolled against that endpoint, with a UI that had
   // just told them they backed out. Silence is indistinguishable from success
   // exactly where it must not be (test-audit #10/#65).
+  //
+  // The call is `lib/reset-local.ts`'s, which is the ONE implementation of it:
+  // `AccountBootstrap` has two more doors onto the same command and they used to
+  // disagree about what a refusal means.
   const onMismatch = () => {
     setAborting(true);
     setError(null);
-    void invoke("plugin:sync|sync_reset_local")
-      .then(() => onCancel())
-      .catch(() => {
-        setAborting(false);
-        setError(t("sync.join.sasAbortFailed"));
-      });
+    void resetLocalOrReport().then((reset) => {
+      if (reset) {
+        onCancel();
+        return;
+      }
+      setAborting(false);
+      setError(t("sync.join.sasAbortFailed"));
+    });
   };
 
   // The beta-terms gate (operations#15). This is the welcome-screen door onto

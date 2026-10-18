@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { strengthLevel } from "../../lib/password-strength";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Screen,
@@ -70,15 +71,6 @@ type Step =
   | "committing"
   | "ready"
   | "unlocking";
-
-type StrengthLevel = "Weak" | "Fair" | "Good" | "Strong";
-
-function strengthLevel(pw: string): StrengthLevel {
-  if (pw.length >= 12) return "Strong";
-  if (pw.length >= 10) return "Good";
-  if (pw.length >= 8) return "Fair";
-  return "Weak";
-}
 
 /** Read the `.kind` discriminant off a rejected invoke into a copy KEY (resolved
  *  with `t()` at the render site — never at module top level). */

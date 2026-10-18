@@ -12,7 +12,7 @@ export interface SourceReference {
 
 export const SOURCE_MAP: Record<string, SourceReference> = {
   "AboutPanel": { file: "src/components/settings/AboutPanel.tsx", line: 222 },
-  "AccountBootstrap": { file: "src/screens/AccountBootstrap.tsx", line: 156 },
+  "AccountBootstrap": { file: "src/screens/AccountBootstrap.tsx", line: 157 },
   "AccountNumberEntry": { file: "src/screens/AccountNumberEntry.tsx", line: 111 },
   "AccountPanel": { file: "src/components/settings/AccountPanel.tsx", line: 112 },
   "ActionStatus": { file: "src/components/ActionStatus.tsx", line: 153 },
@@ -112,7 +112,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "Input": { file: "src/components/primitives/Input.tsx", line: 26 },
   "IntegrityAlertBanner": { file: "src/components/sync/IntegrityAlertBanner.tsx", line: 47 },
   "InviteWizard": { file: "src/components/sync/InviteWizard.tsx", line: 1 },
-  "JoinDeviceModal": { file: "src/components/sync/JoinDeviceModal.tsx", line: 219 },
+  "JoinDeviceModal": { file: "src/components/sync/JoinDeviceModal.tsx", line: 220 },
   "Keycaps": { file: "src/components/primitives/Keycaps.tsx", line: 47 },
   "KitStep": { file: "src/screens/vault-creation/KitStep.tsx", line: 109 },
   "LanguageSelect": { file: "src/components/settings/LanguageSelect.tsx", line: 31 },
@@ -147,7 +147,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "PaneView": { file: "src/notes/components/PaneView.tsx", line: 320 },
   "PasswordChangeForm": { file: "src/components/PasswordChangeForm.tsx", line: 62 },
   "PasswordCreateForm": { file: "src/components/PasswordCreateForm.tsx", line: 112 },
-  "PasswordInput": { file: "src/components/PasswordInput.tsx", line: 129 },
+  "PasswordInput": { file: "src/components/PasswordInput.tsx", line: 119 },
   "PasswordResetStep": { file: "src/screens/vault-recover/PasswordResetStep.tsx", line: 189 },
   "PasswordStep": { file: "src/screens/vault-creation/PasswordStep.tsx", line: 44 },
   "PasswordStrength": { file: "src/components/PasswordStrength.tsx", line: 43 },
