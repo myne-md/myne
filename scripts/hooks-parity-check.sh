@@ -3,8 +3,11 @@
 # pre-commit set (lefthook.yml) and are therefore bypassable with --no-verify /
 # LEFTHOOK=0 / a clone that never ran `lefthook install`. AGENTS.md's model is
 # "hooks are the local net, CI is the remote gate" — but these had no remote
-# gate at all. This script provides it. Git-only (no cargo/node), so it stays
-# cheap and runs in any image with git + file installed.
+# gate at all. This script provides it. It needs THREE tools, and the list is
+# not incidental: `git` (candidate set), `file` (the binary sniff that skips
+# vendored blobs in the EOF-newline scan), and `node` — the SPDX half is
+# `scripts/check-spdx-headers.mjs`, one file shared with the pre-commit hook,
+# NOT the shell loop it used to be. The CI step installs all three.
 #
 # Deliberately NOT covered here:
 #   - i18n-catalog  -> checked in the `pnpm-build` CI step (needs node).
