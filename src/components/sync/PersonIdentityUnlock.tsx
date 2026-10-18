@@ -31,7 +31,7 @@ import { useTranslation } from "react-i18next";
 import { personUnlock } from "../../lib/invite";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
+import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
 import { buildPhraseCredential } from "./phrase-credential";
 import {
   getPersonIdentityGeneration,
@@ -164,7 +164,7 @@ export function PersonIdentityUnlock({
         testId="sync.panel.identity-unlock"
       >
         <div style={BODY_STYLE}>
-          <EnrollPhraseCredential
+          <PhraseEntryGrid
             baseId="sync.panel.identity-unlock"
             cells={phraseCells}
             onCellChange={handlePhraseCellChange}

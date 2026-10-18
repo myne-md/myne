@@ -39,7 +39,7 @@ import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "./ChoiceList";
 import { Input } from "./primitives/Input";
 import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./sync/EnrollPhraseCredential";
+import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "./PhraseEntryGrid";
 import { SecretPhraseReveal, useLocalPhraseReveal } from "./SecretPhraseReveal";
 import { PhraseTypeBack, phraseTypeBackMatches, type TypeBackPositions } from "./PhraseTypeBack";
 import { drawConfirmPositions } from "../screens/vault-creation/reducer";
@@ -440,7 +440,7 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
 
           {(heldIdentity || recoverOpen) && (
           <>
-          <EnrollPhraseCredential
+          <PhraseEntryGrid
             baseId="identity-setup"
             label={t("identitySetup.recoverIntro")}
             disabled={busy}

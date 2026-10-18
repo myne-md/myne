@@ -72,7 +72,7 @@ vi.mock("../../src/lib/memberNames", async (importOriginal) => {
 });
 
 import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
-import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
+import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 import { IdentityHome } from "../../src/screens/IdentityHome";
 
 /** Comfortably over the project floor and zxcvbn-clean (the hook is stubbed). */

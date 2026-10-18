@@ -78,7 +78,7 @@ type AcceptStep = "accept-owner" | "accept-phrase" | "accept-password";
 type JoinStep = "join-phrase" | "join-password";
 
 /** Recovery-phrase width. Frozen by BIP-39 at 24 words (256 bits) and by
- *  `PHRASE_CELL_COUNT` on the desktop's `EnrollPhraseCredential`; the client
+ *  `PHRASE_CELL_COUNT` on the desktop's `PhraseEntryGrid`; the client
  *  does not choose it, so a local constant is not a second source of truth. */
 const PHRASE_WORDS = 24;
 

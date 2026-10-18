@@ -49,7 +49,7 @@ import {
   StepLayout,
   StepProgress,
 } from "../../screens/vault-creation/step-shell";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
+import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
 import {
   personAcceptInvite,
   personJoinVault,
@@ -174,7 +174,7 @@ function PhraseStepBody({
   return (
     <StepCard>
       <p style={BODY_SMALL_STYLE}>{hint}</p>
-      <EnrollPhraseCredential
+      <PhraseEntryGrid
         baseId={baseId}
         label={label}
         cells={cells}

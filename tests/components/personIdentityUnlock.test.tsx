@@ -35,7 +35,7 @@ vi.mock("../../src/lib/invite", () => ({
 }));
 
 import { PersonIdentityUnlock } from "../../src/components/sync/PersonIdentityUnlock";
-import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
+import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 
 const CELL_IDS = Array.from({ length: PHRASE_CELL_COUNT }, (_, index) =>
   index === 0

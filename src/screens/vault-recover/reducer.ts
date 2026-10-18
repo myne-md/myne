@@ -161,7 +161,13 @@ export type Action =
    *  consumer emits a dev-only `console.warn`. */
   | { type: "delete-bug-canary" };
 
-export const PHRASE_CELL_COUNT = 24;
+import { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
+
+// Re-exported rather than redeclared: this file used to carry its own `24`, and
+// so did four other files. The one definition is in
+// `lib/bip39-normalize.ts`, next to the §7.4 normalization the count is paired
+// with.
+export { PHRASE_CELL_COUNT };
 
 /** Single shared empty-cells reference; cheap to alias because cells
  *  are typed `readonly`. Reducer transitions that wipe cells return

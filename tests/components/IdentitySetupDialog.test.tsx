@@ -23,7 +23,7 @@ vi.mock("../../src/lib/invite", () => ({ personLock }));
 vi.mock("../../src/platform/core", () => ({ invoke }));
 
 import { IdentitySetupDialog } from "../../src/components/IdentitySetupDialog";
-import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
+import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 
 function fillPhrase(): void {
   for (let index = 0; index < PHRASE_CELL_COUNT; index += 1) {

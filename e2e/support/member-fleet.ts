@@ -80,7 +80,7 @@ export async function readValue(session: Session, testId: string): Promise<strin
 }
 
 /** Type a phrase into a cell grid. Every grid on this path names its first cell
- *  bare and the rest `<prefix>-<n>` (1-based), the shared `EnrollPhraseCredential`
+ *  bare and the rest `<prefix>-<n>` (1-based), the shared `PhraseEntryGrid`
  *  convention. */
 export async function typePhrase(
   session: Session,

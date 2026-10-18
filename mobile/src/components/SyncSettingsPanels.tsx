@@ -32,6 +32,12 @@ import { useMemberVault } from "../hooks/useMemberVault";
 import { formatBytes } from "../lib/util";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
+// From the shared tree, not the local twin: `PHRASE_CELL_COUNT` has ONE
+// definition (`src/lib/bip39-normalize.ts`) and the twin is byte-identical to
+// that module, so re-exporting through it would make the pair differ and grow
+// the twin-drift ratchet for no gain. The normalizer stays on the twin because
+// the twin predates this and resolving it is its own decision.
+import { PHRASE_CELL_COUNT } from "@myne/phrase-cells";
 import { usePrefs } from "../lib/use-prefs";
 import { setDeviceName } from "../lib/prefs";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../lib/device-name";
@@ -504,7 +510,6 @@ export function SyncEndpointPanel() {
 
 // ── SY-03 / SY-04 · Enroll this device ───────────────────────────────────────
 
-const PHRASE_CELL_COUNT = 24;
 const MODE_VALUES: EnrollCredentialKind[] = ["password", "recovery"];
 
 /** Map a non-secret `SyncDeviceError` kind to honest, non-distinguishing copy.

@@ -23,7 +23,7 @@ import {
 } from "../../lib/personAccount";
 import type { VaultId } from "../../lib/stage";
 import { setPersonIdentityState } from "./personIdentityState";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "./EnrollPhraseCredential";
+import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
 
 /** Minimum PIN length, mirroring the Rust `pin::MIN_PIN_LEN`. */
 const MIN_PIN_LEN = 6;
@@ -169,7 +169,7 @@ export function MemberVaultUnlockCard({
             data-testid="unlock.member-pin"
           />
         ) : surface === "biometric" ? null : (
-          <EnrollPhraseCredential
+          <PhraseEntryGrid
             baseId="unlock-member"
             label={t("unlock.memberPhraseLabel")}
             disabled={busy}

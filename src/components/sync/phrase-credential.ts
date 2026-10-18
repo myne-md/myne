@@ -28,8 +28,7 @@
 
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 
-/** Cells in the paste-to-distribute grid. BIP-39 24-word, per `protocol.md` §7. */
-export const PHRASE_CELL_COUNT = 24;
+export { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
 
 /**
  * Join and normalise the grid's cells into the credential `sync_enroll` takes.
