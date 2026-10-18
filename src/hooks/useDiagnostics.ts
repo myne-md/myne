@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { has } from "../platform/capabilities";
-import { save as saveDialog } from "../platform/dialog";
+import { openSaveDialog, type SaveOutcome } from "../lib/save-dialog";
 import {
   crashRecordClear,
   crashRecordState,
@@ -85,7 +85,7 @@ export interface DiagnosticsState {
    * not a failure and reporting it as one would tell the user something broke
    * when nothing was attempted.
    */
-  saveReport: (block: string) => Promise<"saved" | "cancelled" | "failed">;
+  saveReport: (block: string) => Promise<SaveOutcome>;
 }
 
 /**
@@ -228,25 +228,20 @@ export function useDiagnostics(): DiagnosticsState {
   }, []);
 
   const saveReportTo = useCallback(
-    async (block: string): Promise<"saved" | "cancelled" | "failed"> => {
+    async (block: string): Promise<SaveOutcome> => {
       // A dialog that FAILS to open is not a cancel, and collapsing the two
       // leaves a dead button with no toast while `diagnosticSaveFailed` exists
-      // for exactly that outcome. Separated by construction, the way
-      // `src/lib/noteImageExport.ts` does it: `catch` returns `"failed"` and
-      // only a `null` resolve is a cancel (myne#860 review).
-      let destination: unknown;
+      // for exactly that outcome (myne#860 review). The separation is
+      // `save-dialog.ts`'s now, shared with the two `secret-export` savers and
+      // with `noteImageExport`, so the four surfaces cannot spell it four ways —
+      // which is where the `"failed"` versus `"error"` split came from (R1.7).
+      const target = await openSaveDialog("myne-report.txt", [
+        { name: "Text", extensions: ["txt"] },
+      ]);
+      if (target.kind === "failed") return "failed";
+      if (target.kind === "cancelled") return "cancelled";
       try {
-        destination = await saveDialog({
-          defaultPath: "myne-report.txt",
-          filters: [{ name: "Text", extensions: ["txt"] }],
-        });
-      } catch {
-        return "failed";
-      }
-      if (destination === null || destination === undefined) return "cancelled";
-      if (typeof destination !== "string") return "failed";
-      try {
-        await saveReport(block, destination);
+        await saveReport(block, target.path);
         await refresh();
         return "saved";
       } catch {

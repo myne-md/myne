@@ -140,6 +140,22 @@ pub const DOUBLE_BUFFERED: &[&str] = &[
     // deletion intent orphans the server copy permanently).
     "pending-chats-tombstones",
     "pending-memory-tombstones",
+    // The two GROUP-tier singletons the B2B epic added (MYO5 member display
+    // names, MYU5 device-to-person bindings). They were MISSING from this list
+    // and from the test below, which is the allowlist's stated failure mode
+    // arriving: both are read-modify-written on every member rename, device
+    // claim and removal, and both are written by an atomic-rename path on native
+    // so nothing observed the gap — but the mechanism that is supposed to catch
+    // a new family had missed the two newest ones (Aşama 3, R1.3).
+    //
+    // The strings are literals because this is a `&[&str]` of paths and Rust
+    // cannot concatenate consts into one; the single-source half lives in the
+    // test below, which reads each family's OWN constant
+    // (`member_names::MEMBER_NAMES_FILE`, `device_binding::DEVICE_BINDINGS_FILE`)
+    // so a rename of either file fails there by name rather than silently
+    // un-protecting the family.
+    "vault.member-names",
+    "vault.device-bindings",
 ];
 
 /// How a path is stored on a container-backed store.
@@ -1256,6 +1272,14 @@ mod tests {
     /// protection, so the families are named here rather than derived from the
     /// list itself — a test that reads its subject from its subject asserts
     /// nothing.
+    ///
+    /// Two of them are named through the FAMILY'S OWN CONSTANT rather than as
+    /// literals, and that is the half Aşama 3's R1.3 added: the B2B epic's two
+    /// group-tier singletons were absent from both this list and the roster
+    /// above, so the mechanism meant to catch a new family had missed the two
+    /// newest ones. Reading `MEMBER_NAMES_FILE` / `DEVICE_BINDINGS_FILE` means a
+    /// rename of either file fails HERE, by name, instead of leaving the family
+    /// out of the roster while every other test stays green.
     #[test]
     fn every_known_singleton_is_double_buffered() {
         for name in [
@@ -1290,6 +1314,9 @@ mod tests {
             "pending-attachment-tombstones",
             "pending-chats-tombstones",
             "pending-memory-tombstones",
+            // The two group-tier singletons, through their own constants.
+            crate::plugins::member_names::MEMBER_NAMES_FILE,
+            crate::plugins::device_binding::DEVICE_BINDINGS_FILE,
         ] {
             assert!(
                 mode_for(&format!("/myne/vaults/019f/{name}")) == Mode::Doubled,

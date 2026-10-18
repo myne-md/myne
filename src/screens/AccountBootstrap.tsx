@@ -46,6 +46,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../platform/core";
+import { resetLocalOrReport } from "../lib/reset-local";
 import { CenteredCard, ctaInteraction, ctaStyle } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { PasswordInput } from "../components/PasswordInput";
@@ -288,16 +289,15 @@ export function AccountBootstrap({
                 // told them they backed out (test-audit #10/#65).
                 setAborting(true);
                 setError(null);
-                void invoke("plugin:sync|sync_reset_local")
-                  .then(() => {
-                    setAborting(false);
-                    setPending(false);
-                    setAccount(null);
-                  })
-                  .catch(() => {
-                    setAborting(false);
+                void resetLocalOrReport().then((reset) => {
+                  setAborting(false);
+                  if (!reset) {
                     setError(t("sync.join.sasAbortFailed"));
-                  });
+                    return;
+                  }
+                  setPending(false);
+                  setAccount(null);
+                });
               }}
             >
               {t("accountBootstrap.sasMismatch")}
@@ -347,6 +347,15 @@ export function AccountBootstrap({
             {t("accountBootstrap.noApprovers")}
           </p>
         )}
+        {/* The refused-un-enrol banner. This card had NO slot for an error at
+            all, which is the second half of the same defect the reset handler
+            carried: even after the handler stopped swallowing the refusal there
+            was nowhere to say so, so the message was set and rendered by
+            nothing. The account/password step has had this banner all along. */}
+        {error !== null && (
+          <DestructiveBanner testId="account-bootstrap.error">{error}</DestructiveBanner>
+        )}
+
         {/* #269: the way out.
             Boot re-enters this stage on every reload, the enrol-gate treats
             `pending` as "already enrolled" and hides the form, and the Settings
@@ -355,9 +364,13 @@ export function AccountBootstrap({
             had no route back at all. Reloading returned here; there was nothing
             else to press.
 
-            Same handler as the SAS-mismatch escape above, deliberately: both
-            are "stop trusting this enrolment and start over", and a second
-            implementation of that is a second thing to keep correct. */}
+            One handler with the SAS-mismatch escape above, and it is the same
+            call rather than a copy of it (`lib/reset-local.ts`). The copy that
+            used to sit here claimed to be that handler in a comment while
+            swallowing the refusal and resetting the screen either way, which is
+            the worst version of this door: a refusal leaves the enrolment in
+            place, so the user was told they had left and the next reload brought
+            them back to the same screen. */}
         <button
           data-testid="account-bootstrap.pending-reset"
           type="button"
@@ -365,13 +378,16 @@ export function AccountBootstrap({
           style={{ ...LINK_BUTTON_STYLE, color: "var(--danger)", marginTop: "var(--space-3)" }}
           onClick={() => {
             setAborting(true);
-            void invoke("plugin:sync|sync_reset_local")
-              .catch(() => {})
-              .finally(() => {
-                setAborting(false);
-                setPending(false);
-                setAccount(null);
-              });
+            setError(null);
+            void resetLocalOrReport().then((reset) => {
+              setAborting(false);
+              if (!reset) {
+                setError(t("sync.join.sasAbortFailed"));
+                return;
+              }
+              setPending(false);
+              setAccount(null);
+            });
           }}
         >
           {t("accountBootstrap.pendingStartOver")}

@@ -33,6 +33,16 @@ describe("formatRelativeTime — thresholds", () => {
     expect(formatRelativeTime(null, NOW)).toBe("");
   });
 
+  it("an unparseable Date → empty string, the same answer as null", () => {
+    // Added with the mobile twin's unification (Aşama 3, R1.5): mobile carried
+    // this guard and desktop did not, so an `Invalid Date` rendered
+    // "NaN-NaN-NaN" here while the phone rendered an ISO date. Both answer the
+    // empty string now, which is what the `null` arm above already meant — and
+    // the two arms are one branch in the source, so a future split of them has
+    // to argue with this assertion.
+    expect(formatRelativeTime(new Date("not a date"), NOW)).toBe("");
+  });
+
   it("future timestamp (negative delta) → 'just now'", () => {
     expect(formatRelativeTime(new Date(NOW.getTime() + HOUR), NOW)).toBe(
       "just now",

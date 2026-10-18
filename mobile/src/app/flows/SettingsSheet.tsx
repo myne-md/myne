@@ -1,6 +1,7 @@
 import { type ChangeEvent, type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
+import { strengthLevel } from "../../lib/password-strength";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
@@ -1550,13 +1551,6 @@ export interface SettingsSheetProps {
   initialPanel?: Panel;
 }
 
-function strengthLevel(len: number): "Weak" | "Fair" | "Good" | "Strong" {
-  if (len < 12) return "Weak";
-  if (len < 16) return "Fair";
-  if (len < 20) return "Good";
-  return "Strong";
-}
-
 export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel }: SettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
@@ -3013,7 +3007,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.vault.newPasswordPlaceholder")} />
             {newPw.length > 0 && (
               <div style={{ marginTop: 10 }}>
-                <StrengthMeter level={strengthLevel(newPw.length)} />
+                <StrengthMeter level={strengthLevel(newPw)} />
               </div>
             )}
             <FieldLabel mt={16}>{t("settings.changePassword.confirmLabel")}</FieldLabel>

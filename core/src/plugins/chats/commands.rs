@@ -335,26 +335,13 @@ fn hex_encode_16(bytes: &[u8; 16]) -> String {
     s
 }
 
+/// Parse a 32-hex conversation id. **Strict**
+/// (`protocol::hex::decode_lower`): conversation ids are minted lowercase, so an
+/// uppercase id decodes nowhere, and divergent strictness here would decode in
+/// chats commands what the sync scan and the container classifier skip (Aşama 3,
+/// R1.2).
 fn hex_decode_16(s: &str) -> Option<[u8; 16]> {
-    // Lowercase-only, matching `from_hex16` (sync orchestrator), `is_32_hex`
-    // (double_buffer) and `is_lower_hex` (backup classifier): conversation ids
-    // are minted lowercase, so an uppercase id decodes nowhere. Divergent
-    // strictness here would decode in chats commands what the sync scan and
-    // the container classifier skip.
-    if s.len() != 32
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, pair) in s.as_bytes().chunks(2).enumerate() {
-        let hi = (pair[0] as char).to_digit(16)?;
-        let lo = (pair[1] as char).to_digit(16)?;
-        out[i] = (hi * 16 + lo) as u8;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 /// Validate that a turn payload is a legal conversation inner plaintext: a

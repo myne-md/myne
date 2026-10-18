@@ -22,12 +22,18 @@
 // promise.
 //
 // **Min-floor constants** (`MIN_PASSWORD_LEN = 12`,
-// `MIN_ZXCVBN_SCORE = 3`) live here so every consumer (vault-creation
-// `PasswordStep`, vault-recover `PasswordResetStep`, change-password
-// `PasswordChangeForm`) imports the same numbers. Drift across forms
-// is structurally impossible. The `passwordLength` helper lives here
-// for the same reason: the floor is only mirrored if both sides also
-// count the same unit.
+// `MIN_ZXCVBN_SCORE = 3`) are re-exported from `client-core` so every consumer
+// (vault-creation `PasswordStep`, vault-recover `PasswordResetStep`,
+// change-password `PasswordChangeForm`) imports the same numbers, and so does
+// MOBILE — which used to carry three copies of the floor and compare it in
+// Unicode code units while this file compared USVs. Drift across forms is
+// structurally impossible; the unit is impossible to get wrong through
+// `passwordLength`. The docstrings and the reason live in
+// `client-core/src/password-policy.ts`.
+//
+// Re-exported rather than moved-and-updated at every call site, which is the
+// `@myne/dialect` shim shape: the consumers keep their import and the source of
+// truth is one file.
 
 import {
   useEffect,
@@ -41,23 +47,7 @@ import { useTranslation } from "react-i18next";
 import { Input } from "./primitives/Input";
 import { Icon } from "./primitives/Icon";
 
-/** Minimum password length enforced by every consumer (frontend gate). */
-export const MIN_PASSWORD_LEN = 12;
-
-/**
- * Password length in the unit the backend floor counts: Unicode scalar
- * values, via the string iterator.
- *
- * `String.prototype.length` counts UTF-16 code units, while
- * `protocol::password_policy::validate_min_length` counts USVs
- * (`str::chars().count()`). Every astral scalar (most emoji, the CJK
- * extension blocks, historic scripts) is 2 code units and 1 USV, so a
- * `.length` gate admits an eleven-character password the backend then
- * refuses — the form says "fine", the ceremony says "too short".
- * Compare against `MIN_PASSWORD_LEN` through this helper, never
- * through `.length`.
- */
-export const passwordLength = (password: string) => [...password].length;
+export { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
 
 /** Minimum zxcvbn score (0-4) required to pass the strength gate. */
 export const MIN_ZXCVBN_SCORE = 3;

@@ -3,7 +3,7 @@
 // one place and the step components don't pull in Tauri plugin imports.
 
 import { writeText as clipboardWriteText } from "../platform/clipboardManager";
-import { save as dialogSave } from "../platform/dialog";
+import { openSaveDialog } from "./save-dialog";
 import { invoke } from "../platform/core";
 import { has } from "../platform/capabilities";
 import { deliverFile } from "../platform/download";
@@ -157,25 +157,21 @@ export async function saveSecretAsTextFile(
     return;
   }
 
-  let path: string | null;
-  try {
-    path = await dialogSave({
-      defaultPath,
-      filters: [{ name: "Text", extensions: ["txt"] }],
-    });
-  } catch (e) {
-    // A dialog that would not OPEN is a failure, and it is one the user cannot
-    // tell apart from a cancel unless we say so. Nothing was written either way.
-    logErrorKind(e, "dialog-save-failed");
+  const target = await openSaveDialog(defaultPath, [{ name: "Text", extensions: ["txt"] }]);
+  // A dialog that would not OPEN is a failure, and it is one the user cannot
+  // tell apart from a cancel unless we say so. Nothing was written either way.
+  // The classification is `save-dialog.ts`'s, so this file's two savers cannot
+  // answer it differently again (R1.7).
+  if (target.kind === "failed") {
     announce(feedback.onFailure);
     return;
   }
-  if (!path) return; // cancelled: their own action, not news
+  if (target.kind === "cancelled") return; // their own action, not news
   try {
     // Narrow seam: the Rust core does the only IO. The WebView holds NO
     // fs-write scope (removed from capabilities/default.json); the command
     // re-validates the destination and rejects the app-data / vault tree.
-    await invoke("plugin:secret-export|save_secret_text", { path, contents });
+    await invoke("plugin:secret-export|save_secret_text", { path: target.path, contents });
     announce(feedback.onSuccess);
   } catch (e) {
     logErrorKind(e, "fs-write-failed");
@@ -226,20 +222,19 @@ export async function saveJsonAsFile(
     return;
   }
 
-  let path: string | null;
-  try {
-    path = await dialogSave({
-      defaultPath,
-      filters: [{ name: filterName, extensions: ["json"] }],
-    });
-  } catch (e) {
-    // A dialog-open failure is indistinguishable from a cancel to the user;
-    // swallow it (nothing was written) rather than surfacing a scary error.
-    logErrorKind(e, "dialog-save-failed");
-    return;
+  const target = await openSaveDialog(defaultPath, [{ name: filterName, extensions: ["json"] }]);
+  if (target.kind === "failed") {
+    // REJECTS, and that is the one place this saver's contract differs from its
+    // sibling's: `saveSecretAsTextFile` announces and returns because its caller
+    // renders a banner, and this one throws because its caller is a settings
+    // action that surfaces the failure itself. What may NOT differ — and did,
+    // until R1.7 — is whether the failure is reported at all: this arm used to
+    // swallow it, so a theme export whose dialog refused to open was a dead
+    // button while a recovery-kit save in the same situation produced a message.
+    throw new Error("the save dialog did not open");
   }
-  if (!path) return; // user cancelled the save dialog
-  await invoke("plugin:secret-export|save_secret_text", { path, contents });
+  if (target.kind === "cancelled") return; // user cancelled the save dialog
+  await invoke("plugin:secret-export|save_secret_text", { path: target.path, contents });
 }
 
 /**

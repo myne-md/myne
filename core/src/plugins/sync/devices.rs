@@ -774,15 +774,16 @@ impl SyncDeviceError {
 }
 
 /// Parse a 32-char hex device id.
+///
+/// **Lenient**, through `protocol::hex::decode_ci`, and that is a deliberate
+/// difference from the conversation-id helpers beside it: a device id arrives
+/// from the SERVER (the enrolment response and the device list), so its case is
+/// not this client's to fix, and refusing an uppercase spelling would read as
+/// "no such device" rather than as a malformed id. Aşama 3's R1.2 named the two
+/// policies; before that this function accepted `A`–`F` while
+/// `orchestrator::from_hex16` rejected it, with nothing saying which was meant.
 pub fn hex16(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_ci(s)
 }
 
 /// Which ACCOUNT the device-management + account-status plane speaks for.
