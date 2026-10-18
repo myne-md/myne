@@ -1032,11 +1032,57 @@ export function writeAtomically(path, contents) {
   renameSync(tmp, path);
 }
 
+/**
+ * The value of `--flag <value>`, or `null` when the flag is absent.
+ *
+ * A flag with no value is a refusal rather than a silent default: `--projection`
+ * with nothing after it would otherwise fall back to the real generated document,
+ * so a test that believed it was writing into a sandbox would write into the tree
+ * this guard exists to keep honest.
+ */
+function flagValue(argv, flag) {
+  const i = argv.indexOf(flag);
+  if (i === -1) return null;
+  const value = argv[i + 1];
+  if (value === undefined || value.startsWith("--")) {
+    console.error(`check-manual-test-roster: ${flag} needs a path.`);
+    process.exit(1);
+  }
+  return value;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const wantEmit = argv.includes("--emit");
   const wantCheckProjection = argv.includes("--check");
   const wantRecord = argv.includes("--record");
+
+  // Three seams, and they exist for one reason: a guard test that needs a file the
+  // roster does not claim had to write it into the REAL tree, and a sibling test
+  // file in a parallel worker then read that tree mid-probe. Vitest runs files in
+  // parallel workers, so `pnpm test` went red on a pairing nobody chose, which is
+  // the failure `check-e2e-menu-testids.mjs` records as myne-md/myne#242 and fixes
+  // the same way.
+  //
+  //   --scan <dir>        also walk the denominators under this directory, so a
+  //                       probe there is named exactly as a real surface is
+  //   --ratchet <path>    read and write the ratchet here instead
+  //   --projection <path> read and write the generated document here instead
+  //
+  // `--scan` ADDS to the real walk rather than replacing it, and that is the one
+  // place this differs from the e2e guard's flag of the same name. It cannot
+  // replace: the walk is what satisfies `NOT_A_SURFACE`'s reverse rule ("names a
+  // file that is in no denominator"), so a walk over a bare directory would fail
+  // seventeen unrelated entries and bury the failure the test is measuring.
+  const scanBase = flagValue(argv, "--scan");
+  const ratchetOverride = flagValue(argv, "--ratchet");
+  const projectionOverride = flagValue(argv, "--projection");
+  const ratchetPath = ratchetOverride ?? RATCHET_PATH;
+  const projectionPath = projectionOverride ?? join(ROOT, PROJECTION);
+  // The canonical labels when nothing is overridden, so every message below reads
+  // exactly as it did before these flags existed.
+  const ratchetLabel = ratchetOverride ?? join("scripts", "manual-test-ratchet.json");
+  const projectionLabel = projectionOverride ?? PROJECTION;
 
   const { ROSTER } = await import("./manual-test-roster.mjs");
 
@@ -1044,11 +1090,11 @@ async function main() {
   // "no ratchet configured" would let deleting one file turn the gate off while
   // every other rule still printed ok, which is the shape `check-e2e-floor.mjs`
   // refuses when its report is absent.
-  if (!existsSync(RATCHET_PATH)) {
-    console.error("check-manual-test-roster: scripts/manual-test-ratchet.json is missing. The gate has no floor.");
+  if (!existsSync(ratchetPath)) {
+    console.error(`check-manual-test-roster: ${ratchetLabel} is missing. The gate has no floor.`);
     process.exit(1);
   }
-  const ratchet = JSON.parse(readFileSync(RATCHET_PATH, "utf8"));
+  const ratchet = JSON.parse(readFileSync(ratchetPath, "utf8"));
 
   // A missing FILE was already a hard refusal; a missing KEY inside the present
   // file was silence, and that asymmetry was the defect. With the ceiling deleted,
@@ -1060,7 +1106,7 @@ async function main() {
   for (const field of ["totalMinutesCeiling", "gatedMinutes"]) {
     if (!Number.isFinite(ratchet[field])) {
       console.error(
-        `check-manual-test-roster: scripts/manual-test-ratchet.json has no finite ${field} ` +
+        `check-manual-test-roster: ${ratchetLabel} has no finite ${field} ` +
           `(got ${JSON.stringify(ratchet[field])}). Half the ratchet would be off and the run would still say ok.`,
       );
       process.exit(1);
@@ -1068,7 +1114,7 @@ async function main() {
   }
   for (const field of ["gatedTiers", "gatedClients"]) {
     if (!Array.isArray(ratchet[field]) || ratchet[field].length === 0) {
-      console.error(`check-manual-test-roster: scripts/manual-test-ratchet.json needs a non-empty ${field} array.`);
+      console.error(`check-manual-test-roster: ${ratchetLabel} needs a non-empty ${field} array.`);
       process.exit(1);
     }
   }
@@ -1079,13 +1125,23 @@ async function main() {
   // walk. Reporting `ok` over a tree this guard could not read is the failure
   // `scripts/check-prefs-nonce.mjs` records for its own roster.
   const walked = {};
+  const walkBases = scanBase === null ? [ROOT] : [ROOT, resolve(scanBase)];
   for (const { dir, extensions } of DENOMINATORS) {
-    const files = walkFiles([join(ROOT, dir)], { relativeTo: ROOT, extensions, missingIsNull: true });
-    if (files === null) {
-      console.error(`check-manual-test-roster: denominator directory is missing: ${dir}`);
-      process.exit(1);
+    const found = new Set();
+    for (const base of walkBases) {
+      const files = walkFiles([join(base, dir)], { relativeTo: base, extensions, missingIsNull: true });
+      if (files === null) {
+        // A denominator missing from the REAL tree is a broken checkout, not a
+        // smaller walk. Missing from a `--scan` base is just a directory the probe
+        // does not use, and refusing there would make the flag useless for the one
+        // denominator a test needs.
+        if (base !== ROOT) continue;
+        console.error(`check-manual-test-roster: denominator directory is missing: ${dir}`);
+        process.exit(1);
+      }
+      for (const f of files) found.add(f);
     }
-    walked[dir] = files;
+    walked[dir] = [...found].sort();
   }
 
   // `existsSync` memoised. Rule 1 asks about 1104 distinct strings (952 `paths`
@@ -1146,7 +1202,7 @@ async function main() {
       console.log("check-manual-test-roster: --record: nothing to lock in, the record already describes the roster.");
       return;
     }
-    writeAtomically(RATCHET_PATH, `${JSON.stringify(next, null, 2)}\n`);
+    writeAtomically(ratchetPath, `${JSON.stringify(next, null, 2)}\n`);
     console.log(
       `check-manual-test-roster: --record: ceiling ${ratchet.totalMinutesCeiling} -> ${next.totalMinutesCeiling}, ` +
         `gating ${ratchet.gatedMinutes} -> ${next.gatedMinutes}. ` +
@@ -1158,7 +1214,7 @@ async function main() {
   if (wantEmit) {
     if (failures.length) {
       console.error(
-        `check-manual-test-roster: ${failures.length} failure(s), so ${PROJECTION} was NOT written.\n`,
+        `check-manual-test-roster: ${failures.length} failure(s), so ${projectionLabel} was NOT written.\n`,
       );
       for (const f of failures) console.error(`  - ${f}`);
       console.error(
@@ -1168,13 +1224,13 @@ async function main() {
       );
       process.exit(1);
     }
-    writeAtomically(join(ROOT, PROJECTION), projectionBody(ROSTER, ratchet));
-    console.log(`check-manual-test-roster: wrote ${PROJECTION}`);
+    writeAtomically(projectionPath, projectionBody(ROSTER, ratchet));
+    console.log(`check-manual-test-roster: wrote ${projectionLabel}`);
   } else if (wantCheckProjection) {
-    const current = existsSync(join(ROOT, PROJECTION)) ? readFileSync(join(ROOT, PROJECTION), "utf8") : "";
+    const current = existsSync(projectionPath) ? readFileSync(projectionPath, "utf8") : "";
     if (current !== projectionBody(ROSTER, ratchet)) {
       failures.push(
-        `${PROJECTION} is stale. Run \`node scripts/check-manual-test-roster.mjs --emit\`. ` +
+        `${projectionLabel} is stale. Run \`node scripts/check-manual-test-roster.mjs --emit\`. ` +
           `It is generated from the roster; do not edit it by hand.`,
       );
     }

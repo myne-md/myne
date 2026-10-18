@@ -39,7 +39,7 @@
 // `myne-agents/` itself, which is where these paths are supposed to be.
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, relative } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -116,7 +116,7 @@ export function scanFile(absPath, relPath, read) {
 /** Every scanned file under `root`, repo-relative, with the extension policy
  *  applied. Returns `{ files, unclassified }`; an unclassified extension is a
  *  failure at the call site rather than a smaller walk here. */
-export function walkRoot(root, dir, readDir = readdirSync, read = (p) => readFileSync(p, "utf8")) {
+export function walkRoot(root, dir, readDir = readdirSync, read = (p) => readFileSync(p, "utf8"), relativeTo = join(ROOT, root)) {
   const files = [];
   const unclassified = [];
   const visit = (d) => {
@@ -131,28 +131,34 @@ export function walkRoot(root, dir, readDir = readdirSync, read = (p) => readFil
       // rule that skipped it would be a rule with a hole shaped like a licence.
       if (ext && ext in IGNORED_EXTENSIONS) continue;
       if (ext && !SCANNED_EXTENSIONS.has(ext)) {
-        unclassified.push(relative(join(ROOT, root), full));
+        unclassified.push(relative(relativeTo, full));
         continue;
       }
-      files.push(relative(join(ROOT, root), full).split("\\").join("/"));
+      files.push(relative(relativeTo, full).split("\\").join("/"));
     }
   };
   visit(dir);
   return { files: files.sort(), unclassified: unclassified.sort() };
 }
 
-/** The whole scan: `{ byClass, hits, missingRoots, unclassified }`. */
-export function scan() {
+/**
+ * The whole scan: `{ byClass, hits, missingRoots, unclassified }`.
+ *
+ * `base` is where the three roots are resolved from, and it is a parameter so a
+ * guard test can point the walk at a directory only it can see (`--sandbox`). The
+ * default is the real checkout, so every other caller is unchanged.
+ */
+export function scan(base = ROOT) {
   const hits = new Map();
   const missingRoots = [];
   const unclassified = [];
   for (const root of SCANNED_ROOTS) {
-    const abs = join(ROOT, root);
+    const abs = join(base, root);
     if (!existsSync(abs)) {
       missingRoots.push(root);
       continue;
     }
-    const { files, unclassified: unknown } = walkRoot(root, abs);
+    const { files, unclassified: unknown } = walkRoot(root, abs, readdirSync, undefined, abs);
     unclassified.push(...unknown.map((u) => `${root}/${u}`));
     for (const rel of files) {
       const hit = scanFile(join(abs, rel), rel, (p) => readFileSync(p, "utf8"));
@@ -167,17 +173,17 @@ export function classOf(docPath) {
   return docPath.startsWith("docs/decisions/") ? "append-only-record" : "living-document";
 }
 
-function readRecord() {
-  if (!existsSync(RECORD)) return null;
-  const parsed = JSON.parse(readFileSync(RECORD, "utf8"));
+function readRecord(path = RECORD) {
+  if (!existsSync(path)) return null;
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
   const out = {};
   for (const key of Object.keys(CLASSES)) out[key] = parsed[key] ?? [];
   return out;
 }
 
-function writeRecord(grouped) {
+function writeRecord(grouped, path = RECORD) {
   writeFileSync(
-    RECORD,
+    path,
     JSON.stringify(
       {
         $comment:
@@ -195,8 +201,41 @@ function writeRecord(grouped) {
 }
 
 function main() {
-  const record = process.argv.includes("--record");
-  const { hits, missingRoots, unclassified } = scan();
+  const argv = process.argv.slice(2);
+  const record = argv.includes("--record");
+
+  // `--sandbox <dir>` runs the guard against a tree only a test can see: the
+  // three scanned roots are resolved from `<dir>` and the record is read and
+  // written at `<dir>/private-path-refs.json`. It exists because a guard test
+  // that needs a file the record does not list had to write it into the REAL
+  // `docs/` tree, and a sibling test file in a parallel worker then scanned that
+  // tree mid-probe: vitest runs files in parallel workers, so `pnpm test` went red
+  // on a pairing nobody chose, which is the failure `check-e2e-menu-testids.mjs`
+  // records as myne-md/myne#242 and fixes the same way (`--scan <dir>`).
+  //
+  // Nothing is weakened. The walk, the record comparison and both refusals are the
+  // same code over the same shape; only the directory changes, and the default is
+  // the real checkout. The reverse arm still fires, which is why the sandbox
+  // carries its own record rather than reusing the real one: pointing the walk at
+  // an empty tree while keeping the real record would report every recorded file
+  // as stale and turn this into a test of that arm instead.
+  const sandboxFlag = argv.indexOf("--sandbox");
+  let base = ROOT;
+  let recordPath = RECORD;
+  if (sandboxFlag !== -1) {
+    const value = argv[sandboxFlag + 1];
+    if (value === undefined || value.startsWith("--")) {
+      console.error("private-path-refs: --sandbox needs a directory.");
+      process.exit(1);
+    }
+    base = resolve(value);
+    recordPath = join(base, "private-path-refs.json");
+  }
+  // The canonical relative path when nothing is overridden, so every message below
+  // reads exactly as it did before this flag existed.
+  const recordLabel = sandboxFlag === -1 ? join("scripts", "private-path-refs.json") : recordPath;
+
+  const { hits, missingRoots, unclassified } = scan(base);
 
   if (missingRoots.length > 0) {
     console.error(
@@ -222,7 +261,7 @@ function main() {
   for (const docPath of hits.keys()) grouped[classOf(docPath)].push(docPath);
   for (const key of Object.keys(grouped)) grouped[key].sort();
 
-  const recorded = readRecord();
+  const recorded = readRecord(recordPath);
 
   if (record) {
     if (recorded !== null) {
@@ -240,7 +279,7 @@ function main() {
         process.exit(1);
       }
     }
-    writeRecord(grouped);
+    writeRecord(grouped, recordPath);
     const total = Object.values(grouped).flat().length;
     console.log(
       `private-path-refs: recorded ${total} file(s)` +
@@ -252,7 +291,7 @@ function main() {
 
   if (recorded === null) {
     console.error(
-      "private-path-refs: FAIL — no roster at scripts/private-path-refs.json. Seed it with " +
+      `private-path-refs: FAIL — no roster at ${recordLabel}. Seed it with ` +
         "`node scripts/check-private-path-refs.mjs --record`, then read the classes in that script and " +
         "satisfy yourself that each describes the files it now covers.",
     );

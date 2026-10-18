@@ -4,16 +4,25 @@
 // the most scepticism is the one that WRITES. This guard's `--record` refuses a
 // grown set, and that refusal is the only thing standing between "a published
 // tree points at a file nobody outside the org can open" and a one-line edit that
-// makes the failure go away. So it is driven end to end, against a probe file
-// written into the real tree, rather than asserted by prose.
+// makes the failure go away. So it is driven end to end.
+//
+// It used to drive that end to end against a probe written into the REAL `docs/`
+// tree, deleted in a `finally`. That window was a race rather than a tidiness
+// problem: vitest runs files in parallel workers, so a sibling test asserting the
+// real tree is clean read the probe and failed on a pairing nobody chose. Measured
+// by creating the probe by hand and watching this file and
+// `tests/scripts/webScreens.test.ts` go red with each other's messages, which is
+// the failure `check-e2e-menu-testids.mjs` records as myne-md/myne#242 and fixes
+// the same way. `--sandbox <dir>` is the seam: the same walk and the same two
+// refusals, over a tree only this file can see.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   SCANNED_ROOTS,
@@ -25,7 +34,7 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GUARD = "scripts/check-private-path-refs.mjs";
 const RECORD = join(ROOT, "scripts", "private-path-refs.json");
-const PROBE = join(ROOT, "docs", "__private_path_probe.md");
+const PROBE_REL = "docs/__private_path_probe.md";
 
 function run(args: string[]): { code: number; out: string } {
   try {
@@ -37,11 +46,34 @@ function run(args: string[]): { code: number; out: string } {
   }
 }
 
-afterAll(() => {
-  // A probe left behind would be a docs file that fails the guard for the next
-  // person, so the cleanup runs even when an assertion above threw.
-  if (existsSync(PROBE)) rmSync(PROBE);
-});
+/** The sandbox record, byte-stable so the refusal's no-write half can be compared. */
+const SANDBOX_RECORD = `{
+  "$comment": "Sandbox roster: empty, so the only file a scan can find is the probe.",
+  "append-only-record": [],
+  "living-document": []
+}
+`;
+
+/**
+ * A tree only this file can see: the three scanned roots, empty, plus a record.
+ *
+ * The empty record is load-bearing rather than convenient. Pointing the walk at an
+ * empty tree while keeping the real record would report every recorded file as
+ * stale, so the run would exit 1 for that reason and this test would stop
+ * measuring the arm it is named for.
+ */
+function sandbox(withProbe: boolean): string {
+  const dir = mkdtempSync(join(tmpdir(), "private-refs-sandbox-"));
+  for (const root of SCANNED_ROOTS) mkdirSync(join(dir, root), { recursive: true });
+  writeFileSync(join(dir, "private-path-refs.json"), SANDBOX_RECORD);
+  if (withProbe) {
+    writeFileSync(
+      join(dir, PROBE_REL),
+      "# probe\n\nSee `myne-ops/runbooks/release-checklist.md`.\n",
+    );
+  }
+  return dir;
+}
 
 describe("refsInText", () => {
   it("finds a path into each private repository", () => {
@@ -130,28 +162,38 @@ describe("the wired guard", () => {
   });
 
   it("FAILS on a new private path, and REFUSES to record it", () => {
-    const before = readFileSync(RECORD, "utf8");
-    writeFileSync(PROBE, "# probe\n\nSee `myne-ops/runbooks/release-checklist.md`.\n");
+    const dir = sandbox(true);
+    const realRecordBefore = readFileSync(RECORD, "utf8");
     try {
-      const check = run([]);
+      const check = run(["--sandbox", dir]);
       expect(check.code).toBe(1);
-      expect(check.out).toContain("docs/__private_path_probe.md");
+      expect(check.out).toContain(PROBE_REL);
       expect(check.out).toContain("myne-ops/runbooks/release-checklist.md");
+      // And it failed for the probe, not because the empty sandbox record made
+      // every recorded file stale: that arm is silent here.
+      expect(check.out).not.toContain("no longer point at a private");
 
-      const record = run(["--record"]);
+      const record = run(["--sandbox", dir, "--record"]);
       expect(record.code).toBe(1);
       expect(record.out).toContain("REFUSING to record 1 new file(s)");
 
-      // The half that matters: the refusal wrote nothing. A `--record` that
-      // silently accepted the growth would make every later green run evidence of
-      // nothing, which is the failure root AGENTS.md records about seeding paths.
-      expect(readFileSync(RECORD, "utf8")).toBe(before);
+      // The half that matters: the refusal wrote nothing, in the sandbox and in the
+      // real record. A `--record` that silently accepted the growth would make every
+      // later green run evidence of nothing, which is the failure root AGENTS.md
+      // records about seeding paths.
+      expect(readFileSync(join(dir, "private-path-refs.json"), "utf8")).toBe(SANDBOX_RECORD);
+      expect(readFileSync(RECORD, "utf8")).toBe(realRecordBefore);
     } finally {
-      rmSync(PROBE, { force: true });
+      rmSync(dir, { recursive: true, force: true });
     }
 
-    // And once the probe is gone the tree is green again, so the failure above was
-    // the probe and not a coincidence.
-    expect(run([]).code).toBe(0);
+    // And once the probe is gone the same tree is green again, so the failure above
+    // was the probe and not a coincidence.
+    const clean = sandbox(false);
+    try {
+      expect(run(["--sandbox", clean]).code).toBe(0);
+    } finally {
+      rmSync(clean, { recursive: true, force: true });
+    }
   });
 });

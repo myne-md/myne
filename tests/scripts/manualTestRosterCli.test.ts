@@ -15,11 +15,29 @@
 //
 // A recorded regression with no regression test is a fix that can be undone in
 // silence, which is the thing the root AGENTS.md calls the same non-evidence as
-// running a guard green. So these spawn the real script against the real tree
-// and mutate one input at a time, restoring in `finally` whatever they touched.
+// running a guard green. So these spawn the real script and mutate one input at a
+// time.
+//
+// THE MUTATIONS GO INTO A SANDBOX, and that is a correctness fix rather than
+// tidiness. They used to land in the real tree (`src/screens/Zz*.tsx`,
+// `docs/dev/.manual-test-roster.probe`, the ratchet, the projection) and be
+// restored in a `finally`. Vitest runs files in parallel workers, so for as long
+// as a probe existed, a sibling test reading the real tree failed on a pairing
+// nobody chose. Measured by creating the probe by hand: `webScreens.test.ts` went
+// red with `expected 1 to be +0` (it copies the real `src/screens` and asks
+// whether every screen has a web verdict), and `privatePathRefs.test.ts` with
+// `docs/dev/.manual-test-roster.probe` named as an unclassified extension.
+// `check-e2e-menu-testids.mjs` records the same failure as myne-md/myne#242 and
+// fixes it with a `--scan <dir>` seam; this file uses the three seams `main()`
+// now takes (`--scan`, `--ratchet`, `--projection`).
+//
+// The ONE assertion that still reads the real tree is "the tree as it stands",
+// and that is its whole point: a guard that only ever runs over a sandbox says
+// nothing about the tree that ships.
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -38,7 +56,56 @@ function run(args: string[] = []): { code: number; out: string } {
   }
 }
 
-/** Mutate a checked-in file for one assertion and put the bytes back. */
+interface Sandbox {
+  dir: string;
+  ratchet: string;
+  projection: string;
+}
+
+/**
+ * A throwaway tree the CLI can be pointed at, seeded from the real records.
+ *
+ * Seeded rather than invented, because two of the assertions below are about the
+ * CHECKED-IN document: the projection's bytes have to be the real generated ones
+ * or "regenerates byte-identically" would be a sandbox agreeing with itself, and
+ * the ratchet's numbers have to be the real ones or "nothing to lock in" would be
+ * true of an empty record for the wrong reason.
+ */
+function sandbox(): Sandbox {
+  const dir = mkdtempSync(join(tmpdir(), "roster-cli-"));
+  const ratchet = join(dir, "manual-test-ratchet.json");
+  const projection = join(dir, "manual-test-roster.md");
+  copyFileSync(RATCHET, ratchet);
+  copyFileSync(PROJECTION, projection);
+  return { dir, ratchet, projection };
+}
+
+/** Every input `main()` reads, pointed at the sandbox. */
+function args(s: Sandbox, ...rest: string[]): string[] {
+  return ["--scan", s.dir, "--ratchet", s.ratchet, "--projection", s.projection, ...rest];
+}
+
+/** The sandbox plus one unclaimed screen, which is what the forward rule measures. */
+function sandboxWithScreen(name: string): Sandbox {
+  const s = sandbox();
+  mkdirSync(join(s.dir, "src", "screens"), { recursive: true });
+  writeFileSync(
+    join(s.dir, "src", "screens", name),
+    `export const ${name.replace(/\.tsx$/, "")} = () => null;\n`,
+  );
+  return s;
+}
+
+function withSandbox(body: (s: Sandbox) => void, make: () => Sandbox = sandbox): void {
+  const s = make();
+  try {
+    body(s);
+  } finally {
+    rmSync(s.dir, { recursive: true, force: true });
+  }
+}
+
+/** Mutate a sandbox file for one assertion and put the bytes back. */
 function withMutation(path: string, mutate: (before: string) => string, body: () => void): void {
   const before = readFileSync(path, "utf8");
   try {
@@ -59,51 +126,57 @@ describe("the tree as it stands", () => {
 
 describe("the ratchet file is validated before it is used", () => {
   it("refuses a DELETED totalMinutesCeiling by name rather than skipping the rule", () => {
-    withMutation(
-      RATCHET,
-      (s) => {
-        const d = JSON.parse(s) as Record<string, unknown>;
-        delete d.totalMinutesCeiling;
-        return `${JSON.stringify(d, null, 2)}\n`;
-      },
-      () => {
-        const { code, out } = run(["--check"]);
-        expect(out).toContain("no finite totalMinutesCeiling");
-        expect(code).toBe(1);
-      },
-    );
+    withSandbox((s) => {
+      withMutation(
+        s.ratchet,
+        (text) => {
+          const d = JSON.parse(text) as Record<string, unknown>;
+          delete d.totalMinutesCeiling;
+          return `${JSON.stringify(d, null, 2)}\n`;
+        },
+        () => {
+          const { code, out } = run(args(s, "--check"));
+          expect(out).toContain("no finite totalMinutesCeiling");
+          expect(code).toBe(1);
+        },
+      );
+    });
   });
 
   it("refuses the same deletion on --record, so the null can never be written", () => {
-    withMutation(
-      RATCHET,
-      (s) => {
-        const d = JSON.parse(s) as Record<string, unknown>;
-        delete d.totalMinutesCeiling;
-        return `${JSON.stringify(d, null, 2)}\n`;
-      },
-      () => {
-        const { code, out } = run(["--record"]);
-        expect(out).toContain("no finite totalMinutesCeiling");
-        expect(code).toBe(1);
-        // And the file is untouched: `Math.min(undefined, N)` is NaN, which
-        // `JSON.stringify` writes as `null`, and a null bound is worse than an
-        // absent one because absent exits 1 while null reports ok.
-        expect(readFileSync(RATCHET, "utf8")).not.toContain("null");
-      },
-    );
+    withSandbox((s) => {
+      withMutation(
+        s.ratchet,
+        (text) => {
+          const d = JSON.parse(text) as Record<string, unknown>;
+          delete d.totalMinutesCeiling;
+          return `${JSON.stringify(d, null, 2)}\n`;
+        },
+        () => {
+          const { code, out } = run(args(s, "--record"));
+          expect(out).toContain("no finite totalMinutesCeiling");
+          expect(code).toBe(1);
+          // And the file is untouched: `Math.min(undefined, N)` is NaN, which
+          // `JSON.stringify` writes as `null`, and a null bound is worse than an
+          // absent one because absent exits 1 while null reports ok.
+          expect(readFileSync(s.ratchet, "utf8")).not.toContain("null");
+        },
+      );
+    });
   });
 
   it("refuses an EMPTY gatedClients, which would gate nothing while reading as a policy", () => {
-    withMutation(
-      RATCHET,
-      (s) => s.replace(/"gatedClients": \[[^\]]*\]/, '"gatedClients": []'),
-      () => {
-        const { code, out } = run(["--check"]);
-        expect(out).toContain("needs a non-empty gatedClients array");
-        expect(code).toBe(1);
-      },
-    );
+    withSandbox((s) => {
+      withMutation(
+        s.ratchet,
+        (text) => text.replace(/"gatedClients": \[[^\]]*\]/, '"gatedClients": []'),
+        () => {
+          const { code, out } = run(args(s, "--check"));
+          expect(out).toContain("needs a non-empty gatedClients array");
+          expect(code).toBe(1);
+        },
+      );
+    });
   });
 });
 
@@ -116,83 +189,85 @@ describe("--record refuses a roster the guard has just rejected", () => {
   // with no legitimate way back down.
 
   it("exits 1, prints the failures, and leaves the ratchet bytes untouched", () => {
-    const injected = join(ROOT, "src/screens/ZzRecordProbe.tsx");
-    const ratchetBefore = readFileSync(RATCHET, "utf8");
-    try {
-      writeFileSync(injected, "export const ZzRecordProbe = () => null;\n");
-      const { code, out } = run(["--record"]);
-      expect(out).toContain("--record refused");
-      expect(out).toContain("no roster entry claims src/screens/ZzRecordProbe.tsx");
-      expect(code).toBe(1);
-      expect(readFileSync(RATCHET, "utf8")).toBe(ratchetBefore);
-    } finally {
-      rmSync(injected, { force: true });
-      writeFileSync(RATCHET, ratchetBefore);
-    }
+    withSandbox(
+      (s) => {
+        const sandboxBefore = readFileSync(s.ratchet, "utf8");
+        const realBefore = readFileSync(RATCHET, "utf8");
+        const { code, out } = run(args(s, "--record"));
+        expect(out).toContain("--record refused");
+        expect(out).toContain("no roster entry claims src/screens/ZzRecordProbe.tsx");
+        expect(code).toBe(1);
+        expect(readFileSync(s.ratchet, "utf8")).toBe(sandboxBefore);
+        // And the real record was never in reach of the write at all, which is what
+        // moving this test off the real tree bought.
+        expect(readFileSync(RATCHET, "utf8")).toBe(realBefore);
+      },
+      () => sandboxWithScreen("ZzRecordProbe.tsx"),
+    );
   });
 
   it("says there is nothing to lock in when the record already describes the roster", () => {
     // The other direction: on a clean tree at the recorded numbers, --record is a
     // no-op rather than a rewrite. A test that only proves the refusal would pass
     // against a --record that refuses everything.
-    const before = readFileSync(RATCHET, "utf8");
-    const { code, out } = run(["--record"]);
-    expect(out).toContain("nothing to lock in");
-    expect(code).toBe(0);
-    expect(readFileSync(RATCHET, "utf8")).toBe(before);
+    withSandbox((s) => {
+      const before = readFileSync(s.ratchet, "utf8");
+      const { code, out } = run(args(s, "--record"));
+      expect(out).toContain("nothing to lock in");
+      expect(code).toBe(0);
+      expect(readFileSync(s.ratchet, "utf8")).toBe(before);
+    });
   });
 });
 
 describe("a surface entering the tree fails by name", () => {
   it("names an unclaimed screen, and --emit refuses to publish a projection of a rejected roster", () => {
-    const injected = join(ROOT, "src/screens/ZzGuardProbe.tsx");
-    const projectionBefore = readFileSync(PROJECTION, "utf8");
-    try {
-      writeFileSync(injected, "export const ZzGuardProbe = () => null;\n");
+    withSandbox(
+      (s) => {
+        const projectionBefore = readFileSync(s.projection, "utf8");
 
-      const checked = run(["--check"]);
-      expect(checked.out).toContain("no roster entry claims src/screens/ZzGuardProbe.tsx");
-      expect(checked.code).toBe(1);
+        const checked = run(args(s, "--check"));
+        expect(checked.out).toContain("no roster entry claims src/screens/ZzGuardProbe.tsx");
+        expect(checked.code).toBe(1);
 
-      // The `--emit` half is the one review found: it used to write the CC-BY
-      // projection and THEN exit 1, publishing a document describing a state
-      // nobody accepted. `--record` refuses for the same reason with the
-      // opposite sign, so the principle was already in the file and applied in
-      // one of the two places it holds.
-      const emitted = run(["--emit"]);
-      expect(emitted.out).toContain("was NOT written");
-      expect(emitted.code).toBe(1);
-      expect(readFileSync(PROJECTION, "utf8")).toBe(projectionBefore);
-    } finally {
-      rmSync(injected, { force: true });
-      writeFileSync(PROJECTION, projectionBefore);
-    }
+        // The `--emit` half is the one review found: it used to write the CC-BY
+        // projection and THEN exit 1, publishing a document describing a state
+        // nobody accepted. `--record` refuses for the same reason with the
+        // opposite sign, so the principle was already in the file and applied in
+        // one of the two places it holds.
+        const emitted = run(args(s, "--emit"));
+        expect(emitted.out).toContain("was NOT written");
+        expect(emitted.code).toBe(1);
+        expect(readFileSync(s.projection, "utf8")).toBe(projectionBefore);
+      },
+      () => sandboxWithScreen("ZzGuardProbe.tsx"),
+    );
   });
 });
 
 describe("the generated projection is gated, not merely generated", () => {
-  it("names a hand edit to docs/dev/manual-test-roster.md", () => {
-    withMutation(
-      PROJECTION,
-      (s) => `${s}\nA line somebody added by hand.\n`,
-      () => {
-        const { code, out } = run(["--check"]);
-        expect(out).toContain("is stale");
-        expect(code).toBe(1);
-      },
-    );
+  it("names a hand edit to the projection", () => {
+    withSandbox((s) => {
+      withMutation(
+        s.projection,
+        (text) => `${text}\nA line somebody added by hand.\n`,
+        () => {
+          const { code, out } = run(args(s, "--check"));
+          expect(out).toContain("is stale");
+          expect(code).toBe(1);
+        },
+      );
+    });
   });
 
   it("regenerates byte-identically, so --emit and --check agree", () => {
-    const before = readFileSync(PROJECTION, "utf8");
-    const copy = join(ROOT, "docs/dev/.manual-test-roster.probe");
-    try {
-      copyFileSync(PROJECTION, copy);
-      expect(run(["--emit"]).code).toBe(0);
-      expect(readFileSync(PROJECTION, "utf8")).toBe(before);
-    } finally {
-      rmSync(copy, { force: true });
-      writeFileSync(PROJECTION, before);
-    }
+    withSandbox((s) => {
+      const before = readFileSync(s.projection, "utf8");
+      expect(run(args(s, "--emit")).code).toBe(0);
+      expect(readFileSync(s.projection, "utf8")).toBe(before);
+      // The bytes are the real projection's, so this reproduces the checked-in
+      // document rather than a sandbox agreeing with itself.
+      expect(before).toBe(readFileSync(PROJECTION, "utf8"));
+    });
   });
 });
