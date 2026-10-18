@@ -93,7 +93,7 @@
   "mobile/src/app/flows/JoinFlow.tsx": 5,
   "mobile/src/app/flows/PickerFlow.tsx": 2,
   "mobile/src/app/flows/RecordingSheet.tsx": 1,
-  "mobile/src/app/flows/RecoverFlow.tsx": 6,
+  "mobile/src/app/flows/RecoverFlow.tsx": 5,
   "mobile/src/app/flows/SettingsSheet.tsx": 10,
   "mobile/src/app/flows/ShareImportToast.tsx": 1,
   "mobile/src/app/flows/SnapshotsSheet.tsx": 1,
