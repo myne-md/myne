@@ -199,14 +199,20 @@ export function ToolbarCustomizeSettings() {
         label={t("settings.toolbarCustomize.label")}
         helper={t("settings.toolbarCustomize.helper")}
         control={
-          <div data-testid="settings.toolbar-customize" style={LIST_STYLE}>
+          <div data-testid="settings.toolbar-customize" style={LIST_STYLE} role="list">
             {fullOrder.map((id, i) => {
               const isPending = PENDING_SET.has(id);
+              // The row's own label, reused for the checkbox below: the two
+              // lists either side of this one name their trailing show/hide
+              // control with the item's label too (`BarCustomizeSettings`'s
+              // `Switch ariaLabel`), and a list of twelve boxes whose names are
+              // all "Show" is a list of twelve identical controls.
+              const label = t(toolbarItemLabelKey(id) ?? id);
               return (
                 <CustomizeRow
                   key={id}
                   id={id}
-                  label={t(toolbarItemLabelKey(id) ?? id)}
+                  label={label}
                   index={i}
                   total={fullOrder.length}
                   reorder={reorder}
@@ -228,6 +234,13 @@ export function ToolbarCustomizeSettings() {
                           checked={!hiddenSet.has(id)}
                           onChange={() => toggleShown(id)}
                           disabled={isPending}
+                          // `role="list"` above and this name are the two things
+                          // axe reported as critical on this story: a
+                          // `role="listitem"` whose parent is a plain div, and a
+                          // form element with no accessible name. The sibling
+                          // lists had both; this one adopted the shared row
+                          // without them.
+                          aria-label={label}
                           style={HIDDEN_INPUT_STYLE}
                           data-testid="settings.toolbar-customize.toggle"
                           data-item-id={id}
