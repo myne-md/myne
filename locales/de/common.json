@@ -227,7 +227,8 @@
       "targetVault": "Über den ganzen Tresor",
       "running": "Arbeitet an dieser Unterhaltung",
       "newConversation": "Neue Unterhaltung",
-      "historyLabel": "Verlauf"
+      "historyLabel": "Verlauf",
+      "searchClear": "Alle Unterhaltungen anzeigen"
     },
     "focus": {
       "title": "Agent an Notiz",
@@ -307,8 +308,8 @@
       "clearSearchAriaLabel": "Suche löschen",
       "emptyClearSearch": "Suche löschen",
       "emptyImportHint": "Dateien, die Sie einer Notiz hinzufügen, werden in Ihrem Tresor aufbewahrt; sie werden auf diesem Gerät verschlüsselt, bevor sie irgendwohin gelangen. Importieren Sie eine, um zu beginnen.",
-      "emptyLoadError": "Der Anhangskatalog konnte nicht gelesen werden.",
-      "emptyNoAttachments": "Noch keine Anhänge.",
+      "emptyLoadError": "Der Anhangskatalog konnte nicht gelesen werden",
+      "emptyNoAttachments": "Noch keine Anhänge",
       "emptyNoResultsTitle": "Keine passenden Anhänge.",
       "filterAriaLabel": "Nach Typ filtern",
       "gridView": "Rasteransicht",
@@ -356,7 +357,15 @@
       "emptyFilteredBody": "Hier entspricht nichts dem aktuellen Typfilter. Leeren Sie ihn, um die ganze Bibliothek wieder zu sehen.",
       "emptyFilteredBodyQuery": "Nichts in der Bibliothek passt zu",
       "emptyLoadErrorBody": "Der Katalog ist mit Ihrem Tresor verschlüsselt, daher ist dies meist ein unterbrochener Lesevorgang und keine verlorenen Daten. Versuchen Sie es erneut; wenn es weiterhin scheitert, sind Ihre Notizen und ihre Dateien unversehrt.",
-      "emptyRetry": "Erneut versuchen"
+      "emptyRetry": "Erneut versuchen",
+      "transcriptCopy": "Kopieren",
+      "transcriptCopied": "Transkript kopiert.",
+      "transcriptCopyFailed": "Das Transkript konnte nicht kopiert werden.",
+      "transcriptEmpty": "In dieser Aufnahme wurde keine Sprache gefunden.",
+      "transcriptNoteTitle": "{{name}} (Transkript)",
+      "transcriptSave": "Als Notiz speichern",
+      "transcriptSaved": "Transkript als Notiz gespeichert.",
+      "transcriptSaveFailed": "Das Transkript konnte nicht als Notiz gespeichert werden."
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -787,6 +796,12 @@
       },
       "openPalette": {
         "label": "Suchen und einen Befehl ausführen…"
+      },
+      "attachFile": {
+        "label": "Datei anhängen…"
+      },
+      "convertImportedAttachments": {
+        "label": "Importierte Anhänge umwandeln…"
       }
     },
     "hotkeys": {
@@ -1221,8 +1236,6 @@
           "insert": "In Notiz einfügen",
           "noAnswer": "Keine Antwort. Versuchen Sie, es anders zu formulieren.",
           "newChat": "Neuer Chat",
-          "noModelHint": "Es ist kein KI-Anbieter eingerichtet, daher haben Chat, Zusammenfassungen, Umschreiben und semantische Suche nichts, worauf sie laufen können. Richte einen unter Einstellungen → Developer → KI ein.",
-          "unreachableHint": "Der von dir eingerichtete Anbieter antwortet nicht. Prüfe, ob er läuft, und sende dann erneut.",
           "unavailableHint": "Dieser Build von Myne wurde ohne lokale KI kompiliert, daher kann hier nichts laufen. Keine Einstellung ändert das — es braucht einen Build mit integrierter KI.",
           "offHint": "Lokale KI ist aus. Schalte sie unter Einstellungen → Developer → KI ein.",
           "send": "Senden",
@@ -1240,9 +1253,7 @@
           "historyCancel": "Abbrechen",
           "historyDelete": "Löschen",
           "historyDeleteBody": "Dies löscht die Unterhaltung auf jedem Gerät, sobald es sich das nächste Mal verbindet. Dies kann nicht rückgängig gemacht werden.",
-          "historyEmpty": "Noch keine Unterhaltungen. Neue Chats erscheinen hier.",
           "historyError": "Unterhaltungen konnten nicht geladen werden. Versuche es erneut.",
-          "historyLoading": "Wird geladen…",
           "historyProposalNewNote": "Neue Notiz",
           "historyRename": "Umbenennen",
           "historyTitle": "Chat-Verlauf",
@@ -1274,7 +1285,16 @@
           "diffTitle": "Vorgeschlagene Änderungen",
           "revertConfirmTitle": "Diesen Durchlauf rückgängig machen?",
           "revertConfirmBody": "Notizen, die dieser Durchlauf geändert hat, kehren in den Zustand davor zurück. Notizen, die er erstellt hat, bleiben, wo sie sind.",
-          "focusAgent": "Im Agent-Tab öffnen"
+          "focusAgent": "Im Agent-Tab öffnen",
+          "statusNoModelChosen": "Kein Modell",
+          "statusNoCredential": "Kein API-Schlüssel",
+          "statusConsentMissing": "Zustimmung erforderlich",
+          "statusNotAllowed": "Nicht erlaubt",
+          "statusKeyRejected": "Schlüssel abgelehnt",
+          "statusOutOfCredit": "Guthaben aufgebraucht",
+          "statusRefused": "Abgelehnt",
+          "statusNotWorking": "Funktioniert nicht",
+          "historyRetry": "Erneut versuchen"
         },
         "allHidden": "Alle Tabs sind ausgeblendet. Rechtsklick zum Wiederherstellen.",
         "outline": {
@@ -1404,7 +1424,8 @@
       "propertiesLabel": "Eigenschaften",
       "removeListItemAriaLabel": "{{item}} entfernen",
       "titleAriaLabel": "Notiztitel",
-      "titlePlaceholder": "Ohne Titel"
+      "titlePlaceholder": "Ohne Titel",
+      "managedField": "Dieses Feld schreibt Myne"
     },
     "mermaid": {
       "rendering": "Diagramm wird gerendert…",
@@ -1456,7 +1477,8 @@
       "voiceNote": "Sprachnotiz",
       "wikiLink": "Wikilink",
       "remind": "Erinnerung",
-      "meeting": "Besprechungssitzung"
+      "meeting": "Besprechungssitzung",
+      "sheetTitle": "Einfügen"
     },
     "spell": {
       "menu": {
@@ -1618,6 +1640,9 @@
       },
       "convertCore": {
         "noMatch": "kein Treffer"
+      },
+      "picker": {
+        "sheetTitle": "Mit Notiz verknüpfen"
       }
     },
     "flow": {
@@ -1814,6 +1839,9 @@
       "tapSilent": "Das Audio der anderen Teilnehmenden kommt nicht durch. Prüfen Sie Systemeinstellungen, Datenschutz & Sicherheit, Bildschirm- & Systemaudio-Aufnahme.",
       "transcriptHeading": "Transkript",
       "transcriptionFailed": "Ein Teil der Besprechung konnte nicht transkribiert werden. Das Audio ist weiterhin in der Notiz."
+    },
+    "templateToken": {
+      "sheetTitle": "Token einfügen"
     }
   },
   "export": {
@@ -1862,7 +1890,7 @@
         "title": "Als Markdown exportieren",
         "copyLabel": "Notiztext in die Zwischenablage kopieren",
         "copied": "Notiztext kopiert",
-        "copyFailed": "Notiztext konnte nicht kopiert werden"
+        "copyFailed": "Der Notiztext konnte nicht kopiert werden"
       }
     },
     "egress": {
@@ -2086,8 +2114,8 @@
       "tooLong": "Dieser Ordnerpfad ist zu lang.",
       "moveIntoSelf": "Ein Ordner kann nicht in sich selbst verschoben werden.",
       "moveCollision": "Dort gibt es bereits einen Ordner mit diesem Namen.",
-      "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde der Ordner nicht verändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
-      "renameFailed": "Der Ordner konnte nicht umbenannt werden, daher ist er unverändert.",
+      "unsettledSave": "Eine offene Notiz wurde noch nicht fertig gespeichert, der Ordner wurde also unverändert gelassen. Versuchen Sie es erneut, sobald sie fertig ist.",
+      "renameFailed": "Der Ordner konnte nicht umbenannt werden, er ist also unverändert.",
       "deliberateWriteFailed": "Der Ordner wurde umbenannt, aber eine seiner Einstellungen konnte nicht gespeichert werden. Bei jedem Entsperren erscheint erneut ein leerer Ordner mit dem alten Namen; Sie können ihn sicher löschen, ohne dass sich sonst etwas ändert. Ein erneutes Umbenennen des Ordners entfernt ihn nicht.",
       "folderListFull": "Myne kann sich nur eine begrenzte Anzahl von Ordnern merken, und diese Liste ist voll. Dieser Ordner funktioniert weiterhin, verschwindet aber, sobald seine letzte Notiz ihn verlässt. Wenn Sie einen Ordner löschen, den Sie nicht mehr brauchen, wird wieder Platz frei.",
       "folderNotRemembered": "Der Ordner wurde erstellt, aber Myne konnte ihn nicht vermerken. Er verschwindet, sobald seine letzte Notiz ihn verlässt, und ist beim nächsten Entsperren weg, wenn er dann noch leer ist. Sie können ihn gefahrlos erneut erstellen."
@@ -2124,7 +2152,11 @@
         "derivedMakeEditableFailed": "Diese Gruppen konnten nicht gespeichert werden. Versuchen Sie es erneut.",
         "derivedNote_one": "Der Graph ist nach Tag eingefärbt: {{count}} Gruppe, abgeleitet aus Ihren Tags. Erst wenn Sie ihn editierbar machen, wird er gespeichert.",
         "derivedNote_other": "Der Graph ist nach Tag eingefärbt: {{count}} Gruppen, abgeleitet aus Ihren Tags. Sie werden erst gespeichert, wenn Sie sie editierbar machen.",
-        "newRuleTitle": "Neue Farbgruppe"
+        "newRuleTitle": "Neue Farbgruppe",
+        "moveDown": "Regel nach unten verschieben",
+        "moveUp": "Regel nach oben verschieben",
+        "mobileEmptyBody": "Farbgruppen färben den Graphen nach Tag oder Ordner und werden an einem Computer erstellt. Dieses Telefon verwendet sie, kann aber noch keine erstellen, weil eine neue Gruppe einen Filter braucht.",
+        "mobileSharedNotice": "Farbgruppen werden geteilt: Eine Änderung hier ersetzt die ganze Liste auf Ihren anderen Geräten, und eine an einem Computer bearbeitete Liste kommt hier an."
       },
       "depthToggleTitle": "Nachbarschaftstiefe umschalten (1 ↔ 2 Sprünge)",
       "filterAll": "Alle",
@@ -2351,7 +2383,7 @@
     "list": {
       "addToFavorites": "Zu Favoriten hinzufügen",
       "archiveBulkError": "Die Notizen konnten nicht archiviert werden.",
-      "renameFailed": "Dieser Name konnte nicht gespeichert werden, daher behält die Notiz ihren alten.",
+      "renameFailed": "Dieser Name konnte nicht gespeichert werden, die Notiz behielt also ihren alten.",
       "archiveFolder": "Ordner archivieren",
       "archiveNote": "Archivieren",
       "archiveSingleError": "Die Notiz konnte nicht archiviert werden.",
@@ -2378,7 +2410,7 @@
       "deleteFolderWarning": "Die Notizen werden in den Papierkorb verschoben. Sie können sie später wiederherstellen.",
       "duplicate": "Duplizieren",
       "editFilterTitle": "Filter bearbeiten",
-      "emptyState": "Noch keine Notizen.",
+      "emptyState": "Noch keine Notizen",
       "favoritesHeading": "Favoriten",
       "icon": "Symbol…",
       "mergeAnyway": "Trotzdem zusammenführen",
@@ -2622,7 +2654,7 @@
       "thisNote": "diese Notiz",
       "untitled": "Ohne Titel"
     },
-    "unsettledSave": "Eine geöffnete Notiz ist noch nicht fertig gespeichert, daher wurde nichts geändert. Versuchen Sie es erneut, sobald sie gespeichert ist.",
+    "unsettledSave": "Eine offene Notiz wurde noch nicht fertig gespeichert, es wurde also nichts geändert. Versuchen Sie es erneut, sobald sie fertig ist.",
     "views": {
       "cards": {
         "changeCover": "Titelbild ändern",
@@ -2925,7 +2957,39 @@
       "updateIdle": "Signierte Aktualisierungen, bei Ihrer Prüfung von downloads.myne.md geholt.",
       "updateInstallButton": "Zum Aktualisieren neu starten",
       "updateLabel": "Aktualisierungen",
-      "updateUpToDate": "Sie haben die neueste Version."
+      "updateUpToDate": "Sie haben die neueste Version.",
+      "developerModeInline": "Zeigt die Einstellungen, die Myne standardmäßig aus dem Weg hält.",
+      "diagnosticLogHelper": "Schreibt ein Klartextprotokoll auf diesem Gerät und nur auf diesem. Es zeichnet auf, was Myne gerade tut: nie Ihren Notiztext, nie einen Notiztitel, nie einen Dateipfad. Myne begrenzt die Größe und verwirft zuerst die ältesten Einträge; wenn Sie dies wieder ausschalten, wird das Protokoll gelöscht. Es wird nie etwas irgendwohin gesendet; Sie entscheiden, was Sie teilen.",
+      "diagnosticLogLabel": "Diagnoseprotokollierung",
+      "diagnosticLogError": "Myne konnte diese Einstellung nicht ändern.",
+      "diagnosticLogReadError": "Myne konnte die Einstellung für die Diagnoseprotokollierung nicht lesen, sie wird daher als aus angezeigt.",
+      "diagnosticBlockLabel": "Berichtsdetails",
+      "diagnosticBlockHelper": "Genau das, was Kopieren in Ihre Zwischenablage legt. Es wird nichts irgendwohin gesendet; Sie entscheiden, was Sie teilen.",
+      "diagnosticCopy": "Diagnose kopieren",
+      "diagnosticCopyDone": "Diagnose kopiert",
+      "diagnosticCopyFailed": "Kopieren nicht möglich. Wählen Sie den Text oben aus und kopieren Sie ihn von Hand.",
+      "crashRecordLabel": "Absturzbericht",
+      "crashRecordHelper": "Myne hat am {{date}} einen Absturz aufgezeichnet. Er enthält die Datei und Zeile, die Version und Ihre Plattform, und sonst nichts. Löschen Sie ihn, wann immer Sie möchten.",
+      "crashRecordClear": "Löschen",
+      "diagnosticFilesLabel": "Berichtsdatei",
+      "diagnosticFilesUnknown": "Myne hat das Protokoll noch nicht gelesen.",
+      "crashRecordDateUnknown": "ein unbekanntes Datum",
+      "diagnosticReveal": "Protokollordner anzeigen",
+      "diagnosticSave": "Bericht als Datei speichern…",
+      "diagnosticSaveDone": "Bericht gespeichert",
+      "diagnosticSaveFailed": "Myne konnte den Bericht nicht speichern.",
+      "diagnosticRevealFailed": "Myne konnte den Protokollordner nicht öffnen.",
+      "crashRecordClearFailed": "Myne konnte den Absturzbericht nicht löschen.",
+      "crashRecordReadFailed": "Myne konnte den Absturzbericht nicht lesen und kann daher nicht sagen, ob einer existiert.",
+      "sections": {
+        "version": "Version",
+        "updates": "Auf dem neuesten Stand bleiben",
+        "legal": "Rechtliches und Lizenzen",
+        "developer": "Entwickler",
+        "diagnostics": "Diagnose"
+      },
+      "diagnosticFilesHelper_one": "Eine Datei würde diesen Block plus {{count}} Protokolldatei enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
+      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht."
     },
     "vault": {
       "changePasswordButton": "Passwort ändern",
@@ -2934,39 +2998,46 @@
         "ioError": "Festplattenfehler, bitte versuchen Sie es erneut.",
         "joinFailure": "Etwas ist schiefgelaufen, bitte versuchen Sie es erneut.",
         "samePasswordRejected": "Das neue Passwort stimmt mit dem aktuellen überein.",
-        "serverAckPending": "Ihr neues Passwort funktioniert auf diesem Gerät, aber Myne konnte den Server nicht erreichen, um es zu speichern. Bis das gelingt, erwarten Ihre anderen Geräte weiterhin das alte Passwort, und wenn die Kopie dieses Browsers vorher gelöscht wird, ist die Änderung verloren. Es wird automatisch erneut versucht.",
+        "serverAckPending": "Ihr neues Passwort funktioniert auf diesem Gerät, aber Myne konnte den Server nicht erreichen, um es zu speichern. Bis das gelingt, erwarten Ihre anderen Geräte weiterhin das alte Passwort, und wenn die Kopie dieses Browsers vorher gelöscht wird, geht die Änderung verloren. Es wird automatisch erneut versucht.",
         "weakNewPassword": "Das neue Passwort muss mindestens 12 Zeichen lang sein.",
-        "unexpected": "Diese Passwortänderung ist nicht durchgegangen. Bitte versuchen Sie es erneut.",
+        "unexpected": "Diese Passwortänderung ist nicht durchgelaufen. Bitte versuchen Sie es erneut.",
         "vaultNotUnlocked": "Entsperren Sie diesen Tresor, bevor Sie sein Passwort ändern."
       },
       "changePasswordHeading": "Passwort ändern",
-      "changePasswordHelper": "Wechseln Sie Ihr Master-Passwort, während Sie denselben Tresor behalten. Die Wiederherstellungsphrase bleibt gleich.",
+      "changePasswordHelper": "Ersetzen Sie Ihr Master-Passwort, während derselbe Tresor erhalten bleibt. Die Wiederherstellungsphrase bleibt gleich.",
       "dangerZoneHeading": "Gefahrenzone",
-      "dangerZoneHelper": "Diesen Tresor und alle Notizen endgültig löschen. Kann nicht rückgängig gemacht werden. Die Wiederherstellungsphrase stellt den Tresor nicht wieder her.",
+      "dangerZoneHelper": "Diesen Tresor und alle Notizen dauerhaft löschen. Kann nicht rückgängig gemacht werden. Die Wiederherstellungsphrase stellt den Tresor nicht wieder her.",
       "localEraseHeading": "Dieser Browser",
-      "localEraseHelper": "Löscht Mynes Kopie Ihres Tresors aus diesem Browser. Ihr Konto und alles bereits Synchronisierte bleiben auf dem Server.",
+      "localEraseHelper": "Löschen Sie Mynes Kopie Ihres Tresors aus diesem Browser. Ihr Konto und alles bereits Synchronisierte bleiben auf dem Server.",
       "localEraseButton": "Abmelden und die Kopie dieses Browsers löschen…",
       "deleteVaultButton": "Tresor löschen…",
-      "vaultLabelEyebrow": "TRESORBEZEICHNUNG",
-      "vaultLabelHelper": "Ein Name für diesen Tresor, angezeigt im In-App-Umschalter und in der Tresorauswahl beim Start, bevor Sie entsperren. Wird verschlüsselt im Tresor gespeichert; verlässt Ihr Gerät niemals im Klartext.",
+      "vaultLabelEyebrow": "TRESOR-BEZEICHNUNG",
+      "vaultLabelHelper": "Ein Name für diesen Tresor, angezeigt im In-App-Wechsler und im Start-Tresor-Auswahlbildschirm vor dem Entsperren. Verschlüsselt im Tresor gespeichert; verlässt Ihr Gerät nie im Klartext.",
       "vaultLabelPlaceholder": "Bezeichnung hinzufügen…",
-      "vaultLabelRenameNotice": "Bis Sie diesen Tresor auf Ihren anderen Geräten entsperren, zeigen deren Sperrbildschirme weiterhin, was sie zuletzt gespeichert haben: einen früheren Namen oder einen Platzhalter, falls sie nie einen gespeichert haben.",
+      "vaultLabelRenameNotice": "Bis Sie diesen Tresor auf Ihren anderen Geräten entsperren, zeigen deren Sperrbildschirme weiterhin, was sie zuletzt gespeichert haben: einen früheren Namen oder einen Platzhalter, wenn sie nie einen gespeichert haben.",
       "vaultLabelSave": "Speichern",
       "vaultIconLabel": "SYMBOL",
       "vaultIconDefault": "Standard (Wortmarke)",
       "renamedToast": "Tresor umbenannt",
-      "renameError": "Tresor konnte nicht umbenannt werden",
+      "renameError": "Der Tresor konnte nicht umbenannt werden",
       "newPasswordMismatch": "Die neuen Passwörter stimmen nicht überein.",
-      "samePassword": "Das neue Passwort ist mit dem aktuellen Passwort identisch.",
+      "samePassword": "Das neue Passwort ist dasselbe wie das aktuelle Passwort.",
       "passwordChangedToast": "Passwort geändert",
-      "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
-      "genericChangeError": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-      "renameHelper": "Wird im Tresor-Umschalter angezeigt. Verschlüsselt in diesem Tresor gespeichert; leer lassen, um ihn zu entfernen.",
+      "vaultUnreadable": "Die Tresordatei ist unlesbar. Stellen Sie aus einer Sicherung wieder her.",
+      "genericChangeError": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+      "renameHelper": "Wird im Tresor-Wechsler angezeigt. Verschlüsselt in diesem Tresor gespeichert; leer lassen, um sie zu entfernen.",
       "newPasswordPlaceholder": "Mindestens 12 Zeichen",
       "reenterNewPassword": "Neues Passwort erneut eingeben",
-      "changePasswordFootnote": "Dies macht die Schnellentsperrung ungültig. Deine Wiederherstellungsphrase bleibt unverändert.",
+      "changePasswordFootnote": "Dies macht die Schnellentsperrung ungültig. Ihre Wiederherstellungsphrase bleibt unverändert.",
       "changing": "Wird geändert…",
-      "memberVaultNotice": "Dies ist ein geteilter Tresor. Er hat kein Tresorpasswort. Verwenden Sie „Geteilten Tresor entsperren“ unter Datenschutz, um ein Passwort oder eine PIN hinzuzufügen."
+      "memberVaultNotice": "Dies ist ein geteilter Tresor. Er hat kein Tresor-Passwort. Verwenden Sie „Geteilten Tresor entsperren“ unter Datenschutz, um ein Passwort oder eine PIN hinzuzufügen.",
+      "topics": {
+        "vault": "Tresor",
+        "danger": "Gefahrenzone"
+      },
+      "sections": {
+        "identity": "Tresor-Identität"
+      }
     },
     "appearance": {
       "accentHelper": "Wählen Sie die Akzentfarbe, die in der ganzen App verwendet wird. Nur auf diesem Gerät.",
@@ -3004,6 +3075,16 @@
       "barCustomize": {
         "label": "Untere Leiste",
         "helper": "Wählen Sie, welche Indikatoren die untere Leiste zeigt. Blenden Sie alle aus, und die Leiste selbst wird entfernt, wodurch der Platz zurückgewonnen wird. Ziehen Sie ein Element auf der Leiste oder klicken Sie es mit der rechten Maustaste an, um es umzusortieren."
+      },
+      "topics": {
+        "display": "Anzeige",
+        "notes": "Notizliste",
+        "interface": "Oberfläche"
+      },
+      "sections": {
+        "theme": "Design und Akzent",
+        "sidebar": "In der Seitenleiste",
+        "customisation": "Anpassung"
       }
     },
     "archive": {
@@ -3030,7 +3111,8 @@
       "helper": "Liest Text aus Bildanhängen und gescannten PDFs auf diesem Gerät aus, damit die Suche sie über ihren Inhalt findet. Es wird nichts hochgeladen. Beim Ausschalten stoppt die Extraktion im Hintergrund; bereits extrahierter Text bleibt erhalten.",
       "errorSaveSetting": "Diese Einstellung konnte nicht gespeichert werden.",
       "processing_one": "1 Anhang wird gelesen…",
-      "processing_other": "{{count}} Anhänge werden gelesen…"
+      "processing_other": "{{count}} Anhänge werden gelesen…",
+      "mobileDeviceLocal": "Diese Einstellung gilt pro Gerät: Sie bestimmt, was dieses Telefon indexiert, sodass Ihre anderen Geräte ihre eigene Wahl behalten."
     },
     "autoBackup": {
       "backupFolder": "Sicherungsordner",
@@ -3105,7 +3187,8 @@
       "excludedHelper": "Ein Ordnerpfad pro Zeile. Notizen in diesen Ordnern bleiben aus jedem Terminal-Ergebnis heraus und lassen sich vom Terminal aus auch nicht dorthin schreiben. In der App bleiben sie voll verfügbar. Sie können das festlegen, bevor Sie den Terminal-Zugriff einschalten.",
       "excludedPlaceholder": "Privat/\nTagebuch/",
       "rateLimitLabel": "Das Terminal mit voller Geschwindigkeit laufen lassen",
-      "rateLimitHelper": "Myne beantwortet standardmäßig höchstens 120 Terminal-Befehle pro Minute. Das ist eine Tempobremse für ein außer Kontrolle geratenes Skript, keine Rechteprüfung: Nichts entscheidet, welches Programm fragen darf. Schalten Sie das für Massenarbeit ein, etwa wenn Sie jede Notiz durch ein anderes Werkzeug leiten."
+      "rateLimitHelper": "Myne beantwortet standardmäßig höchstens 120 Terminal-Befehle pro Minute. Das ist eine Tempobremse für ein außer Kontrolle geratenes Skript, keine Rechteprüfung: Nichts entscheidet, welches Programm fragen darf. Schalten Sie das für Massenarbeit ein, etwa wenn Sie jede Notiz durch ein anderes Werkzeug leiten.",
+      "inlineOn": "Jedes Programm, das unter Ihrem Konto läuft, kann darüber Notizen lesen, durchsuchen und erstellen."
     },
     "clipperInstall": {
       "error": "Die Einstellung für den Browser-Clipper konnte nicht aktualisiert werden.",
@@ -3175,7 +3258,12 @@
       "periodFormatAriaLabel": "Titelformat für {{period}} Notizen",
       "periodTemplateAriaLabel": "Vorlage für {{period}} Notizen",
       "sectionPeriodic": "Periodische Notizen",
-      "periodSwitcherAriaLabel": "Typ der periodischen Notiz"
+      "periodSwitcherAriaLabel": "Art der periodischen Notiz",
+      "blockLabel": "Periodische Notizen",
+      "mobilePeriodAriaLabel": "Notizzeitraum",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Speichern",
+      "mobileSharedNotice": "Diese Einstellungen werden geteilt: Eine Änderung hier erreicht Ihre anderen Geräte, und derselbe Wert, der an einem Computer gesetzt wird, kommt hier an."
     },
     "deleteVault": {
       "cancel": "Abbrechen",
@@ -3227,6 +3315,10 @@
         "searchEmpty": "Keine Notizen gefunden.",
         "searchPlaceholder": "Notizen durchsuchen…",
         "untitledNote": "Ohne Titel"
+      },
+      "sections": {
+        "notes": "Notizen und Ordner",
+        "attachments": "Anhänge"
       }
     },
     "focusMode": {
@@ -3341,12 +3433,12 @@
         "excludedLabel": "Ausgeschlossene Ordner"
       },
       "disclosureToggle": "Wie funktioniert das?",
-      "enableHelper": "Führt ein von Ihnen bereitgestelltes Modell aus. Wo es läuft und ob Ihre Notizen dieses Gerät verlassen, hängt davon ab, welchen Anbieter Sie unten benennen. Experimentell, standardmäßig aus.",
-      "enableLabel": "Lokale KI aktivieren",
-      "excludedHelper": "Notizen in diesen Ordnern werden von der KI nie gelesen oder indexiert. Leer bedeutet, dass die KI alles sehen kann; dies ist dieselbe Liste, die der Kommandozeilen-Client berücksichtigt. Ein Ordnerpfad pro Zeile.",
+      "enableHelper": "Schaltet jede KI-Funktion ein. Wo ein Modell läuft und ob Ihre Notizen dieses Gerät verlassen, hängt beides von dem Anbieter ab, den Sie unten wählen. Experimentell, standardmäßig aus.",
+      "enableLabel": "KI-Funktionen einschalten",
+      "excludedHelper": "Notizen in diesen Ordnern werden von der KI nie gelesen oder indexiert. Leer bedeutet, die KI kann alles sehen. Ein Ordnerpfad pro Zeile.",
       "excludedLabel": "Ausgeschlossene Ordner",
       "excludedPlaceholder": "Privat/\nTagebuch/",
-      "endpointHelper": "Wenn Sie auf diesem Computer bereits eine Modell-Laufzeitumgebung betreiben, geben Sie hier deren Adresse an – dann nutzt Myne sie, statt Modelldateien auszuwählen. Lassen Sie dies leer, um die Dateien oben zu verwenden.",
+      "endpointHelper": "Wenn Sie bereits eine Modell-Laufzeitumgebung auf diesem Computer betreiben, verweisen Sie Myne stattdessen darauf, anstatt Modelldateien auszuwählen. Lassen Sie dies leer, um die unter Modelle festgelegten Modelldateien zu verwenden.",
       "endpointLabel": "Lokale Modell-Laufzeitumgebung",
       "endpointModelHelper": "Myne wählt kein Modell für Sie aus. Solange Sie keines angeben, wird die Adresse oben zwar gespeichert, aber nicht verwendet.",
       "endpointModelLabel": "Dort zu verwendendes Modell",
@@ -3373,7 +3465,8 @@
         "unreachable": "Der Anbieter ist nicht erreichbar. Prüfen Sie Ihre Netzwerkverbindung.",
         "featureOff": "KI ist auf diesem Gerät ausgeschaltet. Es wurde nichts gesendet. Schalten Sie sie in den Einstellungen unter KI ein.",
         "consentMissing": "Sie haben nicht zugestimmt, Notizen von diesem Gerät an diesen Anbieter zu senden. Es wurde nichts gesendet. Wählen Sie den Anbieter in den Einstellungen unter KI erneut aus und lesen Sie, was gesendet wird.",
-        "emptyGrant": "Alles, was dieser Lauf lesen konnte, liegt in Ordnern, die die KI nie sieht. Nichts wurde gesendet. Ändern Sie es unter Einstellungen, KI, Ausgeschlossene Ordner."
+        "emptyGrant": "Alles, was dieser Lauf lesen konnte, liegt in Ordnern, die die KI nie sieht. Nichts wurde gesendet. Ändern Sie es unter Einstellungen, KI, Ausgeschlossene Ordner.",
+        "noModel": "Hier ist kein Modell zum Ausführen. Fügen Sie unter Einstellungen, KI, Modelle eines hinzu: Laden Sie eines von Mynes eigenem Ursprung herunter, oder verweisen Sie Myne auf eine Datei, die Sie bereits haben."
       },
       "modelChoose": "Datei auswählen…",
       "modelFilter": {
@@ -3383,7 +3476,7 @@
       "modelNone": "Keine Datei ausgewählt",
       "modelSaveFailed": "Der Modellpfad konnte nicht gespeichert werden (er muss außerhalb deines Tresors liegen).",
       "modelTranscriptionLabel": "Sprache-zu-Text-Modell (Transkription)",
-      "modelsHelper": "Laden Sie hier ein Modell herunter, oder öffnen Sie einen Link, um eines in Ihrem Browser zu holen, und wählen Sie dann die heruntergeladenen Dateien aus. Ein Modell läuft auf Ihrem Gerät; wenn Sie stattdessen einen Anbieter benannt haben, antwortet dieser Anbieter.",
+      "modelsHelper": "Weisen Sie die Datei zu, die jede Rolle verwendet, wenn sie nicht aus der verifizierten Liste oben stammt: Öffnen Sie einen Link, um eine im Browser zu erhalten, und wählen Sie sie dann hier. Ein Modell läuft auf Ihrem Gerät; wenn Sie stattdessen einen Anbieter benannt haben, antwortet dieser Anbieter.",
       "providerHelper": "Statt ein Modell hier auszuführen, kann Myne eine Anfrage an einen von Ihnen benannten Dienst senden. Dabei verlassen Ihre Notizen dieses Gerät. „Keiner“ ist die Voreinstellung und bedeutet, dass überhaupt kein Dienst kontaktiert wird.",
       "providerKeyAdd": "Ihren API-Schlüssel einfügen",
       "providerKeyLabel": "API-Schlüssel",
@@ -3408,7 +3501,7 @@
       "providerModelUnfetched": "Laden Sie die Liste, um ein Modell auszuwählen.",
       "providerNone": "Keiner",
       "providerNothingAnswering": "Es ist noch nichts eingerichtet, das antworten könnte.",
-      "modelsLabel": "Modelle",
+      "modelsLabel": "Ausgelagerte Modelle",
       "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
       "recommendedFilesTranscription": "Benötigt die Whisper-.gguf-Datei + config.json + tokenizer.json im selben Ordner.",
       "title": "KI",
@@ -3424,10 +3517,6 @@
       "meetingPromptHelper": "Die Anweisung, die der Besprechungs-KI-Durchlauf verwendet, um ein Transkript in Abschnitte zu gliedern. Lassen Sie sie leer, um den eingebauten Standard zu verwenden. Sie ersetzt das Standard-Ausgabeformat; wenn Sie sie setzen, verlangen Sie die gewünschten Abschnitte selbst.",
       "meetingPromptLabel": "Prompt für die Besprechungszusammenfassung",
       "meetingPromptReset": "Auf Standard zurücksetzen",
-      "groupAutoTag": "Automatische Tags",
-      "groupVoice": "Sprache und Besprechungen",
-      "groupWriting": "Schreiben und Chat",
-      "groupPrivacy": "Datenschutz und Grenzen",
       "groupAdvanced": "Erweitert",
       "excludedPickLabel": "Einen Ordner zum Auslassen hinzufügen",
       "excludedPickPlaceholder": "Ordner auswählen…",
@@ -3447,7 +3536,39 @@
       "downloadCancel": "Abbrechen",
       "downloadFailed": "Der Download wurde nicht abgeschlossen.",
       "downloadFailedChecksum": "Der Download stimmte nicht mit seinem Fingerabdruck überein und wurde zurückgewiesen. Versuchen Sie es erneut.",
-      "sideloadDisclosure": "Der Entwicklermodus lässt Sie Myne außerdem auf eine Modelldatei verweisen, die Sie selbst beschafft haben. Eine Datei, die Sie woanders herunterladen, wird von Myne nicht geprüft, verwenden Sie also nur eine, der Sie vertrauen."
+      "sideloadDisclosure": "Der Entwicklermodus lässt Sie Myne außerdem auf eine Modelldatei verweisen, die Sie selbst beschafft haben. Eine Datei, die Sie woanders herunterladen, wird von Myne nicht geprüft, verwenden Sie also nur eine, der Sie vertrauen.",
+      "historyBudgetInline": "Wie viel der letzten Unterhaltung jede Anfrage mitführt, in Zeichen.",
+      "historyBudgetMaxNotice": "Sie können höchstens {{max}} Zeichen eingeben; alles Größere wird darauf gekürzt.",
+      "historyBudgetDeviceLocal": "Diese Einstellung gilt pro Gerät: Sie begrenzt, was dieses Telefon sendet, sodass Ihre anderen Geräte ihre eigene behalten.",
+      "meetingPromptShared": "Diese Einstellung wird geteilt: Eine Änderung hier erreicht Ihre anderen Geräte, und eine an einem Computer bearbeitete Eingabeaufforderung kommt hier an.",
+      "groupAnswering": "Antworten",
+      "groupGeneral": "Allgemein",
+      "groupModels": "Modelle",
+      "groupLimits": "Grenzen",
+      "groupTagging": "Tagging",
+      "excludedFoldersHelper": "Notizen in diesen Ordnern werden von der KI nie gelesen oder indexiert. Dies ist dieselbe Liste, die Ihre anderen Geräte verwenden.",
+      "excludedFoldersEmpty": "Noch nichts ausgeschlossen, die KI kann also jeden Ordner in diesem Tresor lesen.",
+      "excludedFoldersAdd": "Hinzufügen",
+      "excludedFoldersAddLabel": "Von der KI auszuschließender Ordner",
+      "excludedFoldersRemove": "Entfernen",
+      "excludedFoldersRemoveLabel": "{{folder}} nicht mehr von der KI ausschließen",
+      "excludedFoldersMonotoneNotice": "Ein auf einem Ihrer Geräte hinzugefügter Ausschluss bleibt, bis Sie ihn überall entfernen: Entfernungen hier werden nicht übertragen, ein Ordner, den Ihre anderen Geräte noch ausschließen, kommt also beim nächsten Sync zurück.",
+      "catalogueOpen": "Ein Modell herunterladen",
+      "catalogueColModel": "Modell",
+      "catalogueColState": "Status",
+      "providerInline": "Ihre Notizen verlassen dieses Gerät, sobald ein Dienst benannt ist.",
+      "providerChooseHelper": "Ein Modell kann auf diesem Gerät laufen, oder Myne kann eine Anfrage an einen von Ihnen benannten Dienst senden. Ihre Notizen verlassen dieses Gerät, wenn das geschieht. „Auf diesem Gerät“ ist die Standardeinstellung und bedeutet, dass überhaupt kein Dienst kontaktiert wird.",
+      "providerChooseLabel": "Anbieter wählen",
+      "providerKeySave": "Diesen Schlüssel speichern",
+      "providerOnDevice": "Auf diesem Gerät",
+      "sections": {
+        "catalogue": "Verifizierte herunterladbare Modelle",
+        "outsourced": "Ausgelagerte Modelle",
+        "preferences": "Einstellungen",
+        "memory": "Gedächtnis",
+        "excluded": "Was die KI lesen darf",
+        "history": "Chat-Verlauf"
+      }
     },
     "network": {
       "disabledCue": "Sync läuft nicht mehr über Tor. Neue Verbindungen gehen direkt zum Sync-Server.",
@@ -3469,7 +3590,8 @@
       "residualScope": "Auf dem Desktop umfasst dies Ihren Sync-Verkehr und Ihre Anfragen an entfernte KI-Anbieter. Mobile hat noch keine Tor-Weiterleitung, daher gehen seine Anbieter-Anfragen direkt. Nichts anderes auf diesem Gerät läuft über Tor.",
       "residualsToggle": "Was das nicht verbirgt",
       "torHelper": "Verbirgt Ihre IP-Adresse und Ihren Standort vor dem Sync-Server und verbirgt vor Ihrem Netzwerk und Ihrem Internetanbieter, mit welchem Server Sie synchronisieren (und auf dem Desktop, welchen KI-Anbieter Sie erreichen). Dass dieses Gerät sich mit Tor verbindet, sehen sie weiterhin. Es macht Sie gegenüber Myne nicht anonym und verbirgt vor dem Server weder, was Sie synchronisieren, noch wann.",
-      "torLabel": "Sync und Desktop-KI über Tor leiten"
+      "torLabel": "Sync und Desktop-KI über Tor leiten",
+      "torInline": "Verbirgt Ihre IP-Adresse und Ihren Standort vor dem Sync-Server und verbirgt vor Ihrem Netzwerk und Ihrem Internetanbieter, mit welchem Server Sie synchronisieren."
     },
     "prefs": {
       "saveError": "Die Einstellung konnte nicht gespeichert werden. Versuchen Sie es erneut.",
@@ -3503,7 +3625,7 @@
       "hideVaultNamesErrorSave": "Die Einstellung konnte nicht gespeichert werden und ist unverändert. Wenn Sie sie gerade aktiviert haben, wurden möglicherweise schon einige gespeicherte Namen zerstört; aktivieren Sie sie erneut, um den Vorgang abzuschließen.",
       "hideVaultNamesErrorErase": "Ein gespeicherter Name konnte nicht zerstört werden. Die Einstellung blieb deshalb deaktiviert, statt eine Löschung zu behaupten, die nicht stattgefunden hat. Versuchen Sie es erneut.",
       "screenCaptureHelperOff": "Der Schutz gilt vor dem Entsperren immer. Nach dem Entsperren folgt er dieser Einstellung.",
-      "screenCaptureHelperOn": "Wirksam unter Windows 10 (Mai-2020-Update) und neuer. macOS und Linux bieten dafür keine System-API, dort kann die Aufnahme also nicht blockiert werden.",
+      "screenCaptureHelperOn": "Wirkt unter Windows 10 (Update von Mai 2020) und später. macOS und Linux haben dafür keine System-API, es kann dort also keine Aufnahme blockieren.",
       "screenCaptureLabel": "Bildschirmaufnahme-Schutz",
       "screenCaptureSubtitle": "Screenshots und Bildschirmaufnahmen blockieren",
       "screenshotBlocked": "Der Bildschirmaufnahme-Schutz ist aktiv: Screenshots von Myne bleiben leer.",
@@ -3526,7 +3648,18 @@
       "recoveryDrillHelper": "Geben Sie die 24 Wörter ein, die Sie aufgeschrieben haben. Myne prüft, ob sie diesen Tresor noch öffnen, und sagt Ihnen nichts weiter — die Wörter werden hier nie angezeigt.",
       "recoveryDrillLabel": "Ihre Wiederherstellungsphrase prüfen",
       "recoveryDrillPassed": "Diese Wörter öffnen diesen Tresor. Bewahren Sie sie dort auf, wo Sie sie gefunden haben.",
-      "recoveryDrillPlaceholder": "Die 24 Wörter, in der Reihenfolge, durch Leerzeichen getrennt"
+      "recoveryDrillPlaceholder": "Die 24 Wörter, in der Reihenfolge, durch Leerzeichen getrennt",
+      "hideVaultNamesInline": "Wenn Sie dies einschalten, werden die Schlüssel zerstört, die die hier gespeicherten Namen lesbar machen.",
+      "topics": {
+        "access": "Zugriff",
+        "locking": "Sperren"
+      },
+      "sections": {
+        "screen": "Bildschirmschutz",
+        "terminal": "Kommandozeilenwerkzeuge",
+        "locking": "Sperren und Entsperren",
+        "recovery": "Wiederherstellung"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Ein anderer Tresorvorgang läuft gerade. Versuchen Sie es gleich erneut.",
@@ -3593,7 +3726,8 @@
         "storage": "Speicher",
         "sync": "Sync",
         "cli": "CLI",
-        "vault": "Tresor"
+        "vault": "Tresor",
+        "data": "Daten"
       },
       "passwordUpdatedToast": "Passwort aktualisiert",
       "title": "Einstellungen"
@@ -3610,7 +3744,8 @@
       "languagesSearchEmpty": "Keine Sprachen passen.",
       "languagesSearchPlaceholder": "Sprachen durchsuchen…",
       "off": "Aus",
-      "on": "Ein"
+      "on": "Ein",
+      "mobileUnavailable": "Die Rechtschreibprüfung ist auf diesem Telefon noch nicht verfügbar: Auf diesem Gerät gibt es kein Wörterbuch, der Editor kann hier also nichts unterstreichen. Schalten Sie sie stattdessen von Ihrem Computer aus ein."
     },
     "storage": {
       "backupHelper": "Sicherungen bleiben genauso verschlüsselt wie Ihr Tresor, in einer einzigen verifizierten .myne-backup-Datei. Die Wiederherstellung funktioniert mit dem Passwort oder der Wiederherstellungsphrase dieses Tresors, genau wie beim Entsperren.",
@@ -3629,7 +3764,12 @@
       "webLocationHelper": "Ihre Notizen liegen im Speicher, den dieser Browser für diese Website verwaltet. Es gibt keinen Ordner zum Öffnen. Wenn Sie die Daten dieser Website löschen, verschwindet die lokale Kopie; da dieser Client synchronisiert, wird sie beim erneuten Anmelden wieder heruntergeladen.",
       "webLocationLabel": "Wo Ihre Notizen gespeichert sind",
       "pathUnavailable": "Pfad nicht verfügbar",
-      "restoreBackup": "Aus Sicherung wiederherstellen…"
+      "restoreBackup": "Aus Sicherung wiederherstellen…",
+      "sections": {
+        "location": "Wo der Tresor liegt",
+        "backup": "Sicherung und Wiederherstellung",
+        "transfer": "Import und Export"
+      }
     },
     "typography": {
       "contentWidthHelper": "Maximale Breite der Bearbeitungsspalte. „Voll“ lässt den Text den ganzen Bereich ausfüllen.",
@@ -3656,7 +3796,8 @@
       "weak": "Schwach",
       "fair": "Mäßig",
       "good": "Gut",
-      "strong": "Stark"
+      "strong": "Stark",
+      "tooWeak": "Zu schwach"
     },
     "sync": {
       "summary": {
@@ -3697,7 +3838,12 @@
         "bullet1": "Zwölf Boxkämpfer jagen Viktor quer über den großen Deich",
         "bullet2": "Vogel Quax zwickt Johnys Pferd Bim",
         "spellCaption": "Rechtschreibprüfung",
-        "spellSample": "Rechtschreipfehler"
+        "spellSample": "Rechtschreipfehler",
+        "dateTime": "Datum und Uhrzeit",
+        "toolbar": "Werkzeugleiste",
+        "task": "Aufgaben",
+        "taskSampleOpen": "Quartalsbericht senden",
+        "taskSampleDone": "Veranstaltungsort buchen"
       },
       "defaultView": "Standardansicht",
       "typewriter": "Schreibmaschinen-Scrollen",
@@ -3715,12 +3861,15 @@
       "taskChipIconOnly": {
         "help": "Priorität nur als Symbol statt als Wort anzeigen.",
         "label": "Nur-Symbol-Priorität"
+      },
+      "topics": {
+        "periodic": "Periodische Notizen"
       }
     },
     "search": {
       "placeholder": "Einstellungen durchsuchen…",
       "ariaLabel": "Einstellungen durchsuchen",
-      "empty": "Keine Einstellungen passen zu „{{query}}“.",
+      "empty": "Keine Einstellungen passen zu „{{query}}“",
       "resultsLabel": "Suchergebnisse",
       "keywords": {
         "aiAutoTag": "auto tag tags vorschlagen vorschläge schlagwörter automatisch ki ai",
@@ -3729,7 +3878,7 @@
         "aiProviderModel": "modell modelle katalog liste welches modell llama qwen gpt auswählen entfernter anbieter remote",
         "aiEnable": "lokale ki ai an aus aktivieren deaktivieren einschalten maschinelles lernen llm",
         "aiExcluded": "ausgeschlossene ordner ausschließen ignorieren ki ai datenschutz privatsphäre",
-        "aiModels": "modelle modell gguf herunterladen download text embedding einbettung llm ki",
+        "aiModels": "modelle gguf herunterladen text embedding llm katalog",
         "archive": "archiv archivieren ausblenden wiederherstellen notizen",
         "autoBackup": "automatische sicherungen backups zeitplan häufigkeit aufbewahrung ordner",
         "autoLock": "automatische sperre sperren zeitlimit leerlauf inaktivität timer sitzung auto lock",
@@ -3794,15 +3943,16 @@
         "ribbon": "linke leiste schiene anheften pins befehl befehle anpassen umsortieren lösen werkzeugleiste kürzel",
         "folderNotes": "ordner notiz index folder_index startseite doppelklick ordner link projekte aus schalter deaktivieren",
         "syncMembers": "mitglieder, teilen, einladen, team, zusammenarbeit, tresor",
-        "accountName": "kontoname konto gruppierung gruppe umbenennen bezeichnung gerät lokal tresore",
-        "accountVaults": "konto tresore gruppiert welche tresore gehören gruppe liste",
+        "accountName": "kontoname gruppe gruppierung umbenennen bezeichnung gerät lokal",
+        "accountVaults": "konto tresore gruppiert welche tresore gehören gruppenliste",
         "aiMeetingPrompt": "besprechung zusammenfassung prompt anweisung benutzerdefiniert transkript aufgabenpunkte entscheidungen",
         "update": "aktualisierung aktualisieren nach aktualisierungen suchen neue version release herunterladen",
         "plainFile": "klartext datei editor markdown lokale festplatte außerhalb tresor vor ort öffnen",
         "memberPassword": "geteilter tresor passwort mitglied entsperren beitreten phrase",
         "recoveryDrill": "wiederherstellungsphrase prüfen überprüfen übung test 24 wörter seed sicherung passwort vergessen",
         "bar": "untere leiste statusleiste indikatoren anpassen umsortieren ausblenden anzeigen symbolleiste",
-        "syncDeviceBindings": "geräte beansprucht von mitgliedern zuordnung wer welches gerät unterschrieben gehört"
+        "syncDeviceBindings": "geräte beansprucht von mitgliedern zuordnung wer welches gerät unterschrieben gehört",
+        "diagnosticLog": "diagnoseprotokoll protokollierung debug fehlerbehebung absturzbericht fehlerbericht support"
       },
       "emptyBody": "Versuchen Sie ein kürzeres Wort oder den Namen eines Bereichs."
     },
@@ -3819,12 +3969,14 @@
       "zoneHelper": "Diese Zone bestimmt, was als heute gilt – und damit, welche Notiz Ihre täglichen, wöchentlichen und monatlichen Notizen öffnen. Leer lassen, um diesem Gerät zu folgen. Die Auswahl gilt pro Gerät: Kein anderes Gerät überschreibt sie, eine abweichende Einstellung kann dieses Gerät also auf einen anderen Tag setzen als Ihre übrigen. Uhrzeiten, die Sie in eine Notiz schreiben, werden nie geändert; 09:00 bleibt überall 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne kennt diese Zeitzone nicht. Verwenden Sie einen Namen wie Europe/Berlin.",
-      "errorSave": "Diese Einstellung konnte nicht gespeichert werden."
+      "errorSave": "Diese Einstellung konnte nicht gespeichert werden.",
+      "zoneInline": "Welche Zone bestimmt, was als heute gilt und damit, welche Notiz Ihre Tages-, Wochen- und Monatsnotizen öffnen."
     },
     "folderNotes": {
       "label": "Ordner-Notizen",
       "helper": "Eine Notiz als Index ihres Ordners agieren lassen: Sie öffnet sich beim Doppelklick auf den Ordner, und Ordnerlinks wie [[Projekte/]] zeigen darauf. Standardmäßig aus. Ausschalten verbirgt die Schaltflächen zum Erstellen von Ordner-Notizen und zeigt vorhandene als normale Notizen; auf der Platte ändert sich nichts, erneutes Einschalten stellt sie genau wieder her.",
-      "errorSaveSetting": "Diese Einstellung konnte nicht gespeichert werden."
+      "errorSaveSetting": "Diese Einstellung konnte nicht gespeichert werden.",
+      "inline": "Lassen Sie eine Notiz als Index ihres Ordners dienen: Sie öffnet sich beim Doppelklick auf den Ordner, und Ordner-Links wie [[Projects/]] zeigen auf sie."
     },
     "ribbonCustomize": {
       "add": "Hinzufügen",
@@ -3868,25 +4020,31 @@
       "personalitySaveFailed": "Die Stilpräferenzen konnten nicht gespeichert werden.",
       "loadFailed": "Erinnerungen oder Stilpräferenzen konnten nicht geladen werden. Nichts wurde geändert.",
       "retryLabel": "Erneut versuchen",
-      "emptyTitle": "Noch nichts gemerkt"
+      "emptyTitle": "Noch nichts gemerkt",
+      "count": "{{used}} von {{cap}}",
+      "atCap": "Die Liste ist voll, es kann also nichts Neues gemerkt werden. Löschen Sie einen Eintrag, um Platz zu schaffen."
     },
     "account": {
       "nameLabel": "Kontoname",
-      "nameHelper": "Ein Name für diese Gruppe von Tresoren auf diesem Gerät. Die Tresorauswahl verwendet ihn als Überschrift der Gruppe. Er bleibt auf diesem Gerät und wird nie in einem Tresor gespeichert, daher synchronisiert er nicht, und ein anderes Gerät kann dieselben Tresore anders gruppieren und benennen.",
+      "nameHelper": "Ein Name für diese Gruppe von Tresoren auf diesem Gerät. Der Tresor-Auswahlbildschirm verwendet ihn als Überschrift der Gruppe. Er bleibt auf diesem Gerät und wird nie in einem Tresor gespeichert, synchronisiert sich also nicht, und ein anderes Gerät kann dieselben Tresore anders gruppieren und benennen.",
       "namePlaceholder": "Namen hinzufügen…",
       "nameSave": "Speichern",
       "nameSaving": "Wird gespeichert…",
       "vaultsLabel": "Tresore in diesem Konto",
-      "vaultsHelper": "Die Tresore, die dieses Gerät unter dem obigen Namen gruppiert. Gruppierung ist eine gerätespezifische organisatorische Wahl, daher ist sie nicht Teil des Inhalts eines Tresors und reist nicht mit ihm.",
+      "vaultsHelper": "Die Tresore, die dieses Gerät unter dem Namen oben gruppiert. Gruppierung ist eine organisatorische Wahl pro Gerät, sie ist also nicht Teil des Inhalts eines Tresors und reist nicht mit ihm.",
       "vaultsCount": "{{count}} Tresore",
       "currentVault": "Dieser Tresor",
       "unknownVault": "Ein anderer Tresor auf diesem Gerät",
-      "standaloneHelper": "Dieser Tresor ist auf diesem Gerät nicht unter einem Konto gruppiert und steht daher für sich. Gruppierung gilt pro Gerät: Ein anderes Gerät kann ihn innerhalb eines Kontos anzeigen.",
-      "unresolvedHelper": "Es wird ermittelt, welcher Tresor geöffnet ist…",
+      "standaloneHelper": "Dieser Tresor ist auf diesem Gerät nicht unter einem Konto gruppiert, er steht also für sich. Gruppierung gilt pro Gerät: Ein anderes Gerät kann ihn in einem anzeigen.",
+      "unresolvedHelper": "Es wird ermittelt, welcher Tresor offen ist…",
       "devicesNote": "Geräte, Mitglieder geteilter Tresore und Ihre Identität werden unter Sync verwaltet.",
-      "groupingHidden": "Kontonamen sind nicht verfügbar, solange Tresornamen ausgeblendet sind. Schalten Sie diese Option unter Datenschutz aus, um dieses Konto zu verwalten.",
+      "groupingHidden": "Kontonamen sind nicht verfügbar, solange Tresornamen verborgen sind. Schalten Sie diese Option unter Datenschutz aus, um dieses Konto zu verwalten.",
       "groupingUnreadable": "Die Kontogruppierung dieses Geräts konnte nicht gelesen werden. Es wurde nichts geändert.",
-      "groupingError": "Die Kontogruppierung auf diesem Gerät konnte nicht gelesen werden. Es wurde nichts geändert."
+      "groupingError": "Die Kontogruppierung auf diesem Gerät konnte nicht gelesen werden. Es wurde nichts geändert.",
+      "sections": {
+        "extensions": "Browser-Erweiterungen",
+        "grouping": "Dieses Konto"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Die Einstellung für Klartext-Dateien konnte nicht gespeichert werden.",
@@ -3915,7 +4073,8 @@
       "pinSetupHelper": "Mindestens {{count}} Ziffern. Wird nur auf diesem Gerät gespeichert; Ihre Wiederherstellungsphrase öffnet den Tresor weiterhin überall.",
       "errorTooShort": "Verwenden Sie mindestens {{count}} Zeichen/Ziffern.",
       "errorGeneric": "Die Anmeldedaten konnten nicht festgelegt werden. Bitte versuchen Sie es erneut."
-    }
+    },
+    "helperDisclosureLabel": "Mehr zu dieser Einstellung"
   },
   "storageLost": {
     "allSynced": "Es ging nichts verloren: Jede Notiz hier hatte den Server bereits erreicht.",
@@ -3943,7 +4102,10 @@
       "intro": "Sync sendet Ihre Notizen verschlüsselt an einen Server. Vier Dinge sollten Sie vorher wissen.",
       "whatThisIsLabel": "Worum es geht",
       "dataLossLabel": "Wenn Sie beide Geheimnisse verlieren",
-      "accept": "Verstanden, Sync aktivieren"
+      "accept": "Verstanden, Sync aktivieren",
+      "whatHappensNextLabel": "Wenn der Server verschwindet",
+      "whatWeCanSeeLabel": "Was der Betreiber des Servers sehen kann",
+      "review": "Prüfen, was Sync bedeutet"
     },
     "materialising": "Ihre Notizen werden heruntergeladen: {{done}} von {{total}}. Sie können bereits arbeiten; der Rest erscheint, sobald er eintrifft.",
     "credentialAmbiguous": "Ihr Passwort wurde möglicherweise auf diesem und auf einem anderen Gerät geändert, und Myne kann nicht erkennen, welche Änderung neuer ist, daher wurde nichts geändert. Melden Sie sich auf einem Gerät an, das bereits Zugriff hat, um das zu klären.",
@@ -4144,7 +4306,7 @@
         "deleteConfirmTitle": "Diese gerettete Notiz löschen?",
         "deleteConfirmWarning": "Dies löscht endgültig die einzige Kopie, die auf diesem Gerät aufbewahrt wird. Dies kann nicht rückgängig gemacht werden.",
         "deleteCta": "Löschen",
-        "empty": "Keine geretteten Notizen.",
+        "empty": "Keine wiederhergestellten Notizen",
         "errorGeneric": "Etwas ist schiefgelaufen. Versuchen Sie es erneut.",
         "helper": "Wenn eine auf einem anderen Gerät gelöschte Notiz hier entfernt wird, bleibt ihre verschlüsselte Kopie auf diesem Gerät erhalten. Stellen Sie eine als neue Notiz wieder her oder löschen Sie sie endgültig.",
         "label": "Gerettete Notizen",
@@ -4161,7 +4323,9 @@
       },
       "usage": {
         "helper": "Wie viele verschlüsselte Daten dieses Konto auf dem Server speichert und wie viele Geräte angemeldet sind.",
-        "label": "Speicher und Geräte"
+        "label": "Speicher und Geräte",
+        "memberHelper": "Wie viele Geräte in Ihrem Konto angemeldet sind.",
+        "memberLabel": "Geräte"
       },
       "identity": {
         "label": "Identität",
@@ -4170,6 +4334,16 @@
         "codeLabel": "Ihr Identitätscode",
         "lockedHelper": "Dieses Gerät hält eine Identität. Sie ist für diese Sitzung gesperrt; entsperren Sie sie mit Ihrer Wiederherstellungsphrase, um Sync und Einladungen zu signieren.",
         "unlockedHelper": "Dieses Gerät hält eine Identität, die für diese Sitzung entsperrt ist."
+      },
+      "topics": {
+        "connection": "Verbindung",
+        "devices": "Geräte und Mitglieder",
+        "conflicts": "Konflikte"
+      },
+      "sections": {
+        "account": "Konto",
+        "server": "Server",
+        "devices": "Registrierte Geräte"
       }
     },
     "reconcile": {
@@ -4345,6 +4519,18 @@
       "label": "Ihr Anzeigename",
       "checking": "Ihr Name wird geprüft…",
       "save": "Weiter"
+    },
+    "memberJoinQr": {
+      "error": "Der Code konnte nicht erstellt werden.",
+      "noAccount": "Das Konto dieses Tresors ist auf diesem Gerät noch nicht aufgezeichnet. Öffnen Sie den Tresor einmal und versuchen Sie es dann erneut.",
+      "hint": "Dieser Code trägt die Adresse Ihres Servers und die ID dieses Tresors. Er trägt nie Ihre Wiederherstellungsphrase oder Ihr Passwort.",
+      "notAMember": "Dieser Tresor ist kein geteilter Tresor, in dem Sie Mitglied sind, es gibt also keinen Code zum Anzeigen.",
+      "notConfigured": "Konfigurieren Sie zuerst einen Sync-Server und erstellen Sie dann den Code.",
+      "scanWithApp": "Mit Myne auf Ihrem anderen Gerät scannen",
+      "stepIdentity": "Öffnen Sie auf Ihrem anderen Gerät Myne und wählen Sie „Ich habe bereits eine Identität“.",
+      "stepJoin": "Dieser geteilte Tresor wartet in Ihren Einladungen. Öffnen Sie ihn, um beizutreten.",
+      "stepPhrase": "Geben Sie dort Ihre 24-Wort-Wiederherstellungsphrase ein.",
+      "title": "Eigenes Gerät hinzufügen"
     }
   },
   "tasks": {
@@ -4393,7 +4579,8 @@
       "completed": "Aufgabe, erledigt",
       "notCompleted": "Aufgabe, nicht erledigt",
       "tooLongToWrite": "Die Zeile dieser Aufgabe ist zu lang, um sie von hier aus zu bearbeiten. Öffnen Sie stattdessen ihre Notiz.",
-      "untitled": "Aufgabe ohne Titel"
+      "untitled": "Aufgabe ohne Titel",
+      "editFields": "Aufgabenfelder bearbeiten"
     },
     "title": "Aufgaben",
     "axis": {
@@ -4546,7 +4733,7 @@
       "lockedDuringChange": "Passwortänderung abgebrochen: Der Tresor wurde gesperrt.",
       "metaChangedExternally": "Der Tresor wurde in einer anderen Sitzung geändert. Bitte erneut entsperren."
     },
-    "title": "Entsperren Sie Ihren Tresor.",
+    "title": "Tresor entsperren",
     "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
     "unlockFailedGeneric": "Entsperren fehlgeschlagen. Bitte versuche es erneut.",
     "biometricTooManyAttempts": "Zu viele {{biometric}}-Versuche. Verwende dein Passwort.",
@@ -4573,7 +4760,7 @@
     "deleteConfirmTitle": "Diesen Tresor löschen?",
     "deletePartialError": "Einige Dateien konnten nicht entfernt werden. Der Tresor ist nicht mehr verwendbar. Fahre fort, um neu zu beginnen.",
     "failClosedEyebrow": "Tresor kann nicht geöffnet werden",
-    "restoreHint": "Zum Fortfahren aus einem Backup wiederherstellen.",
+    "restoreHint": "Das Wiederherstellen aus einer Sicherung ist auf Mobilgeräten noch nicht verfügbar.",
     "memberHint": "Dieser Tresor wurde mit Ihnen geteilt. Entsperren Sie ihn mit Ihrer eigenen Wiederherstellungsphrase.",
     "memberPhraseLabel": "Wiederherstellungsphrase",
     "memberSubmit": "Entsperren",
@@ -4588,7 +4775,9 @@
     "memberPinPlaceholder": "Tresor-PIN (mindestens {{count}} Ziffern)",
     "memberBiometricHint": "Dieser Tresor ist mit Ihnen geteilt. Bestätigen Sie mit Ihrer Gerätebiometrie, um ihn zu entsperren.",
     "memberBiometricSubmit": "Mit Biometrie entsperren",
-    "titleNamed": "{{vault}} entsperren"
+    "titleNamed": "{{vault}} entsperren",
+    "restoreCta": "Aus einer Sicherung wiederherstellen",
+    "ioErrorHint": "Versuchen Sie es erneut oder öffnen Sie Myne neu."
   },
   "vault": {
     "ioBanner": {
@@ -4747,7 +4936,7 @@
       "copy": "Kopieren",
       "extensionNotice": "Browser-Erweiterungen mit Zugriff auf diese Website können lesen, was auf dieser Seite steht. Wenn Sie sich nicht bei jeder Erweiterung in diesem Profil sicher sind, nutzen Sie für diesen Schritt die Desktop-App oder ein sauberes Browserprofil.",
       "copyFailed": "Kopieren nicht möglich. Verwenden Sie stattdessen „Als Datei speichern“.",
-      "downloadStarted": "Die Datei wurde an die Downloads Ihres Browsers übergeben. Prüfen Sie, ob sie angekommen ist: Ihr Browser entscheidet, wohin sie geht, und Myne kann nicht sehen, ob das geschehen ist.",
+      "downloadStarted": "An die Downloads Ihres Browsers gesendet. Prüfen Sie, ob sie angekommen ist: Ihr Browser entscheidet, wohin die Datei geht, und Myne kann nicht sehen, ob sie es tat.",
       "reveal": "Phrase anzeigen",
       "saveAsFile": "Als Datei speichern",
       "saveFailed": "Die Datei konnte nicht gespeichert werden. Kopieren Sie stattdessen die Wörter oder schreiben Sie sie auf.",
@@ -4763,7 +4952,7 @@
       "body": "Ihre Notizen sind verschlüsselt und auf diesem Gerät gespeichert. Bewahren Sie Ihr Passwort und Ihr Wiederherstellungs-Kit an einem sicheren Ort auf: Sie sind der einzige Weg zurück.",
       "decrypting": "Wird entschlüsselt…",
       "done": "Tresor öffnen",
-      "heading": "Ihr Tresor ist bereit.",
+      "heading": "Ihr Tresor ist bereit",
       "showFolder": "Tresorordner anzeigen"
     },
     "sessionLost": {
@@ -5066,7 +5255,7 @@
     "confirmPasswordLabel": "Passwort bestätigen",
     "passwordHelper": "Wird nie gespeichert, nie übertragen. Es verschlüsselt deine Schlüssel auf diesem Gerät.",
     "encryptingSubtitle": "Dein Schlüssel wird mit Argon2id abgeleitet. Das dauert einige Sekunden und kann nicht unterbrochen werden.",
-    "showSecondHalf": "Wörter 13–24 anzeigen",
+    "showSecondHalf": "Wörter 13-24 anzeigen",
     "saveToFile": "In Datei speichern",
     "writtenThemDown": "Ich habe sie aufgeschrieben",
     "typebackTitle": "Bestätige deine Phrase",
@@ -5161,7 +5350,7 @@
     "forgetCta": "Diese Identität vergessen und eine neue erstellen",
     "forgetWarning": "Dies löscht die auf diesem Gerät gehaltene Identität. Wenn Sie ihre 24-Wort-Wiederherstellungsphrase nicht aufgeschrieben haben, ist sie weg: Dieses Gerät verliert den Zugang zu jedem Tresor, den sie besitzt oder dem sie beigetreten ist, bis Sie sie mit dieser Phrase wiederherstellen. Fahren Sie nur fort, wenn Sie sicher sind.",
     "heldIntro": "Dieses Gerät hält bereits eine Identität. Stellen Sie sie mit ihrer 24-Wort-Phrase unten wieder her.",
-    "typeBackLead": "Um zu bestätigen, dass Sie sie gespeichert haben, geben Sie diese vier Wörter aus der Phrase oben ein.",
+    "typeBackLead": "Geben Sie diese vier Wörter aus der Identitätsphrase ein, die Sie gerade gespeichert haben.",
     "typeBackMismatch": "Das stimmt nicht mit Wort Nr. {{pos}} überein.",
     "typeBackWordAtPosition": "Wort Nr. {{pos}}",
     "newTitle": "Eine neue Identität",
@@ -5171,7 +5360,10 @@
     "recoverAction": "Wiederherstellen",
     "back": "Zurück",
     "changeServer": "Sync-Server ändern oder prüfen",
-    "errorTlsFailure": "Das HTTPS-Zertifikat des Servers konnte nicht verifiziert werden. Prüfen Sie die Serveradresse und ihr Zertifikat."
+    "errorTlsFailure": "Das HTTPS-Zertifikat des Servers konnte nicht verifiziert werden. Prüfen Sie die Serveradresse und ihr Zertifikat.",
+    "phraseTitle": "Identitätsphrase speichern",
+    "phraseContinue": "Weiter",
+    "confirmTitle": "Bestätigen Sie Ihre Phrase"
   },
   "personIdentityCode": {
     "copy": "Identitätscode kopieren",
@@ -5218,7 +5410,16 @@
     "forgetConfirm": "Identität vergessen",
     "forgetCta": "Diese Identität auf diesem Gerät vergessen",
     "forgetError": "Die Identität konnte nicht vergessen werden. Versuchen Sie es erneut.",
-    "forgetWarning": "Dies entfernt die Identität nur von diesem Gerät. Das Serverkonto und jeder Tresor, den sie besitzt oder dem sie beigetreten ist, bleiben unberührt, und Sie können die Identität mit ihrer 24-Wort-Phrase auf einem anderen Gerät wiederherstellen. Wenn Sie diese Phrase nicht gespeichert haben, wird dieses Gerät sie nicht wiederherstellen können."
+    "forgetWarning": "Dies entfernt die Identität nur von diesem Gerät. Das Serverkonto und jeder Tresor, den sie besitzt oder dem sie beigetreten ist, bleiben unberührt, und Sie können die Identität mit ihrer 24-Wort-Phrase auf einem anderen Gerät wiederherstellen. Wenn Sie diese Phrase nicht gespeichert haben, wird dieses Gerät sie nicht wiederherstellen können.",
+    "stepIndicator": "Schritt {{n}} von {{total}} · {{label}}",
+    "stepVerifyOwner": "Eigentümer bestätigen",
+    "stepRecoveryPhrase": "Wiederherstellungsphrase",
+    "stepDevicePassword": "Gerätepasswort",
+    "phraseHeading": "Geben Sie Ihre Wiederherstellungsphrase ein",
+    "passwordHeading": "Passwort für dieses Gerät",
+    "acceptHeading": "Diese Einladung annehmen",
+    "acceptPhraseHint": "Geben Sie die 24 Wörter Ihrer Wiederherstellungsphrase ein. Sie ist Ihre, nicht die des Tresor-Eigentümers.",
+    "acceptErrorBadRequest": "Die Einladung konnte nicht verifiziert werden. Fügen Sie den Identitätscode des Tresor-Eigentümers ein (er teilt ihn beim Einladen mit Ihnen)."
   },
   "aiOnboarding": {
     "title": "KI einrichten",
@@ -5279,12 +5480,35 @@
     "unsaved": "Ungespeicherte Änderungen"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Myne {{version}} ist verfügbar.",
-      "failed": "Die Aktualisierung konnte nicht installiert werden. Versuchen Sie es erneut.",
-      "installing": "Die Aktualisierung wird heruntergeladen…",
+      "consequence": "Beim Aktualisieren wird Ihr Tresor gesperrt und Myne neu gestartet. Ihre offenen Notizen werden zuerst gespeichert.",
+      "flushFailed": "Myne konnte nicht jede offene Notiz speichern, daher wurde die Aktualisierung nicht gestartet. Versuchen Sie es in einem Moment erneut.",
+      "stageFailed": "Myne konnte die Aktualisierung nicht starten, weil die App den Tresor bereits verlassen hatte. Entsperren Sie ihn und versuchen Sie es erneut.",
+      "lockFailed": "Myne konnte Ihren Tresor nicht sperren, daher wurde die Aktualisierung nicht gestartet.",
+      "primary": "Aktualisieren und neu starten",
       "later": "Später",
-      "restart": "Zum Aktualisieren neu starten"
+      "confirmTitle": "Myne aktualisieren und neu starten?",
+      "confirmBody": "Ihr Tresor wird gesperrt und Myne wird neu gestartet. Das Herunterladen und Installieren kann bei langsamer Verbindung ein paar Minuten dauern.",
+      "confirmPrimary": "Tresor sperren und aktualisieren",
+      "cancel": "Abbrechen",
+      "pill": "Aktualisierung verfügbar"
+    },
+    "updating": {
+      "eyebrow": "Aktualisierung",
+      "heading": "Myne wird aktualisiert",
+      "version": "Version {{version}}",
+      "caption": "Die neue Version wird heruntergeladen und installiert.",
+      "hint": "Myne startet von selbst neu, wenn dies abgeschlossen ist. Lassen Sie das Fenster geöffnet."
+    },
+    "failed": {
+      "eyebrow": "Aktualisierung nicht abgeschlossen",
+      "heading": "Die Aktualisierung wurde nicht abgeschlossen",
+      "caption": "Myne {{version}} läuft noch und Ihre Notizen sind unberührt.",
+      "hint": "Ein erneuter Versuch startet den Download von vorne.",
+      "retry": "Erneut versuchen",
+      "back": "Zurück zur Entsperrung"
     }
   },
   "firstRun": {
@@ -5326,7 +5550,7 @@
       "title": "Ihre Identitätsphrase speichern",
       "warning": "Schreiben Sie diese 24 Wörter auf und bewahren Sie sie sicher auf. Dies ist das einzige Mal, dass sie angezeigt werden; sie sind der einzige Weg, diese Identität wiederherzustellen. Sie ist eine andere Phrase als jede Wiederherstellungsphrase eines Tresors.",
       "reveal": "Anzeigen",
-      "typebackLead": "Um zu bestätigen, dass Sie sie gespeichert haben, geben Sie diese vier Wörter aus der Phrase oben ein.",
+      "typebackLead": "Geben Sie diese vier Wörter aus der Identitätsphrase ein, die Sie gerade gespeichert haben.",
       "wordNumber": "Wort Nr. {{position}}",
       "wordMismatch": "Das stimmt nicht mit Wort Nr. {{pos}} überein.",
       "continue": "Weiter"
@@ -5341,6 +5565,20 @@
       "forgetHeading": "Dieses Gerät",
       "forget": "Diese Identität auf diesem Gerät vergessen",
       "forgetCheckbox": "Ich verstehe, dass diese Identität von diesem Gerät entfernt wird. Das Serverkonto überlebt, und die Phrase stellt sie wieder her."
+    },
+    "recover": {
+      "open": "Ich habe bereits eine Identität",
+      "title": "Identität wiederherstellen",
+      "lead": "Geben Sie die 24 Wörter Ihrer Identitäts-Wiederherstellungsphrase ein, um diese Identität auf dieses Gerät zu holen. Sie ist eine andere Phrase als jede Tresor-Wiederherstellungsphrase.",
+      "submit": "Identität wiederherstellen",
+      "working": "Wird wiederhergestellt…",
+      "failed": "Auf diesem Gerät konnte keine Identität wiederhergestellt werden. Prüfen Sie die 24 Wörter und versuchen Sie es erneut."
+    },
+    "typeback": {
+      "title": "Bestätigen Sie Ihre Phrase"
+    },
+    "joinFromQr": {
+      "notFound": "Dieser Code benennt einen Tresor, der auf diesem Gerät nicht in Ihren Einladungen ist. Bitten Sie den Tresor-Eigentümer, die Einladung erneut an diese Identität zu senden."
     }
   }
 }

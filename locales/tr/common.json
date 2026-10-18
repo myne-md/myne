@@ -227,7 +227,8 @@
       "targetVault": "Kasanın tamamı hakkında",
       "running": "Bu konuşma üzerinde çalışılıyor",
       "newConversation": "Yeni konuşma",
-      "historyLabel": "Geçmiş"
+      "historyLabel": "Geçmiş",
+      "searchClear": "Tüm konuşmaları göster"
     },
     "focus": {
       "title": "Not üzerinde ajan",
@@ -307,9 +308,9 @@
       "clearSearchAriaLabel": "Aramayı temizle",
       "emptyClearSearch": "Aramayı temizle",
       "emptyImportHint": "Bir nota eklediğiniz dosyalar kasanızda tutulur ve herhangi bir yere gitmeden önce bu cihazda şifrelenir. Başlamak için bir dosya içe aktarın.",
-      "emptyLoadError": "Ek kataloğu okunamadı.",
-      "emptyNoAttachments": "Henüz ek yok.",
-      "emptyNoResultsTitle": "Aramanızla eşleşen ek yok.",
+      "emptyLoadError": "Ek kataloğu okunamadı",
+      "emptyNoAttachments": "Henüz ek yok",
+      "emptyNoResultsTitle": "Eşleşen ek yok",
       "filterAriaLabel": "Türe göre filtrele",
       "gridView": "Izgara görünümü",
       "import": "İçe aktar",
@@ -356,7 +357,15 @@
       "emptyFilteredBody": "Burada geçerli tür filtresiyle eşleşen bir şey yok. Tüm kitaplığı yeniden görmek için filtreyi temizleyin.",
       "emptyFilteredBodyQuery": "Kitaplıkta eşleşen bir şey yok",
       "emptyLoadErrorBody": "Katalog kasanızla şifrelenmiştir, bu yüzden bu genellikle kayıp veri değil yarıda kalan bir okumadır. Tekrar deneyin; sorun sürerse notlarınız ve dosyaları etkilenmez.",
-      "emptyRetry": "Yeniden dene"
+      "emptyRetry": "Yeniden dene",
+      "transcriptCopy": "Kopyala",
+      "transcriptCopied": "Metin dökümü kopyalandı.",
+      "transcriptCopyFailed": "Metin dökümü kopyalanamadı.",
+      "transcriptEmpty": "Bu kayıtta konuşma bulunamadı.",
+      "transcriptNoteTitle": "{{name}} (metin dökümü)",
+      "transcriptSave": "Not olarak kaydet",
+      "transcriptSaved": "Metin dökümü not olarak kaydedildi.",
+      "transcriptSaveFailed": "Metin dökümü not olarak kaydedilemedi."
     },
     "thumbnail": {
       "audioLabel": "Ses: {{filename}}",
@@ -787,6 +796,12 @@
       },
       "openPalette": {
         "label": "Bir komut arayın ve çalıştırın…"
+      },
+      "attachFile": {
+        "label": "Dosya ekle…"
+      },
+      "convertImportedAttachments": {
+        "label": "İçe aktarılmış ekleri dönüştür…"
       }
     },
     "hotkeys": {
@@ -1221,8 +1236,6 @@
           "insert": "Nota ekle",
           "noAnswer": "Yanıt yok. Farklı ifade etmeyi deneyin.",
           "newChat": "Yeni sohbet",
-          "noModelHint": "Kurulu bir yapay zeka sağlayıcısı yok, bu yüzden sohbeti, özetleri, yeniden yazmayı ve anlamsal aramayı çalıştıracak bir şey yok. Ayarlar → Geliştirici → Yapay Zeka bölümünden bir tane kurun.",
-          "unreachableHint": "Kurduğunuz sağlayıcı yanıt vermiyor. Çalışır durumda olduğunu kontrol edip yeniden gönderin.",
           "unavailableHint": "Myne’in bu yapısı yerel yapay zeka olmadan derlendi, bu yüzden burada hiçbir şey çalışamaz. Hiçbir ayar bunu değiştirmez — yapay zekanın dahil olduğu bir yapı gerekir.",
           "offHint": "Yerel yapay zeka kapalı. Ayarlar → Geliştirici → Yapay Zeka bölümünden açın.",
           "send": "Gönder",
@@ -1240,9 +1253,7 @@
           "historyCancel": "İptal",
           "historyDelete": "Sil",
           "historyDeleteBody": "Bu, konuşmayı bir sonraki bağlantıda cihazın tamamından siler. Geri alınamaz.",
-          "historyEmpty": "Henüz konuşma yok. Sohbetler burada görünür.",
           "historyError": "Konuşmalar yüklenemedi. Tekrar deneyin.",
-          "historyLoading": "Yükleniyor…",
           "historyProposalNewNote": "Yeni not",
           "historyRename": "Yeniden adlandır",
           "historyTitle": "Sohbet geçmişi",
@@ -1274,7 +1285,16 @@
           "diffTitle": "Önerilen değişiklikler",
           "revertConfirmTitle": "Bu çalıştırma geri alınsın mı?",
           "revertConfirmBody": "Bu çalıştırmanın değiştirdiği notlar ondan önceki hâline döner. Oluşturduğu notlar oldukları yerde kalır.",
-          "focusAgent": "Ajan sekmesinde aç"
+          "focusAgent": "Ajan sekmesinde aç",
+          "statusNoModelChosen": "Model yok",
+          "statusNoCredential": "API anahtarı yok",
+          "statusConsentMissing": "Onay gerekli",
+          "statusNotAllowed": "İzin verilmedi",
+          "statusKeyRejected": "Anahtar reddedildi",
+          "statusOutOfCredit": "Kredi bitti",
+          "statusRefused": "Reddedildi",
+          "statusNotWorking": "Çalışmıyor",
+          "historyRetry": "Yeniden dene"
         },
         "allHidden": "Tüm sekmeler gizli. Geri yüklemek için sağ tıklayın.",
         "outline": {
@@ -1338,7 +1358,7 @@
     },
     "noteActions": {
       "buttonLabel": "Not işlemleri",
-      "convertFailed": "Bu notun türü değiştirilemedi, bu yüzden not değişmeden kaldı.",
+      "convertFailed": "Bu notun ne olduğu değiştirilemedi, bu yüzden değişmedi.",
       "rename": "Yeniden adlandır",
       "move": "Klasöre taşı…",
       "duplicate": "Çoğalt",
@@ -1404,7 +1424,8 @@
       "propertiesLabel": "Özellikler",
       "removeListItemAriaLabel": "{{item}} öğesini kaldır",
       "titleAriaLabel": "Not başlığı",
-      "titlePlaceholder": "Başlıksız"
+      "titlePlaceholder": "Başlıksız",
+      "managedField": "Bu alanı Myne yazar"
     },
     "mermaid": {
       "rendering": "Şema oluşturuluyor…",
@@ -1456,7 +1477,8 @@
       "voiceNote": "Sesli not",
       "wikiLink": "Wiki bağlantısı",
       "remind": "Hatırlatıcı",
-      "meeting": "Toplantı oturumu"
+      "meeting": "Toplantı oturumu",
+      "sheetTitle": "Ekle"
     },
     "spell": {
       "menu": {
@@ -1618,6 +1640,9 @@
       },
       "convertCore": {
         "noMatch": "eşleşme yok"
+      },
+      "picker": {
+        "sheetTitle": "Nota bağlantı ver"
       }
     },
     "flow": {
@@ -1814,6 +1839,9 @@
       "tapSilent": "Diğer katılımcıların sesi gelmiyor. Sistem Ayarları, Gizlilik ve Güvenlik, Ekran ve Sistem Sesi Kaydı bölümünü kontrol edin.",
       "transcriptHeading": "Metin dökümü",
       "transcriptionFailed": "Toplantının bir kısmı yazıya dökülemedi. Ses hâlâ notta."
+    },
+    "templateToken": {
+      "sheetTitle": "Belirteç ekle"
     }
   },
   "export": {
@@ -1976,8 +2004,8 @@
       "emptyTitle": "Arşivde bir şey yok",
       "folderDeleteBody_one": "“{{name}}” ve içindeki {{count}} not",
       "folderDeleteBody_other": "“{{name}}” ve içindeki {{count}} not",
-      "folderDeleteConfirm_one": "{{count}} not Çöp Kutusu'na taşınsın mı?",
-      "folderDeleteConfirm_other": "{{count}} not Çöp Kutusu'na taşınsın mı?",
+      "folderDeleteConfirm_one": "{{count}} not Çöp Kutusu’na taşınsın mı?",
+      "folderDeleteConfirm_other": "{{count}} not Çöp Kutusu’na taşınsın mı?",
       "folderDeleteConfirmCta": "Çöp Kutusu'na taşı",
       "folderDeleteError": "O klasörün notları Çöp Kutusu'na taşınamadı. Tekrar deneyin.",
       "folderDeleteTitle": "Bu klasör Çöp Kutusu’na taşınsın mı?",
@@ -2086,8 +2114,8 @@
       "tooLong": "Bu klasör yolu çok uzun.",
       "moveIntoSelf": "Bir klasör kendi içine taşınamaz.",
       "moveCollision": "Orada bu adda bir klasör zaten var.",
-      "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden klasöre dokunulmadı. Bittiğinde tekrar deneyin.",
-      "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmeden kaldı.",
+      "unsettledSave": "Açık bir notun kaydedilmesi tamamlanmadı, bu yüzden klasöre dokunulmadı. Tamamlandığında tekrar deneyin.",
+      "renameFailed": "Klasör yeniden adlandırılamadı, bu yüzden değişmedi.",
       "deliberateWriteFailed": "Klasör yeniden adlandırıldı ancak ayarlarından biri kaydedilemedi. Kasanın kilidini her açışınızda eski adla boş bir klasör yeniden belirecek; onu silmek güvenlidir ve başka hiçbir şeyi değiştirmez. Klasörü yeniden adlandırmak bunu temizlemez.",
       "folderListFull": "Myne yalnızca sınırlı sayıda klasörü hatırlayabilir ve o liste dolu. Bu klasör yine de çalışır, ancak içindeki son not ondan ayrıldığında kaybolacak. Artık ihtiyacınız olmayan bir klasörü silmek yer açar.",
       "folderNotRemembered": "Klasör oluşturuldu ancak Myne onu kaydedemedi. İçindeki son not ondan ayrıldığında kaybolacak ve hâlâ boşsa bir sonraki kilit açılışında gitmiş olacak. Yeniden oluşturmak güvenlidir."
@@ -2124,7 +2152,11 @@
         "derivedMakeEditableFailed": "Bu gruplar kaydedilemedi. Yeniden deneyin.",
         "derivedNote_one": "Grafik etikete göre renklendirildi: etiketlerinizden türetilen {{count}} grup. Düzenlenebilir yapana kadar kaydedilmez.",
         "derivedNote_other": "Grafik etikete göre renklendirildi: etiketlerinizden türetilen {{count}} grup. Düzenlenebilir yapana kadar kaydedilmezler.",
-        "newRuleTitle": "Yeni renk grubu"
+        "newRuleTitle": "Yeni renk grubu",
+        "moveDown": "Kuralı aşağı taşı",
+        "moveUp": "Kuralı yukarı taşı",
+        "mobileEmptyBody": "Renk grupları grafiği etikete veya klasöre göre renklendirir ve bir bilgisayarda oluşturulur. Bu telefon onları kullanır ama henüz yenisini oluşturamaz, çünkü yeni bir grup bir filtre gerektirir.",
+        "mobileSharedNotice": "Renk grupları paylaşılır: buradaki bir değişiklik diğer cihazlarınızdaki listenin tamamının yerini alır ve bir bilgisayarda düzenlenen bir liste buraya gelir."
       },
       "depthToggleTitle": "Komşuluk derinliğini değiştir (1 ↔ 2 adım)",
       "filterAll": "Tümü",
@@ -2378,7 +2410,7 @@
       "deleteFolderWarning": "Notlar Çöp Kutusu’na taşınır. Daha sonra geri yükleyebilirsiniz.",
       "duplicate": "Çoğalt",
       "editFilterTitle": "Filtreyi düzenle",
-      "emptyState": "Henüz not yok.",
+      "emptyState": "Henüz not yok",
       "favoritesHeading": "Favoriler",
       "icon": "Simge…",
       "mergeAnyway": "Yine de birleştir",
@@ -2622,7 +2654,7 @@
       "thisNote": "bu not",
       "untitled": "Başlıksız"
     },
-    "unsettledSave": "Açık bir notun kaydedilmesi henüz bitmedi, bu yüzden hiçbir şey değiştirilmedi. Bittiğinde tekrar deneyin.",
+    "unsettledSave": "Açık bir notun kaydedilmesi tamamlanmadı, bu yüzden hiçbir şey değiştirilmedi. Tamamlandığında tekrar deneyin.",
     "views": {
       "cards": {
         "changeCover": "Kapağı değiştir",
@@ -2768,7 +2800,7 @@
     "restoreVaultHeader": "Bir kasayı geri yükle",
     "accountTitle": "Hesap numaranızı girin",
     "accountLead": "Bunu, kurtarma ifadenizi sakladığınız yerde bulursunuz. Geri yüklenecek kasayı tanımlar.",
-    "accountInvalid": "Geçersiz hesap numarası — lütfen kontrol edip yeniden girin.",
+    "accountInvalid": "Geçersiz hesap numarası. Lütfen kontrol edip yeniden girin.",
     "accountOptionalHint": "Elinizde yok mu? Bunu boş bırakıp devam edin. 24 sözcüklük kurtarma ifadeniz yeterlidir.",
     "paste": "Yapıştır",
     "phraseGridHint": "Her sözcüğü yazın veya ızgarayı doldurmak için 24 sözcüğün tümünü tek seferde yapıştırın.",
@@ -2925,7 +2957,39 @@
       "updateIdle": "İmzalı güncellemeler, kontrol ettiğinizde downloads.myne.md'den alınır.",
       "updateInstallButton": "Güncellemek için yeniden başlat",
       "updateLabel": "Güncellemeler",
-      "updateUpToDate": "En son sürümdesiniz."
+      "updateUpToDate": "En son sürümdesiniz.",
+      "developerModeInline": "Myne’in varsayılan olarak yolunuzdan çektiği ayarları gösterir.",
+      "diagnosticLogHelper": "Bu cihazda ve yalnızca bu cihazda düz metin bir günlük yazar. Myne’in ne yaptığını kaydeder: not metninizi asla, bir not başlığını asla, bir dosya yolunu asla. Myne boyutunu sınırlar ve önce en eski girdileri düşürür; bunu yeniden kapatmak günlüğü siler. Hiçbir yere hiçbir şey gönderilmez; neyi paylaşacağınıza siz karar verirsiniz.",
+      "diagnosticLogLabel": "Tanılama günlüğü",
+      "diagnosticLogError": "Myne o ayarı değiştiremedi.",
+      "diagnosticLogReadError": "Myne tanılama günlüğü ayarını okuyamadı, bu yüzden kapalı olarak gösteriliyor.",
+      "diagnosticBlockLabel": "Rapor ayrıntıları",
+      "diagnosticBlockHelper": "Kopyala’nın panonuza koyduğu şeyin tam olarak kendisi. Hiçbir yere hiçbir şey gönderilmez; neyi paylaşacağınıza siz karar verirsiniz.",
+      "diagnosticCopy": "Tanılamayı kopyala",
+      "diagnosticCopyDone": "Tanılama kopyalandı",
+      "diagnosticCopyFailed": "Kopyalanamadı. Yukarıdaki metni seçip elle kopyalayın.",
+      "crashRecordLabel": "Çökme kaydı",
+      "crashRecordHelper": "Myne {{date}} tarihinde bir çökme kaydetti. Kayıt dosyayı ve satırı, sürümü ve platformunuzu tutar, başka hiçbir şey tutmaz. İstediğiniz zaman silebilirsiniz.",
+      "crashRecordClear": "Sil",
+      "diagnosticFilesLabel": "Rapor dosyası",
+      "diagnosticFilesUnknown": "Myne günlüğü henüz okumadı.",
+      "crashRecordDateUnknown": "bilinmeyen bir tarih",
+      "diagnosticReveal": "Günlük klasörünü göster",
+      "diagnosticSave": "Raporu dosya olarak kaydet…",
+      "diagnosticSaveDone": "Rapor kaydedildi",
+      "diagnosticSaveFailed": "Myne raporu kaydedemedi.",
+      "diagnosticRevealFailed": "Myne günlük klasörünü açamadı.",
+      "crashRecordClearFailed": "Myne çökme kaydını silemedi.",
+      "crashRecordReadFailed": "Myne çökme kaydını okuyamadı, bu yüzden bir kaydın olup olmadığını söyleyemiyor.",
+      "sections": {
+        "version": "Sürüm",
+        "updates": "Güncel kalmak",
+        "legal": "Yasal ve lisanslama",
+        "developer": "Geliştirici",
+        "diagnostics": "Tanılama"
+      },
+      "diagnosticFilesHelper_one": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz.",
+      "diagnosticFilesHelper_other": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz."
     },
     "vault": {
       "changePasswordButton": "Parola değiştir",
@@ -2933,7 +2997,7 @@
         "invalidCredentialOrVault": "Geçerli parola yanlış veya kasa dosyası bozuk.",
         "ioError": "Disk hatası, lütfen tekrar deneyin.",
         "joinFailure": "Bir şeyler ters gitti, lütfen tekrar deneyin.",
-        "samePasswordRejected": "Yeni parola, mevcut olanla aynı.",
+        "samePasswordRejected": "Yeni parola mevcut olanla aynı.",
         "serverAckPending": "Yeni parolanız bu cihazda çalışıyor, ancak Myne onu kaydetmek için sunucuya ulaşamadı. Ulaşana kadar diğer cihazlarınız hâlâ eski parolayı bekler ve bu tarayıcıdaki kopya o zamandan önce temizlenirse değişiklik kaybolur. Otomatik olarak yeniden denenecek.",
         "weakNewPassword": "Yeni parola en az 12 karakter olmalı.",
         "unexpected": "Bu parola değişikliği gerçekleşmedi. Lütfen tekrar deneyin.",
@@ -2944,7 +3008,7 @@
       "dangerZoneHeading": "Tehlikeli bölge",
       "dangerZoneHelper": "Bu kasayı ve tüm notları kalıcı olarak silin. Geri alınamaz. Kurtarma ifadesi kasayı geri getirmez.",
       "localEraseHeading": "Bu tarayıcı",
-      "localEraseHelper": "Myne’in kasanıza ait kopyasını bu tarayıcıdan silin. Hesabınız ve eşitlenmiş olan her şey sunucuda kalır.",
+      "localEraseHelper": "Myne’in kasanıza ait kopyasını bu tarayıcıdan silin. Hesabınız ve zaten eşitlenmiş olan her şey sunucuda kalır.",
       "localEraseButton": "Oturumu kapat ve bu tarayıcıdaki kopyayı sil…",
       "deleteVaultButton": "Kasayı sil…",
       "vaultLabelEyebrow": "KASA ETİKETİ",
@@ -2966,7 +3030,14 @@
       "reenterNewPassword": "Yeni parolayı tekrar girin",
       "changePasswordFootnote": "Bu, hızlı kilit açmayı geçersiz kılar. Kurtarma ifadeniz değişmez.",
       "changing": "Değiştiriliyor…",
-      "memberVaultNotice": "Bu paylaşılan bir kasa. Kasa parolası yok. Bir parola ya da PIN eklemek için Gizlilik bölümündeki Paylaşılan kasa kilidi açma bölümünü kullanın."
+      "memberVaultNotice": "Bu paylaşılan bir kasa. Kasa parolası yok. Bir parola ya da PIN eklemek için Gizlilik bölümündeki Paylaşılan kasa kilidi açma bölümünü kullanın.",
+      "topics": {
+        "vault": "Kasa",
+        "danger": "Tehlikeli bölge"
+      },
+      "sections": {
+        "identity": "Kasa kimliği"
+      }
     },
     "appearance": {
       "accentHelper": "Uygulama genelinde kullanılan vurgu rengini seçin. Yalnızca bu cihazda.",
@@ -3004,6 +3075,16 @@
       "barCustomize": {
         "label": "Alt çubuk",
         "helper": "Alt çubuğun hangi göstergeleri göstereceğini seçin. Hepsini gizlerseniz çubuğun kendisi kaldırılır ve alan geri kazanılır. Bir öğeyi yeniden sıralamak için çubuktaki öğeyi sürükleyin ya da sağ tıklayın."
+      },
+      "topics": {
+        "display": "Görünüm",
+        "notes": "Not listesi",
+        "interface": "Arayüz"
+      },
+      "sections": {
+        "theme": "Tema ve vurgu",
+        "sidebar": "Kenar çubuğunda",
+        "customisation": "Özelleştirme"
       }
     },
     "archive": {
@@ -3030,7 +3111,8 @@
       "helper": "Görsel eklerden ve taranmış PDF’lerden bu cihazda metin okur, böylece arama onları içeriklerine göre bulabilir. Hiçbir şey yüklenmez. Bunu kapatmak arka plandaki metin çıkarma işlemini durdurur; hâlihazırda çıkarılmış metin korunur.",
       "errorSaveSetting": "Bu ayar kaydedilemedi.",
       "processing_one": "1 ek okunuyor…",
-      "processing_other": "{{count}} ek okunuyor…"
+      "processing_other": "{{count}} ek okunuyor…",
+      "mobileDeviceLocal": "Bu ayar cihaz başına: bu telefonun neleri dizinleyeceğine karar verir, böylece diğer cihazlarınız kendi seçimini korur."
     },
     "autoBackup": {
       "backupFolder": "Yedekleme klasörü",
@@ -3105,7 +3187,8 @@
       "excludedHelper": "Her satıra bir klasör yolu. Bu klasörlerdeki notlar hiçbir terminal sonucuna girmez ve terminalden oraya yazılamaz. Uygulamada tümüyle erişilebilir kalırlar. Bunu, terminal erişimini açmadan önce de ayarlayabilirsiniz.",
       "excludedPlaceholder": "Özel/\nGünlük/",
       "rateLimitLabel": "Terminal tam hızda çalışsın",
-      "rateLimitHelper": "Myne varsayılan olarak dakikada en fazla 120 terminal komutunu yanıtlar. Bu, kontrolden çıkmış bir betiğe konan hız sınırıdır, bir izin denetimi değil: hangi programın sorabileceğine karar veren hiçbir şey yok. Her notu başka bir araçtan geçirmek gibi toplu işler için bunu açın."
+      "rateLimitHelper": "Myne varsayılan olarak dakikada en fazla 120 terminal komutunu yanıtlar. Bu, kontrolden çıkmış bir betiğe konan hız sınırıdır, bir izin denetimi değil: hangi programın sorabileceğine karar veren hiçbir şey yok. Her notu başka bir araçtan geçirmek gibi toplu işler için bunu açın.",
+      "inlineOn": "Hesabınız altında çalışan her program bunun üzerinden notları okuyabilir, arayabilir ve oluşturabilir."
     },
     "clipperInstall": {
       "error": "Tarayıcı kırpıcısı ayarı güncellenemedi.",
@@ -3174,8 +3257,13 @@
       "periodFolderAriaLabel": "{{period}} not klasörü",
       "periodFormatAriaLabel": "{{period}} not başlık biçimi",
       "periodTemplateAriaLabel": "{{period}} not şablonu",
-      "sectionPeriodic": "Dönemsel notlar",
-      "periodSwitcherAriaLabel": "Dönemsel not türü"
+      "sectionPeriodic": "Periyodik notlar",
+      "periodSwitcherAriaLabel": "Periyodik not türü",
+      "blockLabel": "Periyodik notlar",
+      "mobilePeriodAriaLabel": "Not dönemi",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Kaydet",
+      "mobileSharedNotice": "Bu ayarlar paylaşılır: buradaki bir değişiklik diğer cihazlarınıza ulaşır ve bir bilgisayarda ayarlanan aynı değer buraya gelir."
     },
     "deleteVault": {
       "cancel": "İptal",
@@ -3227,6 +3315,10 @@
         "searchEmpty": "Not bulunamadı.",
         "searchPlaceholder": "Notlarda ara…",
         "untitledNote": "Başlıksız"
+      },
+      "sections": {
+        "notes": "Notlar ve klasörler",
+        "attachments": "Ekler"
       }
     },
     "focusMode": {
@@ -3341,12 +3433,12 @@
         "excludedLabel": "Hariç tutulan klasörler"
       },
       "disclosureToggle": "Bu nasıl çalışır?",
-      "enableHelper": "Sağladığınız bir modeli çalıştırır. Nerede çalıştığı ve notlarınızın bu cihazdan çıkıp çıkmadığı, aşağıda belirttiğiniz sağlayıcıya bağlıdır. Deneyseldir, varsayılan olarak kapalıdır.",
-      "enableLabel": "Yerel yapay zekayı etkinleştir",
-      "excludedHelper": "Bu klasörlerdeki notlar yapay zeka tarafından asla okunmaz veya dizinlenmez. Boş bırakmak yapay zekanın her şeyi görebileceği anlamına gelir; bu, komut satırı istemcisinin de dikkate aldığı listenin aynısıdır. Her satıra bir klasör yolu.",
+      "enableHelper": "Tüm yapay zeka özelliklerini açar. Bir modelin nerede çalıştığı ve notlarınızın bu cihazdan çıkıp çıkmadığı, aşağıda seçtiğiniz sağlayıcıya bağlıdır. Deneyseldir, varsayılan olarak kapalıdır.",
+      "enableLabel": "Yapay zeka özelliklerini aç",
+      "excludedHelper": "Bu klasörlerdeki notlar yapay zeka tarafından asla okunmaz veya dizinlenmez. Boş bırakmak yapay zekanın her şeyi görebileceği anlamına gelir. Her satıra bir klasör yolu.",
       "excludedLabel": "Hariç tutulan klasörler",
       "excludedPlaceholder": "Özel/\nGünlük/",
-      "endpointHelper": "Bu bilgisayarda zaten çalışan bir model çalıştırma ortamınız varsa, model dosyaları seçmek yerine Myne’i ona yönlendirin. Yukarıdaki dosyaları kullanmak için burayı boş bırakın.",
+      "endpointHelper": "Bu bilgisayarda zaten bir model çalıştırma ortamı çalıştırıyorsanız, model dosyaları seçmek yerine Myne’i ona yönlendirin. Modeller bölümünde ayarlanan model dosyalarını kullanmak için burayı boş bırakın.",
       "endpointLabel": "Yerel model çalıştırma ortamı",
       "endpointModelHelper": "Myne sizin yerinize model seçmez. Siz bir tane belirtene kadar yukarıdaki adres kaydedilir ama kullanılmaz.",
       "endpointModelLabel": "Orada kullanılacak model",
@@ -3373,7 +3465,8 @@
         "unreachable": "Sağlayıcıya ulaşılamadı. Ağ bağlantınızı kontrol edin.",
         "featureOff": "Bu cihazda yapay zekâ kapalı. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden açın.",
         "consentMissing": "Bu cihazdan bu sağlayıcıya not gönderilmesini kabul etmediniz. Hiçbir şey gönderilmedi. Ayarlar'da Yapay Zekâ bölümünden sağlayıcıyı yeniden seçin ve neyin gönderileceğini okuyun.",
-        "emptyGrant": "Bu çalıştırmanın okuyabileceği her şey, yapay zekânın asla görmediği klasörlerde. Hiçbir şey gönderilmedi. Bunu Ayarlar, Yapay Zekâ, Hariç Tutulan Klasörler'den değiştirin."
+        "emptyGrant": "Bu çalıştırmanın okuyabileceği her şey, yapay zekânın asla görmediği klasörlerde. Hiçbir şey gönderilmedi. Bunu Ayarlar, Yapay Zekâ, Hariç Tutulan Klasörler'den değiştirin.",
+        "noModel": "Burada çalıştırılacak bir model yok. Ayarlar, Yapay Zeka, Modeller altından bir tane ekleyin: Myne’in kendi kaynağından bir model indirin ya da Myne’i zaten sahip olduğunuz bir dosyaya yönlendirin."
       },
       "modelChoose": "Dosya seç…",
       "modelFilter": {
@@ -3383,7 +3476,7 @@
       "modelNone": "Dosya seçilmedi",
       "modelSaveFailed": "Model yolu kaydedilemedi (kasanızın dışında olmalı).",
       "modelTranscriptionLabel": "Konuşmadan metne modeli (yazıya dökme)",
-      "modelsHelper": "Buradan bir model indirin veya tarayıcınızda bir bağlantı açıp indirilen dosyaları seçin. Bir model cihazınızda çalışır; bunun yerine bir sağlayıcı belirttiyseniz yanıtı o sağlayıcı verir.",
+      "modelsHelper": "Yukarıdaki doğrulanmış listeden farklı bir yerden gelen dosyayı her rol için atayın: tarayıcınızda bir bağlantı açıp indirin, sonra burada seçin. Bir model cihazınızda çalışır; bunun yerine bir sağlayıcı belirttiyseniz yanıtı o sağlayıcı verir.",
       "providerHelper": "Myne, burada bir model çalıştırmak yerine adını verdiğiniz bir hizmete istek gönderebilir. Bunu yaptığında notlarınız bu cihazdan çıkar. Varsayılan “Yok” seçeneğidir ve hiçbir hizmetle iletişim kurulmaması anlamına gelir.",
       "providerKeyAdd": "API anahtarınızı yapıştırın",
       "providerKeyLabel": "API anahtarı",
@@ -3408,7 +3501,7 @@
       "providerModelUnfetched": "Bir model seçmek için listeyi yükleyin.",
       "providerNone": "Yok",
       "providerNothingAnswering": "Henüz yanıt verecek bir şey kurulmadı.",
-      "modelsLabel": "Modeller",
+      "modelsLabel": "Dış kaynaklı modeller",
       "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
       "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
       "title": "Yapay Zeka",
@@ -3424,10 +3517,6 @@
       "meetingPromptHelper": "Toplantı yapay zekası geçişinin bir metin dökümünü bölümlere dönüştürmek için kullandığı yönerge. Yerleşik varsayılan için boş bırakın. Varsayılan çıktı biçiminin yerini alır, yani onu ayarlarsanız istediğiniz bölümleri kendiniz istemelisiniz.",
       "meetingPromptLabel": "Toplantı özeti istemi",
       "meetingPromptReset": "Varsayılana sıfırla",
-      "groupAutoTag": "Otomatik etiketleme",
-      "groupVoice": "Ses ve toplantılar",
-      "groupWriting": "Yazma ve sohbet",
-      "groupPrivacy": "Gizlilik ve sınırlar",
       "groupAdvanced": "Gelişmiş",
       "excludedPickLabel": "Dışarıda bırakılacak bir klasör ekle",
       "excludedPickPlaceholder": "Bir klasör seçin…",
@@ -3447,7 +3536,39 @@
       "downloadCancel": "İptal",
       "downloadFailed": "İndirme tamamlanmadı.",
       "downloadFailedChecksum": "İndirme parmak iziyle eşleşmedi ve reddedildi. Tekrar deneyin.",
-      "sideloadDisclosure": "Geliştirici modu ayrıca Myne'i kendi edindiğiniz bir model dosyasına yönlendirmenize izin verir. Başka bir yerden indirdiğiniz bir dosya Myne tarafından denetlenmez, bu yüzden yalnızca güvendiğiniz birini kullanın."
+      "sideloadDisclosure": "Geliştirici modu ayrıca Myne'i kendi edindiğiniz bir model dosyasına yönlendirmenize izin verir. Başka bir yerden indirdiğiniz bir dosya Myne tarafından denetlenmez, bu yüzden yalnızca güvendiğiniz birini kullanın.",
+      "historyBudgetInline": "Her isteğin son konuşmadan kaç karakter taşıdığı.",
+      "historyBudgetMaxNotice": "Girebileceğiniz en fazla değer {{max}} karakterdir; daha büyük bir değer buna indirilir.",
+      "historyBudgetDeviceLocal": "Bu ayar cihaz başına: bu telefonun gönderdiği miktarı sınırlar, böylece diğer cihazlarınız kendi değerini korur.",
+      "meetingPromptShared": "Bu ayar paylaşılır: buradaki bir değişiklik diğer cihazlarınıza ulaşır ve bir bilgisayarda düzenlenen istem buraya gelir.",
+      "groupAnswering": "Yanıtlama",
+      "groupGeneral": "Genel",
+      "groupModels": "Modeller",
+      "groupLimits": "Sınırlar",
+      "groupTagging": "Etiketleme",
+      "excludedFoldersHelper": "Bu klasörlerdeki notlar yapay zeka tarafından asla okunmaz veya dizinlenmez. Bu, diğer cihazlarınızın da kullandığı listenin aynısıdır.",
+      "excludedFoldersEmpty": "Henüz hiçbir şey hariç tutulmadı, bu yüzden yapay zeka bu kasadaki her klasörü okuyabilir.",
+      "excludedFoldersAdd": "Ekle",
+      "excludedFoldersAddLabel": "Yapay zekadan hariç tutulacak klasör",
+      "excludedFoldersRemove": "Kaldır",
+      "excludedFoldersRemoveLabel": "{{folder}} klasörünü yapay zekadan hariç tutmayı bırak",
+      "excludedFoldersMonotoneNotice": "Cihazlarınızdan herhangi birinde eklenen bir hariç tutma, siz onu her yerde kaldırana kadar kalır: buradaki kaldırmalar iletilmez, bu yüzden diğer cihazlarınızın hâlâ hariç tuttuğu bir klasör bir sonraki eşitlemede geri gelir.",
+      "catalogueOpen": "Bir model indir",
+      "catalogueColModel": "Model",
+      "catalogueColState": "Durum",
+      "providerInline": "Bir hizmet belirtildiğinde notlarınız bu cihazdan çıkar.",
+      "providerChooseHelper": "Bir model bu cihazda çalışabilir ya da Myne adını verdiğiniz bir hizmete istek gönderebilir. Bunu yaptığında notlarınız bu cihazdan çıkar. “Bu cihazda” varsayılandır ve hiçbir hizmetle iletişim kurulmaması anlamına gelir.",
+      "providerChooseLabel": "Sağlayıcı seç",
+      "providerKeySave": "Bu anahtarı kaydet",
+      "providerOnDevice": "Bu cihazda",
+      "sections": {
+        "catalogue": "Doğrulanmış indirilebilir modeller",
+        "outsourced": "Dış kaynaklı modeller",
+        "preferences": "Tercihler",
+        "memory": "Bellek",
+        "excluded": "Yapay zekanın okuyabildikleri",
+        "history": "Sohbet geçmişi"
+      }
     },
     "network": {
       "disabledCue": "Eşitleme artık Tor üzerinden yönlendirilmiyor. Yeni bağlantılar doğrudan eşitleme sunucusuna gider.",
@@ -3469,7 +3590,8 @@
       "residualScope": "Masaüstünde bu, eşitleme trafiğinizi ve uzak yapay zeka sağlayıcısı isteklerinizi kapsar. Mobilde henüz Tor yönlendirmesi yok, bu yüzden sağlayıcı istekleri doğrudan gider. Bu cihazdaki başka hiçbir şey Tor üzerinden gitmez.",
       "residualsToggle": "Bunun gizlemedikleri",
       "torHelper": "IP adresinizi ve konumunuzu eşitleme sunucusundan gizler; hangi sunucuyla eşitlediğinizi (ve masaüstünde hangi yapay zeka sağlayıcısına eriştiğinizi) ağınızdan ve internet sağlayıcınızdan gizler. Onlar yine de bu cihazın Tor’a bağlandığını görebilir. Sizi Myne’e karşı anonim yapmaz ve neyi ne zaman eşitlediğinizi sunucudan gizlemez.",
-      "torLabel": "Eşitlemeyi ve masaüstü yapay zekasını Tor üzerinden yönlendir"
+      "torLabel": "Eşitlemeyi ve masaüstü yapay zekasını Tor üzerinden yönlendir",
+      "torInline": "Eşitleme sunucusundan IP adresinizi ve konumunuzu gizler; ağınızdan ve internet sağlayıcınızdan hangi sunucuyla eşitlediğinizi gizler."
     },
     "prefs": {
       "saveError": "Tercih kaydedilemedi. Tekrar deneyin.",
@@ -3526,7 +3648,18 @@
       "recoveryDrillHelper": "Yazdığınız 24 sözcüğü yazın. Myne bunların bu kasayı hâlâ açıp açmadığını kontrol eder ve başka hiçbir şey söylemez; sözcükler burada asla gösterilmez.",
       "recoveryDrillLabel": "Kurtarma ifadenizi kontrol edin",
       "recoveryDrillPassed": "Bu sözcükler bu kasayı açıyor. Onları bulduğunuz yerde saklayın.",
-      "recoveryDrillPlaceholder": "24 sözcük, sırayla, boşluklarla ayrılmış"
+      "recoveryDrillPlaceholder": "24 sözcük, sırayla, boşluklarla ayrılmış",
+      "hideVaultNamesInline": "Bunu açmak, burada saklanan adları okunabilir kılan anahtarları yok eder.",
+      "topics": {
+        "access": "Erişim",
+        "locking": "Kilitleme"
+      },
+      "sections": {
+        "screen": "Ekran koruması",
+        "terminal": "Komut satırı araçları",
+        "locking": "Kilitleme ve kilit açma",
+        "recovery": "Kurtarma"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Başka bir kasa işlemi sürüyor. Birazdan tekrar deneyin.",
@@ -3593,7 +3726,8 @@
         "storage": "Depolama",
         "sync": "Eşitleme",
         "cli": "CLI",
-        "vault": "Kasa"
+        "vault": "Kasa",
+        "data": "Veri"
       },
       "passwordUpdatedToast": "Parola güncellendi",
       "title": "Ayarlar"
@@ -3610,7 +3744,8 @@
       "languagesSearchEmpty": "Eşleşen dil yok.",
       "languagesSearchPlaceholder": "Dillerde ara…",
       "off": "Kapalı",
-      "on": "Açık"
+      "on": "Açık",
+      "mobileUnavailable": "Yazım denetimi bu telefonda henüz kullanılamıyor: bu cihazda sözlük yok, bu yüzden buradaki düzenleyici hiçbir şeyin altını çizemez. Bunun yerine bilgisayarınızdan açın."
     },
     "storage": {
       "backupHelper": "Yedeklemeler, tek bir doğrulanmış .myne-backup dosyasında, kasanız kadar şifreli kalır. Geri yükleme, tıpkı kilit açmadaki gibi o kasanın parolası veya kurtarma ifadesiyle çalışır.",
@@ -3629,7 +3764,12 @@
       "webLocationHelper": "Notlarınız, bu site için bu tarayıcının deposunda durur; bu depoyu tarayıcı yönetir. Açılacak bir klasör yoktur. Bu sitenin verilerini temizlemek yerel kopyayı kaldırır; bu istemci eşitleme yaptığı için yeniden giriş yapmak onu geri indirir.",
       "webLocationLabel": "Notlarınızın saklandığı yer",
       "pathUnavailable": "Yol kullanılamıyor",
-      "restoreBackup": "Yedeklemeden geri yükle…"
+      "restoreBackup": "Yedeklemeden geri yükle…",
+      "sections": {
+        "location": "Kasanın bulunduğu yer",
+        "backup": "Yedekleme ve geri yükleme",
+        "transfer": "İçe ve dışa aktarma"
+      }
     },
     "typography": {
       "contentWidthHelper": "Düzenleme sütununun en fazla genişliği. Tam, metnin bölmeye yayılmasını sağlar.",
@@ -3656,7 +3796,8 @@
       "weak": "Zayıf",
       "fair": "Orta",
       "good": "İyi",
-      "strong": "Güçlü"
+      "strong": "Güçlü",
+      "tooWeak": "Çok zayıf"
     },
     "sync": {
       "summary": {
@@ -3697,7 +3838,12 @@
         "bullet1": "Yağız şoföre çabucak güvendi",
         "bullet2": "Zıplayan zebralar şaşırtıcı biçimde çevik",
         "spellCaption": "Yazım denetimi",
-        "spellSample": "yanlis"
+        "spellSample": "yanlis",
+        "dateTime": "Tarih ve saat",
+        "toolbar": "Araç çubuğu",
+        "task": "Görevler",
+        "taskSampleOpen": "Üç aylık raporu gönder",
+        "taskSampleDone": "Mekânı ayırt"
       },
       "defaultView": "Varsayılan görünüm",
       "typewriter": "Daktilo kaydırması",
@@ -3715,6 +3861,9 @@
       "taskChipIconOnly": {
         "help": "Önceliği kelimesi yerine yalnızca simgesiyle göster.",
         "label": "Yalnızca simge önceliği"
+      },
+      "topics": {
+        "periodic": "Periyodik notlar"
       }
     },
     "search": {
@@ -3729,7 +3878,7 @@
         "aiProviderModel": "model katalog liste hangi model llama qwen gpt model seç uzak sağlayıcı provider remote",
         "aiEnable": "yapay zeka yerel ai açık kapalı etkinleştir kapat makine öğrenmesi llm",
         "aiExcluded": "hariç tutulan klasörler yoksay dışla ai yapay zeka gizlilik",
-        "aiModels": "model modeller gguf indir metin gömme embedding llm ai",
+        "aiModels": "modeller gguf indir metin gömme embedding llm katalog models gguf download text embedding llm catalogue",
         "archive": "arşiv arşivleme gizle geri yükle notlar archive",
         "autoBackup": "otomatik yedekleme yedeklemeler zamanlama sıklık saklama klasör backup",
         "autoLock": "otomatik kilit zaman aşımı boşta hareketsizlik süre oturum lock",
@@ -3794,15 +3943,16 @@
         "ribbon": "sol şerit ray sabitle sabitlenir komut komutlar özelleştir sırala kaldır araç çubuğu kısayollar",
         "folderNotes": "klasör notu dizin folder_index açılış sayfası çift tıklama klasör bağlantısı projeler kapalı anahtar kapat",
         "syncMembers": "üyeler, paylaş, davet, ekip, iş birliği, kasa",
-        "accountName": "hesap adı grup gruplama yeniden adlandır etiket cihaz yerel account name",
-        "accountVaults": "hesap kasalar gruplanmış hangi kasalar ait grup liste vaults",
+        "accountName": "hesap adı grup gruplama yeniden adlandır etiket cihaz yerel account name group grouping rename label device local",
+        "accountVaults": "hesap kasalar gruplanmış hangi kasalar ait grup liste vaults account vaults grouped which vaults belong group list",
         "aiMeetingPrompt": "toplantı özet istem yönerge özel metin dökümü yapılacaklar kararlar meeting summary prompt",
         "update": "güncelle güncelleme yükselt kontrol yeni sürüm yayın indir update",
         "plainFile": "düz dosya düzenleyici markdown yerel disk kasa dışı düz metin yerinde aç plain file",
         "memberPassword": "paylaşılan kasa parola üye kilit aç katıl ifade member password",
         "recoveryDrill": "kurtarma ifadesi kontrol doğrula tatbikat test 24 sözcük tohum yedek kayıp parola recovery phrase",
         "bar": "alt çubuk durum çubuğu göstergeler özelleştir yeniden sırala gizle göster araç çubuğu bottom bar",
-        "syncDeviceBindings": "cihazlar üyeler tarafından sahiplenilen atıf kim imzaladı hangi cihaz ait device bindings"
+        "syncDeviceBindings": "cihazlar üyeler tarafından sahiplenilen atıf kim imzaladı hangi cihaz ait device bindings",
+        "diagnosticLog": "tanılama günlük günlüğü hata ayıklama sorun giderme çökme raporu hata raporu destek diagnostic log logging debug troubleshooting crash report bug report support"
       },
       "emptyBody": "Daha kısa bir sözcük ya da bir panelin adını deneyin."
     },
@@ -3819,12 +3969,14 @@
       "zoneHelper": "Hangi günün bugün sayılacağına ve dolayısıyla günlük, haftalık ve aylık notlarınızın hangi notu açacağına karar veren saat dilimi. Bu cihazın saat dilimini kullanmak için boş bırakın. Seçim her cihazda ayrı yerleşir: başka hiçbir cihaz onun üzerine yazmaz, bu yüzden buradaki bir seçim bu cihazı diğerlerinden farklı bir güne koyabilir. Bir notta yazdığınız saatler asla değiştirilmez; 09:00 her yerde 09:00 kalır.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne bu saat dilimini tanımıyor. Europe/Berlin gibi bir ad kullanın.",
-      "errorSave": "Bu ayar kaydedilemedi."
+      "errorSave": "Bu ayar kaydedilemedi.",
+      "zoneInline": "Hangi günün bugün sayılacağına ve dolayısıyla günlük, haftalık ve aylık notlarınızın hangi notu açacağına karar veren saat dilimi."
     },
     "folderNotes": {
       "label": "Klasör notları",
       "helper": "Bir notun klasörünün dizini gibi davranmasını sağlayın: çift tıkladığınızda açılır ve [[Projects/]] gibi klasör bağlantıları onu işaret eder. Varsayılan olarak kapalıdır. Kapatmak, klasör notu oluşturan düğmeleri gizler ve zaten olanları sıradan not olarak gösterir; diskte hiçbir şeyi değiştirmez, yeniden açmak hepsini aynen geri yükler.",
-      "errorSaveSetting": "Bu ayar kaydedilemedi."
+      "errorSaveSetting": "Bu ayar kaydedilemedi.",
+      "inline": "Bir notun klasörünün dizini gibi davranmasını sağlayın: klasöre çift tıkladığınızda açılır ve [[Projects/]] gibi klasör bağlantıları onu işaret eder."
     },
     "ribbonCustomize": {
       "add": "Ekle",
@@ -3868,25 +4020,31 @@
       "personalitySaveFailed": "Ses tercihleri kaydedilemedi.",
       "loadFailed": "Anılar veya ses tercihleri yüklenemedi. Hiçbir şey değişmedi.",
       "retryLabel": "Yeniden dene",
-      "emptyTitle": "Henüz bir şey hatırlanmıyor"
+      "emptyTitle": "Henüz bir şey hatırlanmıyor",
+      "count": "{{used}} / {{cap}}",
+      "atCap": "Liste dolu, bu yüzden yeni bir şey hatırlanamaz. Yer açmak için bir girdi silin."
     },
     "account": {
       "nameLabel": "Hesap adı",
-      "nameHelper": "Bu cihazdaki bu kasa grubu için bir ad. Kasa seçici bunu grubun başlığı olarak kullanır. Bu cihazda kalır ve hiçbir zaman bir kasanın içinde saklanmaz, bu yüzden eşitlenmez ve başka bir cihaz aynı kasaları farklı gruplayıp adlandırabilir.",
+      "nameHelper": "Bu cihazdaki bu kasa grubunun adı. Kasa seçici bunu grubun başlığı olarak kullanır. Bu cihazda kalır ve hiçbir zaman bir kasanın içinde saklanmaz, bu yüzden eşitlenmez ve başka bir cihaz aynı kasaları farklı gruplayıp farklı adlandırabilir.",
       "namePlaceholder": "Bir ad ekleyin…",
       "nameSave": "Kaydet",
       "nameSaving": "Kaydediliyor…",
       "vaultsLabel": "Bu hesaptaki kasalar",
-      "vaultsHelper": "Bu cihazın yukarıdaki ad altında grupladığı kasalar. Gruplama cihaz başına bir düzenleme tercihidir, bu yüzden hiçbir kasanın içeriğinin parçası değildir ve onunla birlikte taşınmaz.",
+      "vaultsHelper": "Bu cihazın yukarıdaki ad altında grupladığı kasalar. Gruplama cihaz başına bir düzenleme tercihidir, bu yüzden hiçbir kasanın içeriğinin parçası değildir ve onunla taşınmaz.",
       "vaultsCount": "{{count}} kasa",
       "currentVault": "Bu kasa",
       "unknownVault": "Bu cihazdaki başka bir kasa",
-      "standaloneHelper": "Bu kasa bu cihazda bir hesap altında gruplanmamıştır, bu yüzden tek başına durur. Gruplama cihaz başınadır: başka bir cihaz onu bir hesabın içinde gösterebilir.",
+      "standaloneHelper": "Bu kasa, bu cihazda bir hesap altında gruplanmamış, bu yüzden tek başına duruyor. Gruplama cihaz başına: başka bir cihaz onu bir hesabın içinde gösterebilir.",
       "unresolvedHelper": "Hangi kasanın açık olduğu belirleniyor…",
-      "devicesNote": "Cihazlar, paylaşılan kasa üyeleri ve kimliğiniz Eşitleme bölümünde yönetilir.",
-      "groupingHidden": "Kasa adları gizliyken hesap adları kullanılamaz. Bu hesabı yönetmek için Gizlilik bölümünden o seçeneği kapatın.",
-      "groupingUnreadable": "Bu cihazın hesap gruplaması okunamadı. Hiçbir şey değişmedi.",
-      "groupingError": "Bu cihazdaki hesap gruplaması okunamadı. Hiçbir şey değişmedi."
+      "devicesNote": "Cihazlar, paylaşılan kasa üyeleri ve kimliğiniz Eşitleme bölümünden yönetilir.",
+      "groupingHidden": "Kasa adları gizliyken hesap adları kullanılamaz. Bu hesabı yönetmek için Gizlilik bölümünde o seçeneği kapatın.",
+      "groupingUnreadable": "Bu cihazın hesap gruplaması okunamadı. Hiçbir şey değiştirilmedi.",
+      "groupingError": "Bu cihazdaki hesap gruplaması okunamadı. Hiçbir şey değiştirilmedi.",
+      "sections": {
+        "extensions": "Tarayıcı uzantıları",
+        "grouping": "Bu hesap"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Düz dosya ayarı kaydedilemedi.",
@@ -3915,7 +4073,8 @@
       "pinSetupHelper": "En az {{count}} hane. Yalnızca bu cihazda saklanır; kurtarma ifadeniz kasayı her yerde açmaya devam eder.",
       "errorTooShort": "En az {{count}} karakter/hane kullanın.",
       "errorGeneric": "Kimlik bilgisi belirlenemedi. Lütfen tekrar deneyin."
-    }
+    },
+    "helperDisclosureLabel": "Bu ayar hakkında daha fazla"
   },
   "storageLost": {
     "allSynced": "Hiçbir şey kaybolmadı: buradaki her not sunucuya çoktan ulaşmıştı.",
@@ -3943,7 +4102,10 @@
       "intro": "Eşitleme, notlarınızı şifreli olarak bir sunucuya gönderir. Önce bilmeye değer dört şey var.",
       "whatThisIsLabel": "Bu nedir",
       "dataLossLabel": "İki sırrınızı da kaybederseniz",
-      "accept": "Anlıyorum, eşitlemeyi aç"
+      "accept": "Anlıyorum, eşitlemeyi aç",
+      "whatHappensNextLabel": "Sunucu ortadan kalkarsa",
+      "whatWeCanSeeLabel": "Sunucunun işletmecisinin görebildikleri",
+      "review": "Eşitlemenin ne anlama geldiğini gözden geçir"
     },
     "materialising": "Notlarınız indiriliyor: {{done}} / {{total}}. Çalışmaya başlayabilirsiniz; kalanlar geldikçe görünecek.",
     "credentialAmbiguous": "Parolanız hem bu cihazda hem de başka bir cihazda değişmiş olabilir ve Myne hangisinin daha yeni olduğunu ayırt edemiyor, bu yüzden hiçbir şeyi değiştirmedi. Bunu çözmek için erişimi zaten olan bir cihazdan giriş yapın.",
@@ -4144,7 +4306,7 @@
         "deleteConfirmTitle": "Bu kurtarılan not silinsin mi?",
         "deleteConfirmWarning": "Bu, bu cihazda tutulan tek kopyayı kalıcı olarak siler. Bu işlem geri alınamaz.",
         "deleteCta": "Sil",
-        "empty": "Kurtarılan not yok.",
+        "empty": "Kurtarılan not yok",
         "errorGeneric": "Bir şeyler ters gitti. Tekrar deneyin.",
         "helper": "Başka bir cihazda silinen bir not burada da kaldırıldığında, şifreli kopyası bu cihazda saklanır. Birini yeni bir not olarak geri yükleyin ya da kalıcı olarak silin.",
         "label": "Kurtarılan notlar",
@@ -4161,7 +4323,9 @@
       },
       "usage": {
         "helper": "Bu hesabın sunucuda ne kadar şifreli veri sakladığı ve kaç cihazın giriş yapmış olduğu.",
-        "label": "Depolama ve cihazlar"
+        "label": "Depolama ve cihazlar",
+        "memberHelper": "Hesabınızda kaç cihazın oturum açtığı.",
+        "memberLabel": "Cihazlar"
       },
       "identity": {
         "label": "Kimlik",
@@ -4170,6 +4334,16 @@
         "codeLabel": "Kimlik kodunuz",
         "lockedHelper": "Bu cihaz bir kimlik barındırıyor. Bu oturum için kilitli; eşitleme ve davetleri imzalamak için kurtarma ifadenizle kilidini açın.",
         "unlockedHelper": "Bu cihaz bir kimlik barındırıyor, bu oturum için kilidi açık."
+      },
+      "topics": {
+        "connection": "Bağlantı",
+        "devices": "Cihazlar ve üyeler",
+        "conflicts": "Çakışmalar"
+      },
+      "sections": {
+        "account": "Hesap",
+        "server": "Sunucu",
+        "devices": "Kayıtlı cihazlar"
       }
     },
     "reconcile": {
@@ -4345,6 +4519,18 @@
       "label": "Görünen adınız",
       "checking": "Adınız kontrol ediliyor…",
       "save": "Devam et"
+    },
+    "memberJoinQr": {
+      "error": "Kod oluşturulamadı.",
+      "noAccount": "Bu kasanın hesabı bu cihazda henüz kayıtlı değil. Kasayı bir kez açın, sonra tekrar deneyin.",
+      "hint": "Bu kod sunucunuzun adresini ve bu kasanın kimliğini taşır. Kurtarma ifadenizi ya da parolanızı asla taşımaz.",
+      "notAMember": "Bu kasa, üyesi olduğunuz paylaşılan bir kasa değil, bu yüzden gösterilecek bir kod yok.",
+      "notConfigured": "Önce bir eşitleme sunucusu yapılandırın, sonra kodu oluşturun.",
+      "scanWithApp": "Diğer cihazınızda Myne ile tarayın",
+      "stepIdentity": "Diğer cihazınızda Myne’i açın ve “Zaten bir kimliğim var” seçeneğini seçin.",
+      "stepJoin": "Bu paylaşılan kasa davetlerinizde sizi bekliyor olacak. Katılmak için açın.",
+      "stepPhrase": "Orada 24 sözcüklük kurtarma ifadenizi girin.",
+      "title": "Kendi cihazınızı ekleyin"
     }
   },
   "tasks": {
@@ -4393,7 +4579,8 @@
       "completed": "Görev, tamamlandı",
       "notCompleted": "Görev, tamamlanmadı",
       "tooLongToWrite": "Bu görevin satırı buradan düzenlenemeyecek kadar uzun. Bunun yerine notunu açın.",
-      "untitled": "Başlıksız görev"
+      "untitled": "Başlıksız görev",
+      "editFields": "Görev alanlarını düzenle"
     },
     "title": "Görevler",
     "axis": {
@@ -4573,7 +4760,7 @@
     "deleteConfirmTitle": "Bu kasa silinsin mi?",
     "deletePartialError": "Bazı dosyalar kaldırılamadı. Kasa artık kullanılamaz. Baştan başlamak için devam edin.",
     "failClosedEyebrow": "Kasa açılamıyor",
-    "restoreHint": "Devam etmek için bir yedekten geri yükleyin.",
+    "restoreHint": "Bir yedekten geri yükleme mobilde henüz kullanılamıyor.",
     "memberHint": "Bu kasa sizinle paylaşıldı. Kendi kurtarma ifadenizle açın.",
     "memberPhraseLabel": "Kurtarma ifadesi",
     "memberSubmit": "Aç",
@@ -4588,7 +4775,9 @@
     "memberPinPlaceholder": "Kasa PIN'i (en az {{count}} hane)",
     "memberBiometricHint": "Bu kasa sizinle paylaşıldı. Kilidi açmak için cihazınızın biyometrisiyle onaylayın.",
     "memberBiometricSubmit": "Biyometriyle kilidi aç",
-    "titleNamed": "{{vault}} kilidini aç"
+    "titleNamed": "{{vault}} kilidini aç",
+    "restoreCta": "Bir yedekten geri yükle",
+    "ioErrorHint": "Tekrar deneyin ya da Myne’i yeniden açın."
   },
   "vault": {
     "ioBanner": {
@@ -4628,7 +4817,7 @@
       "heading": "Kurtarma ifadenizi doğrulayın",
       "intro": "Bunları kaydettiğinizi kontrol etmek için şu dört konumdaki sözcükleri yazın.",
       "mismatch": "{{pos}}. sözcükle eşleşmiyor.",
-      "wordAtPosition": "{{pos}}. konumdaki sözcük",
+      "wordAtPosition": "{{pos}}. sözcük",
       "commit": "Kasa oluştur",
       "committing": "Kaydediliyor…",
       "eyebrowLabel": "İfadeyi onayla"
@@ -4747,11 +4936,11 @@
       "copy": "Kopyala",
       "extensionNotice": "Bu siteye erişimi olan tarayıcı uzantıları bu sayfadakileri okuyabilir. Bu profildeki her uzantıdan emin değilseniz bu adım için masaüstü uygulamasını ya da temiz bir tarayıcı profilini kullanın.",
       "copyFailed": "Kopyalanamadı. Bunun yerine “Dosya olarak kaydet”i kullanın.",
-      "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne ulaşıp ulaşmadığını göremez.",
+      "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne onun gidip gitmediğini göremez.",
       "reveal": "İfadeyi göster",
       "saveAsFile": "Dosya olarak kaydet",
-      "saveFailed": "Dosya kaydedilemedi. Bunun yerine sözcükleri kopyalayın ya da bir yere yazın.",
-      "savedToFile": "Kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden yalnızca sizin okuyabileceğiniz bir yerde saklayın."
+      "saveFailed": "Dosya kaydedilemedi. Bunun yerine sözcükleri kopyalayın ya da yazın.",
+      "savedToFile": "Kaydedildi. Bu bir düz metin dosyasıdır, bu yüzden onu yalnızca sizin okuyabileceğiniz bir yerde saklayın."
     },
     "ready": {
       "backedUp": "Yedeklendi",
@@ -5161,7 +5350,7 @@
     "forgetCta": "Bu kimliği unut ve yeni bir tane oluştur",
     "forgetWarning": "Bu, bu cihazda barındırılan kimliği siler. 24 sözcüklük kurtarma ifadesini yazmadıysanız o gitti: bu cihaz, onu o ifadeyle kurtarana kadar sahip olduğu ya da katıldığı hiçbir kasaya erişimini kaybeder. Yalnızca eminseniz devam edin.",
     "heldIntro": "Bu cihaz zaten bir kimlik barındırıyor. Aşağıda onu 24 sözcüklük ifadesiyle kurtarın.",
-    "typeBackLead": "Kaydettiğinizi doğrulamak için yukarıdaki ifadeden bu dört sözcüğü yazın.",
+    "typeBackLead": "Az önce kaydettiğiniz kimlik ifadesinden şu dört sözcüğü girin.",
     "typeBackMismatch": "Bu, {{pos}}. sözcükle eşleşmiyor.",
     "typeBackWordAtPosition": "{{pos}}. sözcük",
     "newTitle": "Yeni bir kimlik",
@@ -5171,7 +5360,10 @@
     "recoverAction": "Kurtar",
     "back": "Geri",
     "changeServer": "Eşitleme sunucusunu değiştir ya da doğrula",
-    "errorTlsFailure": "Sunucunun HTTPS sertifikası doğrulanamadı. Sunucu adresini ve sertifikasını kontrol edin."
+    "errorTlsFailure": "Sunucunun HTTPS sertifikası doğrulanamadı. Sunucu adresini ve sertifikasını kontrol edin.",
+    "phraseTitle": "Kimlik ifadenizi kaydedin",
+    "phraseContinue": "Devam et",
+    "confirmTitle": "İfadenizi onaylayın"
   },
   "personIdentityCode": {
     "copy": "Kimlik kodunu kopyala",
@@ -5218,7 +5410,16 @@
     "forgetConfirm": "Kimliği unut",
     "forgetCta": "Bu kimliği bu cihazda unut",
     "forgetError": "Kimlik unutulamadı. Tekrar deneyin.",
-    "forgetWarning": "Bu, kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı hiçbir kasa etkilenmez ve kimliği 24 sözcüklük ifadesiyle başka bir cihazda kurtarabilirsiniz. O ifadeyi kaydetmediyseniz bu cihaz onu kurtaramaz."
+    "forgetWarning": "Bu, kimliği yalnızca bu cihazdan kaldırır. Sunucu hesabı ve sahip olduğu ya da katıldığı hiçbir kasa etkilenmez ve kimliği 24 sözcüklük ifadesiyle başka bir cihazda kurtarabilirsiniz. O ifadeyi kaydetmediyseniz bu cihaz onu kurtaramaz.",
+    "stepIndicator": "Adım {{n}} / {{total}} · {{label}}",
+    "stepVerifyOwner": "Sahibi doğrula",
+    "stepRecoveryPhrase": "Kurtarma ifadesi",
+    "stepDevicePassword": "Cihaz parolası",
+    "phraseHeading": "Kurtarma ifadenizi girin",
+    "passwordHeading": "Bu cihaz için parola",
+    "acceptHeading": "Bu daveti kabul et",
+    "acceptPhraseHint": "Kurtarma ifadenizin 24 sözcüğünü girin. Bu ifade sizin, kasa sahibinin değil.",
+    "acceptErrorBadRequest": "Davet doğrulanamadı. Kasa sahibinin kimlik kodunu yapıştırın (sizi davet ederken paylaşır)."
   },
   "aiOnboarding": {
     "title": "Yapay zekayı kurun",
@@ -5279,12 +5480,35 @@
     "unsaved": "Kaydedilmemiş değişiklikler"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Myne {{version}} mevcut.",
-      "failed": "Güncelleme kurulamadı. Tekrar deneyin.",
-      "installing": "Güncelleme indiriliyor…",
+      "consequence": "Güncelleme kasanızı kilitler ve Myne’i yeniden başlatır. Açık notlarınız önce kaydedilir.",
+      "flushFailed": "Myne açık olan her notu kaydedemedi, bu yüzden güncelleme başlamadı. Birazdan tekrar deneyin.",
+      "stageFailed": "Uygulama kasadan zaten çıkmış olduğu için Myne güncellemeyi başlatamadı. Kasanın kilidini açıp tekrar deneyin.",
+      "lockFailed": "Myne kasanızı kilitleyemedi, bu yüzden güncelleme başlamadı.",
+      "primary": "Güncelle ve yeniden başlat",
       "later": "Daha sonra",
-      "restart": "Güncellemek için yeniden başlat"
+      "confirmTitle": "Myne güncellensin ve yeniden başlatılsın mı?",
+      "confirmBody": "Kasanız kilitlenecek ve Myne yeniden başlatılacak. Yavaş bir bağlantıda indirme ve kurulum birkaç dakika sürebilir.",
+      "confirmPrimary": "Kasayı kilitle ve güncelle",
+      "cancel": "İptal",
+      "pill": "Güncelleme mevcut"
+    },
+    "updating": {
+      "eyebrow": "Güncelleniyor",
+      "heading": "Myne güncelleniyor",
+      "version": "Sürüm {{version}}",
+      "caption": "Yeni sürüm indiriliyor ve kuruluyor.",
+      "hint": "Bu bittiğinde Myne kendiliğinden yeniden başlar. Pencereyi açık bırakın."
+    },
+    "failed": {
+      "eyebrow": "Güncelleme tamamlanmadı",
+      "heading": "Güncelleme tamamlanmadı",
+      "caption": "Myne {{version}} hâlâ çalışıyor ve notlarınıza dokunulmadı.",
+      "hint": "Yeniden denemek indirmeyi baştan başlatır.",
+      "retry": "Yeniden dene",
+      "back": "Kilit açmaya dön"
     }
   },
   "firstRun": {
@@ -5326,7 +5550,7 @@
       "title": "Kimlik ifadenizi kaydedin",
       "warning": "Bu 24 sözcüğü yazın ve güvende tutun. Gösterildiği tek zaman budur; bu kimliği kurtarmanın tek yolu bunlardır. Herhangi bir kasa kurtarma ifadesinden farklı bir ifadedir.",
       "reveal": "Göster",
-      "typebackLead": "Kaydettiğinizi doğrulamak için yukarıdaki ifadeden bu dört sözcüğü yazın.",
+      "typebackLead": "Az önce kaydettiğiniz kimlik ifadesinden şu dört sözcüğü girin.",
       "wordNumber": "{{position}}. sözcük",
       "wordMismatch": "Bu, {{pos}}. sözcükle eşleşmiyor.",
       "continue": "Devam et"
@@ -5341,6 +5565,20 @@
       "forgetHeading": "Bu cihaz",
       "forget": "Bu kimliği bu cihazda unut",
       "forgetCheckbox": "Bu kimliğin bu cihazdan kaldırılacağını anlıyorum. Sunucu hesabı kalır ve ifade onu kurtarır."
+    },
+    "recover": {
+      "open": "Zaten bir kimliğim var",
+      "title": "Kimliğinizi kurtarın",
+      "lead": "O kimliği bu cihaza getirmek için kimlik kurtarma ifadenizin 24 sözcüğünü girin. Bu, herhangi bir kasa kurtarma ifadesinden farklı bir ifadedir.",
+      "submit": "Kimliği kurtar",
+      "working": "Kurtarılıyor…",
+      "failed": "Bu cihazda bir kimlik kurtarılamadı. 24 sözcüğü kontrol edip tekrar deneyin."
+    },
+    "typeback": {
+      "title": "İfadenizi onaylayın"
+    },
+    "joinFromQr": {
+      "notFound": "Bu kod, bu cihazdaki davetlerinizde bulunmayan bir kasayı gösteriyor. Kasa sahibinden daveti bu kimliğe yeniden göndermesini isteyin."
     }
   }
 }

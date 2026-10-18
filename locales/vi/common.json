@@ -227,7 +227,8 @@
       "targetVault": "Về toàn bộ kho",
       "running": "Đang xử lý cuộc trò chuyện này",
       "newConversation": "Cuộc trò chuyện mới",
-      "historyLabel": "Lịch sử"
+      "historyLabel": "Lịch sử",
+      "searchClear": "Hiện mọi cuộc trò chuyện"
     },
     "focus": {
       "title": "Tác nhân AI trên ghi chú",
@@ -356,7 +357,15 @@
       "emptyFilteredBody": "Không có gì ở đây khớp với bộ lọc loại hiện tại. Hãy xóa nó để xem lại toàn bộ thư viện.",
       "emptyFilteredBodyQuery": "Không có gì trong thư viện khớp",
       "emptyLoadErrorBody": "Danh mục được mã hóa bằng kho của bạn, nên đây thường là một lần đọc bị gián đoạn chứ không phải dữ liệu bị mất. Hãy thử lại; nếu vẫn tiếp tục thất bại, ghi chú và các tệp của bạn không bị ảnh hưởng.",
-      "emptyRetry": "Thử lại"
+      "emptyRetry": "Thử lại",
+      "transcriptCopy": "Sao chép",
+      "transcriptCopied": "Đã sao chép bản chép lời.",
+      "transcriptCopyFailed": "Không thể sao chép bản chép lời.",
+      "transcriptEmpty": "Không tìm thấy giọng nói nào trong bản ghi âm này.",
+      "transcriptNoteTitle": "{{name}} (bản chép lời)",
+      "transcriptSave": "Lưu thành ghi chú",
+      "transcriptSaved": "Đã lưu bản chép lời thành ghi chú.",
+      "transcriptSaveFailed": "Không thể lưu bản chép lời thành ghi chú."
     },
     "thumbnail": {
       "audioLabel": "Âm thanh: {{filename}}",
@@ -787,6 +796,12 @@
       },
       "openPalette": {
         "label": "Tìm và chạy một lệnh…"
+      },
+      "attachFile": {
+        "label": "Đính kèm tệp…"
+      },
+      "convertImportedAttachments": {
+        "label": "Chuyển đổi tệp đính kèm đã nhập…"
       }
     },
     "hotkeys": {
@@ -1221,8 +1236,6 @@
           "insert": "Chèn vào ghi chú",
           "noAnswer": "Không có câu trả lời. Hãy thử diễn đạt lại.",
           "newChat": "Trò chuyện mới",
-          "noModelHint": "Chưa thiết lập nhà cung cấp AI nào, nên các tính năng trò chuyện, tóm tắt, viết lại và tìm kiếm ngữ nghĩa không có gì để chạy. Hãy thiết lập một nhà cung cấp trong Cài đặt → Nhà phát triển → AI.",
-          "unreachableHint": "Nhà cung cấp bạn đã thiết lập không phản hồi. Hãy kiểm tra xem nó có đang chạy không, rồi gửi lại.",
           "unavailableHint": "Bản dựng Myne này được biên dịch mà không kèm AI cục bộ, nên không có gì ở đây chạy được. Không cài đặt nào thay đổi được điều đó — cần một bản dựng có kèm AI.",
           "offHint": "AI cục bộ đang tắt. Hãy bật nó trong Cài đặt → Nhà phát triển → AI.",
           "send": "Gửi",
@@ -1240,9 +1253,7 @@
           "historyCancel": "Hủy",
           "historyDelete": "Xóa",
           "historyDeleteBody": "Thao tác này sẽ xóa cuộc trò chuyện khỏi mọi thiết bị ở lần kết nối tới. Không thể hoàn tác.",
-          "historyEmpty": "Chưa có cuộc trò chuyện. Cuộc trò chuyện mới sẽ xuất hiện ở đây.",
           "historyError": "Không tải được cuộc trò chuyện. Thử lại.",
-          "historyLoading": "Đang tải…",
           "historyProposalNewNote": "Ghi chú mới",
           "historyRename": "Đổi tên",
           "historyTitle": "Lịch sử trò chuyện",
@@ -1274,7 +1285,16 @@
           "diffTitle": "Thay đổi được đề xuất",
           "revertConfirmTitle": "Hoàn tác lượt chạy này?",
           "revertConfirmBody": "Những ghi chú mà lượt chạy này thay đổi sẽ trở về như trước đó. Những ghi chú nó tạo ra vẫn ở nguyên chỗ.",
-          "focusAgent": "Mở trong thẻ tác nhân AI"
+          "focusAgent": "Mở trong thẻ tác nhân AI",
+          "statusNoModelChosen": "Không có mô hình",
+          "statusNoCredential": "Không có khóa API",
+          "statusConsentMissing": "Cần đồng ý",
+          "statusNotAllowed": "Không được phép",
+          "statusKeyRejected": "Khóa bị từ chối",
+          "statusOutOfCredit": "Hết hạn mức",
+          "statusRefused": "Bị từ chối",
+          "statusNotWorking": "Không hoạt động",
+          "historyRetry": "Thử lại"
         },
         "allHidden": "Tất cả tab đều bị ẩn. Nhấp chuột phải để khôi phục.",
         "outline": {
@@ -1404,7 +1424,8 @@
       "propertiesLabel": "Thuộc tính",
       "removeListItemAriaLabel": "Xóa {{item}}",
       "titleAriaLabel": "Tiêu đề ghi chú",
-      "titlePlaceholder": "Không có tiêu đề"
+      "titlePlaceholder": "Không có tiêu đề",
+      "managedField": "Myne ghi trường này"
     },
     "mermaid": {
       "rendering": "Đang dựng sơ đồ…",
@@ -1456,7 +1477,8 @@
       "voiceNote": "Ghi chú giọng nói",
       "wikiLink": "Liên kết wiki",
       "remind": "Nhắc nhở",
-      "meeting": "Phiên họp"
+      "meeting": "Phiên họp",
+      "sheetTitle": "Chèn"
     },
     "spell": {
       "menu": {
@@ -1618,6 +1640,9 @@
       },
       "convertCore": {
         "noMatch": "không khớp"
+      },
+      "picker": {
+        "sheetTitle": "Liên kết tới ghi chú"
       }
     },
     "flow": {
@@ -1814,6 +1839,9 @@
       "tapSilent": "Âm thanh của những người tham gia khác không truyền tới. Hãy kiểm tra Cài đặt hệ thống, Quyền riêng tư & Bảo mật, Ghi màn hình & âm thanh hệ thống.",
       "transcriptHeading": "Bản chép lời",
       "transcriptionFailed": "Một phần cuộc họp không chép lời được. Âm thanh vẫn còn trong ghi chú."
+    },
+    "templateToken": {
+      "sheetTitle": "Chèn token"
     }
   },
   "export": {
@@ -2124,7 +2152,11 @@
         "derivedMakeEditableFailed": "Không lưu được các nhóm này. Thử lại.",
         "derivedNote_one": "Đồ thị được tô màu theo thẻ: {{count}} nhóm suy ra từ thẻ của bạn. Không được lưu cho đến khi bạn cho phép chỉnh sửa.",
         "derivedNote_other": "Đồ thị được tô màu theo thẻ: {{count}} nhóm suy ra từ thẻ của bạn. Không được lưu cho đến khi bạn cho phép chỉnh sửa.",
-        "newRuleTitle": "Nhóm màu mới"
+        "newRuleTitle": "Nhóm màu mới",
+        "moveDown": "Di chuyển quy tắc xuống",
+        "moveUp": "Di chuyển quy tắc lên",
+        "mobileEmptyBody": "Nhóm màu tô màu đồ thị theo thẻ hoặc thư mục, và chúng được tạo trên máy tính. Điện thoại này dùng được chúng nhưng chưa thể tạo nhóm mới, vì một nhóm mới cần một bộ lọc.",
+        "mobileSharedNotice": "Nhóm màu được chia sẻ: chỉnh sửa ở đây sẽ thay thế toàn bộ danh sách trên các thiết bị khác của bạn, và danh sách được chỉnh trên máy tính sẽ đến đây."
       },
       "depthToggleTitle": "Bật/tắt độ sâu lân cận (1 ↔ 2 bước)",
       "filterAll": "Tất cả",
@@ -2351,7 +2383,7 @@
     "list": {
       "addToFavorites": "Thêm vào mục yêu thích",
       "archiveBulkError": "Không thể lưu trữ các ghi chú.",
-      "renameFailed": "Không thể lưu tên đó, nên ghi chú vẫn giữ tên cũ.",
+      "renameFailed": "Không lưu được tên đó, nên ghi chú giữ tên cũ.",
       "archiveFolder": "Lưu trữ thư mục",
       "archiveNote": "Lưu trữ",
       "archiveSingleError": "Không thể lưu trữ ghi chú.",
@@ -2768,7 +2800,7 @@
     "restoreVaultHeader": "Khôi phục một kho lưu trữ",
     "accountTitle": "Nhập số tài khoản của bạn",
     "accountLead": "Tìm số này ở nơi bạn đã lưu cụm từ khôi phục. Nó xác định kho lưu trữ cần khôi phục.",
-    "accountInvalid": "Số tài khoản không hợp lệ — vui lòng kiểm tra và nhập lại.",
+    "accountInvalid": "Số tài khoản không hợp lệ: hãy kiểm tra và nhập lại.",
     "accountOptionalHint": "Không có số này? Để trống và tiếp tục. Cụm từ khôi phục 24 từ của bạn là tất cả những gì bạn cần.",
     "paste": "Dán",
     "phraseGridHint": "Nhập từng từ, hoặc dán cả 24 từ cùng lúc để điền vào lưới.",
@@ -2925,7 +2957,39 @@
       "updateIdle": "Các bản cập nhật đã ký, được lấy từ downloads.myne.md khi bạn kiểm tra.",
       "updateInstallButton": "Khởi động lại để cập nhật",
       "updateLabel": "Cập nhật",
-      "updateUpToDate": "Bạn đang dùng phiên bản mới nhất."
+      "updateUpToDate": "Bạn đang dùng phiên bản mới nhất.",
+      "developerModeInline": "Hiện những cài đặt mà Myne mặc định giữ khuất.",
+      "diagnosticLogHelper": "Ghi một nhật ký văn bản thuần trên thiết bị này, và chỉ thiết bị này. Nó ghi lại những gì Myne đang làm: không bao giờ ghi nội dung ghi chú, không bao giờ ghi tiêu đề ghi chú, không bao giờ ghi đường dẫn tệp. Myne giới hạn kích thước của nó và bỏ những mục cũ nhất trước, và tắt lại sẽ xóa nhật ký. Không có gì từng được gửi đi đâu cả; bạn quyết định chia sẻ gì.",
+      "diagnosticLogLabel": "Ghi nhật ký chẩn đoán",
+      "diagnosticLogError": "Myne không thể thay đổi cài đặt đó.",
+      "diagnosticLogReadError": "Myne không đọc được cài đặt ghi nhật ký chẩn đoán, nên nó hiển thị là tắt.",
+      "diagnosticBlockLabel": "Chi tiết báo cáo",
+      "diagnosticBlockHelper": "Đúng những gì nút Sao chép đưa vào bảng nhớ tạm của bạn. Không có gì được gửi đi đâu cả; bạn quyết định chia sẻ gì.",
+      "diagnosticCopy": "Sao chép thông tin chẩn đoán",
+      "diagnosticCopyDone": "Đã sao chép thông tin chẩn đoán",
+      "diagnosticCopyFailed": "Không thể sao chép. Hãy chọn đoạn văn bản ở trên và tự sao chép.",
+      "crashRecordLabel": "Bản ghi sự cố",
+      "crashRecordHelper": "Myne đã ghi lại một sự cố vào {{date}}. Bản ghi chỉ chứa tệp và dòng, phiên bản và nền tảng của bạn, không gì khác. Bạn có thể xóa nó bất cứ lúc nào.",
+      "crashRecordClear": "Xóa",
+      "diagnosticFilesLabel": "Tệp báo cáo",
+      "diagnosticFilesUnknown": "Myne chưa đọc nhật ký.",
+      "crashRecordDateUnknown": "một ngày không xác định",
+      "diagnosticReveal": "Hiện thư mục nhật ký",
+      "diagnosticSave": "Lưu báo cáo thành tệp…",
+      "diagnosticSaveDone": "Đã lưu báo cáo",
+      "diagnosticSaveFailed": "Myne không thể lưu báo cáo.",
+      "diagnosticRevealFailed": "Myne không thể mở thư mục nhật ký.",
+      "crashRecordClearFailed": "Myne không thể xóa bản ghi sự cố.",
+      "crashRecordReadFailed": "Myne không thể đọc bản ghi sự cố, nên không thể nói liệu có bản ghi nào không.",
+      "sections": {
+        "version": "Phiên bản",
+        "updates": "Luôn cập nhật",
+        "legal": "Pháp lý và giấy phép",
+        "developer": "Nhà phát triển",
+        "diagnostics": "Chẩn đoán"
+      },
+      "diagnosticFilesHelper_one": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi.",
+      "diagnosticFilesHelper_other": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi."
     },
     "vault": {
       "changePasswordButton": "Đổi mật khẩu",
@@ -2966,7 +3030,14 @@
       "reenterNewPassword": "Nhập lại mật khẩu mới",
       "changePasswordFootnote": "Thao tác này vô hiệu hóa mở khóa nhanh. Cụm từ khôi phục của bạn không thay đổi.",
       "changing": "Đang thay đổi…",
-      "memberVaultNotice": "Đây là một kho chia sẻ. Nó không có mật khẩu kho. Hãy dùng Mở khóa kho chia sẻ trong Quyền riêng tư để thêm mật khẩu hoặc mã PIN."
+      "memberVaultNotice": "Đây là một kho chia sẻ. Nó không có mật khẩu kho. Hãy dùng Mở khóa kho chia sẻ trong Quyền riêng tư để thêm mật khẩu hoặc mã PIN.",
+      "topics": {
+        "vault": "Kho lưu trữ",
+        "danger": "Vùng nguy hiểm"
+      },
+      "sections": {
+        "identity": "Danh tính kho lưu trữ"
+      }
     },
     "appearance": {
       "accentHelper": "Chọn màu nhấn được dùng trong toàn ứng dụng. Chỉ trên thiết bị này.",
@@ -3004,6 +3075,16 @@
       "barCustomize": {
         "label": "Thanh dưới",
         "helper": "Chọn những chỉ báo mà thanh dưới hiển thị. Ẩn hết mọi chỉ báo thì thanh đó cũng bị gỡ, thu hồi lại không gian. Kéo hoặc nhấp chuột phải vào một mục trên thanh để sắp xếp lại."
+      },
+      "topics": {
+        "display": "Hiển thị",
+        "notes": "Danh sách ghi chú",
+        "interface": "Giao diện"
+      },
+      "sections": {
+        "theme": "Giao diện và màu nhấn",
+        "sidebar": "Trong thanh bên",
+        "customisation": "Tùy chỉnh"
       }
     },
     "archive": {
@@ -3030,7 +3111,8 @@
       "helper": "Đọc văn bản từ các tệp đính kèm là hình ảnh và PDF quét ngay trên thiết bị này, để tìm kiếm có thể tìm thấy chúng theo nội dung. Không có gì được tải lên. Tắt tùy chọn này sẽ dừng việc trích xuất chạy nền; văn bản đã trích xuất vẫn được giữ lại.",
       "errorSaveSetting": "Không thể lưu cài đặt này.",
       "processing_one": "Đang đọc 1 tệp đính kèm…",
-      "processing_other": "Đang đọc {{count}} tệp đính kèm…"
+      "processing_other": "Đang đọc {{count}} tệp đính kèm…",
+      "mobileDeviceLocal": "Tùy chọn này theo từng thiết bị: nó quyết định điện thoại này đánh chỉ mục những gì, nên các thiết bị khác của bạn giữ lựa chọn riêng."
     },
     "autoBackup": {
       "backupFolder": "Thư mục sao lưu",
@@ -3105,7 +3187,8 @@
       "excludedHelper": "Mỗi dòng một đường dẫn thư mục. Ghi chú trong các thư mục này bị loại khỏi mọi kết quả từ dòng lệnh và không thể ghi vào đó từ dòng lệnh. Chúng vẫn dùng được đầy đủ trong ứng dụng. Bạn có thể đặt việc này trước khi bật truy cập từ dòng lệnh.",
       "excludedPlaceholder": "Private/\nJournal/",
       "rateLimitLabel": "Cho dòng lệnh chạy hết tốc độ",
-      "rateLimitHelper": "Mặc định Myne trả lời tối đa 120 lệnh mỗi phút từ dòng lệnh. Đó là giới hạn nhịp độ dành cho một script chạy loạn, không phải một lớp kiểm tra quyền: không có gì quyết định chương trình nào được phép hỏi. Hãy bật tùy chọn này cho công việc hàng loạt, như đưa từng ghi chú qua một công cụ khác."
+      "rateLimitHelper": "Mặc định Myne trả lời tối đa 120 lệnh mỗi phút từ dòng lệnh. Đó là giới hạn nhịp độ dành cho một script chạy loạn, không phải một lớp kiểm tra quyền: không có gì quyết định chương trình nào được phép hỏi. Hãy bật tùy chọn này cho công việc hàng loạt, như đưa từng ghi chú qua một công cụ khác.",
+      "inlineOn": "Mọi chương trình chạy dưới tài khoản của bạn đều có thể đọc, tìm và tạo ghi chú qua nó."
     },
     "clipperInstall": {
       "error": "Không thể cập nhật cài đặt trình cắt trình duyệt.",
@@ -3175,7 +3258,12 @@
       "periodFormatAriaLabel": "Định dạng tiêu đề ghi chú {{period}}",
       "periodTemplateAriaLabel": "Mẫu ghi chú {{period}}",
       "sectionPeriodic": "Ghi chú định kỳ",
-      "periodSwitcherAriaLabel": "Loại ghi chú định kỳ"
+      "periodSwitcherAriaLabel": "Loại ghi chú định kỳ",
+      "blockLabel": "Ghi chú định kỳ",
+      "mobilePeriodAriaLabel": "Khoảng thời gian ghi chú",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Lưu",
+      "mobileSharedNotice": "Những cài đặt này được chia sẻ: chỉnh sửa ở đây sẽ đến các thiết bị khác của bạn, và giá trị đặt trên máy tính cũng sẽ đến đây."
     },
     "deleteVault": {
       "cancel": "Hủy",
@@ -3227,6 +3315,10 @@
         "searchEmpty": "Không tìm thấy ghi chú nào.",
         "searchPlaceholder": "Tìm ghi chú…",
         "untitledNote": "Chưa đặt tên"
+      },
+      "sections": {
+        "notes": "Ghi chú và thư mục",
+        "attachments": "Tệp đính kèm"
       }
     },
     "focusMode": {
@@ -3341,12 +3433,12 @@
         "excludedLabel": "Thư mục loại trừ"
       },
       "disclosureToggle": "Cách này hoạt động thế nào?",
-      "enableHelper": "Chạy một mô hình do bạn cung cấp. Việc nó chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp mà bạn khai báo bên dưới. Thử nghiệm, tắt theo mặc định.",
-      "enableLabel": "Bật AI cục bộ",
-      "excludedHelper": "Ghi chú trong các thư mục này không bao giờ được AI đọc hoặc lập chỉ mục. Để trống nghĩa là AI có thể thấy mọi thứ; đây cũng là danh sách mà trình khách dòng lệnh tuân theo. Mỗi dòng một đường dẫn thư mục.",
+      "enableHelper": "Bật mọi tính năng AI. Việc mô hình chạy ở đâu, và ghi chú của bạn có rời khỏi thiết bị này hay không, đều phụ thuộc vào nhà cung cấp bạn chọn bên dưới. Thử nghiệm, tắt theo mặc định.",
+      "enableLabel": "Bật các tính năng AI",
+      "excludedHelper": "Ghi chú trong những thư mục này không bao giờ bị AI đọc hay đánh chỉ mục. Để trống nghĩa là AI thấy được mọi thứ. Mỗi dòng một đường dẫn thư mục.",
       "excludedLabel": "Thư mục bị loại trừ",
       "excludedPlaceholder": "Private/\nJournal/",
-      "endpointHelper": "Nếu bạn đã chạy sẵn một trình chạy mô hình trên máy tính này, hãy trỏ Myne tới nó thay vì chọn các tệp mô hình. Để trống ô này để dùng các tệp ở trên.",
+      "endpointHelper": "Nếu bạn đã chạy một trình chạy mô hình trên máy tính này, hãy trỏ Myne tới nó thay vì chọn các tệp mô hình. Để trống để dùng các tệp mô hình đã đặt trong Mô hình.",
       "endpointLabel": "Trình chạy mô hình cục bộ",
       "endpointModelHelper": "Myne không chọn mô hình thay bạn. Cho tới khi bạn nêu tên một mô hình, địa chỉ ở trên vẫn được lưu nhưng không được dùng.",
       "endpointModelLabel": "Mô hình sẽ dùng ở đó",
@@ -3373,7 +3465,8 @@
         "unreachable": "Không thể kết nối tới nhà cung cấp. Hãy kiểm tra kết nối mạng của bạn.",
         "featureOff": "AI đang tắt trên thiết bị này. Không có gì được gửi. Hãy bật trong Cài đặt, mục AI.",
         "consentMissing": "Bạn chưa đồng ý gửi ghi chú tới nhà cung cấp này từ thiết bị này. Không có gì được gửi. Hãy chọn lại nhà cung cấp trong Cài đặt, mục AI, và đọc những gì sẽ được gửi.",
-        "emptyGrant": "Mọi thứ lần chạy này có thể đọc nằm trong thư mục AI không bao giờ thấy. Không gửi gì. Đổi trong Cài đặt, AI, Thư mục loại trừ."
+        "emptyGrant": "Mọi thứ lần chạy này có thể đọc nằm trong thư mục AI không bao giờ thấy. Không gửi gì. Đổi trong Cài đặt, AI, Thư mục loại trừ.",
+        "noModel": "Ở đây không có mô hình nào để chạy. Hãy thêm một mô hình trong Cài đặt, AI, Mô hình: tải một mô hình từ origin của chính Myne, hoặc trỏ Myne tới một tệp bạn đã có."
       },
       "modelChoose": "Chọn tệp…",
       "modelFilter": {
@@ -3383,7 +3476,7 @@
       "modelNone": "Chưa chọn tệp",
       "modelSaveFailed": "Không thể lưu đường dẫn mô hình (nó phải nằm ngoài kho lưu trữ của bạn).",
       "modelTranscriptionLabel": "Mô hình chuyển giọng nói thành văn bản (chép lời)",
-      "modelsHelper": "Hãy tải mô hình tại đây, hoặc mở một liên kết để lấy mô hình trong trình duyệt rồi chọn các tệp đã tải xuống. Mô hình chạy trên thiết bị của bạn; nếu thay vào đó bạn đã khai báo một nhà cung cấp, thì nhà cung cấp đó sẽ trả lời.",
+      "modelsHelper": "Gán tệp cho mỗi vai trò dùng khi nó đến từ nơi khác ngoài danh sách đã xác minh ở trên: mở một liên kết để lấy tệp trong trình duyệt, rồi chọn nó ở đây. Một mô hình chạy trên thiết bị của bạn; nếu bạn đã chỉ định một nhà cung cấp, thì nhà cung cấp đó trả lời.",
       "providerHelper": "Thay vì chạy một mô hình tại đây, Myne có thể gửi yêu cầu tới một dịch vụ do bạn chỉ định. Khi đó ghi chú của bạn rời khỏi thiết bị này. “Không có” là mặc định và nghĩa là không có dịch vụ nào được liên hệ cả.",
       "providerKeyAdd": "dán khóa API của bạn",
       "providerKeyLabel": "Khóa API",
@@ -3408,7 +3501,7 @@
       "providerModelUnfetched": "Hãy tải danh sách để chọn một mô hình.",
       "providerNone": "Không có",
       "providerNothingAnswering": "Chưa có gì được thiết lập để trả lời.",
-      "modelsLabel": "Mô hình",
+      "modelsLabel": "Mô hình thuê ngoài",
       "recommendedFilesGeneration": "Cần tệp .gguf + tokenizer.json trong cùng một thư mục.",
       "recommendedFilesTranscription": "Cần tệp .gguf của Whisper + config.json + tokenizer.json trong cùng một thư mục.",
       "title": "AI",
@@ -3424,10 +3517,6 @@
       "meetingPromptHelper": "Chỉ dẫn mà lượt chạy AI cuộc họp dùng để chuyển bản chép lời thành các phần. Để trống để dùng giá trị mặc định tích hợp sẵn. Nó thay thế định dạng đầu ra mặc định, nên nếu bạn đặt nó, hãy tự yêu cầu những phần bạn muốn.",
       "meetingPromptLabel": "Câu lệnh tóm tắt cuộc họp",
       "meetingPromptReset": "Đặt lại về mặc định",
-      "groupAutoTag": "Tự động gắn thẻ",
-      "groupVoice": "Giọng nói và cuộc họp",
-      "groupWriting": "Viết và trò chuyện",
-      "groupPrivacy": "Quyền riêng tư và giới hạn",
       "groupAdvanced": "Nâng cao",
       "excludedPickLabel": "Thêm một thư mục để loại ra",
       "excludedPickPlaceholder": "Chọn một thư mục…",
@@ -3447,7 +3536,39 @@
       "downloadCancel": "Hủy",
       "downloadFailed": "Bản tải xuống không hoàn tất.",
       "downloadFailedChecksum": "Bản tải xuống không khớp với dấu vân tay của nó và đã bị từ chối. Hãy thử lại.",
-      "sideloadDisclosure": "Chế độ nhà phát triển còn cho phép bạn trỏ Myne tới một tệp mô hình bạn tự lấy. Một tệp bạn tải từ nơi khác không được Myne kiểm tra, nên chỉ dùng tệp bạn tin cậy."
+      "sideloadDisclosure": "Chế độ nhà phát triển còn cho phép bạn trỏ Myne tới một tệp mô hình bạn tự lấy. Một tệp bạn tải từ nơi khác không được Myne kiểm tra, nên chỉ dùng tệp bạn tin cậy.",
+      "historyBudgetInline": "Mỗi yêu cầu mang theo bao nhiêu phần của cuộc trò chuyện gần đây, tính bằng ký tự.",
+      "historyBudgetMaxNotice": "Mức nhiều nhất bạn có thể nhập là {{max}} ký tự; giá trị lớn hơn sẽ được giảm về mức đó.",
+      "historyBudgetDeviceLocal": "Tùy chọn này theo từng thiết bị: nó giới hạn những gì điện thoại này gửi đi, nên các thiết bị khác của bạn giữ mức riêng.",
+      "meetingPromptShared": "Tùy chọn này được chia sẻ: chỉnh sửa ở đây sẽ đến các thiết bị khác của bạn, và câu lệnh chỉnh trên máy tính cũng sẽ đến đây.",
+      "groupAnswering": "Trả lời",
+      "groupGeneral": "Chung",
+      "groupModels": "Mô hình",
+      "groupLimits": "Giới hạn",
+      "groupTagging": "Gắn thẻ",
+      "excludedFoldersHelper": "Ghi chú trong những thư mục này không bao giờ bị AI đọc hay đánh chỉ mục. Đây là danh sách mà các thiết bị khác của bạn cũng dùng.",
+      "excludedFoldersEmpty": "Chưa loại trừ gì cả, nên AI có thể đọc mọi thư mục trong kho này.",
+      "excludedFoldersAdd": "Thêm",
+      "excludedFoldersAddLabel": "Thư mục cần loại trừ khỏi AI",
+      "excludedFoldersRemove": "Gỡ bỏ",
+      "excludedFoldersRemoveLabel": "Ngừng loại trừ {{folder}} khỏi AI",
+      "excludedFoldersMonotoneNotice": "Một mục loại trừ được thêm trên bất kỳ thiết bị nào của bạn vẫn còn cho tới khi bạn gỡ nó ở mọi nơi: việc gỡ ở đây không lan đi, nên một thư mục mà các thiết bị khác vẫn loại trừ sẽ quay lại ở lần đồng bộ tới.",
+      "catalogueOpen": "Tải một mô hình",
+      "catalogueColModel": "Mô hình",
+      "catalogueColState": "Trạng thái",
+      "providerInline": "Ghi chú của bạn rời khỏi thiết bị này ngay khi bạn chỉ định một dịch vụ.",
+      "providerChooseHelper": "Một mô hình có thể chạy trên thiết bị này, hoặc Myne có thể gửi yêu cầu tới một dịch vụ do bạn chỉ định. Khi đó ghi chú của bạn rời khỏi thiết bị này. “Trên thiết bị này” là mặc định và nghĩa là không có dịch vụ nào được liên hệ cả.",
+      "providerChooseLabel": "Chọn nhà cung cấp",
+      "providerKeySave": "Lưu khóa này",
+      "providerOnDevice": "Trên thiết bị này",
+      "sections": {
+        "catalogue": "Mô hình tải xuống đã xác minh",
+        "outsourced": "Mô hình thuê ngoài",
+        "preferences": "Tùy chọn",
+        "memory": "Bộ nhớ",
+        "excluded": "AI có thể đọc gì",
+        "history": "Lịch sử trò chuyện"
+      }
     },
     "network": {
       "disabledCue": "Đồng bộ không còn đi qua Tor. Các kết nối mới đi thẳng tới máy chủ đồng bộ.",
@@ -3469,7 +3590,8 @@
       "residualScope": "Trên máy tính để bàn, tùy chọn này bao gồm lưu lượng đồng bộ và các yêu cầu tới nhà cung cấp AI từ xa của bạn. Di động chưa có định tuyến Tor, nên các yêu cầu tới nhà cung cấp của nó đi trực tiếp. Không có gì khác trên thiết bị này đi qua Tor.",
       "residualsToggle": "Điều này không che giấu những gì",
       "torHelper": "Ẩn địa chỉ IP và vị trí của bạn khỏi máy chủ đồng bộ, và ẩn việc bạn đồng bộ với máy chủ nào (cùng với, trên máy tính để bàn, việc bạn truy cập nhà cung cấp AI nào) khỏi mạng của bạn và nhà cung cấp Internet. Họ vẫn thấy được thiết bị này kết nối tới Tor. Nó không làm bạn ẩn danh với Myne, và không giấu được khỏi máy chủ việc bạn đồng bộ cái gì hay khi nào.",
-      "torLabel": "Định tuyến đồng bộ và AI trên máy tính để bàn qua Tor"
+      "torLabel": "Định tuyến đồng bộ và AI trên máy tính để bàn qua Tor",
+      "torInline": "Ẩn địa chỉ IP và vị trí của bạn khỏi máy chủ đồng bộ, và ẩn việc bạn đồng bộ với máy chủ nào khỏi mạng của bạn và nhà cung cấp Internet."
     },
     "prefs": {
       "saveError": "Không thể lưu tùy chọn. Hãy thử lại.",
@@ -3526,7 +3648,18 @@
       "recoveryDrillHelper": "Hãy nhập 24 từ bạn đã ghi lại. Myne kiểm tra xem chúng còn mở được kho này không và không cho bạn biết gì khác — các từ không bao giờ được hiển thị ở đây.",
       "recoveryDrillLabel": "Kiểm tra cụm từ khôi phục của bạn",
       "recoveryDrillPassed": "Những từ này mở được kho này. Hãy giữ chúng ở nơi bạn đã cất.",
-      "recoveryDrillPlaceholder": "24 từ, theo đúng thứ tự, cách nhau bằng dấu cách"
+      "recoveryDrillPlaceholder": "24 từ, theo đúng thứ tự, cách nhau bằng dấu cách",
+      "hideVaultNamesInline": "Bật nó sẽ hủy các khóa giúp đọc được những tên đã lưu tại đây.",
+      "topics": {
+        "access": "Truy cập",
+        "locking": "Khóa"
+      },
+      "sections": {
+        "screen": "Bảo vệ màn hình",
+        "terminal": "Công cụ dòng lệnh",
+        "locking": "Khóa và mở khóa",
+        "recovery": "Khôi phục"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Một thao tác kho khác đang diễn ra. Hãy thử lại sau giây lát.",
@@ -3593,7 +3726,8 @@
         "storage": "Lưu trữ",
         "sync": "Đồng bộ",
         "cli": "CLI",
-        "vault": "Kho"
+        "vault": "Kho lưu trữ",
+        "data": "Dữ liệu"
       },
       "passwordUpdatedToast": "Đã cập nhật mật khẩu",
       "title": "Cài đặt"
@@ -3610,7 +3744,8 @@
       "languagesSearchEmpty": "Không có ngôn ngữ nào khớp.",
       "languagesSearchPlaceholder": "Tìm ngôn ngữ…",
       "off": "Tắt",
-      "on": "Bật"
+      "on": "Bật",
+      "mobileUnavailable": "Kiểm tra chính tả chưa dùng được trên điện thoại này: không có từ điển trên thiết bị này, nên trình soạn thảo ở đây không thể gạch chân gì cả. Hãy bật nó từ máy tính của bạn."
     },
     "storage": {
       "backupHelper": "Các bản sao lưu được mã hóa đúng như kho của bạn, trong một tệp .myne-backup duy nhất đã được xác minh. Việc khôi phục dùng mật khẩu hoặc cụm từ khôi phục của kho đó, y hệt như khi mở khóa.",
@@ -3629,7 +3764,12 @@
       "webLocationHelper": "Ghi chú của bạn nằm trong vùng lưu trữ mà trình duyệt này dành cho trang này, do trình duyệt quản lý. Không có thư mục nào để mở. Xóa dữ liệu của trang này sẽ gỡ bản sao cục bộ; vì trình khách này có đồng bộ, đăng nhập lại sẽ tải nó về.",
       "webLocationLabel": "Nơi ghi chú của bạn được lưu",
       "pathUnavailable": "Không có đường dẫn",
-      "restoreBackup": "Khôi phục từ bản sao lưu…"
+      "restoreBackup": "Khôi phục từ bản sao lưu…",
+      "sections": {
+        "location": "Nơi kho lưu trữ nằm",
+        "backup": "Sao lưu và khôi phục",
+        "transfer": "Nhập và xuất"
+      }
     },
     "typography": {
       "contentWidthHelper": "Chiều rộng tối đa của cột soạn thảo. Toàn bộ cho phép văn bản trải rộng khắp khung.",
@@ -3656,7 +3796,8 @@
       "weak": "Yếu",
       "fair": "Trung bình",
       "good": "Tốt",
-      "strong": "Mạnh"
+      "strong": "Mạnh",
+      "tooWeak": "Quá yếu"
     },
     "sync": {
       "summary": {
@@ -3697,7 +3838,12 @@
         "bullet1": "Xếp vào hộp của tôi năm tá bình rượu",
         "bullet2": "Đàn ngựa vằn ngờ nghệch nhảy nhanh đến phát bực",
         "spellCaption": "Kiểm tra chính tả",
-        "spellSample": "sai chín tả"
+        "spellSample": "sai chín tả",
+        "dateTime": "Ngày và giờ",
+        "toolbar": "Thanh công cụ",
+        "task": "Công việc",
+        "taskSampleOpen": "Gửi báo cáo quý",
+        "taskSampleDone": "Đặt địa điểm"
       },
       "defaultView": "Chế độ xem mặc định",
       "typewriter": "Cuộn kiểu máy đánh chữ",
@@ -3715,6 +3861,9 @@
       "taskChipIconOnly": {
         "help": "Hiển thị ưu tiên chỉ bằng biểu tượng, không chữ.",
         "label": "Ưu tiên chỉ biểu tượng"
+      },
+      "topics": {
+        "periodic": "Ghi chú định kỳ"
       }
     },
     "search": {
@@ -3729,7 +3878,7 @@
         "aiProviderModel": "mô hình danh mục danh sách chọn mô hình nhà cung cấp từ xa model catalogue list llama qwen gpt remote provider",
         "aiEnable": "ai cục bộ bật tắt kích hoạt học máy local ai",
         "aiExcluded": "thư mục loại trừ bỏ qua ai quyền riêng tư excluded folders",
-        "aiModels": "mô hình gguf tải xuống văn bản nhúng llm models embedding",
+        "aiModels": "mô hình gguf tải xuống văn bản nhúng llm danh mục",
         "archive": "lưu trữ ẩn khôi phục ghi chú archive",
         "autoBackup": "sao lưu tự động lịch tần suất giữ lại thư mục backup",
         "autoLock": "tự động khóa thời gian chờ không hoạt động phiên hẹn giờ auto lock",
@@ -3794,15 +3943,16 @@
         "ribbon": "dải bên trái ghim lệnh lệnh thứ tự bỏ ghim thanh công cụ phím tắt",
         "folderNotes": "thư mục ghi chú chỉ mục folder_index trang đích nhấp đúp liên kết tới thư mục dự án tắt",
         "syncMembers": "thành viên, chia sẻ, mời, nhóm, cộng tác, kho",
-        "accountName": "tên tài khoản nhóm cách nhóm đổi tên nhãn thiết bị cục bộ",
-        "accountVaults": "tài khoản các kho được nhóm những kho nào thuộc nhóm danh sách",
+        "accountName": "tên tài khoản nhóm phân nhóm đổi tên nhãn thiết bị cục bộ",
+        "accountVaults": "tài khoản các kho được nhóm những kho nào thuộc danh sách nhóm",
         "aiMeetingPrompt": "cuộc họp tóm tắt câu lệnh chỉ dẫn tùy chỉnh bản chép lời việc cần làm quyết định",
         "update": "cập nhật nâng cấp kiểm tra cập nhật phiên bản mới phát hành tải xuống",
         "plainFile": "tệp thuần trình soạn thảo markdown đĩa cục bộ ngoài kho văn bản thuần mở tại chỗ",
         "memberPassword": "kho chia sẻ mật khẩu thành viên mở khóa tham gia cụm từ",
         "recoveryDrill": "cụm từ khôi phục kiểm tra xác minh diễn tập thử 24 từ hạt giống sao lưu mất mật khẩu",
         "bar": "thanh dưới thanh trạng thái chỉ báo tùy chỉnh sắp xếp lại ẩn hiện thanh công cụ",
-        "syncDeviceBindings": "thiết bị được thành viên nhận ai đã ký thiết bị nào thuộc về"
+        "syncDeviceBindings": "thiết bị được thành viên nhận ai đã ký thiết bị nào thuộc về",
+        "diagnosticLog": "nhật ký chẩn đoán ghi nhật ký gỡ lỗi khắc phục sự cố báo cáo sự cố báo cáo lỗi hỗ trợ"
       },
       "emptyBody": "Hãy thử một từ ngắn hơn, hoặc tên của một bảng."
     },
@@ -3819,12 +3969,14 @@
       "zoneHelper": "Múi giờ nào quyết định thế nào là hôm nay, và do đó quyết định ghi chú hằng ngày, hằng tuần và hằng tháng của bạn sẽ mở ghi chú nào. Để trống để theo thiết bị này. Lựa chọn này được giữ riêng cho từng thiết bị: không thiết bị nào khác ghi đè lên nó, nên một thiết lập riêng có thể đặt thiết bị này ở một ngày khác với các thiết bị còn lại của bạn. Giờ bạn viết trong ghi chú không bao giờ bị đổi; 09:00 vẫn là 09:00 ở mọi nơi.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne không biết múi giờ đó. Hãy dùng một tên như Europe/Berlin.",
-      "errorSave": "Không thể lưu cài đặt đó."
+      "errorSave": "Không thể lưu cài đặt đó.",
+      "zoneInline": "Múi giờ quyết định ngày nào được tính là hôm nay, và do đó ghi chú hằng ngày, hằng tuần và hằng tháng của bạn mở ra ghi chú nào."
     },
     "folderNotes": {
       "label": "Ghi chú thư mục",
       "helper": "Cho phép ghi chú đóng vai trò chỉ mục thư mục: mở khi nhấp đúp vào thư mục, và liên kết như [[Projects/]] trỏ tới nó. Mặc định tắt. Tắt sẽ ẩn nút tạo loại ghi chú này và hiển thị loại đã có như ghi chú thường; trên đĩa không thay đổi gì, nên bật lại sẽ khôi phục chính xác.",
-      "errorSaveSetting": "Không lưu được cài đặt này."
+      "errorSaveSetting": "Không lưu được cài đặt này.",
+      "inline": "Cho một ghi chú đóng vai trò mục lục của thư mục: nó mở khi bạn nhấp đúp vào thư mục, và các liên kết thư mục như [[Projects/]] trỏ tới nó."
     },
     "ribbonCustomize": {
       "add": "Thêm",
@@ -3868,7 +4020,9 @@
       "personalitySaveFailed": "Không lưu được cài đặt giọng.",
       "loadFailed": "Không tải được ký ức hoặc cài đặt giọng. Không có gì thay đổi.",
       "retryLabel": "Thử lại",
-      "emptyTitle": "Chưa ghi nhớ gì cả"
+      "emptyTitle": "Chưa ghi nhớ gì cả",
+      "count": "{{used}} trên {{cap}}",
+      "atCap": "Danh sách đã đầy, nên không thể ghi nhớ thêm gì mới. Hãy xóa một mục để có chỗ."
     },
     "account": {
       "nameLabel": "Tên tài khoản",
@@ -3886,7 +4040,11 @@
       "devicesNote": "Thiết bị, thành viên kho chia sẻ và danh tính của bạn được quản lý trong Đồng bộ.",
       "groupingHidden": "Tên tài khoản không dùng được khi tên kho đang bị ẩn. Hãy tắt tùy chọn đó trong Quyền riêng tư để quản lý tài khoản này.",
       "groupingUnreadable": "Không đọc được cách nhóm tài khoản của thiết bị này. Không có gì thay đổi.",
-      "groupingError": "Không đọc được cách nhóm tài khoản trên thiết bị này. Không có gì thay đổi."
+      "groupingError": "Không đọc được cách nhóm tài khoản trên thiết bị này. Không có gì thay đổi.",
+      "sections": {
+        "extensions": "Tiện ích mở rộng trình duyệt",
+        "grouping": "Tài khoản này"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Không lưu được cài đặt tệp thuần.",
@@ -3915,7 +4073,8 @@
       "pinSetupHelper": "Ít nhất {{count}} chữ số. Chỉ được lưu trên thiết bị này; cụm từ khôi phục của bạn vẫn mở được kho ở bất cứ đâu.",
       "errorTooShort": "Dùng ít nhất {{count}} ký tự/chữ số.",
       "errorGeneric": "Không đặt được thông tin xác thực. Vui lòng thử lại."
-    }
+    },
+    "helperDisclosureLabel": "Tìm hiểu thêm về cài đặt này"
   },
   "storageLost": {
     "allSynced": "Không có gì bị mất: mọi ghi chú ở đây đều đã lên máy chủ.",
@@ -3943,7 +4102,10 @@
       "intro": "Đồng bộ gửi ghi chú của bạn, đã mã hóa, tới một máy chủ. Có bốn điều bạn nên biết trước.",
       "whatThisIsLabel": "Đây là gì",
       "dataLossLabel": "Nếu bạn mất cả hai bí mật",
-      "accept": "Tôi hiểu, bật đồng bộ"
+      "accept": "Tôi hiểu, bật đồng bộ",
+      "whatHappensNextLabel": "Nếu máy chủ không còn nữa",
+      "whatWeCanSeeLabel": "Người vận hành máy chủ thấy được gì",
+      "review": "Xem lại đồng bộ nghĩa là gì"
     },
     "materialising": "Đang tải ghi chú của bạn về: {{done}} trên {{total}}. Bạn có thể bắt đầu làm việc; phần còn lại sẽ lần lượt xuất hiện.",
     "credentialAmbiguous": "Mật khẩu của bạn có thể đã thay đổi trên thiết bị này và trên một thiết bị khác, và Myne không thể biết bản nào mới hơn, nên nó chưa thay đổi gì. Hãy đăng nhập trên một thiết bị đã có quyền truy cập để xử lý việc này.",
@@ -4161,7 +4323,9 @@
       },
       "usage": {
         "helper": "Lượng dữ liệu đã mã hóa mà tài khoản này lưu trên máy chủ, và số thiết bị đang đăng nhập.",
-        "label": "Lưu trữ và thiết bị"
+        "label": "Lưu trữ và thiết bị",
+        "memberHelper": "Có bao nhiêu thiết bị đang đăng nhập vào tài khoản của bạn.",
+        "memberLabel": "Thiết bị"
       },
       "identity": {
         "label": "Danh tính",
@@ -4170,6 +4334,16 @@
         "codeLabel": "Mã danh tính của bạn",
         "lockedHelper": "Thiết bị này đang giữ một danh tính. Nó bị khóa trong phiên này; hãy mở khóa bằng cụm từ khôi phục để ký đồng bộ và lời mời.",
         "unlockedHelper": "Thiết bị này đang giữ một danh tính, đã mở khóa cho phiên này."
+      },
+      "topics": {
+        "connection": "Kết nối",
+        "devices": "Thiết bị và thành viên",
+        "conflicts": "Xung đột"
+      },
+      "sections": {
+        "account": "Tài khoản",
+        "server": "Máy chủ",
+        "devices": "Thiết bị đã đăng ký"
       }
     },
     "reconcile": {
@@ -4345,6 +4519,18 @@
       "label": "Tên hiển thị của bạn",
       "checking": "Đang kiểm tra tên của bạn…",
       "save": "Tiếp tục"
+    },
+    "memberJoinQr": {
+      "error": "Không thể tạo mã.",
+      "noAccount": "Tài khoản của kho này chưa được ghi lại trên thiết bị này. Hãy mở kho một lần rồi thử lại.",
+      "hint": "Mã này mang địa chỉ máy chủ của bạn và id của kho này. Nó không bao giờ mang cụm từ khôi phục hay mật khẩu của bạn.",
+      "notAMember": "Kho này không phải một kho chia sẻ mà bạn là thành viên, nên không có mã để hiển thị.",
+      "notConfigured": "Hãy cấu hình máy chủ đồng bộ trước, rồi tạo mã.",
+      "scanWithApp": "Quét bằng Myne trên thiết bị khác của bạn",
+      "stepIdentity": "Trên thiết bị khác của bạn, hãy mở Myne và chọn “Tôi đã có một danh tính”.",
+      "stepJoin": "Kho chia sẻ này sẽ chờ trong lời mời của bạn. Hãy mở nó để tham gia.",
+      "stepPhrase": "Nhập cụm từ khôi phục 24 từ của bạn ở đó.",
+      "title": "Thêm thiết bị của riêng bạn"
     }
   },
   "tasks": {
@@ -4393,7 +4579,8 @@
       "completed": "Công việc, đã hoàn thành",
       "notCompleted": "Công việc, chưa hoàn thành",
       "tooLongToWrite": "Dòng của công việc này quá dài để chỉnh sửa từ đây. Hãy mở ghi chú của nó.",
-      "untitled": "Công việc không có tiêu đề"
+      "untitled": "Công việc không có tiêu đề",
+      "editFields": "Chỉnh sửa trường công việc"
     },
     "title": "Công việc",
     "axis": {
@@ -4573,7 +4760,7 @@
     "deleteConfirmTitle": "Xóa kho lưu trữ này?",
     "deletePartialError": "Không thể gỡ một số tệp. Kho không còn dùng được nữa. Hãy tiếp tục để bắt đầu lại.",
     "failClosedEyebrow": "Không thể mở kho lưu trữ",
-    "restoreHint": "Khôi phục từ một bản sao lưu để tiếp tục.",
+    "restoreHint": "Khôi phục từ bản sao lưu chưa dùng được trên di động.",
     "memberHint": "Kho này được chia sẻ với bạn. Mở khóa bằng cụm từ khôi phục của bạn.",
     "memberPhraseLabel": "Cụm từ khôi phục",
     "memberSubmit": "Mở khóa",
@@ -4588,7 +4775,9 @@
     "memberPinPlaceholder": "Mã PIN kho (ít nhất {{count}} chữ số)",
     "memberBiometricHint": "Kho này được chia sẻ với bạn. Hãy xác nhận bằng sinh trắc học của thiết bị để mở khóa.",
     "memberBiometricSubmit": "Mở khóa bằng sinh trắc học",
-    "titleNamed": "Mở khóa {{vault}}"
+    "titleNamed": "Mở khóa {{vault}}",
+    "restoreCta": "Khôi phục từ bản sao lưu",
+    "ioErrorHint": "Hãy thử lại, hoặc mở lại Myne."
   },
   "vault": {
     "ioBanner": {
@@ -4747,11 +4936,11 @@
       "copy": "Sao chép",
       "extensionNotice": "Các tiện ích mở rộng trình duyệt có quyền truy cập trang này có thể đọc những gì hiển thị trên trang. Nếu bạn không chắc chắn về mọi tiện ích trong hồ sơ này, hãy dùng ứng dụng máy tính hoặc một hồ sơ trình duyệt sạch cho bước này.",
       "copyFailed": "Không thể sao chép. Hãy dùng \"Lưu thành tệp\" thay thế.",
-      "downloadStarted": "Đã gửi tới mục tải xuống của trình duyệt. Hãy kiểm tra xem tệp đã tới chưa: trình duyệt của bạn quyết định tệp được lưu ở đâu, và Myne không thể thấy tệp có tới nơi hay không.",
+      "downloadStarted": "Đã gửi tới mục tải xuống của trình duyệt. Hãy kiểm tra xem nó đã đến chưa: trình duyệt quyết định nơi lưu tệp, và Myne không thấy được liệu nó đã đến hay chưa.",
       "reveal": "Hiện cụm từ",
       "saveAsFile": "Lưu thành tệp",
       "saveFailed": "Không thể lưu tệp. Thay vào đó, hãy sao chép các từ này, hoặc ghi chúng ra giấy.",
-      "savedToFile": "Đã lưu. Đây là tệp văn bản thuần, nên hãy cất nó ở nơi chỉ mình bạn đọc được."
+      "savedToFile": "Đã lưu. Đây là một tệp văn bản thuần, nên hãy giữ nó ở nơi chỉ bạn đọc được."
     },
     "ready": {
       "backedUp": "Đã sao lưu",
@@ -5161,7 +5350,7 @@
     "forgetCta": "Quên danh tính này và tạo một danh tính mới",
     "forgetWarning": "Thao tác này xóa vĩnh viễn danh tính đang được giữ trên thiết bị này. Nếu bạn chưa ghi lại cụm từ khôi phục 24 từ của nó, nó sẽ mất: thiết bị này sẽ mất quyền truy cập vào mọi kho mà nó sở hữu hoặc đã tham gia cho tới khi bạn khôi phục nó bằng cụm từ đó. Chỉ tiếp tục nếu bạn chắc chắn.",
     "heldIntro": "Thiết bị này đã giữ một danh tính. Hãy khôi phục nó bằng cụm từ 24 từ của nó ở dưới.",
-    "typeBackLead": "Để xác nhận bạn đã lưu nó, hãy nhập bốn từ này từ cụm từ ở trên.",
+    "typeBackLead": "Nhập bốn từ này từ cụm từ danh tính bạn vừa lưu.",
     "typeBackMismatch": "Từ đó không khớp với từ thứ {{pos}}.",
     "typeBackWordAtPosition": "Từ thứ {{pos}}",
     "newTitle": "Một danh tính mới",
@@ -5171,7 +5360,10 @@
     "recoverAction": "Khôi phục",
     "back": "Quay lại",
     "changeServer": "Đổi hoặc xác minh máy chủ đồng bộ",
-    "errorTlsFailure": "Không xác minh được chứng chỉ HTTPS của máy chủ. Hãy kiểm tra địa chỉ máy chủ và chứng chỉ của nó."
+    "errorTlsFailure": "Không xác minh được chứng chỉ HTTPS của máy chủ. Hãy kiểm tra địa chỉ máy chủ và chứng chỉ của nó.",
+    "phraseTitle": "Lưu cụm từ danh tính của bạn",
+    "phraseContinue": "Tiếp tục",
+    "confirmTitle": "Xác nhận cụm từ của bạn"
   },
   "personIdentityCode": {
     "copy": "Sao chép mã định danh",
@@ -5218,7 +5410,16 @@
     "forgetConfirm": "Quên danh tính",
     "forgetCta": "Quên danh tính này trên thiết bị",
     "forgetError": "Không quên được danh tính. Hãy thử lại.",
-    "forgetWarning": "Thao tác này chỉ gỡ danh tính khỏi thiết bị này. Tài khoản trên máy chủ và mọi kho mà nó sở hữu hoặc đã tham gia đều không bị đụng tới, và bạn có thể khôi phục danh tính bằng cụm từ 24 từ của nó trên một thiết bị khác. Nếu bạn chưa lưu cụm từ đó, thiết bị này sẽ không khôi phục được nó."
+    "forgetWarning": "Thao tác này chỉ gỡ danh tính khỏi thiết bị này. Tài khoản trên máy chủ và mọi kho mà nó sở hữu hoặc đã tham gia đều không bị đụng tới, và bạn có thể khôi phục danh tính bằng cụm từ 24 từ của nó trên một thiết bị khác. Nếu bạn chưa lưu cụm từ đó, thiết bị này sẽ không khôi phục được nó.",
+    "stepIndicator": "Bước {{n}} trên {{total}} · {{label}}",
+    "stepVerifyOwner": "Xác minh chủ sở hữu",
+    "stepRecoveryPhrase": "Cụm từ khôi phục",
+    "stepDevicePassword": "Mật khẩu thiết bị",
+    "phraseHeading": "Nhập cụm từ khôi phục của bạn",
+    "passwordHeading": "Mật khẩu cho thiết bị này",
+    "acceptHeading": "Chấp nhận lời mời này",
+    "acceptPhraseHint": "Nhập 24 từ của cụm từ khôi phục của bạn. Đây là cụm từ của bạn, không phải của chủ kho.",
+    "acceptErrorBadRequest": "Không xác minh được lời mời. Hãy dán mã danh tính của chủ kho (họ chia sẻ khi mời bạn)."
   },
   "aiOnboarding": {
     "title": "Thiết lập AI",
@@ -5279,12 +5480,35 @@
     "unsaved": "Thay đổi chưa lưu"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Đã có Myne {{version}}.",
-      "failed": "Không cài được bản cập nhật. Hãy thử lại.",
-      "installing": "Đang tải bản cập nhật…",
+      "consequence": "Cập nhật sẽ khóa kho của bạn và khởi động lại Myne. Các ghi chú đang mở sẽ được lưu trước.",
+      "flushFailed": "Myne không thể lưu mọi ghi chú đang mở, nên bản cập nhật chưa bắt đầu. Hãy thử lại sau giây lát.",
+      "stageFailed": "Myne không thể bắt đầu cập nhật vì ứng dụng đã rời khỏi kho. Hãy mở khóa rồi thử lại.",
+      "lockFailed": "Myne không thể khóa kho của bạn, nên bản cập nhật chưa bắt đầu.",
+      "primary": "Cập nhật và khởi động lại",
       "later": "Để sau",
-      "restart": "Khởi động lại để cập nhật"
+      "confirmTitle": "Cập nhật và khởi động lại Myne?",
+      "confirmBody": "Kho của bạn sẽ bị khóa và Myne sẽ khởi động lại. Việc tải xuống và cài đặt có thể mất vài phút nếu kết nối chậm.",
+      "confirmPrimary": "Khóa kho và cập nhật",
+      "cancel": "Hủy",
+      "pill": "Có bản cập nhật"
+    },
+    "updating": {
+      "eyebrow": "Đang cập nhật",
+      "heading": "Đang cập nhật Myne",
+      "version": "Phiên bản {{version}}",
+      "caption": "Đang tải xuống và cài đặt phiên bản mới.",
+      "hint": "Myne sẽ tự khởi động lại khi xong. Hãy để cửa sổ mở."
+    },
+    "failed": {
+      "eyebrow": "Cập nhật chưa hoàn tất",
+      "heading": "Bản cập nhật chưa hoàn tất",
+      "caption": "Myne {{version}} vẫn đang chạy và ghi chú của bạn không bị đụng tới.",
+      "hint": "Thử lại sẽ bắt đầu tải xuống từ đầu.",
+      "retry": "Thử lại",
+      "back": "Quay lại màn hình mở khóa"
     }
   },
   "firstRun": {
@@ -5326,7 +5550,7 @@
       "title": "Lưu cụm từ danh tính của bạn",
       "warning": "Hãy ghi lại 24 từ này và giữ chúng ở nơi an toàn. Đây là lần duy nhất chúng được hiển thị; chúng là cách duy nhất để khôi phục danh tính này. Đây là một cụm từ khác với mọi cụm từ khôi phục kho.",
       "reveal": "Hiện",
-      "typebackLead": "Để xác nhận bạn đã lưu nó, hãy nhập bốn từ này từ cụm từ ở trên.",
+      "typebackLead": "Nhập bốn từ này từ cụm từ danh tính bạn vừa lưu.",
       "wordNumber": "Từ thứ {{position}}",
       "wordMismatch": "Từ đó không khớp với từ thứ {{pos}}.",
       "continue": "Tiếp tục"
@@ -5341,6 +5565,20 @@
       "forgetHeading": "Thiết bị này",
       "forget": "Quên danh tính này trên thiết bị",
       "forgetCheckbox": "Tôi hiểu danh tính này sẽ bị gỡ khỏi thiết bị này. Tài khoản trên máy chủ vẫn còn và cụm từ sẽ khôi phục được nó."
+    },
+    "recover": {
+      "open": "Tôi đã có một danh tính",
+      "title": "Khôi phục danh tính của bạn",
+      "lead": "Nhập 24 từ của cụm từ khôi phục danh tính để đưa danh tính đó vào thiết bị này. Đây là một cụm từ khác với mọi cụm từ khôi phục kho.",
+      "submit": "Khôi phục danh tính",
+      "working": "Đang khôi phục…",
+      "failed": "Không thể khôi phục danh tính trên thiết bị này. Hãy kiểm tra 24 từ rồi thử lại."
+    },
+    "typeback": {
+      "title": "Xác nhận cụm từ của bạn"
+    },
+    "joinFromQr": {
+      "notFound": "Mã này nêu tên một kho không có trong lời mời trên thiết bị này. Hãy đề nghị chủ kho gửi lại lời mời tới danh tính này."
     }
   }
 }

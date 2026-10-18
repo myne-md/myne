@@ -254,7 +254,8 @@
       "targetVault": "Despre întregul seif",
       "running": "Se lucrează la această conversație",
       "newConversation": "Conversație nouă",
-      "historyLabel": "Istoric"
+      "historyLabel": "Istoric",
+      "searchClear": "Arată toate conversațiile"
     },
     "focus": {
       "title": "Agent pe notă",
@@ -340,8 +341,8 @@
       "clearSearchAriaLabel": "Șterge căutarea",
       "emptyClearSearch": "Șterge căutarea",
       "emptyImportHint": "Fișierele pe care le adaugi într-o notă sunt păstrate în seiful tău, criptate pe acest dispozitiv înainte de a ajunge oriunde. Importă unul pentru a începe.",
-      "emptyLoadError": "Catalogul de atașamente nu a putut fi citit.",
-      "emptyNoAttachments": "Niciun atașament încă.",
+      "emptyLoadError": "Catalogul de atașamente nu a putut fi citit",
+      "emptyNoAttachments": "Niciun atașament încă",
       "emptyNoResultsTitle": "Niciun atașament nu corespunde.",
       "filterAriaLabel": "Filtrează după tip",
       "gridView": "Vizualizare grilă",
@@ -390,7 +391,15 @@
       "emptyFilteredBody": "Nimic de aici nu se potrivește cu filtrul de tip actual. Șterge-l pentru a vedea din nou întreaga bibliotecă.",
       "emptyFilteredBodyQuery": "Nimic din bibliotecă nu se potrivește",
       "emptyLoadErrorBody": "Catalogul este criptat cu seiful tău, așa că de obicei este o citire întreruptă, nu date pierdute. Încearcă din nou; dacă tot eșuează, notele tale și fișierele lor nu sunt afectate.",
-      "emptyRetry": "Încearcă din nou"
+      "emptyRetry": "Încearcă din nou",
+      "transcriptCopy": "Copiază",
+      "transcriptCopied": "Transcriere copiată.",
+      "transcriptCopyFailed": "Transcrierea nu a putut fi copiată.",
+      "transcriptEmpty": "Nu s-a găsit vorbire în această înregistrare.",
+      "transcriptNoteTitle": "{{name}} (transcriere)",
+      "transcriptSave": "Salvează ca notă",
+      "transcriptSaved": "Transcrierea a fost salvată ca notă.",
+      "transcriptSaveFailed": "Transcrierea nu a putut fi salvată ca notă."
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -824,6 +833,12 @@
       },
       "openPalette": {
         "label": "Caută și rulează o comandă…"
+      },
+      "attachFile": {
+        "label": "Atașează fișier…"
+      },
+      "convertImportedAttachments": {
+        "label": "Convertește atașamentele importate…"
       }
     },
     "hotkeys": {
@@ -1278,8 +1293,6 @@
           "insert": "Inserează în notă",
           "noAnswer": "Niciun răspuns. Încearcă să reformulezi.",
           "newChat": "Chat nou",
-          "noModelHint": "Nu este configurat niciun furnizor AI, așa că chatul, rezumatele, rescrierea și căutarea semantică nu au pe ce să ruleze. Configurează unul din Setări → Developer → AI.",
-          "unreachableHint": "Furnizorul pe care l-ai configurat nu răspunde. Verifică dacă rulează, apoi trimite din nou.",
           "unavailableHint": "Această versiune de Myne a fost compilată fără AI local, așa că nimic de aici nu poate rula. Nicio setare nu va schimba asta — e nevoie de o versiune care include AI.",
           "offHint": "Funcția AI local este dezactivată. Activeaz-o din Setări → Developer → AI.",
           "send": "Trimite",
@@ -1297,9 +1310,7 @@
           "historyCancel": "Anulează",
           "historyDelete": "Șterge",
           "historyDeleteBody": "Asta va ștege conversația de pe fiecare dispozitiv la următoarea conectare. Nu poate fi anulat.",
-          "historyEmpty": "Deocamadă nicio conversație. Chaturile noi vor apărea aici.",
           "historyError": "Conversațiile nu au putut fi încărcate. Încercați din nou.",
-          "historyLoading": "Se încarcă…",
           "historyProposalNewNote": "Notă nouă",
           "historyRename": "Redenumiți",
           "historyTitle": "Istoric chat",
@@ -1331,7 +1342,16 @@
           "diffTitle": "Modificări propuse",
           "revertConfirmTitle": "Anulezi această rulare?",
           "revertConfirmBody": "Notele pe care le-a modificat această rulare revin la starea de dinainte. Notele pe care le-a creat rămân acolo unde sunt.",
-          "focusAgent": "Deschide în fila agent"
+          "focusAgent": "Deschide în fila agent",
+          "statusNoModelChosen": "Niciun model",
+          "statusNoCredential": "Nicio cheie API",
+          "statusConsentMissing": "Acord necesar",
+          "statusNotAllowed": "Nepermis",
+          "statusKeyRejected": "Cheie respinsă",
+          "statusOutOfCredit": "Credit epuizat",
+          "statusRefused": "Refuzat",
+          "statusNotWorking": "Nu funcționează",
+          "historyRetry": "Încearcă din nou"
         },
         "allHidden": "Toate filele sunt ascunse. Clic dreapta pentru a le restaura.",
         "outline": {
@@ -1462,7 +1482,8 @@
       "propertiesLabel": "Proprietăți",
       "removeListItemAriaLabel": "Elimină {{item}}",
       "titleAriaLabel": "Titlul notei",
-      "titlePlaceholder": "Fără titlu"
+      "titlePlaceholder": "Fără titlu",
+      "managedField": "Myne scrie acest câmp"
     },
     "mermaid": {
       "rendering": "Se generează diagrama…",
@@ -1514,7 +1535,8 @@
       "voiceNote": "Notă vocală",
       "wikiLink": "Wikilink",
       "remind": "Memento",
-      "meeting": "Sesiune de ședință"
+      "meeting": "Sesiune de ședință",
+      "sheetTitle": "Inserează"
     },
     "spell": {
       "menu": {
@@ -1679,6 +1701,9 @@
       },
       "convertCore": {
         "noMatch": "nicio potrivire"
+      },
+      "picker": {
+        "sheetTitle": "Leagă de o notă"
       }
     },
     "flow": {
@@ -1883,6 +1908,9 @@
       "tapSilent": "Audio-ul celorlalți participanți nu se aude. Verifică Setări de sistem, Confidențialitate și securitate, Înregistrare ecran și audio de sistem.",
       "transcriptHeading": "Transcriere",
       "transcriptionFailed": "O parte din ședință nu a putut fi transcrisă. Audio-ul este încă în notă."
+    },
+    "templateToken": {
+      "sheetTitle": "Inserează token"
     }
   },
   "export": {
@@ -2168,7 +2196,7 @@
       "moveIntoSelf": "Un folder nu poate fi mutat în el însuși.",
       "moveCollision": "Acolo există deja un folder cu acel nume.",
       "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că folderul a rămas neatins. Încearcă din nou după ce termină.",
-      "renameFailed": "Nu s-a putut redenumi folderul, așa că a rămas neschimbat.",
+      "renameFailed": "Folderul nu a putut fi redenumit, așa că a rămas neschimbat.",
       "deliberateWriteFailed": "Folderul a fost redenumit, dar una dintre setările lui nu a putut fi salvată. De fiecare dată când deblochezi, un folder gol va reapărea sub numele vechi; îl poți șterge în siguranță și nu se schimbă nimic altceva. O nouă redenumire a folderului nu îl va elimina.",
       "folderListFull": "Myne poate reține un număr limitat de foldere, iar acea listă este plină. Acest folder funcționează în continuare, dar va dispărea când ultima lui notă îl părăsește. Ștergerea unui folder de care nu mai ai nevoie face loc.",
       "folderNotRemembered": "Folderul a fost creat, dar Myne nu l-a putut înregistra. Va dispărea când ultima lui notă îl părăsește, iar dacă este încă gol, dispare la următoarea deblocare. Îl poți crea din nou în siguranță."
@@ -2207,7 +2235,11 @@
         "derivedNote_one": "Graful este colorat după etichetă: {{count}} grup derivat din etichetele dvs. Nu se va salva până nu-l faceți editabil.",
         "derivedNote_few": "Graful este colorat după etichetă: {{count}} grupuri derivate din etichetele dvs. Nu se vor salva până nu le faceți editabile.",
         "derivedNote_other": "Graful este colorat după etichetă: {{count}} de grupuri derivate din etichetele dvs. Nu se vor salva până nu le faceți editabile.",
-        "newRuleTitle": "Grup de culori nou"
+        "newRuleTitle": "Grup de culori nou",
+        "moveDown": "Mută regula în jos",
+        "moveUp": "Mută regula în sus",
+        "mobileEmptyBody": "Grupurile de culori colorează graficul după etichetă sau dosar și se creează pe un computer. Acest telefon le folosește, dar încă nu poate crea unul, pentru că un grup nou are nevoie de un filtru.",
+        "mobileSharedNotice": "Grupurile de culori sunt partajate: o modificare aici înlocuiește întreaga listă pe celelalte dispozitive ale tale, iar o listă editată pe un computer ajunge aici."
       },
       "depthToggleTitle": "Comută adâncimea vecinătății (1 ↔ 2 salturi)",
       "filterAll": "Toate",
@@ -2473,7 +2505,7 @@
       "deleteFolderWarning": "Notele se mută în Coș. Le poți restaura mai târziu.",
       "duplicate": "Duplică",
       "editFilterTitle": "Editează filtrul",
-      "emptyState": "Nicio notă încă.",
+      "emptyState": "Nicio notă încă",
       "favoritesHeading": "Favorite",
       "icon": "Pictogramă…",
       "mergeAnyway": "Îmbină oricum",
@@ -2727,7 +2759,7 @@
       "thisNote": "această notă",
       "untitled": "Fără titlu"
     },
-    "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că nimic nu a fost schimbat. Încearcă din nou după ce termină.",
+    "unsettledSave": "O notă deschisă nu a terminat de salvat, așa că nu s-a schimbat nimic. Încearcă din nou după ce termină.",
     "views": {
       "cards": {
         "changeCover": "Schimbă coperta",
@@ -2874,7 +2906,7 @@
     "restoreVaultHeader": "Restaurează un seif",
     "accountTitle": "Introdu numărul tău de cont",
     "accountLead": "Îl găsești acolo unde ți-ai salvat fraza de recuperare. Identifică seiful care va fi restaurat.",
-    "accountInvalid": "Număr de cont nevalid — te rugăm să verifici și să reintroduci.",
+    "accountInvalid": "Număr de cont invalid. Verifică-l și introdu-l din nou.",
     "accountOptionalHint": "Nu îl ai? Lasă câmpul gol și continuă. Fraza ta de recuperare din 24 de cuvinte este tot ce îți trebuie.",
     "paste": "Lipește",
     "phraseGridHint": "Scrie fiecare cuvânt sau lipește-le pe toate cele 24 deodată pentru a completa grila.",
@@ -3036,14 +3068,47 @@
       "updateIdle": "Actualizări semnate, preluate de la downloads.myne.md când verifici.",
       "updateInstallButton": "Repornește pentru a actualiza",
       "updateLabel": "Actualizări",
-      "updateUpToDate": "Ai cea mai nouă versiune."
+      "updateUpToDate": "Ai cea mai nouă versiune.",
+      "developerModeInline": "Arată setările pe care Myne le ține deoparte în mod implicit.",
+      "diagnosticLogHelper": "Scrie un jurnal în text simplu pe acest dispozitiv, și doar pe acest dispozitiv. Înregistrează ce face Myne: niciodată textul notelor tale, niciodată titlul unei note, niciodată o cale de fișier. Myne îi limitează dimensiunea și elimină mai întâi cele mai vechi înregistrări, iar dezactivarea acestei opțiuni șterge jurnalul. Nimic nu este trimis nicăieri; tu decizi ce partajezi.",
+      "diagnosticLogLabel": "Jurnal de diagnostic",
+      "diagnosticLogError": "Myne nu a putut modifica acea setare.",
+      "diagnosticLogReadError": "Myne nu a putut citi setarea jurnalului de diagnostic, așa că este afișată ca dezactivată.",
+      "diagnosticBlockLabel": "Detalii raport",
+      "diagnosticBlockHelper": "Exact ce pune Copiază în clipboard. Nimic nu este trimis nicăieri; tu decizi ce partajezi.",
+      "diagnosticCopy": "Copiază diagnosticul",
+      "diagnosticCopyDone": "Diagnostic copiat",
+      "diagnosticCopyFailed": "Copierea nu a reușit. Selectează textul de mai sus și copiază-l manual.",
+      "crashRecordLabel": "Înregistrare de blocare",
+      "crashRecordHelper": "Myne a înregistrat o blocare la {{date}}. Conține fișierul și linia, versiunea și platforma ta, nimic altceva. Șterge-o oricând vrei.",
+      "crashRecordClear": "Șterge",
+      "diagnosticFilesLabel": "Fișier raport",
+      "diagnosticFilesUnknown": "Myne nu a citit încă jurnalul.",
+      "crashRecordDateUnknown": "o dată necunoscută",
+      "diagnosticReveal": "Arată dosarul jurnalelor",
+      "diagnosticSave": "Salvează raportul ca fișier…",
+      "diagnosticSaveDone": "Raport salvat",
+      "diagnosticSaveFailed": "Myne nu a putut salva raportul.",
+      "diagnosticRevealFailed": "Myne nu a putut deschide dosarul jurnalelor.",
+      "crashRecordClearFailed": "Myne nu a putut șterge înregistrarea de blocare.",
+      "crashRecordReadFailed": "Myne nu a putut citi înregistrarea de blocare, așa că nu poate spune dacă există una.",
+      "sections": {
+        "version": "Versiune",
+        "updates": "Rămâi la zi",
+        "legal": "Juridic și licențiere",
+        "developer": "Developer",
+        "diagnostics": "Diagnostic"
+      },
+      "diagnosticFilesHelper_one": "Un fișier ar conține acest bloc plus {{count}} fișier jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
+      "diagnosticFilesHelper_other": "Un fișier ar conține acest bloc plus {{count}} de fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
+      "diagnosticFilesHelper_few": "Un fișier ar conține acest bloc plus {{count}} fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge."
     },
     "vault": {
       "changePasswordButton": "Schimbă parola",
       "changePasswordError": {
         "invalidCredentialOrVault": "Parola curentă este greșită sau fișierul seifului este corupt.",
         "ioError": "Eroare de disc, te rugăm să încerci din nou.",
-        "joinFailure": "Ceva nu a funcționat, te rugăm să încerci din nou.",
+        "joinFailure": "Ceva nu a mers bine, te rugăm să încerci din nou.",
         "samePasswordRejected": "Parola nouă coincide cu cea curentă.",
         "serverAckPending": "Noua parolă funcționează pe acest dispozitiv, dar Myne nu a putut contacta serverul pentru a o salva. Până când reușește, celelalte dispozitive ale tale așteaptă în continuare parola veche, iar dacă copia din acest browser este ștearsă înainte de asta, schimbarea se pierde. Se va reîncerca automat.",
         "weakNewPassword": "Parola nouă trebuie să aibă cel puțin 12 caractere.",
@@ -3077,7 +3142,14 @@
       "reenterNewPassword": "Reintrodu noua parolă",
       "changePasswordFootnote": "Aceasta invalidează deblocarea rapidă. Fraza ta de recuperare rămâne neschimbată.",
       "changing": "Se schimbă…",
-      "memberVaultNotice": "Acesta este un seif partajat. Nu are parolă de seif. Folosește Deblocarea seifului partajat din Confidențialitate pentru a adăuga o parolă sau un PIN."
+      "memberVaultNotice": "Acesta este un seif partajat. Nu are parolă de seif. Folosește Deblocarea seifului partajat din Confidențialitate pentru a adăuga o parolă sau un PIN.",
+      "topics": {
+        "vault": "Seif",
+        "danger": "Zonă periculoasă"
+      },
+      "sections": {
+        "identity": "Identitatea seifului"
+      }
     },
     "appearance": {
       "accentHelper": "Alege culoarea de accent folosită în toată aplicația. Doar pe acest dispozitiv.",
@@ -3115,6 +3187,16 @@
       "barCustomize": {
         "label": "Bara de jos",
         "helper": "Alege ce indicatori afișează bara de jos. Ascunde-i pe toți și bara în sine este eliminată, recuperând spațiul. Trage sau dă clic dreapta pe un element din bară pentru a-l reordona."
+      },
+      "topics": {
+        "display": "Afișare",
+        "notes": "Lista de note",
+        "interface": "Interfață"
+      },
+      "sections": {
+        "theme": "Temă și culoare de accent",
+        "sidebar": "În bara laterală",
+        "customisation": "Personalizare"
       }
     },
     "archive": {
@@ -3142,7 +3224,8 @@
       "errorSaveSetting": "Această setare nu a putut fi salvată.",
       "processing_one": "Se citește 1 atașament…",
       "processing_few": "Se citesc {{count}} atașamente…",
-      "processing_other": "Se citesc {{count}} de atașamente…"
+      "processing_other": "Se citesc {{count}} de atașamente…",
+      "mobileDeviceLocal": "Aceasta este per dispozitiv: decide ce indexează acest telefon, așa că celelalte dispozitive ale tale își păstrează propria alegere."
     },
     "autoBackup": {
       "backupFolder": "Folder pentru copii de rezervă",
@@ -3223,7 +3306,8 @@
       "excludedHelper": "O cale de folder pe linie. Notele din aceste foldere sunt lăsate în afara oricărui rezultat din terminal și nu pot fi scrise acolo din terminal. Rămân pe deplin disponibile în aplicație. Poți seta asta înainte de a activa accesul din terminal.",
       "excludedPlaceholder": "Privat/\nJurnal/",
       "rateLimitLabel": "Lasă terminalul să meargă la viteză maximă",
-      "rateLimitHelper": "În mod implicit, Myne răspunde la cel mult 120 de comenzi de terminal pe minut. Este o limită de ritm pentru un script scăpat de sub control, nu o verificare de permisiuni: nimic nu decide ce program are voie să întrebe. Activează asta pentru lucrul în masă, de exemplu pentru a trece fiecare notă printr-o altă unealtă."
+      "rateLimitHelper": "În mod implicit, Myne răspunde la cel mult 120 de comenzi de terminal pe minut. Este o limită de ritm pentru un script scăpat de sub control, nu o verificare de permisiuni: nimic nu decide ce program are voie să întrebe. Activează asta pentru lucrul în masă, de exemplu pentru a trece fiecare notă printr-o altă unealtă.",
+      "inlineOn": "Orice program care rulează sub contul tău poate citi, căuta și crea note prin el."
     },
     "clipperInstall": {
       "error": "Setarea clipperului de browser nu a putut fi actualizată.",
@@ -3293,7 +3377,12 @@
       "periodFormatAriaLabel": "Formatul titlului notelor {{period}}",
       "periodTemplateAriaLabel": "Șablonul notelor {{period}}",
       "sectionPeriodic": "Note periodice",
-      "periodSwitcherAriaLabel": "Tip de notă periodică"
+      "periodSwitcherAriaLabel": "Tip de notă periodică",
+      "blockLabel": "Note periodice",
+      "mobilePeriodAriaLabel": "Perioada notelor",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Salvează",
+      "mobileSharedNotice": "Aceste setări sunt partajate: o modificare aici ajunge pe celelalte dispozitive ale tale, iar aceeași valoare setată pe un computer ajunge aici."
     },
     "deleteVault": {
       "cancel": "Anulează",
@@ -3346,6 +3435,10 @@
         "searchEmpty": "Nu s-a găsit nicio notă.",
         "searchPlaceholder": "Caută note…",
         "untitledNote": "Fără titlu"
+      },
+      "sections": {
+        "notes": "Note și dosare",
+        "attachments": "Atașamente"
       }
     },
     "focusMode": {
@@ -3460,12 +3553,12 @@
         "excludedLabel": "Dosare excluse"
       },
       "disclosureToggle": "Cum funcționează?",
-      "enableHelper": "Rulează un model furnizat de tine. Unde rulează și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl indici mai jos. Experimental, dezactivat implicit.",
-      "enableLabel": "Activează AI local",
-      "excludedHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. Gol înseamnă că AI-ul poate vedea tot; aceasta este aceeași listă pe care o respectă clientul din linia de comandă. O cale de dosar pe linie.",
+      "enableHelper": "Activează fiecare funcție AI. Unde rulează un model și dacă notele tale părăsesc acest dispozitiv depind amândouă de furnizorul pe care îl alegi mai jos. Experimental, dezactivat implicit.",
+      "enableLabel": "Activează funcțiile AI",
+      "excludedHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. Gol înseamnă că AI-ul poate vedea tot. O cale de dosar pe linie.",
       "excludedLabel": "Dosare excluse",
       "excludedPlaceholder": "Privat/\nJurnal/",
-      "endpointHelper": "Dacă rulezi deja un mediu de execuție pentru modele pe acest computer, îndreaptă Myne către el în loc să alegi fișiere de model. Lasă gol pentru a folosi fișierele de mai sus.",
+      "endpointHelper": "Dacă rulezi deja un mediu de execuție pentru modele pe acest computer, îndreaptă Myne către el în loc să alegi fișiere de model. Lasă gol pentru a folosi fișierele de model setate la Modele.",
       "endpointLabel": "Mediu local de execuție a modelelor",
       "endpointModelHelper": "Myne nu alege un model în locul tău. Până când numești unul, adresa de mai sus este salvată, dar nefolosită.",
       "endpointModelLabel": "Modelul de folosit acolo",
@@ -3492,7 +3585,8 @@
         "unreachable": "Furnizorul nu a putut fi accesat. Verifică-ți conexiunea la rețea.",
         "featureOff": "IA este oprită pe acest dispozitiv. Nu s-a trimis nimic. Pornește-o în Setări, la IA.",
         "consentMissing": "Nu ai fost de acord să trimiți notițe către acest furnizor de pe acest dispozitiv. Nu s-a trimis nimic. Alege furnizorul din nou în Setări, la IA, și citește ce se va trimite.",
-        "emptyGrant": "Tot ce a putut citi această rulare se află în dosare pe care IA nu le vede niciodată. Nu s-a trimis nimic. Schimbați în Setări, IA, Dosare excluse."
+        "emptyGrant": "Tot ce a putut citi această rulare se află în dosare pe care IA nu le vede niciodată. Nu s-a trimis nimic. Schimbați în Setări, IA, Dosare excluse.",
+        "noModel": "Nu există niciun model de rulat aici. Adaugă unul din Setări, AI, Modele: descarcă unul de la propria origine a Myne sau indică Myne către un fișier pe care îl ai deja."
       },
       "modelChoose": "Alege fișierul…",
       "modelFilter": {
@@ -3502,7 +3596,7 @@
       "modelNone": "Niciun fișier selectat",
       "modelSaveFailed": "Calea modelului nu a putut fi salvată (trebuie să fie în afara seifului tău).",
       "modelTranscriptionLabel": "Model de conversie a vorbirii în text (transcriere)",
-      "modelsHelper": "Descarcă un model aici sau deschide un link pentru a obține unul în browserul tău și alege fișierele descărcate. Un model rulează pe dispozitivul tău; dacă ai indicat în schimb un furnizor, acel furnizor răspunde.",
+      "modelsHelper": "Atribuie fișierul pe care îl folosește fiecare rol atunci când provine din altă parte decât lista verificată de mai sus: deschide un link pentru a obține unul în browserul tău, apoi alege-l aici. Un model rulează pe dispozitivul tău; dacă ai indicat în schimb un furnizor, acel furnizor răspunde.",
       "providerHelper": "În loc să ruleze un model aici, Myne poate trimite o solicitare către un serviciu numit de tine. Când o face, notele tale părăsesc acest dispozitiv. „Niciunul” este valoarea implicită și înseamnă că nu este contactat niciun serviciu.",
       "providerKeyAdd": "lipește cheia ta API",
       "providerKeyLabel": "Cheie API",
@@ -3528,7 +3622,7 @@
       "providerModelUnfetched": "Încarcă lista pentru a alege un model.",
       "providerNone": "Niciunul",
       "providerNothingAnswering": "Nu este configurat încă nimic care să răspundă.",
-      "modelsLabel": "Modele",
+      "modelsLabel": "Modele externe",
       "recommendedFilesGeneration": "Necesită fișierul .gguf + tokenizer.json în același dosar.",
       "recommendedFilesTranscription": "Necesită fișierul Whisper .gguf + config.json + tokenizer.json în același dosar.",
       "title": "AI",
@@ -3545,10 +3639,6 @@
       "meetingPromptHelper": "Instrucțiunea pe care o folosește trecerea AI pentru ședințe ca să transforme o transcriere în secțiuni. Lasă-o goală pentru valoarea implicită integrată. Înlocuiește formatul de ieșire implicit, așa că, dacă o setezi, cere singur secțiunile pe care le vrei.",
       "meetingPromptLabel": "Prompt pentru rezumatul ședinței",
       "meetingPromptReset": "Resetează la implicit",
-      "groupAutoTag": "Etichetare automată",
-      "groupVoice": "Voce și ședințe",
-      "groupWriting": "Scriere și conversație",
-      "groupPrivacy": "Confidențialitate și limite",
       "groupAdvanced": "Avansat",
       "excludedPickLabel": "Adaugă un dosar de exclus",
       "excludedPickPlaceholder": "Alege un dosar…",
@@ -3568,7 +3658,39 @@
       "downloadCancel": "Anulează",
       "downloadFailed": "Descărcarea nu s-a terminat.",
       "downloadFailedChecksum": "Descărcarea nu s-a potrivit cu amprenta ei și a fost respinsă. Încearcă din nou.",
-      "sideloadDisclosure": "Modul dezvoltator îți permite de asemenea să indici Myne către un fișier de model obținut de tine. Un fișier descărcat din altă parte nu este verificat de Myne, așa că folosește doar unul în care ai încredere."
+      "sideloadDisclosure": "Modul dezvoltator îți permite de asemenea să indici Myne către un fișier de model obținut de tine. Un fișier descărcat din altă parte nu este verificat de Myne, așa că folosește doar unul în care ai încredere.",
+      "historyBudgetInline": "Cât din conversația recentă duce cu sine fiecare cerere, în caractere.",
+      "historyBudgetMaxNotice": "Maximul pe care îl poți introduce este de {{max}} caractere; orice valoare mai mare este redusă la atât.",
+      "historyBudgetDeviceLocal": "Aceasta este per dispozitiv: limitează ce trimite acest telefon, așa că celelalte dispozitive ale tale își păstrează propria valoare.",
+      "meetingPromptShared": "Aceasta este partajată: o modificare aici ajunge pe celelalte dispozitive ale tale, iar un prompt editat pe un computer ajunge aici.",
+      "groupAnswering": "Răspunsuri",
+      "groupGeneral": "General",
+      "groupModels": "Modele",
+      "groupLimits": "Limite",
+      "groupTagging": "Etichetare",
+      "excludedFoldersHelper": "Notele din aceste dosare nu sunt niciodată citite sau indexate de AI. Aceasta este aceeași listă pe care o folosesc celelalte dispozitive ale tale.",
+      "excludedFoldersEmpty": "Nimic nu este exclus încă, așa că AI poate citi fiecare dosar din acest seif.",
+      "excludedFoldersAdd": "Adaugă",
+      "excludedFoldersAddLabel": "Dosar de exclus din AI",
+      "excludedFoldersRemove": "Elimină",
+      "excludedFoldersRemoveLabel": "Nu mai exclude {{folder}} din AI",
+      "excludedFoldersMonotoneNotice": "O excludere adăugată pe oricare dintre dispozitivele tale rămâne până o elimini peste tot: eliminările de aici nu călătoresc, așa că un dosar pe care celelalte dispozitive ale tale îl exclud în continuare va reveni la următoarea sincronizare.",
+      "catalogueOpen": "Descarcă un model",
+      "catalogueColModel": "Model",
+      "catalogueColState": "Stare",
+      "providerInline": "Notele tale părăsesc acest dispozitiv de îndată ce este numit un serviciu.",
+      "providerChooseHelper": "Un model poate rula pe acest dispozitiv sau Myne poate trimite o solicitare către un serviciu numit de tine. Când o face, notele tale părăsesc acest dispozitiv. „Pe acest dispozitiv” este valoarea implicită și înseamnă că nu este contactat niciun serviciu.",
+      "providerChooseLabel": "Alege furnizorul",
+      "providerKeySave": "Salvează această cheie",
+      "providerOnDevice": "Pe acest dispozitiv",
+      "sections": {
+        "catalogue": "Modele descărcabile verificate",
+        "outsourced": "Modele externe",
+        "preferences": "Preferințe",
+        "memory": "Memorie",
+        "excluded": "Ce poate citi AI",
+        "history": "Istoric chat"
+      }
     },
     "network": {
       "disabledCue": "Sincronizarea nu mai este rutată prin Tor. Conexiunile noi merg direct la serverul de sincronizare.",
@@ -3590,7 +3712,8 @@
       "residualScope": "Pe desktop, aceasta acoperă traficul tău de sincronizare și cererile tale către furnizorul AI la distanță. Mobilul nu are încă rutare prin Tor, așa că cererile sale către furnizor merg direct. Nimic altceva de pe acest dispozitiv nu trece prin Tor.",
       "residualsToggle": "Ce nu ascunde asta",
       "torHelper": "Îți ascunde adresa IP și locația față de serverul de sincronizare și ascunde cu ce server sincronizezi (și, pe desktop, la ce furnizor AI ajungi) față de rețeaua ta și de furnizorul tău de internet. Ei pot vedea în continuare acest dispozitiv conectându-se la Tor. Nu te face anonim față de Myne și nu ascunde față de server ce sincronizezi sau când.",
-      "torLabel": "Rutează sincronizarea și AI-ul de pe desktop prin Tor"
+      "torLabel": "Rutează sincronizarea și AI-ul de pe desktop prin Tor",
+      "torInline": "Îți ascunde adresa IP și locația față de serverul de sincronizare și ascunde cu ce server sincronizezi față de rețeaua ta și de furnizorul tău de internet."
     },
     "prefs": {
       "saveError": "Preferința nu a putut fi salvată. Încearcă din nou.",
@@ -3647,7 +3770,18 @@
       "recoveryDrillHelper": "Tastează cele 24 de cuvinte pe care le-ai notat. Myne verifică dacă ele deschid în continuare acest seif și nu îți spune nimic altceva — cuvintele nu sunt afișate niciodată aici.",
       "recoveryDrillLabel": "Verifică-ți fraza de recuperare",
       "recoveryDrillPassed": "Aceste cuvinte deschid acest seif. Păstrează-le acolo unde le-ai găsit.",
-      "recoveryDrillPlaceholder": "Cele 24 de cuvinte, în ordine, separate prin spații"
+      "recoveryDrillPlaceholder": "Cele 24 de cuvinte, în ordine, separate prin spații",
+      "hideVaultNamesInline": "Activarea ei distruge cheile care fac lizibile numele stocate aici.",
+      "topics": {
+        "access": "Acces",
+        "locking": "Blocare"
+      },
+      "sections": {
+        "screen": "Protecția ecranului",
+        "terminal": "Unelte pentru linia de comandă",
+        "locking": "Blocare și deblocare",
+        "recovery": "Recuperare"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Este în curs o altă operațiune asupra seifului. Încearcă din nou peste un moment.",
@@ -3716,7 +3850,8 @@
         "storage": "Stocare",
         "sync": "Sincronizare",
         "cli": "CLI",
-        "vault": "Seif"
+        "vault": "Seif",
+        "data": "Date"
       },
       "passwordUpdatedToast": "Parolă actualizată",
       "title": "Setări"
@@ -3733,7 +3868,8 @@
       "languagesSearchEmpty": "Nicio limbă nu corespunde.",
       "languagesSearchPlaceholder": "Caută limbi…",
       "off": "Dezactivat",
-      "on": "Activat"
+      "on": "Activat",
+      "mobileUnavailable": "Verificarea ortografică nu este încă disponibilă pe acest telefon: nu există niciun dicționar pe acest dispozitiv, așa că editorul de aici nu poate sublinia nimic. Activeaz-o de pe computerul tău."
     },
     "storage": {
       "backupHelper": "Copiile de rezervă rămân exact la fel de criptate ca seiful tău, într-un singur fișier .myne-backup verificat. Restaurarea funcționează cu parola sau fraza de recuperare a acelui seif, exact ca la deblocare.",
@@ -3752,7 +3888,12 @@
       "webLocationHelper": "Notele tale se află în spațiul de stocare pe care acest browser îl alocă acestui site, gestionat de browser. Nu există niciun folder de deschis. Ștergerea datelor acestui site elimină copia locală; deoarece acest client se sincronizează, o nouă conectare o descarcă înapoi.",
       "webLocationLabel": "Unde sunt stocate notele tale",
       "pathUnavailable": "Cale indisponibilă",
-      "restoreBackup": "Restaurează dintr-o copie de rezervă…"
+      "restoreBackup": "Restaurează dintr-o copie de rezervă…",
+      "sections": {
+        "location": "Unde se află seiful",
+        "backup": "Copie de rezervă și restaurare",
+        "transfer": "Import și export"
+      }
     },
     "typography": {
       "contentWidthHelper": "Lățimea maximă a coloanei de editare. Completă permite textului să se întindă pe tot panoul.",
@@ -3779,7 +3920,8 @@
       "weak": "Slabă",
       "fair": "Acceptabilă",
       "good": "Bună",
-      "strong": "Puternică"
+      "strong": "Puternică",
+      "tooWeak": "Prea slabă"
     },
     "sync": {
       "summary": {
@@ -3822,7 +3964,12 @@
         "bullet1": "Îmi împachetez cutia cu cinci duzini de sticle",
         "bullet2": "Ce iute și năucitor sar zebrele zănatice",
         "spellCaption": "Verificare ortografică",
-        "spellSample": "greșală"
+        "spellSample": "greșală",
+        "dateTime": "Dată și oră",
+        "toolbar": "Bară de instrumente",
+        "task": "Sarcini",
+        "taskSampleOpen": "Trimite raportul trimestrial",
+        "taskSampleDone": "Rezervă sala"
       },
       "defaultView": "Vizualizare implicită",
       "typewriter": "Derulare tip mașină de scris",
@@ -3840,12 +3987,15 @@
       "taskChipIconOnly": {
         "help": "Arată prioritatea doar cu pictograma, fără cuvânt.",
         "label": "Prioritate doar pictogramă"
+      },
+      "topics": {
+        "periodic": "Note periodice"
       }
     },
     "search": {
       "placeholder": "Caută în setări…",
       "ariaLabel": "Caută în setări",
-      "empty": "Nicio setare nu corespunde cu „{{query}}”.",
+      "empty": "Nicio setare nu corespunde cu „{{query}}”",
       "resultsLabel": "Rezultatele căutării",
       "keywords": {
         "aiAutoTag": "etichete automate etichetare sugestii sugerează etichetă ai auto tag",
@@ -3854,7 +4004,7 @@
         "aiProviderModel": "model catalog listă ce model llama qwen gpt alege model furnizor la distanță remote provider",
         "aiEnable": "ai local activează dezactivează pornit oprit inteligență artificială învățare automată on off",
         "aiExcluded": "dosare excluse foldere excludere exclude ignoră ai confidențialitate",
-        "aiModels": "modele model gguf descărcare text încorporare embedding llm",
+        "aiModels": "modele model gguf descărcare text încorporare embedding llm catalog",
         "archive": "arhivă arhivare ascunde restaurează note archive",
         "autoBackup": "copii de rezervă automate backup automat program frecvență retenție folder",
         "autoLock": "blocare automată auto lock expirare inactivitate temporizator sesiune timeout",
@@ -3927,7 +4077,8 @@
         "memberPassword": "seif partajat parolă membru deblocare alăturare frază",
         "recoveryDrill": "frază de recuperare verificare verifică exercițiu test 24 de cuvinte seed copie de rezervă parolă pierdută",
         "bar": "bară de jos bară de stare indicatori personalizare reordonare ascunde arată bară de instrumente",
-        "syncDeviceBindings": "dispozitive revendicate de membri atribuire cine a semnat cărui dispozitiv aparține"
+        "syncDeviceBindings": "dispozitive revendicate de membri atribuire cine a semnat cărui dispozitiv aparține",
+        "diagnosticLog": "jurnal de diagnostic diagnosticare depanare erori crash raport de erori asistență diagnostic log logging debug troubleshooting crash report bug report support"
       },
       "emptyBody": "Încearcă un cuvânt mai scurt sau numele unui panou."
     },
@@ -3944,12 +4095,14 @@
       "zoneHelper": "Ce fus decide ce înseamnă „astăzi” și, prin urmare, ce notă deschid notele tale zilnice, săptămânale și lunare. Lasă gol pentru a urma acest dispozitiv. Alegerea se stabilește per dispozitiv: niciun alt dispozitiv nu o suprascrie, așa că o astfel de setare poate pune acest dispozitiv într-o zi diferită față de celelalte. Orele pe care le scrii într-o notă nu sunt niciodată modificate; 09:00 rămâne 09:00 peste tot.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne nu cunoaște acel fus orar. Folosește un nume precum Europe/Berlin.",
-      "errorSave": "Acea setare nu a putut fi salvată."
+      "errorSave": "Acea setare nu a putut fi salvată.",
+      "zoneInline": "Ce fus orar decide ce înseamnă „astăzi” și, prin urmare, ce notă deschid notele tale zilnice, săptămânale și lunare."
     },
     "folderNotes": {
       "label": "Note de dosar",
       "helper": "Permiteți unei note să servească drept index al dosarului: se deschide la dublu-clic pe dosar, iar linkuri precum [[Projects/]] duc la ea. Dezactivat implicit. Dezactivarea ascunde butoanele de creare a unor astfel de note și le afișează pe cele existente ca note obișnuite; pe disc nu se schimbă nimic, deci reactivarea le restaurează exact.",
-      "errorSaveSetting": "Această setare nu a putut fi salvată."
+      "errorSaveSetting": "Această setare nu a putut fi salvată.",
+      "inline": "Permite unei note să servească drept index al dosarului: se deschide la dublu-clic pe dosar, iar linkuri către dosar precum [[Projects/]] duc la ea."
     },
     "ribbonCustomize": {
       "add": "Adaugă",
@@ -3993,7 +4146,9 @@
       "personalitySaveFailed": "Setările de voce nu au putut fi salvate.",
       "loadFailed": "Amintirile sau setările de voce nu au putut fi încărcate. Nimic nu s-a schimbat.",
       "retryLabel": "Încearcă din nou",
-      "emptyTitle": "Nimic memorat încă"
+      "emptyTitle": "Nimic memorat încă",
+      "count": "{{used}} din {{cap}}",
+      "atCap": "Lista este plină, așa că nimic nou nu mai poate fi reținut. Șterge o înregistrare pentru a face loc."
     },
     "account": {
       "nameLabel": "Numele contului",
@@ -4011,7 +4166,11 @@
       "devicesNote": "Dispozitivele, membrii seifurilor partajate și identitatea ta se gestionează în Sincronizare.",
       "groupingHidden": "Numele de cont nu sunt disponibile cât timp numele seifurilor sunt ascunse. Dezactivează acea opțiune în Confidențialitate pentru a gestiona acest cont.",
       "groupingUnreadable": "Gruparea conturilor a acestui dispozitiv nu a putut fi citită. Nu s-a schimbat nimic.",
-      "groupingError": "Gruparea conturilor de pe acest dispozitiv nu a putut fi citită. Nu s-a schimbat nimic."
+      "groupingError": "Gruparea conturilor de pe acest dispozitiv nu a putut fi citită. Nu s-a schimbat nimic.",
+      "sections": {
+        "extensions": "Extensii de browser",
+        "grouping": "Acest cont"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Setarea pentru fișiere simple nu a putut fi salvată.",
@@ -4040,7 +4199,8 @@
       "pinSetupHelper": "Cel puțin {{count}} cifre. Stocat doar pe acest dispozitiv; fraza ta de recuperare deschide în continuare seiful oriunde.",
       "errorTooShort": "Folosește cel puțin {{count}} caractere/cifre.",
       "errorGeneric": "Acreditarea nu a putut fi setată. Încearcă din nou."
-    }
+    },
+    "helperDisclosureLabel": "Mai multe despre această setare"
   },
   "storageLost": {
     "allSynced": "Nu s-a pierdut nimic: fiecare notă de aici ajunsese deja pe server.",
@@ -4070,7 +4230,10 @@
       "intro": "Sincronizarea trimite notele tale, criptate, către un server. Merită să știi mai întâi patru lucruri.",
       "whatThisIsLabel": "Ce este",
       "dataLossLabel": "Dacă pierzi ambele secrete",
-      "accept": "Am înțeles, activează sincronizarea"
+      "accept": "Am înțeles, activează sincronizarea",
+      "whatHappensNextLabel": "Dacă serverul dispare",
+      "whatWeCanSeeLabel": "Ce poate vedea operatorul serverului",
+      "review": "Vezi ce înseamnă sincronizarea"
     },
     "materialising": "Se descarcă notele tale: {{done}} din {{total}}. Poți începe să lucrezi; celelalte vor apărea pe măsură ce sosesc.",
     "credentialAmbiguous": "Este posibil ca parola ta să se fi schimbat și pe acest dispozitiv, și pe altul, iar Myne nu poate determina care este mai recentă, așa că nu a schimbat nimic. Conectează-te pe un dispozitiv care are deja acces pentru a lămuri lucrurile.",
@@ -4273,7 +4436,7 @@
         "deleteConfirmTitle": "Ștergi această notă recuperată?",
         "deleteConfirmWarning": "Aceasta șterge definitiv singura copie păstrată pe acest dispozitiv. Acțiunea nu poate fi anulată.",
         "deleteCta": "Șterge",
-        "empty": "Nicio notă recuperată.",
+        "empty": "Nicio notă recuperată",
         "errorGeneric": "Ceva nu a mers bine. Încearcă din nou.",
         "helper": "Când o notă ștearsă pe alt dispozitiv este eliminată și aici, copia ei criptată este păstrată pe acest dispozitiv. Restaurează una ca notă nouă sau șterge-o definitiv.",
         "label": "Note recuperate",
@@ -4290,7 +4453,9 @@
       },
       "usage": {
         "helper": "Câte date criptate stochează acest cont pe server și câte dispozitive sunt conectate.",
-        "label": "Stocare și dispozitive"
+        "label": "Stocare și dispozitive",
+        "memberHelper": "Câte dispozitive sunt conectate la contul tău.",
+        "memberLabel": "Dispozitive"
       },
       "identity": {
         "label": "Identitate",
@@ -4299,6 +4464,16 @@
         "codeLabel": "Codul tău de identitate",
         "lockedHelper": "Acest dispozitiv deține o identitate. Este blocată pentru această sesiune; deblocheaz-o cu fraza ta de recuperare pentru a semna sincronizarea și invitațiile.",
         "unlockedHelper": "Acest dispozitiv deține o identitate, deblocată pentru această sesiune."
+      },
+      "topics": {
+        "connection": "Conexiune",
+        "devices": "Dispozitive și membri",
+        "conflicts": "Conflicte"
+      },
+      "sections": {
+        "account": "Cont",
+        "server": "Server",
+        "devices": "Dispozitive conectate"
       }
     },
     "reconcile": {
@@ -4476,6 +4651,18 @@
       "label": "Numele tău afișat",
       "checking": "Se verifică numele tău…",
       "save": "Continuă"
+    },
+    "memberJoinQr": {
+      "error": "Codul nu a putut fi generat.",
+      "noAccount": "Contul acestui seif nu este încă înregistrat pe acest dispozitiv. Deschide seiful o dată, apoi încearcă din nou.",
+      "hint": "Acest cod conține adresa serverului tău și id-ul acestui seif. Nu conține niciodată fraza ta de recuperare sau parola ta.",
+      "notAMember": "Acest seif nu este un seif partajat din care faci parte, așa că nu există niciun cod de afișat.",
+      "notConfigured": "Configurează mai întâi un server de sincronizare, apoi generează codul.",
+      "scanWithApp": "Scanează cu Myne pe celălalt dispozitiv al tău",
+      "stepIdentity": "Pe celălalt dispozitiv al tău, deschide Myne și alege „Am deja o identitate”.",
+      "stepJoin": "Acest seif partajat te va aștepta în invitațiile tale. Deschide-l pentru a te alătura.",
+      "stepPhrase": "Introdu acolo fraza ta de recuperare de 24 de cuvinte.",
+      "title": "Adaugă-ți propriul dispozitiv"
     }
   },
   "tasks": {
@@ -4526,7 +4713,8 @@
       "completed": "Sarcină, finalizată",
       "notCompleted": "Sarcină, nefinalizată",
       "tooLongToWrite": "Linia acestei sarcini este prea lungă pentru a fi editată de aici. Deschide în schimb nota ei.",
-      "untitled": "Sarcină fără titlu"
+      "untitled": "Sarcină fără titlu",
+      "editFields": "Editează câmpurile sarcinii"
     },
     "title": "Sarcini",
     "axis": {
@@ -4707,7 +4895,7 @@
     "deleteConfirmTitle": "Ștergi acest seif?",
     "deletePartialError": "Unele fișiere nu au putut fi eliminate. Seiful nu mai poate fi folosit. Continuă pentru a începe din nou.",
     "failClosedEyebrow": "Seiful nu poate fi deschis",
-    "restoreHint": "Restaurează dintr-o copie de rezervă pentru a continua.",
+    "restoreHint": "Restaurarea dintr-o copie de rezervă nu este încă disponibilă pe mobil.",
     "memberHint": "Acest depozit este partajat cu dvs. Deblocați-l cu fraza dvs. de recuperare.",
     "memberPhraseLabel": "Fraza de recuperare",
     "memberSubmit": "Deblochează",
@@ -4722,7 +4910,9 @@
     "memberPinPlaceholder": "PIN-ul seifului (cel puțin {{count}} cifre)",
     "memberBiometricHint": "Acest seif este partajat cu tine. Confirmă cu biometria dispozitivului tău pentru a-l debloca.",
     "memberBiometricSubmit": "Deblochează cu biometrie",
-    "titleNamed": "Deblochează {{vault}}"
+    "titleNamed": "Deblochează {{vault}}",
+    "restoreCta": "Restaurează dintr-o copie de rezervă",
+    "ioErrorHint": "Încearcă din nou sau redeschide Myne."
   },
   "vault": {
     "ioBanner": {
@@ -4881,11 +5071,11 @@
       "copy": "Copiază",
       "extensionNotice": "Extensiile de browser care au acces la acest site pot citi ce se află pe această pagină. Dacă nu ești sigur de fiecare extensie din acest profil, folosește aplicația desktop sau un profil de browser curat pentru acest pas.",
       "copyFailed": "Copierea nu a reușit. Folosește în schimb „Salvează ca fișier”.",
-      "downloadStarted": "Trimis în descărcările browserului tău. Verifică dacă a ajuns: browserul tău decide unde merge fișierul, iar Myne nu poate vedea dacă a ajuns acolo.",
+      "downloadStarted": "Trimis în descărcările browserului tău. Verifică dacă a ajuns: browserul tău decide unde ajunge fișierul, iar Myne nu poate vedea dacă s-a întâmplat.",
       "reveal": "Arată fraza",
       "saveAsFile": "Salvează ca fișier",
-      "saveFailed": "Fișierul nu a putut fi salvat. Copiază în schimb cuvintele sau notează-le.",
-      "savedToFile": "Salvat. Este un fișier text simplu, așa că păstrează-l într-un loc unde numai tu îl poți citi."
+      "saveFailed": "Fișierul nu a putut fi salvat. Copiază cuvintele în schimb sau notează-le.",
+      "savedToFile": "Salvat. Este un fișier text simplu, așa că păstrează-l undeva unde doar tu poți citi."
     },
     "ready": {
       "backedUp": "Copie de rezervă creată",
@@ -5308,7 +5498,7 @@
     "forgetCta": "Uită această identitate și creează una nouă",
     "forgetWarning": "Aceasta șterge identitatea deținută pe acest dispozitiv. Dacă nu ai notat fraza ei de recuperare de 24 de cuvinte, ea este pierdută: acest dispozitiv va pierde accesul la orice seif pe care îl deține sau în care a fost adăugată, până când o recuperezi cu acea frază. Continuă doar dacă ești sigur.",
     "heldIntro": "Acest dispozitiv deține deja o identitate. Recupereaz-o cu fraza ei de 24 de cuvinte de mai jos.",
-    "typeBackLead": "Pentru a confirma că ai salvat-o, tastează aceste patru cuvinte din fraza de mai sus.",
+    "typeBackLead": "Introdu aceste patru cuvinte din fraza de identitate pe care tocmai ai salvat-o.",
     "typeBackMismatch": "Nu se potrivește cu cuvântul #{{pos}}.",
     "typeBackWordAtPosition": "Cuvântul #{{pos}}",
     "newTitle": "O identitate nouă",
@@ -5318,7 +5508,10 @@
     "recoverAction": "Recuperează",
     "back": "Înapoi",
     "changeServer": "Schimbă sau verifică serverul de sincronizare",
-    "errorTlsFailure": "Certificatul HTTPS al serverului nu a putut fi verificat. Verifică adresa serverului și certificatul acestuia."
+    "errorTlsFailure": "Certificatul HTTPS al serverului nu a putut fi verificat. Verifică adresa serverului și certificatul acestuia.",
+    "phraseTitle": "Salvează-ți fraza de identitate",
+    "phraseContinue": "Continuă",
+    "confirmTitle": "Confirmă-ți fraza"
   },
   "personIdentityCode": {
     "copy": "Copiază codul de identitate",
@@ -5365,7 +5558,16 @@
     "forgetConfirm": "Uită identitatea",
     "forgetCta": "Uită această identitate pe acest dispozitiv",
     "forgetError": "Identitatea nu a putut fi uitată. Încearcă din nou.",
-    "forgetWarning": "Aceasta elimină identitatea doar de pe acest dispozitiv. Contul de server și orice seif pe care îl deține sau în care a fost adăugată rămân neatinse, iar tu poți recupera identitatea cu fraza ei de 24 de cuvinte pe alt dispozitiv. Dacă nu ai salvat acea frază, acest dispozitiv nu o va putea recupera."
+    "forgetWarning": "Aceasta elimină identitatea doar de pe acest dispozitiv. Contul de server și orice seif pe care îl deține sau în care a fost adăugată rămân neatinse, iar tu poți recupera identitatea cu fraza ei de 24 de cuvinte pe alt dispozitiv. Dacă nu ai salvat acea frază, acest dispozitiv nu o va putea recupera.",
+    "stepIndicator": "Pasul {{n}} din {{total}} · {{label}}",
+    "stepVerifyOwner": "Verifică proprietarul",
+    "stepRecoveryPhrase": "Frază de recuperare",
+    "stepDevicePassword": "Parola dispozitivului",
+    "phraseHeading": "Introdu fraza ta de recuperare",
+    "passwordHeading": "Parolă pentru acest dispozitiv",
+    "acceptHeading": "Acceptă această invitație",
+    "acceptPhraseHint": "Introdu cele 24 de cuvinte ale frazei tale de recuperare. Este a ta, nu a proprietarului seifului.",
+    "acceptErrorBadRequest": "Invitația nu a putut fi verificată. Lipește codul de identitate al proprietarului seifului (îl împărtășește când te invită)."
   },
   "aiOnboarding": {
     "title": "Configurează AI",
@@ -5426,12 +5628,35 @@
     "unsaved": "Modificări nesalvate"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Myne {{version}} este disponibil.",
-      "failed": "Actualizarea nu a putut fi instalată. Încearcă din nou.",
-      "installing": "Se descarcă actualizarea…",
+      "consequence": "Actualizarea îți blochează seiful și repornește Myne. Notele deschise sunt salvate mai întâi.",
+      "flushFailed": "Myne nu a putut salva fiecare notă deschisă, așa că actualizarea nu a pornit. Încearcă din nou într-o clipă.",
+      "stageFailed": "Myne nu a putut porni actualizarea pentru că aplicația ieșise deja din seif. Deblochează-l și încearcă din nou.",
+      "lockFailed": "Myne nu a putut bloca seiful tău, așa că actualizarea nu a pornit.",
+      "primary": "Actualizează și repornește",
       "later": "Mai târziu",
-      "restart": "Repornește pentru a actualiza"
+      "confirmTitle": "Actualizezi și repornești Myne?",
+      "confirmBody": "Seiful tău va fi blocat și Myne se va reporni. Descărcarea și instalarea pot dura câteva minute pe o conexiune lentă.",
+      "confirmPrimary": "Blochează seiful și actualizează",
+      "cancel": "Anulează",
+      "pill": "Actualizare disponibilă"
+    },
+    "updating": {
+      "eyebrow": "Se actualizează",
+      "heading": "Se actualizează Myne",
+      "version": "Versiunea {{version}}",
+      "caption": "Se descarcă și se instalează noua versiune.",
+      "hint": "Myne se repornește singur când aceasta se termină. Lasă fereastra deschisă."
+    },
+    "failed": {
+      "eyebrow": "Actualizarea nu s-a terminat",
+      "heading": "Actualizarea nu s-a terminat",
+      "caption": "Myne {{version}} rulează în continuare, iar notele tale sunt neatinse.",
+      "hint": "Dacă încerci din nou, descărcarea o ia de la capăt.",
+      "retry": "Încearcă din nou",
+      "back": "Înapoi la deblocare"
     }
   },
   "firstRun": {
@@ -5473,7 +5698,7 @@
       "title": "Salvează-ți fraza de identitate",
       "warning": "Notează aceste 24 de cuvinte și păstrează-le în siguranță. Aceasta este singura dată când sunt afișate; ele sunt singura modalitate de a recupera această identitate. Este o frază diferită de orice frază de recuperare a unui seif.",
       "reveal": "Dezvăluie",
-      "typebackLead": "Pentru a confirma că ai salvat-o, tastează aceste patru cuvinte din fraza de mai sus.",
+      "typebackLead": "Introdu aceste patru cuvinte din fraza de identitate pe care tocmai ai salvat-o.",
       "wordNumber": "Cuvântul #{{position}}",
       "wordMismatch": "Nu se potrivește cu cuvântul #{{pos}}.",
       "continue": "Continuă"
@@ -5488,6 +5713,20 @@
       "forgetHeading": "Acest dispozitiv",
       "forget": "Uită această identitate pe acest dispozitiv",
       "forgetCheckbox": "Înțeleg că această identitate va fi eliminată de pe acest dispozitiv. Contul de server supraviețuiește, iar fraza o recuperează."
+    },
+    "recover": {
+      "open": "Am deja o identitate",
+      "title": "Recuperează-ți identitatea",
+      "lead": "Introdu cele 24 de cuvinte ale frazei de recuperare a identității tale pentru a aduce acea identitate pe acest dispozitiv. Este o frază diferită de orice frază de recuperare a unui seif.",
+      "submit": "Recuperează identitatea",
+      "working": "Se recuperează…",
+      "failed": "Identitatea nu a putut fi recuperată pe acest dispozitiv. Verifică cele 24 de cuvinte și încearcă din nou."
+    },
+    "typeback": {
+      "title": "Confirmă-ți fraza"
+    },
+    "joinFromQr": {
+      "notFound": "Acest cod indică un seif care nu se află în invitațiile tale de pe acest dispozitiv. Cere proprietarului seifului să trimită din nou invitația către această identitate."
     }
   }
 }
