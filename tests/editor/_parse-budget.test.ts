@@ -33,7 +33,21 @@ describe("assertParsedState", () => {
   it("passes on a document the caller's tree already covers", () => {
     // The arm that must NOT throw. If this ever starts failing, the guard has
     // become unconditional and would redden every editor test.
-    const state = markdownState("pelin dilara çolak izle\n  - [ ] admin preview\n");
+    //
+    // `completeState` FIRST, and that is the fix for a flake this file produced
+    // in CI rather than a convenience. A bare state's initial parse is
+    // time-budgeted (`LanguageState.init`, 20 ms), and that deadline is
+    // consulted between BLOCKS: measured with the clock spent, this very
+    // document comes back with a tree covering 24 of its 46 characters, because
+    // the first pass resolves the paragraph and stops at the list item that
+    // opens the next block. Asserting that a bare init is complete asserted a
+    // property CodeMirror does not offer, which is why this passed alone and
+    // failed in the full suite. The arm itself is unchanged: `assertParsedState`
+    // still must not throw on a tree that covers the document, and it is
+    // `completeState` that throws first if it has become unconditional.
+    const state = completeState(
+      markdownState("pelin dilara çolak izle\n  - [ ] admin preview\n"),
+    );
     expect(syntaxTree(state).length).toBe(state.doc.length);
     expect(() => assertParsedState(state)).not.toThrow();
   });

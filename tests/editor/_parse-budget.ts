@@ -22,10 +22,15 @@
 // is NOT, at the document sizes in this tree, and the measurement that says so
 // is recorded here because it refutes the obvious theory. Set this constant to
 // 0, run `list-fold.test.ts` and `table-in-blockquote.test.ts`, and all ten
-// tests still PASS: `ParseContext.work` advances at least one chunk before it
-// consults its deadline, and a forty-character document finishes inside that
-// first chunk. The budget is unreachable at these sizes, so raising it fixes
-// nothing at these sizes.
+// tests still PASS: `ParseContext.work` returns early through its `isDone`
+// check whenever the tree the context already holds covers the document, so for
+// those documents it never consults a deadline at all. Do not read that as a
+// property of the SIZES, which is the mistake this paragraph exists to correct:
+// the deadline is consulted between BLOCKS, and measured with the clock spent, a
+// 46-character paragraph-then-list-item document comes back with a tree covering
+// 24 characters, because the first pass resolves only the first block. The
+// budget is unreachable at these sizes, so raising it fixes nothing at these
+// sizes.
 //
 // What the budget does bound is a LARGE document, and that bound is real: a
 // mounted 40 000-item list under a 0 ms budget does stop early, and it does
