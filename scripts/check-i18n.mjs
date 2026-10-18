@@ -104,11 +104,78 @@ function walkFiles(dir, out = []) {
 // Match `t("a.b")` / `i18n.t('a.b')` — require a dotted key (all Myne keys are
 // namespaced) and reject method calls like `.t(` / identifiers ending in `t`.
 const KEY_RE = /(?<![\w.])(?:i18n\.)?t\(\s*["'`]([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)["'`]/g;
+// And the SAME keys when they sit inside an EXPRESSION rather than directly
+// after `t(`, which is the half this scan used to miss.
+//
+// The failure it left open, measured: `AiChatTab.tsx` labelled its honesty
+// chevron with `t(honestyOpen ? "…aiChat.honestyCollapse" : "…aiChat.honestyExpand")`.
+// The catalog carries both names one level deeper (`…aiChat.agentTurn.…`), so the
+// control rendered the RAW KEY PATH as its label and tooltip in every locale, and
+// this guard — whose whole job is "a t() key used in src/ exists in the catalog" —
+// reported ok, because `t(` is followed by an identifier rather than a quote. The
+// key was also invisible to `pnpm i18n:extract` for the same reason, so nothing in
+// the documented add-a-string procedure could have caught it either.
+//
+// The widening is scoped rather than loose: it takes the BALANCED argument list of
+// each `t(` / `i18n.t(` call and looks for dotted-key literals inside it, so a key
+// reached through a ternary, a `??`, a `&&` or an array index is covered while an
+// arbitrary string elsewhere in the file is not.
+const CALL_RE = /(?<![\w.])(?:i18n\.)?t\s*\(/g;
+const LITERAL_KEY_RE = /["'`]([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)["'`]/g;
+
+/** The source text of the call's argument list, parens balanced and string
+ *  literals skipped, or `null` when the call is unterminated. */
+function callArguments(src, openParen) {
+  let depth = 0;
+  for (let i = openParen; i < src.length; i += 1) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      i += 1;
+      while (i < src.length && src[i] !== quote) {
+        if (src[i] === "\\") i += 1;
+        i += 1;
+      }
+      continue;
+    }
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) return src.slice(openParen + 1, i);
+    }
+  }
+  return null;
+}
+
 const used = new Set();
+
+/** Comments out, with the repository's own idiom (`tests/a11y/accessibleAuth`):
+ *  a block comment first, then line comments, and the `(^|[^:])` guard so an
+ *  `https://` inside a string literal is not mistaken for one.
+ *
+ *  This is load-bearing for the expression scan and was measured, not assumed:
+ *  without it the paren balancer walks into an apostrophe inside a comment
+ *  ("the catalog's path") and treats it as an unterminated string literal, after
+ *  which the balance is nonsense and the keys it exists to find are skipped. The
+ *  first version of this widening had exactly that bug and reported ok over the
+ *  very key it was written for. */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
 for (const f of TREES.flatMap((t) => walkFiles(t))) {
   const txt = readFileSync(f, "utf8");
   let m;
   while ((m = KEY_RE.exec(txt)) !== null) used.add(m[1]);
+  const code = stripComments(txt);
+  CALL_RE.lastIndex = 0;
+  while ((m = CALL_RE.exec(code)) !== null) {
+    const args = callArguments(code, m.index + m[0].length - 1);
+    if (args === null) continue;
+    let k;
+    LITERAL_KEY_RE.lastIndex = 0;
+    while ((k = LITERAL_KEY_RE.exec(args)) !== null) used.add(k[1]);
+  }
 }
 const missing = [...used].filter((k) => !keyExists(k)).sort();
 
