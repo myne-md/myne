@@ -52,7 +52,7 @@ type CredentialKind = "password" | "phrase";
 
 /** 24 words, per `protocol.md` §3.1, from the one definition. */
 import { PhraseEntryGrid } from "../../components/PhraseEntryGrid";
-import { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 
 /** The `<Select>` value that means "nothing chosen yet". */
 const NO_VAULT = "";

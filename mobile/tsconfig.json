@@ -25,7 +25,6 @@
       "@myne/dialect": ["../dialect/src/index.ts"],
       "@myne/dialect/*": ["../dialect/src/*"],
       "@myne/sync-staleness": ["../src/lib/sync-staleness.ts"],
-      "@myne/phrase-cells": ["../src/lib/phrase-cells.ts"],
       "@myne/recovery-kit": ["../src/lib/recovery-kit.ts"],
       "@myne/locales-en": ["../locales/en/common.json"],
       "@myne/i18n": ["../src/i18n/index.ts"],

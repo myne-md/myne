@@ -28,7 +28,7 @@
 
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 
-export { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
+export { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 
 /**
  * Join and normalise the grid's cells into the credential `sync_enroll` takes.

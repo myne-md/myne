@@ -52,7 +52,7 @@ import { useTranslation } from "react-i18next";
 // normalization the count is paired with. Re-exported here rather than
 // redeclared, because a re-export is the same binding and cannot drift, while
 // the five hand-written copies this replaces could and did.
-export { PHRASE_CELL_COUNT } from "../lib/phrase-cells";
+export { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 
 const FIELD: CSSProperties = { display: "flex", flexDirection: "column", gap: "var(--space-2)" };
 const LABEL: CSSProperties = { fontSize: "var(--text-sm)", color: "var(--fg-2)" };

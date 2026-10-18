@@ -11,7 +11,9 @@ import {
   Sheet,
   Icon,
   MyneMark,
+  PhraseEntryGrid,
 } from "../../components";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
 import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
@@ -361,7 +363,9 @@ export function UnlockFlow(props: UnlockFlowProps) {
   const [member, setMember] = useState(false);
   const [memberMethod, setMemberMethod] = useState<MemberUnlockMethod | null>(null);
   const [memberMode, setMemberMode] = useState<MemberUnlockMode>("phrase");
-  const [memberPhrase, setMemberPhrase] = useState("");
+  const [memberPhraseCells, setMemberPhraseCells] = useState<string[]>(() =>
+    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
+  );
   const [memberPassword, setMemberPasswordInput] = useState("");
   const [memberPin, setMemberPinInput] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
@@ -390,7 +394,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
 
   const canMemberSubmit =
     memberMode === "phrase"
-      ? memberPhrase.trim().split(/\s+/).filter(Boolean).length >= 12
+      ? memberPhraseCells.every((cell) => cell.length > 0)
       : memberMode === "pin"
         ? memberPin.length >= 6
         : memberMode === "biometric"
@@ -406,7 +410,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
       if (!HAS_TAURI) {
         await new Promise((r) => setTimeout(r, 350));
       } else if (memberMode === "phrase") {
-        await personUnlockMemberVault(vaultId, memberPhrase);
+        await personUnlockMemberVault(vaultId, memberPhraseCells.join(" "));
       } else if (memberMode === "password") {
         await personUnlockMemberVaultWithPassword(vaultId, memberPassword);
       } else if (memberMode === "pin") {
@@ -414,7 +418,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
       } else {
         await personUnlockMemberVaultWithBiometric(vaultId);
       }
-      setMemberPhrase("");
+      setMemberPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
       setMemberPasswordInput("");
       setMemberPinInput("");
       props.onUnlocked();
@@ -425,7 +429,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
   }, [
     memberBusy,
     memberMode,
-    memberPhrase,
+    memberPhraseCells,
     memberPassword,
     memberPin,
     vaultId,
@@ -703,30 +707,23 @@ export function UnlockFlow(props: UnlockFlowProps) {
                   : t("unlock.memberPasswordLabel")}
             </FieldLabel>
             {memberMode === "phrase" ? (
-              <textarea
-                value={memberPhrase}
-                onChange={(e) => {
+              // A 24-cell GRID, not a `<textarea>` (Aşama 2a). The textarea was
+              // the shape `recovery-flow.md` §3.2 forbids by name: "Stating it as
+              // a property of the recovery screen alone is what let a second
+              // surface ship a single-line input", and §3.2 binds every surface.
+              // Its gate was "at least 12 whitespace-separated tokens", which is
+              // a count a free-text box has to guess at; the grid knows there are
+              // 24 cells and §3.2's rule is that all of them are non-empty.
+              <PhraseEntryGrid
+                cells={memberPhraseCells}
+                onCells={(next) => {
                   setMemberError(false);
-                  setMemberPhrase(e.target.value);
+                  setMemberPhraseCells(next.map((cell) => cell.replace(/\s+/g, "")));
                 }}
-                rows={3}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                aria-label={t("unlock.memberPhraseLabel")}
-                data-testid="unlock-member-phrase"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  border: `${memberError ? 1.5 : 1}px solid ${memberError ? "var(--danger)" : "var(--line-2)"}`,
-                  borderRadius: "var(--radius-2)",
-                  background: "var(--bg-1)",
-                  padding: "var(--space-3) var(--space-4)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "var(--text-base)",
-                  color: "var(--fg-1)",
-                  resize: "none",
-                }}
+                testIdPrefix="unlock-member-phrase"
+                columns={2}
+                cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
+                style={{ marginTop: "var(--space-2)" }}
               />
             ) : memberMode === "biometric" ? (
               <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-base)", color: "var(--fg-2)" }}>

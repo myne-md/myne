@@ -11,7 +11,7 @@
 // timestamp. The cert-trust surface never claims "-PLUS"/channel-binding (cbind empty,
 // R3 transport review-debt).
 
-import { type CSSProperties, type ReactNode, useEffect, useId, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { SyncStatus } from "../lib/use-sync-status";
@@ -37,7 +37,7 @@ import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 // that module, so re-exporting through it would make the pair differ and grow
 // the twin-drift ratchet for no gain. The normalizer stays on the twin because
 // the twin predates this and resolving it is its own decision.
-import { PHRASE_CELL_COUNT } from "@myne/phrase-cells";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 import { usePrefs } from "../lib/use-prefs";
 import { setDeviceName } from "../lib/prefs";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../lib/device-name";
@@ -49,7 +49,7 @@ import {
   REMOVE_DEVICE_DISCLOSURE,
 } from "../lib/load-bearing-copy";
 import { canAddThisDevice } from "@myne/enroll-gate";
-import { Banner, Segmented } from "./index";
+import { Banner, PhraseEntryGrid, Segmented } from "./index";
 // The host probe has ONE definition (`lib/app-window.ts`), which is also the one
 // file `check-platform-seam.mjs` exempts from the runtime-global rule. This
 // module used to re-spell it inline, and the copy was subtly weaker: no
@@ -559,7 +559,6 @@ function accountStructurallyPlausible(display: string): boolean {
 /** SY-03 enroll + SY-04 pending — account# + Password/Recovery segmented control. */
 export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const { t } = useTranslation();
-  const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
 
   // MYND-548: this device's own name. One hook for both mobile doors (and the
@@ -583,26 +582,6 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const accountFilled = accountNumber.trim().length > 0;
   const credentialFilled = mode === "password" ? password.length > 0 : cells.every((c) => c.length > 0);
   const canSubmit = accountFilled && credentialFilled && !busy;
-
-  const setCell = (index: number, value: string) => {
-    clearOutcome();
-    const cleaned = value.replace(/\s+/g, "");
-    setCells((prev) => prev.map((c, i) => (i === index ? cleaned : c)));
-  };
-
-  const handlePaste = (index: number) => (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const tokens = e.clipboardData.getData("text").split(/\s+/).filter((t) => t.length > 0);
-    if (tokens.length < 2) return; // single token → native paste fills this cell
-    e.preventDefault();
-    clearOutcome();
-    setCells((prev) => {
-      const next = [...prev];
-      for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i++) {
-        next[index + i] = tokens[i];
-      }
-      return next;
-    });
-  };
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -682,68 +661,19 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--fg-3)" }}>
             {t("sync.settings.recoveryPhraseHint")}
           </p>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}
-            data-testid="sync.enroll.phrase-grid"
-          >
-            {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
-              const inputId = `${baseId}-cell-${i}`;
-              return (
-                <label
-                  key={i}
-                  htmlFor={inputId}
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    background: "var(--bg-1)",
-                    border: "1px solid var(--line-1)",
-                    borderRadius: 4,
-                    paddingInlineStart: 24,
-                    paddingInlineEnd: 6,
-                    height: 34,
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      insetInlineStart: 6,
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color: "var(--fg-3)",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <input
-                    id={inputId}
-                    type="text"
-                    value={cells[i] ?? ""}
-                    onChange={(e) => setCell(i, e.target.value)}
-                    onPaste={handlePaste(i)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      background: "transparent",
-                      border: 0,
-                      outline: "none",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 14,
-                      color: "var(--fg-1)",
-                      padding: 0,
-                    }}
-                    data-testid="sync.enroll.phrase-cell"
-                    data-index={i + 1}
-                  />
-                </label>
-              );
-            })}
-          </div>
+          <PhraseEntryGrid
+            cells={cells}
+            onCells={(next) => {
+              clearOutcome();
+              // §3.2: no typed whitespace. The field is stripped here rather than
+              // in the primitive, because "what a phrase cell may contain" is a
+              // rule about this credential and not about a grid of text inputs.
+              setCells(next.map((cell) => cell.replace(/\s+/g, "")));
+            }}
+            testIdPrefix="sync.enroll.phrase"
+            columns={3}
+            cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
+          />
         </>
       )}
 

@@ -325,10 +325,6 @@ const V = {
   // screen is substituted, and `check-web-no-phrase.mjs` asserts its grid's
   // absence") is itself retired: entry 0704 ships the enrolment grid too, deletes
   // that guard, and leaves no phrase path absent from served code.
-  "src/lib/phrase-cells.ts": [
-    "ported",
-    "One exported integer: how many cells a phrase grid has. No host call, no side effect, and the same value on every client. It is the single definition that five hand-written copies were collapsed into, which is why it is a module of its own rather than a line in a neighbour.",
-  ],
   "src/lib/bip39-normalize.ts": [
     "ported",
     "Pure NFKD/whitespace normalisation, and it now has a real import edge from served code: `EnrollDeviceForm` and the recovery entry screen both feed it, since phrase entry ships on web (`decisions.md` 2026-08-15, entry 0514). No host call anywhere in it.",

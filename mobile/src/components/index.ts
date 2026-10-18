@@ -16,6 +16,7 @@ export {
   MonoField,
   MonoBox,
   TextField,
+  PhraseEntryGrid,
 } from "./inputs";
 export { Banner, Toast, Spinner, BlockingOverlay } from "./feedback";
 export { Chip, AccountNumber, Fab, Sheet, SidePanel, useEnterTransition } from "./misc";
