@@ -12,6 +12,17 @@ client imports is listed here and is not, in fact, redistributed. The direction
 is deliberate, because over-inclusion is harmless in a licence notice and
 under-inclusion is not.
 
+**One exclusion, and its argument.** A package that declares `os`, `cpu` or
+`libc` in its own manifest is a prebuilt binary for one platform, and each
+platform's install carries a different one of them (`fsevents` on macOS, a
+different `@napi-rs/canvas-*` prebuild per OS and architecture). Those are not
+listed here, so this file is one artefact rather than a per-platform one, and
+the gate that holds it byte-equal can hold at all. Nothing a notice owes is lost
+by it: a platform-restricted package is a native binary, which no WebView bundle
+can contain or call. Everything else in the production closure is listed above,
+whether or not a client imports it. `scripts/gen-third-party-licenses.mjs`
+carries the rule and names what it excluded when it runs.
+
 The per-dependency rationale (why a package is a dependency at all) lives in
 `docs/dependency-policy.md`; the project's own licensing map is `LICENSING.md`;
 the bundled non-npm assets are the fonts below plus the model weights and
@@ -115,7 +126,7 @@ OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR
 FROM OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ================================================================================
-Packages (300)
+Packages (298)
 ================================================================================
 ATTENTION: 1 package(s) declare no licence at all: khroma@2.1.0. Each one's own licence file, where it ships one, is reproduced below; where it does not, the obligation has to be established from the package's own repository before this notice can be called complete.
 
@@ -171,7 +182,6 @@ ATTENTION: 1 package(s) declare no licence at all: khroma@2.1.0. Each one's own 
 @mermaid-js/parser 0.6.3 — MIT
 @mermaid-js/parser 1.1.1 — MIT
 @napi-rs/canvas 1.0.0 — MIT
-@napi-rs/canvas-darwin-arm64 1.0.0 — MIT
 @radix-ui/primitive 1.0.0 — MIT
 @radix-ui/primitive 1.1.1 — MIT
 @radix-ui/react-arrow 1.1.2 — MIT
@@ -322,7 +332,6 @@ es6-promise-pool 2.5.0 — MIT
 fastest-levenshtein 1.0.16 — MIT
 fill-range 7.1.1 — MIT
 fractional-indexing 3.2.0 — CC0-1.0
-fsevents 2.3.3 — MIT
 fuzzy 0.1.3 — MIT
 get-nonce 1.0.1 — MIT
 glob-parent 5.1.2 — ISC
@@ -2783,11 +2792,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------------
-@napi-rs/canvas-darwin-arm64 1.0.0 — MIT
---------------------------------------------------------------------------------
-(this package ships no readable licence file; the licence named above is its manifest's only record)
 
 --------------------------------------------------------------------------------
 @radix-ui/primitive 1.0.0 — MIT
@@ -7267,32 +7271,6 @@ express Statement of Purpose.
  d. Affirmer understands and acknowledges that Creative Commons is not a
     party to this document and has no duty or obligation with respect to
     this CC0 or use of the Work.
-
---------------------------------------------------------------------------------
-fsevents 2.3.3 — MIT
---------------------------------------------------------------------------------
-MIT License
------------
-
-Copyright (C) 2010-2020 by Philipp Dunkel, Ben Noordhuis, Elan Shankar, Paul Miller
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 fuzzy 0.1.3 — MIT

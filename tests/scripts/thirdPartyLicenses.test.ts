@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { flatten, licenceText, normalise, render } from "../../scripts/gen-third-party-licenses.mjs";
+import { flatten, licenceText, normalise, platformRestricted, render } from "../../scripts/gen-third-party-licenses.mjs";
 
 /** An injected filesystem: `dirs` maps a directory to its entries, `files` a path to its text. */
 function fakeFs(dirs: Record<string, string[]>, files: Record<string, string>) {
@@ -181,5 +181,120 @@ describe("render", () => {
   it("is byte-stable for the same input", () => {
     const rows = flatten(payload({ MIT: [{ name: "a", version: "1.0.0" }] }));
     expect(render(rows, fs2.readDir, fs2.readFile)).toBe(render(rows, fs2.readDir, fs2.readFile));
+  });
+});
+
+// The rule that makes this artefact ONE file rather than a per-platform one.
+// It exists because `--check` runs on Linux and the file was generated on a
+// Mac: the closure differed by exactly one platform-restricted package, so the
+// gate could never hold for both.
+describe("platformRestricted", () => {
+  /** An injected manifest reader: `dir` -> the package.json text, or a throw. */
+  const manifests = (map: Record<string, unknown>) => (dir: string | null): string => {
+    if (dir === null || !(dir in map)) throw new Error(`ENOENT: ${dir}`);
+    return JSON.stringify(map[dir]);
+  };
+
+  it("excludes a package that declares `os`, and reports what it was", () => {
+    const rows = flatten(
+      payload({
+        MIT: [
+          { name: "fsevents", version: "2.3.3", dir: "/nm/fsevents" },
+          { name: "a", version: "1.0.0", dir: "/nm/a" },
+        ],
+      }),
+    );
+    const { kept, excluded } = platformRestricted(
+      rows,
+      manifests({ "/nm/fsevents": { name: "fsevents", os: ["darwin"] }, "/nm/a": { name: "a" } }),
+    );
+    expect(excluded.map((r) => `${r.name}@${r.version}`)).toEqual(["fsevents@2.3.3"]);
+    expect(excluded[0].restriction).toEqual({ os: ["darwin"], cpu: null, libc: null });
+    expect(kept.map((r) => r.name)).toEqual(["a"]);
+  });
+
+  it("excludes on `cpu` or `libc` alone, which is how the canvas prebuilds gate", () => {
+    const rows = flatten(
+      payload({
+        MIT: [
+          { name: "@napi-rs/canvas-linux-x64-gnu", version: "1.0.0", dir: "/nm/c1" },
+          { name: "@napi-rs/canvas-linux-arm64-musl", version: "1.0.0", dir: "/nm/c2" },
+          { name: "@napi-rs/canvas", version: "1.0.0", dir: "/nm/wrapper" },
+        ],
+      }),
+    );
+    const { kept, excluded } = platformRestricted(
+      rows,
+      manifests({
+        "/nm/c1": { cpu: ["x64"] },
+        "/nm/c2": { libc: ["musl"] },
+        "/nm/wrapper": {},
+      }),
+    );
+    // The WRAPPER, which carries the same licence text, stays listed: the rule
+    // drops the per-platform binaries, not the package family.
+    expect(kept.map((r) => r.name)).toEqual(["@napi-rs/canvas"]);
+    expect(excluded.map((r) => r.name)).toEqual([
+      "@napi-rs/canvas-linux-arm64-musl",
+      "@napi-rs/canvas-linux-x64-gnu",
+    ]);
+  });
+
+  it("KEEPS a row whose manifest cannot be read, rather than dropping it", () => {
+    // The harmless direction: an unreadable manifest must not narrow the notice
+    // silently, and `dir === null` is the shape a row with no resolved path has.
+    const rows = flatten(payload({ MIT: [{ name: "a", version: "1.0.0", dir: "/nm/missing" }] }));
+    const { kept, excluded } = platformRestricted(rows, manifests({}));
+    expect(excluded).toEqual([]);
+    expect(kept.map((r) => r.name)).toEqual(["a"]);
+  });
+
+  it("keeps a package whose NAME looks platform-specific but declares no restriction", () => {
+    // The rule reads each manifest rather than matching a name pattern, so this
+    // is the case that would catch it degenerating into one.
+    const rows = flatten(payload({ MIT: [{ name: "esbuild-darwin-arm64", version: "1.0.0", dir: "/nm/e" }] }));
+    const { kept, excluded } = platformRestricted(rows, manifests({ "/nm/e": {} }));
+    expect(excluded).toEqual([]);
+    expect(kept.map((r) => r.name)).toEqual(["esbuild-darwin-arm64"]);
+  });
+
+  it("makes ONE notice out of two platforms' installs", () => {
+    // The defect this whole rule exists for, reproduced: the same production
+    // closure installed on two machines differs only in which member of a
+    // platform-restricted family is there. Without the rule the two artefacts
+    // differ, which is the red gate; with it they are the same file.
+    const macRows = flatten(
+      payload({
+        MIT: [
+          { name: "a", version: "1.0.0", dir: "/nm/a" },
+          { name: "@napi-rs/canvas-darwin-arm64", version: "1.0.0", dir: "/nm/canvas" },
+        ],
+      }),
+    );
+    const linuxRows = flatten(
+      payload({
+        MIT: [
+          { name: "a", version: "1.0.0", dir: "/nm/a" },
+          { name: "@napi-rs/canvas-linux-x64-gnu", version: "1.0.0", dir: "/nm/canvas" },
+        ],
+      }),
+    );
+    const macFs = fakeFs(
+      { "/nm/a": ["LICENSE"], "/nm/canvas": ["LICENSE"] },
+      { "/nm/a/LICENSE": "A MIT text\n", "/nm/canvas/LICENSE": "native prebuild\n" },
+    );
+    const readMac = manifests({ "/nm/a": {}, "/nm/canvas": { os: ["darwin"], cpu: ["arm64"] } });
+    const readLinux = manifests({ "/nm/a": {}, "/nm/canvas": { os: ["linux"], cpu: ["x64"] } });
+
+    // Non-vacuity: the same fixture WITHOUT the rule reddens this test.
+    expect(render(macRows, macFs.readDir, macFs.readFile)).not.toBe(
+      render(linuxRows, macFs.readDir, macFs.readFile),
+    );
+
+    const mac = platformRestricted(macRows, readMac);
+    const linux = platformRestricted(linuxRows, readLinux);
+    expect(render(mac.kept, macFs.readDir, macFs.readFile)).toBe(
+      render(linux.kept, macFs.readDir, macFs.readFile),
+    );
   });
 });

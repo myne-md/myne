@@ -26,6 +26,31 @@
 // Myne desktop build", which is a claim about a bundle graph this script does
 // not build, and so a claim it could not check.
 //
+// ── THE ONE EXCLUSION, AND WHY IT IS NOT A HOLE IN THE ABOVE ────────────────
+//
+// A package whose own `package.json` declares `os`, `cpu` or `libc` is a
+// prebuilt binary for ONE platform, and a different member of that family is
+// what each platform's install contains: `fsevents@2.3.3` exists on macOS and
+// not on Linux, and the canvas prebuild is `@napi-rs/canvas-darwin-arm64` on an
+// Apple silicon Mac where CI gets `@napi-rs/canvas-linux-x64-gnu`. Measured on
+// 2026-10-18: of the 300 production packages the macOS tree reports, exactly
+// TWO are platform-restricted, and the Linux tree reports 299 with a different
+// one of them.
+//
+// That is why this gate was red on `develop` with nothing actually wrong: the
+// artefact was byte-equal only on the machine that generated it, and `--check`
+// runs on another one. Excluding them is what makes the file ONE artefact
+// instead of a per-platform one, and it costs a notice nothing: a
+// platform-restricted package is a native binary, and a WebView bundle cannot
+// contain or call one. Everything else stays listed, over-inclusive as before.
+//
+// The rule reads each package's own manifest rather than a hand-kept list, so
+// it cannot go stale when a family gains a platform. What it CANNOT judge is
+// whether some future native package is redistributed anyway; that needs the
+// bundle graph this script does not build, which is the same limit the
+// over-approximation above already states. The packages it drops are named on
+// stdout, so any run shows them.
+//
 // ── WHY IT READS `node_modules` AND NOT ONLY THE LOCKFILE ──────────────────
 //
 // `pnpm licenses list` answers with names, versions and a licence expression.
@@ -75,6 +100,17 @@ an over-approximation of "what is really bundled": a production dependency no
 client imports is listed here and is not, in fact, redistributed. The direction
 is deliberate, because over-inclusion is harmless in a licence notice and
 under-inclusion is not.
+
+**One exclusion, and its argument.** A package that declares \`os\`, \`cpu\` or
+\`libc\` in its own manifest is a prebuilt binary for one platform, and each
+platform's install carries a different one of them (\`fsevents\` on macOS, a
+different \`@napi-rs/canvas-*\` prebuild per OS and architecture). Those are not
+listed here, so this file is one artefact rather than a per-platform one, and
+the gate that holds it byte-equal can hold at all. Nothing a notice owes is lost
+by it: a platform-restricted package is a native binary, which no WebView bundle
+can contain or call. Everything else in the production closure is listed above,
+whether or not a client imports it. \`scripts/gen-third-party-licenses.mjs\`
+carries the rule and names what it excluded when it runs.
 
 The per-dependency rationale (why a package is a dependency at all) lives in
 \`docs/dependency-policy.md\`; the project's own licensing map is \`LICENSING.md\`;
@@ -219,6 +255,44 @@ export function flatten(payload) {
   return rows;
 }
 
+/** Split the rows into what one notice can list on every platform, and what it cannot.
+ *
+ *  A package declaring `os`/`cpu`/`libc` exists to be a prebuilt binary for one
+ *  platform, so which member of the family is installed depends on where
+ *  `pnpm install` ran. A notice that names the macOS member on a Mac and the
+ *  Linux member on CI is two different artefacts, and `--check` compares this
+ *  one byte-for-byte, so it could never hold on both. See the header for why
+ *  dropping them costs a notice nothing.
+ *
+ *  `readManifest` is injected so the rule can be driven over a fixture. A
+ *  manifest that cannot be read leaves its row LISTED rather than dropped:
+ *  keeping a package is the harmless direction, and a filesystem hiccup must
+ *  not silently narrow a notice. */
+export function platformRestricted(rows, readManifest) {
+  const kept = [];
+  const excluded = [];
+  for (const row of rows) {
+    let manifest;
+    try {
+      manifest = JSON.parse(readManifest(row.dir));
+    } catch {
+      kept.push(row);
+      continue;
+    }
+    const restriction = {
+      os: manifest.os ?? null,
+      cpu: manifest.cpu ?? null,
+      libc: manifest.libc ?? null,
+    };
+    if (restriction.os || restriction.cpu || restriction.libc) {
+      excluded.push({ ...row, restriction });
+    } else {
+      kept.push(row);
+    }
+  }
+  return { kept, excluded };
+}
+
 /** The licence text a package ships, concatenated over its `LICEN[CS]E*` files.
  *
  *  `readDir`/`readFile` are injected so the rule can be driven over a fixture.
@@ -359,7 +433,26 @@ function main() {
     process.exit(2);
   }
 
-  const generated = render(rows, readdirSync, (p) => readFileSync(p, "utf8"));
+  const { kept, excluded } = platformRestricted(rows, (dir) =>
+    readFileSync(join(dir, "package.json"), "utf8"),
+  );
+  if (excluded.length > 0) {
+    console.log(
+      `third-party-licenses: ${excluded.length} platform-restricted package(s) not ` +
+        "listed, by the rule in this file's header: " +
+        excluded.map((r) => `${r.name}@${r.version}`).join(", "),
+    );
+  }
+  if (kept.length === 0) {
+    console.error(
+      "gen-third-party-licenses: FAIL — every production package came back " +
+        "platform-restricted, so the notice would list nothing at all. That is a " +
+        "broken read or a rule that has gone wrong, not a tree with no obligations.",
+    );
+    process.exit(2);
+  }
+
+  const generated = render(kept, readdirSync, (p) => readFileSync(p, "utf8"));
 
   if (check) {
     if (!existsSync(OUT)) {
@@ -381,15 +474,16 @@ function main() {
       process.exit(1);
     }
     console.log(
-      `third-party-licenses: ok (${rows.length} production package(s) reproduced verbatim in ${OUT_REL})`,
+      `third-party-licenses: ok (${kept.length} production package(s) reproduced ` +
+        `verbatim in ${OUT_REL}; ${excluded.length} platform-restricted excluded)`,
     );
     return;
   }
 
   writeFileSync(OUT, generated);
-  const undeclared = rows.filter((r) => r.declaredInGroup === "Unknown").length;
+  const undeclared = kept.filter((r) => r.declaredInGroup === "Unknown").length;
   console.log(
-    `third-party-licenses: wrote ${OUT_REL} (${rows.length} package(s), ` +
+    `third-party-licenses: wrote ${OUT_REL} (${kept.length} package(s), ` +
       `${(generated.length / 1024).toFixed(0)} KiB` +
       `${undeclared > 0 ? `, ${undeclared} declaring no licence` : ""})`,
   );
