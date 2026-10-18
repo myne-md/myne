@@ -462,9 +462,16 @@ export function AiChatTab({
             <IconButton
               icon={honestyOpen ? "chevron-up" : "chevron-down"}
               label={t(
+                // The catalog's path is authoritative and these two live under
+                // `agentTurn.*` (their copy is the clamping pair, "Show the full
+                // note" / "Shorten the note", which is what this chevron does).
+                // The call used to omit `agentTurn.`, so the control rendered the
+                // raw key path as its label and tooltip: `check-i18n.mjs` reads
+                // `t("…")` literals, and a key inside a ternary is not one. The
+                // guard scans expressions now, which is what found this.
                 honestyOpen
-                  ? "editor.chrome.rightPanel.aiChat.honestyCollapse"
-                  : "editor.chrome.rightPanel.aiChat.honestyExpand",
+                  ? "editor.chrome.rightPanel.aiChat.agentTurn.honestyCollapse"
+                  : "editor.chrome.rightPanel.aiChat.agentTurn.honestyExpand",
               )}
               tooltip
               iconSize={12}
