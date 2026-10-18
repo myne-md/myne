@@ -31,6 +31,27 @@ Everything else is unchanged. The sync server still sees only opaque ciphertext
 (TB5), and it makes no difference to that whether the client came from us or
 from you.
 
+**And one surface you now serve that you did not before.** The recovery phrase
+reaches served code on every path since `decisions.md` 2026-10-18 entry 0704:
+creation displays it, recovery accepts it, the Settings drill checks one the user
+already holds, and device enrolment accepts it as a credential. Before that entry
+the enrolment grid was substituted out of the bundle and an artefact grep
+(`scripts/check-web-no-phrase.mjs`) held it out, which is why this document did
+not mention the surface; both are gone. So the 24 words a user types into any of
+those flows pass through the process you operate, inside the DOM of the page you
+serve. What that means for you is narrow, and stating it precisely matters more
+than stating it strongly. You are not being asked to protect the phrase: nothing
+in this design ever hands it to a server, the client sends no copy of it
+anywhere, and every key it derives is derived in the page. What it does mean is
+three things. Your instance is one more place the phrase sits in plaintext while
+a user is on that screen. Anyone who can read that DOM reads it, including a
+browser extension the user granted host permissions to (`threat-model.md` A19),
+which no header you send can prevent. And a user cannot tell your origin from a
+lookalike by whether it asks for the phrase, because every Myne deployment now
+does: `threat-model.md` A18 records that the "no Myne page asks for your 24
+words" rule was retired, so the check is the user's. Tell your users which origin
+is yours, and tell them plainly.
+
 ## What the container is, and why it is not a directory of files
 
 `web/container/Dockerfile` builds an image carrying **the bundle and a server**.

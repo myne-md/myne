@@ -22,8 +22,10 @@
 //
 // `excluded` is the only verdict with teeth beyond bookkeeping, and it needs
 // them: "the route is hidden" is a claim about routing, "the string is not in
-// the artefact" is a fact about what we serve. Same reasoning, and same
-// mechanism, as `scripts/check-web-no-phrase.mjs`.
+// the artefact" is a fact about what we serve. `gated` is its neighbour and
+// deliberately has no teeth, because it claims nothing about the artefact: it
+// records a module that ships and that an absent capability keeps unreachable,
+// which is a statement about routing and is labelled as one.
 
 import { readFileSync, existsSync } from "node:fs";
 import {
@@ -43,6 +45,14 @@ const DIST = join("web", "dist");
  * Keys are paths relative to `src/screens/`. A file with no entry fails; an
  * entry with no file fails. Both directions matter — the second is what stops
  * this roster from quietly describing a tree that no longer exists.
+ *
+ * The vocabulary: `ported` (ships and works on web), `adapted` (ships, and the
+ * web build behaves differently), `gated` (ships, and an absent capability means
+ * nothing renders it), `excluded` (absent from the artefact, which its `marker`
+ * asserts against the built bundle), `web-only` (exists on web and nowhere
+ * else). `gated` was added by `decisions.md` 2026-10-18 entry 0704: retiring the
+ * phrase restriction moved modules out of `excluded` without making them work,
+ * and neither `ported` nor `adapted` describes "in the artefact, unreachable".
  */
 const VERDICTS = {
   // ── excluded: substituted out of the web bundle ─────────────────────────
@@ -69,9 +79,14 @@ const VERDICTS = {
     note: "Unreachable on web (an empty client routes to account-entry, task 85) and every door it offers — create, join, fresh-install restore — is an absent capability.",
   },
   "IdentityHome.tsx": {
-    verdict: "excluded",
-    marker: "identity-home.identity-code",
-    note: "Unreachable on web because person status is unsupported, and the identity-only accept flow must not ship its recovery-phrase path in the served artefact.",
+    verdict: "gated",
+    note:
+      "SHIPS since decisions.md 2026-10-18 (entry 0704) retired the phrase restriction that kept " +
+      "this screen substituted out of the bundle. It is still unreachable on web, and that half is " +
+      "unchanged: person status is unsupported, so the capability descriptor refuses the flow and no " +
+      "route renders it. `gated` rather than `ported`, because nothing here has been shown to work on " +
+      "web; rather than `adapted`, because the shared module ships unmodified; and rather than " +
+      "`excluded`, because it is IN the artefact now and claiming absence would be false.",
   },
   "VaultPicker.tsx": {
     verdict: "excluded",
@@ -334,7 +349,8 @@ function main() {
   const by = (k) => Object.values(VERDICTS).filter((v) => v.verdict === k).length;
   console.log(
     `web screens: ok (${files.length} file(s): ${by("ported")} ported, ${by("adapted")} adapted, ` +
-      `${by("excluded")} excluded, ${by("web-only")} web-only; ${markers.length} absence marker(s) checked)`,
+      `${by("gated")} gated, ${by("excluded")} excluded, ${by("web-only")} web-only; ` +
+      `${markers.length} absence marker(s) checked)`,
   );
 }
 

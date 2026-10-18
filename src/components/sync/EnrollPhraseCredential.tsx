@@ -3,20 +3,25 @@
 //
 // # Why it is its own module
 //
-// Not for reuse alone: it is separate so the **web build can substitute it away
-// entirely** (`web/vite.config.ts`). The member roster reuses this primitive
-// with caller-specific test IDs. Member-vault, identity-only, and migration
-// callers use the same primitive with their own caller-specific test IDs.
-// `decisions.md` 2026-07-26 forbids the recovery phrase from being typed into
-// served code, and enrolment is the third path to it after creation and
-// recovery — the one that is easy to miss, because that screen is about adding
-// a device rather than about the phrase.
+// It is a shared primitive. The member roster, the member-vault unlock, the
+// identity-only and the migration callers all use it with their own
+// caller-specific test IDs, so the 24-cell anatomy lives in one place.
 //
-// Gating it at runtime was the first attempt and it was not enough:
-// `scripts/check-web-no-phrase.mjs` reads the built artefact and found the grid
-// still shipped, hidden behind a branch. `protocol.md` §7 is why "hidden" does
-// not qualify — the phrase survives every password change, no rotation command
-// exists, so one exposure is permanent.
+// # It was separated for a second reason, and that reason is gone
+//
+// It was also separated so the web build could substitute it away entirely
+// (`web/vite.config.ts`), because `decisions.md` 2026-07-26 forbade the recovery
+// phrase from being typed into served code and `scripts/check-web-no-phrase.mjs`
+// grepped the built artefact for this module's `data-testid`. Both are retired
+// (`decisions.md` 2026-10-18, entry 0704): the substitution entry is removed, the
+// grep is deleted, and this module ships on every client. It is still not
+// RENDERED on web for enrolment, because `phraseEnrolment` is an absent
+// capability there — but "not rendered" and "not in the artefact" are different
+// claims, and only the first is true now.
+//
+// `protocol.md` §7 is why the phrase deserves the care either way: it survives
+// every password change, no rotation command exists, and one exposure is
+// therefore permanent.
 
 import { type ChangeEvent, type ClipboardEvent, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";

@@ -75,10 +75,16 @@ function runSurfaces(bundleText: string): { code: number; output: string } {
 }
 
 describe("check-web-screens", () => {
-  it("catches the IdentityHome exclusion marker in the bundle", () => {
-    const result = run('const marker = "identity-home.identity-code";');
+  it("catches an excluded screen's marker in the bundle", () => {
+    // `IdentityHome` used to carry this needle and no longer does: it is `gated`
+    // rather than `excluded` since `decisions.md` 2026-10-18 (entry 0704), so it
+    // ships and has no marker to leak. `VaultPicker` is the marker that proves
+    // the arm still works, and the choice is deliberate rather than incidental —
+    // a test that greps for a needle nothing declares passes for the wrong
+    // reason.
+    const result = run('const marker = "picker.vault-row";');
     expect(result.code).not.toBe(0);
-    expect(result.output).toContain("identity-home.identity-code");
+    expect(result.output).toContain("picker.vault-row");
   });
 
   it("catches a screen with no roster verdict", () => {

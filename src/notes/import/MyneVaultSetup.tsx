@@ -15,15 +15,17 @@
 // font size appears below, which is what `check-token-adoption.mjs` ratchets on
 // and what lets a custom theme reach this screen at all.
 //
-// # This module is SUBSTITUTED on web, and the reason is not the capability
+// # This module is SUBSTITUTED on web, for the capability and not for the phrase
 //
 // `vaultImport` is absent there, so `availableSourceOrder()` already omits the
-// card and this component is unreachable. That is a runtime gate, and a runtime
-// gate is not the bar for the phrase field below: `scripts/check-web-no-phrase.mjs`
-// exists because device enrolment tried exactly that shape and the grid was
-// found still shipping in the artefact, one devtools breakpoint away.
-// `web/vite.config.ts` carries the entry, and `web/src/notes/import/MyneVaultSetup.tsx`
-// is the stub.
+// card and this component is unreachable; `web/vite.config.ts` carries the entry
+// and `web/src/notes/import/MyneVaultSetup.tsx` is the stub. The phrase field
+// below used to be a second reason. The artefact grep
+// (`scripts/check-web-no-phrase.mjs`) read this grid's absence out of `web/dist`,
+// and device enrolment had already shown that a runtime gate leaves a grid in the
+// bundle, one devtools breakpoint away. That grep is deleted (`decisions.md`
+// 2026-10-18, entry 0704), so the substitution now rests on the absent capability
+// alone.
 
 import {
   useCallback,
@@ -242,11 +244,13 @@ function vaultName(
 /**
  * The 24-cell phrase grid, held to `recovery-flow.md` §3.2.
  *
- * Its own copy rather than `EnrollPhraseCredential`, for one specific reason:
- * that module's `data-testid` is the single needle `check-web-no-phrase.mjs`
- * greps `web/dist` for, so reusing it would make this file's presence
- * indistinguishable from the enrolment grid's in the artefact and would break a
- * guard whose whole assertion is one string.
+ * Its own copy rather than `EnrollPhraseCredential`, and that is now duplication
+ * rather than a requirement. The reason it existed was that this module's
+ * `data-testid` was one of the needles `check-web-no-phrase.mjs` grepped
+ * `web/dist` for, so reusing the shared primitive would have made two surfaces
+ * indistinguishable in the artefact and broken a guard whose whole assertion was
+ * one string. That guard is deleted (`decisions.md` 2026-10-18, entry 0704), so
+ * nothing stops these two grids from becoming one.
  *
  * The §3.2 properties it inherits, each of which is a privacy rule rather than a
  * style choice: no per-cell validation, no typeahead over the BIP-39 wordlist,

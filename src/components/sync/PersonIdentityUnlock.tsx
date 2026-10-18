@@ -15,10 +15,12 @@
 // the setup dialog's recover path, which re-registers the person account at the
 // sync server; a locked session needs no round trip.
 //
-// Web-substituted to `null` by build-time substitution, like MemberRosterPanel
-// and IdentitySetupDialog: the phrase prompt must stay out of the served bundle
-// (`web/src/components/sync/PersonIdentityUnlock.tsx`,
-// `scripts/check-web-no-phrase.mjs`).
+// SHIPS on web since `decisions.md` 2026-10-18 (entry 0704), which retired the
+// build-time substitution this module used to have and deleted the
+// `scripts/check-web-no-phrase.mjs` grep that asserted its absence. It is still
+// unreachable there: `phraseEnrolment` and the person plane are absent
+// capabilities, so no arm renders it. Present and gated, which is a weaker
+// claim than absent and is stated rather than implied.
 import {
   useState,
   type ChangeEvent,

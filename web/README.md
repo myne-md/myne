@@ -128,14 +128,15 @@ format change, no version bump. Two tabs on one OPFS container would race that
 scheme, so a vault is held under a Web Locks lease and a second tab **reports**
 rather than takes over (`src/vault-lock.ts`).
 
-**Narrower than the native clients, by decision and in the artefact.** Account
-and vault creation ship, and so does phrase-based recovery: the phrase may be
-generated, displayed and typed in served code (`decisions.md` 2026-08-15, entry
-0514, which supersedes the 2026-07-26 capability set). What does **not** ship is
-the phrase as a **device-enrolment** credential: the enrolment grid is
-substituted away at build time by the same resolver that substitutes the seam
-(`src/screens/`), and `scripts/check-web-no-phrase.mjs` greps the built output to
-keep it out. Sync is required — there is no offline-first first run. Also absent:
-quick-unlock and backup import/export. [`docs/threat-model.md`](../docs/threat-model.md)
-A15 / TB11 states what the served-code delivery channel costs relative to a
-signed desktop build.
+**Narrower than the native clients, by decision.** Account and vault creation
+ship, so does phrase-based recovery, and so does phrase-credential device
+enrolment: the phrase may be generated, displayed and typed in served code
+anywhere (`decisions.md` 2026-08-15 entry 0514, which superseded the 2026-07-26
+capability set, and 2026-10-18 entry 0704, which retired the last restriction and
+deleted the `scripts/check-web-no-phrase.mjs` artefact grep that enforced it).
+What remains absent is the B2B member plane, quick-unlock and backup
+import/export — a runtime capability refusal rather than a build-time
+substitution. Sync is required: there is no offline-first first run.
+[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
+served-code delivery channel costs relative to a signed desktop build, and A18
+records that no rule now tells a user which phrase prompt is legitimate.

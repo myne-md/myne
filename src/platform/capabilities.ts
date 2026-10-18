@@ -223,15 +223,15 @@ export type Capability =
    * `decisions.md` 2026-07-26 makes omission the normative answer to exactly
    * that shape.
    *
-   * It also carries a SECOND consequence that the runtime flag alone cannot
-   * deliver, so the module is substituted as well (`web/vite.config.ts`): the
-   * setup step accepts a 24-word recovery phrase, and `threat-model.md` A18 is
-   * about ROUTINE phrase prompts in a browser teaching a user that typing 24
-   * words into a page is normal. `decisions.md` 2026-08-15 bounds this client
-   * to asking for the phrase in exactly one situation, a recovery the user
-   * started themselves, and an import is not that situation. A hidden branch
-   * would leave the field in the artefact, one devtools breakpoint away, which
-   * is the reason `scripts/check-web-no-phrase.mjs` exists at all.
+   * It also carries a SECOND consequence the runtime flag alone cannot deliver,
+   * which is why the module is substituted as well (`web/vite.config.ts`): a
+   * browser origin holds ONE container under a constant vault id, so there is no
+   * second vault to import FROM, and `importer:` is `Class::Unsupported`
+   * wholesale. The 24-word recovery phrase this step accepts used to be a third
+   * reason and is no longer one: `decisions.md` 2026-10-18 (entry 0704) retires
+   * the phrase restriction and deletes the artefact grep that enforced it, so
+   * what keeps this module out of the bundle is the absent capability rather than
+   * a phrase in a field.
    */
   | "vaultImport"
   /**
