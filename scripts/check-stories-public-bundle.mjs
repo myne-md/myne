@@ -27,7 +27,7 @@
 // would pass whether the literals survived bundling or not — a module can be
 // tree-shaken, reachable or not, and the test would pass either way. What is
 // shipped is a property of `stories/dist-public`, so that is what gets read.
-// `check-web-no-phrase.mjs` records the same reasoning at length.
+// `check-web-third-party.mjs` records the same reasoning at length.
 //
 // ── Why it also asserts a POSITIVE, which is the load-bearing half ──────────
 //

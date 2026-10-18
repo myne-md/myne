@@ -1184,13 +1184,6 @@ steps:
       # its contract makes questions about the bundle premature.
       - pnpm test:seam:web
       - node scripts/check-web-third-party.mjs
-      # The recovery phrase must be ABSENT from the served bundle, not hidden
-      # (MYND-574 task 32). Same shape as the third-party gate above and for the
-      # same reason: it is a question about the ARTEFACT, which no test can ask.
-      # `decisions.md` 2026-07-26 makes the absence normative and `protocol.md`
-      # §7 sets the stakes — the phrase survives every password change and there
-      # is no rotation command, so one exposure is permanent.
-      - node scripts/check-web-no-phrase.mjs
       # No production test hook in the served bundle (MYND-574 task 105). Same
       # artefact-grep shape, and the stakes are the same kind: a hook the bundle
       # ships is an API any script that gets execution on the page can call, and
@@ -1222,8 +1215,8 @@ steps:
       # (MYND-574 task 70). Two halves: a roster that fails when a file under
       # `src/screens/` has no verdict (a new screen otherwise ships to the
       # browser by default), and a marker grep over `web/dist` that fails if an
-      # "excluded" screen is in the artefact after all — the same
-      # absence-not-unreachability bar as `check-web-no-phrase.mjs`.
+      # "excluded" screen is in the artefact after all — absence, not
+      # unreachability.
       - node scripts/check-web-screens.mjs
       # The same two questions for the SERVICE layer — settings panels, `src/lib`,
       # `src/hooks` (MYND-574 task 96). Different directory, same failure: a

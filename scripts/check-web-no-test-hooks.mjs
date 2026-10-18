@@ -15,7 +15,7 @@
 //
 // # Why this greps the ARTEFACT and not the source
 //
-// The same reason `check-web-no-phrase.mjs` does. A hook can be added under a
+// The same reason `check-web-third-party.mjs` does. A hook can be added under a
 // `import.meta.env.DEV` guard that a reviewer reads as safe and a misconfigured
 // build ships anyway; a hook can arrive inside a dependency; a hook can be
 // introduced by a bundler plugin. Reading the bytes that will be served is the

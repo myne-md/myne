@@ -107,26 +107,22 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // `recovery-flow.md` §2.2 forbids presenting a control whose stated
   // protection this client cannot perform.
   "clipboardAutoClear",
-  // The third phrase path, and the one the 2026-08-15 reversal deliberately
-  // does NOT lift: the phrase as a device-enrolment credential. It stays absent
-  // on web permanently, which is why it is its own capability rather than a
-  // branch of `phraseRecovery`.
+  // The phrase as a device-enrolment credential, kept absent by a runtime flag
+  // and no longer by anything else. It was its own capability rather than a
+  // branch of `phraseRecovery` so the 2026-08-15 reversal could lift the phrase
+  // ban without shipping three phrase screens while the decision named two.
   //
   // The reason is not portability. `plugin:sync|sync_enroll` is dispatched here
   // and the credential would work; what is refused is offering it. Enrolment is
   // a ROUTINE action that already accepts account number plus master password,
-  // and every routine use of the phrase in a page is what trains a user that
-  // typing 24 words into a browser is normal. That training is the entire
-  // mechanism behind `threat-model.md` A18, and keeping this absent is what
-  // leaves a rule a user can actually apply: this client asks for the phrase in
-  // only one ROUTINE situation, a recovery they started themselves. The one
-  // other entry point is the unlock-gated, read-only drill, which checks a
-  // phrase the user already holds and never displays one
-  // (`decisions/security/0645`). Never to add a device, never to sign in.
-  //
-  // Enforced structurally rather than by this flag alone: the credential grid is
-  // substituted out of the bundle (`web/vite.config.ts`) and its absence from
-  // the built artefact is asserted by `scripts/check-web-no-phrase.mjs`.
+  // and a user who is not offered the phrase in a routine flow has one fewer
+  // place to be trained into typing 24 words into a page, which is the mechanism
+  // behind `threat-model.md` A18. What that buys is smaller than it was: the grid
+  // now SHIPS in the bundle (`decisions.md` 2026-10-18, entry 0704, which retired
+  // the build-time substitution and the `scripts/check-web-no-phrase.mjs` grep
+  // that asserted its absence), so this flag hides a rendered arm rather than
+  // keeping a module out of the artefact. A18 records the difference between
+  // those two and no longer claims the stronger one.
   "phraseEnrolment",
   // The command's contract IS the desktop filesystem (`core-wasm-assessment.md`:
   // `cannot-exist-in-browser`).

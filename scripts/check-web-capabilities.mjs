@@ -157,9 +157,11 @@ const CAPABILITY_BACKING = {
   // Deliberately empty, and for the same reason `localOnlyVault` is: there is
   // no refused command behind it. `plugin:sync|sync_enroll` IS dispatched on
   // web and would accept a phrase-derived credential perfectly well. What is
-  // absent is the OFFER — the credential picker's recovery arm and the 24-cell
-  // grid, substituted out of the bundle (`web/vite.config.ts`) and asserted gone
-  // from the built artefact by `check-web-no-phrase.mjs`.
+  // absent is the OFFER — the credential picker's recovery arm. The 24-cell grid
+  // ships since `decisions.md` 2026-10-18 (entry 0704), which retired the
+  // build-time substitution and the artefact grep
+  // (`scripts/check-web-no-phrase.mjs`) that used to keep it out, so what this
+  // flag now hides is a rendered arm and not a module.
   //
   // Pointing this at the `vault-recover` commands would be wrong twice over: it
   // would claim a refusal that does not exist, and `decisions.md` 2026-08-15

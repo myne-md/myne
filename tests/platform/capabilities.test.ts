@@ -72,27 +72,26 @@ describe("capability descriptor", () => {
       "vaultMigration",
       "backup",
       "nativeSaveAs",
-      // `decisions/clients/0551`, myne-md/myne#464. Absent on two independent
-      // grounds, and either alone would be enough. A browser origin holds ONE
-      // container under a constant vault id, so there is no second vault to
-      // import FROM and the source list would be permanently empty. And the
-      // setup step accepts a 24-word recovery phrase, which is the ROUTINE
-      // phrase prompt `phraseEnrolment` two entries down exists to keep out of
-      // this client: `decisions.md` 2026-08-15 bounds web to asking for the
-      // phrase in exactly one situation, a recovery the user started
-      // themselves. The module is substituted as well as gated, for the reason
-      // `check-web-no-phrase.mjs` was written.
+      // `decisions/clients/0551`, myne-md/myne#464. Absent because a browser
+      // origin holds ONE container under a constant vault id, so there is no
+      // second vault to import FROM and the source list would be permanently
+      // empty. The setup step also accepts a 24-word recovery phrase, and that
+      // used to be a second reason — a routine phrase prompt, which
+      // `phraseEnrolment` two entries down exists to withhold. It is no longer
+      // one: `decisions.md` 2026-10-18 (entry 0704) retires the phrase
+      // restriction and deletes the artefact grep that enforced it, so the
+      // absent capability is what keeps this module out.
       "vaultImport",
       // `decisions.md` 2026-08-15, and the reason it is a SECOND capability
       // rather than a branch of `phraseRecovery`: one flag used to gate two
       // unrelated things, the recovery screen and the enrolment form's
       // credential picker, so lifting the phrase ban would have shipped three
       // phrase screens while the decision named two. Enrolment is a ROUTINE
-      // action with a password credential already available, and every routine
-      // use is what teaches a user that typing 24 words into a browser is
-      // normal. Keeping it absent is what leaves a rule a user can apply: the
-      // web client asks for the phrase in exactly one situation, a recovery
-      // they started themselves.
+      // action with a password credential already available, and not offering
+      // the phrase there is one fewer place a user is trained into typing 24
+      // words into a page. What that buys is smaller since `decisions.md`
+      // 2026-10-18 (entry 0704): the grid SHIPS in the bundle now, so this flag
+      // hides a rendered arm rather than keeping a module out of the artefact.
       "phraseEnrolment",
       // `decisions.md` 2026-08-15. The Copy affordance SHIPS on web; what is
       // absent is the 30 second auto-clear, because the read-back that makes it

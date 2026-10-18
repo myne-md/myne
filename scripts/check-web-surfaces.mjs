@@ -317,13 +317,14 @@ const V = {
   // means "substituted out", and this module is not — it is still importable,
   // still compiled, and `EnrollDeviceForm`'s own tests exercise it.
   //
-  // CORRECTED 2026-08-15: this note used to claim there was NO import edge from
-  // served code to the wordlist, because `phrase-credential` was substituted.
-  // That substitution is gone — phrase ENTRY ships on web now
+  // CORRECTED 2026-08-15, and again 2026-10-18: this note used to claim there was
+  // NO import edge from served code to the wordlist, because `phrase-credential`
+  // was substituted. That substitution is gone — phrase ENTRY ships on web now
   // (`decisions.md` 2026-08-15, entry 0514) — so the edge is real and intended.
-  // What keeps the phrase out of the artefact is narrower and lives elsewhere:
-  // the ENROLMENT screen is substituted, and `check-web-no-phrase.mjs` asserts
-  // its grid's absence from the built bundle.
+  // The second correction is that the sentence which replaced it ("the ENROLMENT
+  // screen is substituted, and `check-web-no-phrase.mjs` asserts its grid's
+  // absence") is itself retired: entry 0704 ships the enrolment grid too, deletes
+  // that guard, and leaves no phrase path absent from served code.
   "src/lib/bip39-normalize.ts": [
     "ported",
     "Pure NFKD/whitespace normalisation, and it now has a real import edge from served code: `EnrollDeviceForm` and the recovery entry screen both feed it, since phrase entry ships on web (`decisions.md` 2026-08-15, entry 0514). No host call anywhere in it.",
