@@ -272,6 +272,17 @@ async function waitForPinned(s: Session, band: number, what: string): Promise<An
     // Name the plugin's inputs before rethrowing: the pin needs DOM focus in
     // the editor AND the typewriter gate, and a bare timeout cannot tell "the
     // plugin is broken" from "focus left" or "the gate dropped".
+    //
+    // The SCROLL HOST is the third input and the one that decided
+    // myne-md/myne#555, so the probe names it too: `resolveScrollHost`'s rule is
+    // the nearest ancestor whose `overflow-y` scrolls, and the plugin's write is
+    // a silent no-op on any element that cannot scroll. Reported BOTH ways
+    // around, because the two answers are different diagnoses: the host is
+    // correct and the pin did not move it, or the resolver picked an element
+    // with nothing to scroll (then `.cm-scroller` and the host are the same
+    // node). The rule is re-stated here rather than imported because the probe
+    // runs in the PAGE, where no module of ours is loaded — and the duplication
+    // is bounded to a diagnostic string.
     const diag = await s
       .execute<string>(
         "var inEd = false;" +
@@ -279,7 +290,25 @@ async function waitForPinned(s: Session, band: number, what: string): Promise<An
           "  if (el.getAttribute && el.getAttribute('data-testid') === 'editor.content') { inEd = true; break; }" +
           "}" +
           "var gate = !!document.querySelector('[data-focus-typewriter]');" +
-          "return 'focusInEd=' + inEd + ' typewriterGate=' + gate;",
+          "var scroller = document.querySelector('.cm-scroller');" +
+          "function metrics(el) {" +
+          "  if (!el) return 'absent';" +
+          "  var cs = getComputedStyle(el);" +
+          "  return cs.overflowY + ' scrollable=' + (el.scrollHeight > el.clientHeight) +" +
+          "    ' scrollTop=' + Math.round(el.scrollTop) + ' clientH=' + Math.round(el.clientHeight) +" +
+          "    ' scrollH=' + Math.round(el.scrollHeight);" +
+          "}" +
+          "var host = 'none';" +
+          "for (var p = scroller ? scroller.parentElement : null; p && p !== document.documentElement; p = p.parentElement) {" +
+          "  var oy = getComputedStyle(p).overflowY;" +
+          "  if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') {" +
+          "    host = (p.getAttribute('data-testid') || p.className || p.tagName) + ' [' + metrics(p) + ']';" +
+          "    break;" +
+          "  }" +
+          "}" +
+          "return 'focusInEd=' + inEd + ' typewriterGate=' + gate +" +
+          "  ' cm-scroller=[' + metrics(scroller) + ']' +" +
+          "  ' resolvedHost=' + host;",
       )
       .catch(() => "probe failed");
     throw new Error(`${(e as Error).message}\n  pin-state: ${diag}`);

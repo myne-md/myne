@@ -25,6 +25,8 @@
 // `describe.skip` and the run would report green having executed zero tests).
 // This is the `e2e/AGENTS.md` definition of done for a new scenario.
 
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
@@ -38,6 +40,7 @@ import {
   pageSeatInvoke,
   unlockToEditor,
 } from "./support/flows";
+import { REPO_ROOT } from "./support/session";
 import type { Session } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
@@ -81,9 +84,18 @@ aiDescribe("meeting AI (meeting-ai)", () => {
         const model = await pageSeatInvoke(
           s,
           "plugin:local-inference|set_model_path",
-          // Any file outside the vault tree works: the StubEngine ignores the
-          // path and the store only requires the file to exist.
-          { role: "generation", path: "/work/package.json" },
+          // A file the CHECKOUT always carries: the store only requires the path
+          // to exist and to be outside the vault tree, and `package.json` is both
+          // in every tree the harness runs in.
+          //
+          // It used to be the literal `/work/package.json`, which is where
+          // `scripts/lib/e2e-docker.sh` bind-mounts the repo INSIDE the local
+          // container. That path exists on a developer machine and nowhere else:
+          // CI's checkout is `$CI_WORKSPACE`, so `set_model_path` answered
+          // `Io { NotFound }` and mai1 failed on the first assertion after the
+          // unlock, reporting a model-store error rather than a bad path. Deriving
+          // it from `REPO_ROOT` is the same file in both places.
+          { role: "generation", path: join(REPO_ROOT, "package.json") },
           IPC_TIMEOUT,
         );
         expect(model.err, "set_model_path should record the generation role").toBeUndefined();

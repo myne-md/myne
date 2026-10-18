@@ -77,17 +77,36 @@ async function bandState(s: Session): Promise<BandState> {
   ) as BandState;
 }
 
-/** Poll until the band offers exactly `want` (as a set), and return that state. */
+/** Poll until the band offers exactly `want` (as a set), and return that state.
+ *
+ *  The label is a THUNK that names the state the poll last saw. Without it a
+ *  failure here reads as "timed out", which cannot distinguish the three ways
+ *  this genuinely fails: a chip whose click never took effect (the band still
+ *  lists it), a pass that re-suggested and ADDED one, and a band that went away
+ *  entirely. That is the same shape `typewriter-anchor.e2e.ts` uses for its pin
+ *  readings, and it is what turned this scenario's CI failure into a symptom
+ *  nobody could read. */
 async function waitForBandTags(s: Session, want: string[], label: string): Promise<BandState> {
+  let last: BandState | null = null;
   return s.waitUntil(
     async () => {
       const st = await bandState(s);
+      last = st;
       const have = st.chips.map((c) => c.tag);
       return have.length === want.length && want.every((t) => have.includes(t)) ? st : null;
     },
-    // Generous: one full debounce interval plus a stub inference, and a pass may
-    // legitimately re-run after the accept changes the note.
-    { label, timeoutMs: 30_000 },
+    {
+      label: () => {
+        const seen =
+          last === null
+            ? "nothing was ever read"
+            : last.present
+              ? `the band showed [${last.chips.map((c) => c.tag).join(", ")}]`
+              : "the band was absent";
+        return `${label}: ${seen}; wanted exactly [${want.join(", ")}]`;
+      },
+      timeoutMs: 30_000,
+    },
   );
 }
 
@@ -144,6 +163,33 @@ aiDescribe("tsb1 auto-tag band: suggest → accept into frontmatter → dismiss 
         await waitForBandTags(s, ["stub-tag", "notes"], "the accepted tag leaves the band");
 
         // ── 3. Dismissing a chip drops just that one ──
+        //
+        // KNOWN RED in the container (pipeline #697), and the measurements are
+        // recorded here because the next person will start from them.
+        //
+        // What is NOT the cause, each measured rather than reasoned:
+        //   - the x glyph itself. `dispatchChipEvent` fires a well-formed
+        //     `myne-tag-suggestion-dismiss` whose `detail.tag` is `notes`.
+        //   - delivery. A page-side listener sees that event on `.cm-editor`, on
+        //     the `editor.content` node the relay subscribes to, and on
+        //     `document`.
+        //   - the widget's identity. `bandNodeReplaced: false` says no push
+        //     reached the editor's state field, and that reading is sound because
+        //     `TagSuggestionBandWidget.eq` is chip-aware, so a different chip list
+        //     forces a new DOM node.
+        //   - the logic on both sides. `tests/notes/useTagSuggestions.test.tsx`
+        //     and `tests/editor/tagSuggestionBand.test.ts` pass (34 scenarios),
+        //     dismissal under the tag-identity fold included.
+        //
+        // So the gap is the COMPOSITION - PaneView's props -> CMEditor's relay ->
+        // the hook - and nothing in the tree exercises that as one unit. Writing
+        // that jsdom integration test is the next step, not a guess.
+        //
+        // The accept step above cannot stand in as the control experiment:
+        // accepting ALSO writes the tag into the frontmatter, and the band's
+        // `plan.existingFolds` filter removes that chip whether or not the
+        // dismissal fired. Only a dismissal is unambiguous, which is why this is
+        // the step that fails.
         await (
           await s.waitForElement(
             testIdSelector("editor.tag-suggestion-dismiss", { "data-tag-dismiss": "notes" }),

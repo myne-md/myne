@@ -7,7 +7,7 @@
 // byte. Both halves run against the same source image in one scenario, because
 // the second half only means anything as a contrast with the first.
 //
-//   1. Paste an oversized image (3000 px long edge, above the 2400 px
+//   1. Paste an oversized image (2500 px long edge, above the 2400 px
 //      ceiling) → the compression notice appears, reporting the ORIGINAL size
 //      and the container swap (PNG → WebP). Reporting the original size is the
 //      load-bearing part: the stored attachment no longer knows it, so a notice
@@ -39,11 +39,14 @@
 //     (`editor/src/attachments/toast.ts` DEFAULT_DURATION_MS), so a single
 //     late check could pass vacuously against a notice that came and went.
 //
-// The source image is `.github/banner.png` (3000×1046, 152 401 bytes), an asset
-// already tracked in this repo rather than a new fixture: it is the same image
-// the feature's constant-measurement pass used (feature `progress.md`, task 2),
-// so its compressed size is a known quantity, and one binary with two consumers
-// beats a duplicate.
+// The source image is GENERATED, not read off disk: `support/bloated-png.ts`
+// explains why in full. In one line, this scenario needs a source whose
+// re-encode is reliably smaller, and a shared repo asset cannot promise that —
+// `.github/banner.png` was the source until it was redrawn in `e98353fd` and its
+// lossless-WebP re-encode came out 6 % LARGER than the source, so the
+// compressor's not-smaller guard correctly declined to compress and the notice
+// never appeared. 2500x240 is above the 2400 px ceiling (so the downscale rule
+// fires) and re-encodes at ~0.76x of the source's bytes.
 //
 // Vault-count precondition: 1. KDF: weak generator fixture (unlock reads params
 // from vault.meta).
@@ -51,12 +54,13 @@
 // byte counts and the notice string. The attachment filenames are in-source
 // scenario constants.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+
+import { formatBytes } from "@myne/editor/host/components/attachments/format";
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
+import { bloatedPng } from "./support/bloated-png";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
   closeSettings,
@@ -66,7 +70,6 @@ import {
   pageSeatInvoke,
   unlockToEditor,
 } from "./support/flows";
-import { REPO_ROOT } from "./support/session";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
@@ -87,14 +90,32 @@ const IPC_TIMEOUT = 20_000;
 
 /** Distinct display names so the two imports are unambiguous in the catalog.
  *  Single lowercase-alnum tokens (residue needle rule). */
-const NAME_COMPRESSED = "bannerpasteon7q2w9.png";
-const NAME_UNCOMPRESSED = "bannerpasteoff4m8k3.png";
+const NAME_COMPRESSED = "fixturepasteon7q2w9.png";
+const NAME_UNCOMPRESSED = "fixturepasteoff4m8k3.png";
 
-/** 3000×1046 — long edge above the 2400 px ceiling, so the downscale rule and
- *  the lossless-WebP re-encode both fire and the container changes. */
-function sourceBytes(): Buffer {
-  return readFileSync(join(REPO_ROOT, ".github", "banner.png"));
-}
+/**
+ * 2500x240 — long edge above the 2400 px ceiling, so the downscale rule fires
+ * and the container changes PNG -> WebP. See the header for why this is
+ * generated rather than read from the repo.
+ */
+const SOURCE_WIDTH = 2500;
+const SOURCE_HEIGHT = 240;
+const source = bloatedPng(SOURCE_WIDTH, SOURCE_HEIGHT);
+const base64 = source.toString("base64");
+
+/**
+ * The size the notice must report, in the app's own formatter.
+ *
+ * Imported from the module the UI reads (`editor/src/attachments/insert.ts`
+ * formats both figures with it) rather than pinned as a literal: the value this
+ * used to carry ("149 KiB") was the OLD banner's size, so it would have failed
+ * the notice-text assertion even in a run where compression happened. One
+ * authority on the rounding rule, and it moves with the fixture.
+ *
+ * For THIS fixture that is "1.7 MiB" — 1 800 573 bytes, which the formatter
+ * promotes past KiB on its way up.
+ */
+const expectedFrom = formatBytes(source.length);
 
 /**
  * Dispatch a synthetic `paste` carrying one image file at the live editor
@@ -190,13 +211,6 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
   // Vault-count precondition: 1 (weak KDF).
   it("discloses the compression on insert, and stores the source verbatim when off", async () => {
     let seeded: SeededVault;
-    const source = sourceBytes();
-    const base64 = source.toString("base64");
-    // `formatBytes(152401)` — 148.83 KiB, which the formatter rounds to whole
-    // units once the value passes 10. So "149 KiB", not "148.8 KiB".
-    const expectedFrom = "149 KiB";
-    const expectedFromKib = 149;
-
     await scenario(
       "ic1-image-compression",
       { seed: (dir) => void (seeded = seedVault(dir, {})) },
@@ -245,21 +259,32 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
 
         // Full shape: the container swap is named, and the "from" size is the
         // ORIGINAL file's — the one nothing on disk remembers any more.
-        const match = /^Compressed to WebP: (.+) → ([\d.]+) KiB$/.exec(notice.trim());
+        //
+        // Unit-agnostic on purpose. This used to be
+        // `/^Compressed to WebP: (.+) → ([\d.]+) KiB$/` and the trailing `KiB`
+        // is a hardcoded unit: the formatter promotes to MiB above 1024 KiB, so
+        // a fixture big enough to produce "1.7 MiB → 1.3 MiB" failed on the
+        // REGEX rather than on anything about compression. Both figures are now
+        // compared against `formatBytes` in the same shape the UI uses, so no
+        // unit arithmetic lives here at all.
+        const match = /^Compressed to WebP: (.+) → (.+)$/.exec(notice.trim());
         expect(match, `unexpected notice text: ${JSON.stringify(notice)}`).not.toBeNull();
         expect(match?.[1], "the notice must report the pre-compression size").toBe(
           expectedFrom,
         );
-        expect(
-          Number(match?.[2]),
-          "the notice's stored size must be smaller than the source",
-        ).toBeLessThan(expectedFromKib);
 
         // The stored bytes really are the compressed ones: the catalog row is
         // smaller than the source and carries the new container's extension.
-        const compressed = await rowFor(s, "bannerpasteon");
+        const compressed = await rowFor(s, "fixturepasteon");
         expect(compressed.size).toBeLessThan(source.length);
-        expect(compressed.filename).toBe("bannerpasteon7q2w9.webp");
+        expect(compressed.filename).toBe("fixturepasteon7q2w9.webp");
+
+        // ...and the notice's second figure is the size the VAULT holds, not a
+        // number the UI arrived at on its own. Comparing it to the catalog row
+        // is what makes "the user was told the truth" an assertion about disk.
+        expect(match?.[2], "the notice's stored size must be the size on disk").toBe(
+          formatBytes(compressed.size),
+        );
 
         // ---- 2. preference OFF: paste → no notice, source stored verbatim ----
         // Wait for phase 1's OWN notice to clear, on whichever surface carried
@@ -305,7 +330,7 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
           if (stored === null) {
             if (tick % 5 === 0) {
               const row = (await catalog(s)).find((r) =>
-                r.filename.startsWith("bannerpasteoff"),
+                r.filename.startsWith("fixturepasteoff"),
               );
               if (row !== undefined) {
                 stored = row.size;
@@ -327,7 +352,7 @@ describeE2E("ic1 ingest-time image compression (ingest-image-compression)", () =
         );
         // ...and the filename kept its original extension, since no re-encode
         // happened to change the container.
-        expect((await rowFor(s, "bannerpasteoff")).filename).toBe(NAME_UNCOMPRESSED);
+        expect((await rowFor(s, "fixturepasteoff")).filename).toBe(NAME_UNCOMPRESSED);
       },
     );
   });
