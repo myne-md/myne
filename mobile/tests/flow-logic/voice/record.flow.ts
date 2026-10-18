@@ -99,11 +99,14 @@ test.describe("voice note recording", () => {
     await page.waitForTimeout(150); // let a few audio frames accumulate
     await page.getByTestId("voice-record.stop").click();
 
-    // The sheet closes and exactly one WAV bytes-import reached the backend.
+    // The sheet closes and exactly one WAV import reached the backend, as one
+    // STANDARD base64 string: that is the arm `importFile` sends from the phone
+    // (`mobile/src/lib/attachments.ts`), and the mock measures it as decoded
+    // bytes, so the length assertion below is still about the WAV.
     await expect(page.getByTestId("voice-record-bar")).toBeHidden();
     const imports = await readImports(page);
     expect(imports.length).toBe(1);
-    expect(imports[0].kind).toBe("bytes");
+    expect(imports[0].kind).toBe("bytes_b64");
     expect(imports[0].len).toBeGreaterThan(44); // header (44) + at least some PCM
     expect(imports[0].filename).toMatch(/^Voice note .+\.wav$/);
   });

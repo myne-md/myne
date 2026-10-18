@@ -1445,14 +1445,31 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // `Voice note ….wav` bytes-import; echo the filename back so the inserted
       // form-C embed carries it. Refs/catalog reads are benign empties.
       "plugin:attachments|attachment_import": (args) => {
-        const source = (args.source ?? {}) as { kind?: string; bytes?: number[]; filename?: string | null };
+        const source = (args.source ?? {}) as {
+          kind?: string;
+          bytes?: number[];
+          bytes_b64?: string;
+          filename?: string | null;
+        };
+        // TWO bytes arms reach this command. `bytes` is a JSON number array (the
+        // desktop clip / paste-drop / ENEX callers); `bytes_b64` is one STANDARD
+        // base64 string, which is what the phone sends, because the array form
+        // made the WebView materialize a number per byte (mobile/src/lib/
+        // attachments.ts, `importFile`). `len` and `size` mean BYTES, so the
+        // base64 arm is measured as what it DECODES to rather than as the length
+        // of its own string: a spec asserting `len > 44` is asking about the WAV
+        // header and PCM, and base64 characters would answer a different
+        // question, four thirds of the way off.
+        const b64 = source.bytes_b64 ?? "";
+        const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+        const len = source.bytes?.length ?? (b64.length / 4) * 3 - padding;
         const w = window as unknown as { __voiceImports?: Array<{ kind?: string; len: number; filename?: string | null }> };
-        (w.__voiceImports ??= []).push({ kind: source.kind, len: source.bytes?.length ?? 0, filename: source.filename ?? null });
+        (w.__voiceImports ??= []).push({ kind: source.kind, len, filename: source.filename ?? null });
         return {
           id: "a".repeat(64),
           content_type: "audio/wav",
           filename: source.filename ?? "file",
-          size: source.bytes?.length ?? 0,
+          size: len,
           created_at: 0,
           deduplicated: false,
         };
