@@ -122,7 +122,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "MemberNameGate": { file: "src/components/sync/MemberNameGate.tsx", line: 45 },
   "MemberPasswordSettings": { file: "src/components/settings/MemberPasswordSettings.tsx", line: 68 },
   "MemberRosterPanel": { file: "src/components/sync/MemberRosterPanel.tsx", line: 168 },
-  "MemberVaultUnlockCard": { file: "src/components/sync/MemberVaultUnlockCard.tsx", line: 39 },
+  "MemberVaultUnlockCard": { file: "src/components/sync/MemberVaultUnlockCard.tsx", line: 68 },
   "MemoryPopover": { file: "src/notes/components/MemoryPopover.tsx", line: 110 },
   "MemorySection": { file: "src/components/settings/MemorySection.tsx", line: 253 },
   "MigrateVaultForm": { file: "src/components/settings/MigrateVaultForm.tsx", line: 59 },

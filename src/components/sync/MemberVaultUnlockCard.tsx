@@ -5,13 +5,13 @@ import {
   useState,
   type ChangeEvent,
   type ClipboardEvent,
+  type CSSProperties,
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CenteredCard, ctaInteraction, ctaStyle } from "../primitives/CenteredCard";
-import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
+import { ctaInteraction, ctaStyle } from "../primitives/CenteredCard";
 import {
   memberUnlockStatus,
   personStatus,
@@ -28,6 +28,26 @@ import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
 /** Minimum PIN length, mirroring the Rust `pin::MIN_PIN_LEN`. */
 const MIN_PIN_LEN = 6;
 
+/** The shell supplies the card, so the body only lays out its own rows. */
+const MEMBER_FORM: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  marginTop: "var(--space-4)",
+};
+
+/** The credential swap, at the same rank as the owner screen0027s `unlock.alt-row`. */
+const ALT_LINK_STYLE: CSSProperties = {
+  alignSelf: "center",
+  background: "none",
+  border: 0,
+  padding: 0,
+  cursor: "pointer",
+  color: "var(--fg-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+};
+
 /**
  * The unlock surface for a B2B member vault. A member holds no vault password:
  * their portable credential is their own recovery phrase (`vault.member-key`,
@@ -35,6 +55,15 @@ const MIN_PIN_LEN = 6;
  * (`vault.member-unlock`, decisions/protocol/0653): a password, a PIN, or a
  * biometric. This card offers whichever is configured, with the recovery phrase
  * always one click away as the fallback.
+ *
+ * **It is a BODY, not a screen** (Aşama 2b). It used to draw its own
+ * `CenteredCard` and be returned EARLY from `Unlock.tsx`, so a member vault got a
+ * different screen from an owner vault: no brand mark, no heading, and — the part
+ * that matters — no way to say WHICH vault was being opened, on the one screen
+ * whose whole job is to ask that. The early return also meant the member branch
+ * received none of the shell's slots, so a member had no back link at any vault
+ * count. It renders into `AuthShell` now, like the password form, and the two
+ * surfaces differ only in the credential they offer.
  */
 export function MemberVaultUnlockCard({
   vaultId,
@@ -135,11 +164,10 @@ export function MemberVaultUnlockCard({
           : t("unlock.memberHint");
 
   return (
-    <CenteredCard>
-      <form onSubmit={submit} data-testid="unlock.member-form">
-        <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-          {hint}
-        </p>
+    <form onSubmit={submit} data-testid="unlock.member-form" style={MEMBER_FORM}>
+      <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+        {hint}
+      </p>
         {surface === "pending" ? null : surface === "password" ? (
           <PasswordInput
             label={t("unlock.memberPasswordLabel")}
@@ -214,18 +242,22 @@ export function MemberVaultUnlockCard({
           {surface === "biometric" ? t("unlock.memberBiometricSubmit") : t("unlock.memberSubmit")}
         </button>
         {method != null ? (
-          <Button
+          // A text link rather than a ghost `Button` (Aşama 2b): it is a
+          // credential SWAP on one screen, the same rank as the owner's
+          // "use your password instead" link, and a bordered button made it look
+          // like a second way to submit. `unlock.alt-row`'s idiom.
+          <button
             type="button"
-            variant="ghost"
             onClick={() => {
               setError(false);
               setUsePhrase((v) => !v);
             }}
             data-testid="unlock.member-toggle-credential"
-            style={{ marginTop: "var(--space-3)" }}
+            style={ALT_LINK_STYLE}
+            className="myne-text-link"
           >
             {surface === "phrase" ? t("unlock.memberUseFast") : t("unlock.memberUsePhrase")}
-          </Button>
+          </button>
         ) : null}
         {error ? (
           <p data-testid="unlock.member-error" style={{ color: "var(--danger)", fontFamily: "var(--font-sans)" }}>
@@ -233,6 +265,5 @@ export function MemberVaultUnlockCard({
           </p>
         ) : null}
       </form>
-    </CenteredCard>
   );
 }
