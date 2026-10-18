@@ -161,7 +161,7 @@ export type Action =
    *  consumer emits a dev-only `console.warn`. */
   | { type: "delete-bug-canary" };
 
-import { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 
 // Re-exported rather than redeclared: this file used to carry its own `24`, and
 // so did four other files. The one definition is in

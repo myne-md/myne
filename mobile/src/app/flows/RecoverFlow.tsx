@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ClipboardEvent, CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   Screen,
   ScreenScroll,
@@ -14,6 +14,7 @@ import {
   BlockingOverlay,
   StrengthMeter,
   Icon,
+  PhraseEntryGrid,
 } from "../../components";
 import {
   recoverWithPhrase,
@@ -138,72 +139,6 @@ function AccountField({
     </div>
   );
 }
-
-// One recovery-phrase grid cell (RC-02) — editable; supports paste-to-grid.
-function WordCell({
-  index,
-  word,
-  focused,
-  onFocus,
-  onBlur,
-  onChange,
-  onPaste,
-}: {
-  index: number;
-  word: string;
-  focused: boolean;
-  onFocus: (i: number) => void;
-  onBlur: () => void;
-  onChange: (i: number, v: string) => void;
-  onPaste: (i: number, e: ClipboardEvent<HTMLInputElement>) => void;
-}) {
-  const filled = word.trim() !== "";
-  const border = focused
-    ? "1.5px solid var(--accent)"
-    : filled
-      ? "1px solid var(--line-1)"
-      : "1px solid var(--line-2)";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        height: 42,
-        background: filled ? "var(--bg-2)" : "var(--bg-1)",
-        border,
-        borderRadius: 6,
-        padding: "0 11px",
-        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent)" : "none",
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 11,
-          color: "var(--line-3)",
-          width: 16,
-          textAlign: "end",
-          flexShrink: 0,
-        }}
-      >
-        {String(index + 1).padStart(2, "0")}
-      </span>
-      <input
-        value={word}
-        onChange={(e) => onChange(index, e.target.value.toLowerCase())}
-        onFocus={() => onFocus(index)}
-        onBlur={onBlur}
-        onPaste={(e) => onPaste(index, e)}
-        autoCapitalize="none"
-        autoComplete="off"
-        spellCheck={false}
-        style={{ ...inputReset, fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg-1)" }}
-      />
-    </div>
-  );
-}
-
 // Editable password field (RC-04) — masked monospace, optional reveal eye.
 function EditablePassword({
   value,
@@ -478,14 +413,6 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
     }
   }
 
-  function onCellPaste(index: number, e: ClipboardEvent<HTMLInputElement>) {
-    const tokens = splitWords(e.clipboardData.getData("text"));
-    if (tokens.length <= 1) return; // single word → let the native paste land
-    e.preventDefault();
-    const words = state.words.slice();
-    for (let i = 0; i < tokens.length && index + i < WORD_COUNT; i++) words[index + i] = tokens[i];
-    dispatch({ type: "words.fill", words });
-  }
 
   function mapPhraseError(e: unknown): { message: string; wipe: boolean } {
     const kind = (e as { kind?: string } | null)?.kind;
@@ -678,20 +605,13 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", marginBottom: 12 }}>
             {t("recover.phraseGridHint")}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 }}>
-            {state.words.map((w, i) => (
-              <WordCell
-                key={i}
-                index={i}
-                word={w}
-                focused={state.focused === i}
-                onFocus={(idx) => dispatch({ type: "cell.focus", index: idx })}
-                onBlur={() => dispatch({ type: "cell.blur" })}
-                onChange={(idx, v) => dispatch({ type: "word.set", index: idx, value: v })}
-                onPaste={onCellPaste}
-              />
-            ))}
-          </div>
+          <PhraseEntryGrid
+            cells={state.words}
+            onCells={(next) => dispatch({ type: "words.fill", words: next })}
+            testIdPrefix="recover.phrase"
+            columns={2}
+            cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
+          />
         </ScreenScroll>
         <FooterBar style={{ flexDirection: "column", gap: 8, padding: "10px 16px calc(12px + env(safe-area-inset-bottom, 0px))" }}>
           <Button

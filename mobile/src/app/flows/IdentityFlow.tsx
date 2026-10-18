@@ -5,10 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ClipboardEvent,
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -21,6 +18,7 @@ import {
   Button,
   MonoField,
   MonoBox,
+  PhraseEntryGrid,
   TextField,
   RecoveryGrid,
   Checkbox,
@@ -265,52 +263,6 @@ const PHRASE_GRID_STYLE = {
   gap: "var(--space-2)",
   marginTop: "var(--space-3)",
 } as const;
-
-/** One editable recovery-phrase cell: the barrel's `TextField` with the grid's
- *  `01` index in front of it and the fill state wired to its border. The cell
- *  carries a testid, because the flow-logic tier has to fill 24 of them and a
- *  field with no testid is not reachable by position from there. */
-function PhraseCell({
-  index,
-  word,
-  testId,
-  label,
-  onChange,
-  onPaste,
-}: {
-  index: number;
-  word: string;
-  testId: string;
-  label: string;
-  onChange: (index: number, value: string) => void;
-  onPaste: (index: number, event: ClipboardEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <TextField
-      value={word}
-      onChange={(value) => onChange(index, value)}
-      onPaste={(event) => onPaste(index, event)}
-      testId={testId}
-      label={label}
-      filled={word.trim() !== ""}
-      mono
-      dir="ltr"
-      leading={
-        <span
-          aria-hidden="true"
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-3)",
-            flexShrink: 0,
-          }}
-        >
-          {String(index + 1).padStart(2, "0")}
-        </span>
-      }
-    />
-  );
-}
 
 /**
  * Masked device-password input with a reveal toggle. The field is the barrel's
@@ -770,52 +722,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     setStep("gate");
   }, [clearRecoverSecrets]);
 
-  const setAcceptWord = useCallback((index: number, value: string) => {
-    setError(null);
-    setAcceptWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
-  }, []);
 
-  const setJoinWord = useCallback((index: number, value: string) => {
-    setJoinError(null);
-    setJoinWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
-  }, []);
-
-  const setRecoverWord = useCallback((index: number, value: string) => {
-    setError(null);
-    setRecoverWords((words) => words.map((w, i) => (i === index ? value.replace(/\s+/g, "") : w)));
-  }, []);
-
-  /** Paste-to-grid, shared by the accept grid, the join grid and the recover
-   *  grid. A 24-word phrase is pasted rather than typed, so a paste that lands
-   *  whole in the first cell is the only usable shape. Fewer than two tokens is
-   *  left to the browser, so pasting a single word into a cell still works.
-   *  `setWords` is whichever grid's setter was pasted into, so the three steps
-   *  cannot inherit each other's words, and `onEdit` clears the banner of the step
-   *  the paste belongs to. */
-  const pasteWords = useCallback(
-    (
-      setWords: Dispatch<SetStateAction<string[]>>,
-      onEdit: () => void,
-      index: number,
-      event: ClipboardEvent<HTMLInputElement>,
-    ) => {
-      const tokens = event.clipboardData
-        .getData("text")
-        .split(/\s+/)
-        .filter((word) => word.length > 0);
-      if (tokens.length < 2) return;
-      event.preventDefault();
-      onEdit();
-      setWords((words) => {
-        const next = [...words];
-        for (let i = 0; i < tokens.length && index + i < PHRASE_WORDS; i += 1) {
-          next[index + i] = tokens[i];
-        }
-        return next;
-      });
-    },
-    [],
-  );
 
   // Every gate in one place, so the submit button and the handler cannot
   // disagree about whether the form is complete. The backend re-checks the floor
@@ -1310,21 +1217,20 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
           <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
         </div>
         <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
-        <div role="group" aria-labelledby={recoverPhraseLabelId} style={PHRASE_GRID_STYLE}>
-          {recoverWords.map((word, i) => (
-            <PhraseCell
-              key={i}
-              index={i}
-              word={word}
-              testId={
-                i === 0 ? "identity-flow.recover-phrase" : `identity-flow.recover-phrase-cell-${i + 1}`
-              }
-              label={t("sync.enroll.wordAria", { number: i + 1 })}
-              onChange={setRecoverWord}
-              onPaste={(index, event) => pasteWords(setRecoverWords, () => setError(null), index, event)}
-            />
-          ))}
-        </div>
+        <PhraseEntryGrid
+          cells={recoverWords}
+          onCells={(next) => {
+            setError(null);
+            setRecoverWords(next.map((w) => w.replace(/\s+/g, "")));
+          }}
+          testIdPrefix="identity-flow.recover-phrase"
+          cellTestId={(i) =>
+            i === 0 ? "identity-flow.recover-phrase" : `identity-flow.recover-phrase-cell-${i + 1}`
+          }
+          cellLabel={(i) => t("sync.enroll.wordAria", { number: i + 1 })}
+          labelledBy={recoverPhraseLabelId}
+          style={PHRASE_GRID_STYLE}
+        />
 
         {/* The refusal belongs to THIS step, so its banner does. One message for
             every kind this call can refuse with, because a wrong phrase and a
@@ -1606,23 +1512,20 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
                 <FieldLabel>{t("identityHome.acceptPhraseLabel")}</FieldLabel>
               </div>
               <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
-              <div role="group" aria-labelledby={phraseLabelId} style={PHRASE_GRID_STYLE}>
-                {acceptWords.map((word, i) => (
-                  <PhraseCell
-                    key={i}
-                    index={i}
-                    word={word}
-                    testId={
-                      i === 0
-                        ? "identity-flow.accept-phrase"
-                        : `identity-flow.accept-phrase-cell-${i + 1}`
-                    }
-                    label={t("sync.enroll.wordAria", { number: i + 1 })}
-                    onChange={setAcceptWord}
-                    onPaste={(index, event) => pasteWords(setAcceptWords, () => setError(null), index, event)}
-                  />
-                ))}
-              </div>
+              <PhraseEntryGrid
+          cells={acceptWords}
+          onCells={(next) => {
+            setError(null);
+            setAcceptWords(next.map((w) => w.replace(/\s+/g, "")));
+          }}
+          testIdPrefix="identity-flow.accept-phrase"
+          cellTestId={(i) =>
+            i === 0 ? "identity-flow.accept-phrase" : `identity-flow.accept-phrase-cell-${i + 1}`
+          }
+          cellLabel={(i) => t("sync.enroll.wordAria", { number: i + 1 })}
+          labelledBy={phraseLabelId}
+          style={PHRASE_GRID_STYLE}
+        />
             </>
           ) : (
             <>
@@ -1790,23 +1693,20 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
                 <FieldLabel>{t("identityHome.joinPhraseLabel")}</FieldLabel>
               </div>
               <div style={HINT_STYLE}>{t("sync.enroll.recoveryPhraseHint")}</div>
-              <div role="group" aria-labelledby={joinPhraseLabelId} style={PHRASE_GRID_STYLE}>
-                {joinWords.map((word, i) => (
-                  <PhraseCell
-                    key={i}
-                    index={i}
-                    word={word}
-                    testId={
-                      i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`
-                    }
-                    label={t("sync.enroll.wordAria", { number: i + 1 })}
-                    onChange={setJoinWord}
-                    onPaste={(index, event) =>
-                      pasteWords(setJoinWords, () => setJoinError(null), index, event)
-                    }
-                  />
-                ))}
-              </div>
+              <PhraseEntryGrid
+          cells={joinWords}
+          onCells={(next) => {
+            setJoinError(null);
+            setJoinWords(next.map((w) => w.replace(/\s+/g, "")));
+          }}
+          testIdPrefix="identity-flow.join-phrase"
+          cellTestId={(i) =>
+            i === 0 ? "identity-flow.join-phrase" : `identity-flow.join-phrase-cell-${i + 1}`
+          }
+          cellLabel={(i) => t("sync.enroll.wordAria", { number: i + 1 })}
+          labelledBy={joinPhraseLabelId}
+          style={PHRASE_GRID_STYLE}
+        />
             </>
           ) : (
             <>

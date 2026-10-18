@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 import { Icon } from "./Icon";
 
 /**
@@ -708,5 +709,144 @@ export function MonoBox({ value, testId }: { value: string; testId: string }) {
         color: "var(--fg-2)",
       }}
     />
+  );
+}
+
+/** The `01` index a phrase cell renders before its input. */
+const PHRASE_INDEX_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
+
+/**
+ * The 24-cell phrase ENTRY grid, shared by every mobile surface that takes a
+ * phrase: device enrolment, vault recovery, the invite wizard's accept and join
+ * steps, and the member-vault unlock.
+ *
+ * # One primitive, because the alternative was six
+ *
+ * `IdentityFlow` had already factored its own `PhraseCell`, and the other three
+ * files each carried a copy of the same envelope: the grid template, the `01`
+ * index, the paste-to-distribute arithmetic and the field reset. Six copies of
+ * one credential surface is six chances for a phrase to be typed into a grid
+ * that behaves differently from the one beside it, and `recovery-flow.md` §3.2
+ * binds every surface rather than the recovery screen alone.
+ *
+ * # The anatomy
+ *
+ * A `TextField` per cell, which is where the field envelope already lives (its
+ * own header records the three hand-rolled copies it replaced). The index is
+ * `leading`, so it is a sibling of the input rather than inside it, and
+ * `filled` draws the stronger border on a cell that has content.
+ *
+ * `dir="ltr"` on the GRID, and it is a correctness fix rather than typography
+ * (myne-md/myne#468): the ORDER of the words is part of the secret,
+ * `recovery-flow.md` §2.4 commits to never showing them again, and BIP-39's
+ * checksum does not catch a permutation — so a grid laid out in an RTL locale's
+ * direction hands the user a transcription whose wrongness is undiscoverable
+ * until the phrase fails to open the vault.
+ *
+ * `minmax(0, 1fr)` rather than `1fr`: a `1fr` track is `minmax(auto, 1fr)`, and
+ * that `auto` floor is the input's intrinsic width, which pushes the last column
+ * off a narrow screen (the desktop equivalent is myne-md/myne#764).
+ *
+ * # What stays in the caller
+ *
+ * What a phrase is FOR — the submit gate, normalisation, the error banner, and
+ * whether an edit clears one. `onCellEdited` exists for that last one, because
+ * the copy this replaced each cleared its own error on the first keystroke.
+ */
+export function PhraseEntryGrid({
+  cells,
+  onCells,
+  testIdPrefix,
+  cellLabel,
+  cellTestId,
+  columns = 2,
+  count = PHRASE_CELL_COUNT,
+  labelledBy,
+  disabled = false,
+  onCellEdited,
+  style,
+}: {
+  cells: readonly string[];
+  onCells: (next: string[]) => void;
+  /** Testid stem: grid `<stem>-grid`, cell `<stem>-cell` unless `cellTestId`. */
+  testIdPrefix: string;
+  /** The accessible name per cell. */
+  cellLabel: (index: number) => string;
+  /** Exact per-cell testid, for the callers whose first cell carries a bare name
+   *  and the rest a `-cell-N` suffix. */
+  cellTestId?: (index: number) => string;
+  columns?: number;
+  count?: number;
+  /** The id of the element that names the group, when the caller renders one. */
+  labelledBy?: string;
+  disabled?: boolean;
+  onCellEdited?: () => void;
+  /** Merged onto the grid element, for the per-screen top margin the callers
+   *  each had. */
+  style?: CSSProperties;
+}) {
+  const setCell = (index: number, value: string): void => {
+    onCellEdited?.();
+    const next = [...cells];
+    next[index] = value;
+    onCells(next);
+  };
+  const paste = (index: number, event: ClipboardEvent<HTMLInputElement>): void => {
+    // §3.2 paste-to-distribute: a phrase kept as one string in a password
+    // manager is the common case, and asking the user to split it by hand is 24
+    // chances to put a word in the wrong cell.
+    const tokens = event.clipboardData
+      .getData("text")
+      .split(/\s+/)
+      .filter((token) => token.length > 0);
+    if (tokens.length < 2) return;
+    event.preventDefault();
+    onCellEdited?.();
+    const next = [...cells];
+    for (let i = 0; i < tokens.length && index + i < count; i += 1) {
+      next[index + i] = tokens[i];
+    }
+    onCells(next);
+  };
+  return (
+    <div
+      dir="ltr"
+      role="group"
+      aria-labelledby={labelledBy}
+      data-testid={`${testIdPrefix}-grid`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gap: "var(--space-2)",
+        ...style,
+      }}
+    >
+      {Array.from({ length: count }, (_, index) => {
+        const word = cells[index] ?? "";
+        return (
+          <TextField
+            key={index}
+            value={word}
+            onChange={(value) => setCell(index, value)}
+            onPaste={(event) => paste(index, event)}
+            testId={cellTestId ? cellTestId(index) : `${testIdPrefix}-cell`}
+            label={cellLabel(index)}
+            filled={word.trim() !== ""}
+            mono
+            disabled={disabled}
+            leading={
+              <span aria-hidden="true" style={PHRASE_INDEX_STYLE}>
+                {String(index + 1).padStart(2, "0")}
+              </span>
+            }
+          />
+        );
+      })}
+    </div>
   );
 }
