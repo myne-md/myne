@@ -359,14 +359,21 @@ steps:
   # ─── Hook-parity backstop ────────────────────────────────────
   # SPDX headers, EOF newline, trailing whitespace live ONLY in the lefthook
   # pre-commit set (bypassable via --no-verify) and had no remote gate. This
-  # step is that gate. Git-only, so cheap; all logic is in the committed script
-  # (NOT inline) — like ai-no-network above — so Woodpecker's env-substitution
-  # never sees shell dollar-brace expansions and can't error config-compile.
-  # i18n-catalog is gated in pnpm-build (needs node); damm32 VALUE drift by cargo-test.
+  # step is that gate. All logic is in the committed script (NOT inline) — like
+  # ai-no-network above — so Woodpecker's env-substitution never sees shell
+  # dollar-brace expansions and can't error config-compile.
+  #
+  # `nodejs` is installed because the SPDX half moved into
+  # `scripts/check-spdx-headers.mjs` (one file shared with the pre-commit hook)
+  # and this image, `rust:1.96.0-slim`, ships no node at all. The step printed
+  # "node: command not found" and went red on EVERY push from that commit
+  # onwards, which is the shape worth naming: a guard that cannot run reports
+  # like a guard that failed. Debian trixie's nodejs is v20 and runs the ESM
+  # script fine. `file` stays for the EOF-newline half.
   hooks-parity:
     image: rust:1.96.0-slim
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends git file
+      - apt-get update && apt-get install -y --no-install-recommends git file nodejs
       - bash scripts/hooks-parity-check.sh
 
   # ─── TypeScript typecheck + Vite build ───────────────────────
@@ -878,11 +885,20 @@ steps:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
+      # `docker:cli` is Alpine and ships neither `bash` nor `curl`, and the probe
+      # needs both: the script's shebang is `#!/usr/bin/env bash` and it queries
+      # the running container with curl. Without this line the step answered
+      # `env: can't execute 'bash': No such file or directory` and could never
+      # have passed — it landed in 46c15e8f, and the first push to touch
+      # `stories/**` afterwards (b87a7860, the public-catalogue change) was also
+      # the first time it was ever asked to run. Same line as
+      # `web-container-check` below, which is why its script works.
+      - apk add --no-cache bash curl
       # Asserts the EFFECTS of the image rather than its configuration: the
       # header set, that `/healthz` answers its own body rather than the page,
       # that an unknown path is a 404, and that the bundle it actually serves is
       # the public variant.
-      - ./scripts/check-stories-container-headers.sh
+      - bash scripts/check-stories-container-headers.sh
 
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.
