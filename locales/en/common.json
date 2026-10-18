@@ -4803,6 +4803,7 @@
     "continue": "Continue",
     "decrypting": "Decrypting…",
     "memberHint": "This vault is shared with you. Unlock it with your own recovery phrase.",
+    "memberSubtitle": "Open this shared vault.",
     "memberPhraseLabel": "Recovery phrase",
     "memberSubmit": "Unlock",
     "memberError": "That phrase did not open this shared vault.",

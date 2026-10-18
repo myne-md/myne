@@ -506,8 +506,6 @@ export function Unlock({
       cancelled = true;
     };
   }, []);
-  const otherVaultsExist = vaults.length >= 2;
-
   /**
    * The name of the vault being opened, or `null`.
    *
@@ -783,12 +781,11 @@ export function Unlock({
   };
 
   // A member vault is opened from the recovery phrase, not a password
-  // (myne-md/myne#711 task 25). Rendered as its own card so the password form's
-  // quick-unlock / recovery machinery is untouched.
-  if (memberVault && vaultId) {
-    return <MemberVaultUnlockCard vaultId={vaultId} onUnlocked={onUnlocked} />;
-  }
-
+  // (myne-md/myne#711 task 25). It is a BODY inside this shell rather than its
+  // own screen (Aşama 2b): the early return it used to be gave a member a
+  // different screen from an owner — no mark, no heading, no way to say which
+  // vault was being opened — and none of the shell's slots, so a member had no
+  // back link at any vault count.
   return (
     <AuthShell
       testId="unlock.root"
@@ -801,10 +798,16 @@ export function Unlock({
       brand={false}
       // The way back to the vault picker, in the top-left corner where a back
       // control is looked for, now that the corner holds no brand. Shown
-      // whenever ≥2 vaults exist (App always wires `onBack`), and withdrawn
+      // whenever `onBack` is wired, which App does unconditionally, and withdrawn
       // during `decrypting` so an in-flight unlock is never abandoned mid-IPC.
+      //
+      // It used to need ≥2 vaults, and that threshold was the dead end the audit
+      // opened on: with a single vault the picker — and with it create, join and
+      // restore — was unreachable, so a user whose one vault would not open had
+      // no door but quitting. `VaultPicker` renders its three doors at any count,
+      // including one, so the threshold was the whole of the problem.
       leading={
-        onBack && otherVaultsExist && !decrypting ? (
+        onBack && !decrypting ? (
           <Button
             type="button"
             variant="ghost"
@@ -835,14 +838,25 @@ export function Unlock({
             : t("unlock.titleNamed", { vault: vaultName })
         }
       >
-        {t(
-          surface === "quick"
-            ? quickMethod === "biometric"
-              ? "unlock.subtitleBiometric"
-              : "unlock.subtitlePin"
-            : "unlock.subtitle",
-        )}
+        {memberVault
+          ? t("unlock.memberSubtitle")
+          : t(
+              surface === "quick"
+                ? quickMethod === "biometric"
+                  ? "unlock.subtitleBiometric"
+                  : "unlock.subtitlePin"
+                : "unlock.subtitle",
+            )}
       </AuthHeading>
+      {/* A member vault's credential is not a password, so the two surfaces share
+          this shell and differ only in the body. The heading, the mark and the
+          back link above are the same on both — which is the point: the question
+          this screen asks is "which vault, and what opens it", and the answer to
+          the first half is the same for everyone. */}
+      {memberVault && vaultId ? (
+        <MemberVaultUnlockCard vaultId={vaultId} onUnlocked={onUnlocked} />
+      ) : (
+        <>
       {/* Quick-unlock (PIN / Touch ID) — the primary surface when the probe
           above says it is redeemable and the user hasn't opted out (MYND-329,
           MYND-558). The password escape hatch sits one click below it:
@@ -959,6 +973,8 @@ export function Unlock({
             {t("unlock.deleteLink")}
           </button>
         </div>
+      )}
+        </>
       )}
     </AuthShell>
   );

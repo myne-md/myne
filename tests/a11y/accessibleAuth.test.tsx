@@ -44,6 +44,7 @@ const CREDENTIAL_SURFACES: ReadonlyArray<[path: string, what: string]> = [
   ["src/screens/vault-creation/ConfirmStep.tsx", "four words of the phrase, re-entered"],
   ["src/screens/vault-recover/PhraseEntryStep.tsx", "the 24-word recovery grid"],
   ["src/components/PhraseEntryGrid.tsx", "a phrase grid, device enrolment"],
+  ["src/components/sync/MemberVaultUnlockCard.tsx", "a shared vault's password, PIN or phrase"],
   ["src/notes/import/MyneVaultSetup.tsx", "a phrase grid, vault import"],
 ];
 

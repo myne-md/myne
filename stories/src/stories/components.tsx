@@ -1193,8 +1193,17 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "MemberVaultUnlockCard",
     state: "default",
-    description: "Member Vault Unlock Card, a default state.",
-    tags: ["components", "membervaultunlockcard", "default"],
+    description:
+      "The credential body a shared (member) vault is opened with. It renders INSIDE AuthShell, like the owner's password form, so the mark, the heading naming the vault and the back link to the picker are the same on both screens and only the credential differs. A member holds no vault password of their own: this offers whichever device-local fast credential is configured (password, PIN or biometric) with the member's own recovery phrase one click away, and the swap between the two is a text link rather than a button.",
+    tags: [
+      "components",
+      "member vault",
+      "shared vault",
+      "unlock",
+      "recovery phrase",
+      "b2b",
+      "credential swap",
+    ],
     render: () => (
       <MemberVaultUnlockCard vaultId={FIXTURE_VAULT_ID} onUnlocked={action("onUnlocked")} />
     ),
