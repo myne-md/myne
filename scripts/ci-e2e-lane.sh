@@ -78,9 +78,32 @@ esac
 # `ci/Dockerfile` without republishing makes its recorded digest describe
 # an image the file no longer produces. Installed here until that lands,
 # so this seat matches `e2e/Dockerfile`'s.
+#
+# `libayatana-appindicator3-1` is the one entry here that is a RUNTIME lib with
+# no build-time counterpart on this seat, and it is load-bearing in a way that
+# is easy to miss. `libappindicator-sys` does not link it: it dlopens
+# `libayatana-appindicator3.so.1` (then `libappindicator3.so.1`) through
+# `libloading`, and PANICS when neither loads. The desktop binary reaches that
+# crate from exactly one place, the tray, whose only runtime caller is
+# `meeting_session_start` — so `mn1`/`mn2` are the only two scenarios that can
+# observe its absence, and on pipeline #697 they both died 8 s in with
+# `[invalid session id] session deleted because of page crash or hang` while
+# passing in the local `myne-e2e` image, which carries the library via
+# `libayatana-appindicator3-dev`.
+#
+# Measured, not reasoned (2026-10-18): `rust:1.96.0-slim` plus this exact list
+# has `libasound.so.2` and `libgtk-3.so.0` present (webkit2gtk-driver pulls both)
+# and `libayatana-appindicator3.so.1` absent.
+#
+# `check-e2e-toolchain.mjs` deliberately does NOT require this: its rule is
+# "subtract whatever tauri-compile installs", and `libayatana-appindicator3-dev`
+# IS a build sysdep, so the subtraction hides the runtime half. That is the
+# guard's stated scope rather than a defect in it, but it means this line has no
+# machine check and the comment above is the record.
 apt-get update
 apt-get install -y --no-install-recommends \
-  curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold
+  curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold \
+  libayatana-appindicator3-1
 
 # The Node tarball is version-pinned and fetched over TLS from the first-party
 # distribution origin, and it is NOT sha256-pinned. `.woodpecker/e2e.yml` states

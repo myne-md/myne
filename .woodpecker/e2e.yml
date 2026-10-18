@@ -29,8 +29,9 @@
 # ─── Why this workflow builds its own binaries ───────────────────────────────
 # Woodpecker workflows do not share a workspace: `main.yml`'s `tauri-compile`
 # output does not exist here. So this file compiles the release binary, the
-# fixture generator and the web bundle itself. That cost is paid only when
-# somebody triggers it. The shared `/cache` sccache + cargo mounts (see
+# fixture generator, the wasm entry surface and the web bundle itself. That cost
+# is paid only when somebody triggers it. The shared `/cache` sccache + cargo
+# mounts (see
 # `main.yml`'s `tauri-compile` comment for what provides them) make a warm run
 # cheaper; a cold one is a full release build on top of everything else.
 #
@@ -47,7 +48,9 @@
 # exception (it touches neither `node_modules` nor cargo), so it runs alongside
 # from the start. The web lane goes FIRST because it is the cheap half (no
 # binary build, no display) and gives a signal long before the desktop suite
-# lands. Strictly speaking only the INSTALLS conflict, so the web lane could run
+# lands, with `e2e-web-wasm` immediately in front of it because `pnpm web:build`
+# cannot resolve its wasm import without that artefact. Strictly speaking only
+# the INSTALLS conflict, so the web lane could run
 # beside the release build; that is deliberately not taken, because it would put
 # a chromium suite next to a full release build on the host this very file
 # documents as contention-sensitive (see the shard note in
@@ -107,9 +110,57 @@ steps:
           exit 0;
         fi
       - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server-src"
+      # GitHub, not the `git.myne.md` Forgejo mirror, and `x-access-token:`
+      # rather than `oauth2:`. The secret holds a GitHub PAT (main.yml's
+      # `sync-sim` records the whole story: the mirror's token "kept expiring",
+      # red on 2026-09-05/06 with the identical `Credentials are incorrect or
+      # have expired` this step then reproduced), so pointing it at the mirror is
+      # a 401 with a token that is perfectly valid for somewhere else. That
+      # message names neither the host nor the token type, which is why it reads
+      # as an expired secret rather than as a mismatched one.
+      #
+      # `--depth 1` plus a build output at `$CI_WORKSPACE/myne-server-e2e`, which
+      # is the path `scripts/ci-e2e-lane.sh` looks for (`SERVER_BIN`). Renaming
+      # either half here silently turns every sync scenario into a self-skip.
+      - git clone --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server-src"
       - cd "$CI_WORKSPACE/myne-server-src" && CGO_ENABLED=0 go build -o "$CI_WORKSPACE/myne-server-e2e" ./cmd/myne-server
       - ls -la "$CI_WORKSPACE/myne-server-e2e"
+
+  # ─── wasm entry surface the web bundle imports ───────────────
+  # `pnpm web:build` bundles `web/src/worker/worker.ts`, which imports
+  # `../../wasm/pkg/myne_web_wasm.js`. That directory is GITIGNORED, so it is
+  # never in a checkout, and `web:build` does not generate it: the script is
+  # `tsc && vite build && emit-web-version`, with no `build-wasm.sh` in it.
+  #
+  # `main.yml` solved this for its own `web-build` with an ordering edge onto
+  # `wasm-repro`, and that edge is the half this workflow did not inherit when
+  # both lanes left the push pipeline (myne-md/myne#579). Without it `e2e-web`
+  # died 1.4 s into `vite build` with
+  # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`,
+  # which names a missing dependency and so reads as a broken branch rather than
+  # as a missing edge in this file. The whole browser lane asserted nothing.
+  #
+  # The CI base image rather than `e2e-web`'s `node:25`, because this needs Rust
+  # and the wasm32 target (both baked into it) and the version-matched
+  # `wasm-bindgen-cli`. `wasm-repro-check.sh` is the committed entry point that
+  # installs that CLI from `Cargo.lock` and then produces the artefact, and
+  # `main.yml`'s `web-build` depends on exactly this script for exactly this
+  # reason. It runs the `--verify` double build, which this lane does not need on
+  # its own account; that is one extra wasm build on a manual, pre-release
+  # workflow, traded for reusing the one path that is already exercised on every
+  # push. `/cache` is the shared mount, so the CLI and the crate cache survive
+  # between runs.
+  e2e-web-wasm:
+    image: ghcr.io/myne-md/myne-ci@sha256:99fbe08624fd824de91a9615202439fceb4d696e2bb911e175f4624096131b67
+    when: *always
+    environment:
+      CARGO_HOME: /cache/cargo
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+    commands:
+      - bash scripts/wasm-repro-check.sh
 
   # ─── Web E2E lane (the built bundle in a real browser) ───────
   # Builds `web/dist` and drives it through chromedriver. The harness serves it
@@ -145,6 +196,16 @@ steps:
   e2e-web:
     image: node:25
     when: *always
+    # ─── Depends on `e2e-web-wasm`, and that is a CORRECTNESS edge ─────────────
+    # See that step for the full reason. `optional: true` ORDERS without
+    # requiring success, which is the right shape here and the one `main.yml`
+    # ratified for the same pair: if the producer fails, this step still RUNS and
+    # fails on the unresolved import. A required edge would instead SKIP it, and
+    # by this file's own sentence a gate that did not run is indistinguishable
+    # from one that passed.
+    depends_on:
+      - name: e2e-web-wasm
+        optional: true
     environment:
       CI: "true"
       # An explicit opt-in meaning "a driver is listening". See
@@ -344,15 +405,18 @@ steps:
   # `e2e` and `e2e-quarantine` are both `failure: ignore` and so can never reach
   # this notifier with a failure; they are listed anyway, with `optional: true`,
   # so notify WAITS for their terminal status rather than racing it. The steps
-  # that can actually fire it are `e2e-compile`, `e2e-web` and `e2e-floor`. The
-  # last is the one whose failure means the suite asserted less than it
-  # claims to. Every step is named rather than relying on the chain's tail: the
+  # that can actually fire it are `e2e-web-wasm`, `e2e-compile`, `e2e-web` and
+  # `e2e-floor`. The last is the one whose failure means the suite asserted less
+  # than it claims to. Every step is named rather than relying on the chain's
+  # tail: the
   # tail is a fact about today's graph, and a step added beside it later would
   # silently stop being waited for.
   notify-failure:
     image: alpine:3.21
     depends_on:
       - name: myne-server-build
+        optional: true
+      - name: e2e-web-wasm
         optional: true
       - name: e2e-web
         optional: true

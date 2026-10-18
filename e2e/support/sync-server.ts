@@ -22,9 +22,20 @@ import { REPO_ROOT } from "./session";
 const SERVER_HOST = "127.0.0.1";
 const SERVER_READY_TIMEOUT_MS = 10_000;
 
-/** The myne-server binary under test (env override, else the built path). */
+/** The myne-server binary under test (env override, else the built path).
+ *
+ *  An EMPTY override is not an override. `scripts/ci-e2e-lane.sh` exports
+ *  `MYNE_E2E_SERVER=""` to mean "the server was not provisioned", and `??` only
+ *  catches `undefined`, so the empty string used to sail past it and become the
+ *  answer. The consequence was worse than a wrong path: the skip reason printed
+ *  `myne-server binary not found at  — build it …` with nothing after "at", and
+ *  `sync-replication` and five siblings reported it while
+ *  `e2e/multi-device-harness.e2e.ts` failed its `syncServerBinary().length > 0`
+ *  wiring assertion on an expired secret. Naming the real fallback path is what
+ *  makes that message actionable. */
 export function syncServerBinary(): string {
-  return process.env.MYNE_E2E_SERVER ?? join(REPO_ROOT, "myne-server", "myne-server");
+  const override = process.env.MYNE_E2E_SERVER?.trim();
+  return override ? override : join(REPO_ROOT, "myne-server", "myne-server");
 }
 
 /** Preflight: can we spawn an ephemeral server? (Binary present.) */
