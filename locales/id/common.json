@@ -227,7 +227,8 @@
       "targetVault": "Tentang seluruh brankas",
       "running": "Sedang mengerjakan percakapan ini",
       "newConversation": "Percakapan baru",
-      "historyLabel": "Riwayat"
+      "historyLabel": "Riwayat",
+      "searchClear": "Tampilkan semua percakapan"
     },
     "focus": {
       "title": "Agen pada catatan",
@@ -356,7 +357,15 @@
       "emptyFilteredBody": "Tidak ada di sini yang cocok dengan filter jenis saat ini. Kosongkan untuk melihat seluruh pustaka lagi.",
       "emptyFilteredBodyQuery": "Tidak ada di pustaka yang cocok",
       "emptyLoadErrorBody": "Katalog ini terenkripsi bersama brankas Anda, jadi ini biasanya pembacaan yang terputus, bukan data yang hilang. Coba lagi; jika terus gagal, catatan Anda dan berkasnya tidak terpengaruh.",
-      "emptyRetry": "Coba lagi"
+      "emptyRetry": "Coba lagi",
+      "transcriptCopy": "Salin",
+      "transcriptCopied": "Transkripsi disalin.",
+      "transcriptCopyFailed": "Tidak dapat menyalin transkripsi.",
+      "transcriptEmpty": "Tidak ada ucapan yang ditemukan dalam rekaman ini.",
+      "transcriptNoteTitle": "{{name}} (transkripsi)",
+      "transcriptSave": "Simpan sebagai catatan",
+      "transcriptSaved": "Transkripsi disimpan sebagai catatan.",
+      "transcriptSaveFailed": "Tidak dapat menyimpan transkripsi sebagai catatan."
     },
     "thumbnail": {
       "audioLabel": "Audio: {{filename}}",
@@ -787,6 +796,12 @@
       },
       "openPalette": {
         "label": "Cari dan jalankan perintah…"
+      },
+      "attachFile": {
+        "label": "Lampirkan berkas…"
+      },
+      "convertImportedAttachments": {
+        "label": "Konversi lampiran yang diimpor…"
       }
     },
     "hotkeys": {
@@ -1221,8 +1236,6 @@
           "insert": "Sisipkan ke catatan",
           "noAnswer": "Tidak ada jawaban. Coba ubah kalimatnya.",
           "newChat": "Obrolan baru",
-          "noModelHint": "Tidak ada penyedia AI yang disiapkan, jadi tidak ada yang menjalankan obrolan, ringkasan, penulisan ulang, dan pencarian semantik. Siapkan satu di Pengaturan → Developer → AI.",
-          "unreachableHint": "Penyedia yang Anda siapkan tidak merespons. Pastikan penyedia itu berjalan, lalu kirim lagi.",
           "unavailableHint": "Build Myne ini dikompilasi tanpa AI lokal, jadi tidak ada yang dapat dijalankan di sini. Tidak ada pengaturan yang dapat mengubahnya — dibutuhkan build yang menyertakan AI.",
           "offHint": "AI lokal mati. Nyalakan di Pengaturan → Developer → AI.",
           "send": "Kirim",
@@ -1240,9 +1253,7 @@
           "historyCancel": "Batal",
           "historyDelete": "Hapus",
           "historyDeleteBody": "Ini menghapus percakapan dari setiap perangkat saat terhubung berikutnya. Tindakan ini tidak dapat dibatalkan.",
-          "historyEmpty": "Belum ada percakapan. Obrolan baru muncul di sini.",
           "historyError": "Tidak dapat memuat percakapan. Coba lagi.",
-          "historyLoading": "Memuat…",
           "historyProposalNewNote": "Catatan baru",
           "historyRename": "Ganti nama",
           "historyTitle": "Riwayat obrolan",
@@ -1274,7 +1285,16 @@
           "diffTitle": "Perubahan yang diusulkan",
           "revertConfirmTitle": "Kembalikan proses ini?",
           "revertConfirmBody": "Catatan yang diubah proses ini kembali seperti sebelum proses itu. Catatan yang dibuatnya tetap di tempatnya.",
-          "focusAgent": "Buka di tab agen"
+          "focusAgent": "Buka di tab agen",
+          "statusNoModelChosen": "Tidak ada model",
+          "statusNoCredential": "Tidak ada kunci API",
+          "statusConsentMissing": "Perlu persetujuan",
+          "statusNotAllowed": "Tidak diizinkan",
+          "statusKeyRejected": "Kunci ditolak",
+          "statusOutOfCredit": "Kredit habis",
+          "statusRefused": "Ditolak",
+          "statusNotWorking": "Tidak berfungsi",
+          "historyRetry": "Coba lagi"
         },
         "allHidden": "Semua tab tersembunyi. Klik kanan untuk memulihkan.",
         "outline": {
@@ -1404,7 +1424,8 @@
       "propertiesLabel": "Properti",
       "removeListItemAriaLabel": "Hapus {{item}}",
       "titleAriaLabel": "Judul catatan",
-      "titlePlaceholder": "Tanpa judul"
+      "titlePlaceholder": "Tanpa judul",
+      "managedField": "Myne yang menulis bidang ini"
     },
     "mermaid": {
       "rendering": "Merender diagram…",
@@ -1456,7 +1477,8 @@
       "voiceNote": "Catatan suara",
       "wikiLink": "Wikilink",
       "remind": "Pengingat",
-      "meeting": "Sesi rapat"
+      "meeting": "Sesi rapat",
+      "sheetTitle": "Sisipkan"
     },
     "spell": {
       "menu": {
@@ -1618,6 +1640,9 @@
       },
       "convertCore": {
         "noMatch": "tidak ada yang cocok"
+      },
+      "picker": {
+        "sheetTitle": "Tautkan ke catatan"
       }
     },
     "flow": {
@@ -1814,6 +1839,9 @@
       "tapSilent": "Audio peserta lain tidak masuk. Periksa Pengaturan Sistem, Privasi & Keamanan, Perekaman Layar & Audio Sistem.",
       "transcriptHeading": "Transkrip",
       "transcriptionFailed": "Sebagian rapat tidak dapat ditranskripsi. Audionya tetap ada di catatan."
+    },
+    "templateToken": {
+      "sheetTitle": "Sisipkan token"
     }
   },
   "export": {
@@ -2124,7 +2152,11 @@
         "derivedMakeEditableFailed": "Grup tersebut tidak dapat disimpan. Coba lagi.",
         "derivedNote_one": "Graf diwarnai berdasarkan tag: {{count}} grup, diturunkan dari tag Anda. Tidak disimpan sampai Anda membuatnya bisa disunting.",
         "derivedNote_other": "Graf diwarnai berdasarkan tag: {{count}} grup, diturunkan dari tag Anda. Tidak disimpan sampai Anda membuatnya bisa disunting.",
-        "newRuleTitle": "Grup warna baru"
+        "newRuleTitle": "Grup warna baru",
+        "moveDown": "Pindahkan aturan ke bawah",
+        "moveUp": "Pindahkan aturan ke atas",
+        "mobileEmptyBody": "Grup warna mewarnai grafik berdasarkan tag atau folder, dan dibuat di komputer. Ponsel ini memakainya tetapi belum dapat membuatnya, karena grup baru memerlukan filter.",
+        "mobileSharedNotice": "Grup warna dibagikan: suntingan di sini menggantikan seluruh daftar di perangkat Anda yang lain, dan daftar yang disunting di komputer akan tiba di sini."
       },
       "depthToggleTitle": "Alihkan kedalaman sekitar (1 ↔ 2 lompatan)",
       "filterAll": "Semua",
@@ -2925,7 +2957,39 @@
       "updateIdle": "Pembaruan bertanda tangan, diambil dari downloads.myne.md saat Anda memeriksa.",
       "updateInstallButton": "Mulai ulang untuk memperbarui",
       "updateLabel": "Pembaruan",
-      "updateUpToDate": "Anda sudah memakai versi terbaru."
+      "updateUpToDate": "Anda sudah memakai versi terbaru.",
+      "developerModeInline": "Menampilkan pengaturan yang secara bawaan disimpan Myne di luar jangkauan.",
+      "diagnosticLogHelper": "Menulis log teks biasa di perangkat ini, dan hanya di perangkat ini. Log itu mencatat apa yang sedang dilakukan Myne: tidak pernah teks catatan Anda, tidak pernah judul catatan, tidak pernah jalur berkas. Myne membatasi ukurannya dan membuang entri terlama lebih dulu, dan mematikan ini kembali akan menghapus log itu. Tidak ada yang pernah dikirim ke mana pun; Anda yang menentukan apa yang dibagikan.",
+      "diagnosticLogLabel": "Pencatatan diagnostik",
+      "diagnosticLogError": "Myne tidak dapat mengubah pengaturan itu.",
+      "diagnosticLogReadError": "Myne tidak dapat membaca pengaturan pencatatan diagnostik, jadi ditampilkan sebagai mati.",
+      "diagnosticBlockLabel": "Detail laporan",
+      "diagnosticBlockHelper": "Persis apa yang diletakkan tombol Salin ke papan klip Anda. Tidak ada yang dikirim ke mana pun; Anda yang menentukan apa yang dibagikan.",
+      "diagnosticCopy": "Salin diagnostik",
+      "diagnosticCopyDone": "Diagnostik disalin",
+      "diagnosticCopyFailed": "Tidak dapat menyalin. Pilih teks di atas lalu salin secara manual.",
+      "crashRecordLabel": "Catatan crash",
+      "crashRecordHelper": "Myne mencatat sebuah crash pada {{date}}. Catatan itu memuat berkas dan baris, versinya, serta platform Anda, dan tidak ada yang lain. Hapus kapan pun Anda mau.",
+      "crashRecordClear": "Hapus",
+      "diagnosticFilesLabel": "Berkas laporan",
+      "diagnosticFilesUnknown": "Myne belum membaca log itu.",
+      "crashRecordDateUnknown": "tanggal yang tidak diketahui",
+      "diagnosticReveal": "Tampilkan folder log",
+      "diagnosticSave": "Simpan laporan sebagai berkas…",
+      "diagnosticSaveDone": "Laporan disimpan",
+      "diagnosticSaveFailed": "Myne tidak dapat menyimpan laporan itu.",
+      "diagnosticRevealFailed": "Myne tidak dapat membuka folder log.",
+      "crashRecordClearFailed": "Myne tidak dapat menghapus catatan crash itu.",
+      "crashRecordReadFailed": "Myne tidak dapat membaca catatan crash itu, jadi tidak dapat memastikan apakah ada.",
+      "sections": {
+        "version": "Versi",
+        "updates": "Tetap mutakhir",
+        "legal": "Hukum dan lisensi",
+        "developer": "Developer",
+        "diagnostics": "Diagnostik"
+      },
+      "diagnosticFilesHelper_one": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi.",
+      "diagnosticFilesHelper_other": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi."
     },
     "vault": {
       "changePasswordButton": "Ubah kata sandi",
@@ -2933,7 +2997,7 @@
         "invalidCredentialOrVault": "Kata sandi saat ini salah atau berkas brankas rusak.",
         "ioError": "Galat disk, silakan coba lagi.",
         "joinFailure": "Terjadi kesalahan, silakan coba lagi.",
-        "samePasswordRejected": "Kata sandi baru sama dengan yang sekarang.",
+        "samePasswordRejected": "Kata sandi baru sama dengan kata sandi saat ini.",
         "serverAckPending": "Kata sandi baru Anda berfungsi di perangkat ini, tetapi Myne tidak dapat menjangkau server untuk menyimpannya. Sampai itu berhasil, perangkat Anda yang lain masih mengharapkan kata sandi lama, dan jika salinan di peramban ini dibersihkan sebelum itu, perubahannya hilang. Myne akan mencobanya lagi secara otomatis.",
         "weakNewPassword": "Kata sandi baru harus minimal 12 karakter.",
         "unexpected": "Perubahan kata sandi itu tidak berhasil. Silakan coba lagi.",
@@ -2942,31 +3006,38 @@
       "changePasswordHeading": "Ubah kata sandi",
       "changePasswordHelper": "Ganti kata sandi master Anda sambil tetap memakai brankas yang sama. Frasa pemulihan tetap sama.",
       "dangerZoneHeading": "Zona bahaya",
-      "dangerZoneHelper": "Hapus permanen brankas ini beserta semua catatan. Tidak dapat dibatalkan. Frasa pemulihan tidak akan mengembalikan brankas.",
+      "dangerZoneHelper": "Hapus permanen brankas ini dan semua catatannya. Tindakan ini tidak dapat dibatalkan. Frasa pemulihan tidak akan memulihkan brankas ini.",
       "localEraseHeading": "Peramban ini",
-      "localEraseHelper": "Hapus salinan brankas Anda yang disimpan Myne di peramban ini. Akun Anda dan semua yang sudah tersinkron tetap berada di server.",
+      "localEraseHelper": "Hapus salinan brankas Anda milik Myne dari peramban ini. Akun Anda dan semua yang sudah disinkronkan tetap ada di server.",
       "localEraseButton": "Keluar dan hapus salinan di peramban ini…",
       "deleteVaultButton": "Hapus brankas…",
       "vaultLabelEyebrow": "LABEL BRANKAS",
-      "vaultLabelHelper": "Nama untuk brankas ini, ditampilkan di pengalih dalam aplikasi dan di pemilih brankas saat mulai sebelum Anda membuka kunci. Disimpan terenkripsi di dalam brankas; tidak pernah meninggalkan perangkat Anda dalam bentuk teks biasa.",
+      "vaultLabelHelper": "Nama untuk brankas ini, ditampilkan di pengalih brankas di dalam aplikasi dan di pemilih brankas saat mulai sebelum Anda membuka kunci. Disimpan terenkripsi di dalam brankas; tidak pernah meninggalkan perangkat Anda dalam bentuk teks biasa.",
       "vaultLabelPlaceholder": "Tambahkan label…",
-      "vaultLabelRenameNotice": "Sampai Anda membuka kunci brankas ini di perangkat Anda yang lain, layar kunci di perangkat tersebut tetap menampilkan nama yang terakhir tersimpan di sana: nama sebelumnya, atau teks pengganti jika belum pernah ada nama yang tersimpan.",
+      "vaultLabelRenameNotice": "Sampai Anda membuka brankas ini di perangkat Anda yang lain, layar kuncinya tetap menampilkan yang terakhir disimpannya: nama sebelumnya, atau teks pengganti jika belum pernah menyimpannya.",
       "vaultLabelSave": "Simpan",
       "vaultIconLabel": "IKON",
       "vaultIconDefault": "Bawaan (wordmark)",
-      "renamedToast": "Brankas diganti namanya",
+      "renamedToast": "Nama brankas diubah",
       "renameError": "Tidak dapat mengganti nama brankas",
       "newPasswordMismatch": "Kata sandi baru tidak cocok.",
       "samePassword": "Kata sandi baru sama dengan kata sandi saat ini.",
       "passwordChangedToast": "Kata sandi diubah",
       "vaultUnreadable": "Berkas brankas tidak dapat dibaca. Pulihkan dari cadangan.",
       "genericChangeError": "Terjadi kesalahan. Silakan coba lagi.",
-      "renameHelper": "Ditampilkan di pengalih brankas. Disimpan terenkripsi di dalam brankas ini; biarkan kosong untuk mengosongkannya.",
+      "renameHelper": "Ditampilkan di pengalih brankas. Disimpan terenkripsi di dalam brankas ini; biarkan kosong untuk menghapusnya.",
       "newPasswordPlaceholder": "Minimal 12 karakter",
       "reenterNewPassword": "Masukkan ulang kata sandi baru",
       "changePasswordFootnote": "Ini membatalkan buka kunci cepat. Frasa pemulihan Anda tidak berubah.",
       "changing": "Mengubah…",
-      "memberVaultNotice": "Ini brankas bersama. Brankas ini tidak punya kata sandi brankas. Gunakan Buka kunci brankas bersama di Privasi untuk menambahkan kata sandi atau PIN."
+      "memberVaultNotice": "Ini brankas bersama. Brankas ini tidak punya kata sandi brankas. Gunakan Buka kunci brankas bersama di Privasi untuk menambahkan kata sandi atau PIN.",
+      "topics": {
+        "vault": "Brankas",
+        "danger": "Zona bahaya"
+      },
+      "sections": {
+        "identity": "Identitas brankas"
+      }
     },
     "appearance": {
       "accentHelper": "Pilih warna aksen yang digunakan di seluruh aplikasi. Hanya perangkat ini.",
@@ -3004,6 +3075,16 @@
       "barCustomize": {
         "label": "Bilah bawah",
         "helper": "Pilih indikator mana yang ditampilkan bilah bawah. Sembunyikan semuanya, bilahnya sendiri akan dihapus dan ruangnya kembali. Seret atau klik kanan item di bilah untuk mengurutkannya."
+      },
+      "topics": {
+        "display": "Tampilan",
+        "notes": "Daftar catatan",
+        "interface": "Antarmuka"
+      },
+      "sections": {
+        "theme": "Tema dan aksen",
+        "sidebar": "Di bilah sisi",
+        "customisation": "Kustomisasi"
       }
     },
     "archive": {
@@ -3030,7 +3111,8 @@
       "helper": "Membaca teks dari lampiran gambar dan PDF hasil pindaian di perangkat ini, sehingga pencarian dapat menemukannya berdasarkan isinya. Tidak ada yang diunggah. Mematikan ini menghentikan ekstraksi di latar belakang; teks yang sudah diekstrak tetap disimpan.",
       "errorSaveSetting": "Tidak dapat menyimpan pengaturan ini.",
       "processing_one": "Membaca 1 lampiran…",
-      "processing_other": "Membaca {{count}} lampiran…"
+      "processing_other": "Membaca {{count}} lampiran…",
+      "mobileDeviceLocal": "Yang ini per perangkat: ini menentukan apa yang diindeks ponsel ini, sehingga perangkat Anda yang lain tetap memakai pilihannya sendiri."
     },
     "autoBackup": {
       "backupFolder": "Folder cadangan",
@@ -3105,7 +3187,8 @@
       "excludedHelper": "Satu jalur folder per baris. Catatan di folder ini tidak disertakan dalam hasil terminal mana pun dan tidak dapat ditulis ke sana dari terminal. Catatan itu tetap tersedia sepenuhnya di aplikasi. Anda dapat mengatur ini sebelum menyalakan akses terminal.",
       "excludedPlaceholder": "Private/\nJournal/",
       "rateLimitLabel": "Biarkan terminal berjalan penuh kecepatan",
-      "rateLimitHelper": "Secara bawaan Myne menjawab paling banyak 120 perintah terminal per menit. Itu batas laju untuk skrip yang lepas kendali, bukan pemeriksaan izin: tidak ada yang memutuskan program mana yang boleh bertanya. Nyalakan ini untuk pekerjaan massal, seperti mengalirkan setiap catatan melalui alat lain."
+      "rateLimitHelper": "Secara bawaan Myne menjawab paling banyak 120 perintah terminal per menit. Itu batas laju untuk skrip yang lepas kendali, bukan pemeriksaan izin: tidak ada yang memutuskan program mana yang boleh bertanya. Nyalakan ini untuk pekerjaan massal, seperti mengalirkan setiap catatan melalui alat lain.",
+      "inlineOn": "Program apa pun yang berjalan di bawah akun Anda dapat membaca, mencari, dan membuat catatan melaluinya."
     },
     "clipperInstall": {
       "error": "Tidak dapat memperbarui setelan clipper peramban.",
@@ -3175,7 +3258,12 @@
       "periodFormatAriaLabel": "Format judul catatan {{period}}",
       "periodTemplateAriaLabel": "Templat catatan {{period}}",
       "sectionPeriodic": "Catatan berkala",
-      "periodSwitcherAriaLabel": "Jenis catatan berkala"
+      "periodSwitcherAriaLabel": "Jenis catatan berkala",
+      "blockLabel": "Catatan berkala",
+      "mobilePeriodAriaLabel": "Periode catatan",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Simpan",
+      "mobileSharedNotice": "Pengaturan ini dibagikan: suntingan di sini mencapai perangkat Anda yang lain, dan nilai yang sama yang disetel di komputer akan tiba di sini."
     },
     "deleteVault": {
       "cancel": "Batal",
@@ -3227,6 +3315,10 @@
         "searchEmpty": "Tidak ada catatan ditemukan.",
         "searchPlaceholder": "Cari catatan…",
         "untitledNote": "Tanpa judul"
+      },
+      "sections": {
+        "notes": "Catatan dan folder",
+        "attachments": "Lampiran"
       }
     },
     "focusMode": {
@@ -3341,12 +3433,12 @@
         "excludedLabel": "Folder dikecualikan"
       },
       "disclosureToggle": "Bagaimana ini bekerja?",
-      "enableHelper": "Menjalankan model yang Anda sediakan. Di mana model itu berjalan, dan apakah catatan Anda keluar dari perangkat ini, bergantung pada penyedia yang Anda sebutkan di bawah. Eksperimental, mati secara bawaan.",
-      "enableLabel": "Aktifkan AI lokal",
-      "excludedHelper": "Catatan di folder ini tidak pernah dibaca atau diindeks oleh AI. Kosong berarti AI dapat melihat semuanya; ini daftar yang sama yang dipatuhi klien command-line. Satu path folder per baris.",
+      "enableHelper": "Menyalakan setiap fitur AI. Di mana model berjalan, dan apakah catatan Anda keluar dari perangkat ini, keduanya bergantung pada penyedia yang Anda pilih di bawah. Eksperimental, mati secara bawaan.",
+      "enableLabel": "Aktifkan fitur AI",
+      "excludedHelper": "Catatan di folder ini tidak pernah dibaca atau diindeks oleh AI. Kosong berarti AI dapat melihat semuanya. Satu jalur folder per baris.",
       "excludedLabel": "Folder yang dikecualikan",
       "excludedPlaceholder": "Private/\nJournal/",
-      "endpointHelper": "Jika Anda sudah menjalankan runtime model di komputer ini, arahkan Myne ke sana alih-alih memilih berkas model. Biarkan kosong untuk memakai berkas di atas.",
+      "endpointHelper": "Jika Anda sudah menjalankan runtime model di komputer ini, arahkan Myne ke situ alih-alih memilih berkas model. Biarkan kosong untuk memakai berkas model yang disetel di Model.",
       "endpointLabel": "Runtime model lokal",
       "endpointModelHelper": "Myne tidak memilihkan model untuk Anda. Sampai Anda menyebutkan satu, alamat di atas tersimpan tetapi tidak dipakai.",
       "endpointModelLabel": "Model yang dipakai di sana",
@@ -3373,7 +3465,8 @@
         "unreachable": "Tidak dapat menjangkau penyedia. Periksa koneksi jaringan Anda.",
         "featureOff": "AI dimatikan di perangkat ini. Tidak ada yang dikirim. Nyalakan di Pengaturan, bagian AI.",
         "consentMissing": "Anda belum menyetujui pengiriman catatan ke penyedia ini dari perangkat ini. Tidak ada yang dikirim. Pilih kembali penyedia di Pengaturan, bagian AI, dan baca apa yang akan dikirim.",
-        "emptyGrant": "Semua yang dapat dibaca proses ini ada di folder yang tidak pernah dilihat AI. Tidak ada yang dikirim. Ubah di Pengaturan, AI, Folder dikecualikan."
+        "emptyGrant": "Semua yang dapat dibaca proses ini ada di folder yang tidak pernah dilihat AI. Tidak ada yang dikirim. Ubah di Pengaturan, AI, Folder dikecualikan.",
+        "noModel": "Tidak ada model di sini untuk dijalankan. Tambahkan satu di Pengaturan, AI, Model: unduh dari origin Myne sendiri, atau arahkan Myne ke berkas yang sudah Anda miliki."
       },
       "modelChoose": "Pilih berkas…",
       "modelFilter": {
@@ -3383,7 +3476,7 @@
       "modelNone": "Tidak ada berkas terpilih",
       "modelSaveFailed": "Tidak dapat menyimpan path model (harus di luar brankas Anda).",
       "modelTranscriptionLabel": "Model ucapan-ke-teks (transkripsi)",
-      "modelsHelper": "Unduh model di sini, atau buka tautan untuk mendapatkannya di peramban Anda dan pilih berkas yang telah diunduh. Sebuah model berjalan di perangkat Anda; jika Anda justru menyebutkan sebuah penyedia, penyedia itulah yang menjawab.",
+      "modelsHelper": "Tetapkan berkas yang dipakai setiap peran jika berasal dari tempat lain selain daftar terverifikasi di atas: buka tautan untuk mendapatkannya di peramban Anda, lalu pilih di sini. Sebuah model berjalan di perangkat Anda; jika Anda justru menyebutkan sebuah penyedia, penyedia itulah yang menjawab.",
       "providerHelper": "Alih-alih menjalankan model di sini, Myne dapat mengirim permintaan ke layanan yang Anda sebutkan. Catatan Anda keluar dari perangkat ini saat itu terjadi. “Tidak ada” adalah pilihan bawaannya dan berarti tidak ada layanan yang dihubungi sama sekali.",
       "providerKeyAdd": "tempel kunci API Anda",
       "providerKeyLabel": "Kunci API",
@@ -3408,7 +3501,7 @@
       "providerModelUnfetched": "Muat daftarnya untuk memilih model.",
       "providerNone": "Tidak ada",
       "providerNothingAnswering": "Belum ada yang disiapkan untuk menjawab.",
-      "modelsLabel": "Model",
+      "modelsLabel": "Model dari luar",
       "recommendedFilesGeneration": "Membutuhkan berkas .gguf + tokenizer.json dalam folder yang sama.",
       "recommendedFilesTranscription": "Membutuhkan berkas Whisper .gguf + config.json + tokenizer.json dalam folder yang sama.",
       "title": "AI",
@@ -3424,10 +3517,6 @@
       "meetingPromptHelper": "Instruksi yang dipakai proses AI rapat untuk mengubah transkrip menjadi beberapa bagian. Biarkan kosong untuk memakai bawaan. Ini menggantikan format keluaran bawaan, jadi jika Anda mengisinya, mintalah sendiri bagian-bagian yang Anda inginkan.",
       "meetingPromptLabel": "Perintah ringkasan rapat",
       "meetingPromptReset": "Setel ulang ke bawaan",
-      "groupAutoTag": "Tag otomatis",
-      "groupVoice": "Suara dan rapat",
-      "groupWriting": "Penulisan dan obrolan",
-      "groupPrivacy": "Privasi dan batas",
       "groupAdvanced": "Lanjutan",
       "excludedPickLabel": "Tambahkan folder untuk dikecualikan",
       "excludedPickPlaceholder": "Pilih folder…",
@@ -3447,7 +3536,39 @@
       "downloadCancel": "Batal",
       "downloadFailed": "Unduhan tidak selesai.",
       "downloadFailedChecksum": "Unduhan tidak cocok dengan sidik jarinya dan ditolak. Coba lagi.",
-      "sideloadDisclosure": "Mode developer juga memungkinkan Anda mengarahkan Myne ke berkas model yang Anda dapatkan sendiri. Berkas yang Anda unduh dari tempat lain tidak diperiksa Myne, jadi hanya gunakan yang Anda percayai."
+      "sideloadDisclosure": "Mode developer juga memungkinkan Anda mengarahkan Myne ke berkas model yang Anda dapatkan sendiri. Berkas yang Anda unduh dari tempat lain tidak diperiksa Myne, jadi hanya gunakan yang Anda percayai.",
+      "historyBudgetInline": "Seberapa banyak percakapan terbaru yang dibawa setiap permintaan, dalam karakter.",
+      "historyBudgetMaxNotice": "Angka terbesar yang dapat Anda masukkan adalah {{max}} karakter; yang lebih besar akan dikurangi ke angka itu.",
+      "historyBudgetDeviceLocal": "Yang ini per perangkat: ini membatasi apa yang dikirim ponsel ini, sehingga perangkat Anda yang lain tetap memakai miliknya sendiri.",
+      "meetingPromptShared": "Yang ini dibagikan: suntingan di sini mencapai perangkat Anda yang lain, dan perintah yang disunting di komputer akan tiba di sini.",
+      "groupAnswering": "Menjawab",
+      "groupGeneral": "Umum",
+      "groupModels": "Model",
+      "groupLimits": "Batas",
+      "groupTagging": "Pemberian tag",
+      "excludedFoldersHelper": "Catatan di folder ini tidak pernah dibaca atau diindeks oleh AI. Ini daftar yang sama yang dipakai perangkat Anda yang lain.",
+      "excludedFoldersEmpty": "Belum ada yang dikecualikan, jadi AI dapat membaca setiap folder di brankas ini.",
+      "excludedFoldersAdd": "Tambah",
+      "excludedFoldersAddLabel": "Folder yang dikecualikan dari AI",
+      "excludedFoldersRemove": "Hapus",
+      "excludedFoldersRemoveLabel": "Berhenti mengecualikan {{folder}} dari AI",
+      "excludedFoldersMonotoneNotice": "Pengecualian yang ditambahkan di perangkat mana pun tetap ada sampai Anda menghapusnya di semua tempat: penghapusan di sini tidak ikut berpindah, jadi folder yang masih dikecualikan perangkat Anda yang lain akan muncul lagi pada sinkronisasi berikutnya.",
+      "catalogueOpen": "Unduh model",
+      "catalogueColModel": "Model",
+      "catalogueColState": "Status",
+      "providerInline": "Catatan Anda keluar dari perangkat ini begitu sebuah layanan disebutkan.",
+      "providerChooseHelper": "Sebuah model dapat berjalan di perangkat ini, atau Myne dapat mengirim permintaan ke layanan yang Anda sebutkan. Catatan Anda keluar dari perangkat ini saat itu terjadi. “Di perangkat ini” adalah bawaannya dan berarti tidak ada layanan yang dihubungi sama sekali.",
+      "providerChooseLabel": "Pilih penyedia",
+      "providerKeySave": "Simpan kunci ini",
+      "providerOnDevice": "Di perangkat ini",
+      "sections": {
+        "catalogue": "Model terverifikasi yang dapat diunduh",
+        "outsourced": "Model dari luar",
+        "preferences": "Preferensi",
+        "memory": "Memori",
+        "excluded": "Apa yang dapat dibaca AI",
+        "history": "Riwayat obrolan"
+      }
     },
     "network": {
       "disabledCue": "Sinkronisasi tidak lagi dirutekan melalui Tor. Koneksi baru langsung menuju server sinkronisasi.",
@@ -3469,7 +3590,8 @@
       "residualScope": "Di desktop ini mencakup lalu lintas sinkronisasi Anda dan permintaan penyedia AI jarak jauh Anda. Mobile belum memiliki perutean Tor, jadi permintaan penyedianya langsung. Tidak ada hal lain di perangkat ini yang melewati Tor.",
       "residualsToggle": "Apa yang tidak disembunyikannya",
       "torHelper": "Menyembunyikan alamat IP dan lokasi Anda dari server sinkronisasi, serta menyembunyikan server mana yang Anda sinkronkan (dan, di desktop, penyedia AI mana yang Anda jangkau) dari jaringan dan penyedia internet Anda. Mereka tetap dapat melihat perangkat ini terhubung ke Tor. Ini tidak membuat Anda anonim bagi Myne, dan tidak menyembunyikan apa yang Anda sinkronkan atau kapan dari server.",
-      "torLabel": "Rutekan sinkronisasi dan AI desktop melalui Tor"
+      "torLabel": "Rutekan sinkronisasi dan AI desktop melalui Tor",
+      "torInline": "Menyembunyikan alamat IP dan lokasi Anda dari server sinkronisasi, serta menyembunyikan server mana yang Anda sinkronkan dari jaringan dan penyedia internet Anda."
     },
     "prefs": {
       "saveError": "Tidak dapat menyimpan preferensi. Coba lagi.",
@@ -3526,7 +3648,18 @@
       "recoveryDrillHelper": "Ketik 24 kata yang Anda catat. Myne memeriksa apakah kata-kata itu masih membuka brankas ini dan tidak memberi tahu hal lain — kata-katanya tidak pernah ditampilkan di sini.",
       "recoveryDrillLabel": "Periksa frasa pemulihan Anda",
       "recoveryDrillPassed": "Kata-kata ini membuka brankas ini. Simpanlah di tempat Anda menemukannya.",
-      "recoveryDrillPlaceholder": "24 kata, berurutan, dipisahkan spasi"
+      "recoveryDrillPlaceholder": "24 kata, berurutan, dipisahkan spasi",
+      "hideVaultNamesInline": "Mengaktifkannya menghancurkan kunci yang membuat nama yang tersimpan di sini dapat dibaca.",
+      "topics": {
+        "access": "Akses",
+        "locking": "Penguncian"
+      },
+      "sections": {
+        "screen": "Perlindungan layar",
+        "terminal": "Alat baris perintah",
+        "locking": "Mengunci dan membuka kunci",
+        "recovery": "Pemulihan"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Operasi brankas lain sedang berlangsung. Coba lagi sebentar lagi.",
@@ -3593,7 +3726,8 @@
         "storage": "Penyimpanan",
         "sync": "Sinkronisasi",
         "cli": "CLI",
-        "vault": "Brankas"
+        "vault": "Brankas",
+        "data": "Data"
       },
       "passwordUpdatedToast": "Kata sandi diperbarui",
       "title": "Pengaturan"
@@ -3610,7 +3744,8 @@
       "languagesSearchEmpty": "Tidak ada bahasa yang cocok.",
       "languagesSearchPlaceholder": "Cari bahasa…",
       "off": "Mati",
-      "on": "Hidup"
+      "on": "Hidup",
+      "mobileUnavailable": "Pemeriksaan ejaan belum tersedia di ponsel ini: tidak ada kamus di perangkat ini, jadi penyunting di sini tidak dapat menggarisbawahi apa pun. Nyalakan dari komputer Anda saja."
     },
     "storage": {
       "backupHelper": "Cadangan tetap terenkripsi sama seperti brankas Anda, dalam satu berkas .myne-backup yang terverifikasi. Pemulihan bekerja dengan kata sandi atau frasa pemulihan brankas itu, persis seperti membuka kunci.",
@@ -3629,7 +3764,12 @@
       "webLocationHelper": "Catatan Anda berada di penyimpanan peramban ini untuk situs ini, yang dikelola oleh peramban. Tidak ada folder yang bisa dibuka. Membersihkan data situs ini menghapus salinan lokalnya; karena klien ini menyinkronkan, masuk kembali akan mengunduhnya lagi.",
       "webLocationLabel": "Tempat catatan Anda disimpan",
       "pathUnavailable": "Jalur tidak tersedia",
-      "restoreBackup": "Pulihkan dari cadangan…"
+      "restoreBackup": "Pulihkan dari cadangan…",
+      "sections": {
+        "location": "Tempat brankas disimpan",
+        "backup": "Cadangan dan pemulihan",
+        "transfer": "Impor dan ekspor"
+      }
     },
     "typography": {
       "contentWidthHelper": "Lebar maksimum kolom penyuntingan. Penuh membuat teks memenuhi panel.",
@@ -3656,7 +3796,8 @@
       "weak": "Lemah",
       "fair": "Cukup",
       "good": "Baik",
-      "strong": "Kuat"
+      "strong": "Kuat",
+      "tooWeak": "Terlalu lemah"
     },
     "sync": {
       "summary": {
@@ -3697,7 +3838,12 @@
         "bullet1": "Isi kotak saya dengan lima lusin kendi minuman",
         "bullet2": "Betapa cepat zebra dungu itu melompat",
         "spellCaption": "Pemeriksaan ejaan",
-        "spellSample": "sallah eja"
+        "spellSample": "sallah eja",
+        "dateTime": "Tanggal dan waktu",
+        "toolbar": "Bilah alat",
+        "task": "Tugas",
+        "taskSampleOpen": "Kirim laporan kuartalan",
+        "taskSampleDone": "Pesan tempatnya"
       },
       "defaultView": "Tampilan bawaan",
       "typewriter": "Gulir mesin tik",
@@ -3715,6 +3861,9 @@
       "taskChipIconOnly": {
         "help": "Tampilkan prioritas hanya sebagai ikon, bukan kata.",
         "label": "Prioritas hanya-ikon"
+      },
+      "topics": {
+        "periodic": "Catatan berkala"
       }
     },
     "search": {
@@ -3729,7 +3878,7 @@
         "aiProviderModel": "model katalog daftar model mana llama qwen gpt pilih model penyedia jarak jauh remote provider",
         "aiEnable": "ai lokal hidup mati aktifkan matikan pembelajaran mesin local ai",
         "aiExcluded": "folder dikecualikan kecualikan abaikan ai privasi excluded",
-        "aiModels": "model gguf unduh teks embedding llm models",
+        "aiModels": "model gguf unduh teks embedding llm katalog",
         "archive": "arsip pengarsipan arsipkan sembunyikan pulihkan catatan archive",
         "autoBackup": "cadangan otomatis jadwal frekuensi retensi folder backup",
         "autoLock": "kunci otomatis auto lock waktu habis idle timer tidak aktif sesi",
@@ -3802,7 +3951,8 @@
         "memberPassword": "brankas bersama kata sandi anggota buka kunci gabung frasa",
         "recoveryDrill": "frasa pemulihan periksa verifikasi latihan uji 24 kata seed cadangan lupa kata sandi",
         "bar": "bilah bawah bilah status indikator kustomisasi urutkan ulang sembunyikan tampilkan bilah alat",
-        "syncDeviceBindings": "perangkat diklaim oleh anggota atribusi siapa yang menandatangani perangkat mana milik siapa"
+        "syncDeviceBindings": "perangkat diklaim oleh anggota atribusi siapa yang menandatangani perangkat mana milik siapa",
+        "diagnosticLog": "log diagnostik pencatatan debug pemecahan masalah laporan crash laporan bug dukungan diagnostic log"
       },
       "emptyBody": "Coba kata yang lebih pendek, atau nama panel."
     },
@@ -3819,12 +3969,14 @@
       "zoneHelper": "Zona mana yang menentukan apa yang dihitung sebagai hari ini, dan karenanya catatan mana yang dibuka oleh catatan harian, mingguan, dan bulanan Anda. Biarkan kosong untuk mengikuti perangkat ini. Pilihan ini berlaku per perangkat: tidak ada perangkat lain yang menimpanya, jadi menyetelnya di sini dapat membuat perangkat ini berada di hari yang berbeda dari perangkat Anda yang lain. Waktu yang Anda tulis di dalam catatan tidak pernah diubah; 09:00 tetap 09:00 di mana pun.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne tidak mengenali zona waktu itu. Gunakan nama seperti Europe/Berlin.",
-      "errorSave": "Tidak dapat menyimpan pengaturan itu."
+      "errorSave": "Tidak dapat menyimpan pengaturan itu.",
+      "zoneInline": "Zona mana yang menentukan apa yang dihitung sebagai hari ini, dan karenanya catatan mana yang dibuka oleh catatan harian, mingguan, dan bulanan Anda."
     },
     "folderNotes": {
       "label": "Catatan folder",
       "helper": "Buat catatan bertindak sebagai indeks foldernya: terbuka saat Anda mengklik ganda folder, dan tautan folder seperti [[Projects/]] menunjuk ke situ. Nonaktif secara bawaan. Menonaktifkannya menyembunyikan tombol yang membuat catatan folder dan menampilkan catatan yang sudah ada sebagai catatan biasa; tidak mengubah apa pun di disk, jadi menyalakannya kembali memulihkannya persis.",
-      "errorSaveSetting": "Pengaturan ini tidak dapat disimpan."
+      "errorSaveSetting": "Pengaturan ini tidak dapat disimpan.",
+      "inline": "Biarkan sebuah catatan bertindak sebagai indeks foldernya: catatan itu terbuka saat Anda mengklik ganda foldernya, dan tautan folder seperti [[Projects/]] menunjuk ke situ."
     },
     "ribbonCustomize": {
       "add": "Tambah",
@@ -3868,7 +4020,9 @@
       "personalitySaveFailed": "Preferensi suara tidak dapat disimpan.",
       "loadFailed": "Tidak dapat memuat memori atau preferensi suara. Tidak ada yang diubah.",
       "retryLabel": "Coba lagi",
-      "emptyTitle": "Belum ada yang diingat"
+      "emptyTitle": "Belum ada yang diingat",
+      "count": "{{used}} dari {{cap}}",
+      "atCap": "Daftar sudah penuh, jadi tidak ada hal baru yang dapat diingat. Hapus satu entri untuk memberi ruang."
     },
     "account": {
       "nameLabel": "Nama akun",
@@ -3886,7 +4040,11 @@
       "devicesNote": "Perangkat, anggota brankas bersama, dan identitas Anda dikelola di Sinkronisasi.",
       "groupingHidden": "Nama akun tidak tersedia selama nama brankas disembunyikan. Matikan opsi itu di Privasi untuk mengelola akun ini.",
       "groupingUnreadable": "Pengelompokan akun perangkat ini tidak dapat dibaca. Tidak ada yang diubah.",
-      "groupingError": "Tidak dapat membaca pengelompokan akun di perangkat ini. Tidak ada yang diubah."
+      "groupingError": "Tidak dapat membaca pengelompokan akun di perangkat ini. Tidak ada yang diubah.",
+      "sections": {
+        "extensions": "Ekstensi peramban",
+        "grouping": "Akun ini"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Pengaturan berkas biasa tidak dapat disimpan.",
@@ -3915,7 +4073,8 @@
       "pinSetupHelper": "Minimal {{count}} digit. Disimpan hanya di perangkat ini; frasa pemulihan Anda tetap membuka brankas di mana pun.",
       "errorTooShort": "Gunakan minimal {{count}} karakter/digit.",
       "errorGeneric": "Kredensial tidak dapat disetel. Silakan coba lagi."
-    }
+    },
+    "helperDisclosureLabel": "Selengkapnya tentang pengaturan ini"
   },
   "storageLost": {
     "allSynced": "Tidak ada yang hilang: setiap catatan di sini sudah sampai ke server.",
@@ -3943,7 +4102,10 @@
       "intro": "Sinkronisasi mengirim catatan Anda, dalam bentuk terenkripsi, ke sebuah server. Ada empat hal yang perlu diketahui lebih dulu.",
       "whatThisIsLabel": "Apa ini",
       "dataLossLabel": "Jika Anda kehilangan kedua rahasia",
-      "accept": "Saya mengerti, aktifkan sinkronisasi"
+      "accept": "Saya mengerti, aktifkan sinkronisasi",
+      "whatHappensNextLabel": "Jika server tidak lagi tersedia",
+      "whatWeCanSeeLabel": "Apa yang dapat dilihat operator server",
+      "review": "Tinjau arti sinkronisasi"
     },
     "materialising": "Mengunduh catatan Anda: {{done}} dari {{total}}. Anda sudah dapat mulai bekerja; sisanya akan muncul seiring kedatangannya.",
     "credentialAmbiguous": "Kata sandi Anda mungkin berubah di perangkat ini dan di perangkat lain, dan Myne tidak dapat menentukan mana yang lebih baru, sehingga tidak ada yang diubah. Masuk di perangkat yang sudah memiliki akses untuk membereskannya.",
@@ -4161,7 +4323,9 @@
       },
       "usage": {
         "helper": "Seberapa banyak data terenkripsi yang disimpan akun ini di server, dan berapa banyak perangkat yang sudah masuk.",
-        "label": "Penyimpanan dan perangkat"
+        "label": "Penyimpanan dan perangkat",
+        "memberHelper": "Berapa banyak perangkat yang sudah masuk ke akun Anda.",
+        "memberLabel": "Perangkat"
       },
       "identity": {
         "label": "Identitas",
@@ -4170,6 +4334,16 @@
         "codeLabel": "Kode identitas Anda",
         "lockedHelper": "Perangkat ini menyimpan sebuah identitas. Identitas itu terkunci untuk sesi ini; buka kuncinya dengan frasa pemulihan Anda untuk menandatangani sinkronisasi dan undangan.",
         "unlockedHelper": "Perangkat ini menyimpan sebuah identitas, terbuka untuk sesi ini."
+      },
+      "topics": {
+        "connection": "Koneksi",
+        "devices": "Perangkat dan anggota",
+        "conflicts": "Konflik"
+      },
+      "sections": {
+        "account": "Akun",
+        "server": "Server",
+        "devices": "Perangkat terdaftar"
       }
     },
     "reconcile": {
@@ -4345,6 +4519,18 @@
       "label": "Nama tampilan Anda",
       "checking": "Memeriksa nama Anda…",
       "save": "Lanjutkan"
+    },
+    "memberJoinQr": {
+      "error": "Tidak dapat membuat kodenya.",
+      "noAccount": "Akun brankas ini belum tercatat di perangkat ini. Buka brankasnya sekali, lalu coba lagi.",
+      "hint": "Kode ini membawa alamat server Anda dan id brankas ini. Kode ini tidak pernah membawa frasa pemulihan atau kata sandi Anda.",
+      "notAMember": "Brankas ini bukan brankas bersama yang Anda anggotai, jadi tidak ada kode untuk ditampilkan.",
+      "notConfigured": "Konfigurasikan server sinkronisasi terlebih dahulu, lalu buat kodenya.",
+      "scanWithApp": "Pindai dengan Myne di perangkat Anda yang lain",
+      "stepIdentity": "Di perangkat Anda yang lain, buka Myne lalu pilih “Saya sudah punya identitas”.",
+      "stepJoin": "Brankas bersama ini akan menunggu di undangan Anda. Buka untuk bergabung.",
+      "stepPhrase": "Masukkan frasa pemulihan 24 kata Anda di sana.",
+      "title": "Tambahkan perangkat Anda sendiri"
     }
   },
   "tasks": {
@@ -4393,7 +4579,8 @@
       "completed": "Tugas, selesai",
       "notCompleted": "Tugas, belum selesai",
       "tooLongToWrite": "Baris tugas ini terlalu panjang untuk disunting dari sini. Buka catatannya saja.",
-      "untitled": "Tugas tanpa judul"
+      "untitled": "Tugas tanpa judul",
+      "editFields": "Sunting bidang tugas"
     },
     "title": "Tugas",
     "axis": {
@@ -4573,7 +4760,7 @@
     "deleteConfirmTitle": "Hapus brankas ini?",
     "deletePartialError": "Beberapa berkas tidak dapat dihapus. Brankas tidak lagi dapat digunakan. Lanjutkan untuk memulai dari awal.",
     "failClosedEyebrow": "Tidak dapat membuka brankas",
-    "restoreHint": "Pulihkan dari cadangan untuk melanjutkan.",
+    "restoreHint": "Pemulihan dari cadangan belum tersedia di ponsel.",
     "memberHint": "Brankas ini dibagikan kepada Anda. Buka dengan frasa pemulihan Anda sendiri.",
     "memberPhraseLabel": "Frasa pemulihan",
     "memberSubmit": "Buka",
@@ -4588,7 +4775,9 @@
     "memberPinPlaceholder": "PIN brankas (minimal {{count}} digit)",
     "memberBiometricHint": "Brankas ini dibagikan kepada Anda. Konfirmasi dengan biometrik perangkat Anda untuk membuka kunci.",
     "memberBiometricSubmit": "Buka kunci dengan biometrik",
-    "titleNamed": "Buka kunci {{vault}}"
+    "titleNamed": "Buka kunci {{vault}}",
+    "restoreCta": "Pulihkan dari cadangan",
+    "ioErrorHint": "Coba lagi, atau buka ulang Myne."
   },
   "vault": {
     "ioBanner": {
@@ -5161,7 +5350,7 @@
     "forgetCta": "Lupakan identitas ini dan buat yang baru",
     "forgetWarning": "Ini menghapus identitas yang disimpan di perangkat ini. Jika Anda belum menuliskan frasa pemulihan 24 katanya, identitas itu hilang: perangkat ini akan kehilangan akses ke brankas apa pun yang dimiliki atau diikutinya sampai Anda memulihkannya dengan frasa itu. Lanjutkan hanya jika Anda yakin.",
     "heldIntro": "Perangkat ini sudah menyimpan sebuah identitas. Pulihkan dengan frasa 24 katanya di bawah.",
-    "typeBackLead": "Untuk mengonfirmasi Anda sudah menyimpannya, ketik empat kata ini dari frasa di atas.",
+    "typeBackLead": "Masukkan empat kata ini dari frasa identitas yang baru saja Anda simpan.",
     "typeBackMismatch": "Itu tidak cocok dengan kata #{{pos}}.",
     "typeBackWordAtPosition": "Kata #{{pos}}",
     "newTitle": "Identitas baru",
@@ -5171,7 +5360,10 @@
     "recoverAction": "Pulihkan",
     "back": "Kembali",
     "changeServer": "Ubah atau verifikasi server sinkronisasi",
-    "errorTlsFailure": "Tidak dapat memverifikasi sertifikat HTTPS server. Periksa alamat server dan sertifikatnya."
+    "errorTlsFailure": "Tidak dapat memverifikasi sertifikat HTTPS server. Periksa alamat server dan sertifikatnya.",
+    "phraseTitle": "Simpan frasa identitas Anda",
+    "phraseContinue": "Lanjutkan",
+    "confirmTitle": "Konfirmasi frasa Anda"
   },
   "personIdentityCode": {
     "copy": "Salin kode identitas",
@@ -5218,7 +5410,16 @@
     "forgetConfirm": "Lupakan identitas",
     "forgetCta": "Lupakan identitas ini di perangkat ini",
     "forgetError": "Identitas tidak dapat dilupakan. Coba lagi.",
-    "forgetWarning": "Ini menghapus identitas hanya dari perangkat ini. Akun server dan brankas apa pun yang dimiliki atau diikutinya tidak tersentuh, dan Anda dapat memulihkan identitas itu dengan frasa 24 katanya di perangkat lain. Jika Anda belum menyimpan frasa itu, perangkat ini tidak akan dapat memulihkannya."
+    "forgetWarning": "Ini menghapus identitas hanya dari perangkat ini. Akun server dan brankas apa pun yang dimiliki atau diikutinya tidak tersentuh, dan Anda dapat memulihkan identitas itu dengan frasa 24 katanya di perangkat lain. Jika Anda belum menyimpan frasa itu, perangkat ini tidak akan dapat memulihkannya.",
+    "stepIndicator": "Langkah {{n}} dari {{total}} · {{label}}",
+    "stepVerifyOwner": "Verifikasi pemiliknya",
+    "stepRecoveryPhrase": "Frasa pemulihan",
+    "stepDevicePassword": "Kata sandi perangkat",
+    "phraseHeading": "Masukkan frasa pemulihan Anda",
+    "passwordHeading": "Kata sandi untuk perangkat ini",
+    "acceptHeading": "Terima undangan ini",
+    "acceptPhraseHint": "Masukkan 24 kata frasa pemulihan Anda. Frasa itu milik Anda, bukan milik pemilik brankas.",
+    "acceptErrorBadRequest": "Undangan tidak dapat diverifikasi. Tempel kode identitas pemilik brankas (mereka membagikannya saat mengundang Anda)."
   },
   "aiOnboarding": {
     "title": "Siapkan AI",
@@ -5279,12 +5480,35 @@
     "unsaved": "Perubahan belum tersimpan"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Myne {{version}} tersedia.",
-      "failed": "Pembaruan tidak dapat dipasang. Coba lagi.",
-      "installing": "Mengunduh pembaruan…",
+      "consequence": "Memperbarui akan mengunci brankas Anda dan memulai ulang Myne. Catatan yang terbuka disimpan terlebih dahulu.",
+      "flushFailed": "Myne tidak dapat menyimpan setiap catatan yang terbuka, jadi pembaruan tidak dimulai. Coba lagi sebentar lagi.",
+      "stageFailed": "Myne tidak dapat memulai pembaruan karena aplikasi sudah keluar dari brankas. Buka kuncinya lalu coba lagi.",
+      "lockFailed": "Myne tidak dapat mengunci brankas Anda, jadi pembaruan tidak dimulai.",
+      "primary": "Perbarui dan mulai ulang",
       "later": "Nanti",
-      "restart": "Mulai ulang untuk memperbarui"
+      "confirmTitle": "Perbarui dan mulai ulang Myne?",
+      "confirmBody": "Brankas Anda akan dikunci dan Myne akan dimulai ulang. Mengunduh dan memasang bisa memakan beberapa menit pada koneksi lambat.",
+      "confirmPrimary": "Kunci brankas dan perbarui",
+      "cancel": "Batal",
+      "pill": "Pembaruan tersedia"
+    },
+    "updating": {
+      "eyebrow": "Memperbarui",
+      "heading": "Memperbarui Myne",
+      "version": "Versi {{version}}",
+      "caption": "Mengunduh dan memasang versi baru.",
+      "hint": "Myne mulai ulang sendiri setelah ini selesai. Biarkan jendela tetap terbuka."
+    },
+    "failed": {
+      "eyebrow": "Pembaruan tidak selesai",
+      "heading": "Pembaruan tidak selesai",
+      "caption": "Myne {{version}} masih berjalan dan catatan Anda tidak tersentuh.",
+      "hint": "Mencoba lagi akan memulai ulang unduhannya.",
+      "retry": "Coba lagi",
+      "back": "Kembali ke buka kunci"
     }
   },
   "firstRun": {
@@ -5326,7 +5550,7 @@
       "title": "Simpan frasa identitas Anda",
       "warning": "Tuliskan 24 kata ini dan simpan dengan aman. Inilah satu-satunya kali kata-kata itu ditampilkan; itu satu-satunya cara memulihkan identitas ini. Frasa ini berbeda dari frasa pemulihan brankas mana pun.",
       "reveal": "Tampilkan",
-      "typebackLead": "Untuk mengonfirmasi Anda sudah menyimpannya, ketik empat kata ini dari frasa di atas.",
+      "typebackLead": "Masukkan empat kata ini dari frasa identitas yang baru saja Anda simpan.",
       "wordNumber": "Kata #{{position}}",
       "wordMismatch": "Itu tidak cocok dengan kata #{{pos}}.",
       "continue": "Lanjutkan"
@@ -5341,6 +5565,20 @@
       "forgetHeading": "Perangkat ini",
       "forget": "Lupakan identitas ini di perangkat ini",
       "forgetCheckbox": "Saya memahami identitas ini akan dihapus dari perangkat ini. Akun server tetap ada dan frasanya memulihkannya."
+    },
+    "recover": {
+      "open": "Saya sudah punya identitas",
+      "title": "Pulihkan identitas Anda",
+      "lead": "Masukkan 24 kata frasa pemulihan identitas Anda untuk membawa identitas itu ke perangkat ini. Frasa ini berbeda dari frasa pemulihan brankas mana pun.",
+      "submit": "Pulihkan identitas",
+      "working": "Memulihkan…",
+      "failed": "Tidak dapat memulihkan identitas di perangkat ini. Periksa 24 kata itu lalu coba lagi."
+    },
+    "typeback": {
+      "title": "Konfirmasi frasa Anda"
+    },
+    "joinFromQr": {
+      "notFound": "Kode ini menyebut brankas yang tidak ada di undangan Anda di perangkat ini. Mintalah pemilik brankas mengirim ulang undangan ke identitas ini."
     }
   }
 }

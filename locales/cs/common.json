@@ -281,7 +281,8 @@
       "targetVault": "O celém trezoru",
       "running": "Pracuje se na této konverzaci",
       "newConversation": "Nová konverzace",
-      "historyLabel": "Historie"
+      "historyLabel": "Historie",
+      "searchClear": "Zobrazit všechny konverzace"
     },
     "focus": {
       "title": "Agent u poznámky",
@@ -373,9 +374,9 @@
       "clearSearchAriaLabel": "Vymazat hledání",
       "emptyClearSearch": "Vymazat hledání",
       "emptyImportHint": "Soubory, které přidáte k poznámce, se uchovávají ve vašem trezoru, zašifrované na tomto zařízení, než se dostanou kamkoli jinam. Začněte importem jednoho z nich.",
-      "emptyLoadError": "Katalog příloh se nepodařilo přečíst.",
-      "emptyNoAttachments": "Zatím žádné přílohy.",
-      "emptyNoResultsTitle": "Vašemu hledání neodpovídají žádné přílohy.",
+      "emptyLoadError": "Katalog příloh se nepodařilo přečíst",
+      "emptyNoAttachments": "Zatím žádné přílohy",
+      "emptyNoResultsTitle": "Žádné přílohy neodpovídají",
       "filterAriaLabel": "Filtrovat podle typu",
       "gridView": "Zobrazení mřížky",
       "import": "Importovat",
@@ -424,7 +425,15 @@
       "emptyFilteredBody": "Tady ničemu neodpovídá aktuální filtr typu. Vymažte ho a znovu uvidíte celou knihovnu.",
       "emptyFilteredBodyQuery": "V knihovně ničemu neodpovídá",
       "emptyLoadErrorBody": "Katalog je zašifrovaný vaším trezorem, takže jde obvykle o přerušené čtení, ne o ztracená data. Zkuste to znovu; pokud to selhává dál, vaše poznámky a jejich soubory jsou v pořádku.",
-      "emptyRetry": "Zkusit znovu"
+      "emptyRetry": "Zkusit znovu",
+      "transcriptCopy": "Kopírovat",
+      "transcriptCopied": "Přepis zkopírován.",
+      "transcriptCopyFailed": "Přepis se nepodařilo zkopírovat.",
+      "transcriptEmpty": "V této nahrávce nebyla nalezena žádná řeč.",
+      "transcriptNoteTitle": "{{name}} (přepis)",
+      "transcriptSave": "Uložit jako poznámku",
+      "transcriptSaved": "Přepis uložen jako poznámka.",
+      "transcriptSaveFailed": "Přepis se nepodařilo uložit jako poznámku."
     },
     "thumbnail": {
       "audioLabel": "Zvuk: {{filename}}",
@@ -861,6 +870,12 @@
       },
       "openPalette": {
         "label": "Vyhledat a spustit příkaz…"
+      },
+      "attachFile": {
+        "label": "Přiložit soubor…"
+      },
+      "convertImportedAttachments": {
+        "label": "Převést importované přílohy…"
       }
     },
     "hotkeys": {
@@ -1335,8 +1350,6 @@
           "insert": "Vložit do poznámky",
           "noAnswer": "Žádná odpověď. Zkuste otázku přeformulovat.",
           "newChat": "Nový chat",
-          "noModelHint": "Není nastaven žádný poskytovatel AI, takže chat, shrnutí, přepisování ani sémantické hledání nemají na čem běžet. Nastavte ho v Nastavení → Developer → AI.",
-          "unreachableHint": "Poskytovatel, kterého jste nastavili, neodpovídá. Zkontrolujte, že běží, a odešlete znovu.",
           "unavailableHint": "Toto sestavení Myne bylo zkompilováno bez místní AI, takže tady nic nemůže běžet. Žádné nastavení to nezmění — je potřeba sestavení s AI.",
           "offHint": "Místní AI je vypnutá. Zapnout ji můžete v Nastavení → Developer → AI.",
           "send": "Odeslat",
@@ -1354,9 +1367,7 @@
           "historyCancel": "Zrušit",
           "historyDelete": "Smazat",
           "historyDeleteBody": "Tím se konverzace smaže ze všech zařízení při příštím připojení. Nelze vrátit zpět.",
-          "historyEmpty": "Zatím žádné konverzace. Nové chaty se objeví zde.",
           "historyError": "Konverzace se nepodařilo načíst. Zkuste to znovu.",
-          "historyLoading": "Načítání…",
           "historyProposalNewNote": "Nová poznámka",
           "historyRename": "Přejmenovat",
           "historyTitle": "Historie chatu",
@@ -1388,7 +1399,16 @@
           "diffTitle": "Navrhované změny",
           "revertConfirmTitle": "Vrátit tento běh?",
           "revertConfirmBody": "Poznámky, které tento běh změnil, se vrátí do stavu před ním. Poznámky, které vytvořil, zůstanou tam, kde jsou.",
-          "focusAgent": "Otevřít na kartě agenta"
+          "focusAgent": "Otevřít na kartě agenta",
+          "statusNoModelChosen": "Žádný model",
+          "statusNoCredential": "Žádný klíč API",
+          "statusConsentMissing": "Chybí souhlas",
+          "statusNotAllowed": "Nepovoleno",
+          "statusKeyRejected": "Klíč odmítnut",
+          "statusOutOfCredit": "Došel kredit",
+          "statusRefused": "Odmítnuto",
+          "statusNotWorking": "Nefunguje",
+          "historyRetry": "Zkusit znovu"
         },
         "allHidden": "Všechny karty jsou skryté. Obnovíte je klepnutím pravým tlačítkem.",
         "outline": {
@@ -1520,7 +1540,8 @@
       "propertiesLabel": "Vlastnosti",
       "removeListItemAriaLabel": "Odebrat {{item}}",
       "titleAriaLabel": "Název poznámky",
-      "titlePlaceholder": "Bez názvu"
+      "titlePlaceholder": "Bez názvu",
+      "managedField": "Toto pole zapisuje Myne"
     },
     "mermaid": {
       "rendering": "Vykresluje se diagram…",
@@ -1572,7 +1593,8 @@
       "voiceNote": "Hlasová poznámka",
       "wikiLink": "Wikiodkaz",
       "remind": "Připomínka",
-      "meeting": "Schůzka"
+      "meeting": "Schůzka",
+      "sheetTitle": "Vložit"
     },
     "spell": {
       "menu": {
@@ -1740,6 +1762,9 @@
       },
       "convertCore": {
         "noMatch": "žádná shoda"
+      },
+      "picker": {
+        "sheetTitle": "Odkaz na poznámku"
       }
     },
     "flow": {
@@ -1952,6 +1977,9 @@
       "tapSilent": "Zvuk ostatních účastníků neprochází. Zkontrolujte Systémová nastavení, Soukromí a zabezpečení, Záznam obrazovky a zvuku systému.",
       "transcriptHeading": "Přepis",
       "transcriptionFailed": "Část schůzky se nepodařilo přepsat. Zvuk je stále v poznámce."
+    },
+    "templateToken": {
+      "sheetTitle": "Vložit token"
     }
   },
   "export": {
@@ -2248,7 +2276,7 @@
       "tooLong": "Tato cesta ke složce je příliš dlouhá.",
       "moveIntoSelf": "Složku nelze přesunout do sebe samé.",
       "moveCollision": "Složka s tímto názvem tam už je.",
-      "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže složka zůstala nedotčená. Až skončí, zkuste to znovu.",
+      "unsettledSave": "Otevřená poznámka se ještě neuložila, takže složka zůstala nedotčená. Zkuste to znovu, až se uloží.",
       "renameFailed": "Složku se nepodařilo přejmenovat, takže zůstala beze změny.",
       "deliberateWriteFailed": "Složka byla přejmenována, ale jedno z jejích nastavení se nepodařilo uložit. Při každém odemčení se pod původním názvem znovu objeví prázdná složka; je bezpečné ji smazat a nic jiného se tím nezmění. Dalším přejmenováním složky ji neodstraníte.",
       "folderListFull": "Myne si pamatuje jen omezený počet složek a tento seznam je plný. Tato složka funguje dál, ale zmizí, až ji opustí její poslední poznámka. Smazáním složky, kterou už nepotřebujete, uvolníte místo.",
@@ -2290,7 +2318,11 @@
         "derivedNote_few": "Graf se barví podle štítku: {{count}} skupiny odvozené z vašich štítků. Neuloží se, dokud je nebudete moci upravovat.",
         "derivedNote_many": "Graf se barví podle štítku: {{count}} skupin odvozených z vašich štítků. Neuloží se, dokud je nebudete moci upravovat.",
         "derivedNote_other": "Graf se barví podle štítku: {{count}} skupin odvozených z vašich štítků. Neuloží se, dokud je nebudete moci upravovat.",
-        "newRuleTitle": "Nová barevná skupina"
+        "newRuleTitle": "Nová barevná skupina",
+        "moveDown": "Posunout pravidlo dolů",
+        "moveUp": "Posunout pravidlo nahoru",
+        "mobileEmptyBody": "Barevné skupiny obarvují graf podle značky nebo složky a vytvářejí se na počítači. Tento telefon je používá, ale zatím žádnou nevytvoří, protože nová skupina potřebuje filtr.",
+        "mobileSharedNotice": "Barevné skupiny se sdílejí: změna zde nahradí celý seznam na vašich ostatních zařízeních a seznam upravený na počítači dorazí sem."
       },
       "depthToggleTitle": "Přepnout hloubku okolí (1 ↔ 2 skoky)",
       "filterAll": "Vše",
@@ -2533,7 +2565,7 @@
     "list": {
       "addToFavorites": "Přidat do oblíbených",
       "archiveBulkError": "Poznámky se nepodařilo archivovat.",
-      "renameFailed": "Tento název se nepodařilo uložit, takže poznámce zůstal ten původní.",
+      "renameFailed": "Název se nepodařilo uložit, takže si poznámka ponechala ten starý.",
       "archiveFolder": "Archivovat složku",
       "archiveNote": "Archivovat",
       "archiveSingleError": "Poznámku se nepodařilo archivovat.",
@@ -2568,7 +2600,7 @@
       "deleteFolderWarning": "Poznámky se přesunou do koše. Později je můžete obnovit.",
       "duplicate": "Duplikovat",
       "editFilterTitle": "Upravit filtr",
-      "emptyState": "Zatím žádné poznámky.",
+      "emptyState": "Zatím žádné poznámky",
       "favoritesHeading": "Oblíbené",
       "icon": "Ikona…",
       "mergeAnyway": "Přesto sloučit",
@@ -2832,7 +2864,7 @@
       "thisNote": "tato poznámka",
       "untitled": "Bez názvu"
     },
-    "unsettledSave": "Ukládání otevřené poznámky ještě neskončilo, takže se nic nezměnilo. Až skončí, zkuste to znovu.",
+    "unsettledSave": "Otevřená poznámka se ještě neuložila, takže se nic nezměnilo. Zkuste to znovu, až se uloží.",
     "views": {
       "cards": {
         "changeCover": "Změnit obálku",
@@ -2980,7 +3012,7 @@
     "restoreVaultHeader": "Obnovit trezor",
     "accountTitle": "Zadejte své číslo účtu",
     "accountLead": "Najdete jej tam, kam jste si uložili obnovovací frázi. Identifikuje trezor, který se má obnovit.",
-    "accountInvalid": "Neplatné číslo účtu — zkontrolujte jej a zadejte znovu.",
+    "accountInvalid": "Neplatné číslo účtu. Zkontrolujte ho a zadejte znovu.",
     "accountOptionalHint": "Nemáte jej? Ponechte prázdné a pokračujte. Stačí vaše 24slovná fráze pro obnovení.",
     "paste": "Vložit",
     "phraseGridHint": "Napište každé slovo, nebo vložte všech 24 najednou a vyplňte mřížku.",
@@ -3147,7 +3179,41 @@
       "updateIdle": "Podepsané aktualizace, stažené z downloads.myne.md při kontrole.",
       "updateInstallButton": "Restartovat kvůli aktualizaci",
       "updateLabel": "Aktualizace",
-      "updateUpToDate": "Máte nejnovější verzi."
+      "updateUpToDate": "Máte nejnovější verzi.",
+      "developerModeInline": "Zobrazí nastavení, která Myne ve výchozím stavu drží stranou.",
+      "diagnosticLogHelper": "Zapisuje protokol v prostém textu na toto zařízení, a jen na něj. Zaznamenává, co Myne dělá: nikdy text vašich poznámek, nikdy název poznámky, nikdy cestu k souboru. Myne omezuje jeho velikost a nejstarší záznamy zahazuje jako první; vypnutím se protokol smaže. Nikam se nic neodesílá; o tom, co sdílet, rozhodujete vy.",
+      "diagnosticLogLabel": "Diagnostické protokolování",
+      "diagnosticLogError": "Myne toto nastavení nedokázalo změnit.",
+      "diagnosticLogReadError": "Myne nedokázalo přečíst nastavení diagnostického protokolování, takže se zobrazuje jako vypnuté.",
+      "diagnosticBlockLabel": "Podrobnosti hlášení",
+      "diagnosticBlockHelper": "Přesně to, co Kopírovat vloží do schránky. Nikam se nic neodesílá; o tom, co sdílet, rozhodujete vy.",
+      "diagnosticCopy": "Kopírovat diagnostiku",
+      "diagnosticCopyDone": "Diagnostika zkopírována",
+      "diagnosticCopyFailed": "Kopírování se nepodařilo. Vyberte text výše a zkopírujte ho ručně.",
+      "crashRecordLabel": "Záznam o selhání",
+      "crashRecordHelper": "Myne zaznamenalo selhání dne {{date}}. Obsahuje soubor a řádek, verzi a vaši platformu, nic jiného. Smažte ho, kdykoli chcete.",
+      "crashRecordClear": "Smazat",
+      "diagnosticFilesLabel": "Soubor hlášení",
+      "diagnosticFilesUnknown": "Myne ještě protokol nepřečetlo.",
+      "crashRecordDateUnknown": "neznámé datum",
+      "diagnosticReveal": "Zobrazit složku s protokoly",
+      "diagnosticSave": "Uložit hlášení jako soubor…",
+      "diagnosticSaveDone": "Hlášení uloženo",
+      "diagnosticSaveFailed": "Myne hlášení nedokázalo uložit.",
+      "diagnosticRevealFailed": "Myne nedokázalo otevřít složku s protokoly.",
+      "crashRecordClearFailed": "Myne nedokázalo smazat záznam o selhání.",
+      "crashRecordReadFailed": "Myne nedokázalo přečíst záznam o selhání, takže nemůže říct, jestli nějaký existuje.",
+      "sections": {
+        "version": "Verze",
+        "updates": "Zůstat v obraze",
+        "legal": "Právní informace a licence",
+        "developer": "Vývojář",
+        "diagnostics": "Diagnostika"
+      },
+      "diagnosticFilesHelper_one": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubor protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
+      "diagnosticFilesHelper_other": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souborů protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
+      "diagnosticFilesHelper_few": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubory protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
+      "diagnosticFilesHelper_many": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souboru protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží."
     },
     "vault": {
       "changePasswordButton": "Změnit heslo",
@@ -3188,7 +3254,14 @@
       "reenterNewPassword": "Zadejte nové heslo znovu",
       "changePasswordFootnote": "Tímto se zneplatní rychlé odemknutí. Vaše obnovovací fráze zůstává beze změny.",
       "changing": "Měním…",
-      "memberVaultNotice": "Toto je sdílený trezor. Nemá heslo trezoru. Chcete-li přidat heslo nebo PIN, použijte v Soukromí Odemknutí sdíleného trezoru."
+      "memberVaultNotice": "Toto je sdílený trezor. Nemá heslo trezoru. Chcete-li přidat heslo nebo PIN, použijte v Soukromí Odemknutí sdíleného trezoru.",
+      "topics": {
+        "vault": "Trezor",
+        "danger": "Nebezpečná zóna"
+      },
+      "sections": {
+        "identity": "Identita trezoru"
+      }
     },
     "appearance": {
       "accentHelper": "Vyberte barvu zvýraznění používanou v celé aplikaci. Pouze na tomto zařízení.",
@@ -3226,6 +3299,16 @@
       "barCustomize": {
         "label": "Spodní lišta",
         "helper": "Vyberte, které ukazatele spodní lišta zobrazuje. Skryjete-li všechny, lišta sama zmizí a uvolní místo. Pořadí změníte přetažením nebo kliknutím pravým tlačítkem na položku lišty."
+      },
+      "topics": {
+        "display": "Zobrazení",
+        "notes": "Seznam poznámek",
+        "interface": "Rozhraní"
+      },
+      "sections": {
+        "theme": "Motiv a barva zvýraznění",
+        "sidebar": "V postranním panelu",
+        "customisation": "Přizpůsobení"
       }
     },
     "archive": {
@@ -3254,7 +3337,8 @@
       "processing_one": "Čte se 1 příloha…",
       "processing_few": "Čtou se {{count}} přílohy…",
       "processing_many": "Čte se {{count}} přílohy…",
-      "processing_other": "Čte se {{count}} příloh…"
+      "processing_other": "Čte se {{count}} příloh…",
+      "mobileDeviceLocal": "Toto nastavení platí pro každé zařízení zvlášť: určuje, co tento telefon indexuje, takže vaše ostatní zařízení si drží vlastní volbu."
     },
     "autoBackup": {
       "backupFolder": "Složka zálohy",
@@ -3341,7 +3425,8 @@
       "excludedHelper": "Jedna cesta ke složce na řádek. Poznámky v těchto složkách se neobjeví v žádném výsledku z terminálu a nelze do nich z terminálu zapisovat. V aplikaci zůstávají plně dostupné. Nastavit to můžete ještě před zapnutím přístupu z terminálu.",
       "excludedPlaceholder": "Soukromé/\nDeník/",
       "rateLimitLabel": "Nechat terminál běžet plnou rychlostí",
-      "rateLimitHelper": "Myne ve výchozím stavu odpoví nejvýše na 120 příkazů z terminálu za minutu. Je to omezení tempa pro zdivočelý skript, ne kontrola oprávnění: nic nerozhoduje o tom, který program se smí ptát. Zapněte to pro hromadnou práci, třeba když posíláte každou poznámku rourou do jiného nástroje."
+      "rateLimitHelper": "Myne ve výchozím stavu odpoví nejvýše na 120 příkazů z terminálu za minutu. Je to omezení tempa pro zdivočelý skript, ne kontrola oprávnění: nic nerozhoduje o tom, který program se smí ptát. Zapněte to pro hromadnou práci, třeba když posíláte každou poznámku rourou do jiného nástroje.",
+      "inlineOn": "Jakýkoli program běžící pod vaším účtem přes něj může číst, prohledávat a vytvářet poznámky."
     },
     "clipperInstall": {
       "error": "Nepodařilo se aktualizovat nastavení prohlížečového výstřižkovače.",
@@ -3411,7 +3496,12 @@
       "periodFormatAriaLabel": "Formát názvu {{period}} poznámek",
       "periodTemplateAriaLabel": "Šablona {{period}} poznámek",
       "sectionPeriodic": "Periodické poznámky",
-      "periodSwitcherAriaLabel": "Typ periodické poznámky"
+      "periodSwitcherAriaLabel": "Typ periodické poznámky",
+      "blockLabel": "Periodické poznámky",
+      "mobilePeriodAriaLabel": "Období poznámky",
+      "mobileSaveGlyph": "✓",
+      "mobileSaveLabel": "Uložit",
+      "mobileSharedNotice": "Tato nastavení se sdílejí: změna zde se dostane na vaše ostatní zařízení a stejná hodnota nastavená na počítači dorazí sem."
     },
     "deleteVault": {
       "cancel": "Zrušit",
@@ -3465,6 +3555,10 @@
         "searchEmpty": "Nebyly nalezeny žádné poznámky.",
         "searchPlaceholder": "Hledat poznámky…",
         "untitledNote": "Bez názvu"
+      },
+      "sections": {
+        "notes": "Poznámky a složky",
+        "attachments": "Přílohy"
       }
     },
     "focusMode": {
@@ -3579,12 +3673,12 @@
         "excludedLabel": "Vyloučené složky"
       },
       "disclosureToggle": "Jak to funguje?",
-      "enableHelper": "Spouští model, který poskytnete. Kde běží a zda vaše poznámky opustí toto zařízení, obojí závisí na poskytovateli, kterého určíte níže. Experimentální, ve výchozím nastavení vypnuto.",
-      "enableLabel": "Povolit místní AI",
-      "excludedHelper": "Poznámky v těchto složkách AI nikdy nečte ani neindexuje. Prázdný seznam znamená, že AI vidí vše; je to stejný seznam, který respektuje i klient pro příkazový řádek. Jedna cesta ke složce na řádek.",
+      "enableHelper": "Zapne všechny funkce AI. Kde model běží a zda vaše poznámky opustí toto zařízení, obojí závisí na poskytovateli, kterého zvolíte níže. Experimentální, ve výchozím nastavení vypnuto.",
+      "enableLabel": "Zapnout funkce AI",
+      "excludedHelper": "Poznámky v těchto složkách AI nikdy nečte ani neindexuje. Prázdný seznam znamená, že AI vidí vše. Jedna cesta ke složce na řádek.",
       "excludedLabel": "Vyloučené složky",
       "excludedPlaceholder": "Soukromé/\nDeník/",
-      "endpointHelper": "Pokud už na tomto počítači provozujete běhové prostředí pro modely, nasměrujte na něj Myne místo vybírání souborů modelu. Chcete-li použít soubory výše, nechte prázdné.",
+      "endpointHelper": "Pokud už na tomto počítači provozujete běhové prostředí pro modely, nasměrujte na něj Myne místo vybírání souborů modelu. Chcete-li použít soubory nastavené v části Modely, nechte prázdné.",
       "endpointLabel": "Místní běhové prostředí pro modely",
       "endpointModelHelper": "Myne za vás model nevybírá. Dokud nějaký neurčíte, adresa výše se sice uloží, ale nepoužije.",
       "endpointModelLabel": "Model, který se tam má použít",
@@ -3611,7 +3705,8 @@
         "unreachable": "Poskytovatel je nedostupný. Zkontrolujte síťové připojení.",
         "featureOff": "AI je na tomto zařízení vypnutá. Nic nebylo odesláno. Zapněte ji v Nastavení, v části AI.",
         "consentMissing": "Nesouhlasili jste s odesíláním poznámek tomuto poskytovateli z tohoto zařízení. Nic nebylo odesláno. Vyberte poskytovatele znovu v Nastavení, v části AI, a přečtěte si, co se odešle.",
-        "emptyGrant": "Vše, co tento běh mohl číst, leží ve složkách, které AI nikdy nevidí. Nic nebylo odesláno. Změňte v Nastavení, AI, Vyloučené složky."
+        "emptyGrant": "Vše, co tento běh mohl číst, leží ve složkách, které AI nikdy nevidí. Nic nebylo odesláno. Změňte v Nastavení, AI, Vyloučené složky.",
+        "noModel": "Není tu žádný model ke spuštění. Přidejte ho v Nastavení, AI, Modely: stáhněte jeden z vlastního původu Myne, nebo nasměrujte Myne na soubor, který už máte."
       },
       "modelChoose": "Vybrat soubor…",
       "modelFilter": {
@@ -3621,7 +3716,7 @@
       "modelNone": "Není vybrán žádný soubor",
       "modelSaveFailed": "Cestu k modelu se nepodařilo uložit (musí být mimo váš trezor).",
       "modelTranscriptionLabel": "Model převodu řeči na text (přepis)",
-      "modelsHelper": "Stáhněte model zde, nebo otevřete odkaz, získáte ho v prohlížeči a vyberte stažené soubory. Model běží na vašem zařízení; pokud jste místo toho určili poskytovatele, odpovídá tento poskytovatel.",
+      "modelsHelper": "Přiřaďte soubor, který každá role používá, když pochází odjinud než z ověřeného seznamu výše: otevřete odkaz, získáte ho v prohlížeči, a poté ho zde vyberte. Model běží na vašem zařízení; pokud jste místo toho určili poskytovatele, odpovídá tento poskytovatel.",
       "providerHelper": "Místo spouštění modelu tady může Myne poslat požadavek službě, kterou určíte. Vaše poznámky tím opustí toto zařízení. Výchozí volba „Žádný“ znamená, že se s žádnou službou nekomunikuje.",
       "providerKeyAdd": "vložte svůj klíč API",
       "providerKeyLabel": "Klíč API",
@@ -3648,7 +3743,7 @@
       "providerModelUnfetched": "Načtěte seznam a vyberte model.",
       "providerNone": "Žádný",
       "providerNothingAnswering": "Zatím není nastaveno nic, co by odpovídalo.",
-      "modelsLabel": "Modely",
+      "modelsLabel": "Modely odjinud",
       "recommendedFilesGeneration": "Vyžaduje soubor .gguf + tokenizer.json ve stejné složce.",
       "recommendedFilesTranscription": "Vyžaduje soubor Whisper .gguf + config.json + tokenizer.json ve stejné složce.",
       "title": "AI",
@@ -3666,10 +3761,6 @@
       "meetingPromptHelper": "Pokyn, který průchod AI pro schůzky používá k převodu přepisu na oddíly. Ponechte prázdné pro vestavěný výchozí. Nahrazuje výchozí formát výstupu, takže pokud ho nastavíte, vyžádejte si požadované oddíly sami.",
       "meetingPromptLabel": "Pokyn pro shrnutí schůzky",
       "meetingPromptReset": "Obnovit výchozí",
-      "groupAutoTag": "Automatické štítky",
-      "groupVoice": "Hlas a schůzky",
-      "groupWriting": "Psaní a chat",
-      "groupPrivacy": "Soukromí a limity",
       "groupAdvanced": "Pokročilé",
       "excludedPickLabel": "Přidat složku k vyloučení",
       "excludedPickPlaceholder": "Vyberte složku…",
@@ -3689,7 +3780,39 @@
       "downloadCancel": "Zrušit",
       "downloadFailed": "Stahování nedoběhlo.",
       "downloadFailedChecksum": "Stažení neodpovídalo svému otisku a bylo odmítnuto. Zkuste to znovu.",
-      "sideloadDisclosure": "Vývojářský režim vám také umožní nasměrovat Myne na soubor modelu, který jste si opatřili sami. Soubor stažený odjinud Myne nekontroluje, takže používejte jen takový, kterému důvěřujete."
+      "sideloadDisclosure": "Vývojářský režim vám také umožní nasměrovat Myne na soubor modelu, který jste si opatřili sami. Soubor stažený odjinud Myne nekontroluje, takže používejte jen takový, kterému důvěřujete.",
+      "historyBudgetInline": "Kolik z nedávné konverzace nese každý požadavek, ve znacích.",
+      "historyBudgetMaxNotice": "Zadat můžete nejvýše {{max}} znaků; větší hodnota se na ni sníží.",
+      "historyBudgetDeviceLocal": "Toto nastavení platí pro každé zařízení zvlášť: omezuje, co tento telefon odesílá, takže vaše ostatní zařízení si drží vlastní.",
+      "meetingPromptShared": "Toto nastavení se sdílí: změna zde se dostane na vaše ostatní zařízení a pokyn upravený na počítači dorazí sem.",
+      "groupAnswering": "Odpovídání",
+      "groupGeneral": "Obecné",
+      "groupModels": "Modely",
+      "groupLimits": "Limity",
+      "groupTagging": "Štítkování",
+      "excludedFoldersHelper": "Poznámky v těchto složkách AI nikdy nečte ani neindexuje. Je to stejný seznam, který používají vaše ostatní zařízení.",
+      "excludedFoldersEmpty": "Zatím není nic vyloučeno, takže AI může číst každou složku v tomto trezoru.",
+      "excludedFoldersAdd": "Přidat",
+      "excludedFoldersAddLabel": "Složka k vyloučení z AI",
+      "excludedFoldersRemove": "Odebrat",
+      "excludedFoldersRemoveLabel": "Přestat vylučovat {{folder}} z AI",
+      "excludedFoldersMonotoneNotice": "Vyloučení přidané na kterémkoli z vašich zařízení zůstává, dokud ho neodeberete všude: odebrání zde se nepřenáší, takže složka, kterou vaše ostatní zařízení stále vylučují, se při příští synchronizaci vrátí.",
+      "catalogueOpen": "Stáhnout model",
+      "catalogueColModel": "Model",
+      "catalogueColState": "Stav",
+      "providerInline": "Jakmile pojmenujete službu, vaše poznámky opustí toto zařízení.",
+      "providerChooseHelper": "Model může běžet na tomto zařízení, nebo Myne může požadavek poslat službě, kterou určíte. Vaše poznámky tehdy opustí toto zařízení. „Na tomto zařízení“ je výchozí volba a znamená, že se s žádnou službou nekomunikuje.",
+      "providerChooseLabel": "Zvolit poskytovatele",
+      "providerKeySave": "Uložit tento klíč",
+      "providerOnDevice": "Na tomto zařízení",
+      "sections": {
+        "catalogue": "Ověřené modely ke stažení",
+        "outsourced": "Modely odjinud",
+        "preferences": "Předvolby",
+        "memory": "Paměť",
+        "excluded": "Co může AI číst",
+        "history": "Historie chatu"
+      }
     },
     "network": {
       "disabledCue": "Synchronizace už se nesměruje přes Tor. Nová připojení jdou přímo na synchronizační server.",
@@ -3711,7 +3834,8 @@
       "residualScope": "Na desktopu to zahrnuje váš synchronizační provoz a požadavky na vzdáleného poskytovatele AI. Mobil zatím směrování přes Tor nemá, takže jeho požadavky na poskytovatele jdou přímo. Nic jiného na tomto zařízení přes Tor nejde.",
       "residualsToggle": "Co to neskryje",
       "torHelper": "Skryje vaši IP adresu a polohu před synchronizačním serverem a před vaší sítí a poskytovatelem internetu skryje, se kterým serverem synchronizujete (a na desktopu, kterého poskytovatele AI oslovujete). Stále uvidí, že se toto zařízení připojuje k Toru. Nedělá vás anonymními vůči Myne a neskrývá před serverem, co ani kdy synchronizujete.",
-      "torLabel": "Směrovat synchronizaci a AI na desktopu přes Tor"
+      "torLabel": "Směrovat synchronizaci a AI na desktopu přes Tor",
+      "torInline": "Skryje před synchronizačním serverem vaši IP adresu a polohu a před vaší sítí a poskytovatelem internetu skryje, se kterým serverem synchronizujete."
     },
     "prefs": {
       "saveError": "Předvolbu se nepodařilo uložit. Zkuste to znovu.",
@@ -3768,7 +3892,18 @@
       "recoveryDrillHelper": "Napište 24 slov, která jste si zapsali. Myne zkontroluje, zda stále otevírají tento trezor, a neřekne vám nic dalšího — slova se tu nikdy nezobrazují.",
       "recoveryDrillLabel": "Zkontrolovat frázi pro obnovení",
       "recoveryDrillPassed": "Tato slova otevírají tento trezor. Uchovejte je tam, kde jste je měli.",
-      "recoveryDrillPlaceholder": "24 slov, v pořadí, oddělená mezerami"
+      "recoveryDrillPlaceholder": "24 slov, v pořadí, oddělená mezerami",
+      "hideVaultNamesInline": "Zapnutím se zničí klíče, díky nimž jsou zde uložené názvy čitelné.",
+      "topics": {
+        "access": "Přístup",
+        "locking": "Zamykání"
+      },
+      "sections": {
+        "screen": "Ochrana obrazovky",
+        "terminal": "Nástroje příkazového řádku",
+        "locking": "Zamykání a odemykání",
+        "recovery": "Obnovení"
+      }
     },
     "quickUnlock": {
       "errorBusy": "Probíhá jiná operace s trezorem. Zkuste to za chvíli znovu.",
@@ -3839,7 +3974,8 @@
         "storage": "Úložiště",
         "sync": "Synchronizace",
         "cli": "CLI",
-        "vault": "Trezor"
+        "vault": "Trezor",
+        "data": "Data"
       },
       "passwordUpdatedToast": "Heslo aktualizováno",
       "title": "Nastavení"
@@ -3856,7 +3992,8 @@
       "languagesSearchEmpty": "Žádné jazyky neodpovídají.",
       "languagesSearchPlaceholder": "Hledat jazyky…",
       "off": "Vypnuto",
-      "on": "Zapnuto"
+      "on": "Zapnuto",
+      "mobileUnavailable": "Kontrola pravopisu zatím na tomto telefonu není dostupná: na tomto zařízení není žádný slovník, takže zdejší editor nemůže nic podtrhnout. Zapněte ji místo toho na svém počítači."
     },
     "storage": {
       "backupHelper": "Zálohy zůstávají přesně tak zašifrované jako váš trezor, v jediném ověřeném souboru .myne-backup. Obnovení funguje s heslem nebo frází pro obnovení daného trezoru, přesně jako při odemykání.",
@@ -3875,7 +4012,12 @@
       "webLocationHelper": "Vaše poznámky jsou v úložišti tohoto prohlížeče pro tento web, které spravuje prohlížeč. Není zde žádná složka k otevření. Vymazáním dat tohoto webu se místní kopie odstraní; protože tento klient synchronizuje, opětovným přihlášením se stáhne zpět.",
       "webLocationLabel": "Kde jsou uloženy vaše poznámky",
       "pathUnavailable": "Cesta není k dispozici",
-      "restoreBackup": "Obnovit ze zálohy…"
+      "restoreBackup": "Obnovit ze zálohy…",
+      "sections": {
+        "location": "Kde trezor sídlí",
+        "backup": "Zálohování a obnovení",
+        "transfer": "Import a export"
+      }
     },
     "typography": {
       "contentWidthHelper": "Maximální šířka editačního sloupce. Plná umožní textu zabrat celý panel.",
@@ -3902,7 +4044,8 @@
       "weak": "Slabé",
       "fair": "Ucházející",
       "good": "Dobré",
-      "strong": "Silné"
+      "strong": "Silné",
+      "tooWeak": "Příliš slabé"
     },
     "sync": {
       "summary": {
@@ -3947,7 +4090,12 @@
         "bullet1": "Nechť již hříšné saxofony ďáblů rozezvučí síň",
         "bullet2": "Zvlášť zákeřný učeň s ďolíčky běží podél zóny úlů",
         "spellCaption": "Kontrola pravopisu",
-        "spellSample": "chibně"
+        "spellSample": "chibně",
+        "dateTime": "Datum a čas",
+        "toolbar": "Panel nástrojů",
+        "task": "Úkoly",
+        "taskSampleOpen": "Poslat čtvrtletní zprávu",
+        "taskSampleDone": "Rezervovat místo konání"
       },
       "defaultView": "Výchozí zobrazení",
       "typewriter": "Posouvání jako psací stroj",
@@ -3965,12 +4113,15 @@
       "taskChipIconOnly": {
         "help": "Zobrazovat prioritu pouze ikonou, bez slova.",
         "label": "Priorita pouze ikonou"
+      },
+      "topics": {
+        "periodic": "Periodické poznámky"
       }
     },
     "search": {
       "placeholder": "Hledat v nastavení…",
       "ariaLabel": "Hledat v nastavení",
-      "empty": "Dotazu „{{query}}“ neodpovídá žádné nastavení.",
+      "empty": "Dotazu „{{query}}“ neodpovídá žádné nastavení",
       "resultsLabel": "Výsledky hledání",
       "keywords": {
         "aiAutoTag": "automatické značky značka návrhy navrhovat štítky popisky ai auto tag tags",
@@ -3979,7 +4130,7 @@
         "aiProviderModel": "model modely katalog seznam který model llama qwen gpt vybrat vzdálený poskytovatel provider",
         "aiEnable": "ai umělá inteligence místní lokální zapnout vypnout povolit zakázat strojové učení local",
         "aiExcluded": "vyloučené složky výjimky ignorovat ai soukromí vyloučit excluded folders",
-        "aiModels": "modely model gguf stáhnout stažení textový vektory embedding llm ai",
+        "aiModels": "modely model gguf stáhnout stažení textový vektory embedding llm katalog ai",
         "archive": "archiv archivace archivovat skrýt obnovit poznámky archive",
         "autoBackup": "automatické zálohy záloha zálohování plán frekvence uchování složka backup",
         "autoLock": "automatické zamykání zamknout zámek časový limit nečinnost prodleva relace auto lock timeout",
@@ -4044,7 +4195,7 @@
         "ribbon": "levá lišta připnout pin příkaz příkazy nastavit pořadí odpinout panel nástrojů zkratky klávesnice",
         "folderNotes": "složka poznámka index folder_index cílová stránka dvojklik odkaz na složku projekty vypnout vypnout",
         "syncMembers": "členové sdílet pozvat tým spolupráce úložiště",
-        "accountName": "název účtu skupina seskupení přejmenovat označení zařízení místní",
+        "accountName": "název účtu účet skupina seskupení přejmenovat označení štítek zařízení místní",
         "accountVaults": "účet trezory seskupené které trezory patří seznam skupiny",
         "aiMeetingPrompt": "schůzka shrnutí pokyn instrukce vlastní přepis akční body rozhodnutí",
         "update": "aktualizace upgrade kontrola aktualizací nová verze vydání stažení",
@@ -4052,7 +4203,8 @@
         "memberPassword": "sdílený trezor heslo člen odemknout připojit fráze",
         "recoveryDrill": "fráze pro obnovení kontrola ověřit zkouška test 24 slov seed záloha ztracené heslo",
         "bar": "spodní lišta stavová lišta ukazatele přizpůsobit pořadí skrýt zobrazit panel nástrojů",
-        "syncDeviceBindings": "zařízení nárokovaná členy přiřazení kdo podepsal které zařízení patří"
+        "syncDeviceBindings": "zařízení nárokovaná členy přiřazení kdo podepsal které zařízení patří",
+        "diagnosticLog": "diagnostický protokol protokol protokolování ladění řešení potíží záznam o selhání hlášení chyby podpora"
       },
       "emptyBody": "Zkuste kratší slovo nebo název panelu."
     },
@@ -4069,12 +4221,14 @@
       "zoneHelper": "Pásmo, které určuje, co se počítá jako dnešek, a tím i to, kterou poznámku otevřou vaše denní, týdenní a měsíční poznámky. Nechte prázdné, chcete-li se řídit tímto zařízením. Volba se ustaluje zvlášť na každém zařízení: žádné jiné ji nepřepíše, takže tímto nastavením se toto zařízení může ocitnout v jiném dni než vaše ostatní. Časy, které napíšete do poznámky, se nikdy nemění; 09:00 zůstane všude 09:00.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne toto časové pásmo nezná. Použijte název jako Europe/Berlin.",
-      "errorSave": "Toto nastavení se nepodařilo uložit."
+      "errorSave": "Toto nastavení se nepodařilo uložit.",
+      "zoneInline": "Které pásmo určuje, co se počítá jako dnešek, a tím i to, kterou poznámku otevřou vaše denní, týdenní a měsíční poznámky."
     },
     "folderNotes": {
       "label": "Poznámky složek",
       "helper": "Umožněte poznámce sloužit jako index složky: otevře se dvojklikem na složce a odkazy jako [[Projects/]] na ni míří. Ve výchozím nastavení vypnuto. Vypnutí skryje tlačítka pro vytváření takových poznámek a existující zobrazí jako běžné; na disku se nic nemění, takže opětovné zapnutí je přesně obnoví.",
-      "errorSaveSetting": "Toto nastavení se nepodařilo uložit."
+      "errorSaveSetting": "Toto nastavení se nepodařilo uložit.",
+      "inline": "Nechte poznámku sloužit jako index její složky: otevře se dvojklikem na složku a odkazy na složku jako [[Projects/]] na ni míří."
     },
     "ribbonCustomize": {
       "add": "Přidat",
@@ -4118,7 +4272,9 @@
       "personalitySaveFailed": "Nastavení hlasu se nepodařilo uložit.",
       "loadFailed": "Vzpomínky nebo nastavení hlasu se nepodařilo načíst. Nic se nezměnilo.",
       "retryLabel": "Zkusit znovu",
-      "emptyTitle": "Zatím si nic nepamatuje"
+      "emptyTitle": "Zatím si nic nepamatuje",
+      "count": "{{used}} z {{cap}}",
+      "atCap": "Seznam je plný, takže si nic nového nemůže zapamatovat. Uvolněte místo smazáním záznamu."
     },
     "account": {
       "nameLabel": "Název účtu",
@@ -4136,7 +4292,11 @@
       "devicesNote": "Zařízení, členové sdílených trezorů a vaše identita se spravují v Synchronizaci.",
       "groupingHidden": "Názvy účtů nejsou dostupné, dokud jsou názvy trezorů skryté. Chcete-li tento účet spravovat, tuto volbu v Soukromí vypněte.",
       "groupingUnreadable": "Seskupení účtů na tomto zařízení se nepodařilo přečíst. Nic se nezměnilo.",
-      "groupingError": "Seskupení účtů na tomto zařízení se nepodařilo přečíst. Nic se nezměnilo."
+      "groupingError": "Seskupení účtů na tomto zařízení se nepodařilo přečíst. Nic se nezměnilo.",
+      "sections": {
+        "extensions": "Rozšíření prohlížeče",
+        "grouping": "Tento účet"
+      }
     },
     "plainFile": {
       "errorSaveSetting": "Nastavení prostých souborů se nepodařilo uložit.",
@@ -4165,7 +4325,8 @@
       "pinSetupHelper": "Alespoň {{count}} číslic. Uloženo jen na tomto zařízení; vaše fráze pro obnovení stále otevře trezor kdekoli.",
       "errorTooShort": "Použijte alespoň {{count}} znaků/číslic.",
       "errorGeneric": "Přihlašovací údaj se nepodařilo nastavit. Zkuste to prosím znovu."
-    }
+    },
+    "helperDisclosureLabel": "Více o tomto nastavení"
   },
   "storageLost": {
     "allSynced": "Nic se neztratilo: každá zdejší poznámka už na server dorazila.",
@@ -4197,7 +4358,10 @@
       "intro": "Synchronizace odesílá vaše poznámky zašifrované na server. Nejdřív je dobré vědět čtyři věci.",
       "whatThisIsLabel": "Co to je",
       "dataLossLabel": "Pokud přijdete o heslo i frázi pro obnovení",
-      "accept": "Rozumím, zapnout synchronizaci"
+      "accept": "Rozumím, zapnout synchronizaci",
+      "whatHappensNextLabel": "Když server zmizí",
+      "whatWeCanSeeLabel": "Co může vidět provozovatel serveru",
+      "review": "Zkontrolovat, co synchronizace znamená"
     },
     "materialising": "Stahují se vaše poznámky: {{done}} z {{total}}. Můžete začít pracovat; zbytek se objeví, jak bude přicházet.",
     "credentialAmbiguous": "Vaše heslo se možná změnilo na tomto zařízení i na jiném a Myne nedokáže určit, které je novější, takže nic nezměnil. Vyřešte to přihlášením na zařízení, které už přístup má.",
@@ -4402,7 +4566,7 @@
         "deleteConfirmTitle": "Smazat tuto obnovenou poznámku?",
         "deleteConfirmWarning": "Tímto se trvale smaže jediná kopie uchovaná na tomto zařízení. Tuto akci nelze vrátit zpět.",
         "deleteCta": "Smazat",
-        "empty": "Žádné obnovené poznámky.",
+        "empty": "Žádné obnovené poznámky",
         "errorGeneric": "Něco se pokazilo. Zkuste to znovu.",
         "helper": "Když se zde odstraní poznámka smazaná na jiném zařízení, její zašifrovaná kopie zůstane na tomto zařízení. Obnovte ji jako novou poznámku, nebo ji trvale smažte.",
         "label": "Obnovené poznámky",
@@ -4419,7 +4583,9 @@
       },
       "usage": {
         "helper": "Kolik zašifrovaných dat tento účet uchovává na serveru a kolik zařízení je přihlášeno.",
-        "label": "Úložiště a zařízení"
+        "label": "Úložiště a zařízení",
+        "memberHelper": "Kolik zařízení je přihlášeno k vašemu účtu.",
+        "memberLabel": "Zařízení"
       },
       "identity": {
         "label": "Identita",
@@ -4428,6 +4594,16 @@
         "codeLabel": "Váš kód identity",
         "lockedHelper": "Toto zařízení má identitu. Je pro tuto relaci uzamčená; odemkněte ji svou frází pro obnovení, abyste mohli podepisovat synchronizaci a pozvánky.",
         "unlockedHelper": "Toto zařízení má identitu, odemčenou pro tuto relaci."
+      },
+      "topics": {
+        "connection": "Připojení",
+        "devices": "Zařízení a členové",
+        "conflicts": "Konflikty"
+      },
+      "sections": {
+        "account": "Účet",
+        "server": "Server",
+        "devices": "Registrovaná zařízení"
       }
     },
     "reconcile": {
@@ -4607,6 +4783,18 @@
       "label": "Vaše zobrazované jméno",
       "checking": "Kontroluje se vaše jméno…",
       "save": "Pokračovat"
+    },
+    "memberJoinQr": {
+      "error": "Kód se nepodařilo vytvořit.",
+      "noAccount": "Účet tohoto trezoru zatím na tomto zařízení není zaznamenán. Otevřete trezor jednou a zkuste to znovu.",
+      "hint": "Tento kód nese adresu vašeho serveru a id tohoto trezoru. Nikdy nenese vaši frázi pro obnovení ani heslo.",
+      "notAMember": "Tento trezor není sdílený trezor, jehož jste členem, takže není žádný kód k zobrazení.",
+      "notConfigured": "Nejprve nastavte synchronizační server a poté kód vytvořte.",
+      "scanWithApp": "Naskenujte aplikací Myne na svém dalším zařízení",
+      "stepIdentity": "Na svém dalším zařízení otevřete Myne a zvolte „Už mám identitu“.",
+      "stepJoin": "Tento sdílený trezor bude čekat ve vašich pozvánkách. Otevřete ho a připojte se.",
+      "stepPhrase": "Zadejte tam svou 24slovnou frázi pro obnovení.",
+      "title": "Přidat vlastní zařízení"
     }
   },
   "tasks": {
@@ -4659,7 +4847,8 @@
       "completed": "Úkol, dokončeno",
       "notCompleted": "Úkol, nedokončeno",
       "tooLongToWrite": "Řádek tohoto úkolu je příliš dlouhý na úpravu odsud. Otevřete raději jeho poznámku.",
-      "untitled": "Úkol bez názvu"
+      "untitled": "Úkol bez názvu",
+      "editFields": "Upravit pole úkolu"
     },
     "title": "Úkoly",
     "axis": {
@@ -4841,7 +5030,7 @@
     "deleteConfirmTitle": "Smazat tento trezor?",
     "deletePartialError": "Některé soubory se nepodařilo odstranit. Trezor již není použitelný. Pokračujte a začněte znovu.",
     "failClosedEyebrow": "Trezor nelze otevřít",
-    "restoreHint": "Pro pokračování obnovte ze zálohy.",
+    "restoreHint": "Obnovení ze zálohy zatím není na mobilu dostupné.",
     "memberHint": "Toto úložiště je s vámi sdíleno. Odemkněte ho svou obnovovací frází.",
     "memberPhraseLabel": "Obnovovací fráze",
     "memberSubmit": "Odemknout",
@@ -4856,7 +5045,9 @@
     "memberPinPlaceholder": "PIN trezoru (alespoň {{count}} číslic)",
     "memberBiometricHint": "Tento trezor je s vámi sdílený. Potvrďte biometrikou svého zařízení a odemkněte ho.",
     "memberBiometricSubmit": "Odemknout pomocí biometriky",
-    "titleNamed": "Odemknout {{vault}}"
+    "titleNamed": "Odemknout {{vault}}",
+    "restoreCta": "Obnovit ze zálohy",
+    "ioErrorHint": "Zkuste to znovu, nebo Myne znovu otevřete."
   },
   "vault": {
     "ioBanner": {
@@ -5015,11 +5206,11 @@
       "copy": "Kopírovat",
       "extensionNotice": "Rozšíření prohlížeče, která mají přístup k tomuto webu, si mohou přečíst, co je na této stránce. Pokud si nejste jistí každým rozšířením v tomto profilu, použijte pro tento krok desktopovou aplikaci nebo čistý profil prohlížeče.",
       "copyFailed": "Nepodařilo se zkopírovat. Použijte místo toho „Uložit jako soubor“.",
-      "downloadStarted": "Odesláno do stažených souborů vašeho prohlížeče. Ověřte, že soubor dorazil: kam půjde, rozhoduje váš prohlížeč, a Myne nevidí, zda dorazil.",
+      "downloadStarted": "Odesláno do stažených souborů vašeho prohlížeče. Zkontrolujte, že dorazilo: kam soubor jde, rozhoduje prohlížeč, a Myne nedokáže zjistit, jestli dorazil.",
       "reveal": "Odhalit frázi",
       "saveAsFile": "Uložit jako soubor",
-      "saveFailed": "Soubor se nepodařilo uložit. Zkopírujte místo toho slova, nebo si je zapište.",
-      "savedToFile": "Uloženo. Je to soubor v prostém textu, uchovejte ho proto tam, kde si ho přečtete jen vy."
+      "saveFailed": "Soubor se nepodařilo uložit. Slova si raději zkopírujte nebo si je zapište.",
+      "savedToFile": "Uloženo. Je to soubor v prostém textu, takže ho uchovejte tam, kam vidíte jen vy."
     },
     "ready": {
       "backedUp": "Zálohováno",
@@ -5031,7 +5222,7 @@
       "body": "Vaše poznámky jsou zašifrované a uložené na tomto zařízení. Uchovejte své heslo a sadu pro obnovení na bezpečném místě: jsou jedinou cestou zpět.",
       "decrypting": "Dešifruje se…",
       "done": "Otevřít trezor",
-      "heading": "Váš trezor je připraven.",
+      "heading": "Váš trezor je připraven",
       "showFolder": "Zobrazit složku trezoru"
     },
     "sessionLost": {
@@ -5455,7 +5646,7 @@
     "forgetCta": "Zapomenout tuto identitu a vytvořit novou",
     "forgetWarning": "Tím se vymaže identita uložená na tomto zařízení. Pokud jste si nezapsali její 24slovnou frázi pro obnovení, je pryč: toto zařízení ztratí přístup ke všem trezorům, které vlastní nebo do kterých se připojilo, dokud ji touto frází neobnovíte. Pokračujte jen tehdy, jste-li si jistí.",
     "heldIntro": "Toto zařízení už má identitu. Obnovte ji níže pomocí její 24slovné fráze.",
-    "typeBackLead": "Pro potvrzení, že jste si ji uložili, napište tato čtyři slova z fráze výše.",
+    "typeBackLead": "Napište tato čtyři slova z fráze identity, kterou jste právě uložili.",
     "typeBackMismatch": "To neodpovídá slovu č. {{pos}}.",
     "typeBackWordAtPosition": "Slovo č. {{pos}}",
     "newTitle": "Nová identita",
@@ -5465,7 +5656,10 @@
     "recoverAction": "Obnovit",
     "back": "Zpět",
     "changeServer": "Změnit nebo ověřit synchronizační server",
-    "errorTlsFailure": "HTTPS certifikát serveru se nepodařilo ověřit. Zkontrolujte adresu serveru a jeho certifikát."
+    "errorTlsFailure": "HTTPS certifikát serveru se nepodařilo ověřit. Zkontrolujte adresu serveru a jeho certifikát.",
+    "phraseTitle": "Uložte si svou frázi identity",
+    "phraseContinue": "Pokračovat",
+    "confirmTitle": "Potvrdit svou frázi"
   },
   "personIdentityCode": {
     "copy": "Kopírovat identifikační kód",
@@ -5512,7 +5706,16 @@
     "forgetConfirm": "Zapomenout identitu",
     "forgetCta": "Zapomenout tuto identitu na tomto zařízení",
     "forgetError": "Identitu se nepodařilo zapomenout. Zkuste to znovu.",
-    "forgetWarning": "Tím se identita odebere pouze z tohoto zařízení. Účet na serveru a všechny trezory, které vlastní nebo do kterých se připojila, zůstanou nedotčené a identitu můžete obnovit na jiném zařízení pomocí její 24slovné fráze. Pokud jste si tuto frázi neuložili, toto zařízení ji nebude moci obnovit."
+    "forgetWarning": "Tím se identita odebere pouze z tohoto zařízení. Účet na serveru a všechny trezory, které vlastní nebo do kterých se připojila, zůstanou nedotčené a identitu můžete obnovit na jiném zařízení pomocí její 24slovné fráze. Pokud jste si tuto frázi neuložili, toto zařízení ji nebude moci obnovit.",
+    "stepIndicator": "Krok {{n}} z {{total}} · {{label}}",
+    "stepVerifyOwner": "Ověřit vlastníka",
+    "stepRecoveryPhrase": "Fráze pro obnovení",
+    "stepDevicePassword": "Heslo zařízení",
+    "phraseHeading": "Zadejte svou frázi pro obnovení",
+    "passwordHeading": "Heslo pro toto zařízení",
+    "acceptHeading": "Přijmout tuto pozvánku",
+    "acceptPhraseHint": "Zadejte 24 slov své fráze pro obnovení. Je vaše, ne vlastníkova.",
+    "acceptErrorBadRequest": "Pozvánku se nepodařilo ověřit. Vložte kód identity vlastníka trezoru (sdílejí ho, když vás zvou)."
   },
   "aiOnboarding": {
     "title": "Nastavit AI",
@@ -5573,12 +5776,35 @@
     "unsaved": "Neuložené změny"
   },
   "update": {
-    "banner": {
+    "banner": {},
+    "notice": {
       "available": "Je dostupné Myne {{version}}.",
-      "failed": "Aktualizaci se nepodařilo nainstalovat. Zkuste to znovu.",
-      "installing": "Stahuje se aktualizace…",
+      "consequence": "Aktualizace zamkne váš trezor a restartuje Myne. Otevřené poznámky se nejprve uloží.",
+      "flushFailed": "Myne nedokázalo uložit všechny otevřené poznámky, takže aktualizace nezačala. Zkuste to za chvíli znovu.",
+      "stageFailed": "Myne nemohlo spustit aktualizaci, protože aplikace už opustila trezor. Odemkněte ho a zkuste to znovu.",
+      "lockFailed": "Myne nedokázalo zamknout váš trezor, takže aktualizace nezačala.",
+      "primary": "Aktualizovat a restartovat",
       "later": "Později",
-      "restart": "Restartovat kvůli aktualizaci"
+      "confirmTitle": "Aktualizovat a restartovat Myne?",
+      "confirmBody": "Váš trezor se zamkne a Myne se restartuje. Stahování a instalace může na pomalém připojení trvat několik minut.",
+      "confirmPrimary": "Zamknout trezor a aktualizovat",
+      "cancel": "Zrušit",
+      "pill": "Je dostupná aktualizace"
+    },
+    "updating": {
+      "eyebrow": "Aktualizuje se",
+      "heading": "Aktualizuje se Myne",
+      "version": "Verze {{version}}",
+      "caption": "Stahuje se a instaluje se nová verze.",
+      "hint": "Po dokončení se Myne sám restartuje. Nechte okno otevřené."
+    },
+    "failed": {
+      "eyebrow": "Aktualizace nedoběhla",
+      "heading": "Aktualizace nedoběhla",
+      "caption": "Myne {{version}} stále běží a vaše poznámky jsou nedotčené.",
+      "hint": "Nový pokus spustí stahování od začátku.",
+      "retry": "Zkusit znovu",
+      "back": "Zpět na odemknutí"
     }
   },
   "firstRun": {
@@ -5620,7 +5846,7 @@
       "title": "Uložte si svou frázi identity",
       "warning": "Zapište si těchto 24 slov a uložte je v bezpečí. Zobrazují se pouze nyní; jsou jediným způsobem, jak tuto identitu obnovit. Je to jiná fráze, než jakákoli fráze pro obnovení trezoru.",
       "reveal": "Zobrazit",
-      "typebackLead": "Pro potvrzení, že jste si ji uložili, napište tato čtyři slova z fráze výše.",
+      "typebackLead": "Napište tato čtyři slova z fráze identity, kterou jste právě uložili.",
       "wordNumber": "Slovo č. {{position}}",
       "wordMismatch": "To neodpovídá slovu č. {{pos}}.",
       "continue": "Pokračovat"
@@ -5635,6 +5861,20 @@
       "forgetHeading": "Toto zařízení",
       "forget": "Zapomenout tuto identitu na tomto zařízení",
       "forgetCheckbox": "Rozumím, že tato identita bude z tohoto zařízení odebrána. Účet na serveru zůstává a fráze ji obnoví."
+    },
+    "recover": {
+      "open": "Už mám identitu",
+      "title": "Obnovit svou identitu",
+      "lead": "Zadejte 24 slov své fráze pro obnovení identity a přeneste tuto identitu na toto zařízení. Je to jiná fráze než jakákoli fráze pro obnovení trezoru.",
+      "submit": "Obnovit identitu",
+      "working": "Obnovuje se…",
+      "failed": "Identitu se na tomto zařízení nepodařilo obnovit. Zkontrolujte 24 slov a zkuste to znovu."
+    },
+    "typeback": {
+      "title": "Potvrdit svou frázi"
+    },
+    "joinFromQr": {
+      "notFound": "Tento kód označuje trezor, který na tomto zařízení není mezi vašimi pozvánkami. Požádejte vlastníka trezoru, aby pozvánku této identitě poslal znovu."
     }
   }
 }
