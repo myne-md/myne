@@ -34,7 +34,7 @@ import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import { has } from "../../platform/capabilities";
-import { EnrollPhraseCredential } from "./EnrollPhraseCredential";
+import { PhraseEntryGrid } from "../PhraseEntryGrid";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -293,7 +293,7 @@ export function EnrollDeviceForm() {
           testId="sync.enroll.password-input"
         />
       ) : (
-        <EnrollPhraseCredential
+        <PhraseEntryGrid
           baseId={baseId}
           cells={cells}
           onCellChange={handleCellChange}

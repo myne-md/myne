@@ -13,7 +13,7 @@ import { useEffect, useState, type ChangeEvent, type ClipboardEvent } from "reac
 import { useTranslation } from "react-i18next";
 import { PasswordInput } from "../PasswordInput";
 import { Button } from "../primitives/Button";
-import { EnrollPhraseCredential, PHRASE_CELL_COUNT } from "../sync/EnrollPhraseCredential";
+import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
 import {
   isAlreadyMigrated,
   isRecoveryPhraseRequired,
@@ -138,7 +138,7 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
         testId="migrate.password-input"
       />
 
-      <EnrollPhraseCredential
+      <PhraseEntryGrid
         baseId="migrate"
         label={t("migrate.phraseLabel")}
         hint={t("migrate.phraseHelp")}

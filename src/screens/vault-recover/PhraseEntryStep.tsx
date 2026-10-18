@@ -39,13 +39,13 @@
 import {
   useEffect,
   useId,
-  useState,
   type CSSProperties,
   type ChangeEvent,
   type ClipboardEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
+import { PhraseEntryGrid } from "../../components/PhraseEntryGrid";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import {
   PHRASE_CELL_COUNT,
@@ -125,66 +125,6 @@ const BODY_STYLE: CSSProperties = {
   margin: 0,
 };
 
-const GRID_STYLE: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gap: 6,
-};
-
-const CELL_WRAP_BASE: CSSProperties = {
-  position: "relative",
-  display: "flex",
-  alignItems: "center",
-  background: "var(--paper)",
-  borderRadius: 2,
-  paddingInlineStart: 28,
-  paddingInlineEnd: 8,
-  height: 32,
-  cursor: "text",
-  transition: "border-color var(--duration-instant) var(--ease-standard)",
-};
-
-function cellWrapStyle(focused: boolean): CSSProperties {
-  return {
-    ...CELL_WRAP_BASE,
-    border: `1px solid ${focused ? "var(--accent)" : "var(--line-1)"}`,
-    // No background branch: `--bg-1` IS `--paper` (the semantic alias), so the
-    // two arms named one value. They used to read `--bg-1` against `--paper-1`,
-    // and `--paper-1` does not exist, it resolved to nothing, so the unfocused
-    // cell showed the page through it, which on this screen is `--paper` again.
-    // The focus affordance is the border, and it always was
-    // (myne-md/myne#478).
-  };
-}
-
-const CELL_NUMBER_STYLE: CSSProperties = {
-  position: "absolute",
-  insetInlineStart: 8,
-  top: "50%",
-  transform: "translateY(-50%)",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-  pointerEvents: "none",
-  userSelect: "none",
-};
-
-const CELL_INPUT_STYLE: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  background: "transparent",
-  border: 0,
-  outline: "none",
-  appearance: "none",
-  WebkitAppearance: "none",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-base)",
-  color: "var(--fg-1)",
-  padding: 0,
-  margin: 0,
-  boxShadow: "none",
-};
-
 const FOOTER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -244,7 +184,6 @@ export function PhraseEntryStep({
 }: PhraseEntryStepProps) {
   const { t } = useTranslation();
   const baseId = useId();
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   // Clear the typed words when the page is hidden or unloaded
   // (`recovery-flow.md` §3.5 as amended 2026-08-15).
@@ -307,35 +246,15 @@ export function PhraseEntryStep({
           <DestructiveBanner testId="recover.banner">{state.banner}</DestructiveBanner>
         )}
 
-        <div style={GRID_STYLE} data-testid="recover.phrase-grid">
-          {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
-            const inputId = `${baseId}-cell-${i}`;
-            const focused = focusedIndex === i;
-            return (
-              <label key={i} htmlFor={inputId} style={cellWrapStyle(focused)}>
-                <span style={CELL_NUMBER_STYLE}>{i + 1}</span>
-                <input
-                  id={inputId}
-                  type="text"
-                  value={state.cells[i] ?? ""}
-                  onChange={handleCellChange(i)}
-                  onPaste={handlePaste(i)}
-                  onFocus={() => setFocusedIndex(i)}
-                  onBlur={() => setFocusedIndex((cur) => (cur === i ? null : cur))}
-                  autoComplete="off"
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  inputMode="text"
-                  style={CELL_INPUT_STYLE}
-                  aria-label={t("vaultRecover.phrase.cellLabel", { index: i + 1 })}
-                  data-testid="recover.phrase-cell"
-                  data-index={i + 1}
-                />
-              </label>
-            );
-          })}
-        </div>
+        <PhraseEntryGrid
+          baseId={baseId}
+          cells={state.cells}
+          onCellChange={handleCellChange}
+          onCellPaste={handlePaste}
+          gridTestId="recover.phrase-grid"
+          cellTestId={() => "recover.phrase-cell"}
+          cellAriaLabel={(index) => t("vaultRecover.phrase.cellLabel", { index: index + 1 })}
+        />
 
         <div style={FOOTER_STYLE}>
           <button

@@ -40,7 +40,7 @@ import {
 import { AuthShell } from "../../screens/AuthShell";
 import { Button } from "../primitives/Button";
 import { Segmented } from "../primitives/Segmented";
-import { EnrollPhraseCredential } from "./EnrollPhraseCredential";
+import { PhraseEntryGrid } from "../PhraseEntryGrid";
 import { buildPhraseCredential, PHRASE_CELL_COUNT } from "./phrase-credential";
 import { useEnroll } from "../../hooks/useEnroll";
 import { has } from "../../platform/capabilities";
@@ -504,7 +504,7 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
         <p style={HELP} data-testid="join.phrase-escape-warning">
           {t("sync.join.phraseEscapeBody")}
         </p>
-        <EnrollPhraseCredential
+        <PhraseEntryGrid
           baseId={`${baseId}-pending`}
           cells={cells}
           onCellChange={handleCellChange}
@@ -705,7 +705,7 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
             <p style={HELP} data-testid="join.phrase-warning">
               {t("sync.join.phraseWarning")}
             </p>
-            <EnrollPhraseCredential
+            <PhraseEntryGrid
               baseId={baseId}
               cells={cells}
               onCellChange={handleCellChange}

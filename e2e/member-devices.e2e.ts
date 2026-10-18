@@ -375,7 +375,7 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       );
       // The proof that no owner code is needed is BEHAVIOURAL and this click is it: the
       // form's own required fields are the phrase grid and the two password fields
-      // (`InviteWizard.tsx`, `EnrollPhraseCredential` + `PasswordCreateForm`, whose
+      // (`InviteWizard.tsx`, `PhraseEntryGrid` + `PasswordCreateForm`, whose
       // `disabled` reads only `joinPhraseCells`), so a completed submit with no code
       // field anywhere on the form is the join having verified the group package
       // against the owner PINNED in the person's own sealed profile

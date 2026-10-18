@@ -55,7 +55,7 @@ import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
-import { EnrollPhraseCredential } from "@app/components/sync/EnrollPhraseCredential";
+import { PhraseEntryGrid } from "@app/components/PhraseEntryGrid";
 import { ErrorBanner } from "@app/components/ErrorBanner";
 import { ExportEgressNotice } from "@app/components/export/ExportEgressNotice";
 import { FailClosedError } from "@app/components/FailClosedError";
@@ -1092,12 +1092,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
   {
     id: "components/enrollphrasecredential/default",
     group: "components",
-    surface: "EnrollPhraseCredential",
+    surface: "PhraseEntryGrid",
     state: "default",
     description: "Enroll Phrase Credential, a default state.",
     tags: ["components", "enrollphrasecredential", "default"],
     render: () => (
-      <EnrollPhraseCredential
+      <PhraseEntryGrid
         baseId="story-enroll"
         cells={PHONE_CELLS}
         onCellChange={() => noop}

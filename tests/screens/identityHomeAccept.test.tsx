@@ -48,7 +48,7 @@ vi.mock("../../src/platform/clipboardManager", () => ({ writeText: vi.fn() }));
 vi.mock("../../src/components/toast/toastStore", () => ({ toast: vi.fn() }));
 
 import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
-import { PHRASE_CELL_COUNT } from "../../src/components/sync/EnrollPhraseCredential";
+import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 import { MIN_PASSWORD_LEN } from "../../src/components/PasswordInput";
 
 /** Leave the current accept step for the next one. The accept is three steps now

@@ -50,8 +50,9 @@ import { IMPORT_SOURCES } from "./sourceCatalog";
 /** Which credential the user is presenting. */
 type CredentialKind = "password" | "phrase";
 
-/** 24 words, per `protocol.md` §3.1. */
-const PHRASE_CELL_COUNT = 24;
+/** 24 words, per `protocol.md` §3.1, from the one definition. */
+import { PhraseEntryGrid } from "../../components/PhraseEntryGrid";
+import { PHRASE_CELL_COUNT } from "../../lib/phrase-cells";
 
 /** The `<Select>` value that means "nothing chosen yet". */
 const NO_VAULT = "";
@@ -192,39 +193,6 @@ const DISCLOSURE_TEXT: CSSProperties = {
   lineHeight: 1.5,
 };
 
-const PHRASE_GRID: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "var(--space-2)",
-};
-
-const CELL_WRAP: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-1)",
-};
-
-const CELL_NUMBER: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-  width: "1.4em",
-  textAlign: "end",
-  fontFamily: "var(--font-mono)",
-};
-
-const CELL_INPUT: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-1)",
-  padding: "var(--space-1) var(--space-2)",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  outline: "none",
-};
-
 /**
  * The name to show for a vault whose label this session has never decrypted.
  *
@@ -242,21 +210,14 @@ function vaultName(
 }
 
 /**
- * The 24-cell phrase grid, held to `recovery-flow.md` §3.2.
+ * The 24-cell phrase grid for the import source credential, held to
+ * `recovery-flow.md` §3.2.
  *
- * Its own copy rather than `EnrollPhraseCredential`, and that is now duplication
- * rather than a requirement. The reason it existed was that this module's
- * `data-testid` was one of the needles `check-web-no-phrase.mjs` grepped
- * `web/dist` for, so reusing the shared primitive would have made two surfaces
- * indistinguishable in the artefact and broken a guard whose whole assertion was
- * one string. That guard is deleted (`decisions.md` 2026-10-18, entry 0704), so
- * nothing stops these two grids from becoming one.
- *
- * The §3.2 properties it inherits, each of which is a privacy rule rather than a
- * style choice: no per-cell validation, no typeahead over the BIP-39 wordlist,
- * paste-to-distribute from cell one, and browser autocomplete/spellcheck off.
- * Any positive or negative per-cell feedback leaks one bit of wordlist
- * membership per word to anyone looking at the screen.
+ * A thin adapter over the shared `PhraseEntryGrid`: this surface keeps its own
+ * `cells` array and its own paste arithmetic, and the grid owns the cell
+ * anatomy. It was a full second copy until `decisions.md` 2026-10-18 (entry 0704)
+ * deleted the artefact grep whose one-testid-per-surface rule was the reason
+ * seven surfaces could not share a primitive.
  */
 function PhraseGrid({
   cells,
@@ -285,29 +246,15 @@ function PhraseGrid({
     onCells(next);
   };
   return (
-    <div style={PHRASE_GRID} data-testid="import-myne.phrase-grid">
-      {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => (
-        <label key={i} htmlFor={`import-myne-word-${i}`} style={CELL_WRAP}>
-          <span style={CELL_NUMBER}>{i + 1}</span>
-          <Input
-            id={`import-myne-word-${i}`}
-            type="text"
-            value={cells[i] ?? ""}
-            onChange={(e) => setCell(i, e.target.value)}
-            onPaste={onPaste(i)}
-            autoComplete="off"
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            inputMode="text"
-            style={CELL_INPUT}
-            aria-label={t("notes.import.myne.wordAria", { number: i + 1 })}
-            data-testid="import-myne.phrase-cell"
-            data-index={i + 1}
-          />
-        </label>
-      ))}
-    </div>
+    <PhraseEntryGrid
+      baseId="import-myne-word"
+      cells={cells}
+      onCellChange={(index) => (e) => setCell(index, e.target.value)}
+      onCellPaste={onPaste}
+      gridTestId="import-myne.phrase-grid"
+      cellTestId={() => "import-myne.phrase-cell"}
+      cellAriaLabel={(index) => t("notes.import.myne.wordAria", { number: index + 1 })}
+    />
   );
 }
 
