@@ -82,6 +82,58 @@ ignore = [
     # — re-argue it, don't re-date it.
     "RUSTSEC-2023-0071",  # rsa: Marvin timing sidechannel; unreachable here (above).
 
+    # ── the `zip` extraction advisories, published together on 2026-10-17 ─────
+    # RUSTSEC-2026-0367 / -0368 / -0369 are all one surface: `ZipArchive::extract`,
+    # `ZipStreamReader::extract` and the stream extraction API WRITING an
+    # archive's entries to a filesystem path (symlink targets escaping the
+    # destination, SUID/SGID bits preserved, permissions applied through a
+    # symlink). The fix upstream is `>=9.0.0`.
+    #
+    # No call to any of them exists in this workspace, which is the whole
+    # argument:
+    #
+    #     grep -rn '\.extract(\|extract_stream' --include='*.rs' \
+    #       src-tauri/src core/src mobile/src-tauri/src protocol/
+    #       -> no match
+    #
+    # and every `zip` call site is a read over an in-memory `Cursor`:
+    #
+    #     src-tauri/src/plugins/attachments/extract.rs:384, :453, :674
+    #       ZipArchive::new(std::io::Cursor::new(bytes)) + by_name(..).read_to_end(..)
+    #     :812, :831, :939   ZipWriter over `&mut Vec<u8>` (test fixtures)
+    #
+    # The reachability claim is about the SINK, not the input, and the
+    # distinction matters here: a DOCX or XLSX IS attacker-chosen, because the
+    # user imports one. What is absent is any hand-off to the filesystem, so
+    # there is no path that creates a symlink, a setuid file, or a permission
+    # bit. Three versions sit in the tree — 1.1.4 via candle-core 0.8.4, 2.6.1
+    # direct, 4.6.1 via tauri-plugin-updater 2.12.0 — and the one sentence
+    # covers all three because it is about our code, not about theirs.
+    #
+    # Neither transitive one can take the fix (candle-core 0.8.4 requires
+    # `^1.1.1`; tauri-plugin-updater pins `^4`). Our OWN `zip = "2"`
+    # (src-tauri/Cargo.toml) is the one that could move to 9, and that is a
+    # separate change with the extractor surface to re-verify. Re-argue this
+    # block when any of the three moves; do not re-date it.
+    "RUSTSEC-2026-0367",  # zip: SUID/SGID bits preserved during extraction
+    "RUSTSEC-2026-0368",  # zip: extracted symlink may point outside the destination
+    "RUSTSEC-2026-0369",  # zip: permissions applied through extracted symlinks
+
+    # ── the `zbus` family, unmaintained (2026-10-17) ─────────────────────────
+    # RUSTSEC-2026-0370 / -0371 / -0372: upstream merged `zvariant`,
+    # `zbus_names` and `zvariant_derive` into `zbus` 6.0.0, so the DB says "No
+    # safe upgrade is available" for each. They reach us through `zbus` 5.16,
+    # which is a dependency of `tauri-plugin-opener` 2.5.4 and
+    # `tauri-plugin-single-instance` 2.4.2 — both Tauri's own, so the upgrade is
+    # a Tauri bump and not something this workspace can take alone. Status, not
+    # a vulnerability: no advisory attaches to any of the three crates, and what
+    # rots is future maintenance rather than a reachable defect. THREE entries,
+    # because the split is three crates: an ignore naming two of them leaves the
+    # third red, which is exactly how this list was written the first time.
+    "RUSTSEC-2026-0370",  # zvariant unmaintained (merged into zbus 6)
+    "RUSTSEC-2026-0371",  # zbus_names unmaintained (merged into zbus 6)
+    "RUSTSEC-2026-0372",  # zvariant_derive unmaintained (merged into zbus 6)
+
     # ── the yanked-but-unfixable `zip` 1.x line (2026-10-16) ──────────
     # `zip 1.1.4` is reached through `candle-core 0.8.4`'s NON-optional
     # `zip = "^1.1.1"`, and every 1.x release is yanked upstream — cargo prints
