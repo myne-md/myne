@@ -13,8 +13,13 @@
 //
 // # The three things it checks
 //
-// 1. **Every web-only rendering module carries at least one testid.** A screen
-//    with none is unreachable from the suite that is supposed to prove it works.
+// 1. **Every web-only rendering module carries at least one selector** — a
+//    `data-testid` of its own, or a `testId` / `testIdPrefix` literal it hands
+//    to a curated-prop child. A screen with neither is unreachable from the
+//    suite that is supposed to prove it works. The SHARED web-only screens are
+//    DERIVED from `check-web-screens.mjs`'s `web-only` verdicts rather than
+//    listed here: the hand-kept pair this started as left three of five unscanned
+//    while the header claimed "every" (audit 2026-10-18 R0.2).
 // 2. **Every testid is `<screen>.<element>`.** The naming rule is what lets a
 //    scenario guess a selector instead of grepping for it.
 // 3. **No `data-*` attribute is fed a runtime expression** in the pre-unlock
@@ -23,8 +28,10 @@
 //    keystroke away and would put it in the DOM, in screenshots, and in every
 //    failure artefact CI keeps.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+
+import { VERDICTS } from "./check-web-screens.mjs";
 
 /** Web-only rendering modules: everything under `web/src` that renders. */
 const WEB_DIR = join("web", "src");
@@ -32,62 +39,70 @@ const WEB_DIR = join("web", "src");
 /**
  * Web-only screens that live in the SHARED tree because they are stages
  * (`src/lib/stage.ts` owns their names), reachable only on this client.
+ *
+ * **DERIVED, not listed.** It used to be a hand-kept pair
+ * (`AccountNumberEntry`, `WebNoAccount`) under a header claiming "every web-only
+ * rendering module carries at least one testid" — so `AccountBootstrap` (which
+ * is where the account number is actually TYPED), `DeviceRevoked` and
+ * `ProvisioningStep` were outside the guard while it printed ok (audit 2026-10-18
+ * R0.2). `check-web-screens.mjs` already owns the verdict for every file under
+ * `src/screens/`, and `web-only` is exactly this set, so a sixth web-only screen
+ * now enters this guard on the same commit that adds its verdict instead of
+ * needing a second edit here that nobody would make.
+ *
+ * The import direction is one-way on purpose: `check-web-screens.mjs` reads a
+ * directory and a roster of its own, and knows nothing about testids. A cycle
+ * would be the alternative, and it is the reason the two rules stay in separate
+ * files.
  */
-const SHARED_WEB_ONLY = [
-  join("src", "screens", "AccountNumberEntry.tsx"),
-  join("src", "screens", "WebNoAccount.tsx"),
-];
+export function sharedWebOnlyScreens(verdicts = VERDICTS) {
+  return Object.entries(verdicts)
+    .filter(([, v]) => v.verdict === "web-only")
+    .map(([file]) => join("src", "screens", file))
+    .sort();
+}
+
+export const SHARED_WEB_ONLY = sharedWebOnlyScreens();
+
+/**
+ * Fewest shared web-only screens the derivation may yield before it is suspect.
+ *
+ * Recorded from a real run (5 when the derivation landed), the same shape as
+ * `PRE_UNLOCK_FLOOR` below and for the same reason: a derivation that yields
+ * NOTHING passes every rule inside it. That is not hypothetical here — renaming
+ * one `web-only` verdict to `adapted` in the neighbour's table would silently
+ * drop that screen out of this guard, which is exactly the class R0.2 fixed.
+ * It may rise with the tree; lowering it is the edit that is never routine.
+ */
+const SHARED_WEB_ONLY_FLOOR = 5;
 
 /**
  * Modules that legitimately render NOTHING, so "at least one testid" cannot
  * apply. Each is a substitution whose whole job is to be absent — and each is
  * already covered by an absence marker in `check-web-surfaces.mjs`, which is a
  * stronger check than a testid would be.
+ *
+ * **Compared both ways, like every roster in this repository.** Five entries
+ * were stale when R0.2 landed: the phrase-ban removal (2026-10-18, entry 0704)
+ * deleted those `web/src` substitutes, so the list was describing files that no
+ * longer existed and nothing failed. A stale exemption is worse than a missing
+ * one — it reads as a decision that was made about a file that is gone.
  */
 const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "PairingDialog.tsx"),
   join("web", "src", "components", "sync", "JoinDeviceModal.tsx"),
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
-  join("web", "src", "screens", "EnrollPhraseCredential.tsx"),
   // The creation flow's local-disk affordances, substituted away on 2026-08-15:
   // a native save dialog and an OS file-manager reveal, neither of which this
   // client has. Renders `null`, so there is nothing for a testid to name.
   join("web", "src", "screens", "vault-creation", "ReadyLocalArtefacts.tsx"),
-  // The vault-import setup step (myne-md/myne#464). It renders nothing because
-  // it THROWS: `vaultImport` is absent here, so `availableSourceOrder()` never
-  // offers the card and the component is unreachable. A stub that returned
-  // `null` instead would swallow a routing bug that made it reachable, which is
-  // the one thing this substitution must not do, since the real module takes a
-  // 24-word recovery phrase.
-  join("web", "src", "notes", "import", "MyneVaultSetup.tsx"),
-  // The B2B member-roster panel (myne-md/myne#698). It renders `null` by
-  // design: the real panel prompts for the recovery phrase, and `docs/vision.md`
-  // keeps that out of served code by build-time substitution. A testid would be
-  // a lie (there is no reachable surface) and returning markup would defeat the
-  // substitution. See `web/vite.config.ts` SUBSTITUTED_MODULES.
-  join("web", "src", "components", "sync", "MemberRosterPanel.tsx"),
-  // The person-identity session unlock, moved out of MemberRosterPanel
-  // (myne-md/myne#831). Same rule: the real component prompts for the recovery
-  // phrase, so the web build substitutes `null`. A testid would be a lie and
-  // returning markup would defeat the substitution.
-  join("web", "src", "components", "sync", "PersonIdentityUnlock.tsx"),
-  // The member-vault phrase unlock is substituted out for the same reason as
-  // the member roster: a browser must not ship this credential path.
-  join("web", "src", "components", "sync", "MemberVaultUnlockCard.tsx"),
   // The device-attribution panel (myne-md/myne#852 story 11). It renders `null`
   // by design: the store it reads is `NTV6`-only and group-tier sealed, both of
   // its commands are `Class::Unsupported` on web, and `memberSharing` is absent
   // here, so there is no reachable surface for a testid to name. See
   // `web/vite.config.ts` SUBSTITUTED_MODULES.
   join("web", "src", "components", "sync", "DeviceAttributionPanel.tsx"),
-  // The identity setup dialog (myne-md/myne#768). It registers a person account
-  // at a sync server, and `plugin:sync|sync_person_setup` is `Class::Unsupported`
-  // on web, so the served bundle must not carry the real dialog: it renders
-  // `null`. `AccountBootstrap`, not `Welcome`, is the web first-run screen, so
-  // the substitution target is never reached either. See
-  // `web/vite.config.ts` SUBSTITUTED_MODULES.
-  join("web", "src", "components", "IdentitySetupDialog.tsx"),
   // Whole-vault migration is desktop-only, so its phrase credential is absent
   // from the browser bundle rather than merely unreachable.
   join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),
@@ -100,13 +115,14 @@ const NAME = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/;
 /**
  * Fewest files the pre-unlock walk may cover before the walk itself is suspect.
  *
- * Recorded from a real run (15 at the time of writing), not invented, and it may
- * rise as the tree grows.
+ * Recorded from a real run (40 when R0.2 widened the roots to every derived
+ * web-only screen, 15 before that), not invented, and it may rise as the tree
+ * grows.
  * Lowering it is the edit that is never routine: it means the account-number
  * screens compose less than they did, which is either a real simplification
  * worth saying out loud or a walk that has stopped finding things.
  */
-const PRE_UNLOCK_FLOOR = 15;
+const PRE_UNLOCK_FLOOR = 40;
 
 export function webModules(dir = WEB_DIR) {
   const out = [];
@@ -124,6 +140,39 @@ export function webModules(dir = WEB_DIR) {
 /** Every `data-testid="…"` literal in `source`. */
 export function testidsIn(source) {
   return [...source.matchAll(/data-testid="([^"]*)"/g)].map((m) => m[1]);
+}
+
+/**
+ * Selectors a module hands to a CURATED-PROP child: `testId="…"` and
+ * `testIdPrefix="…"` string literals.
+ *
+ * `src/AGENTS.md` ("Test observability") names this as the sanctioned shape for a
+ * component whose caller chooses the name — `PasswordInput`, `DestructiveBanner`
+ * and `BlockingProgressStep` all take one. A screen whose whole observability
+ * contract is "it passes `create.provisioning` to the progress step" IS
+ * observable, and scoring it as having no testid would be the guard asserting
+ * something untrue about it. `ProvisioningStep.tsx` is that screen (audit R0.2):
+ * before this, it was simply absent from the walked set, and adding it without
+ * this would have produced a false finding.
+ *
+ * Only STRING LITERALS count. An interpolated `testId={…}` is not a stable
+ * selector and is covered by the `data-testid` interpolation rule, which is
+ * where the message about variant sets already lives.
+ */
+export function curatedTestIdProps(source) {
+  return [...source.matchAll(/\btestId(?:Prefix)?="([^"]*)"/g)].map((m) => m[1]);
+}
+
+/** Exemption entries whose file is gone, so a `RENDERS_NOTHING` decision cannot
+ *  outlive the substitution it was made about. */
+export function staleRenderNothingEntries(set = RENDERS_NOTHING, exists = existsSync) {
+  return [...set].filter((f) => !exists(f));
+}
+
+/** Every selector `source` offers: its own `data-testid`s and the curated props
+ *  it passes down. */
+export function selectorsIn(source) {
+  return [...testidsIn(source), ...curatedTestIdProps(source)];
 }
 
 /** Source with JSX/line/block comments removed, so prose about a rule is not
@@ -153,6 +202,34 @@ function templateInterpolates(body) {
 }
 
 /**
+ * The value expression starting at `start` inside a JSX `data-*={…}`, balanced
+ * over the closing brace.
+ *
+ * It used to stop at the first `,` or `}`, which cut a TEMPLATE at its own
+ * interpolation and a TERNARY at the first `}`: `testId === undefined ?
+ * "modal-close" : \`${testId}-close\`` was captured as a mangled prefix, so the
+ * caller-supplied exemption below was asked about a string that was not the
+ * expression. Balanced scanning is what makes the value under test the value in
+ * the file. A quote or a template is skipped as a unit so a `}` inside a string
+ * cannot close the expression early.
+ */
+function jsxExprAt(clean, start) {
+  let i = start;
+  for (; i < clean.length; i++) {
+    const c = clean[i];
+    if (c === "}" || c === "\n") break;
+    if (c === '"' || c === "'") {
+      i++;
+      while (i < clean.length && clean[i] !== c) if (clean[i++] === "\\") i++;
+    } else if (c === "`") {
+      i++;
+      while (i < clean.length && clean[i] !== "`") if (clean[i++] === "\\") i++;
+    }
+  }
+  return clean.slice(start, i).trim();
+}
+
+/**
  * The value expression starting at `start`, which is NOT simply "up to the next
  * `,` or `}`".
  *
@@ -167,6 +244,9 @@ function templateInterpolates(body) {
  *
  * A backtick is therefore scanned to its close, which is what `dynamicDataAttrs`
  * has always done by index; every other shape still stops at the delimiter.
+ * This one stays for the PROPS-OBJECT form, where a comma really does end the
+ * value and no closing brace belongs to the expression; the JSX form uses
+ * `jsxExprAt`, which balances braces instead.
  */
 function valueAfter(clean, start) {
   if (clean[start] !== "`") {
@@ -187,6 +267,65 @@ function valueAfter(clean, start) {
 function isConstantTestIdExpr(expr) {
   if (/^(["'])[^"'`]*\1$/.test(expr)) return true;
   return expr.startsWith("`") && expr.endsWith("`") && !templateInterpolates(expr);
+}
+
+/**
+ * Identifiers an expression may name and still count as CALLER-SUPPLIED.
+ *
+ * `src/AGENTS.md` ("Test observability") sanctions a curated prop: the caller
+ * names the selector via `testId` / `testIdPrefix`, so a value derived from one
+ * is not a value the user typed. `props` rides along because the props-object
+ * spelling (`data-testid={props.testId}`) is the same thing one layer down —
+ * and it cannot smuggle anything in, because every OTHER identifier is rejected:
+ * `props.accountNumber` fails on `accountNumber`, not on `props`.
+ *
+ * `undefined` / `true` / `false` / `null` are there for a fallback
+ * (`testId === undefined ? "modal-close" : \`${testId}-close\``), which is the
+ * shape `ModalShell` uses.
+ */
+const CALLER_TESTID_IDENTIFIERS = new Set([
+  "testId",
+  "testIdPrefix",
+  "props",
+  "undefined",
+  "true",
+  "false",
+  "null",
+]);
+
+/**
+ * Drop string literals and a template's literal TEXT, keeping its `${…}` bodies,
+ * so the identifiers that remain are the ones the code actually names.
+ *
+ * Without this a literal like `"modal-close"` contributes `modal` and `close`,
+ * which would reject a legitimate expression; with it, `` `${testId}-close` ``
+ * contributes exactly `testId`.
+ */
+function codeOnly(expr) {
+  return expr
+    .replace(/`(?:\\.|[^`\\])*`/g, (tpl) =>
+      [...tpl.matchAll(/\$\{([^}]*)\}/g)].map((m) => ` ${m[1]} `).join(" "),
+    )
+    .replace(/"(?:\\.|[^"\\])*"/g, " ")
+    .replace(/'(?:\\.|[^'\\])*'/g, " ");
+}
+
+/**
+ * Is this runtime `data-testid` expression built ONLY from caller-supplied
+ * identifiers?
+ *
+ * This started as `/^testId$|^testIdPrefix$/`, a substring test, on the stated
+ * grounds that "the exemption is for a value the caller chose, which is the bare
+ * identifier and nothing else". Two real spellings of that value were therefore
+ * reported as leaks when R0.2 widened the scanned set — a props object and a
+ * caller value with a fallback — and both are exactly what the exemption is FOR.
+ * So the test is structural now: every identifier names a sanctioned source, and
+ * a leak shape still fails because its extra identifier is not on the list.
+ */
+export function isCallerSuppliedTestIdExpr(expr) {
+  const identifiers = [...codeOnly(expr).matchAll(/[A-Za-z_$][\w$]*/g)].map((m) => m[0]);
+  if (identifiers.length === 0) return false;
+  return identifiers.every((id) => CALLER_TESTID_IDENTIFIERS.has(id));
 }
 
 /**
@@ -329,20 +468,78 @@ const ALLOWED_DYNAMIC = new Map([
     "The same, for content below. Both drive the `.myne-scroll-fade` mask in " +
       "`tokens.css` and carry no value the account-number field could reach.",
   ],
+  // The three below entered this budget when R0.2 derived the scanned set from
+  // `check-web-screens.mjs`'s `web-only` verdicts: the two screens the roster had
+  // named by hand did not compose `Button`, `Input` or `DeviceRevoked`, so their
+  // `data-*` decisions had never been asked for. All three are closed sets the
+  // CODE controls, which is the distinction this map records rather than a
+  // general permission.
+  [
+    "data-variant",
+    "`Button`'s own variant — the closed union `primary | secondary | ghost | " +
+      "danger` it declares in `src/components/primitives/Button.tsx`. It says " +
+      "which of the primitive's own skins is applied; no user input reaches it.",
+  ],
+  [
+    "data-mono",
+    "`Input`'s boolean prop, rendered as `\"true\" | undefined`. Set by the " +
+      "caller at the call site (the account-number field is one of its mono " +
+      "consumers) and never derived from what is typed into it.",
+  ],
+  [
+    "data-invalid",
+    "The same shape on the same primitive: `invalid === true ? \"true\" : " +
+      "undefined`. It reports the primitive's own state, and the value reaches " +
+      "the DOM as a two-valued string.",
+  ],
+  [
+    "data-erased",
+    "`DeviceRevoked`'s local `erased` boolean, rendered as `\"true\" | " +
+      "\"false\"`. It records whether this browser's copy has been deleted — a " +
+      "fact about this browser's own storage, which the screen states in full " +
+      "text beside it. The account number is not on this screen and cannot reach " +
+      "this attribute.",
+  ],
 ]);
 
 function main() {
   const files = webModules();
   const problems = [];
 
+  // The derivation's own floor, checked BEFORE the walk it guards. See
+  // `SHARED_WEB_ONLY_FLOOR`: a `web-only` verdict renamed to `adapted` in
+  // `check-web-screens.mjs` would drop a screen out of this guard in silence.
+  if (SHARED_WEB_ONLY.length < SHARED_WEB_ONLY_FLOOR) {
+    problems.push(
+      `the web-only roster derived from check-web-screens.mjs covers ` +
+        `${SHARED_WEB_ONLY.length} screen(s), below the recorded floor of ` +
+        `${SHARED_WEB_ONLY_FLOOR}. The rules below check what this list contains, ` +
+        `so a shrunken derivation is a check that passed having looked at nothing. ` +
+        `A verdict renamed to \`adapted\`/\`excluded\` is the usual cause.`,
+    );
+  }
+
+  // The exemption list, compared BOTH ways. A `null`-returning substitution
+  // that has been deleted leaves an entry behind, and an entry describing a file
+  // that is gone reads as a decision somebody made — which is why the sibling
+  // guards (`check-unwired.mjs`, `check-ipc-binding-callers.mjs`) fail on it too.
+  for (const f of staleRenderNothingEntries()) {
+    problems.push(
+      `${f} is recorded in RENDERS_NOTHING but does not exist. A substitution ` +
+        `that has been removed leaves the exemption describing a file nobody ` +
+        `can open. Delete the entry with the file.`,
+    );
+  }
+
   for (const f of files) {
     const src = readFileSync(f, "utf8");
-    const ids = testidsIn(src);
-
+    const ids = selectorsIn(src);
     if (ids.length === 0 && !RENDERS_NOTHING.has(f)) {
       problems.push(
-        `${f}: renders with no data-testid — the web suite cannot reach it. ` +
-          `If it renders nothing, add it to RENDERS_NOTHING with the reason.`,
+        `${f}: renders with no selector — the web suite cannot reach it. Either give ` +
+          `it a \`data-testid\`, or pass a \`testId\`/\`testIdPrefix\` literal to a ` +
+          `curated-prop child (src/AGENTS.md, "Test observability"), or add it to ` +
+          `RENDERS_NOTHING with the reason if it renders nothing.`,
       );
     }
     for (const id of ids) {
@@ -412,18 +609,20 @@ function main() {
     const interpolated = [
       // A constant string in either spelling is not a runtime value, and
       // `isConstantTestIdExpr` is the one place that decides which is which.
+      // `jsxExprAt` balances the braces, so a ternary or a template is the
+      // expression the file contains rather than a prefix of it.
       ...[...preUnlockSrc.matchAll(/data-testid=\{\s*/g)]
-        .map((m) => valueAfter(preUnlockSrc, m.index + m[0].length))
+        .map((m) => jsxExprAt(preUnlockSrc, m.index + m[0].length))
         .filter((expr) => !isConstantTestIdExpr(expr)),
       // The props-object spelling, which the JSX pattern above never matched.
       ...interpolatedTestIdObjectForm(preUnlockSrc),
     ];
     for (const expr of interpolated) {
-      // BOTH alternatives anchored. `/testIdPrefix/` was a bare substring test,
-      // so any expression merely CONTAINING the prop name was exempt, including
-      // `` `${testIdPrefix}-${accountNumber}` ``. The exemption is for a value
-      // the caller chose, which is the bare identifier and nothing else.
-      if (/^testId$/.test(expr) || /^testIdPrefix$/.test(expr)) continue;
+      // The curated-prop shape, structurally rather than by name-matching the
+      // bare identifier: `props.testId` and a `testId`-derived fallback are the
+      // same sanctioned thing, and `` `${testIdPrefix}-${accountNumber}` `` is
+      // still reported because `accountNumber` is not on the list.
+      if (isCallerSuppliedTestIdExpr(expr)) continue;
       problems.push(
         `${f}: data-testid={${expr}} takes a runtime value on (or under) a ` +
           `pre-unlock screen. Its value reaches the DOM like any other data-*, ` +
@@ -452,9 +651,9 @@ function main() {
     process.exit(1);
   }
 
-  const total = files.reduce((n, f) => n + testidsIn(readFileSync(f, "utf8")).length, 0);
+  const total = files.reduce((n, f) => n + selectorsIn(readFileSync(f, "utf8")).length, 0);
   console.log(
-    `web testids: ok (${files.length} web-only module(s), ${total} testid(s), ` +
+    `web testids: ok (${files.length} web-only module(s), ${total} selector(s), ` +
       `${RENDERS_NOTHING.size} render-nothing substitution(s), ` +
       `${preUnlock.length} pre-unlock file(s) scanned for the leak budget)`,
   );

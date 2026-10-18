@@ -13,33 +13,51 @@
 // See `docs/dev/i18n.md` for the full add-a-string workflow.
 
 import { defineConfig } from "i18next-cli";
+import { presentSharedRoots } from "./scripts/lib/shared-roots.mjs";
+
+// Every shared tree, from ONE roster (#273).
+//
+// **It was a hand-kept list, and the note above it said so** ("kept in step with
+// `scripts/lib/shared-roots.mjs` by hand, because this file is consumed by the
+// extractor CLI rather than by Node with an import"). It had drifted: the roster
+// holds nine trees and this list held six, so `client-core/src`, `ornaments/src`
+// and `stories/src` were never scanned and a `t()` key added there was invisible
+// to the documented add-a-string procedure (`docs/dev/i18n.md`) — the exact
+// failure the note was written about, one package later (audit 2026-10-18 R0.4).
+//
+// The stated reason was wrong rather than merely stale: this file IS loaded by
+// Node (it uses `export default` under `"type": "module"`), so importing the
+// roster works, and it is what makes "one roster" a construction instead of a
+// promise. `tests/scripts/i18nExtractRoster.test.ts` holds the two together, so a
+// future hand-written copy of this list fails rather than drifting.
+const { present: SHARED_PRESENT, missing: SHARED_MISSING } = presentSharedRoots();
+
+// Fail by NAME on a root that is not in this checkout, rather than narrowing the
+// scan in silence. A glob that matches nothing does not error: the extractor
+// simply finds no keys, so every string in that tree stops being extracted and
+// nothing says so.
+if (SHARED_MISSING.length > 0) {
+  throw new Error(
+    `i18n extractor: shared root(s) absent from this checkout: ${SHARED_MISSING.join(", ")}. ` +
+      `The extractor would silently stop seeing every string in them.`,
+  );
+}
 
 export default defineConfig({
   locales: ["en","ar","bn","cs","da","de","el","es","fa","fi","fr","hi","hu","id","it","ja","ko","nb","nl","pa","pl","pt","ro","ru","sv","sw","th","tr","uk","ur","vi","zh"],
   extract: {
-    // Desktop client (`src/`) + the mobile client (`mobile/src/`, MYND-485).
-    // Both clients share these repo-root catalogs, so a single `pnpm i18n:extract`
-    // keeps desktop + mobile `t("…")` keys in one source. The
-    // shared `@myne/{editor,dialect}` engines carry their own keys (already
-    // resident); scanning each client's own source is what surfaces new strings.
-    // Every shared tree — kept in step with `scripts/lib/shared-roots.mjs` by
-    // hand, because this file is consumed by the extractor CLI rather than by
-    // Node with an import (#273). It listed `src` and the mobile tree only,
-    // predating the `editor/`, `dialect/` and `copy/` packages: `editor/src`
-    // alone holds 226 live `i18n.t()` keys the extractor never saw, so
-    // following the documented add-a-string procedure exactly still shipped a
-    // raw dotted key.
-    input: [
-      "src/**/*.{ts,tsx}",
-      "editor/src/**/*.{ts,tsx}",
-      "dialect/src/**/*.{ts,tsx}",
-      "copy/src/**/*.{ts,tsx}",
-      "web/src/**/*.{ts,tsx}",
-      // NOTE — this path moved when the mobile client came in-repo (decisions.md
-      // 2026-08-13). A stale glob here does not error: the extractor simply
-      // matches nothing, so every mobile string silently stops being extracted.
-      "mobile/src/**/*.{ts,tsx}",
-    ],
+    // Desktop, web and mobile clients plus the shared SOURCE packages
+    // (`editor/`, `dialect/`, `copy/`, `client-core/`, `ornaments/`) and the
+    // story catalogue — all of them compile into more than one client and all of
+    // them share these repo-root catalogs, so a single `pnpm i18n:extract` keeps
+    // every client's `t("…")` keys in one source. Derived from
+    // `scripts/lib/shared-roots.mjs`; see the note above for why that matters.
+    //
+    // NOTE — the mobile path moved when the client came in-repo
+    // (decisions.md 2026-08-13), which is the class of edit a hand-kept list gets
+    // wrong: a stale glob here does not error, so every mobile string silently
+    // stops being extracted.
+    input: SHARED_PRESENT.map((root) => `${root}/**/*.{ts,tsx}`),
     output: "locales/{{language}}/{{namespace}}.json",
     // English is the source language: its catalog is hand-maintained and is
     // the per-key runtime fallback for every other locale.

@@ -34,9 +34,27 @@
 // is NOT acceptable without a timeout: a hung server would wedge the Worker
 // permanently, so every request carries one.
 
-/** Mirrors the native transports' socket deadline (`SOCKET_TIMEOUT`, 60 s):
- *  comfortably above any legitimate response, including a 64 MiB blob. */
-const REQUEST_TIMEOUT_MS = 60_000;
+/** Mirrors the native transports' socket deadline — `SOCKET_TIMEOUT` in
+ *  `core/src/plugins/sync/http_transport.rs` (180 s). `rustls_transport.rs` and
+ *  `socks5.rs` both import that one constant, so this is the only other copy of
+ *  the number that exists.
+ *
+ *  **It said 60 s, and had said so since the native value moved to 180 s.** The
+ *  native deadline was raised for a reason worth repeating, because the same
+ *  reasoning applies here: the budget has to cover the SERVER's work, not just
+ *  the transfer (myne-md/myne#222). The old 60 s was justified as "comfortably
+ *  exceeds any legitimate response (incl. a 64 MiB blob)" — a transfer-time
+ *  budget, and the reason a first sync of a large vault failed: the client had
+ *  finished writing long before the deadline and was waiting on a server still
+ *  applying blobs. A push is the one request class whose server-side cost scales
+ *  with what we sent, and on this client there is no other deadline to fall back
+ *  on: the Rust `SOCKET_TIMEOUT` is `#[cfg(not(target_arch = "wasm32"))]`, so a
+ *  browser request has exactly one clock and this is it.
+ *
+ *  `scripts/check-sync-timeout-drift.mjs` compares the two numbers, because
+ *  nothing did: `wasm32` means the Rust constant is not in the browser's build
+ *  at all, so no compiler, test or guard in this tree could see the pair drift. */
+const REQUEST_TIMEOUT_MS = 180_000;
 
 export interface SyncHttpResponse {
   status: number;

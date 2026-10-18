@@ -7,6 +7,16 @@
 // construction — cross-client paraphrase is impossible. E2E asserts them by
 // FULL-literal equality; changing any is a `design-notes.md` event, never a
 // copy edit. Never i18n these (see `src/AGENTS.md` "Do NOT i18n load-bearing copy").
+//
+// **What "by construction" covers, stated because it was overclaimed.** This
+// sentence was TRUE of the sync/enroll family below and FALSE of eighteen
+// per-note-export, clip-notice and settings literals, which were declared in both
+// client files byte-identical BY HAND while this header claimed otherwise (audit
+// 2026-10-18, R0.1; fixed 2026-10-19). A declaration is now the whole mechanism:
+// a client tree may not define a name this file exports, and
+// `scripts/check-copy-membership.mjs` fails by naming the file when one does. What
+// each client still declares locally is that client's own surface copy, which is
+// per-client by design and outside this package's claim.
 
 // Device removal honesty (MYND-425). "Remove device" revokes a per-device sync
 // token — it stops the server from serving that device — but it does NOT
@@ -463,3 +473,209 @@ export const CONSENT_EXCLUDED_FOLDERS =
  *  Rendered verbatim in every locale (never i18n'd). */
 export const AI_TRANSCRIPT_HONESTY_NOTE =
   "This transcript was made by a small model running on your device and may be wrong — check it against the audio.";
+
+/* ---- Per-note export, settings and notice copy (audit R0.1, 2026-10-19) -----
+ *
+ * The eighteen literals below were DECLARED in both
+ * `src/lib/load-bearing-copy.ts` and `mobile/src/lib/load-bearing-copy.ts`,
+ * byte-identical by hand, while this package's header claimed the class was
+ * "byte-identical across clients by construction" and `docs/dev/twin-inventory.md`
+ * recorded the pair as "RESOLVED … both sides now re-export the shared family".
+ * Measured: 23 exported consts on desktop, 19 on mobile, 18 in both, and none of
+ * the 18 appeared here. The claim was true of the sync/enroll family and false of
+ * everything below it.
+ *
+ * It was latent rather than broken: the two copies were byte-identical on the day
+ * it was found, so nothing was misrendering. What was missing is the MECHANISM —
+ * a `design-notes.md` event had to be a copy edit in two files, and the only
+ * guard over the pair (`check-twin-drift-ratchet.mjs`) fires on a pair that
+ * STARTS differing, not on one that was already recorded as differing for an
+ * unrelated reason. `scripts/check-copy-membership.mjs` is the missing mechanism
+ * now: a client tree may not declare a name this file exports.
+ *
+ * The load-bearing reason for each group is kept with it here, because this is
+ * now the only copy of it.
+ */
+
+/** Unlock A8b `InvalidCredentialOrVault` banner — §7.3 compound form. */
+export const UNLOCK_NON_DISTINGUISHING_BANNER =
+  "Wrong password or vault file is corrupted.";
+
+/** Recovery A8d `InvalidCredentialOrVault` banner — §3.4 single
+ *  non-distinguishing outcome (cells wiped, one message, no per-word
+ *  or per-cause detail). */
+export const RECOVERY_NON_DISTINGUISHING_BANNER =
+  "Phrase or vault file is invalid. Please try again.";
+
+// The normative "honest about cost" sentence (PRODUCT.md principle 3 /
+// docs/design/README.md "Lost both secrets") — the irreversible
+// consequence of losing both credentials, stated plainly. Rendered
+// verbatim by PasswordStep's helper copy AND embedded in the first-run
+// safety briefing's recovery-phrase "Why?" (MYND-114); the briefing
+// component test asserts it as a substring of that "Why?" text. Single
+// source so a revision (a product-voice decision, not a copy edit) lands
+// in one place.
+
+/** "If you lose both …" — the canonical irreversibility sentence. */
+export const LOST_BOTH_SECRETS_SENTENCE =
+  "If you lose both your password and recovery phrase, your notes are unrecoverable. We cannot help.";
+
+// Per-note export pre-flight (MYND-116). The honest-egress sentence is
+// load-bearing UI honesty (TB3 plaintext egress is stated plainly, once,
+// never as a banner); the sub-label pins the attachments-placement
+// contract of `note_export_attachments` (files land beside the note).
+// E2E asserts both by FULL-literal equality — production renders the
+// constants verbatim (`NoteExportModal`).
+
+/** The one plain egress sentence of the per-note markdown export —
+ *  shown in the pre-flight modal when the note references attachments,
+ *  and carried as the OS save dialog's title on the common no-modal
+ *  path (`runNoteExportFlow`), so it is said exactly once at the
+ *  decision point either way. */
+export const EXPORT_PLAIN_MARKDOWN_SENTENCE =
+  "The exported file is plain Markdown — it is not encrypted.";
+
+/** Whole-vault export (MYND-211): the one plain egress sentence shown in
+ *  the vault-export modal's setup phase (`VaultExportModal`) — the
+ *  whole-tree sibling of `EXPORT_PLAIN_MARKDOWN_SENTENCE`. Same honesty
+ *  discipline: stated plainly, once, never as a banner; E2E asserts it by
+ *  FULL-literal equality. */
+export const VAULT_EXPORT_PLAIN_TREE_SENTENCE =
+  "The exported files are plain Markdown — they are not encrypted.";
+
+/** Muted sub-label under the "Include N attachments" toggle. */
+export const EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL =
+  "Files are placed in the same folder as the note.";
+
+// Per-note PDF export pre-flight (MYND-255). Same honesty discipline as
+// the markdown sentences above: the egress is stated plainly, once,
+// never as a banner; the exclusion sentence pins the product decision
+// that non-image attachment embeds (PDFs, archives, anything else the
+// projection cannot inline) are NOT carried into the generated PDF
+// (a muted in-document placeholder marks each position instead). The
+// notice (`NotePdfExportNotice`) renders both verbatim; E2E asserts
+// them by FULL-literal equality.
+
+/** The one plain egress sentence of the per-note PDF export — shown in
+ *  the pre-export notice when the projection excludes attachments, and
+ *  carried as the OS save dialog's title on the common no-notice path
+ *  (`runNotePdfExportFlow`), so it is said exactly once at the decision
+ *  point either way. */
+export const EXPORT_PDF_PLAIN_SENTENCE =
+  "The exported file is a plain PDF — it is not encrypted.";
+
+/** The attachment exclusion sentence (shown only when the note embeds
+ *  attachments the projection cannot include — every non-image type,
+ *  not just PDFs). */
+export const EXPORT_PDF_EXCLUSION_SENTENCE =
+  "Attached files (PDFs and other non-image attachments) are not included in the generated PDF.";
+
+// Per-note HTML + plain-text export (note-export MYND-340). Same honesty
+// discipline as the markdown / PDF sentences above: the egress is stated
+// plainly, once (carried on the OS save dialog title, or shown in the
+// pre-flight attachments modal for HTML), never as a banner; E2E asserts
+// them by FULL-literal equality.
+
+/** The one plain egress sentence of the per-note HTML export — shown in
+ *  the pre-flight modal when the note references image attachments, and
+ *  carried as the OS save dialog's title on the common no-modal path
+ *  (`runNoteHtmlExportFlow`), so it is said exactly once at the decision
+ *  point either way. */
+export const EXPORT_PLAIN_HTML_SENTENCE =
+  "The exported file is plain HTML — it is not encrypted.";
+
+/** The one plain egress sentence of the per-note plain-text export —
+ *  carried as the OS save dialog's title (`runNoteTxtExportFlow`); the
+ *  TXT projection never includes attachments, so there is no pre-flight
+ *  modal and the sentence is said only here. */
+export const EXPORT_PLAIN_TEXT_SENTENCE =
+  "The exported file is plain text — it is not encrypted.";
+
+// Automatic local-backup failure toast (MYND-351). A backup feature must never
+// fail silently — when a scheduled backup cannot write (target gone / disk full
+// / permission denied) the user sees this once (debounced); the schedule stays
+// enabled and retries next cycle. E2E (task 8 failure-path) asserts it by
+// FULL-literal equality, so it lives here as the single source.
+
+/** Scheduled-backup failure toast — the quiet, non-silent failure alert. */
+export const BACKUP_SCHEDULE_FAILED_TOAST =
+  "Automatic backup failed. Check your backup folder in Settings → Storage.";
+
+/* ---- Browser-extension clip success notice (desktop-ingest task 7, MYND-442) --
+ *
+ * A clip lands at the vault ROOT (SYNC-15) and the user keeps working — the
+ * notice is a non-blocking toast with a "view" affordance that opens the new
+ * note. The copy is load-bearing: E2E asserts the message + action label + each
+ * omitted-tally line by FULL-literal equality, so the strings live here as the
+ * single source. The tally renders PROMINENTLY (one labelled line per omitted
+ * media class) because a single clip losing its hero image is surprising — far
+ * more so than a per-type loss inside a bulk import.
+ *
+ * `clipOmittedTallyLine` came with them: it was declared byte-identically in
+ * both client files and builds those asserted lines, so leaving it behind would
+ * have left half the block duplicated while this package claimed the whole.
+ */
+
+/** The clip success notice's primary line — the clip landed at the vault root. */
+export const CLIP_NOTICE_ROOT_MESSAGE = "Clipped to your vault root.";
+
+/** The label of the clip notice's "view" affordance (opens the new note). */
+export const CLIP_NOTICE_VIEW_ACTION = "View";
+
+/** The display label for each omitted media class in the clip tally. Keyed on
+ *  the user-meaningful media class (`src/notes/import/media.ts`); the value is
+ *  the singular noun the tally line uses (pluralised by `clipOmittedTallyLine`
+ *  when the count is >1). */
+const CLIP_OMITTED_CLASS_NOUN: Record<string, string> = {
+  image: "image",
+  pdf: "PDF",
+  audio: "audio file",
+  video: "video",
+  other: "attachment",
+};
+
+/** Render one prominent omitted-by-type tally line (e.g. "1 image omitted",
+ *  "3 PDFs omitted"). Load-bearing: E2E asserts the rendered line by literal
+ *  equality, so the wording lives here. The count is always ≥1 (the builder
+ *  emits a line only for a non-zero class). */
+export function clipOmittedTallyLine(mediaClass: string, count: number): string {
+  const noun = CLIP_OMITTED_CLASS_NOUN[mediaClass] ?? "attachment";
+  const plural = count === 1 ? noun : pluraliseOmittedNoun(noun);
+  return `${count} ${plural} omitted`;
+}
+
+/** Pluralise an omitted-class noun. "PDF" → "PDFs", "audio file" → "audio
+ *  files" (the head noun pluralises), everything else gets a trailing "s". */
+function pluraliseOmittedNoun(noun: string): string {
+  if (noun === "audio file") return "audio files";
+  return `${noun}s`;
+}
+
+/* ---- Connected-extensions Settings section (ext-foundation-handoff task 7,
+ * MYND-443) ------------------------------------------------------------------
+ *
+ * Settings → Account lists the live (non-revoked) paired browser extensions
+ * with a per-row Revoke. Revoke is desktop-authoritative, immediate + durable —
+ * the re-pair hint states the consequence plainly (the extension must pair
+ * again to reconnect). E2E asserts these literals by full equality, so they live
+ * here as the single source.
+ */
+
+/** Section title for the connected-extensions list (Settings → Account). */
+export const CONNECTED_EXTENSIONS_TITLE = "Connected extensions";
+
+/** Helper line under the section title — what a paired extension is. */
+export const CONNECTED_EXTENSIONS_HELPER =
+  "Browser extensions you have paired with this vault. Revoking one disconnects it immediately.";
+
+/** Empty state — no extension has been paired yet (the start-empty case). */
+export const CONNECTED_EXTENSIONS_EMPTY = "No connected extensions.";
+
+/** The per-row Revoke action label. */
+export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
+
+/** The one-line consequence hint shown after the list — revoke is durable and
+ *  the extension must pair again to reconnect (the re-pair itself is the
+ *  extension's side, out of scope for this UI). */
+export const CONNECTED_EXTENSIONS_REPAIR_HINT =
+  "A revoked extension must pair again to reconnect.";

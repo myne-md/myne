@@ -419,6 +419,19 @@ pre-commit:
       glob: "{dialect/src/embedLayout.ts,core/src/export_naming.rs,scripts/check-embed-layout-drift.mjs}"
       run: node scripts/check-embed-layout-drift.mjs
 
+    sync-timeout-drift:
+      # Audit R0.3 (2026-10-19): the sync request deadline is written in Rust
+      # (`core/src/plugins/sync/http_transport.rs::SOCKET_TIMEOUT`, 180 s since
+      # myne-md/myne#222) and in the browser's blocking XHR bridge
+      # (`web/src/worker/sync-transport.ts::REQUEST_TIMEOUT_MS`), which still said
+      # 60 s with a comment claiming it mirrored the native value. Nothing could
+      # compare them: `SOCKET_TIMEOUT` is `#[cfg(not(target_arch = "wasm32"))]`, so
+      # it is not in the browser's build at all, and a wrong deadline is neither a
+      # build error nor a test failure — it is "sync is slow" on a large vault.
+      # Same shape as `embed-layout-drift` above: one fact, two languages.
+      glob: "{web/src/worker/sync-transport.ts,core/src/plugins/sync/http_transport.rs,scripts/check-sync-timeout-drift.mjs}"
+      run: node scripts/check-sync-timeout-drift.mjs
+
     update-channel:
       # The update channel is chosen by MYNE_UPDATE_CHANNEL and used to be named
       # in four places that could disagree, one of which did nothing at all:
@@ -877,6 +890,23 @@ pre-commit:
       # literal equality, so a test updated alongside the text passes either way.
       glob: "{copy/src/index.ts,scripts/beta-terms-digest.json}"
       run: node scripts/check-beta-terms-version.mjs
+
+    copy-membership:
+      # Audit R0.1 (2026-10-19): `copy/src/index.ts` claimed its literals were
+      # "byte-identical across clients by construction" while eighteen of them —
+      # both non-distinguishing banners included — were declared in
+      # `src/lib/load-bearing-copy.ts` AND `mobile/src/lib/load-bearing-copy.ts`.
+      # Neither twin guard could see it: the inventory compares the two clients
+      # WITH EACH OTHER and both were wrong the same way, and the drift ratchet
+      # fires only on a pair that STARTS differing. This fails by naming the file
+      # that declares a name the package exports.
+      #
+      # The glob is the client trees rather than the two files that had it: the
+      # next one will be elsewhere, and the class is "a second place the value can
+      # drift". `check-token-parity.mjs` above carries the same reasoning for the
+      # same shape of rule.
+      glob: "{src/**,mobile/src/**,web/src/**,client-core/src/**,editor/src/**,dialect/src/**,copy/src/**,ornaments/src/**,stories/src/**,scripts/check-copy-membership.mjs}"
+      run: node scripts/check-copy-membership.mjs
 
     whitespace:
       # Excludes vendored third-party dictionary data (wooorm/dictionaries

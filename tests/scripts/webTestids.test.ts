@@ -17,10 +17,16 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  curatedTestIdProps,
   dynamicDataAttrs,
   interpolatedTestIdObjectForm,
+  isCallerSuppliedTestIdExpr,
   preUnlockScope,
+  selectorsIn,
+  sharedWebOnlyScreens,
+  staleRenderNothingEntries,
 } from "../../scripts/check-web-testids.mjs";
+import { VERDICTS } from "../../scripts/check-web-screens.mjs";
 
 describe("dynamicDataAttrs: the JSX form (what it always caught)", () => {
   it("names an attribute fed an expression", () => {
@@ -174,5 +180,106 @@ describe("interpolatedTestIdObjectForm: the props-object testid spelling", () =>
     // template, and was reported as a runtime value. A guard that fires on a
     // correct file is a guard people learn to route around.
     expect(interpolatedTestIdObjectForm("const p = { 'data-testid': `a, b` };")).toEqual([]);
+  });
+});
+
+// Audit R0.2 (2026-10-19). The roster this guard walks for "every web-only
+// module carries a selector" was a hand-kept pair, so three of the five shared
+// web-only screens were unscanned while the header claimed "every". It is now
+// derived from the neighbour's verdict table, and these cases hold that
+// derivation and its floor in place.
+describe("sharedWebOnlyScreens: the roster is derived, not listed", () => {
+  it("takes every `web-only` verdict from check-web-screens.mjs", () => {
+    const derived = sharedWebOnlyScreens();
+    const expected = Object.entries(VERDICTS)
+      .filter(([, v]) => v.verdict === "web-only")
+      .map(([file]) => `src/screens/${file}`)
+      .sort();
+    expect(derived).toEqual(expected);
+  });
+
+  it("includes the screens the hand-kept pair left out", () => {
+    // The finding itself, asserted by name: these three were outside the guard.
+    for (const file of [
+      "src/screens/AccountBootstrap.tsx",
+      "src/screens/DeviceRevoked.tsx",
+      "src/screens/vault-creation/ProvisioningStep.tsx",
+    ]) {
+      expect(sharedWebOnlyScreens()).toContain(file);
+    }
+  });
+
+  it("drops a screen whose verdict changes, which is what the floor guards", () => {
+    // Injected verdict table: one `web-only` renamed to `adapted`. The real
+    // guard records a floor for this, because a derivation that shrinks passes
+    // every rule inside it.
+    const injected = { ...VERDICTS, "DeviceRevoked.tsx": { verdict: "adapted", note: "x" } };
+    expect(sharedWebOnlyScreens(injected)).not.toContain("src/screens/DeviceRevoked.tsx");
+    expect(sharedWebOnlyScreens(injected).length).toBe(sharedWebOnlyScreens().length - 1);
+  });
+});
+
+describe("curated testid props: a selector the caller names", () => {
+  it("reads a `testId` literal, which is how ProvisioningStep is observable", () => {
+    expect(curatedTestIdProps('<BlockingProgressStep testId="create.provisioning" />')).toEqual([
+      "create.provisioning",
+    ]);
+  });
+
+  it("reads a `testIdPrefix` literal", () => {
+    expect(curatedTestIdProps('<Form testIdPrefix="recover.reset" />')).toEqual(["recover.reset"]);
+  });
+
+  it("ignores an interpolated prop, which is not a stable selector", () => {
+    expect(curatedTestIdProps("<Foo testId={`a-${b}`} />")).toEqual([]);
+  });
+
+  it("counts both spellings for the presence check", () => {
+    expect(selectorsIn('<div data-testid="x.y" /><Foo testId="x.z" />')).toEqual(["x.y", "x.z"]);
+  });
+});
+
+describe("staleRenderNothingEntries: an exemption cannot outlive its file", () => {
+  it("names an entry whose substitution is gone", () => {
+    expect(staleRenderNothingEntries(new Set(["web/src/screens/Gone.tsx"]))).toEqual([
+      "web/src/screens/Gone.tsx",
+    ]);
+  });
+
+  it("is empty on the real tree, which is what R0.2 fixed", () => {
+    // Five entries were stale when R0.2 landed: the phrase-ban removal
+    // (2026-10-18, entry 0704) deleted those `web/src` substitutes, and nothing
+    // compared the list with the tree.
+    expect(staleRenderNothingEntries()).toEqual([]);
+  });
+});
+
+describe("isCallerSuppliedTestIdExpr: the exemption, structurally", () => {
+  it("accepts the bare identifier it always did", () => {
+    expect(isCallerSuppliedTestIdExpr("testId")).toBe(true);
+    expect(isCallerSuppliedTestIdExpr("testIdPrefix")).toBe(true);
+  });
+
+  it("accepts the two real spellings R0.2 surfaced", () => {
+    // `BetaTermsConsent` passes a props member; `ModalShell` derives a close-button
+    // id from the surface id with a fallback. Both are caller-supplied, and both
+    // were reported as leaks by the bare-identifier test.
+    expect(isCallerSuppliedTestIdExpr("props.testId")).toBe(true);
+    expect(isCallerSuppliedTestIdExpr('testId === undefined ? "modal-close" : `${testId}-close`')).toBe(true);
+  });
+
+  it("rejects an expression that names anything else, which is the leak shape", () => {
+    // The direction the exemption must keep checking: the account number is one
+    // identifier away from the sanctioned prop.
+    expect(isCallerSuppliedTestIdExpr("`${testIdPrefix}-${accountNumber}`")).toBe(false);
+    expect(isCallerSuppliedTestIdExpr("accountNumber")).toBe(false);
+    expect(isCallerSuppliedTestIdExpr("props.accountNumber")).toBe(false);
+  });
+
+  it("does not let a string literal smuggle an identifier past it", () => {
+    // `"modal-close"` contributes `modal` and `close` if literals are not
+    // stripped, and `testId + account` must not be rescued by a near-miss.
+    expect(isCallerSuppliedTestIdExpr('"modal-close"')).toBe(false);
+    expect(isCallerSuppliedTestIdExpr("testId + account")).toBe(false);
   });
 });

@@ -622,6 +622,22 @@ steps:
       # push/manual, so on pull_request the stated lock ran green and empty.
       # This one runs on every PR.
       - node scripts/check-embed-layout-drift.mjs
+      # Membership in `@myne/copy` (audit R0.1, 2026-10-19). The package claimed
+      # its literals were byte-identical across clients "by construction" while
+      # eighteen of them, both non-distinguishing banners among them, were
+      # declared in the desktop and mobile `load-bearing-copy.ts` files at once.
+      # Both twin guards are blind to it by construction (the inventory compares
+      # the two clients with EACH OTHER, and both were wrong the same way; the
+      # drift ratchet fires only on a pair that STARTS differing). This fails by
+      # naming the file that re-declares an exported name.
+      - node scripts/check-copy-membership.mjs
+      # The sync request deadline, written in Rust (`http_transport.rs::
+      # SOCKET_TIMEOUT`, 180 s) and in the browser's blocking XHR bridge
+      # (`web/src/worker/sync-transport.ts::REQUEST_TIMEOUT_MS`), which had
+      # drifted to 60 s (audit R0.3, 2026-10-19). The Rust constant is
+      # `#[cfg(not(target_arch = "wasm32"))]`, so it is not in the browser build
+      # at all and nothing in this tree could compare the pair.
+      - node scripts/check-sync-timeout-drift.mjs
       # The update channel (one endpoint, one variable name, one manifest file
       # name per channel). The config's `plugins.updater.endpoints` list is
       # REPLACED rather than merged by the updater the plugin builds, so a value
