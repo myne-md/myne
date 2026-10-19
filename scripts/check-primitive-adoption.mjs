@@ -76,10 +76,23 @@ const UNCOVERED_INPUT_TYPES = new Set([
 const SCAN_EXT = new Set([".tsx"]);
 
 function scrub(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return (
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, (m) => m.replace(/[^\n]/g, " "))
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+      // A STRING whose own text mentions a tag is prose ABOUT the element, not the
+      // element. The story catalogue describes the switch as "a `<button
+      // role=switch aria-checked>`", which made this ratchet fire on a correct file
+      // (measured 2026-10-19) — and a guard that fires on a correct file is a guard
+      // people learn to route around. Only the interior is blanked, so the
+      // delimiters survive for `openingTags`'s quote state machine, and a match
+      // cannot cross another quote or a newline, so a real element on the same line
+      // cannot be swallowed by the blanking.
+      .replace(/"[^"\n]*<[^"\n]*"/g, (m) => `"${" ".repeat(m.length - 2)}"`)
+      .replace(/'[^'\n]*<[^'\n]*'/g, (m) => `'${" ".repeat(m.length - 2)}'`)
+      .replace(/`[^`\n]*<[^`\n]*`/g, (m) => `\`${" ".repeat(m.length - 2)}\``)
+  );
 }
 
 /** Brace-aware opening tags — `style={{...}}` contains `>` inside expressions. */
