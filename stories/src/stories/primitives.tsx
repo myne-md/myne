@@ -241,7 +241,7 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     surface: "Switch",
     state: "on-off-and-disabled",
     description:
-      "The toggle control in all three shapes: on, off, and the disabled placeholder a caller renders by omitting `onChange` or passing `disabled`. It is a button carrying `role="switch"` and `aria-checked`, so the painted state and the announced state come from one attribute. Look for `aria-checked` to match the knob's side.",
+      "The toggle control in all three shapes: on, off, and the disabled placeholder a caller renders by omitting `onChange` or passing `disabled`. It is a button carrying `role=\"switch\"` and `aria-checked`, so the painted state and the announced state come from one attribute. Look for `aria-checked` to match the knob's side.",
     tags: ["primitives", "switch", "toggle", "on-off", "disabled", "aria-checked"],
     render: () => (
       <Row>
