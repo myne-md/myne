@@ -39,6 +39,7 @@ import { ioBanner } from "../../lib/io-banner";
 import {
   UNLOCK_NON_DISTINGUISHING_BANNER,
   LOST_BOTH_SECRETS_SENTENCE,
+  MEMBER_VAULT_REMOVAL_DISCLOSURE,
 } from "../../lib/load-bearing-copy";
 import type { SuspicionReason } from "../../lib/stage";
 import type { VaultUnlockError } from "../../types/vault-unlock-error";
@@ -932,18 +933,63 @@ export function UnlockFlow(props: UnlockFlowProps) {
           }}
           testId="unlock-delete-link"
         >
-          {t("vaultRecover.phrase.deleteLink")}
+          {member ? t("unlock.memberRemoveLink") : t("vaultRecover.phrase.deleteLink")}
         </TextButton>
       </div>
 
       {confirmingDelete && (
         <Sheet onClose={deleteFailed ? undefined : () => setConfirmingDelete(false)}>
-          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
-            {t("unlock.deleteConfirmTitle")}
-          </div>
-          <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}>
-            {LOST_BOTH_SECRETS_SENTENCE}
-          </p>
+          {/* What this action means, and it is not a styling switch (audit K2-i).
+              A member vault is a SHARED vault: removing it from this device is
+              reversible and it is not the member's to destroy. The owner copy
+              below ("Delete this vault?" + the lost-both-secrets sentence) is
+              false twice in the dangerous direction, so the member arm renders
+              the member heading, its eyebrow, and the shared disclosure verbatim
+              instead — the owner's sentences are absent, not corrected after the
+              fact. `member` is resolved once per mount from the same
+              `memberVaultStatus` probe the member unlock surface reads. */}
+          {member ? (
+            <>
+              <div
+                data-testid="unlock-member-remove-eyebrow"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "var(--danger)",
+                }}
+              >
+                {t("settings.deleteVault.memberEyebrow")}
+              </div>
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 19,
+                  fontWeight: 600,
+                  letterSpacing: "-0.01em",
+                  color: "var(--fg-display)",
+                }}
+              >
+                {t("settings.deleteVault.memberHeading")}
+              </div>
+              <p
+                data-testid="unlock-member-removal-disclosure"
+                style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}
+              >
+                {MEMBER_VAULT_REMOVAL_DISCLOSURE}
+              </p>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
+                {t("unlock.deleteConfirmTitle")}
+              </div>
+              <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}>
+                {LOST_BOTH_SECRETS_SENTENCE}
+              </p>
+            </>
+          )}
           {deleteFailed && (
             <div data-testid="unlock-delete-error" style={{ marginTop: 14 }}>
               <Banner kind="danger">
@@ -970,7 +1016,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 onClick={() => void handleDelete()}
                 data-testid="unlock-delete-confirm"
               >
-                {deleting ? t("attachments.deleteDialog.deleting") : t("settings.deleteVault.heading")}
+                {deleting
+                  ? member
+                    ? t("settings.deleteVault.memberSubmitInFlight")
+                    : t("attachments.deleteDialog.deleting")
+                  : member
+                    ? t("settings.deleteVault.memberSubmit")
+                    : t("settings.deleteVault.heading")}
               </Button>
             )}
             {!deleteFailed && (

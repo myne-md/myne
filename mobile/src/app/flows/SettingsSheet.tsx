@@ -102,6 +102,8 @@ import { consentIsDeviceScoped, providerLabelOf } from "@myne/copy";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
+import { useMemberVault } from "../../hooks/useMemberVault";
+import { MEMBER_VAULT_REMOVAL_DISCLOSURE } from "../../lib/load-bearing-copy";
 import { tappable } from "../a11y/tappable";
 
 /**
@@ -1574,6 +1576,16 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
+  // Which account plane the active vault speaks for, resolved once per open by
+  // the shared `useMemberVault` probe (`vault.member-unlock`) — the same
+  // predicate the unlock surface and the sync panels read, so the two cannot
+  // disagree. A member vault is a SHARED vault: removing it from this device is
+  // reversible and it is not the member's to destroy, so its danger zone must not
+  // show the owner's permanent-deletion copy ("Delete vault", "This permanently
+  // deletes this vault… cannot be undone"). `unknown` renders the owner shape,
+  // which is what the probe's own doc says its callers may do.
+  const member = useMemberVault(vaultId) === "member";
+
   // Quick-unlock (PIN + biometric) state. `quStatus` reflects disk truth for
   // the active vault; the PIN fields are local secrets wiped on every exit path.
   const [quStatus, setQuStatus] = useState<QuickUnlockStatus | null>(null);
@@ -2159,7 +2171,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   }
 
   // ── Sheet header (title + back/close) ──────────────────────────────────────
-  const headerTitle = t(PANEL_TITLE[panel]);
+  // The delete/removal panel's header is the action's own heading, and for a
+  // member that is the member sentence rather than "Delete vault" (audit K2-i):
+  // the owner heading names a destruction a member cannot perform.
+  const headerTitle =
+    panel === "delete-vault" && member
+      ? t("settings.deleteVault.memberHeading")
+      : t(PANEL_TITLE[panel]);
 
   return (
     <Sheet onClose={onClose} style={{ maxHeight: "88%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -2193,7 +2211,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
           </button>
         )}
-        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{headerTitle}</div>
+        <div data-testid="settings.panel-title" style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{headerTitle}</div>
         <button
           onClick={close}
           style={{
@@ -2310,7 +2328,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 cursor: "pointer",
               }}
             >
-              {t("settings.deleteVault.heading")}
+              {member ? t("settings.deleteVault.memberSubmit") : t("settings.deleteVault.heading")}
             </button>
           </div>
         )}
@@ -3025,9 +3043,43 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
         {panel === "delete-vault" && (
           <div>
-            <Banner kind="danger" style={{ marginBottom: 14 }}>
-              {t("settings.deleteVault.warning")}
-            </Banner>
+            {/* What this action means, and it is not a styling switch (audit K2-i).
+                On a SHARED (member) vault this same command removes this device's
+                copy and nothing else: the vault and its notes stay on the server
+                and the owner's other devices, the member's account is untouched,
+                and the vault can be added again from the member's own recovery
+                phrase. The owner's warning ("This permanently deletes this vault
+                and all of its notes from this device. This cannot be undone.") is
+                false twice in the dangerous direction, so the member arm renders
+                the member heading's eyebrow and the shared disclosure VERBATIM
+                instead — the owner's sentence is absent, not corrected after it. */}
+            {member ? (
+              <>
+                <div
+                  data-testid="settings.member-remove-eyebrow"
+                  style={{
+                    marginBottom: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--danger)",
+                  }}
+                >
+                  {t("settings.deleteVault.memberEyebrow")}
+                </div>
+                <p
+                  data-testid="settings.member-removal-disclosure"
+                  style={{ margin: "0 0 14px", fontSize: 13, lineHeight: 1.5, color: "var(--fg-2)" }}
+                >
+                  {MEMBER_VAULT_REMOVAL_DISCLOSURE}
+                </p>
+              </>
+            ) : (
+              <Banner kind="danger" style={{ marginBottom: 14 }}>
+                {t("settings.deleteVault.warning")}
+              </Banner>
+            )}
             {deleteError && (
               <Banner kind="danger" style={{ marginBottom: 14 }}>
                 {deleteError}
@@ -3053,7 +3105,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                   opacity: canDelete ? 1 : 0.7,
                 }}
               >
-                {deleteBusy ? t("attachments.deleteDialog.deleting") : t("settings.deleteVault.deleteButton")}
+                {deleteBusy
+                  ? member
+                    ? t("settings.deleteVault.memberSubmitInFlight")
+                    : t("attachments.deleteDialog.deleting")
+                  : member
+                    ? t("settings.deleteVault.memberSubmit")
+                    : t("settings.deleteVault.deleteButton")}
               </button>
             </div>
           </div>
