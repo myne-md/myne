@@ -44,6 +44,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 // W3C Actions API key code points (mirrors the escapes used across the suite,
 // e.g. search-palette.e2e.ts CONTROL/ESCAPE, table-editing.e2e.ts ENTER).
@@ -56,10 +57,10 @@ const ARROW_RIGHT = "\uE014";
 const ARROW_UP = String.fromCharCode(0xe013);
 const ARROW_DOWN = "\uE015";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 // selectionCountObserver writes `data-selection-count` onto the editor's outer
 // DOM node (`.cm-editor` === CM6's `view.dom`), nested under the testid host.
-const CM_EDITOR = '[data-testid="editor.content"] .cm-editor';
+const CM_EDITOR = testIdSelector("editor.content") + " .cm-editor";
 
 /** Read the live multi-cursor selection-range count from the editor DOM. */
 async function selectionCount(s: Session): Promise<number> {

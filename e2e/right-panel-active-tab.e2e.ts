@@ -24,7 +24,7 @@ import {
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 // WebDriver's Enter key — `\n` is unreliable across drivers; U+E007 is the
 // W3C "Enter" code point the harness uses elsewhere for newlines.
 const ENTER = "\uE007";

@@ -64,6 +64,7 @@ import { describeE2E } from "./support/scenario";
 import { openFixtureVault, openSettingsTab } from "./support/fixture-session";
 import { LOCAL_ERASE_DISCLOSURE } from "../src/lib/load-bearing-copy";
 import type { Session } from "./support/session";
+import { testIdSelector } from "./support/session";
 
 /** What the confirmation input demands. `DeleteVaultConfirmForm`'s own
  *  constant; typing anything else leaves the submit disabled. */
@@ -144,7 +145,7 @@ describeE2E("deleting the vault erases the OPFS container", () => {
       // the opposite branch would be telling the user their notes are about to
       // be destroyed everywhere, which on this client is false.
       const disclosure = await session.waitForElement(
-        '[data-testid="delete-vault.local-erase-disclosure"]',
+        testIdSelector("delete-vault.local-erase-disclosure"),
         { timeoutMs: 15_000 },
       );
       expect(
@@ -164,7 +165,7 @@ describeE2E("deleting the vault erases the OPFS container", () => {
       // The app routes away from the editor on success. Waiting for THAT rather
       // than sleeping is what makes the enumeration below a measurement of a
       // finished delete instead of a race with one in flight.
-      await session.waitForGone('[data-testid="editor.bottom-bar"]', {
+      await session.waitForGone(testIdSelector("editor.bottom-bar"), {
         timeoutMs: 30_000,
       });
 

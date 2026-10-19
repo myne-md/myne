@@ -42,36 +42,17 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
+import { KEY, pressChord } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const CONTROL = ""; // W3C Actions API code point for Control
 const FOLD_PLACEHOLDER = testIdSelector("editor.fold-placeholder");
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
-
-/** Send a single `Control+<key>` chord via the W3C Actions API (no sendKeys —
- *  sidesteps the invisible-U+E007 chord hazard, MEMORY e2e note). */
-async function sendCtrlChord(session: Session, key: string): Promise<void> {
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: key },
-          { type: "keyUp", value: key },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
-}
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** Open the in-note find bar (App.tsx's window-level Ctrl+F) and wait for its
  *  input — the bar carries no testid on the root, so the find input IS the
  *  open signal. */
 async function openFind(session: Session): Promise<void> {
-  await sendCtrlChord(session, "f");
+  await pressChord(session, KEY.CONTROL, "f");
   await session.byTestId("find.input", { timeoutMs: 10_000 });
 }
 
@@ -141,7 +122,7 @@ describeE2E("fr1 replace-one + replace-all + single-undo (MYND-302)", () => {
         await (await s.byTestId("find.input")).sendKeys(String.fromCharCode(0xe00c)); // ESCAPE
         await s.waitForGone(testIdSelector("find.input"));
         await (await s.waitForElement(CM_CONTENT)).sendKeys(String.fromCharCode(0xe014)); // ARROW_RIGHT
-        await sendCtrlChord(s, "z");
+        await pressChord(s, KEY.CONTROL, "z");
         await s.waitUntil(
           async () => ((await editorText(s)).includes("widgetfr1") ? true : null),
           { label: "single undo reverted the bulk replace-all" },

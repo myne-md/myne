@@ -31,9 +31,6 @@
 // Vault-count precondition: 1 (weak KDF). The fixture image is in-source
 // scenario content, not credentials (SYNC-13).
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
@@ -42,31 +39,15 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   seedEmbedIntoNote,
+  selectedNoteId,
   unlockToEditor,
   waitForInlineImage,
+  importFixturePng,
 } from "./support/flows";
-import { REPO_ROOT } from "./support/session";
 import type { Session } from "./support/webdriver";
 
 const FILENAME = "diagram.png";
 const IPC_TIMEOUT = 60_000;
-
-function fixturePng(): number[] {
-  return Array.from(
-    readFileSync(join(REPO_ROOT, "core", "tests", "fixtures", "ocr-sample.png")),
-  );
-}
-
-async function importImage(s: Session): Promise<string> {
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:attachments|attachment_import",
-    { source: { kind: "bytes", bytes: fixturePng(), filename: FILENAME } },
-    IPC_TIMEOUT,
-  );
-  expect(r.err, "attachment_import should accept the .png file").toBeUndefined();
-  return (r.ok as { id: string }).id;
-}
 
 /** The note the scenario is editing, read back from disk rather than from the
  *  editor: the point of the drag is that it wrote BYTES, and the buffer would
@@ -74,11 +55,6 @@ async function importImage(s: Session): Promise<string> {
 async function noteBody(s: Session, noteId: string): Promise<string> {
   const r = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
   return typeof r.ok === "string" ? r.ok : "";
-}
-
-async function activeNoteRowId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-  return (await row.attribute("data-note-id")) ?? "";
 }
 
 /** Whether the embed is drawn as a BLOCK: its frame is outside every `.cm-line`.
@@ -125,15 +101,14 @@ describeE2E("er1 drag-to-resize writes a width into the note (myne#604)", () => 
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        const attachmentId = await importImage(s);
+        const attachmentId = await importFixturePng(s, FILENAME);
         await createNote(s, "Diagram note");
         // On its own line, which is the form the renderer draws as a block and
         // the only form that carries handles.
         await seedEmbedIntoNote(s, `![[att:${attachmentId}|${FILENAME}]]`);
         await waitForInlineImage(s, attachmentId);
 
-        const noteId = await activeNoteRowId(s);
-        expect(noteId, "the active note row should carry an id").not.toBe("");
+        const noteId = await selectedNoteId(s);
 
         // Precondition, asserted rather than assumed: an embed alone on its line
         // is a block, and only a block has handles.

@@ -34,6 +34,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import type { Element, Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 // `typeIntoEditor` prepends a sacrificial "q" probe to establish the keystroke
 // pipeline (support/flows.ts) — it lands glued to the payload's first word, so
@@ -320,7 +321,7 @@ describeE2E("SP-5 the native context menu is suppressed only where Myne replaces
             [selector],
           );
 
-        const overSquiggle = await probe('[data-testid="editor.spell-error"]');
+        const overSquiggle = await probe(testIdSelector("editor.spell-error"));
         expect(overSquiggle, "no squiggle element to dispatch on").not.toBeNull();
         expect(
           overSquiggle,

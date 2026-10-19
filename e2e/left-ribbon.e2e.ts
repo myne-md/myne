@@ -27,8 +27,9 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const RAIL_BUTTON = '[data-testid="editor.ribbon.button"]';
+const RAIL_BUTTON = testIdSelector("editor.ribbon.button");
 
 /** The rail's rendered command ids, in order. */
 async function railOrder(s: Session): Promise<string[]> {

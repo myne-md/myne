@@ -62,11 +62,12 @@ import {
   editorText,
   pageSeatInvoke,
   runPaletteAction,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 // Distinctive ≥24-char lowercase-alnum tokens (PS-1 needle rule): one per
 // version so the residue scan and the preview/diff asserts target a specific
@@ -80,21 +81,6 @@ const PASSWORD = "Qp9#xT4!nG7&wM2k-sr1";
  *  snapshotted before restore). */
 const RESIDUE_NEEDLES = [V1.trim(), V3.trim()];
 const IPC_TIMEOUT = 15_000;
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the note
- *  `createNote` just created and left selected (the byTestId-only path to a
- *  live-created note's id; the row carries `aria-selected="true"` +
- *  `data-note-id`). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 describeE2E("sr1 snapshot restore round-trip + MY01 at-rest (MYND-232)", () => {
   // Vault-count precondition: 1 (weak KDF).

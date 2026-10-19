@@ -13,44 +13,21 @@
 // the container (`./scripts/e2e-buildrun.sh attachment-zoom` — touches product
 // code). See e2e/AGENTS.md "definition of done".
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import { expect, it } from "vitest";
+import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickByTestId,
   createNote,
   dismissImporterOffer,
-  pageSeatInvoke,
   seedEmbedIntoNote,
   unlockToEditor,
   waitForInlineImage,
+  importFixturePng,
 } from "./support/flows";
-import { REPO_ROOT } from "./support/session";
 import { type Session } from "./support/webdriver";
 
 const FILENAME = "diagram.png";
-const IPC_TIMEOUT = 60_000;
-
-function fixturePng(): number[] {
-  return Array.from(
-    readFileSync(join(REPO_ROOT, "core", "tests", "fixtures", "ocr-sample.png")),
-  );
-}
-
-async function importImage(s: Session): Promise<string> {
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:attachments|attachment_import",
-    { source: { kind: "bytes", bytes: fixturePng(), filename: FILENAME } },
-    IPC_TIMEOUT,
-  );
-  expect(r.err, "attachment_import should accept the .png file").toBeUndefined();
-  return (r.ok as { id: string }).id;
-}
-
 
 /** The lightbox zoom percentage as a number (reads "NN%"). */
 async function zoomPercent(s: Session): Promise<number> {
@@ -80,7 +57,7 @@ describeE2E("za1 attachment image lightbox zoom/pan (MYND-594)", () => {
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        const attachmentId = await importImage(s);
+        const attachmentId = await importFixturePng(s, FILENAME);
         await createNote(s, "Diagram note");
         // No `waitForSaved` after this: the write went through `note_update`,
         // not through the editor, so the autosave badge never leaves its

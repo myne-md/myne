@@ -36,6 +36,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** Only run against the `local-inference-stub` build (sets `MYNE_E2E_AI=1`) —
  *  the fault lever does not exist in any other binary. */
@@ -222,7 +223,7 @@ aiDescribe("ad3 an explicit AI action always answers, even when it cannot run", 
           // down for the rest of the sequence, so this is Shift+Home at the
           // editor, independent of focus.
           const content = await s.waitForElement(
-            '[data-testid="editor.content"] .cm-content',
+            testIdSelector("editor.content") + " .cm-content",
           );
           await content.sendKeys(KEY.SHIFT + KEY.HOME);
           // **Verify the selection rather than assume it.** The comment above

@@ -46,26 +46,12 @@ import {
   dismissImporterOffer,
   editorText,
   searchAndOpenNote,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the
- *  note `createNote` just created and left selected. The byTestId-only
- *  path to capturing a live-created note's id (the sidebar row carries
- *  `aria-selected="true"` + `data-note-id`). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /** Count the NOTES-section hit rows currently rendered in the palette
  *  (`data-kind="note"` distinguishes them from COMMAND rows that share

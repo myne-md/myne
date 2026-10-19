@@ -31,6 +31,7 @@ import {
   switchToVault,
   unlockToEditor,
 } from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 
 describeE2E("backup-restore (MYND-56)", () => {
   it("br1: export → verified file → keep-both restore → restored vault unlocks with the original password", async () => {
@@ -119,16 +120,16 @@ describeE2E("backup-restore (MYND-56)", () => {
     await scenario("br2-welcome-door", {}, async (app) => {
       const { session } = app;
       const restoreCta = await session.waitForElement(
-        '[data-testid="welcome.restore-cta"]',
+        testIdSelector("welcome.restore-cta"),
       );
       await restoreCta.click();
-      await session.waitForElement('[data-testid="restore.root"]');
+      await session.waitForElement(testIdSelector("restore.root"));
       // Pre-unlock-class Stage screen (never a modal): picking a file is a
       // native dialog, so br1 covers the engine path — here we pin the
       // surface + the reprobe-based Back exit.
       const back = await session.byTestId("restore.back");
       await back.click();
-      await session.waitForElement('[data-testid="welcome.root"]');
+      await session.waitForElement(testIdSelector("welcome.root"));
     });
   });
 });

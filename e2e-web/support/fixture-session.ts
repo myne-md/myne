@@ -29,6 +29,7 @@ import { waitForAnyTestId } from "./flows";
 import { DRIVER_PORT } from "./worker-ports";
 import { loadVaultFixture, seedVault } from "./opfs-seed";
 import type { SupportedBrowser } from "./harness";
+import { testIdSelector } from "./session";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const UNLOCK_TIMEOUT_MS = 120_000;
@@ -102,11 +103,11 @@ export async function openFixtureVault(
       await session.navigate(`${server.origin}/`);
     }
 
-    const field = await session.waitForElement('[data-testid="unlock.password-input"]', {
+    const field = await session.waitForElement(testIdSelector("unlock.password-input"), {
       timeoutMs: BOOT_TIMEOUT_MS,
     });
     await field.sendKeys(vault.password);
-    await (await session.findElement('[data-testid="unlock.submit"]')).click();
+    await (await session.findElement(testIdSelector("unlock.submit"))).click();
 
     // Positively, over the whole set. A bare wait on `editor.bottom-bar` would
     // report "the editor never appeared" when what happened is that the vault
@@ -148,7 +149,7 @@ export async function openSettingsTab(session: Session, tab: string): Promise<vo
   await session.execute(
     "document.querySelector('[data-testid=\"editor.settings-cta\"]').click();",
   );
-  await session.waitForElement('[data-testid="settings.modal"]', { timeoutMs: 15_000 });
+  await session.waitForElement(testIdSelector("settings.modal"), { timeoutMs: 15_000 });
   await session.execute(
     "document.querySelector('[data-testid=\"' + arguments[0] + '\"]')?.click();",
     [tab],

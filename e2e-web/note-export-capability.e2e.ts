@@ -39,6 +39,7 @@ import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { loadVaultFixture, seedVault } from "./support/opfs-seed";
 import { clickContextMenuItem, createNote, openNoteContextMenu } from "./support/flows";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -67,8 +68,8 @@ describeE2E("the export submenu withholds the format a page cannot produce", () 
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       await unlockField.sendKeys(vault.password);
-      await (await session.findElement('[data-testid="unlock.submit"]')).click();
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+      await (await session.findElement(testIdSelector("unlock.submit"))).click();
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
@@ -77,7 +78,7 @@ describeE2E("the export submenu withholds the format a page cannot produce", () 
       // context menu needs a row to open on.
       await createNote(session);
 
-      await session.waitForElement('[data-testid="notes.row"]', {
+      await session.waitForElement(testIdSelector("notes.row"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 

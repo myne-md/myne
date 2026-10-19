@@ -32,6 +32,7 @@
 import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault, openSettingsTab } from "./support/fixture-session";
+import { testIdSelector } from "./support/session";
 
 /**
  * The controls the desktop Storage panel owns and a page cannot.
@@ -58,7 +59,7 @@ describeE2E("the web Storage panel", () => {
       // It is THERE. An excluded panel that rendered nothing would satisfy
       // every absence below while leaving a rail entry pointing at a blank
       // pane — a different defect with the same test result.
-      const panel = await session.findElements('[data-testid="settings.storage-panel"]');
+      const panel = await session.findElements(testIdSelector("settings.storage-panel"));
       expect(
         panel.length,
         "the web Storage panel did not render. Its rail entry is offered, so a " +

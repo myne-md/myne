@@ -49,6 +49,7 @@ import {
   openNoteContextMenu,
 } from "./support/flows";
 import { EXPORT_PLAIN_MARKDOWN_SENTENCE } from "../src/lib/load-bearing-copy";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -75,15 +76,15 @@ describeE2E("the download path says the egress sentence before it delivers", () 
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       await unlockField.sendKeys(vault.password);
-      await (await session.findElement('[data-testid="unlock.submit"]')).click();
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+      await (await session.findElement(testIdSelector("unlock.submit"))).click();
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
       // The fixture vault holds no notes, so one is made here: the export menu
       // needs a note row to open on.
       await createNote(session);
-      await session.waitForElement('[data-testid="notes.row"]', {
+      await session.waitForElement(testIdSelector("notes.row"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
@@ -102,25 +103,25 @@ describeE2E("the download path says the egress sentence before it delivers", () 
       // for the menu to GO rather than for it to still hold items.
       await clickContextMenuLeaf(session, "export-markdown");
 
-      const notice = await session.waitForElement('[data-testid="export.egress-notice"]', {
+      const notice = await session.waitForElement(testIdSelector("export.egress-notice"), {
         timeoutMs: 15_000,
       });
       expect(notice, "the download path must ask before it delivers").toBeDefined();
 
-      const sentence = await session.findElement('[data-testid="export.egress-sentence"]');
+      const sentence = await session.findElement(testIdSelector("export.egress-sentence"));
       expect(
         (await sentence.textContent()).trim(),
         "the disclosure is load-bearing copy and is rendered verbatim, not paraphrased",
       ).toBe(EXPORT_PLAIN_MARKDOWN_SENTENCE);
 
       // Cancel is a free exit: the notice goes and the editor is still there.
-      await (await session.findElement('[data-testid="export.egress-cancel"]')).click();
+      await (await session.findElement(testIdSelector("export.egress-cancel"))).click();
       await session.waitUntil(
         async () =>
           (await session.byTestIdAll("export.egress-notice")).length === 0 ? true : null,
         { label: "the egress notice dismissed on Cancel", timeoutMs: 10_000 },
       );
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', { timeoutMs: 10_000 });
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), { timeoutMs: 10_000 });
     } finally {
       await browser?.teardown().catch(() => {});
       await server.close();

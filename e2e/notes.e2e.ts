@@ -36,8 +36,9 @@ import {
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  contextMenuPick,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 import { KEY, pressKey } from "./support/keyboard";
 
 // createNote / typeIntoEditor / waitForSaved / editorText moved to
@@ -46,21 +47,6 @@ import { KEY, pressKey } from "./support/keyboard";
 // W3C code point for Control (the Linux multi-select modifier, MYND-367) —
 // escape form, never a literal (the invisible-key hazard).
 const CONTROL = "";
-
-/** Right-click an element and pick a context-menu item by its
- *  `data-item-id`. */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
 
 describeE2E("nc1 note content AEAD round-trip (MYND-223)", () => {
   // Vault-count precondition: 1 (weak KDF).

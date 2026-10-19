@@ -37,32 +37,15 @@ import {
   unlockToEditor,
   writeNoteBody,
 } from "./support/flows";
+import { KEY, pressChord } from "./support/keyboard";
 import { type Session } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
 
-/** W3C Actions `Control`. The split is driven by the real chord rather than by
- *  reaching into the workspace, because #600's second symptom is what the USER
- *  does: `Ctrl-\\` maps to `pane.split-row`, which dispatches
- *  `ws.splitFocused("row")` through the keybind engine. */
-const CONTROL = "\uE009";
-
-async function sendCtrlChord(session: Session, key: string): Promise<void> {
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: key },
-          { type: "keyUp", value: key },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
-}
+// The split is driven by the real chord rather than by reaching into the
+// workspace, because #600's second symptom is what the USER does: `Ctrl-\\`
+// maps to `pane.split-row`, which dispatches `ws.splitFocused("row")` through
+// the keybind engine. `pressChord(…, KEY.CONTROL, …)` is the shared sender.
 
 /** Long enough to scroll in any window this suite runs in, and numbered so the
  *  line on screen identifies itself. `line 0` is the load-wait needle (always
@@ -426,7 +409,7 @@ describeE2E("sm2 a split keeps the reading position it was split from (myne#600)
         if ((await s.byTestIdAll("editor.pane")).length !== 1) {
           throw new Error("expected a single pane before the split chord");
         }
-        await sendCtrlChord(s, "\\");
+        await pressChord(s, KEY.CONTROL, "\\");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("editor.pane")).length === 2 ? true : null),
           { label: "the split produced a second pane", timeoutMs: 20_000 },

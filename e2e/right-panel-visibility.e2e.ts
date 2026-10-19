@@ -24,15 +24,9 @@ import {
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   unlockToEditor,
+  tabIds,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
-
-/** The right-panel tab ids in current DOM (display) order. */
-async function tabIds(session: Session): Promise<string[]> {
-  const els = await session.byTestIdAll("editor.right-panel-tab");
-  const ids = await Promise.all(els.map((e) => e.attribute("data-panel-tab-id")));
-  return ids.filter((id): id is string => id !== null);
-}
 
 /** Right-click the strip's empty area, then return the checklist item for `tabId`. */
 async function openTabChecklistItem(session: Session, tabId: string) {

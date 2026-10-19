@@ -65,6 +65,7 @@ import {
   ipcOk,
   pageSeatInvoke,
 } from "./support/flows";
+import { sleep } from "./support/member-fleet";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -96,10 +97,6 @@ const CRDT_MAGIC = "NC05";
 /** Non-overlapping occurrences of `needle` in `haystack`. */
 function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**

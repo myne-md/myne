@@ -40,6 +40,7 @@ import { openFixtureVault } from "./support/fixture-session";
 import { dismissImporterOfferIfPresent } from "../e2e/support/flows";
 import { KEY, pressChord, pressKey, activeSignature } from "../e2e/support/keyboard";
 import type { Session } from "./support/session";
+import { testIdSelector } from "./support/session";
 
 /** True when the focused element is inside the element carrying `testId`. */
 function activeWithin(session: Session, testId: string): Promise<boolean> {
@@ -96,7 +97,7 @@ describeE2E("the quick picker's focus trap in a browser", () => {
       // because the claim is about KEYBOARD users and a pointer-opened dialog
       // is a different path.
       await pressChord(session, MOD, "k");
-      await session.waitForElement('[data-testid="palette.dialog"]', { timeoutMs: 15_000 });
+      await session.waitForElement(testIdSelector("palette.dialog"), { timeoutMs: 15_000 });
 
       // 1. Focus is INSIDE on open.
       expect(
@@ -132,7 +133,7 @@ describeE2E("the quick picker's focus trap in a browser", () => {
       await pressKey(session, KEY.ESCAPE);
       await session.waitUntil(
         async () =>
-          (await session.findElements('[data-testid="palette.dialog"]')).length === 0
+          (await session.findElements(testIdSelector("palette.dialog"))).length === 0
             ? true
             : null,
         { label: "the palette closed on Escape", timeoutMs: 10_000 },

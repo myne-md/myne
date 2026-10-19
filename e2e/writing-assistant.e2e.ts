@@ -51,7 +51,7 @@ import {
 import { KEY, pressChord, pressKey } from "./support/keyboard";
 import { type Session, testIdSelector } from "./support/webdriver";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** Only run when the binary under test is the AI-feature (`local-inference-stub`)
  *  build — the default production bundle has no AI commands/extensions, so these

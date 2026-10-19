@@ -30,7 +30,7 @@ import { seedVault } from "./support/fixtures";
 import { createNote, dismissImporterOffer, unlockToEditor, waitForSaved } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 const BACKSPACE = "\uE003"; // W3C key codepoint
 const ENTER = "\uE007"; // W3C key codepoint
 

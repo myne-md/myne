@@ -47,6 +47,7 @@ import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault } from "./support/fixture-session";
 import type { Session } from "./support/session";
+import { testIdSelector } from "./support/session";
 
 /** Typed and deliberately not waited on. Single lowercase token, in-source. */
 const SENTENCE = "sekmekapanirkenkurtarilanyazi";
@@ -74,7 +75,7 @@ async function createNote(session: Session): Promise<void> {
   await session.execute(
     "document.querySelector('[data-testid=\"notes.create\"]').click();",
   );
-  await session.waitForElement('[data-testid="editor.content"] .cm-content', {
+  await session.waitForElement(testIdSelector("editor.content") + " .cm-content", {
     timeoutMs: 20_000,
   });
 }
@@ -194,7 +195,7 @@ describeE2E("closing the tab flushes the edit", () => {
       await createNote(session);
 
       const content = await session.findElement(
-        '[data-testid="editor.content"] .cm-content',
+        testIdSelector("editor.content") + " .cm-content",
       );
       // Focused by script, not by a driver click. `.cm-content` is a
       // `contenteditable` div and the driver's interactability check times out
@@ -217,7 +218,7 @@ describeE2E("closing the tab flushes the edit", () => {
       await session.execute(
         "document.querySelector('[data-testid=\"importer.offer-dismiss\"]')?.click();",
       );
-      await session.waitForGone('[data-testid="importer.offer-root"]', {
+      await session.waitForGone(testIdSelector("importer.offer-root"), {
         timeoutMs: 15_000,
       });
       await content.actionClick();
@@ -280,14 +281,14 @@ describeE2E("closing the tab flushes the edit", () => {
         // its text — so the sidebar row is clicked first and the buffer read
         // after. The row existing at all is the weaker half of the claim and is
         // asserted by this wait.
-        await second.session.waitForElement('[data-testid="notes.row"]', {
+        await second.session.waitForElement(testIdSelector("notes.row"), {
           timeoutMs: 30_000,
         });
         await second.session.execute(
           "document.querySelector('[data-testid=\"notes.row\"]').click();",
         );
         await second.session.waitForElement(
-          '[data-testid="editor.content"] .cm-content',
+          testIdSelector("editor.content") + " .cm-content",
           { timeoutMs: 20_000 },
         );
         expect(

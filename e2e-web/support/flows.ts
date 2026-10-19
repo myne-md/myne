@@ -19,6 +19,7 @@
 // dumping the page.
 
 import type { Session } from "./session";
+import { testIdSelector } from "./session";
 
 /** Long enough for a first paint plus the wasm module's instantiation, which is
  *  the slowest thing between navigation and the first testid on this client. */
@@ -205,12 +206,12 @@ export async function waitForAnyTestId(
  * hard wait would burn its budget on something correctly absent.
  */
 export async function dismissImporterOfferIfPresent(session: Session): Promise<void> {
-  const present = await session.findElements('[data-testid="importer.offer-root"]');
+  const present = await session.findElements(testIdSelector("importer.offer-root"));
   if (present.length === 0) return;
   await session.execute(
     "document.querySelector('[data-testid=\"importer.offer-dismiss\"]')?.click();",
   );
-  await session.waitForGone('[data-testid="importer.offer-root"]', { timeoutMs: 15_000 });
+  await session.waitForGone(testIdSelector("importer.offer-root"), { timeoutMs: 15_000 });
 }
 
 /**
@@ -235,7 +236,7 @@ export async function createNote(session: Session): Promise<void> {
   await session.execute(
     "document.querySelector('[data-testid=\"notes.create\"]').click();",
   );
-  await session.waitForElement('[data-testid="editor.content"] .cm-content', {
+  await session.waitForElement(testIdSelector("editor.content") + " .cm-content", {
     timeoutMs: 20_000,
   });
 }
@@ -373,7 +374,7 @@ export async function openNoteContextMenu(
 export async function typeIntoEditor(session: Session, text: string): Promise<void> {
   await dismissImporterOfferIfPresent(session);
   const content = await session.waitForElement(
-    '[data-testid="editor.content"] .cm-content',
+    testIdSelector("editor.content") + " .cm-content",
     { timeoutMs: 20_000 },
   );
   await content.actionClick();

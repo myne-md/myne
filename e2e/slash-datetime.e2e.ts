@@ -17,9 +17,10 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { createNote, dismissImporterOffer, editorText, unlockToEditor } from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 
 const ENTER = ""; // W3C Actions API code point for Enter
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 describeE2E("sd1 /date slash insert (MYND-338)", () => {
   // Vault-count precondition: 1 (weak KDF).

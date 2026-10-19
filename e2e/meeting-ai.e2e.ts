@@ -42,9 +42,10 @@ import {
 } from "./support/flows";
 import { REPO_ROOT } from "./support/session";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** Only the `local-inference-stub` build. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;

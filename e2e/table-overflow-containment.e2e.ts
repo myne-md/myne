@@ -49,8 +49,9 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const CM_CONTENT = `${EDITOR} .cm-content`;
 const CM_SCROLLER = `${EDITOR} .cm-scroller`;
 // The scroll container for a TOP-LEVEL table, which is what this scenario

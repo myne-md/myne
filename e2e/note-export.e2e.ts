@@ -46,7 +46,7 @@ import { expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { seedVault, type SeededVault } from "./support/fixtures";
+import { seedVault, seededExportSuite, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
   openExportSubmenuItem,
@@ -81,14 +81,6 @@ async function openExportMenuItem(s: Session, noteId: string) {
   // One level down since myne-md/myne#611: the four formats live under one
   // `Export…` row rather than four top-level ones.
   return openExportSubmenuItem(s, "export-markdown");
-}
-
-function seededExportSuite(seeded: SeededVault) {
-  const suite = seeded.exportSuite;
-  if (suite === undefined) {
-    throw new Error("fixture was not seeded with exportSuite: true");
-  }
-  return suite;
 }
 
 describeE2E("ne1 no-attachments export is byte-verbatim (MYND-116)", () => {

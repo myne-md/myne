@@ -44,6 +44,7 @@ import { dismissImporterOfferIfPresent } from "../e2e/support/flows";
 // a NOTE tab is focused (`Editor.tsx`). The fixture vault holds none, so a note
 // is created after the first unlock and reopened after each reload.
 import { createNote } from "./support/flows";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -54,12 +55,12 @@ const TITLE = "Fixture question about tea";
 const ANSWER = "Fixture answer: start with last year.";
 
 async function unlock(session: Session, password: string): Promise<void> {
-  const field = await session.waitForElement('[data-testid="unlock.password-input"]', {
+  const field = await session.waitForElement(testIdSelector("unlock.password-input"), {
     timeoutMs: UNLOCK_TIMEOUT_MS,
   });
   await field.sendKeys(password);
-  await (await session.findElement('[data-testid="unlock.submit"]')).click();
-  await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+  await (await session.findElement(testIdSelector("unlock.submit"))).click();
+  await session.waitForElement(testIdSelector("editor.bottom-bar"), {
     timeoutMs: UNLOCK_TIMEOUT_MS,
   });
   // A desktop-sized viewport: the headless default is 800x600, at which the
@@ -79,18 +80,18 @@ async function unlock(session: Session, password: string): Promise<void> {
  * a second note.
  */
 async function ensureNoteOpen(session: Session): Promise<void> {
-  const rows = await session.findElements('[data-testid="notes.row"]');
+  const rows = await session.findElements(testIdSelector("notes.row"));
   if (rows.length === 0) {
     await createNote(session);
   } else {
     await session.execute(
       "document.querySelector('[data-testid=\"notes.row\"]').click();",
     );
-    await session.waitForElement('[data-testid="editor.content"] .cm-content', {
+    await session.waitForElement(testIdSelector("editor.content") + " .cm-content", {
       timeoutMs: 20_000,
     });
   }
-  await session.waitForElement('[data-testid="editor.sidebar-right"]', {
+  await session.waitForElement(testIdSelector("editor.sidebar-right"), {
     timeoutMs: 15_000,
   });
 }
@@ -161,7 +162,7 @@ describeE2E("a seeded conversation survives a reload, and a deletion too", () =>
       await (await session.byTestId("ai.history-button")).click();
       await (await session.byTestId("ai.conversation-delete")).click();
       await (await session.byTestId("ai.conversation-delete-confirm")).click();
-      await session.waitForElement('[data-testid="ai.history-empty"]', {
+      await session.waitForElement(testIdSelector("ai.history-empty"), {
         timeoutMs: 10_000,
       });
 
@@ -170,7 +171,7 @@ describeE2E("a seeded conversation survives a reload, and a deletion too", () =>
       await ensureNoteOpen(session);
       await openAiChatTab(session);
       await (await session.byTestId("ai.history-button")).click();
-      await session.waitForElement('[data-testid="ai.history-empty"]', {
+      await session.waitForElement(testIdSelector("ai.history-empty"), {
         timeoutMs: 10_000,
       });
     } finally {

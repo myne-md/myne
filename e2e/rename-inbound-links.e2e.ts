@@ -38,6 +38,7 @@ import {
   pasteIntoEditor,
   unlockToEditor,
   waitForSaved,
+  contextMenuPick,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
@@ -46,20 +47,6 @@ import { type Session, testIdSelector } from "./support/webdriver";
 const TARGET_OLD = "ril1targetalfa7k2m9qx4w";
 const TARGET_NEW = "ril1targetbravo3h8z1cn5";
 const LINKER = "ril1linkercharlie6b3k9wq";
-
-/** Right-click a row and pick a context-menu item by its id. */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
 
 /** Open a sidebar row by its title and return the editor's current text. */
 async function openAndRead(session: Session, noteId: string): Promise<string> {

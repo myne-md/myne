@@ -52,6 +52,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** The four typographic facts the bullet names, as the engine computed them. */
 type Typography = {
@@ -81,8 +82,8 @@ async function typographyOf(s: Session, selector: string): Promise<Typography | 
 // paragraph carries no testid of its own, so it is reached through the
 // preview's — adding one would be fine, but the structural query is stable and
 // this scenario is about computed style rather than about the markup.
-const EDITOR_LINE = '[data-testid="editor.content"] .cm-line';
-const SPECIMEN_BODY = '[data-testid="settings.editor-preview"] p';
+const EDITOR_LINE = testIdSelector("editor.content") + " .cm-line";
+const SPECIMEN_BODY = testIdSelector("settings.editor-preview") + " p";
 
 describeE2E("esp1 the typography specimen matches the editor (myne-md/myne#555)", () => {
   // Vault-count precondition: 1 (weak KDF).

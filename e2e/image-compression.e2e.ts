@@ -72,7 +72,7 @@ import {
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 const TOAST = testIdSelector("attachment-toast");
 const COMPRESSION_SWITCH = "settings.attachment-compression";
 

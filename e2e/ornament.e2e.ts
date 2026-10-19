@@ -41,6 +41,7 @@ import {
   openSettings,
   pageSeatInvoke,
   unlockToEditor,
+  rootInlineStyle,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -69,11 +70,6 @@ const UNKNOWN_VARIANT = JSON.stringify({ ...BASE, "--box-frame": "quadruple" });
 /** The `<html>` element's attribute value, or `null` when absent. */
 async function rootAttr(session: Session, name: string): Promise<string | null> {
   return (await (await session.findElement("html")).attribute(name).catch(() => null)) ?? null;
-}
-
-/** The inline `style` attribute on `<html>` — where the palette vars land. */
-async function rootInlineStyle(session: Session): Promise<string> {
-  return (await (await session.findElement("html")).attribute("style").catch(() => null)) ?? "";
 }
 
 /** Seal a palette into the unlocked vault through the production command. */

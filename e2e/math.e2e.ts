@@ -22,8 +22,9 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { createNote, dismissImporterOffer, unlockToEditor, waitForSaved } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const CM_CONTENT = `${EDITOR} .cm-content`;
 const BACKSPACE = "\uE003"; // W3C key codepoint (Backspace)
 

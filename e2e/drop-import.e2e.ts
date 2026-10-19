@@ -24,40 +24,15 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import {
-  clickNewItem,
   dismissImporterOffer,
   pageSeatInvoke,
   runPaletteAction,
   unlockToEditor,
+  createFolder,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
-
-/** W3C key codepoint (Enter). Written as an escape, never as the literal
- *  character — it is invisible in an editor and gets lost when a line is
- *  copied between files. */
-const ENTER = "\uE007";
-
-/**
- * Create a folder through the sidebar "New folder" CTA and its inline input —
- * the same flow `folder-notes.e2e.ts` uses.
- *
- * **Why not seed a `folder:` note over IPC.** A folder is derived from notes'
- * frontmatter, so seeding one that way looks like it should work — but a
- * page-seat `note_create` writes past the UI, and nothing re-derives the tree
- * afterwards, so `notes.folder-row` never materializes and the scenario times
- * out waiting for a row that only a reload would produce.
- *
- * Lowercase-only name: WebKitWebDriver's Send Keys drops the shift modifier, so
- * an uppercase char would arrive lowercased (a driver limitation, not a product
- * one) and the `data-folder-path` assertion would miss.
- */
-async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewItem(s, "notes.new-folder");
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}${ENTER}`);
-  await s.byTestId("notes.folder-row");
-}
 
 /**
  * Dispatch a real `drop` (preceded by `dragover`, which the handlers gate on)

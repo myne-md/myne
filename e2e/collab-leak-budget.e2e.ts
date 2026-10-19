@@ -42,6 +42,7 @@ import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { noteBlobCount, noteBlobMagics, setupTwoSyncedDevices } from "./support/multi-device";
 import { clickNoteRow, ipcOk, pageSeatInvoke } from "./support/flows";
+import { sleep } from "./support/member-fleet";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -65,10 +66,6 @@ const MARKERS = [
   "leakburstcharlie9d4t7yp2mq6xs",
   "leakburstdelta1w4e7r9t2y5u8i0o",
 ] as const;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /** The `sync_awareness_stats` shape (`core/src/plugins/sync/awareness_listener.rs`).
  *  Counts and lengths only; never a frame byte, a room id or a note id. */

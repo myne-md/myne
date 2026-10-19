@@ -31,24 +31,11 @@ import {
   dismissImporterOffer,
   pageSeatInvoke,
   runPaletteAction,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import type { Session } from "./support/webdriver";
-
-/** The `data-note-id` of the currently-selected sidebar row — the note
- *  `createNote` just created and left selected. Same helper `sr1` keeps
- *  locally; duplicated rather than shared so neither scenario's selectors move
- *  when the other's do. */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 const PASSWORD = "Qp9#xT4!nG7&wM2k-ch1";
 const V1 = "first revision marker qzcrdthistoryoneaaaaaaaa\n";

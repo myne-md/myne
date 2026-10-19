@@ -61,6 +61,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { createNote, dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** Language codes to sweep. English first, as the baseline the rest are
  *  compared against for "did the switch actually take". */
@@ -144,7 +145,7 @@ async function pickLanguage(s: Session, code: string): Promise<void> {
     },
   );
   await (await s.byTestId("settings.close")).click();
-  await s.waitForGone('[data-testid="settings.modal"]');
+  await s.waitForGone(testIdSelector("settings.modal"));
 }
 
 describeE2E("ios1 no bottom-bar control clips or overlaps in any language (myne-md/myne#555)", () => {

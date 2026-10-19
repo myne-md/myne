@@ -24,8 +24,9 @@ import {
   typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const CM_CONTENT = `${EDITOR} .cm-content`;
 
 // Mermaid lazy-loads on the first diagram; a generous budget for the dynamic
@@ -182,14 +183,14 @@ describeE2E("mv3 a bare wheel over the diagram zooms it (#742)", () => {
         await dismissImporterOffer(s);
         await createNote(s, "Tekerlekli Diyagram");
         await seedEmbedIntoNote(s, DIAGRAM);
-        const viewportSel = `${EDITOR} [data-testid="editor.mermaid.viewport"]`;
+        const viewportSel = `${EDITOR} ${testIdSelector("editor.mermaid.viewport")}`;
         await s.waitForElement(viewportSel, { timeoutMs: MERMAID_TIMEOUT });
         // The SAME svg node moves onto the expand stage later, so the selector
         // covers both homes and `document.querySelector` answers with whichever
         // one currently holds it.
         const svgSel =
-          `[data-testid="editor.mermaid.viewport"] svg, ` +
-          `[data-testid="editor.mermaid.expand-stage"] svg`;
+          `${testIdSelector("editor.mermaid.viewport")} svg, ` +
+          `${testIdSelector("editor.mermaid.expand-stage")} svg`;
         await s.waitForElement(svgSel, { timeoutMs: MERMAID_TIMEOUT });
 
         // The committed transform, not a computed style: `render()` writes
@@ -338,7 +339,7 @@ describeE2E("mv3 a bare wheel over the diagram zooms it (#742)", () => {
         // the new controller restores the remembered percent, so the baseline
         // here is the already-zoomed scale and the wheel must move it again.
         await (await s.byTestId("editor.mermaid.expand")).click();
-        await s.waitForElement(`[data-testid="editor.mermaid.expand-stage"]`, {
+        await s.waitForElement(testIdSelector("editor.mermaid.expand-stage"), {
           timeoutMs: 10_000,
         });
         const afterExpand = await s.waitUntil(
@@ -349,7 +350,7 @@ describeE2E("mv3 a bare wheel over the diagram zooms it (#742)", () => {
           { label: () => "the expand overlay's committed scale to be readable" },
         );
         const expandZoomed = await wheelZooms(
-          `[data-testid="editor.mermaid.expand-stage"]`,
+          testIdSelector("editor.mermaid.expand-stage"),
           afterExpand,
         );
         expect(expandZoomed).toBeGreaterThan(afterExpand);
@@ -390,9 +391,9 @@ describeE2E("mv4 the diagram's keyboard is reachable, and typing cannot touch it
         await createNote(s, "Klavye Diyagrami");
         await seedEmbedIntoNote(s, DIAGRAM);
 
-        const viewportSel = `${EDITOR} [data-testid="editor.mermaid.viewport"]`;
+        const viewportSel = `${EDITOR} ${testIdSelector("editor.mermaid.viewport")}`;
         await s.waitForElement(viewportSel, { timeoutMs: MERMAID_TIMEOUT });
-        const svgSel = `[data-testid="editor.mermaid.viewport"] svg`;
+        const svgSel = `${testIdSelector("editor.mermaid.viewport")} svg`;
         await s.waitForElement(svgSel, { timeoutMs: MERMAID_TIMEOUT });
 
         // The committed transform, not a computed style: `render()` writes

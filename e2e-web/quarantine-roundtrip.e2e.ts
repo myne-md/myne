@@ -34,6 +34,7 @@ import { newBrowserSession } from "./support/session";
 import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { loadVaultFixture, seedVault } from "./support/opfs-seed";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -88,8 +89,8 @@ describeE2E("a quarantined note round-trips through OPFS", () => {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       await pw.sendKeys(vault.password);
-      await (await session.findElement('[data-testid="unlock.submit"]')).click();
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+      await (await session.findElement(testIdSelector("unlock.submit"))).click();
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
@@ -99,8 +100,8 @@ describeE2E("a quarantined note round-trips through OPFS", () => {
       // the driver's browser picks its own locale — this scenario failed first
       // against a German Firefox looking for "Open settings". `byTestId` is the
       // lane's only sanctioned selector for exactly this reason.
-      await (await session.findElement('[data-testid="editor.settings-cta"]')).click();
-      await session.waitForElement('[data-testid="settings.modal"]');
+      await (await session.findElement(testIdSelector("editor.settings-cta"))).click();
+      await session.waitForElement(testIdSelector("settings.modal"));
       const tabs = await session.execute<string>(
         "return [...document.querySelectorAll('[data-testid^=\"settings.tab-\"]')].map(e=>e.getAttribute('data-testid')).join(',');",
       );
@@ -110,31 +111,31 @@ describeE2E("a quarantined note round-trips through OPFS", () => {
       // driver spends its whole click budget on "element not interactable" and
       // reports a timeout, which reads like a missing element rather than an
       // off-screen one.
-      const syncTab = await session.findElement('[data-testid="settings.tab-sync"]');
+      const syncTab = await session.findElement(testIdSelector("settings.tab-sync"));
       await syncTab.scrollIntoView();
       await syncTab.click();
 
       // ── enumerate ───────────────────────────────────────────────────────
-      await session.waitForElement('[data-testid="sync.recovered-row"]', {
+      await session.waitForElement(testIdSelector("sync.recovered-row"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
-      const rows = await session.findElements('[data-testid="sync.recovered-row"]');
+      const rows = await session.findElements(testIdSelector("sync.recovered-row"));
       expect(rows.length, "one seeded quarantine entry should list as one row").toBe(1);
 
       // ── read (the AEAD half) ────────────────────────────────────────────
       // The body, not the filename. A listing that parsed the container slot
       // name wrongly still shows a row; only decrypting proves it resolved the
       // note id the tag is bound to.
-      await (await session.findElement('[data-testid="sync.recovered-preview"]')).click();
-      const body = await session.waitForElement('[data-testid="sync.recovered-preview-body"]', {
+      await (await session.findElement(testIdSelector("sync.recovered-preview"))).click();
+      const body = await session.waitForElement(testIdSelector("sync.recovered-preview-body"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       expect(await body.text()).toContain("quokkazephyr");
-      await (await session.findElement('[data-testid="sync.recovered-preview-close"]')).click();
+      await (await session.findElement(testIdSelector("sync.recovered-preview-close"))).click();
 
       // ── unlink ──────────────────────────────────────────────────────────
-      await (await session.findElement('[data-testid="sync.recovered-delete"]')).click();
-      await session.waitForGone('[data-testid="sync.recovered-row"]', {
+      await (await session.findElement(testIdSelector("sync.recovered-delete"))).click();
+      await session.waitForGone(testIdSelector("sync.recovered-row"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 

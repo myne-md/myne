@@ -27,29 +27,10 @@ import {
   editorText,
   waitForSaved,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { KEY, pressChord } from "./support/keyboard";
+import { testIdSelector } from "./support/webdriver";
 
-// The Linux harness accelerator is Control (the canonical `Mod`); the W3C
-// Actions API key code point for Control.
-const CONTROL = "";
-
-/** Send a single `Control+<key>` chord via the W3C Actions API (no sendKeys). */
-async function sendCtrlChord(session: Session, key: string): Promise<void> {
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: key },
-          { type: "keyUp", value: key },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
-}
+// Control chords go through the shared `pressChord(session, KEY.CONTROL, key)`.
 
 const rowSel = (commandId: string) =>
   testIdSelector("hotkeys.row", { "data-command-id": commandId });
@@ -104,7 +85,7 @@ describeE2E("hk2 rebind persists through reload + reset (MYND-364/366)", () => {
           await s.waitForElement(`${rowSel("graph.show")} [data-testid="hotkeys.add-binding"]`)
         ).click();
         await s.byTestId("hotkeys.capture-input");
-        await sendCtrlChord(s, "j");
+        await pressChord(s, KEY.CONTROL, "j");
 
         // The new chord chip appears on the row (formatChord → "Ctrl+J" on Linux).
         await s.waitUntil(
@@ -165,7 +146,7 @@ describeE2E("hk3 conflict warns + assigns anyway + indicator (MYND-365)", () => 
           await s.waitForElement(`${rowSel("note.new-tab")} [data-testid="hotkeys.add-binding"]`)
         ).click();
         await s.byTestId("hotkeys.capture-input");
-        await sendCtrlChord(s, ",");
+        await pressChord(s, KEY.CONTROL, ",");
 
         // Warn-only (SYNC-7): the warning names the colliding command, AND the
         // binding is assigned anyway (the chord chip appears).
@@ -209,7 +190,7 @@ describeE2E("hk4 a migrated window chord still fires through the engine (MYND-36
           throw new Error("expected a single pane before the split chord");
         }
         // Ctrl-\ → pane.split-row default → engine dispatches ws.splitFocused("row").
-        await sendCtrlChord(s, "\\");
+        await pressChord(s, KEY.CONTROL, "\\");
         await s.waitUntil(
           async () => ((await s.byTestIdAll("editor.pane")).length === 2 ? true : null),
           { label: "Ctrl-\\ split the pane (1 → 2) via the engine" },
@@ -247,7 +228,7 @@ describeE2E("hk5 the command palette is a rebindable command + opens via the eng
         await closeSettings(s);
 
         // (b) Ctrl+K → palette.toggle default → engine opens the palette.
-        await sendCtrlChord(s, "k");
+        await pressChord(s, KEY.CONTROL, "k");
         await s.byTestId("palette.input");
       },
     );
@@ -297,7 +278,7 @@ describeE2E("hk6 editor formatting is rebindable; a rebind takes effect live (#1
           )
         ).click();
         await s.byTestId("hotkeys.capture-input");
-        await sendCtrlChord(s, "6");
+        await pressChord(s, KEY.CONTROL, "6");
         await s.waitUntil(
           async () =>
             (await (await s.waitForElement(rowSel("editor.bold"))).textContent()).includes(
@@ -315,8 +296,8 @@ describeE2E("hk6 editor formatting is rebindable; a rebind takes effect live (#1
         await createNote(s, "Rebind Bold");
         await typeIntoEditor(s, "boldme");
         await waitForSaved(s);
-        await sendCtrlChord(s, "a"); // editor.select-all (scoped → body)
-        await sendCtrlChord(s, "6"); // the rebound bold chord
+        await pressChord(s, KEY.CONTROL, "a"); // editor.select-all (scoped → body)
+        await pressChord(s, KEY.CONTROL, "6"); // the rebound bold chord
         await s.waitUntil(
           async () => ((await editorText(s)).includes("**boldme**") ? true : null),
           { label: "rebound Ctrl+6 bolded the selection live", timeoutMs: 10_000 },

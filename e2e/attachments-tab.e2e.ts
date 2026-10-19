@@ -30,8 +30,9 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const RAIL_BUTTON = '[data-testid="editor.ribbon.button"]';
+const RAIL_BUTTON = testIdSelector("editor.ribbon.button");
 
 /** The rail entry marked `aria-current="page"`, by command id, or null. */
 async function currentRailCommand(s: Session): Promise<string | null> {

@@ -27,22 +27,9 @@ import {
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  contextMenuPick,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** Right-click an element and pick a context-menu item by its `data-item-id`. */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
 
 /** Count the NOTES-section hit rows currently rendered in the palette. */
 async function noteHitCount(s: Session): Promise<number> {
@@ -131,8 +118,11 @@ describeE2E("ar2 archived note stays searchable with a badge (MYND-331)", () => 
         // Archive the second note via its context menu — the just-created note
         // is the selected row; archive it so it leaves the tree but stays
         // indexed (the Rust BM25 index is archive-blind).
+        // This asks about the SIDEBAR ROW (the element this right-clicks), not
+        // the active editor tab the shared `selectedNoteId` reads, so the raw
+        // row selector stays.
         const selected = await s.waitForElement(
-          '[data-testid="notes.row"][aria-selected="true"]',
+          testIdSelector("notes.row", { "aria-selected": "true" }),
         );
         await contextMenuPick(s, selected, "archive");
 

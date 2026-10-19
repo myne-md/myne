@@ -88,6 +88,7 @@ import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { loadVaultFixture, seedPendingVault, seedVault } from "./support/opfs-seed";
 import { waitForAnyTestId } from "./support/flows";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -137,7 +138,7 @@ async function bootAndLand(
     await seed(session, vault);
     await session.navigate(`${server.origin}/`);
 
-    await session.waitForElement('[data-testid="unlock.password-input"]', {
+    await session.waitForElement(testIdSelector("unlock.password-input"), {
       timeoutMs: BOOT_TIMEOUT_MS,
     });
     const present = (testId: string) =>
@@ -188,11 +189,11 @@ async function unlockAndLand(
     await seed(session, vault);
     await session.navigate(`${server.origin}/`);
 
-    const field = await session.waitForElement('[data-testid="unlock.password-input"]', {
+    const field = await session.waitForElement(testIdSelector("unlock.password-input"), {
       timeoutMs: BOOT_TIMEOUT_MS,
     });
     await field.sendKeys(vault.password);
-    await (await session.findElement('[data-testid="unlock.submit"]')).click();
+    await (await session.findElement(testIdSelector("unlock.submit"))).click();
 
     // Through the shared fork-waiter rather than a hand-rolled poll, because its
     // timeout message names the whole SET it was watching. A bare wait on one of

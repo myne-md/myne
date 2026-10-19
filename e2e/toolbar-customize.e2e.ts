@@ -52,7 +52,7 @@ import {
 import { KEY } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const CM_CONTENT = `${EDITOR} .cm-content`;
 const CM_LINE = `${EDITOR} .cm-content .cm-line`;
 // The floating selection toolbar mounts on document.body as `.cm-toolbar` —

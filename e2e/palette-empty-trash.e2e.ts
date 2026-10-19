@@ -35,23 +35,9 @@ import {
   dismissImporterOffer,
   runPaletteAction,
   unlockToEditor,
+  contextMenuPick,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** Right-click an element and pick a context-menu item by its
- *  `data-item-id` (the nc3 helper, notes.e2e.ts). */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
 
 /** Read the confirm modal's title + body via its aria anchors (stable ids on
  *  the alertdialog — `DeleteConfirmModal` labels itself with them). */

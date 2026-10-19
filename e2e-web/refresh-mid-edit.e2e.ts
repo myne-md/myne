@@ -34,6 +34,7 @@ import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { loadVaultFixture, seedVault } from "./support/opfs-seed";
 import { createNote, typeIntoEditor } from "./support/flows";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -91,8 +92,8 @@ describeE2E("an unsaved edit survives a refresh", () => {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       await unlockField.sendKeys(vault.password);
-      await (await session.findElement('[data-testid="unlock.submit"]')).click();
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+      await (await session.findElement(testIdSelector("unlock.submit"))).click();
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
@@ -115,8 +116,8 @@ describeE2E("an unsaved edit survives a refresh", () => {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       await field.sendKeys(vault.password);
-      await (await session.findElement('[data-testid="unlock.submit"]')).click();
-      await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+      await (await session.findElement(testIdSelector("unlock.submit"))).click();
+      await session.waitForElement(testIdSelector("editor.bottom-bar"), {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
 
@@ -139,7 +140,7 @@ describeE2E("an unsaved edit survives a refresh", () => {
       // back empty", and those are different answers: the second is the
       // data-loss one this scenario exists to catch, and a poll would report it
       // as a timeout with no value in the message.
-      await session.waitForElement('[data-testid="editor.content"] .cm-content', {
+      await session.waitForElement(testIdSelector("editor.content") + " .cm-content", {
         timeoutMs: UNLOCK_TIMEOUT_MS,
       });
       const after = (await editorText(session)).replace(/[^a-z0-9]/gi, "");

@@ -64,6 +64,7 @@ import { openFixtureVault } from "./support/fixture-session";
 import { cdp, supportsCdp } from "./support/cdp";
 import { harnessEnv, type SupportedBrowser } from "./support/harness";
 import type { Session } from "./support/session";
+import { testIdSelector } from "./support/session";
 
 /** Everything the app could have stored on this origin. */
 const STORAGE_TYPES = "appcache,cookies,file_systems,indexeddb,local_storage,shader_cache,websql,service_workers,cache_storage";
@@ -149,7 +150,7 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       // routes an empty container to the Welcome/create screen fails here saying
       // the bootstrap gate never appeared — verified by injecting exactly that
       // into `initialStageFromProbe`.
-      await session.waitForElement('[data-testid="bootstrap.beta-terms"]', {
+      await session.waitForElement(testIdSelector("bootstrap.beta-terms"), {
         timeoutMs: 45_000,
       });
       const route = await session.execute<string>("return location.pathname;");
@@ -164,7 +165,7 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       await session.execute(
         "document.querySelector('[data-testid=\"bootstrap.beta-terms.open\"]').click();",
       );
-      await session.waitForElement('[data-testid="sync.beta-terms.accept"]', {
+      await session.waitForElement(testIdSelector("sync.beta-terms.accept"), {
         timeoutMs: 15_000,
       });
       await session.execute(
@@ -172,7 +173,7 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       );
 
       // …and the account form is what is behind it.
-      await session.waitForElement('[data-testid="account-entry.input"]', {
+      await session.waitForElement(testIdSelector("account-entry.input"), {
         timeoutMs: 30_000,
       });
 
@@ -194,7 +195,7 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       // and offering to CREATE one would leave the user with a second, empty
       // account while their notes sit on the server under the first. The Welcome
       // screen's create CTA is the surface that must NOT be what answered.
-      const created = await session.findElements('[data-testid="welcome.create-cta"]');
+      const created = await session.findElements(testIdSelector("welcome.create-cta"));
       expect(
         created.length,
         `the emptied origin landed on a screen offering to create a new vault. On ` +
