@@ -97,7 +97,7 @@
   "mobile/src/app/flows/SettingsSheet.tsx": 102,
   "mobile/src/app/flows/SnapshotsSheet.tsx": 18,
   "mobile/src/app/flows/TemplatesSheet.tsx": 23,
-  "mobile/src/app/flows/UnlockFlow.tsx": 39,
+  "mobile/src/app/flows/UnlockFlow.tsx": 36,
   "mobile/src/app/flows/ViewEditorSheet.tsx": 34,
   "mobile/src/app/flows/WelcomeFlow.tsx": 12,
   "mobile/src/app/flows/editor/EmptyDetail.tsx": 9,

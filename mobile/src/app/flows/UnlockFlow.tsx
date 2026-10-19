@@ -45,6 +45,38 @@ import type { SuspicionReason } from "../../lib/stage";
 import type { VaultUnlockError } from "../../types/vault-unlock-error";
 import type { UnlockFlowProps } from "./types";
 
+// ── The destructive-confirm sheet's text roles ────────────────────────────────
+// Hoisted to one constant per role so the OWNER and MEMBER arms of the same
+// sheet cannot drift apart — they render the same shapes with different copy —
+// and bound to design tokens so a custom theme reaches them rather than being
+// out-ranked by an inline literal (myne#394).
+
+/** The uppercase eyebrow over the member heading. */
+const CONFIRM_EYEBROW_STYLE: CSSProperties = {
+  marginBottom: "var(--space-2)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
+  letterSpacing: "var(--tracking-caps)",
+  textTransform: "uppercase",
+  color: "var(--danger)",
+};
+
+/** The sheet's heading — display ink. Shared by both arms. */
+const CONFIRM_HEADING_STYLE: CSSProperties = {
+  fontSize: "var(--text-lg)",
+  fontWeight: "var(--weight-semibold)",
+  letterSpacing: "var(--tracking-tight)",
+  color: "var(--fg-display)",
+};
+
+/** The body line under the heading. Shared by both arms. */
+const CONFIRM_BODY_STYLE: CSSProperties = {
+  margin: "var(--space-3) 0 0",
+  fontSize: "var(--text-base)",
+  lineHeight: 1.55,
+  color: "var(--fg-2)",
+};
+
 // ── On-design helpers (local, mirroring src/screens/unlock/index.tsx) ─────────
 
 /** Wordmark: mark + "myne" (unlock screens use the 24/18 size). */
@@ -950,44 +982,18 @@ export function UnlockFlow(props: UnlockFlowProps) {
               `memberVaultStatus` probe the member unlock surface reads. */}
           {member ? (
             <>
-              <div
-                data-testid="unlock-member-remove-eyebrow"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: "var(--danger)",
-                }}
-              >
+              <div data-testid="unlock-member-remove-eyebrow" style={CONFIRM_EYEBROW_STYLE}>
                 {t("settings.deleteVault.memberEyebrow")}
               </div>
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 19,
-                  fontWeight: 600,
-                  letterSpacing: "-0.01em",
-                  color: "var(--fg-display)",
-                }}
-              >
-                {t("settings.deleteVault.memberHeading")}
-              </div>
-              <p
-                data-testid="unlock-member-removal-disclosure"
-                style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}
-              >
+              <div style={CONFIRM_HEADING_STYLE}>{t("settings.deleteVault.memberHeading")}</div>
+              <p data-testid="unlock-member-removal-disclosure" style={CONFIRM_BODY_STYLE}>
                 {MEMBER_VAULT_REMOVAL_DISCLOSURE}
               </p>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
-                {t("unlock.deleteConfirmTitle")}
-              </div>
-              <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}>
-                {LOST_BOTH_SECRETS_SENTENCE}
-              </p>
+              <div style={CONFIRM_HEADING_STYLE}>{t("unlock.deleteConfirmTitle")}</div>
+              <p style={CONFIRM_BODY_STYLE}>{LOST_BOTH_SECRETS_SENTENCE}</p>
             </>
           )}
           {deleteFailed && (

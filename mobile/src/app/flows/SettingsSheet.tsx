@@ -190,6 +190,25 @@ const HINT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+/** The member-removal panel's eyebrow and disclosure — the member arm of the
+ *  destructive panel. Hoisted and token-bound (myne#394) so a custom theme
+ *  reaches them and the panel cannot re-grow an inline literal. */
+const MEMBER_REMOVE_EYEBROW_STYLE: CSSProperties = {
+  marginBottom: "var(--space-2)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)",
+  letterSpacing: "var(--tracking-caps)",
+  textTransform: "uppercase",
+  color: "var(--danger)",
+};
+
+const MEMBER_REMOVE_DISCLOSURE_STYLE: CSSProperties = {
+  margin: "0 0 var(--space-4)",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.5,
+  color: "var(--fg-2)",
+};
+
 function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
   return (
     <div
@@ -3055,23 +3074,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 instead — the owner's sentence is absent, not corrected after it. */}
             {member ? (
               <>
-                <div
-                  data-testid="settings.member-remove-eyebrow"
-                  style={{
-                    marginBottom: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--danger)",
-                  }}
-                >
+                <div data-testid="settings.member-remove-eyebrow" style={MEMBER_REMOVE_EYEBROW_STYLE}>
                   {t("settings.deleteVault.memberEyebrow")}
                 </div>
-                <p
-                  data-testid="settings.member-removal-disclosure"
-                  style={{ margin: "0 0 14px", fontSize: 13, lineHeight: 1.5, color: "var(--fg-2)" }}
-                >
+                <p data-testid="settings.member-removal-disclosure" style={MEMBER_REMOVE_DISCLOSURE_STYLE}>
                   {MEMBER_VAULT_REMOVAL_DISCLOSURE}
                 </p>
               </>
