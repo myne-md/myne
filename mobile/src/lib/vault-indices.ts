@@ -154,6 +154,30 @@ export function vaultIndicesRemove(noteId: string): Promise<void> {
   return invoke("plugin:vault-indices|vault_indices_remove", { noteId });
 }
 
+/** Persist the live in-RAM index to the encrypted `vault.indices` (`MYI1`)
+ *  blob (`protocol.md` §9.8; MYND-271 Task 8). Best-effort: a failure leaves
+ *  the RAM index intact and the next unlock rebuilds the missing delta. Must
+ *  run while the vault is unlocked, because the command peeks `root_key`.
+ *
+ *  Call it through `lib/vault-indices-lifecycle.ts`, which owns the dirty flag
+ *  and the write ordering, rather than from a component. */
+export function persistVaultIndicesBlob(): Promise<void> {
+  return invoke("plugin:vault-indices|vault_indices_persist");
+}
+
+/** Load the `vault.indices` blob on unlock (the fast path) and return the
+ *  **stale** note ids (changed / new since the snapshot) for the caller to
+ *  re-read and re-apply. Unchanged notes are already populated into the store
+ *  by the host; notes deleted since the snapshot are dropped. An absent /
+ *  undecodable blob answers every on-disk note as stale, so a cold vault does
+ *  a full rebuild; the cache is never authoritative (§9.8.4 / SYNC-1).
+ *
+ *  The caller must seed the delta tracker from this result before letting the
+ *  sweep run; `lib/vault-indices-lifecycle.ts` carries that contract. */
+export function hydrateVaultIndicesBlob(): Promise<string[]> {
+  return invoke<string[]>("plugin:vault-indices|vault_indices_hydrate");
+}
+
 /** Whole-vault edge dump: `[noteId, edges][]`. */
 export function vaultIndicesAllEdges(): Promise<[string, WikilinkEdge[]][]> {
   return invoke<[string, WikilinkEdge[]][]>("plugin:vault-indices|vault_indices_all_edges");

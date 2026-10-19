@@ -343,8 +343,8 @@ function StageSwitch() {
           vaultId={stage.vaultId}
           // The palette revert rides `lockVault()` with the other per-vault
           // teardowns, so every route through the lock inherits it (MYND-598).
-          onLock={async () => {
-            await lockVault().catch(() => {});
+          onLock={async (reason) => {
+            await lockVault(reason === "idle" ? "idle" : "manual").catch(() => {});
             dispatch({ type: "editor.lock" });
           }}
           onCreateVault={() => dispatch({ type: "editor.create-vault" })}
@@ -359,7 +359,7 @@ function StageSwitch() {
             setJoinFrom("editor");
           }}
           onSwitchVault={async (vaultId: VaultId) => {
-            await lockVault().catch(() => {});
+            await lockVault("switch").catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
           }}
           // Vault deletion is the one exit that does NOT go through `lockVault`
