@@ -193,6 +193,15 @@ export function DeleteVaultConfirmForm({
   // lookup by construction (`src/platform/capabilities.ts`), so caching it would
   // add a dependency array to protect nothing.
   const onlyCopy = has("localOnlyVault");
+  // A DIFFERENT question from `onlyCopy`, and conflating the two is what shipped
+  // this line on the one client that has no keychain: `localOnlyVault` says
+  // whether this client's copy is the only one, while the disclosure below is
+  // about a system keychain. This predicate separates the browser (where no
+  // per-vault keychain item was ever created, and whose copy is a different
+  // claim about a different store) from the Tauri clients. It does NOT mean "a
+  // keychain item exists here": on desktop the capability is true for every
+  // platform, and the sentence itself names the ones that have a key.
+  const hasKeychainItem = has("biometricQuickUnlock");
 
   // The member arm FIRST, and it does not fold into `onlyCopy`: a member vault on
   // a sync-backed client is both (this device's copy is a cache AND the removal is
@@ -264,6 +273,23 @@ export function DeleteVaultConfirmForm({
           <p style={COPY_SECONDARY_STYLE}>
             {t("settings.deleteVault.copySecondary")}
           </p>
+
+          {/* myne-md/myne#761: the erase destroys the per-vault keychain item on
+              the platforms that have one, and there is no such item on the
+              others. Saying so here rather than implying a cleanup that cannot
+              happen is the non-Apple half of the class rule
+              (`design-notes/security/0709`). Gated on the provider capability
+              rather than on `onlyCopy`: the browser has no per-vault keychain
+              item and its copy is a different claim about a different store, so
+              the line is omitted there. */}
+          {hasKeychainItem && (
+            <p
+              style={COPY_SECONDARY_STYLE}
+              data-testid="delete-vault.keychain-note"
+            >
+              {t("settings.deleteVault.keychainNote")}
+            </p>
+          )}
 
           <div
             style={{

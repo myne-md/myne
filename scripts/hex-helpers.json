@@ -5,7 +5,6 @@
   "core/src/plugins/captures/queue.rs::hex_lower": "capture-id rendering in the MYK1 queue; a duplicate encoder of the canonical one.",
   "core/src/plugins/live/session_test.rs::hex_lower": "live-session test harness encoder (session_test); test-only, debt.",
   "core/src/plugins/notes/crdt.rs::hex_lower": "CRDT note-family encoder; a duplicate of the canonical encoder.",
-  "core/src/plugins/quick_unlock/apple.rs::hex_lower": "Apple quick-unlock keychain helper encoder; a duplicate.",
   "core/src/plugins/share_import/queue.rs::is_share_id": "lenient predicate accepting A-F on purpose (protocol.md §9.20.4); keep, pinned here as a decision.",
   "core/src/plugins/share_import/queue.rs::hex_lower": "share-id rendering in the MYF1 queue; a duplicate encoder.",
   "core/src/plugins/sync/engine.rs::hex_lower": "const-generic encoder over &[u8; N]; a duplicate used on fixed-width sync ids.",

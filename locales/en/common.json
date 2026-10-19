@@ -3358,6 +3358,7 @@
       "continue": "Continue",
       "copyPrimary": "This permanently deletes this vault and every note inside it. The action cannot be undone, and your recovery phrase will not restore the data.",
       "copySecondary": "Vault keys are zeroized from memory before the files are unlinked; any orphan ciphertext that remains on disk stays unrecoverable Argon2id-wrapped junk.",
+      "keychainNote": "When the deletion completes, Myne also asks your system keychain to delete the biometric unlock key it stored for this vault, on the platforms where it stores one.",
       "eyebrow": "IRREVERSIBLE",
       "memberEyebrow": "THIS DEVICE ONLY",
       "heading": "Delete vault",

@@ -77,6 +77,17 @@ const CONFIRM_BODY_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
+/** Footnote weight for a claim that qualifies the arm above rather than being
+ *  the one the user must act on (myne-md/myne#761). Token-bound and hoisted, so
+ *  it matches the desktop form's secondary role instead of reading as a second
+ *  body paragraph. */
+const CONFIRM_NOTE_STYLE: CSSProperties = {
+  margin: "var(--space-3) 0 0",
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--fg-3)",
+};
+
 // ── On-design helpers (local, mirroring src/screens/unlock/index.tsx) ─────────
 
 /** Wordmark: mark + "myne" (unlock screens use the 24/18 size). */
@@ -996,6 +1007,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
               <p style={CONFIRM_BODY_STYLE}>{LOST_BOTH_SECRETS_SENTENCE}</p>
             </>
           )}
+          {/* myne-md/myne#761: iOS destroys the per-vault keychain item, Android
+              keeps no such key, and the sentence names both halves, so it is
+              rendered on both rather than gated into disagreement with the
+              desktop twin. */}
+          <p data-testid="unlock-delete-keychain-note" style={CONFIRM_NOTE_STYLE}>
+            {t("settings.deleteVault.keychainNote")}
+          </p>
           {deleteFailed && (
             <div data-testid="unlock-delete-error" style={{ marginTop: 14 }}>
               <Banner kind="danger">

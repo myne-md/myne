@@ -91,6 +91,7 @@ const MEMBER_REMOVAL_KEYS = [
   "settings.deleteVault.memberHeading",
   "settings.deleteVault.memberEyebrow",
   "settings.deleteVault.memberSubmit",
+  "settings.deleteVault.keychainNote",
 ];
 
 afterEach(() => cleanup());
@@ -135,6 +136,11 @@ describe("SettingsSheet member-vault removal copy (audit K2-i)", () => {
     );
     // The owner's permanent-deletion warning is absent, not corrected after.
     expect(screen.queryByText("settings.deleteVault.warning")).toBeNull();
+    // myne-md/myne#761: iOS destroys the per-vault keychain item on this same
+    // command, so the disclosure is present on the member arm too.
+    expect(screen.getByTestId("settings.delete-vault.keychain-note").textContent).toBe(
+      "settings.deleteVault.keychainNote",
+    );
     // The submit carries the member sentence, not "Delete this vault".
     expect(screen.getByRole("button", { name: "settings.deleteVault.memberSubmit" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "settings.deleteVault.deleteButton" })).toBeNull();
@@ -145,6 +151,9 @@ describe("SettingsSheet member-vault removal copy (audit K2-i)", () => {
 
     expect(screen.getByText("settings.deleteVault.warning")).toBeTruthy();
     expect(screen.queryByTestId("settings.member-removal-disclosure")).toBeNull();
+    expect(screen.getByTestId("settings.delete-vault.keychain-note").textContent).toBe(
+      "settings.deleteVault.keychainNote",
+    );
     expect(screen.getByTestId("settings.panel-title").textContent).toBe(
       "settings.deleteVault.heading",
     );

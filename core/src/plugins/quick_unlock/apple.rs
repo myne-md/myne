@@ -33,9 +33,15 @@
 //! The item is named per VAULT, not per account — see [`AppleBiometricProvider`]
 //! for why, and for the read-side migration that re-homes a credential enrolled
 //! under the earlier account-only name.
+//!
+//! **The account address itself lives in [`super::device_secret`]**, because the
+//! vault-delete teardown destroys this item without an enrolled credential in
+//! hand and both halves have to derive the SAME bytes. This module keeps only the
+//! biometric access-control mechanics.
 
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
+use super::device_secret::{account_component, legacy_account_component, KEYCHAIN_SERVICE};
 use super::provider::{
     store_error_from_osstatus, ProviderError, ProviderSecret, QuickUnlockProvider,
     ERR_SEC_MISSING_ENTITLEMENT, WRAP_KEY_LEN,
@@ -49,16 +55,12 @@ use security_framework::passwords_options::PasswordOptions;
 use security_framework_sys::access_control::kSecAccessControlBiometryCurrentSet;
 use zeroize::Zeroizing;
 
-/// Keychain service string for quick-unlock wrap keys — the app-level namespace
-/// (same shape as `md.myne.shareimport`); per-item identity lives in the account
-/// component, not here. UNCHANGED from the desktop-era value — existing macOS
-/// Touch ID credentials keep resolving after the move to `myne-core`.
-const KEYCHAIN_SERVICE: &str = "md.myne.quickunlock";
-
-/// Separator between the account and vault halves of the Keychain account
-/// component. `:` is outside the hex alphabet and outside a `VaultId`'s
-/// canonical form, so the two halves can never be confused for one another.
-const ACCOUNT_COMPONENT_SEPARATOR: char = ':';
+// Keychain service string for quick-unlock wrap keys: the app-level namespace
+// (same shape as `md.myne.shareimport`); per-item identity lives in the account
+// component, not here. The value lives in `super::device_secret` because the
+// vault-delete teardown addresses the same items, and it is UNCHANGED from the
+// desktop-era value so existing macOS Touch ID credentials keep resolving after
+// the move to `myne-core`.
 
 /// The Apple biometric provider (macOS Touch ID; iOS Face ID / Touch ID).
 /// Constructed per operation from the vault's `account_number_hash` AND its
@@ -93,10 +95,9 @@ impl AppleBiometricProvider {
     /// [`VaultId`] naming its directory. Callers already hold the vault root,
     /// so the id is `crate::paths::vault_id_from_root(&dir)` away.
     pub fn new(account_number_hash: [u8; 16], vault_id: VaultId) -> Self {
-        let legacy_account = hex_lower(&account_number_hash);
         Self {
-            account: format!("{legacy_account}{ACCOUNT_COMPONENT_SEPARATOR}{vault_id}"),
-            legacy_account,
+            account: account_component(&account_number_hash, vault_id),
+            legacy_account: legacy_account_component(&account_number_hash),
         }
     }
 
@@ -131,10 +132,23 @@ impl AppleBiometricProvider {
     /// a cancelled prompt or an unsigned build still surfaces its own error. A
     /// successful legacy read happened INSIDE the biometric prompt the user just
     /// passed, so the same `wrap_key` is re-stored under the vault-scoped
-    /// account and the legacy item removed — a single-vault install upgrades
-    /// transparently on its next unlock, with no UI and no unlocked vault. The
-    /// re-store is best-effort: if it fails the legacy item stays, because
-    /// deleting it before its replacement exists destroys the credential.
+    /// account: a single-vault install upgrades transparently on its next
+    /// unlock, with no UI and no unlocked vault. **The legacy item is left in
+    /// place**, deliberately: it is shared by twins of one `account_number_hash`
+    /// and this function cannot tell whose it is, so deleting it here can take
+    /// the only copy of a key a SIBLING vault still needs. The re-store is
+    /// best-effort, and a failed store leaves the item as the only copy, which
+    /// is the second reason not to remove it here.
+    ///
+    /// **That ordering rule is about REPLACING a live credential, and it does not
+    /// forbid destroying one whose only consumer is gone.** Vault deletion is the
+    /// other case: the vault directory (and with it `vault.quickunlock`, the only
+    /// thing this key unwraps) has already been removed, a re-enrol of the same
+    /// vault is a NEW vault with a fresh `VaultId`, and `create_with_ops` deletes
+    /// any stale item before storing anyway. The teardown therefore destroys the
+    /// item AFTER the directory removal, inside the same post-delete step as the
+    /// sealed-label key. See
+    /// `design-notes/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
     fn retrieve_with_ops(
         &self,
         ops: &dyn KeychainOps,
@@ -144,9 +158,19 @@ impl AppleBiometricProvider {
             Err(ProviderError::CredentialMissing) => {
                 let legacy = ops.get(&self.legacy_account)?;
                 let wrap_key = wrap_key_from_item(legacy.as_slice())?;
-                if ops.store(&self.account, wrap_key.as_slice()).is_ok() {
-                    ops.delete(&self.legacy_account);
-                }
+                // Re-store under the vault-scoped name, and do NOT delete the
+                // legacy item. The legacy account is shared by twin vaults of one
+                // `account_number_hash` (a `KeepBoth` restore, or joining an
+                // account this device already holds), so the item just read may
+                // be the SIBLING's live credential: deleting it here would take
+                // the only copy of a key another vault still needs, and this
+                // function cannot tell the two apart. What is left behind is one
+                // 32-byte secret per legacy enrolment, whose only consumer is the
+                // vault whose `MYQ1` blob it unwraps; it is a declared residue of
+                // the class rule in `design-notes/security/0709` rather than a
+                // leak. Retiring it safely needs the device's vault roster, which
+                // a provider with no IO does not have.
+                let _ = ops.store(&self.account, wrap_key.as_slice());
                 Ok(wrap_key)
             }
             Err(e) => Err(e),
@@ -321,16 +345,9 @@ fn map_keychain_error(e: security_framework::base::Error) -> ProviderError {
     }
 }
 
-/// Lowercase-hex encode (no external dep; matches the device-local naming).
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        out.push(HEX[(b >> 4) as usize] as char);
-        out.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    out
-}
+// Lowercase-hex encoding lives in `super::device_secret` (via
+// `protocol::hex::encode_lower`), because the vault-delete teardown derives the
+// same account bytes and two copies could drift.
 
 #[cfg(test)]
 mod tests {
@@ -490,8 +507,14 @@ mod tests {
     }
 
     #[test]
-    fn retrieve_migrates_a_legacy_item_to_the_vault_scoped_account() {
+    fn retrieve_re_homes_a_legacy_item_and_leaves_the_legacy_item_in_place() {
         // The pre-vault-scoping install: one Touch ID unlock re-homes the item.
+        // **The legacy item is NOT deleted**, and that is the fix rather than an
+        // oversight (myne-md/myne#761): the legacy account is shared by twins of
+        // one `account_number_hash`, so on a KeepBoth restore or a join it may be
+        // the SIBLING's live credential, and this function cannot tell whose it
+        // is. Deleting it here took the only copy of a key another vault still
+        // needed. The item is a declared residue of the class rule instead.
         let fake = FakeKeychain::with_item(HASH_HEX, [0x33; WRAP_KEY_LEN]);
         let provider = AppleBiometricProvider::new(HASH, vault(VAULT_A));
 
@@ -503,7 +526,11 @@ mod tests {
             Some(&[0x33; WRAP_KEY_LEN][..]),
             "same wrap key, vault-scoped account"
         );
-        assert!(fake.read(HASH_HEX).is_none(), "legacy item removed");
+        assert_eq!(
+            fake.read(HASH_HEX).as_deref(),
+            Some(&[0x33; WRAP_KEY_LEN][..]),
+            "the shared legacy item stays: it may be a sibling vault's credential"
+        );
     }
 
     #[test]

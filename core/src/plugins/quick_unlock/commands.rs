@@ -207,9 +207,18 @@ fn cleanup_os_credential(dir: &Path) {
 /// dangle — it still unwraps the live `root_key`.
 ///
 /// A best-effort no-op when nothing is configured.
-/// Vault deletion needs no call here — `vault_delete`'s recursive unlink
-/// already removes the files, and unlock reads the blob first, so an orphaned
-/// keychain item already forces the password path.
+///
+/// **Vault deletion is NOT this function's job, and it no longer claims to be
+/// covered.** It used to say "vault_delete's recursive unlink already removes the
+/// files, and unlock reads the blob first, so an orphaned keychain item already
+/// forces the password path", which described the defect rather than a decision:
+/// the unlink removes the `MYQ1` blob and leaves the wrap key in the keychain,
+/// and "unlock reads the blob first" is a statement about the unlock path, not
+/// about what the erase left behind. The post-delete teardown destroys that item
+/// itself (`vault_delete`'s `run_post_delete_teardown`, via
+/// `super::device_secret::erase_for_vault`), on the delete-proceeded path and
+/// after the directory removal. The class rule and the ordering argument are in
+/// `design-notes/security/0709-per-vault-device-local-secrets-are-erased-with-the-vault.md`.
 ///
 /// Best-effort, but no longer silent: a removal that fails is logged with its
 /// bounded `IoFailureKind`, because a credential that outlived the rotation is
@@ -701,7 +710,15 @@ pub async fn quick_unlock_setup_pin_from_host(
     let dir = active_dir(host, state).await?;
     let (_, meta) = read_meta(&dir)?;
     let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    setup_with_dir(&dir, state, provider, &meta.account_number_hash).await
+    let result = setup_with_dir(&dir, state, provider, &meta.account_number_hash).await;
+    if result.is_ok() {
+        // A PIN blob has no Keychain consumer, so the biometric item a previous
+        // enrolment left at this vault's address has none either (myne-md/myne#761).
+        // Same rule the disable path follows, on the path that REPLACES rather
+        // than disables.
+        cleanup_os_credential(&dir);
+    }
+    result
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend

@@ -110,6 +110,13 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
     )
     .await;
 
+    // The roster drop takes `vault.quickunlock` and leaves the Keychain wrap key
+    // that opens it. This peer never re-seals the old generation, so nothing else
+    // would ever remove it (myne-md/myne#761, `design-notes/security/0709`).
+    // Called before the `vault.meta` write at the end of this function, so the
+    // address is still readable.
+    crate::plugins::quick_unlock::commands::invalidate_credential(vault_root);
+
     // `chats/` (`MYJ1` per-conversation files, myne-md/myne#675) is the
     // per-file twin of the catalog drop above: sealed under the old
     // `chats-key`, so the whole subtree goes with it. The files come back

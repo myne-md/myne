@@ -190,6 +190,16 @@ const HINT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+/** The per-vault keychain note under the delete panel (myne-md/myne#761): a
+ *  footnote that qualifies the danger banner rather than a second warning.
+ *  Hoisted and token-bound so it cannot re-grow inline literals. */
+const DELETE_KEYCHAIN_NOTE_STYLE: CSSProperties = {
+  marginTop: "var(--space-3)",
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--fg-3)",
+};
+
 /** The member-removal panel's eyebrow and disclosure — the member arm of the
  *  destructive panel. Hoisted and token-bound (myne#394) so a custom theme
  *  reaches them and the panel cannot re-grow an inline literal. */
@@ -3086,6 +3096,16 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 {t("settings.deleteVault.warning")}
               </Banner>
             )}
+            {/* myne-md/myne#761: the same sentence the desktop form carries. iOS
+                destroys the per-vault keychain item and Android keeps no such key,
+                which is the sentence's own second clause; it is rendered on both so
+                the two Tauri clients do not disagree about the same constant. */}
+            <p
+              data-testid="settings.delete-vault.keychain-note"
+              style={DELETE_KEYCHAIN_NOTE_STYLE}
+            >
+              {t("settings.deleteVault.keychainNote")}
+            </p>
             {deleteError && (
               <Banner kind="danger" style={{ marginBottom: 14 }}>
                 {deleteError}
