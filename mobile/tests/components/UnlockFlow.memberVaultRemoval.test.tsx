@@ -94,6 +94,7 @@ const MEMBER_REMOVAL_KEYS = [
   "settings.deleteVault.memberEyebrow",
   "settings.deleteVault.memberSubmit",
   "settings.deleteVault.memberSubmitInFlight",
+  "settings.deleteVault.keychainNote",
 ];
 
 const VAULT_ID = "vault-id-hex";
@@ -144,6 +145,10 @@ describe("UnlockFlow member-vault removal copy (audit K2-i)", () => {
 
     // 2. The owner's permanent-deletion copy is absent, not corrected after.
     expect(screen.queryByText("unlock.deleteConfirmTitle")).toBeNull();
+    // myne-md/myne#761: the same command destroys the per-vault keychain item.
+    expect(screen.getByTestId("unlock-delete-keychain-note").textContent).toBe(
+      "settings.deleteVault.keychainNote",
+    );
     expect(document.body.textContent ?? "").not.toContain(LOST_BOTH_SECRETS_SENTENCE);
 
     // 3. The action carries the member sentence, not "Delete vault".
@@ -160,6 +165,9 @@ describe("UnlockFlow member-vault removal copy (audit K2-i)", () => {
 
     expect(screen.getByText("unlock.deleteConfirmTitle")).toBeTruthy();
     expect(document.body.textContent ?? "").toContain(LOST_BOTH_SECRETS_SENTENCE);
+    expect(screen.getByTestId("unlock-delete-keychain-note").textContent).toBe(
+      "settings.deleteVault.keychainNote",
+    );
     // The member arm did NOT leak into an owner vault.
     expect(screen.queryByTestId("unlock-member-removal-disclosure")).toBeNull();
     expect(screen.getByTestId("unlock-delete-link").textContent).toBe(

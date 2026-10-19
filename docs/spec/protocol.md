@@ -2257,7 +2257,9 @@ completion of a phrase recovery (§7.3), which commits a new master password by 
 route and is the *stronger* signal of the two, since the user reached it by losing the
 password rather than by choosing to rotate it; (2) enrolled-biometric-set change
 (automatic at the OS level via `biometryCurrentSet` for provider `0x01`); (3) user
-disabling the feature; (4) vault deletion (the blob lives in the vault directory).
+disabling the feature; (4) vault deletion (the blob lives in the vault directory;
+the OS-keychain provider credential is destroyed by the post-delete teardown,
+`docs/decisions/security/0709`).
 
 **The reason for (1) is access-reset policy, not key lineage.** An earlier revision of
 this clause said the wrapped copy is "of the *old* `root_key` lineage", which is false:

@@ -15,7 +15,7 @@
 #   - `md.myne.desktop` — the real app and the real vault — is NEVER touched.
 #   - The Keychain SERVICE names are shared, not per-instance: a
 #     `md.myne.quickunlock` item's account is `<account_number_hash>:<vault_id>`
-#     (`core/src/plugins/quick_unlock/apple.rs`) and a `md.myne.vaultlabel`
+#     (`core/src/plugins/quick_unlock/device_secret.rs`) and a `md.myne.vaultlabel`
 #     item's account is the bare `<vault_id>` (`core/src/vault_label/key.rs`).
 #     So each match is against the vault ids read from the dev dirs, never by
 #     service alone — deleting by service would strand the real vault's key.

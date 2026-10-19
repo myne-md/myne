@@ -58,7 +58,7 @@ The trait is deliberately scoped to note-CRUD + unlock/lock. Hooks that fire onl
 | `member_names` | `vault.member-names` (`MYO5`) B2B member display names: `member_names_list` / `member_names_set_mine` / `member_names_clear_mine` over the group-tier-sealed map, each writer touching only the caller's own signed row. `NTV6`-only |
 | `notes` | per-note CRUD + listing, title extraction, drawing-text projection |
 | `prefs` | `vault.prefs` (`MYP1`/`MYP5`) read + the per-field setters |
-| `quick_unlock` | PIN + biometric wrap-key paths (`MYQ1`); `apple.rs` is macOS/iOS-gated |
+| `quick_unlock` | PIN + biometric wrap-key paths (`MYQ1`); `apple.rs` is macOS/iOS-gated; `device_secret.rs` owns the erase-side keychain address shared by the owner quick-unlock and member-biometric wrap keys (`hex(account_number_hash):vault_id`) |
 | `secret_export` | the single narrow-seam `save_secret_text` write |
 | `share_import` | `MYF1` OS-share-sheet staging queue — mobile-only |
 | `snapshots` | list / preview / restore / prune over encrypted note history |

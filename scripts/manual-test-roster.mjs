@@ -6561,6 +6561,13 @@ export const ROSTER = Object.freeze([
         estimateMin: 6,
         tier: "core",
       },
+      {
+        see: "On a macOS build with Touch ID, unlock a vault, enable biometric quick-unlock in Settings, then find the md.myne.quickunlock entry in Keychain Access whose account starts with this vault's account hash. Delete the vault, refresh Keychain Access, and confirm the entry is gone and that `security find-generic-password -s md.myne.quickunlock -a <account>` exits non-zero. Then relaunch and confirm the app offers the password path and nothing about quick unlock. A remaining entry is a FAIL even though the blob it wrapped was removed with the vault. What this item does NOT settle, and does not claim to: whether the unlinked bytes are carvable back from the medium.",
+        whyNotAutomated: "The per-vault item is created and destroyed through security_framework's SecItemAdd/SecItemDelete against the real login keychain, and no lane in this tree has one: the desktop suite runs WebKitGTK in a Linux container where the Apple module does not compile and the platform backend answers Unavailable, and the automated half this change adds injects a fake on purpose, because the OS access-control gate and the deletion's own effect are exactly what a fake cannot simulate. Whether a deleted keychain entry leaves recoverable bytes is a property of the platform's own storage and its erasure, observable only on a real macOS install with Keychain Access.",
+        clients: ["desktop-macos"],
+        estimateMin: 8,
+        tier: "core",
+      },
     ],
     exemptionReason: "",
   },

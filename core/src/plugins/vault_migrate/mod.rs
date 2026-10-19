@@ -1387,11 +1387,17 @@ pub async fn migrate_vault_notes_on_disk(
     //      promotion (#447) because "which artefacts does a root replacement
     //      invalidate" has one answer. Notably it includes the PIN/biometric
     //      credential and its attempt counter, so a re-key forces a fresh
-    //      enrolment. (The OS-keychain biometric item is inert without the blob
-    //      and was wrapped under the old root — a follow-up should route
-    //      migration through the same `quick_unlock_invalidate` the
-    //      change-password path uses.)
+    //      enrolment. The OS-keychain biometric item is destroyed by the
+    //      `invalidate_credential` call below, on the same chokepoint the
+    //      change-password path uses: the roster drop alone takes the `MYQ1`
+    //      blob and leaves the wrap key that opens it (myne-md/myne#761, the
+    //      class rule in `docs/decisions/security/0709`).
     drop_artefacts_sealed_under_replaced_root(io, vault_root, &[]).await;
+    // Best-effort and idempotent: the files are already gone above, and this adds
+    // the Keychain half (read `vault.meta`, derive the per-vault account,
+    // delete). Called AFTER the roster drop, so a failure cannot leave a live
+    // credential over a live blob.
+    crate::plugins::quick_unlock::commands::invalidate_credential(vault_root);
 
     // (5d) Re-base the SYNC plane onto the new generation (#429).
     //

@@ -73,6 +73,9 @@
 
 use super::error::VaultDeleteError;
 use crate::host::HostCtx;
+use crate::plugins::quick_unlock::device_secret::{
+    self, DeviceSecretKeychain, SecretDeleteFailure,
+};
 use crate::plugins::vault_unlock::state::{SlotKind, TakeAndRunError, VaultRuntimeState};
 use crate::vault_id::VaultId;
 use std::path::PathBuf;
@@ -143,6 +146,7 @@ pub async fn vault_delete_from_host(
     io: &dyn crate::vault_io::VaultIo,
     vault_id: String,
     keychain: &dyn crate::vault_label::key::LabelKeychain,
+    secret_keychain: &dyn DeviceSecretKeychain,
 ) -> Result<(), VaultDeleteError> {
     // SYNC-6 explicit-id targeting (mirrors `unlock` / `recover`): the IPC layer
     // carries a canonical hyphenated `VaultId` string, and since #250 it is
@@ -171,9 +175,26 @@ pub async fn vault_delete_from_host(
     // inside `vault_delete_with_dir` is not rejected by the invisible job.
     hooks.preempt_inflight_backup(state).await;
 
+    // myne-md/myne#761: the per-vault keychain item's account component is
+    // derived from `account_number_hash`, and the sweep below removes the only
+    // at-rest copy of it. Read it BEFORE the erase. A `None` here is a vault
+    // whose `vault.meta` could not be read or parsed; the delete still proceeds
+    // (that is the existing contract), and the teardown logs the reason rather
+    // than pretending the item was addressed.
+    let account_number_hash = read_account_number_hash(io, &vault_dir).await;
+
     let result = vault_delete_with_dir(vault_dir.clone(), vault_id, state).await;
     run_post_delete_teardown(
-        host, state, hooks, io, &vault_dir, vault_id, keychain, &result,
+        host,
+        state,
+        hooks,
+        io,
+        &vault_dir,
+        vault_id,
+        keychain,
+        secret_keychain,
+        account_number_hash,
+        &result,
     )
     .await;
     result
@@ -196,6 +217,7 @@ pub async fn vault_delete_via_io_from_host(
     io: &dyn crate::vault_io::VaultIo,
     vault_id: String,
     keychain: &dyn crate::vault_label::key::LabelKeychain,
+    secret_keychain: &dyn DeviceSecretKeychain,
 ) -> Result<(), VaultDeleteError> {
     // Required target, same as the native twin (#250) — the browser reaches
     // this through the same TS wrapper, so an optional id here would reopen the
@@ -209,12 +231,47 @@ pub async fn vault_delete_via_io_from_host(
 
     hooks.preempt_inflight_backup(state).await;
 
+    // Same pre-erase read as the native twin, through the storage seam so it
+    // works on OPFS too. On web it is inert (no keychain), but the read is the
+    // command's, not the platform's, so the two clients cannot drift.
+    let account_number_hash = read_account_number_hash(io, &vault_dir).await;
+
     let result = vault_delete_via_io(io, vault_dir.clone(), vault_id, state).await;
     run_post_delete_teardown(
-        host, state, hooks, io, &vault_dir, vault_id, keychain, &result,
+        host,
+        state,
+        hooks,
+        io,
+        &vault_dir,
+        vault_id,
+        keychain,
+        secret_keychain,
+        account_number_hash,
+        &result,
     )
     .await;
     result
+}
+
+/// Read `account_number_hash` from `vault.meta`, for the erase.
+///
+/// Derived-then-discarded shape: the hash never leaves this function as
+/// anything but its `[u8; 16]`, it never reaches a log line, and a `None` is
+/// "could not address the item", not an error the delete has to propagate. The
+/// MYND-108-bis lost-credentials arm relies on this reading a vault whose
+/// password is gone, which is exactly the arm where erasing the device-local
+/// fast-unlock secret matters most.
+async fn read_account_number_hash(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &std::path::Path,
+) -> Option<[u8; 16]> {
+    let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
+    // Either generation (`NTV5` / `NTV6`): a member vault's biometric item is
+    // addressed by the same hash, so a reader taught only v0.1 would silently
+    // skip exactly the second member of the class this change covers.
+    protocol::parse_vault_meta_any(&bytes)
+        .ok()
+        .map(|meta| meta.account_number_hash)
 }
 
 /// Wipe every plaintext-derived artefact that must not outlive the vault.
@@ -230,6 +287,33 @@ pub async fn vault_delete_via_io_from_host(
 /// **rejected** delete would leave a surviving vault's picker row falling back
 /// until its next unlock. Everything above the erase is RAM; the erase is the
 /// one durable member, and it goes last for that reason.
+///
+/// **And it is why the per-vault keychain secrets belong here too**
+/// (myne-md/myne#761, `docs/decisions/security/0709`). `forget_label` destroys
+/// the sealed-label wrap key; `erase_for_vault` destroys the item the owner
+/// quick-unlock **and** member-vault biometric wrap keys share
+/// (`plugins::quick_unlock::device_secret`), which nothing removed until this
+/// change. Two ordering facts are load-bearing. First, both run AFTER the
+/// directory removal (`vault_delete_with_dir` / `vault_delete_via_io` has
+/// returned), which is exactly the case the warning in
+/// `plugins::quick_unlock::apple` distinguishes from replacing a live one. The
+/// two gated arms differ and the difference is stated rather than glossed: on
+/// `Ok(())` the encrypted blob that consumes this key is gone, so the credential
+/// is destroyed with its only consumer; on `PartialDelete` some files resisted
+/// the unlink and `vault.quickunlock` may still be on disk, and the erase still
+/// runs because the user asked for the vault to be destroyed, the user keeps the
+/// password path, and a retry finishes the sweep. Second, both are gated on the
+/// delete having proceeded, for the reason above.
+///
+/// **Neither erase may fail the command, and that is stated rather than
+/// implied.** At this point the vault's files are gone; reporting `Err` would
+/// tell the user the vault survived when it did not, and a retry would answer
+/// `VaultNotFound`. So a keychain delete that failed is logged with its bounded
+/// reason (`SecretDeleteFailure::Backend`) and the command still returns its
+/// file-level result. What survives in that case is one random 32-byte secret
+/// whose ciphertext was removed with the vault, which is the hygiene residue the
+/// label path already accepts; it is visible in the diagnostic log rather than
+/// silent.
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(target_arch = "wasm32", allow(unused_variables))]
 async fn run_post_delete_teardown(
@@ -240,6 +324,8 @@ async fn run_post_delete_teardown(
     vault_dir: &std::path::Path,
     vault_id: VaultId,
     keychain: &dyn crate::vault_label::key::LabelKeychain,
+    secret_keychain: &dyn DeviceSecretKeychain,
+    account_number_hash: Option<[u8; 16]>,
     result: &Result<(), VaultDeleteError>,
 ) {
     if matches!(result, Ok(()) | Err(VaultDeleteError::PartialDelete { .. })) {
@@ -297,6 +383,40 @@ async fn run_post_delete_teardown(
         // actually recognises: the vault's name. Destroying the key IS the
         // erase.
         crate::vault_label::writeback::forget_label(io, vault_dir, vault_id, keychain).await;
+        // myne-md/myne#761: the other per-vault device-local secret. The owner
+        // quick-unlock biometric wrap key and the member-vault biometric wrap
+        // key share ONE keychain item (service `md.myne.quickunlock`, account
+        // `hex(account_number_hash):vault_id`); `plugins::quick_unlock::
+        // device_secret` is the single source of that address. Destroying it is
+        // the same class rule `forget_label` follows one line up.
+        match account_number_hash {
+            Some(hash) => match device_secret::erase_for_vault(&hash, vault_id, secret_keychain) {
+                Ok(()) => {}
+                // No keychain on this target: nothing was ever created there,
+                // so there is nothing to erase. The delete copy says so
+                // (`settings.deleteVault.keychainNote`); this is not a failure
+                // and logging it would cry wolf on Windows, Linux and Android.
+                Err(SecretDeleteFailure::Unavailable) => {}
+                // A real failure, and NOT silent: the item survived. The command
+                // still returns its file-level result (see the doc comment), so
+                // the diagnostic log is the only place this can surface.
+                Err(failure) => tracing::warn!(
+                    stage = "vault_delete_device_secret",
+                    failure = ?failure,
+                    "per-vault device-local secret outlived the vault it belongs to"
+                ),
+            },
+            // `vault.meta` could not be read or parsed before the sweep, so the
+            // item cannot be addressed. The delete itself still proceeds; say
+            // so, because "we did not erase it" and "there was nothing to erase"
+            // are different sentences.
+            None => tracing::warn!(
+                stage = "vault_delete_device_secret",
+                reason = "account_number_hash_unavailable",
+                "vault.meta yielded no account_number_hash, so the per-vault \
+                 device-local secret could not be addressed"
+            ),
+        }
         // myne-md/myne#792: destroy this vault's device-local person-identity
         // carrier. Its KEK is this vault's `root_key`, so a deleted vault's
         // carrier is cryptographically inert, but it is still an at-rest copy of
@@ -328,6 +448,7 @@ pub async fn vault_delete<R: Runtime>(
         &crate::vault_io::StdVaultIo,
         vault_id,
         crate::vault_label::key::platform_keychain(),
+        device_secret::quick_unlock_keychain(),
     )
     .await
 }
@@ -1782,6 +1903,7 @@ mod tests {
                 )
                 .await;
 
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
             vault_delete_from_host(
                 &state,
                 &hooks,
@@ -1789,6 +1911,7 @@ mod tests {
                 &crate::vault_io::StdVaultIo,
                 id.to_string(),
                 &keychain,
+                &secret_keychain,
             )
             .await
             .expect("delete");
@@ -1834,6 +1957,7 @@ mod tests {
                 )
                 .await;
 
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
             vault_delete_from_host(
                 &state,
                 &hooks,
@@ -1841,6 +1965,7 @@ mod tests {
                 &crate::vault_io::StdVaultIo,
                 id_a.to_string(),
                 &keychain,
+                &secret_keychain,
             )
             .await
             .expect("delete A");
@@ -1852,6 +1977,485 @@ mod tests {
                     .expect("read B"),
                 LabelRead::Label(String::from("Personal")),
                 "deleting one vault must not make another's name unreadable"
+            );
+        });
+    }
+
+    // ---- myne-md/myne#761: the OTHER per-vault keychain secret --------------
+    //
+    // `forget_label` above destroys `md.myne.vaultlabel`'s item. The owner
+    // quick-unlock biometric wrap key and the member-vault biometric wrap key
+    // live at `md.myne.quickunlock` under `hex(account_number_hash):vault_id`,
+    // and until this change nothing removed them: the recursive unlink takes the
+    // `MYQ1` blob and the member-unlock store, and leaves the wrap key that
+    // opens neither. `docs/decisions/security/0709` is the class rule.
+
+    /// A `<app_data_dir>/vaults/<id>/` whose `vault.meta` is REAL and parses, so
+    /// the teardown can derive the keychain account component. `seeded_vault`
+    /// writes a placeholder that does not parse, which is the state in which the
+    /// item genuinely cannot be addressed.
+    fn seeded_vault_with_account(
+        base: &std::path::Path,
+        id: crate::vault_id::VaultId,
+        account_number_hash: [u8; 16],
+    ) -> std::path::PathBuf {
+        let dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&dir).expect("vault root");
+        let meta = protocol::VaultMeta {
+            account_number_hash,
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            membership: None,
+            person_binding: None,
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta(&meta),
+        )
+        .expect("seed a parseable vault.meta");
+        dir
+    }
+
+    #[test]
+    fn deleting_a_vault_destroys_its_quick_unlock_and_member_biometric_item() {
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-erase").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            const HASH: [u8; 16] = [0xab; 16];
+            let dir = seeded_vault_with_account(&base, id, HASH);
+
+            // The one address both the owner quick-unlock and the member-vault
+            // biometric wrap keys occupy; seeding either is seeding this.
+            let account = device_secret::account_component(&HASH, id);
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            secret_keychain.put(&account, &[0x5a; 32]);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+                &secret_keychain,
+            )
+            .await
+            .expect("delete");
+
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                secret_keychain.read(&account).is_none(),
+                "the per-vault quick-unlock / member-biometric wrap key survived \
+                 the delete. The blob it wrapped is gone with the directory, but \
+                 the secret is still in the keychain the erase path claims to \
+                 have cleaned."
+            );
+        });
+    }
+
+    #[test]
+    fn deleting_one_vault_leaves_another_vaults_quick_unlock_item() {
+        // Per-vault scoping, asserted by reading the keychain back rather than
+        // by trusting the call returned Ok: two vaults of ONE account, which is
+        // the KeepBoth-restore shape the account component's vault half exists
+        // for.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-scoped").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id_a = VaultId::mint();
+            let id_b = VaultId::mint();
+            const HASH: [u8; 16] = [0xcd; 16];
+            let dir_a = seeded_vault_with_account(&base, id_a, HASH);
+            let dir_b = seeded_vault_with_account(&base, id_b, HASH);
+            let account_a = device_secret::account_component(&HASH, id_a);
+            let account_b = device_secret::account_component(&HASH, id_b);
+            assert_ne!(account_a, account_b, "twin vaults, distinct items");
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            secret_keychain.put(&account_a, &[0x5a; 32]);
+            secret_keychain.put(&account_b, &[0x6b; 32]);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id_a,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id_a.to_string(),
+                &keychain,
+                &secret_keychain,
+            )
+            .await
+            .expect("delete A");
+
+            assert!(secret_keychain.read(&account_a).is_none());
+            assert!(!dir_a.exists(), "A's directory is gone");
+            assert_eq!(
+                secret_keychain.read(&account_b),
+                Some(vec![0x6b; 32]),
+                "deleting one vault must not destroy another vault's fast-unlock key"
+            );
+            assert!(dir_b.exists(), "and B's directory is untouched");
+        });
+    }
+
+    #[test]
+    fn a_rejected_delete_does_not_destroy_the_quick_unlock_item() {
+        // The `matches!(result, Ok | PartialDelete)` gate seen from this secret's
+        // side: a delete refused because another auth op holds the permit left a
+        // live vault standing, and destroying its fast-unlock key would strand
+        // that vault's next quick-unlock on the password path for no reason.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-rejected").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            const HASH: [u8; 16] = [0xef; 16];
+            let dir = seeded_vault_with_account(&base, id, HASH);
+
+            let account = device_secret::account_component(&HASH, id);
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            secret_keychain.put(&account, &[0x5a; 32]);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            let _held = state.auth_permits().acquire().await.unwrap();
+
+            assert!(
+                matches!(
+                    vault_delete_from_host(
+                        &state,
+                        &hooks,
+                        &host,
+                        &crate::vault_io::StdVaultIo,
+                        id.to_string(),
+                        &keychain,
+                        &secret_keychain,
+                    )
+                    .await,
+                    Err(VaultDeleteError::VaultBusyAuth)
+                ),
+                "the delete must be rejected for this test to mean anything"
+            );
+
+            assert!(dir.exists(), "the vault stands");
+            assert_eq!(
+                secret_keychain.read(&account),
+                Some(vec![0x5a; 32]),
+                "a rejected delete must not destroy a surviving vault's key"
+            );
+        });
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_failed_device_secret_delete_is_logged_and_the_file_result_stands() {
+        // The contract the doc comment states rather than implies: the vault's
+        // files ARE gone by the time the keychain delete runs, so a keychain
+        // failure is logged and does NOT turn the erase into an error a retry
+        // would answer `VaultNotFound` to. What must not happen is silence: a
+        // secret outliving the vault is the finding this change exists for.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-failed").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            const HASH: [u8; 16] = [0x11; 16];
+            let dir = seeded_vault_with_account(&base, id, HASH);
+
+            let account = device_secret::account_component(&HASH, id);
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            secret_keychain.put(&account, &[0x5a; 32]);
+            secret_keychain.fail_delete_for(&account);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result = vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+                &secret_keychain,
+            )
+            .await;
+
+            assert!(
+                result.is_ok(),
+                "the erase itself succeeded; the keychain half is best-effort by \
+                 contract, and reporting an error here would tell the user the \
+                 vault survived when it did not. Got {result:?}"
+            );
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                secret_keychain.read(&account).is_some(),
+                "the fixture must leave the item behind, or the log assertion below \
+                 would be testing a delete that succeeded"
+            );
+            assert!(
+                logs_contain("stage=\"vault_delete_device_secret\""),
+                "a surviving per-vault secret must be visible in the diagnostic log"
+            );
+            assert!(
+                logs_contain("per-vault device-local secret outlived the vault it belongs to"),
+                "the log line must say what happened, not merely that something did"
+            );
+        });
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn an_unaddressable_item_is_logged_as_not_addressed_rather_than_silently_skipped() {
+        // The `None` arm of `read_account_number_hash`: `vault.meta` is
+        // byte-present but does not parse, which is the state the delete gate
+        // admits (it tests byte-presence, not parseability) and the state most of
+        // this file's own fixtures are in. The item cannot be addressed, and the
+        // difference between "we did not erase it" and "there was nothing to
+        // erase" is the whole of the log line. Without this test, replacing the
+        // arm's body with `None => {}` leaves every test in this file green.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-unaddressed").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            // `well_formed: true` writes `b"meta bytes"`, which is byte-present
+            // and unparseable: the fixture the arm needs, not a missing file.
+            let dir = seeded_vault(&base, id, true);
+
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result = vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+                &secret_keychain,
+            )
+            .await;
+
+            assert!(result.is_ok(), "the file-level erase still succeeds");
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                secret_keychain.calls().is_empty(),
+                "the erase must be SKIPPED rather than attempted against a guessed \
+                 account, which is what makes the log line the only signal"
+            );
+            assert!(
+                logs_contain("stage=\"vault_delete_device_secret\""),
+                "an unaddressable per-vault secret must be visible in the diagnostic log"
+            );
+            assert!(
+                logs_contain("account_number_hash_unavailable"),
+                "the log must name WHY the item was not addressed, distinctly from \
+                 'there was nothing to erase'"
+            );
+        });
+    }
+
+    /// Same fixture as [`seeded_vault_with_account`] but written in a given meta
+    /// generation, so the version-aware read this change depends on can be
+    /// pinned. v0.1 is the default in every other fixture here, which is exactly
+    /// why `parse_vault_meta_any` could be swapped for the v0.1 reader without a
+    /// single test going red.
+    fn seeded_vault_with_account_versioned(
+        base: &std::path::Path,
+        id: crate::vault_id::VaultId,
+        account_number_hash: [u8; 16],
+        version: protocol::MetaVersion,
+    ) -> std::path::PathBuf {
+        let dir = base.join("vaults").join(id.to_string());
+        std::fs::create_dir_all(&dir).expect("vault root");
+        let meta = protocol::VaultMeta {
+            account_number_hash,
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            membership: None,
+            person_binding: None,
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta_versioned(version, &meta),
+        )
+        .expect("seed a parseable vault.meta");
+        dir
+    }
+
+    #[test]
+    fn a_v0_2_vault_meta_still_addresses_the_item() {
+        // myne-md/myne#638's shape, on this caller: a reader taught only v0.1
+        // answers `None` for a migrated vault, the erase is skipped, and nothing
+        // says so. `parse_vault_meta_any` is what makes the member-vault half of
+        // the class reachable, so a v0.2 fixture has to prove it.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-v02").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            const HASH: [u8; 16] = [0x2c; 16];
+            let dir =
+                seeded_vault_with_account_versioned(&base, id, HASH, protocol::MetaVersion::V0_2);
+
+            let account = device_secret::account_component(&HASH, id);
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            secret_keychain.put(&account, &[0x6b; 32]);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+                &secret_keychain,
+            )
+            .await
+            .expect("delete");
+
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                secret_keychain.read(&account).is_none(),
+                "a v0.2 vault.meta must yield the address; skipping it is the \
+                 silent-skip shape #638 records"
+            );
+        });
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_platform_with_no_keychain_is_a_no_op_rather_than_a_false_survivor() {
+        // The `Err(SecretDeleteFailure::Unavailable)` arm. Collapsing it into the
+        // `Backend` arm (one match arm rewritten) leaves every test green while
+        // Windows, Linux and Android log "outlived the vault it belongs to" on
+        // every delete, in the log the user is invited to attach to a report. A
+        // false line naming a surviving secret reads as a live security finding.
+        use crate::vault_id::VaultId;
+        use crate::vault_label::fake_keychain::FakeKeychain;
+
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-device-secret-no-keychain").unwrap();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let base = host.app_data_dir().expect("test host data dir");
+            let id = VaultId::mint();
+            const HASH: [u8; 16] = [0x3d; 16];
+            let dir = seeded_vault_with_account(&base, id, HASH);
+
+            let keychain = FakeKeychain::empty();
+            let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    id,
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result = vault_delete_from_host(
+                &state,
+                &hooks,
+                &host,
+                &crate::vault_io::StdVaultIo,
+                id.to_string(),
+                &keychain,
+                &device_secret::NoSystemKeychain,
+            )
+            .await;
+
+            assert!(result.is_ok(), "no keychain is not an erase failure");
+            assert!(!dir.exists(), "the vault tree is gone");
+            assert!(
+                !logs_contain("outlived the vault it belongs to"),
+                "a platform that never created the item must not report one \
+                 surviving it"
+            );
+            assert!(
+                !logs_contain("account_number_hash_unavailable"),
+                "the address was available; only the platform was not"
             );
         });
     }
@@ -1881,6 +2485,7 @@ mod tests {
 
             let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
             let state = VaultRuntimeState::default();
+            let secret_keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
 
             assert!(
                 matches!(
@@ -1891,6 +2496,7 @@ mod tests {
                         &crate::vault_io::StdVaultIo,
                         id.to_string(),
                         &keychain,
+                        &secret_keychain,
                     )
                     .await,
                     Err(VaultDeleteError::VaultNotFound)

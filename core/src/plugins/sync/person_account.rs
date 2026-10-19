@@ -1988,12 +1988,72 @@ async fn write_member_attempts(
         .await;
 }
 
-/// Remove the member-unlock store and its attempt counter (cap reached).
-async fn wipe_member_unlock(io: &dyn VaultIo, vault_dir: &std::path::Path) {
+/// Remove the member-unlock store and its attempt counter (cap reached), and
+/// destroy the OS-keychain item the member's biometric credential uses.
+///
+/// **The file is not the whole credential** (myne-md/myne#761). The member's
+/// biometric fast unlock reuses the owner's provider, so its wrap key lives in
+/// the same Keychain item as the owner's quick-unlock key: service
+/// `md.myne.quickunlock`, account `hex(account_number_hash):vault_id`. Removing
+/// the store file leaves that item with no consumer, exactly as disabling the
+/// owner's quick unlock would, and the owner path already destroys it there
+/// (`quick_unlock::commands::cleanup_os_credential`). This is the member half of
+/// the same rule (`docs/decisions/security/0709`).
+async fn wipe_member_unlock(
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+    keychain: &dyn crate::plugins::quick_unlock::device_secret::DeviceSecretKeychain,
+) {
     let _ = io
         .remove_file(&vault_dir.join(super::member_unlock_store::MEMBER_UNLOCK_STORE_FILE))
         .await;
     let _ = io.remove_file(&vault_dir.join(MEMBER_ATTEMPT_FILE)).await;
+    let _ = erase_member_device_secret_with(io, vault_dir, keychain).await;
+}
+
+/// [`erase_member_device_secret_with`] over the platform keychain, bounded and
+/// logged the way `vault_delete`'s teardown is: `Unavailable` is the honest
+/// no-op on a platform that never created the item, `Backend` is a secret that
+/// outlived its consumer and must not be silent.
+async fn erase_member_device_secret(io: &dyn VaultIo, vault_dir: &std::path::Path) {
+    use crate::plugins::quick_unlock::device_secret::{self, SecretDeleteFailure};
+    match erase_member_device_secret_with(io, vault_dir, device_secret::quick_unlock_keychain())
+        .await
+    {
+        Ok(()) => {}
+        Err(SecretDeleteFailure::Unavailable) => {}
+        Err(failure) => tracing::warn!(
+            stage = "member_device_secret",
+            failure = ?failure,
+            "per-vault device-local secret outlived the credential it belonged to"
+        ),
+    }
+}
+
+/// Best-effort destroy of the shared per-vault Keychain item for `vault_dir`.
+///
+/// Same shape as `vault_delete`'s teardown: the address is derived from
+/// `vault.meta`, read while the vault is still on disk, and an unreadable or
+/// unparseable meta means the item cannot be addressed (which `vault_delete`
+/// logs and this path does not, because this is not an erase and the vault
+/// survives). A platform with no Keychain answers `Unavailable`, the honest
+/// no-op rather than a claimed erase. The keychain is a parameter rather than
+/// `platform_keychain()` read in here so the wiring is testable on a machine
+/// with no Keychain at all.
+async fn erase_member_device_secret_with(
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+    keychain: &dyn crate::plugins::quick_unlock::device_secret::DeviceSecretKeychain,
+) -> Result<(), crate::plugins::quick_unlock::device_secret::SecretDeleteFailure> {
+    use crate::plugins::quick_unlock::device_secret;
+    let Ok(bytes) = io.read(&vault_dir.join("vault.meta")).await else {
+        return Ok(());
+    };
+    let Ok(meta) = protocol::parse_vault_meta_any(&bytes) else {
+        return Ok(());
+    };
+    let id = crate::paths::vault_id_from_root(vault_dir);
+    device_secret::erase_for_vault(&meta.account_number_hash, id, keychain)
 }
 
 /// **Set (or replace) the device-local member vault password.** Requires the
@@ -2024,7 +2084,11 @@ pub async fn set_member_password_from_host(
         &m.pair,
     )
     .await
-    .map_err(|_| SyncDeviceError::Internal)
+    .map_err(|_| SyncDeviceError::Internal)?;
+    // Same rule as the PIN setter: a password credential consumes no Keychain
+    // item, so a biometric one left behind has no owner (myne-md/myne#761).
+    erase_member_device_secret(io, &m.vault_dir).await;
+    Ok(())
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -2154,7 +2218,11 @@ pub async fn set_member_pin_from_host(
         &m.pair,
     )
     .await
-    .map_err(|_| SyncDeviceError::Internal)
+    .map_err(|_| SyncDeviceError::Internal)?;
+    // A PIN credential has no Keychain item, so a biometric item left from the
+    // method this replaced has lost its only consumer (myne-md/myne#761).
+    erase_member_device_secret(io, &m.vault_dir).await;
+    Ok(())
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -2257,7 +2325,12 @@ pub async fn unlock_member_vault_with_pin_from_host(
     let attempt_path = vault_dir.join(MEMBER_ATTEMPT_FILE);
     let mut attempts = read_member_attempts(io, &attempt_path).await;
     if attempts.must_wipe() {
-        wipe_member_unlock(io, &vault_dir).await;
+        wipe_member_unlock(
+            io,
+            &vault_dir,
+            crate::plugins::quick_unlock::device_secret::quick_unlock_keychain(),
+        )
+        .await;
         return Err(SyncDeviceError::BadRequest);
     }
     let provider = crate::plugins::quick_unlock::pin::PinProvider::new(
@@ -2300,7 +2373,12 @@ pub async fn unlock_member_vault_with_pin_from_host(
         None => {
             match attempts.record_failure() {
                 crate::plugins::quick_unlock::attempt::AttemptOutcome::Wipe => {
-                    wipe_member_unlock(io, &vault_dir).await;
+                    wipe_member_unlock(
+                        io,
+                        &vault_dir,
+                        crate::plugins::quick_unlock::device_secret::quick_unlock_keychain(),
+                    )
+                    .await;
                 }
                 crate::plugins::quick_unlock::attempt::AttemptOutcome::Allowed { .. } => {
                     write_member_attempts(io, &attempt_path, &attempts).await;
@@ -2446,7 +2524,12 @@ pub async fn clear_member_unlock_from_host(
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(active))
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    wipe_member_unlock(io, &vault_dir).await;
+    wipe_member_unlock(
+        io,
+        &vault_dir,
+        crate::plugins::quick_unlock::device_secret::quick_unlock_keychain(),
+    )
+    .await;
     Ok(())
 }
 
@@ -4039,6 +4122,92 @@ mod tests {
                 )
                 .await
                 .is_none()
+            );
+        });
+    }
+
+    // myne-md/myne#761, the member half: removing the member fast-unlock store
+    // leaves the Keychain item that wraps the same `root_key` with no consumer
+    // unless it is destroyed too, exactly as disabling the owner's quick unlock
+    // would. The address comes from `vault.meta`, so an unreadable or unparseable
+    // meta addresses nothing and must not guess.
+    #[test]
+    fn wiping_the_member_store_destroys_the_shared_keychain_item() {
+        crate::test_support::block_on(async {
+            use crate::plugins::quick_unlock::device_secret;
+            use crate::vault_id::VaultId;
+
+            let tmp = crate::test_support::ScopedTempDir::new("member-wipe-secret").expect("tmp");
+            let io = crate::vault_io::StdVaultIo;
+            let id = VaultId::mint();
+            // The production layout, because the address is derived from the
+            // directory name: `vault_id_from_root` reads the last path segment.
+            let vault_dir = tmp.path().join("vaults").join(id.to_string());
+            io.create_dir_all(&vault_dir).await.expect("vault dir");
+            let hash = [0x4e; 16];
+            let meta = protocol::VaultMeta {
+                account_number_hash: hash,
+                kdf_params: crate::test_support::FAST_TEST_KDF,
+                random_salt_password: [1u8; 16],
+                random_salt_recovery: [2u8; 16],
+                nonce_password_wrap: [3u8; 24],
+                enc_root_key_password: [4u8; 64],
+                nonce_recovery_wrap: [5u8; 24],
+                enc_root_key_recovery: [6u8; 64],
+                items_key_id: [7u8; 16],
+                items_key_nonce: [8u8; 24],
+                enc_items_key: [9u8; 64],
+                membership: None,
+                person_binding: None,
+            };
+            io.write(
+                &vault_dir.join("vault.meta"),
+                &protocol::serialize_vault_meta(&meta),
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("vault.meta");
+
+            let account = device_secret::account_component(&hash, id);
+            let keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            keychain.put(&account, &[0x7e; 32]);
+
+            wipe_member_unlock(&io, &vault_dir, &keychain).await;
+
+            assert_eq!(
+                keychain.calls(),
+                vec![format!("delete {account}")],
+                "the member's store file is the item's only consumer; the erase must \
+                 address the same account the owner's provider uses"
+            );
+            assert!(keychain.read(&account).is_none(), "and the item is gone");
+        });
+    }
+
+    #[test]
+    fn an_unparseable_meta_addresses_no_item_rather_than_guessing_one() {
+        crate::test_support::block_on(async {
+            use crate::plugins::quick_unlock::device_secret;
+
+            let tmp = crate::test_support::ScopedTempDir::new("member-wipe-nometa").expect("tmp");
+            let io = crate::vault_io::StdVaultIo;
+            let vault_dir = tmp.path().join("vault");
+            io.create_dir_all(&vault_dir).await.expect("vault dir");
+            io.write(
+                &vault_dir.join("vault.meta"),
+                b"meta bytes",
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("unparseable vault.meta");
+
+            let keychain = device_secret::fake::FakeDeviceSecretKeychain::empty();
+            wipe_member_unlock(&io, &vault_dir, &keychain).await;
+
+            assert!(
+                keychain.calls().is_empty(),
+                "no address means no delete; a guessed account could take a sibling's \
+                 live credential"
             );
         });
     }

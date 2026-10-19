@@ -41,8 +41,12 @@ afterEach(() => {
 });
 
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
-function renderForm(only: boolean, variant?: "owner" | "member") {
-  hasMock.mockImplementation((cap: string) => (cap === "localOnlyVault" ? only : true));
+function renderForm(only: boolean, variant?: "owner" | "member", keychain = true) {
+  hasMock.mockImplementation((cap: string) => {
+    if (cap === "localOnlyVault") return only;
+    if (cap === "biometricQuickUnlock") return keychain;
+    return true;
+  });
   render(
     <DeleteVaultConfirmForm
       onSubmit={() => {}}
@@ -104,6 +108,39 @@ describe("the delete-vault promise", () => {
       expect((screen.getByTestId("delete-vault.submit") as HTMLButtonElement).disabled).toBe(true);
       cleanup();
     }
+  });
+
+  /**
+   * myne-md/myne#761: the erase destroys the per-vault keychain item on the
+   * platforms that have one, and there is none on the others. The sentence is
+   * the non-Apple half of the class rule, so it is asserted on the arm that
+   * carries a keychain and ABSENT on the browser, whose copy is a different
+   * claim about a different store.
+   */
+  it("says which platforms have a quick-unlock keychain item to erase", () => {
+    // The Tauri client: it HAS the provider and therefore an item to erase. The
+    // gate is the capability, not `localOnlyVault`: asserting this on the web arm
+    // is what certified the inversion this test now guards against.
+    renderForm(true);
+    expect(screen.getByTestId("delete-vault.keychain-note").textContent).toBe(
+      i18n.t("settings.deleteVault.keychainNote"),
+    );
+  });
+
+  it("does not claim a keychain cleanup on a client that has no keychain", () => {
+    // The browser: no provider, no item, no sentence.
+    renderForm(false, undefined, false);
+    expect(screen.queryByTestId("delete-vault.keychain-note")).toBeNull();
+  });
+
+  it("answers the gate with the capability, not with `onlyCopy`", () => {
+    // The two values CO-VARY on every case above (the Tauri client is both the
+    // only copy and the one with a keychain), so those two specs cannot tell the
+    // two predicates apart. Measured: `const hasKeychainItem = onlyCopy;` left
+    // them green. This case is the disagreement: a copy that is NOT the only one,
+    // on a client that still has a keychain item to erase.
+    renderForm(false, undefined, true);
+    expect(screen.getByTestId("delete-vault.keychain-note")).toBeTruthy();
   });
 });
 

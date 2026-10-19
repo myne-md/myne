@@ -16,6 +16,11 @@
 pub mod apple;
 pub mod attempt;
 pub mod commands;
+/// The per-vault device-local secrets that live in the OS keychain (the one
+/// address the owner quick-unlock and member-vault biometric wrap keys share).
+/// All-target on purpose: the erase path and its tests compile without a
+/// keychain, and the non-Apple backend is an explicit `Unavailable`.
+pub mod device_secret;
 pub mod error;
 pub mod pin;
 pub mod provider;

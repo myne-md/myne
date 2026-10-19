@@ -798,10 +798,15 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 a.vault_id,
                 // An origin holds exactly one container and the browser has no
                 // OS keychain, so the sealed label store (`MYL1`) is inert
-                // here: this resolves to the `UnavailableKeychain`, the erase
+                // here: this resolves to `vault_label::key::UnavailableKeychain`, the erase
                 // finds nothing, and the picker the store exists for does not
                 // render on web at all.
                 myne_core::vault_label::key::platform_keychain(),
+                // Same shape, same reason: no OS keychain, so the per-vault
+                // quick-unlock / member-biometric item was never created here.
+                // The UI copy for this client is the local-erase disclosure,
+                // which makes no keychain claim.
+                myne_core::plugins::quick_unlock::device_secret::quick_unlock_keychain(),
             )
             .await
             {
