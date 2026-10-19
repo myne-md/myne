@@ -56,6 +56,21 @@
 // The goal is sticky across consecutive vertical moves, so passing through a
 // short line and back out to a long one returns to the original column, and it
 // is dropped by any other selection change or any edit.
+//
+// # What the row answer is worth, one layer down
+//
+// `moveVertically` is asked WHICH ROW, and its answer is a coordinate probe like
+// the column one this module was written to stop trusting. It fails the same way
+// and more visibly: `posAtCoords` answers `PosAssoc(0, 1)` — offset 0, the
+// document's first line — whenever its upward scan walks past the top of the
+// content box, and on a task row every arm of that scan is reachable (the
+// `- [ ] ` run is a replaced range, `+` is a point widget, headings hide their
+// `#`). Reported as "ArrowUp from a todo jumps to the note's heading", six rows
+// away, with the column intact. So the answer is verified to be the block
+// adjacent to the caret's in the height map (skipping blocks that hold no text,
+// which a vertical move legitimately steps over); anything else takes the
+// adjacent-logical-line fallback. The invariant, in one line: **a vertical arrow
+// moves at most one visual row.**
 
 import {
   EditorSelection,
@@ -65,7 +80,7 @@ import {
   StateField,
   type SelectionRange,
 } from "@codemirror/state";
-import { EditorView, type KeyBinding } from "@codemirror/view";
+import { BlockType, EditorView, type KeyBinding } from "@codemirror/view";
 import { listContentStart, skipAtoms, verifiedLineBoundary } from "./line-boundary";
 
 /** Carried by this module's own dispatches so the goal survives them. */
@@ -156,13 +171,66 @@ function rowEnd(view: EditorView, range: SelectionRange): number {
 }
 
 /**
+ * Whether `landing` sits on the row the user would call "the one above" (or
+ * "the one below"), reached from `range`'s own row.
+ *
+ * `moveVertically` is a coordinate probe, and this module exists because that
+ * probe answers wrongly in this app in ways no keymap can reach: `posAtCoords`
+ * returns `PosAssoc(0, 1)` — the DOCUMENT START — whenever its scan walks above
+ * the content box, and every arm of that scan is reachable on a task row (the
+ * `- [ ] ` marker is a replaced range, `+` is a point widget, and headings hide
+ * their `#`). The result reads to the user as "ArrowUp teleports me to the note's
+ * first line", which is not a row move at all: it is the caret landing on
+ * offset 0 while the column arithmetic below happily keeps the character column.
+ *
+ * So the answer is no longer trusted on its own. It has to be the block that is
+ * next to this one in the height map, walking past blocks that hold no text —
+ * a fold placeholder, an embed's block widget, the table's — because those are
+ * legitimately skipped by a vertical move and the line beyond them IS the row
+ * the user sees above. A jump across text-bearing rows fails here and takes the
+ * adjacent-logical-line fallback instead.
+ *
+ * A soft-wrapped line is ONE block covering several visual rows, so a move
+ * between two of its rows is inside `here` and is always adjacent.
+ */
+function isAdjacentRow(
+  view: EditorView,
+  range: SelectionRange,
+  landing: SelectionRange,
+  forward: boolean,
+): boolean {
+  const here = view.lineBlockAt(range.head);
+  const there = view.lineBlockAt(landing.head);
+  // Same block: a wrap point, legal in both directions.
+  if (there.from < here.to && there.to > here.from) return true;
+
+  // At most a few skipped widget blocks. A taller chain is not something this
+  // editor produces, and the bound keeps an unforeseen layout from turning a
+  // wrong answer into an accepted one.
+  let edge = forward ? here.bottom + 1 : here.top - 1;
+  for (let pass = 0; pass < 4; pass++) {
+    const next = view.lineBlockAtHeight(edge);
+    // No progress (the document's edge): nothing to be adjacent to.
+    if (next.from === here.from && next.to === here.to) return false;
+    if (next.type === BlockType.Text) {
+      return there.from === next.from && there.to === next.to;
+    }
+    edge = forward ? next.bottom + 1 : next.top - 1;
+  }
+  return false;
+}
+
+/**
  * The row to land on, as any position inside it, or `null` when there is none.
  *
  * `moveVertically` is asked only WHICH row, never where in it: its column answer
- * is the defect this module exists for. When it reports no progress (at the
- * document's edge, or when its own probe fails) the adjacent logical line is
- * used instead, because the one thing that must never happen here is falling
- * through to `moveToLineBoundary`.
+ * is the defect this module exists for. Its answer is then verified to be the
+ * adjacent row (`isAdjacentRow`) rather than accepted because it differs from
+ * the caret's position — that check is what keeps a bogus probe answer from
+ * being spent as a seven-row jump. When it reports no progress (at the document's
+ * edge, or when its own probe fails) the adjacent logical line is used instead,
+ * because the one thing that must never happen here is falling through to
+ * `moveToLineBoundary`.
  */
 function targetRow(
   view: EditorView,
@@ -177,7 +245,9 @@ function targetRow(
   // offset shared by two visual rows, and only `assoc` says which, so reducing
   // this to a number and rebuilding a bare cursor would resolve the row
   // boundaries below against the row ABOVE the one we just moved into.
-  if (moved.head !== range.head) return moved;
+  if (moved.head !== range.head && isAdjacentRow(view, range, moved, forward)) {
+    return moved;
+  }
 
   const doc = view.state.doc;
   const line = doc.lineAt(range.head);
@@ -202,7 +272,14 @@ export function verticalTarget(
   forward: boolean,
   goal: number | null,
 ): { head: number; assoc: -1 | 1; goal: number } | null {
-  const column = goal ?? range.head - rowStart(view, range);
+  // Never negative. A stored goal is a character column, and a column left of
+  // the row's start is not a place: it is what a `rowStart` that resolved to a
+  // LATER line leaves behind (the verified boundary trusts its probe when the
+  // caret sits in a replaced range and `coordsAtPos` cannot measure it), and
+  // `from + column` then lands on a row above the one that was chosen. Clamping
+  // keeps a bad origin to the row it names instead of letting it reach backwards
+  // through the document.
+  const column = Math.max(goal ?? range.head - rowStart(view, range), 0);
   const landing = targetRow(view, range, forward);
   if (landing === null) return null;
 

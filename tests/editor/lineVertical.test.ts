@@ -19,7 +19,7 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState, RangeSet } from "@codemirror/state";
-import { Decoration, EditorView, keymap } from "@codemirror/view";
+import { Decoration, BlockType, EditorView, keymap } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   lineVerticalExtension,
@@ -84,13 +84,56 @@ function stubView(
       // `assoc` CodeMirror puts on it, which is the part that must survive.
       return EditorSelection.cursor(state.doc.line(n).to, -1);
     },
+    ...blockMap(state, () => 20),
   };
   return view as unknown as EditorView;
 }
 
+/**
+ * The height map half of the stub: one 20px `BlockType.Text` block per logical
+ * line, which is the shape `isAdjacentRow` reads. `heightOf` lets a caller make
+ * one line taller, which is how a soft-wrapped line is modelled.
+ *
+ * It exists because `isAdjacentRow` verifies `moveVertically`'s answer instead
+ * of trusting it, so a stub without these two methods cannot drive the module at
+ * all — and a stub that returned "adjacent, always" would make the guard
+ * untestable, which is the failure mode this file's own history is about.
+ */
+function blockMap(
+  state: EditorState,
+  heightOf: (line: number) => number,
+): {
+  lineBlockAt: (pos: number) => unknown;
+  lineBlockAtHeight: (height: number) => unknown;
+} {
+  const topOf = (n: number) => {
+    let y = 0;
+    for (let i = 1; i < n; i++) y += heightOf(i);
+    return y;
+  };
+  const at = (n: number) => ({
+    from: state.doc.line(n).from,
+    to: state.doc.line(n).to,
+    top: topOf(n),
+    bottom: topOf(n) + heightOf(n),
+    type: BlockType.Text,
+  });
+  return {
+    lineBlockAt: (pos: number) => at(state.doc.lineAt(pos).number),
+    lineBlockAtHeight: (height: number) => {
+      let y = 0;
+      for (let n = 1; n <= state.doc.lines; n++) {
+        const h = heightOf(n);
+        if (height < y + h) return at(n);
+        y += h;
+      }
+      return at(state.doc.lines);
+    },
+  };
+}
+
 /** Offset where the task line's single logical line breaks into two rows. */
 const TASK_WRAP = TASK.from + 8;
-
 /**
  * The shared stub with ONE line soft-wrapped, which is the only difference that
  * matters here: `coordsAtPos` gives the task line's two rows different y values,
@@ -123,11 +166,118 @@ function wrappedTaskStubView(): EditorView {
       if (n < 1 || n > state.doc.lines) return EditorSelection.cursor(range.head);
       return EditorSelection.cursor(state.doc.line(n).to, -1);
     },
+    ...blockMap(state, (n) => (state.doc.line(n).from === TASK.from ? 30 : 20)),
+  };
+  return view as unknown as EditorView;
+}
+
+/**
+ * The shared stub with `moveVertically` answering the DOCUMENT START, which is
+ * what `posAtCoords` returns (`PosAssoc(0, 1)`) when its scan walks above the
+ * content box — the reported "ArrowUp teleports me to the note's heading".
+ */
+function jumpyStubView(): EditorView {
+  const state = EditorState.create({
+    doc: DOC,
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  const view = {
+    state,
+    moveToLineBoundary: (range: { head: number }, forward: boolean) => {
+      const line = state.doc.lineAt(range.head);
+      return EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1);
+    },
+    // A real y per line, so `verifiedLineBoundary` VERIFIES the probe and the
+    // row boundaries below are the sane ones. Only the row choice is broken.
+    coordsAtPos: (pos: number) => {
+      const y = state.doc.lineAt(pos).number * 20;
+      return { top: y, bottom: y + 18, left: 0, right: 0 };
+    },
+    moveVertically: () => EditorSelection.cursor(0, 1),
+    ...blockMap(state, () => 20),
+  };
+  return view as unknown as EditorView;
+}
+
+/**
+ * The shared stub whose BACKWARD boundary, on the caret's own row, resolves past
+ * the caret — and whose `coordsAtPos` is constant, so the verification in
+ * `verifiedLineBoundary` cannot tell that it did (`before === null || after ===
+ * null` is not the only way to be unmeasurable; a same-y answer is what a caret
+ * against a replaced run produces).
+ *
+ * Everything except that one case answers normally, so the landing row's own
+ * boundaries stay sane and the assertion is about the NEGATIVE column alone.
+ */
+function bogusRowStartStubView(): EditorView {
+  const state = EditorState.create({
+    doc: DOC,
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  const original = TASK.content + 3;
+  const view = {
+    state,
+    moveToLineBoundary: (range: { head: number }, forward: boolean) => {
+      if (!forward && range.head === original) {
+        return EditorSelection.cursor(original + 2, 1);
+      }
+      const line = state.doc.lineAt(range.head);
+      return EditorSelection.cursor(forward ? line.to : line.from, forward ? -1 : 1);
+    },
+    // Constant: the probe always looks like it stayed on the caret's row.
+    coordsAtPos: () => ({ top: 0, bottom: 18, left: 0, right: 0 }),
+    moveVertically: (range: { head: number }, forward: boolean) => {
+      const line = state.doc.lineAt(range.head);
+      const n = line.number + (forward ? 1 : -1);
+      if (n < 1 || n > state.doc.lines) return EditorSelection.cursor(range.head);
+      return EditorSelection.cursor(state.doc.line(n).to, -1);
+    },
+    ...blockMap(state, () => 20),
   };
   return view as unknown as EditorView;
 }
 
 describe("verticalTarget", () => {
+  it("refuses a row answer that is not adjacent, instead of jumping to it", () => {
+    // The reported defect, mechanised. `moveVertically` is a coordinate probe,
+    // and `posAtCoords` answers `PosAssoc(0, 1)` — the document's FIRST line —
+    // when its upward scan walks past the top of the content box. Every arm of
+    // that scan is reachable on a task row (the `- [ ] ` run is a replaced
+    // range, `+` is a point widget, headings hide their `#`), so what the user
+    // sees is "ArrowUp from any todo teleports me to the note's heading", six
+    // rows away, with the character column intact — the column is computed
+    // separately, which is why the jump read as a row move.
+    //
+    // The stub's answer is offset 0 on purpose. The assertion is that the caret
+    // ends up ONE row up, at the same column, and not on line 1.
+    const view = jumpyStubView();
+    const out = verticalTarget(view, EditorSelection.cursor(TASK.content + 3), false, null);
+    expect(out).not.toBeNull();
+    expect(out!.head, "one row up, same column — not the document's first line").toBe(
+      LONG_2.from + 3,
+    );
+  });
+
+  it("never measures a column from a row that starts after the caret", () => {
+    // The other way a vertical arrow reaches backwards: `rowStart`'s verified
+    // boundary trusts its probe when `coordsAtPos` cannot measure the position
+    // (`before === null || after === null` is "unmeasurable → trust it"), and a
+    // task row is exactly where it cannot — the caret sits against a replaced
+    // run. A boundary that resolves PAST the caret makes the column negative,
+    // and `min(from + column, to)` then lands on the row above the one that was
+    // chosen. Clamped, the same input can only land on the row's start.
+    const view = bogusRowStartStubView();
+    const out = verticalTarget(
+      view,
+      EditorSelection.cursor(TASK.content + 3),
+      false,
+      null,
+    );
+    expect(out).not.toBeNull();
+    expect(out!.goal, "a column is never negative").toBe(0);
+    expect(out!.head, "the landing row's own start").toBe(LONG_2.from);
+  });
+
   it("lands on the same column, not the row's end, when the next row is longer", () => {
     const view = stubView();
     // Column 5 on the short middle line, moving down into a 20-char line.
