@@ -28,7 +28,7 @@ vi.mock("../../src/platform/capabilities", async (importOriginal) => {
 });
 
 const { DeleteVaultConfirmForm } = await import("../../src/components/DeleteVaultConfirmForm");
-const { LOCAL_ERASE_DISCLOSURE } = await import("@myne/copy");
+const { LOCAL_ERASE_DISCLOSURE, MEMBER_VAULT_REMOVAL_DISCLOSURE } = await import("@myne/copy");
 // The suite loads the real English catalog, so `t()` resolves. Resolving the
 // expected strings through the SAME catalog rather than pasting them keeps this
 // a test of the BRANCH; the wording of the i18n'd half is the catalog's business
@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
-function renderForm(only: boolean) {
+function renderForm(only: boolean, variant?: "owner" | "member") {
   hasMock.mockImplementation((cap: string) => (cap === "localOnlyVault" ? only : true));
   render(
     <DeleteVaultConfirmForm
@@ -49,6 +49,7 @@ function renderForm(only: boolean) {
       onCancel={() => {}}
       onContinueAfterPartial={() => {}}
       partialFailContext={null}
+      variant={variant}
     />,
   );
 }
@@ -103,6 +104,54 @@ describe("the delete-vault promise", () => {
       expect((screen.getByTestId("delete-vault.submit") as HTMLButtonElement).disabled).toBe(true);
       cleanup();
     }
+  });
+});
+
+describe("the member vault's removal (audit K2-i)", () => {
+  /**
+   * Both capability answers, because the defect this covers was ON the desktop
+   * arm: `localOnlyVault` is true there, so a member vault fell into the owner
+   * branch and read "Delete vault … cannot be undone … your recovery phrase will
+   * not restore the data". The member sentence is checked FIRST for exactly this
+   * reason, and the test drives both answers so the ordering cannot regress.
+   */
+  for (const only of [true, false]) {
+    it(`renders the member disclosure VERBATIM where localOnlyVault=${only}`, () => {
+      renderForm(only, "member");
+      expect(screen.getByTestId("delete-vault.member-removal-disclosure").textContent).toBe(
+        MEMBER_VAULT_REMOVAL_DISCLOSURE,
+      );
+    });
+
+    /**
+     * The claim that must not survive, stated as absence rather than as a
+     * correction: a member who reads "permanently deletes this vault and every
+     * note inside it" has already been told their shared vault is gone.
+     */
+    it(`never shows the owner's permanent-deletion copy to a member (localOnlyVault=${only})`, () => {
+      renderForm(only, "member");
+      const body = document.body.textContent ?? "";
+      expect(body).not.toContain(i18n.t("settings.deleteVault.copyPrimary"));
+      expect(body).not.toContain(LOCAL_ERASE_DISCLOSURE);
+      expect(body).not.toContain(i18n.t("settings.deleteVault.eyebrow"));
+      expect(screen.getByTestId("delete-vault.eyebrow").textContent).toBe(
+        i18n.t("settings.deleteVault.memberEyebrow"),
+      );
+      expect(screen.getByTestId("delete-vault.heading").textContent).toBe(
+        i18n.t("settings.deleteVault.memberHeading"),
+      );
+      expect(screen.getByTestId("delete-vault.submit").textContent).toBe(
+        i18n.t("settings.deleteVault.memberSubmit"),
+      );
+    });
+  }
+
+  it("keeps the typed confirmation on the member arm too", () => {
+    // Unsynced edits on this device die with its copy, and the last sentence of
+    // the disclosure says so; the gate is what backs it.
+    renderForm(true, "member");
+    expect(screen.getByTestId("delete-vault.confirm-input")).toBeTruthy();
+    expect((screen.getByTestId("delete-vault.submit") as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

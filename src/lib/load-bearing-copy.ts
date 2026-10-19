@@ -170,6 +170,11 @@ export {
   // about what a command does, and a second client that ever ships a cached
   // vault must reach for this literal rather than write its own.
   LOCAL_ERASE_DISCLOSURE,
+  // What removing a SHARED vault from this device means (audit K2-i). A member
+  // used to read the owner's "Delete vault and start over": false twice, since
+  // the vault is not theirs to destroy and the removal is not permanent. Shared
+  // because both clients hold member vaults and render the owner copy today.
+  MEMBER_VAULT_REMOVAL_DISCLOSURE,
   // The other end of `REMOVE_DEVICE_DISCLOSURE`: what a revocation means to the
   // browser it happened TO (task 94). Kept beside it so the two claims stay
   // consistent — a user who reads both must not conclude one is lying.

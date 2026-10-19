@@ -43,7 +43,10 @@ import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
 import { DestructiveBanner } from "./DestructiveBanner";
 import { has } from "../platform/capabilities";
-import { LOCAL_ERASE_DISCLOSURE } from "../lib/load-bearing-copy";
+import {
+  LOCAL_ERASE_DISCLOSURE,
+  MEMBER_VAULT_REMOVAL_DISCLOSURE,
+} from "../lib/load-bearing-copy";
 
 const CONFIRM_PHRASE = "DELETE";
 
@@ -90,6 +93,21 @@ interface DeleteVaultConfirmFormProps {
    * via the response itself).
    */
   partialFailContext: DeleteVaultPartialFailContext | null;
+  /**
+   * Which sentence this form is making, and it is not a styling switch
+   * (audit 2026-10-18 K2-i, shipped 2026-10-19).
+   *
+   * `"owner"` (the default) is the owner's destructive delete: permanent, no
+   * recovery phrase will bring it back, the vault is gone.
+   *
+   * `"member"` is a SHARED vault being removed from this device: the vault and its
+   * notes stay on the server and on the owner's other devices, the member's
+   * account is untouched, and it is NOT a removal from the vault (only its owner
+   * can do that). The owner copy said to a member is false twice, in the
+   * dangerous direction each time, which is why this is a prop rather than a
+   * rewritten heading: the two claims are different claims, not two wordings.
+   */
+  variant?: "owner" | "member";
 }
 
 const HEADING_ROW_STYLE: CSSProperties = {
@@ -166,6 +184,7 @@ export function DeleteVaultConfirmForm({
   onContinueAfterPartial,
   inFlight,
   partialFailContext,
+  variant = "owner",
 }: DeleteVaultConfirmFormProps) {
   const { t } = useTranslation();
   const [typed, setTyped] = useState("");
@@ -174,6 +193,41 @@ export function DeleteVaultConfirmForm({
   // lookup by construction (`src/platform/capabilities.ts`), so caching it would
   // add a dependency array to protect nothing.
   const onlyCopy = has("localOnlyVault");
+
+  // The member arm FIRST, and it does not fold into `onlyCopy`: a member vault on
+  // a sync-backed client is both (this device's copy is a cache AND the removal is
+  // not a deletion), so the two questions are independent and the member one
+  // decides the claims.
+  const copy =
+    variant === "member"
+      ? {
+          heading: t("settings.deleteVault.memberHeading"),
+          eyebrow: t("settings.deleteVault.memberEyebrow"),
+          primary: MEMBER_VAULT_REMOVAL_DISCLOSURE,
+          primaryTestId: "delete-vault.member-removal-disclosure",
+          submit: inFlight
+            ? t("settings.deleteVault.memberSubmitInFlight")
+            : t("settings.deleteVault.memberSubmit"),
+        }
+      : onlyCopy
+        ? {
+            heading: t("settings.deleteVault.heading"),
+            eyebrow: t("settings.deleteVault.eyebrow"),
+            primary: t("settings.deleteVault.copyPrimary"),
+            primaryTestId: null,
+            submit: inFlight
+              ? t("settings.deleteVault.submitInFlight")
+              : t("settings.deleteVault.submit"),
+          }
+        : {
+            heading: t("settings.deleteVault.localEraseHeading"),
+            eyebrow: t("settings.deleteVault.localEraseEyebrow"),
+            primary: LOCAL_ERASE_DISCLOSURE,
+            primaryTestId: "delete-vault.local-erase-disclosure",
+            submit: inFlight
+              ? t("settings.deleteVault.localEraseSubmitInFlight")
+              : t("settings.deleteVault.localEraseSubmit"),
+          };
 
   const handleSubmit = () => {
     if (!submitReady) return;
@@ -191,41 +245,25 @@ export function DeleteVaultConfirmForm({
       }}
     >
       <div style={HEADING_ROW_STYLE}>
-        <h3 style={HEADING_STYLE}>
-          {onlyCopy
-            ? t("settings.deleteVault.heading")
-            : t("settings.deleteVault.localEraseHeading")}
+        <h3 style={HEADING_STYLE} data-testid="delete-vault.heading">
+          {copy.heading}
         </h3>
       </div>
 
       {partialFailContext === null ? (
         <>
           <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
-            {onlyCopy
-              ? t("settings.deleteVault.eyebrow")
-              : t("settings.deleteVault.localEraseEyebrow")}
+            {copy.eyebrow}
           </div>
-          {onlyCopy ? (
-            <>
-              <p style={COPY_PRIMARY_STYLE}>
-                {t("settings.deleteVault.copyPrimary")}
-              </p>
-              <p style={COPY_SECONDARY_STYLE}>
-                {t("settings.deleteVault.copySecondary")}
-              </p>
-            </>
-          ) : (
-            <>
-              {/* Verbatim in every locale — the literal IS the guarantee, and
-                  E2E asserts it by full equality. */}
-              <p style={COPY_PRIMARY_STYLE} data-testid="delete-vault.local-erase-disclosure">
-                {LOCAL_ERASE_DISCLOSURE}
-              </p>
-              <p style={COPY_SECONDARY_STYLE}>
-                {t("settings.deleteVault.copySecondary")}
-              </p>
-            </>
-          )}
+          <p
+            style={COPY_PRIMARY_STYLE}
+            {...(copy.primaryTestId === null ? {} : { "data-testid": copy.primaryTestId })}
+          >
+            {copy.primary}
+          </p>
+          <p style={COPY_SECONDARY_STYLE}>
+            {t("settings.deleteVault.copySecondary")}
+          </p>
 
           <div
             style={{
@@ -273,13 +311,7 @@ export function DeleteVaultConfirmForm({
               disabled={!submitReady}
               data-testid="delete-vault.submit"
             >
-              {onlyCopy
-                ? inFlight
-                  ? t("settings.deleteVault.submitInFlight")
-                  : t("settings.deleteVault.submit")
-                : inFlight
-                  ? t("settings.deleteVault.localEraseSubmitInFlight")
-                  : t("settings.deleteVault.localEraseSubmit")}
+              {copy.submit}
             </Button>
           </div>
         </>

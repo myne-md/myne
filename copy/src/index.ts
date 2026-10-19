@@ -157,6 +157,45 @@ export const DEVICE_REVOKED_DISCLOSURE =
 export const LOCAL_ERASE_DISCLOSURE =
   "This erases Myne's copy of your vault from this browser only. Your account and everything already synced stay on the server, and signing in here again brings them back. It is not an account deletion and not a remote wipe. Anything this browser has not synced yet is lost for good.";
 
+/** What removing a SHARED (member) vault from this device does, and what it does
+ *  not do (audit 2026-10-18 K2-i, decided 2026-10-18 and shipped 2026-10-19).
+ *
+ *  **Load-bearing, and the reason is the third sentence.** A member's danger zone
+ *  used to carry the OWNER's sentence ("Lost both password and recovery phrase?
+ *  Delete vault and start over") and the owner's confirm copy, which says the
+ *  action cannot be undone and that the recovery phrase will not bring the data
+ *  back. Said to a member that is false in the dangerous direction twice over: the
+ *  shared vault is not theirs to destroy, and the vault they just removed is one
+ *  they can add again. What a member needs to know is the asymmetry the two
+ *  sentences hide: removing the vault HERE is not removing themselves FROM the
+ *  vault, and only its owner can do the second.
+ *
+ *  Five clauses, and each is one of the shapes `src/lib/load-bearing-copy.ts`
+ *  enumerates: the effect, what survives, what this is NOT, the real loss (this
+ *  device's unsynced edits), and the way back.
+ *
+ *  **The way back was verified rather than assumed, and the first version of this
+ *  sentence got it wrong.** It said "you can add the vault here again with the
+ *  password you set for this device", which is a path that does not exist: the
+ *  device-local member stores (`vault.member-unlock`, `vault.member-key`) live
+ *  INSIDE the vault directory
+ *  (`person_account::wipe_member_unlock(io, &vault_dir)`), so a removal that takes
+ *  the directory takes the device credential with it. What is left is the member's
+ *  person recovery phrase, which is how the vault is added again
+ *  (`mobile/docs/dev/device-matrix.md` walks exactly that flow). The clause says
+ *  so now, which is the whole point of K2-i's "verify what the action means"
+ *  half: the copy had to follow the code, not the other way round.
+ *
+ *  Rendered verbatim in every locale and pinned by full-literal equality, like its
+ *  three siblings above.
+ *
+ *  In `@myne/copy` rather than desktop-local because BOTH clients hold a member
+ *  vault: `mobile/src/app/flows/UnlockFlow.tsx` and its Settings sheet render the
+ *  same owner copy today, and the sentence has to be one sentence before that is
+ *  fixed on the phone. */
+export const MEMBER_VAULT_REMOVAL_DISCLOSURE =
+  "This removes this device's copy of the shared vault. The vault and its notes stay on the server and on the owner's other devices, and your account is untouched. It is not a removal from the vault itself: only the vault's owner can take your access away, and this does not do that. Anything this device has not synced yet is lost, and you can add the vault here again from your recovery phrase.";
+
 // What turning sync on means, as the app states it (myne-ops#15). These four
 // clauses are what a person must actually have read before sync starts carrying
 // their notes to a server, phrased so that reading only these four leaves them

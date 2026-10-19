@@ -74,7 +74,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DefaultViewModeSettings": { file: "src/components/settings/DefaultViewModeSettings.tsx", line: 30 },
   "DeleteAttachmentDialog": { file: "src/components/attachments/DeleteAttachmentDialog.tsx", line: 71 },
   "DeleteConfirmModal": { file: "src/notes/components/DeleteConfirmModal.tsx", line: 181 },
-  "DeleteVaultConfirmForm": { file: "src/components/DeleteVaultConfirmForm.tsx", line: 163 },
+  "DeleteVaultConfirmForm": { file: "src/components/DeleteVaultConfirmForm.tsx", line: 181 },
   "DestructiveBanner": { file: "src/components/DestructiveBanner.tsx", line: 31 },
   "DeviceAttributionPanel": { file: "src/components/sync/DeviceAttributionPanel.tsx", line: 147 },
   "DeviceJoinQr": { file: "src/components/sync/DeviceJoinQr.tsx", line: 147 },
