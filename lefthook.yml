@@ -799,11 +799,36 @@ pre-commit:
       # believed new-account registration was closed had done nothing at all, and neither file
       # said so. The compose now forwards every documented knob, and this rule holds it there.
       #
+      # **`--emit` regenerates the guide's compose block from the bundle's file** (audit R0/A4,
+      # 2026-10-19): the guide's block used to be a hand-written subset with LITERAL values, so
+      # the page's own "`bundle.env.example` is the file you edit" was false and fourteen knobs
+      # it documents could not reach the container. A red here whose first problem is the block
+      # not matching is fixed by running the same command with `--emit`, never by editing the
+      # block by hand — the next check would overwrite it.
+      #
       # The trigger caveat from `server-env-roster` above applies unchanged: the inputs live in
       # two OTHER git repositories, so this fires on an unrelated edit here and nothing fires
       # when a companion breaks it. It is a local periodic check, not a gate on the change.
       glob: "*.{md,mjs,yml,yaml,json}"
       run: node scripts/check-selfhost-bundle-drift.mjs
+
+    web-image-tag-drift:
+      # Audit A5 (2026-10-19): the web client's image tag is written in the chart's
+      # `values.yaml` (what the Kubernetes path deploys), in `Chart.yaml` (Helm's
+      # `--version`), and in the user guide in BOTH forms on ONE page. Measured: the
+      # page said `myne-web:0.8.0` in its compose block and `--version 0.8.1` in its
+      # Kubernetes block, while the chart deploys `v0.8.1` — two releases, one page,
+      # neither sentence wrong alone. Nothing compared them:
+      # `check-referenced-digests.mjs` resolves each tag against the registry and BOTH
+      # resolve, so "it resolves" is not the question; `check-release-versions.sh` (in
+      # `myne-ops`) compares the repos' own manifests and never reads a guide page; and
+      # a Helm `--version` is a CHART version, so no app-version rule catches the pair.
+      #
+      # Same companion-trigger caveat as its neighbours: the chart is in `myne-server`
+      # and the guide in `myne-website`, so it is a local periodic check rather than a
+      # gate on the change, and it prints NOTHING COMPARED where they are absent.
+      glob: "*.{md,mjs,yml,yaml}"
+      run: node scripts/check-web-image-tag-drift.mjs
 
     referenced-digests:
       # Every `ghcr.io` pin this project hands a self-hoster must RESOLVE, and the server image

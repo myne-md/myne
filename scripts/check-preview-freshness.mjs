@@ -49,6 +49,48 @@ import { fileURLToPath } from "node:url";
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const META = join(REPO, "preview", "src", "meta.json");
 
+/**
+ * The website's COPY of the same snapshot (audit 2026-10-18 A8, fixed 2026-10-19).
+ *
+ * `myne-website/src/data/preview/` is what the site's theme builder and the
+ * `myne-themes` gallery actually render, and it is a copy pulled by
+ * `pnpm sync-preview` in that repo. This guard read only the app's copy, so it
+ * reported `ok (the snapshot depicts the current interface)` while the site's was
+ * 21 days behind (commit `2c694451`, 2026-08-09, against the app's `ae664ee6`):
+ * the app's own preview pages and the site's live preview showed two different
+ * interfaces, and the sentence was true of exactly one of them.
+ *
+ * A companion, and therefore absent in CI and in a fresh clone. Absence is
+ * skipped with the reason rather than reported as freshness — the `SKIPPED`
+ * shape its neighbours use.
+ */
+const SITE_META = join(REPO, "myne-website", "src", "data", "preview", "meta.json");
+
+/** A sentence about the site's copy, or null when the two agree. */
+function siteCopyNote(appMeta) {
+  if (!existsSync(SITE_META)) {
+    return "site: skipped — myne-website is not cloned here, so its copy of the snapshot was not compared.";
+  }
+  let site;
+  try {
+    site = JSON.parse(readFileSync(SITE_META, "utf8"));
+  } catch (e) {
+    return (
+      `site: myne-website's copy of the snapshot is present but not valid JSON (${e.message}).\n` +
+      "  It renders in the theme builder and the gallery, so a broken one is a defect:\n" +
+      "    cd myne-website && pnpm sync-preview"
+    );
+  }
+  if (site.commit && appMeta.commit && site.commit === appMeta.commit) return null;
+  return (
+    `site: myne-website's copy is from ${String(site.commit ?? "an unknown commit").slice(0, 12)} ` +
+    `while this repo's is ${String(appMeta.commit ?? "unknown").slice(0, 12)}.\n` +
+    "  The site's live preview and the app's own preview pages are then showing two\n" +
+    "  different interfaces. Refresh it from here:\n" +
+    "    cd myne-website && pnpm sync-preview"
+  );
+}
+
 // The trees the snapshot is a picture of. Deliberately the surfaces that decide
 // what the captured editor LOOKS like, not every file the app is built from: the
 // point is a signal worth reading, and a roster that fires on every commit is a
@@ -171,8 +213,10 @@ if (!/^[0-9a-f]{64}$/.test(recorded)) {
 }
 
 const actual = surfaceHash();
+const siteNote = siteCopyNote(meta);
 if (actual === recorded) {
   console.log("preview-freshness: ok (the snapshot depicts the current interface)");
+  if (siteNote) console.warn(`⚠ preview-freshness: ${siteNote}`);
   process.exit(0);
 }
 
@@ -188,4 +232,5 @@ console.warn(
     "  This is a warning, not a gate — most UI changes do not change what the\n" +
     "  preview shows, and a capture run costs a container (myne#394).",
 );
+if (siteNote) console.warn(`⚠ preview-freshness: ${siteNote}`);
 process.exit(0);

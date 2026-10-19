@@ -79,11 +79,19 @@ const REPO_SOURCES = [join(ROOT, "docs", "self-host-policy.md"), join(ROOT, "doc
 const SOURCES = [...COMPANION_SOURCES, ...REPO_SOURCES];
 
 /** The minimum this guard will scan before it stops believing itself. MEASURED on the real
- * tree at the branch tip: 3 — one unique server digest (pinned in four files: the bundle's
- * compose, its env example, the chart's `values.yaml` and the guide's compose block) and two
- * web tags (the guide's compose and the web chart's default). The floor is the measurement,
- * not a guess, so losing a pin entirely fails by name — which is the drift this exists for. */
-const REF_FLOOR = 3;
+ * tree at the branch tip: 2 — one unique server digest (pinned in four files: the bundle's
+ * compose, its env example, the chart's `values.yaml` and the guide's compose block) and one
+ * web tag (the web chart's default `v0.8.1`, which the guide's compose block now names too).
+ * The floor is the measurement, not a guess, so losing a pin entirely fails by name — which is
+ * the drift this exists for.
+ *
+ * **It was 3, and the drop to 2 is the fix rather than a loss.** The guide's compose block
+ * pinned `myne-web:0.8.0` while the chart deployed `v0.8.1`, which is two published tags for
+ * one product; the audit's A5 fix made the block name the chart's tag, so the two web
+ * references COLLAPSED into one unique pin. That is what "one release" means, and it is why
+ * the second web reference is no longer a separate entry in the measured set
+ * (`check-web-image-tag-drift.mjs` now holds the pair together). */
+const REF_FLOOR = 2;
 
 /** The server image must be a manifest list carrying both of these. The WEB image is
  * deliberately exempt: it is amd64-only today (a documented gap with its own decision to
