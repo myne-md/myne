@@ -19,6 +19,16 @@
 //
 // Three rules, all of them about the seam between the three files:
 //
+//   0. **The guide's compose block IS the bundle's compose file.** Structure and
+//      values byte-for-byte, comments stripped (the bundle's carry internal ids
+//      and private paths; the guide carries none). The page tells the reader
+//      "Save it as docker-compose.yml" and "`bundle.env.example` is the file you
+//      edit", and until this rule existed both sentences were FALSE: the guide's
+//      block was a hand-written subset with LITERAL values, so editing `.env`
+//      changed nothing, and fourteen knobs the same page documents could not
+//      reach the container at all. `--emit` regenerates the block from the
+//      bundle; `--check` (the default) holds the two byte-equal. This is the rule
+//      that makes "the runnable copy" mechanical rather than a claim.
 //   1. The guide's compose pins the SAME digest as the bundle. Two copies of the pin is
 //      two places it can drift, and the guide is the copy most self-hosters follow.
 //   2. Every environment variable the guide's server service sets EXISTS in the bundle's
@@ -29,13 +39,20 @@
 //      rule that catches the class above; it is stated as a reference rather than as
 //      "the value is right" because forwarding is what was missing.
 //
+// Rule 0 makes rules 1 and 2 redundant for the SERVER service, and they are kept
+// rather than deleted for one reason: rule 0 can only run when both files are
+// readable and its projection is the only definition of "the block", so if the
+// projection ever stops matching reality (a renamed service, a different fence
+// language) rules 1 and 2 still answer the question that matters, from the two
+// documents as they are.
+//
 // Companion repos, like its neighbours: the guide is `myne-website`, the bundle is
 // `operations`, and in CI and in a fresh clone BOTH ARE ABSENT, so this prints what it
 // could not check rather than a verdict. `MYNE_WEBSITE_DIR` / `MYNE_OPS_DIR` override
 // the locations; `--require-companion` turns the absent branch into a failure for a
 // caller that knows better.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -65,6 +82,43 @@ function fencedBlock(text, info, marker) {
   const re = new RegExp("```" + info + "\\n([\\s\\S]*?)```", "g");
   for (const m of text.matchAll(re)) {
     if (m[1].includes(marker)) return m[1];
+  }
+  return null;
+}
+
+/**
+ * The bundle compose as the guide must carry it: the whole file from `name:`
+ * down, with comments removed.
+ *
+ * Comments go because the bundle's carry internal tracker ids, a private script
+ * path and a main-repo reference, and the guide is a public page that carries
+ * none of those (`grep -c 'MYND-\\|SYNC-'` on it is 0). Structure and values stay
+ * exactly as they are, which is the whole point: `${MYNE_INVITE_CODE:-}` is what
+ * makes the page's own "`bundle.env.example` is the file you edit" true.
+ *
+ * The leading block before `name:` is documentation rather than compose, so the
+ * projection starts at `name:`.
+ */
+function projectedCompose(compose) {
+  const lines = compose.split("\n");
+  const start = lines.findIndex((l) => l.startsWith("name:"));
+  if (start === -1) return null;
+  const out = [];
+  for (const line of lines.slice(start)) {
+    if (/^\s*#/.test(line)) continue;
+    out.push(line.replace(/\s+#.*$/, "").replace(/\s+$/, ""));
+  }
+  while (out.length > 0 && out[out.length - 1] === "") out.pop();
+  return out.join("\n") + "\n";
+}
+
+/** `{ start, end, body }` for the guide's compose fence, or null. */
+function guideBlockSpan(text, marker) {
+  const re = /```yaml\n([\s\S]*?)```/g;
+  for (const m of text.matchAll(re)) {
+    if (m[1].includes(marker)) {
+      return { start: m.index, end: m.index + m[0].length, body: m[1] };
+    }
   }
   return null;
 }
@@ -118,6 +172,7 @@ function composeDefault(compose, name) {
 const websitePresent = existsSync(GUIDE);
 const opsPresent = existsSync(BUNDLE_COMPOSE) && existsSync(BUNDLE_ENV);
 const REQUIRE_COMPANION = process.argv.includes("--require-companion");
+const EMIT = process.argv.includes("--emit");
 
 if (!websitePresent && !opsPresent) {
   const message =
@@ -140,6 +195,54 @@ if (!websitePresent && !opsPresent) {
   const guide = readFileSync(GUIDE, "utf8");
   const bundle = readFileSync(BUNDLE_COMPOSE, "utf8");
   const envExample = readFileSync(BUNDLE_ENV, "utf8");
+
+  // --- rule 0: one compose file, two copies ----------------------------------
+  const projected = projectedCompose(bundle);
+  if (projected === null) {
+    fail(`bundle/docker-compose.yml carries no top-level \`name:\` line, so the guide's\n` +
+      `         block cannot be projected from it.`);
+  } else if (EMIT) {
+    const span = guideBlockSpan(guide, "name: myne-server");
+    if (!span) {
+      fail(`the guide carries no fenced yaml block containing "name: myne-server", so\n` +
+        `         there is nothing to overwrite at ${GUIDE}.`);
+    } else if (span.body === projected) {
+      notes.push(`--emit: the guide's compose block already matches the bundle; left alone.`);
+    } else {
+      writeFileSync(GUIDE, guide.slice(0, span.start) + "```yaml\n" + projected + "```" + guide.slice(span.end));
+      notes.push(`--emit: the guide's compose block was regenerated from bundle/docker-compose.yml.`);
+    }
+  } else {
+    const span = guideBlockSpan(guide, "name: myne-server");
+    if (!span) {
+      fail(
+        `the guide carries no fenced yaml block containing "name: myne-server", so the\n` +
+          `         compose file it tells a self-hoster to run could not be found at ${GUIDE}.\n` +
+          `         If the block moved or changed its project name, this guard's marker is stale.`,
+      );
+    } else if (span.body !== projected) {
+      fail(
+        `the guide's compose block is not the bundle's file. The page says "Save it as\n` +
+          `         docker-compose.yml" and "bundle.env.example is the file you edit"; a block\n` +
+          `         with different content or LITERAL values makes the second sentence false, so\n` +
+          `         editing .env does nothing and every \${NAME} knob is unreachable.\n` +
+          `         Run: node scripts/check-selfhost-bundle-drift.mjs --emit`,
+      );
+    }
+  }
+
+  if (EMIT) {
+    // Write mode stops here: the rules below compare the two documents, and the
+    // one it just rewrote is the guide's half of that comparison.
+    for (const n of notes) console.log(`note: ${n}`);
+    if (failures.length > 0) {
+      console.error(`\ncheck-selfhost-bundle-drift --emit: ${failures.length} problem(s)\n`);
+      for (const f of failures) console.error(`  ${f}\n`);
+      process.exit(1);
+    }
+    console.log("ok: --emit finished. Run without --emit to check the result.");
+    process.exit(0);
+  }
 
   const guideCompose = fencedBlock(guide, "yaml", "name: myne-server");
   if (!guideCompose) {
