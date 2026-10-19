@@ -21,6 +21,9 @@ interface IndexFeed {
   noteReads: string[];
   indicesApplies: string[];
   indicesRemoves: string[];
+  /** MYI1 hydrate / persist counts (myne-md/myne#722). */
+  indicesHydrates: number;
+  indicesPersists: number;
   searchReplaces: number[];
   searchApplies: string[][];
   searchRemoves: string[];
@@ -45,6 +48,8 @@ function readFeed(page: Page): Promise<IndexFeed> {
         noteReads: [],
         indicesApplies: [],
         indicesRemoves: [],
+        indicesHydrates: 0,
+        indicesPersists: 0,
         searchReplaces: [],
         searchApplies: [],
         searchRemoves: [],

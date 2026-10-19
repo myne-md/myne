@@ -103,7 +103,10 @@ export interface RecoverFlowProps {
 
 export interface EditorFlowProps {
   vaultId?: VaultId;
-  onLock: () => void;
+  /** Lock the vault. `idle` is the auto-lock timer, which must NOT flush the
+   *  structured index first (`protocol.md` §9.8.5, fail-closed); every other
+   *  caller is manual and may. */
+  onLock: (reason?: "manual" | "idle") => void;
   onCreateVault: () => void;
   /** Enter the sync-join flow from the vault switcher — the "connect to my
    *  account" twin of `onCreateVault` (myne-mobile#40). */

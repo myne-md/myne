@@ -78,7 +78,7 @@ export async function switchVault(
   try {
     // Param-less lock = "lock the sole unlocked (active) vault" (SYNC-8).
     // Its `flushIfDirty` covers unsaved edits — no confirm-discard dialog.
-    await lockVault();
+    await lockVault("switch");
   } catch (err) {
     // Best-effort: route to the target anyway (see docstring). Surface to
     // the dev console so a genuinely broken lock IPC isn't silent.

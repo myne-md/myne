@@ -128,7 +128,16 @@ import { joinVaultBlockAnchors } from "@myne/editor/host/notes/blockAnchors";
 import type { VaultHeading } from "@myne/editor/wikilink/vault-headings";
 import type { VaultBlockAnchor as EditorVaultBlockAnchor } from "@myne/editor/wikilink/vault-block-anchors";
 import { extractRecord } from "../../lib/indices-extract";
-import { createIndexDeltaTracker, type IndexDeltaTracker } from "../../lib/index-delta";
+import { createIndexDeltaTracker, type DeltaItem, type IndexDeltaTracker } from "../../lib/index-delta";
+import {
+  flushVaultIndicesPersistNow,
+  hydrateVaultIndicesOnce,
+  noteVaultIndicesChanged,
+  resetVaultIndicesLifecycle,
+  seedIndexTrackerFromHydration,
+  setVaultIndicesExitSeamLeveller,
+  warnVaultIndicesFailure,
+} from "../../lib/vault-indices-lifecycle";
 import { buildNoteGraphAndModel, clientEdges } from "../../lib/backend-graph";
 import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
@@ -567,32 +576,85 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   useEffect(() => {
     newNoteFlushedRef.current = false;
   }, [editing?.id]);
-  const flushRef = useRef<() => void>(() => {});
-  flushRef.current = () => {
-    if (!HAS_TAURI || !editing) return;
+  /** One corpus item, from the same derivation the boot hydrate and the sweep
+   *  use, so the tracker's signature means one thing everywhere. */
+  const indexCorpusItem = useCallback(
+    (id: string, body: string): DeltaItem => ({
+      id,
+      title: entryFrom(id, body).title,
+      folder: readNoteFolder(body),
+      body,
+    }),
+    [],
+  );
+
+  /** Bring the RAM index level with a body this flush just handed to disk.
+   *
+   *  `vault_indices_persist` pairs a manifest scanned from disk at call time
+   *  with the RAM records. A flush writes the open note's body (fresh
+   *  `content_nonce`) and the index moves only on the sweep's 400 ms debounce,
+   *  so without this the pair can persist a pre-edit record under a post-edit
+   *  nonce, and the next unlock would trust it. Desktop keeps the same order
+   *  its own way: autosave reindexes the note, and the only persist call site
+   *  is the graceful-exit flush chain, never a per-edit write. Returns false
+   *  when the apply failed, which tells the caller to skip the persist: an old
+   *  record under a new nonce is the one shape the staleness check cannot
+   *  see. */
+  const applyOpenNoteToIndex = async (id: string, body: string): Promise<boolean> => {
+    const item = indexCorpusItem(id, body);
+    try {
+      await vaultIndicesApply(extractRecord(item.id, item.title, item.folder, item.body));
+      indicesDelta.markApplied(item);
+      noteVaultIndicesChanged();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  /** Notes minted by this flush. They are applied and tracked by id, but they
+   *  are not in `resolverNotes`/`bodies` yet, so both corpora below splice them
+   *  in: otherwise `diff` reports them as REMOVED and the sweep undoes the very
+   *  record the flush just wrote. */
+  const seamCreatedRef = useRef<DeltaItem[]>([]);
+  const flushRef = useRef<() => Promise<boolean>>(async () => true);
+  flushRef.current = async () => {
+    if (!HAS_TAURI || !editing) return true;
     if (editing.id != null) {
       const id = editing.id;
       const raw = editorText;
       // Untouched since load / last write → nothing to persist. Updating the
       // baseline BEFORE the write resolves also collapses the visibilitychange
       // + pagehide double-fire into a single write.
-      if (editorUnchanged(id)) return;
+      if (editorUnchanged(id)) return true;
       loadedTextRef.current = { id, text: raw };
-      void noteUpdate(id, stampUpdated(raw)).catch(() => {
+      try {
+        await noteUpdate(id, stampUpdated(raw));
+      } catch {
         // Failed write: drop the baseline so a later flush/save retries.
         if (loadedTextRef.current?.id === id) loadedTextRef.current = null;
-      });
-    } else if (editorText.trim() !== "" && !newNoteFlushedRef.current) {
+        return false;
+      }
+      return await applyOpenNoteToIndex(id, raw);
+    }
+    if (editorText.trim() !== "" && !newNoteFlushedRef.current) {
       newNoteFlushedRef.current = true;
       // The folder comes off the body being flushed, so a note backgrounded
       // before its first save registers its folder exactly as a saved one does.
       // It did not, which made the folder's survival depend on whether the user
       // pressed save or the OS took the app away (myne#613 review round 2).
       const flushed = stampUpdated(editorText);
-      void noteCreate(flushed, readNoteFolder(flushed) || null).catch(() => {
+      try {
+        const id = await noteCreate(flushed, readNoteFolder(flushed) || null);
+        const applied = await applyOpenNoteToIndex(id, flushed);
+        if (applied) seamCreatedRef.current.push(indexCorpusItem(id, flushed));
+        return applied;
+      } catch {
         newNoteFlushedRef.current = false;
-      });
+        return false;
+      }
     }
+    return true;
   };
   useEffect(() => {
     // ONE listener pair for the whole app-background moment. Everything that must
@@ -602,7 +664,20 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     // block the other, and a second registration for the same event would just be
     // two ways to get the same moment wrong.
     const flushAll = () => {
-      flushRef.current();
+      // MYI1 on the same seam, and ORDERED behind the body write rather than
+      // beside it. A phone is BACKGROUNDED rather than closed, and an OS kill
+      // of a backgrounded WebView is the normal way the process ends, so this
+      // is mobile's graceful exit: write the index while the slot is unlocked.
+      // The flush returns false when it could not make the index level with
+      // the bytes it wrote, and persisting a lagging index is the one shape
+      // hydrate cannot detect, so that case writes nothing.
+      void (async () => {
+        if (!(await flushRef.current())) return;
+        // `flushVaultIndicesPersistNow` runs the registered leveller first, so
+        // the write only happens when the RAM index is level with disk; a
+        // failed pass writes nothing (§9.8.4: rebuild is the fail direction).
+        await flushVaultIndicesPersistNow();
+      })();
       void flushWorkspaceNow();
       // Settled chat turns a backgrounding interrupted (myne-md/myne#675): the
       // AI flow stages its transcript on every settle and this flushes what is
@@ -688,6 +763,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // Backend vault-indices edge dump (null until the first sweep; drives the
   // Turkish-correct graph + backlinks). Falls back to the client graph in dev.
   const [backendEdges, setBackendEdges] = useState<[string, WikilinkEdge[]][] | null>(null);
+  // MYI1 fast path (protocol.md §9.8): the delta sweep below may not seed its
+  // tracker until the persisted index has been hydrated and the tracker has
+  // been told which records the host already holds. `pending` gates the sweep;
+  // a failed hydrate still resolves it to `ready` with an empty tracker, which
+  // is the specification's fall-to-rebuild rather than an error state.
+  const [indicesHydration, setIndicesHydration] = useState<"pending" | "ready">(
+    HAS_TAURI ? "pending" : "ready",
+  );
+  // Bumped on every vault change; a hydrate that resolves across one is
+  // dropped rather than seeding the new vault's tracker with the old ids.
+  const indicesHydrationGen = useRef(0);
   // myne-md/myne#452: the two whole-vault picker sets, raw as the index returns
   // them. Empty until a read lands, and empty again whenever the vault changes.
   //
@@ -1281,7 +1367,88 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setHeadingRows(EMPTY_ROWS);
     setBlockAnchorRows(EMPTY_ROWS);
     setPickerFetch({ index: 0, attempt: 0 });
+    // The persisted index and its write are per vault too. Clearing the
+    // hydration latch here means a swap WITHOUT a remount falls back to the
+    // sweep's full rebuild rather than seeding from vault A's blob. The
+    // generation additionally invalidates a hydrate already in flight: the
+    // latch alone cannot cancel it, and its result would seed vault A's ids
+    // into vault B's tracker.
+    indicesHydrationGen.current += 1;
+    seamCreatedRef.current = [];
+    resetVaultIndicesLifecycle();
   }, [vaultId, searchDelta, indicesDelta]);
+
+  /**
+   * MYI1 fast path (`protocol.md` §9.8): hydrate the persisted structured index,
+   * seed the delta tracker with the records the host loaded, and only then let
+   * the sweep below run.
+   *
+   * `corpus` is the boot-time read, deliberately, not live component state: the
+   * persisted records describe the notes as they were when the hydrate scan ran.
+   * Seeding from a later body would mark an edit that landed during the hydrate
+   * as already applied, leaving the Rust record stale for the session. A seeded
+   * signature that no longer matches the live body is re-applied by the sweep,
+   * which is the direction this has to fail in.
+   *
+   * `stale === null` is a command-level failure (slot / IO): the tracker stays
+   * empty, the sweep rebuilds the whole corpus, and the cache is exactly as
+   * authoritative as §9.8.4 says it is: not at all.
+   */
+  const hydrateIndicesFromBlob = useCallback(
+    async (corpus: readonly DeltaItem[]) => {
+      const generation = indicesHydrationGen.current;
+      const stale = await hydrateVaultIndicesOnce();
+      // A vault swap during the read: the store this reply describes is not
+      // the store now open, and seeding it would make the sweep remove vault
+      // B's notes as "gone". Open the gate instead of leaving it `pending`:
+      // this component does not remount on a vault change, so nothing would
+      // re-run the boot hydrate, and a stuck gate means an index that never
+      // rebuilds for the session. The reset above emptied the tracker, so the
+      // sweep that follows is a full rebuild, which is the correct answer for
+      // a vault whose blob was never hydrated.
+      if (indicesHydrationGen.current !== generation) {
+        setIndicesHydration("ready");
+        return;
+      }
+      if (stale !== null) {
+        seedIndexTrackerFromHydration(indicesDelta, corpus, stale);
+        // A record the host loaded for a note that is no longer in the LIVE
+        // set (trashed, templated, conflicted on another device) has no sweep
+        // to report it: `diff` only removes ids the tracker knows, and the
+        // stale list never entered the tracker. The Rust store is trash-blind
+        // by design (§9.8.4), so the caller owns this half: drop those
+        // records, or the blob's stale entry outlives the note's liveness.
+        const live = new Set(corpus.map((item) => item.id));
+        let dropped = false;
+        for (const id of stale) {
+          if (live.has(id)) continue;
+          try {
+            await vaultIndicesRemove(id);
+            dropped = true;
+          } catch (err) {
+            // Best-effort. The record survives until a later unlock retries,
+            // so it is worth one line in the log rather than silence.
+            warnVaultIndicesFailure(err);
+          }
+        }
+        // The removal is a change the store must write back, or the blob keeps
+        // the record and every unlock re-installs and re-drops it.
+        if (dropped) noteVaultIndicesChanged();
+        // The store now holds the unchanged records. When nothing is stale the
+        // sweep early-returns, so the graph's edge dump and the two picker
+        // readers have to be told about the new index by THIS path.
+        try {
+          setBackendEdges(await vaultIndicesAllEdges());
+        } catch {
+          // The sweep's own fallback (client graph) covers a failed read.
+        }
+      }
+      if (indicesHydrationGen.current !== generation) return;
+      setPickerFetch((p) => ({ index: p.index + 1, attempt: 0 }));
+      setIndicesHydration("ready");
+    },
+    [indicesDelta],
+  );
 
   // Keep the backend MYS1 search index synced with the live corpus (the WebView
   // already holds every note's plaintext). Debounced so a burst of edits settles
@@ -1342,11 +1509,87 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // stacked a second full sweep on the first instead of replacing it, and every
   // `extractRecord` parse in the map ran synchronously on the main thread before
   // the first await could yield.
+  /**
+   * Apply the pending delta for `corpus`: removals first, then applies, with
+   * the tracker marked per successful call. Returns whether anything moved.
+   *
+   * ONE implementation for the sweep and for the exit seam, deliberately. The
+   * seam persists `{manifest scanned from disk, RAM records}`, and the only
+   * way that pair is sound is for the records to be level with the bodies on
+   * disk first: a record left behind by the 400 ms debounce would sit under a
+   * fresh `content_nonce` and the next hydrate would read it as unchanged
+   * (§9.8.4's identity-with-rebuild property).
+   *
+   * `isCancelled` is checked BETWEEN awaits, so a superseded sweep stops
+   * without stranding a mark it did not earn.
+   */
+  const applyPendingIndices = useCallback(
+    async (corpus: readonly DeltaItem[], isCancelled: () => boolean = () => false): Promise<boolean> => {
+      const { changed, removed } = indicesDelta.diff(corpus);
+      let moved = false;
+      for (const id of removed) {
+        if (isCancelled()) return moved;
+        await vaultIndicesRemove(id);
+        indicesDelta.markRemoved(id);
+        moved = true;
+      }
+      for (const note of changed) {
+        if (isCancelled()) return moved;
+        await vaultIndicesApply(extractRecord(note.id, note.title, note.folder, note.body));
+        indicesDelta.markApplied(note);
+        moved = true;
+      }
+      return moved;
+    },
+    [indicesDelta],
+  );
+
+  /** The live corpus as the sweep sees it, with the open note's unsaved buffer
+   *  spliced in so a body the flush just wrote is not diffed against its old
+   *  copy. A brand-new note is not in `resolverNotes` yet; the flush applied
+   *  its record by id, so leaving it out here is harmless. */
+  const indexCorpus = useCallback((): DeltaItem[] => {
+    const corpus = resolverNotes.map((n) => ({
+      id: n.noteUuid,
+      title: n.title ?? "",
+      folder: n.folder,
+      body: bodies.get(n.noteUuid) ?? "",
+    }));
+    if (editing?.id != null) {
+      const live = indexCorpusItem(editing.id, editorText);
+      const at = corpus.findIndex((item) => item.id === editing.id);
+      if (at >= 0) corpus[at] = live;
+      else corpus.push(live);
+    }
+    for (const minted of seamCreatedRef.current) {
+      if (!corpus.some((item) => item.id === minted.id)) corpus.push(minted);
+    }
+    return corpus;
+  }, [resolverNotes, bodies, editing?.id, editorText, indexCorpusItem]);
+
+  // Every exit seam levels the store first (see the lifecycle module). The
+  // leveller is registered here because this component owns the tracker and
+  // the corpus; a lock does not unmount it, so it must survive one. It reads
+  // today's corpus through a ref, so the registration is one-shot and no seam
+  // can land in the gap between a cleanup and a re-register.
+  const levellerRef = useRef<() => Promise<void>>(async () => {});
+  levellerRef.current = async () => {
+    if (await applyPendingIndices(indexCorpus())) noteVaultIndicesChanged();
+  };
+  useEffect(() => {
+    setVaultIndicesExitSeamLeveller(() => levellerRef.current());
+    return () => setVaultIndicesExitSeamLeveller(null);
+  }, []);
+
   useEffect(() => {
     if (!HAS_TAURI) {
       setBackendEdges(null);
       return;
     }
+    // Do not seed the tracker before the persisted index has hydrated: the
+    // first pass would report the whole vault as changed and re-send it, which
+    // is exactly the rebuild the blob exists to avoid.
+    if (indicesHydration !== "ready") return;
     let cancelled = false;
     const t = window.setTimeout(() => {
       const tracker = indicesDelta;
@@ -1356,6 +1599,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         folder: n.folder,
         body: bodies.get(n.noteUuid) ?? "",
       }));
+      for (const minted of seamCreatedRef.current) {
+        if (!corpus.some((item) => item.id === minted.id)) corpus.push(minted);
+      }
       const { changed, removed } = tracker.diff(corpus);
       if (changed.length === 0 && removed.length === 0) return;
       void (async () => {
@@ -1365,20 +1611,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         // and the nonce did not, the readers below never learn the index changed.
         let moved = false;
         try {
-          for (const id of removed) {
-            if (cancelled) return;
-            await vaultIndicesRemove(id);
-            tracker.markRemoved(id);
-            moved = true;
-          }
-          for (const note of changed) {
-            if (cancelled) return;
-            await vaultIndicesApply(extractRecord(note.id, note.title, note.folder, note.body));
-            tracker.markApplied(note);
-            moved = true;
-          }
-          const edges = await vaultIndicesAllEdges();
-          if (!cancelled) setBackendEdges(edges);
+          moved = await applyPendingIndices(corpus, () => cancelled);
+          if (cancelled) return;
+          setBackendEdges(await vaultIndicesAllEdges());
         } catch {
           if (!cancelled) setBackendEdges(null);
         } finally {
@@ -1392,6 +1627,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           // `finally` also covers the throwing path, where the loops may have
           // applied and marked several notes before the failure.
           if (moved) setPickerFetch((p) => ({ index: p.index + 1, attempt: 0 }));
+          // MYI1: the store moved, so the next exit seam has something to
+          // write. Nothing is written from here: the cadence is the exit
+          // seams (`protocol.md` §9.8.5), and an edit that never reaches one
+          // costs the next unlock a rebuild of exactly these notes. A
+          // cancelled or partly-failed pass marks too, because the notes it
+          // did apply are still on disk; the seam runs this same delta to
+          // completion before it writes, and `encode_snapshot` never persists
+          // a manifest entry the store has no record for, so an unreached note
+          // reads as stale instead of being trusted.
+          if (moved) noteVaultIndicesChanged();
         }
       })();
     }, 400);
@@ -1399,7 +1644,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [resolverNotes, bodies, indicesDelta]);
+  }, [resolverNotes, bodies, indicesDelta, indicesHydration]);
 
   // myne-md/myne#452: read the two whole-vault picker sets back.
   //
@@ -1699,8 +1944,28 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           .then((p) => backfillDeliberateFolders(loaded.values(), p.deliberate_folders))
           .catch(ignorePrefsWriteFailure);
       }
+      // MYI1 fast path. HERE rather than in an effect of its own for two
+      // reasons: it must run AFTER `refreshAll` (the corpus below is the boot
+      // read, which is what the persisted records describe) and BEFORE the
+      // sweep's first pass; and `booted` already guarantees one invocation, so
+      // React 19's double-invoked effect cannot issue a second hydrate that
+      // bulk-replaces records an in-between apply had already fixed.
+      //
+      // A load failure resolves the gate with an empty tracker rather than
+      // staying pending: the sweep must still re-seed from whatever the sync
+      // listener later reads.
+      if (HAS_TAURI && loaded !== null) {
+        const corpus: DeltaItem[] = [];
+        for (const [id, body] of loaded) {
+          if (!isResolverCandidate(readNoteFlags(body))) continue;
+          corpus.push(indexCorpusItem(id, body));
+        }
+        await hydrateIndicesFromBlob(corpus);
+      } else {
+        setIndicesHydration("ready");
+      }
     })();
-  }, [refreshAll]);
+  }, [refreshAll, hydrateIndicesFromBlob, indexCorpusItem]);
 
   // SYNC-37: the foreground sync loop (and manual `sync_now`) emit `sync://changed`
   // after a pull writes incoming notes to disk - reload the list + bodies so notes
@@ -1833,7 +2098,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       if (fired) return;
       if (Date.now() - lastActivity >= secs * 1000) {
         fired = true;
-        onLock();
+        onLock("idle");
       }
     };
     const markActive = () => {

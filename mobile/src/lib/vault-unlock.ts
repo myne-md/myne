@@ -9,6 +9,10 @@ import {
   flushGraphLayoutNow,
   resetGraphLayoutOnLock,
 } from "./graph-layout-persist";
+import {
+  flushVaultIndicesPersistNow,
+  resetVaultIndicesLifecycle,
+} from "./vault-indices-lifecycle";
 import { flushWorkspaceNow, resetWorkspaceOnLock } from "./workspace-persist";
 import { endAgentRun } from "./agent-lifetime";
 import { clearChatHistoryPersistForLock } from "./chatHistory";
@@ -40,6 +44,11 @@ export async function isVaultUnlocked(): Promise<boolean> {
  * §9.7.4 posture), then lock.
  *
  *  - graph layout → `vault.graph` (MYG1)
+ *  - structured index → `vault.indices` (MYI1). Desktop persists on the same
+ *    graceful-exit cadence; on a phone a backgrounding is the ordinary exit,
+ *    which `EditorFlow`'s listener owns. A manual lock and a vault switch
+ *    flush here as well, because both drop the keys immediately after; idle
+ *    auto-lock deliberately skips it (`protocol.md` §9.8.5).
  *  - sidebar folder-expand set → `vault.workspace` (MYND-561, MYW1). This is one
  *    of only two write seams for that blob (the other is app-background), which
  *    is what keeps its mtime from becoming an activity log.
@@ -53,7 +62,9 @@ export async function isVaultUnlocked(): Promise<boolean> {
  *
  * Every flush/reset step is best-effort; the lock itself always runs.
  */
-export async function lockVault(): Promise<void> {
+export async function lockVault(
+  reason: "manual" | "idle" | "switch" = "manual",
+): Promise<void> {
   clearCustomTheme();
   // **The agent run, first, and not best-effort in the way the flushes are.**
   // Everything else on this path is a WRITE that would be nice to land; this is
@@ -73,6 +84,13 @@ export async function lockVault(): Promise<void> {
   clearChatHistoryPersistForLock();
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
+  // MYI1: manual lock and a vault switch MAY flush it before the slot drops,
+  // and idle auto-lock must NOT (`protocol.md` §9.8.5: persist-then-wipe on a
+  // deliberate exit, fail-closed on the A6 path where the key drop must not sit
+  // behind an AEAD encode of a large index). Idle inherits the next unlock's
+  // fall-to-rebuild instead, which costs time and never data.
+  if (reason !== "idle") await flushVaultIndicesPersistNow();
+  resetVaultIndicesLifecycle();
   await flushWorkspaceNow();
   resetWorkspaceOnLock();
   // Everything the shared editor caches from decrypted attachment content:

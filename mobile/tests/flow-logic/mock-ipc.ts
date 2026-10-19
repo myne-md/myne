@@ -317,6 +317,23 @@ export interface MockConfig {
    *  client-extracted wikilink edges over the seeded `notes` bodies (the graph
    *  flow's edge source — real extraction, no canned edge dump to drift). */
   backendEdgesUnavailable?: boolean;
+  /** Model a persisted `vault.indices` (`MYI1`) blob that already covers every
+   *  seeded note, so `vault_indices_hydrate` reports nothing stale and the
+   *  boot sweep applies nothing (myne-md/myne#722). ABSENT models a cold vault
+   *  with no blob, where hydrate answers every on-disk note as stale exactly
+   *  as §9.8.4's fall-to-rebuild does. Either way the CALL COUNT is recorded on
+   *  the index feed, which is what the fast-path spec asserts. */
+  indicesPersisted?: boolean;
+  /** Delay the hydrate reply. A REAL hydrate is IPC plus vault IO plus an AEAD
+   *  decode, so it can land after the sweep's 400 ms debounce; with this above
+   *  that debounce, a client that does NOT gate its first sweep on the hydrate
+   *  re-sends the whole corpus before the seed arrives (myne-md/myne#722). */
+  indicesHydrateDelayMs?: number;
+  /** Stale ids the hydrate reports ALONGSIDE the seeded notes, modelling a
+   *  record whose note left the live set on another device (trashed, templated
+   *  or conflict-flagged). The client must remove those records rather than
+   *  keep them resident (`protocol.md` §9.8.4, trash-blind Rust store). */
+  indicesStaleExtra?: string[];
   /** Canned `graph_layout_read` payload — the encrypted `vault.graph` cache's
    *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
    *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
@@ -531,6 +548,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // Copied, not aliased: `note_create` / `note_update` mutate this store so
     // `note_list` and `note_read` answer from it (see those handlers).
     const seededNotes = [...(config.notes ?? [])];
+    /** The ids `note_list` reports: the richer `notes` seed when present, else
+     *  the `noteIds`-only seed, plus anything `note_create` minted. */
+    const liveNoteIds = (): string[] => {
+      const stored = seededNotes.map((n) => n.id);
+      const base =
+        (config.notes ?? []).length > 0 ? stored : [...(config.noteIds ?? []), ...stored];
+      return [...new Set(base)];
+    };
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
     /** Next `note_create` id suffix — 0 reproduces the long-standing constant. */
     let mintedNotes = 0;
@@ -666,6 +691,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       noteReads: string[];
       indicesApplies: string[];
       indicesRemoves: string[];
+      indicesHydrates: number;
+      indicesPersists: number;
       searchReplaces: number[];
       searchApplies: string[][];
       searchRemoves: string[];
@@ -675,6 +702,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         noteReads: [],
         indicesApplies: [],
         indicesRemoves: [],
+        // MYI1 (myne-md/myne#722): counts, not payloads. The fast path's whole
+        // contract is "zero applies after a covered hydrate, one write per
+        // exit seam", so the number of calls IS the assertion.
+        indicesHydrates: 0,
+        indicesPersists: 0,
         // One entry per whole-corpus replace, holding the doc count it carried.
         searchReplaces: [],
         searchApplies: [],
@@ -1354,11 +1386,24 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // `note_create` land in `seededNotes`, so they appear here either way —
       // the union matters for the `noteIds`-only specs, whose seed is not in
       // that store and must not be displaced by the first create.
-      "plugin:notes|note_list": () => {
-        const stored = seededNotes.map((n) => n.id);
-        const base =
-          (config.notes ?? []).length > 0 ? stored : [...(config.noteIds ?? []), ...stored];
-        return [...new Set(base)];
+      "plugin:notes|note_list": () => liveNoteIds(),
+      // ── MYI1 hydrate / persist (myne-md/myne#722) ──
+      // A cold vault (default) answers every on-disk note as stale, which is
+      // what the real command does for an absent blob (§9.8.4 fall-to-rebuild)
+      // and what keeps the pre-existing flows rebuilding exactly as before.
+      "plugin:vault-indices|vault_indices_hydrate": () => {
+        feed().indicesHydrates += 1;
+        const stale = [
+          ...(config.indicesPersisted ? [] : liveNoteIds()),
+          ...(config.indicesStaleExtra ?? []),
+        ];
+        const delay = config.indicesHydrateDelayMs ?? 0;
+        if (delay <= 0) return stale;
+        return new Promise<string[]>((resolve) => setTimeout(() => resolve(stale), delay));
+      },
+      "plugin:vault-indices|vault_indices_persist": () => {
+        feed().indicesPersists += 1;
+        return null;
       },
       // ── Vault-indices graph surface ──
       // Default [] keeps `backendEdges` an empty dump (degree-0 graph); the
