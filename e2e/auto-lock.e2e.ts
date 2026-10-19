@@ -69,7 +69,7 @@ describeE2E("al1 idle auto-lock returns to the same vault (MYND-229)", () => {
         await (await s.byTestId("settings.auto-lock-select")).click();
         await (
           await s.waitForElement(
-            '[data-testid="settings.auto-lock-select-option"][data-value="60"]',
+            testIdSelector("settings.auto-lock-select-option", { "data-value": "60" }),
           )
         ).click();
         if (!(await (await s.byTestId("settings.auto-lock-select")).textContent()).includes("1 min")) {

@@ -34,7 +34,7 @@ import {
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
-const CM_EDITOR = '[data-testid="editor.content"] .cm-editor';
+const CM_EDITOR = testIdSelector("editor.content") + " .cm-editor";
 const FOLD_MARKER = testIdSelector("editor.fold-gutter-marker");
 const FOLD_PLACEHOLDER = testIdSelector("editor.fold-placeholder");
 

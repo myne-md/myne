@@ -34,7 +34,7 @@ import { expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { seedVault, type SeededVault } from "./support/fixtures";
+import { seedVault, seededExportSuite, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
   openExportSubmenuItem,
@@ -53,14 +53,6 @@ const STATIC_DOC =
   "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">" +
   "<title>Capture</title></head><body><h1>HTML Probe</h1>" +
   "<p>Static body for the E2E HTML write probe.</p></body></html>\n";
-
-function seededExportSuite(seeded: SeededVault) {
-  const suite = seeded.exportSuite;
-  if (suite === undefined) {
-    throw new Error("fixture was not seeded with exportSuite: true");
-  }
-  return suite;
-}
 
 /** Right-click the sidebar row of `noteId` and wait for the HTML export
  *  context-menu item. Returns the item handle. */

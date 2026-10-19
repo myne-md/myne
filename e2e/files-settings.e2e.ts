@@ -29,27 +29,16 @@ import {
   closeSettings,
   createNote,
   dismissImporterOffer,
+  noteRowIds,
   openSettings,
   pickSelect,
   unlockToEditor,
 } from "./support/flows";
-import { type Element, type Session, testIdSelector } from "./support/webdriver";
+import { type Element, testIdSelector } from "./support/webdriver";
 
 // Distinct note titles — single lowercase-alnum tokens (residue needle rule).
 const NOTE_TITLE = "filesnotealpha7k2m9qx4w8e5rj0";
 const TARGET_FOLDER = "filesinbox7c2vb5kk0/";
-
-/** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
-async function noteRowIds(session: Session, expected: number): Promise<string[]> {
-  const rows = await session.waitUntil(
-    async () => {
-      const found = await session.byTestIdAll("notes.row");
-      return found.length === expected ? found : null;
-    },
-    { label: `${expected} note rows`, timeoutMs: 15_000 },
-  );
-  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
-}
 
 // ── nl1: default new-note location = specific folder ─────────────────────────
 

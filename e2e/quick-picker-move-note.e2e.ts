@@ -35,28 +35,15 @@ import {
   createNote,
   dismissImporterOffer,
   runPaletteAction,
+  selectedNoteId,
   unlockToEditor,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 // W3C key codepoints — kept as \uE0xx ESCAPE FORMS, never literals (the
 // invisible-key hazard: a raw U+E007 in source is unreviewable).
 const ESCAPE = "\uE00C";
 const ENTER = "\uE007";
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the note
- *  `createNote` just created and left selected (the sp1 helper,
- *  search-palette.e2e.ts). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 describeE2E("qp1 palette move-note QuickPicker: Esc pops back, Enter moves (palette-gap #32)", () => {
   // Vault-count precondition: 1 (weak KDF).

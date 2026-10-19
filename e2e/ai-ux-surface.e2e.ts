@@ -27,13 +27,13 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewItem,
   closeSettings,
   createNote,
   dismissImporterOffer,
   enableDeveloperMode,
   excludeFolderFromAi,
   unlockToEditor,
+  createFolder,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 import {
@@ -139,15 +139,6 @@ aiDescribe("aux1 AI settings surface + right-sidebar AI Chat tab (ai-ux-surface)
     );
   });
 });
-
-/** Create a folder via the sidebar's inline new-folder input. The trailing `\uE007`
- *  (W3C Enter) commits it, else `notes.folder-row` never materializes, the same
- *  helper `folder-archive.e2e.ts` carries locally. */
-async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewItem(s, "notes.new-folder");
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
-  await s.byTestId("notes.folder-row");
-}
 
 describeE2E("aux2 the excluded-folders picker writes the list the AI honors", () => {
   // myne-md/myne#848. The list is the control `docs/threat-model.md` A17 rests its

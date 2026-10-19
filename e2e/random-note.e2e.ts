@@ -19,25 +19,12 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the row
- *  `createNote` just left selected, or the row the random action navigated to
- *  (`aria-selected="true"` + `data-note-id`, the byTestId-only handle). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /** Open the command palette via the Control+K chord (W3C Actions API). */
 async function openPalette(s: Session): Promise<void> {
@@ -107,7 +94,13 @@ describeE2E("rn1 \"Open random note\" → deterministic navigate (MYND-323)", ()
           { label: "random pick opened the OTHER note (Alpha)" },
         );
         expect((await editorText(s)).includes("betatailm7w5qp")).toBe(false);
-        expect(await selectedNoteId(s)).toBe(alphaId);
+        // This assertion asks about the SIDEBAR ROW's selection state, not the
+        // active editor tab the shared `selectedNoteId` reads: the point is that
+        // the list marks Alpha selected, not merely that its tab is focused.
+        const selectedRow = await s.waitForElement(
+          testIdSelector("notes.row", { "aria-selected": "true" }),
+        );
+        expect(await selectedRow.attribute("data-note-id")).toBe(alphaId);
       },
     );
   });

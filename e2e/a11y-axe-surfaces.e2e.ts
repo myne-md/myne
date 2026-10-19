@@ -38,8 +38,9 @@ import {
 } from "./support/flows";
 import { runAxeInPage, formatAxe } from "./support/axe";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const RAIL = '[data-testid="editor.ribbon.button"]';
+const RAIL = testIdSelector("editor.ribbon.button");
 
 /**
  * Click the rail entry for a registry command id, and FAIL LOUDLY when the rail
@@ -162,7 +163,7 @@ describeE2E("AXS-4 the Trash panel has no WCAG 2.2 AA violations", () => {
         const s = await ready(app, fixture.password);
         await runRail(s, "trash.open");
         await s.byTestId("trash.panel", { timeoutMs: 15_000 });
-        const violations = await runAxeInPage(s, '[data-testid="trash.panel"]');
+        const violations = await runAxeInPage(s, testIdSelector("trash.panel"));
         expect(violations, formatAxe(violations)).toEqual([]);
       },
     );
@@ -180,7 +181,7 @@ describeE2E("AXS-5 the Archive panel has no WCAG 2.2 AA violations", () => {
         const s = await ready(app, fixture.password);
         await runRail(s, "archive.open");
         await s.byTestId("archive.panel", { timeoutMs: 15_000 });
-        const violations = await runAxeInPage(s, '[data-testid="archive.panel"]');
+        const violations = await runAxeInPage(s, testIdSelector("archive.panel"));
         expect(violations, formatAxe(violations)).toEqual([]);
       },
     );
@@ -220,7 +221,7 @@ describeE2E("AXS-6 the agent tab has no WCAG 2.2 AA violations", () => {
         await runPaletteAction(s, "ai.open-agent-vault", "agent");
         await s.byTestId("agent.pane", { timeoutMs: 15_000 });
         await s.byTestId("agent.hub-empty", { timeoutMs: 15_000 });
-        const violations = await runAxeInPage(s, '[data-testid="agent.pane"]');
+        const violations = await runAxeInPage(s, testIdSelector("agent.pane"));
         expect(violations, formatAxe(violations)).toEqual([]);
       },
     );

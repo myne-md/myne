@@ -65,6 +65,7 @@ import {
   pageSeatInvoke,
   runPaletteAction,
   unlockToEditor,
+  contextMenuPick,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -87,21 +88,6 @@ title: ${ROOT_NOTE_TITLE}
 
 A note at the vault root, which no folder delete can touch.
 `;
-
-/** Right-click an element and pick a context-menu item by its `data-item-id`
- *  (the shared notes/folder menu encoding). */
-async function contextMenuPick(
-  s: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await s.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
 
 /** Create a note through the production create IPC, carrying its own folder
  *  frontmatter, and return its id. NOT a test hook: `plugin:notes|note_create`

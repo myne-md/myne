@@ -30,7 +30,7 @@ import { expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { seedVault, type SeededVault } from "./support/fixtures";
+import { seedVault, seededExportSuite, type SeededVault } from "./support/fixtures";
 import {
   dismissImporterOffer,
   openExportSubmenuItem,
@@ -46,14 +46,6 @@ const TXT_ITEM_SELECTOR = testIdSelector("notes.context-menu-item", {
 /** A small static stripped plain-text payload — the emitter's full golden
  *  coverage lives in tests/dialect/text; this pins the Rust WRITE arm. */
 const STATIC_TEXT = "Title\n\nplain body line\n";
-
-function seededExportSuite(seeded: SeededVault) {
-  const suite = seeded.exportSuite;
-  if (suite === undefined) {
-    throw new Error("fixture was not seeded with exportSuite: true");
-  }
-  return suite;
-}
 
 /** Right-click the sidebar row of `noteId` and wait for the plain-text
  *  export context-menu item. Returns the item handle. */

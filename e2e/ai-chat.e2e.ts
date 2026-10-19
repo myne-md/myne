@@ -29,7 +29,6 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewItem,
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
@@ -40,6 +39,8 @@ import {
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  contextMenuPick,
+  createFolder,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -146,7 +147,7 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         // desktop puts a mention: a user's own words stay plain text
         // (`ConversationSurface` renders them as `pre-wrap` on purpose), so a
         // link there would be a second, different surface.
-        const mentions = await s.findElements('[data-testid="ai.mention-link"]');
+        const mentions = await s.findElements(testIdSelector("ai.mention-link"));
         expect(mentions.length).toBeGreaterThan(0);
         expect((await mentions[0]!.textContent()).trim()).toBe("stub run");
         await mentions[0]!.click();
@@ -201,32 +202,6 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
     );
   });
 });
-
-/** Right-click an element and pick a context-menu item by its `data-item-id`.
- *  Local twin of the same helper in `folder-archive.e2e.ts` /
- *  `folder-notes.e2e.ts`, which is where this shape lives in the suite. */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
-
-/** Create a folder via the sidebar's inline new-folder input. The trailing
- *  `\uE007` (W3C Enter) commits the inline input, else `notes.folder-row` never
- *  materializes. Same helper, and the same commit key, as
- *  `ai-ux-surface.e2e.ts` and `folder-archive.e2e.ts` carry. */
-async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewItem(s, "notes.new-folder");
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}\uE007`);
-  await s.byTestId("notes.folder-row");
-}
 
 /** Create a note INSIDE `folder` through the folder's own "New note here" item
  *  and commit `title` through the inline-rename input. Creating the note OPENS

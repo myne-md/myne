@@ -48,6 +48,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { createNote, dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** Elements whose SIDE must flip. Each is a chrome surface a user locates by
  *  side rather than by reading it. */
@@ -180,7 +181,7 @@ describeE2E("rms1 the chrome mirrors in an RTL locale (myne-md/myne#555)", () =>
 
         // Close Settings so the chrome underneath is what gets measured.
         await (await s.byTestId("settings.close")).click();
-        await s.waitForGone('[data-testid="settings.modal"]');
+        await s.waitForGone(testIdSelector("settings.modal"));
 
         // Settled, not sampled: the sidebars animate their width and the bar
         // reflows, so a single read can land mid-transition.

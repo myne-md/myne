@@ -60,6 +60,7 @@ import {
   closeSettings,
   searchAndOpenNote,
   selectSettingsTopic,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -68,22 +69,6 @@ import { testIdSelector, type Session } from "./support/webdriver";
 
 const PIN = "135790";
 const WRONG_PIN = "024680";
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the note
- *  `createNote` just created and left selected. Mirrors the helper in
- *  `search-palette.e2e.ts`; the sidebar row carries `aria-selected="true"`
- *  alongside `data-note-id`, which is the byTestId-only path to a
- *  live-created note's id. */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /**
  * Configure a PIN in Settings → Privacy from an unlocked editor.
@@ -141,7 +126,7 @@ describeE2E("qu1 PIN quick-unlock round-trip (MYND-329)", () => {
         // ---- Wrong PIN first: the remaining-attempts note appears ----------
         await (await s.byTestId("unlock.quick-pin-input")).replaceText(WRONG_PIN);
         await (await s.byTestId("unlock.quick-pin-submit")).click();
-        const note = await s.waitForElement('[data-testid="unlock.quick-note"]');
+        const note = await s.waitForElement(testIdSelector("unlock.quick-note"));
         if (!(await note.textContent()).toLowerCase().includes("attempt")) {
           throw new Error("wrong PIN did not surface the remaining-attempts note");
         }

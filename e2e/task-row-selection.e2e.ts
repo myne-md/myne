@@ -49,6 +49,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 const BODY = ["- [ ] first task rowsel1", "- [ ] second task rowsel2"].join("\n");
 
@@ -99,7 +100,7 @@ describeE2E("trs1 a triple-click on a task row keeps the caret on that row", () 
         // selection to spill onto. `.cm-line` rather than a testid: the subject
         // is the line box CM6 laid out, and it must have a row after it.
         const rows = await s.findElements(
-          '[data-testid="editor.content"] .cm-content .cm-line',
+          testIdSelector("editor.content") + " .cm-content .cm-line",
         );
         const target = rows[rows.length - 2];
         if (target === undefined) throw new Error("trs1: fewer than two lines rendered");

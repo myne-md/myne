@@ -44,6 +44,7 @@ import {
 } from "./support/flows";
 import { KEY, pressChord } from "./support/keyboard";
 import { runAxeInPage, formatAxe } from "./support/axe";
+import { testIdSelector } from "./support/webdriver";
 
 describeE2E("AX-1 Welcome screen has no WCAG 2.2 AA violations (MYND-93)", () => {
   it("axe (incl. contrast) is clean on the cold-boot Welcome screen", async () => {
@@ -132,7 +133,7 @@ describeE2E("AX-5 Command palette has no WCAG 2.2 AA violations (MYND-93)", () =
         // is the editor's concern, not the palette's).
         const violations = await runAxeInPage(
           app.session,
-          '[data-testid="palette.dialog"]',
+          testIdSelector("palette.dialog"),
         );
         expect(violations, formatAxe(violations)).toEqual([]);
       },

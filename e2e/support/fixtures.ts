@@ -267,6 +267,22 @@ export function seedVault(appDataDir: string, opts: Omit<SeedOptions, "count"> =
   return seedVaults(appDataDir, { ...opts, count: 1 })[0];
 }
 
+/**
+ * The `exportSuite` an export scenario requires, or a named throw when the
+ * fixture was not seeded with it.
+ *
+ * Three export suites had their own copy. The throw is the point: a fixture
+ * seeded without `exportSuite: true` produces `undefined` here, and a copy that
+ * dropped the guard would fail later on a property of `undefined` instead of
+ * naming the missing seed option. */
+export function seededExportSuite(seeded: SeededVault): ExportSuite {
+  const suite = seeded.exportSuite;
+  if (suite === undefined) {
+    throw new Error("fixture was not seeded with exportSuite: true");
+  }
+  return suite;
+}
+
 // (MYND-486) The `seedCustomTheme` helper — which copied a fixture into the
 // device-local `app_config_dir/themes/` directory — was removed when the
 // custom-theme palettes moved into the encrypted `vault.themes` (`MYT1`) store.

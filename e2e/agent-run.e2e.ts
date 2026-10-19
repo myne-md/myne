@@ -137,7 +137,7 @@ async function openComposer(session: Session): Promise<void> {
 /** The active editor tab's note id ("note:<id>"), so a failing assertion can say
  *  whether the agent reviewed the note the scenario just wrote. */
 async function noteIdUnderTest(session: Session): Promise<string | null> {
-  const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+  const tabs = await session.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
   if (tabs.length === 0) return null;
   const raw = (await tabs[0].attribute("data-tab-id")) ?? "";
   return raw.startsWith("note:") ? raw.slice("note:".length) : null;

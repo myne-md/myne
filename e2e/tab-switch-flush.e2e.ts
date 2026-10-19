@@ -31,6 +31,7 @@ import {
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   editorText,
+  noteRowIds,
   typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
@@ -42,17 +43,6 @@ const TSF_TITLES = ["tsfnotealpha6b3k9wq2m7x5rj1", "tsfnotebravo4h8z1cn5vb2kk7"]
 /** The payload that must survive the switch. Prose only — no syntax a live
  *  decoration would replace, so `typeIntoEditor`'s arrival check can pass. */
 const TSF_PAYLOAD = "unsavedkeystrokes8w3q";
-
-async function noteRowIds(session: Session, expected: number): Promise<string[]> {
-  const rows = await session.waitUntil(
-    async () => {
-      const found = await session.byTestIdAll("notes.row");
-      return found.length === expected ? found : null;
-    },
-    { label: `${expected} note rows`, timeoutMs: 15_000 },
-  );
-  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
-}
 
 async function row(session: Session, noteId: string): Promise<Element> {
   return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));

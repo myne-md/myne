@@ -25,22 +25,13 @@ import {
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
   editorText,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  tabIds,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
-
-/** The `data-note-id` of the currently-selected sidebar row (the note
- *  `createNote` just created and left selected) — mirrors search-palette.e2e.ts. */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /** Open a note via its sidebar row and wait for its body to land. */
 async function openNoteById(s: Session, noteId: string, expectTail: string): Promise<void> {
@@ -59,13 +50,6 @@ async function clickLinksTab(s: Session): Promise<void> {
       testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "backlinks" }),
     )
   ).click();
-}
-
-/** The right-panel tab ids in current DOM (display) order — rp2's helper. */
-async function tabIds(s: Session): Promise<string[]> {
-  const els = await s.byTestIdAll("editor.right-panel-tab");
-  const ids = await Promise.all(els.map((e) => e.attribute("data-panel-tab-id")));
-  return ids.filter((id): id is string => id !== null);
 }
 
 /** Right-click a right-panel tab, then invoke "Move left"/"Move right" — rp2's helper. */

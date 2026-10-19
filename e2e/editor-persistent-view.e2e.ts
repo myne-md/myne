@@ -27,10 +27,12 @@ import {
   createNote,
   dismissImporterOffer,
   editorText,
+  noteRowIds,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
+import { KEY, pressChord } from "./support/keyboard";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 // Distinct single-token markers (residue needle rule).
@@ -38,28 +40,10 @@ const EDIT_MARKER = "alphaedit7k2m9qx4w8e5rj0";
 const NOTE_A = "persistviewalpha7c2vb5kk0";
 const NOTE_B = "persistviewbeta9d3wc6ll1";
 
-// W3C Actions Control chord (the Linux harness accelerator is Control), sidesteps
-// the invisible-U+E007 sendKeys hazard — same pattern as hotkeys.e2e.ts.
-const CONTROL = "";
-async function sendCtrlChord(session: Session, key: string): Promise<void> {
-  await session.send("POST", "/actions", {
-    actions: [
-      {
-        type: "key",
-        id: "kbd",
-        actions: [
-          { type: "keyDown", value: CONTROL },
-          { type: "keyDown", value: key },
-          { type: "keyUp", value: key },
-          { type: "keyUp", value: CONTROL },
-        ],
-      },
-    ],
-  });
-}
+// Control chords go through the shared `pressChord(session, KEY.CONTROL, key)`.
 
 // The live editable surface (the selector support/flows.ts uses to drive it).
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** Focus the live editor so an editor keybind (undo) lands on its content DOM. A
  *  tab click focuses the tab button, and under this WebDriver a plain click does
@@ -68,18 +52,6 @@ const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
  *  find-replace.e2e.ts fr1). */
 async function focusEditor(session: Session): Promise<void> {
   await (await session.waitForElement(CM_CONTENT)).sendKeys(String.fromCharCode(0xe014)); // ARROW_RIGHT
-}
-
-/** The DOM-order note-row ids once exactly `expected` rows exist. */
-async function noteRowIds(session: Session, expected: number): Promise<string[]> {
-  const rows = await session.waitUntil(
-    async () => {
-      const found = await session.byTestIdAll("notes.row");
-      return found.length === expected ? found : null;
-    },
-    { label: `${expected} note rows`, timeoutMs: 15_000 },
-  );
-  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
 }
 
 /** The id of the single note row that is NOT `exclude`, once `total` rows exist. */
@@ -180,7 +152,7 @@ describeE2E("pv1 persistent view — undo survives a note switch (MYND-534)", ()
         await s.waitUntil(
           async () => {
             await focusEditor(s);
-            await sendCtrlChord(s, "z");
+            await pressChord(s, KEY.CONTROL, "z");
             return !(await editorText(s)).includes(EDIT_MARKER) ? true : null;
           },
           { label: "undo reverted the pre-switch edit in note A", timeoutMs: 20_000 },

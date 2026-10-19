@@ -40,7 +40,6 @@ import { harnessSupported, launchApp, REPO_ROOT } from "./../support/session";
 import { seedVault } from "./../support/fixtures";
 import {
   activeNoteId,
-  clickNewItem,
   clickRibbonUntilVisible,
   clickUntilVisible,
   clickNoteRow,
@@ -61,12 +60,13 @@ import {
   waitForSaved,
   runPaletteAction,
   unlockToEditor,
+  createFolder,
 } from "./../support/flows";
 import { testIdSelector, type Element, type Session } from "./../support/webdriver";
 
 const OUT_DIR = join(REPO_ROOT, "e2e", "artifacts", "userguide");
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
-const CM_EDITOR = '[data-testid="editor.content"] .cm-editor';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
+const CM_EDITOR = testIdSelector("editor.content") + " .cm-editor";
 const ENTER = String.fromCharCode(0xe007); // W3C key: commit inline rename
 const ESCAPE = String.fromCharCode(0xe00c); // W3C key: dismiss overlays/menus
 const CTRL = String.fromCharCode(0xe009); // W3C modifier (sticky until repeated)
@@ -121,14 +121,6 @@ async function createNote(session: Session, title: string): Promise<void> {
   const noteId = await activeNoteId(session);
   if (!noteId) throw new Error(`createNote left no active note tab for "${title}"`);
   capturedNoteIds.set(title, noteId);
-}
-
-/** Create a top-level folder named `name`. Enter commits the name input;
- *  then wait for at least one folder row to materialize. */
-async function createFolder(session: Session, name: string): Promise<void> {
-  await clickNewItem(session, "notes.new-folder");
-  await (await session.byTestId("notes.new-folder-input")).sendKeys(name + ENTER);
-  await session.byTestId("notes.folder-row", { timeoutMs: 10000 });
 }
 
 /** Create a note and fill it with a real English body (so frames show a
@@ -1523,7 +1515,7 @@ runner(
           await safe("scroll sync status into view", async () => {
             await s.execute(
               "var el=document.querySelector(arguments[0]); if (el) el.scrollIntoView({ block: 'center' });",
-              ['[data-testid="settings.sync-panel"] [data-testid="sync.status-indicator"]'],
+              [`${testIdSelector("settings.sync-panel")} ${testIdSelector("sync.status-indicator")}`],
             );
           });
           await settle(s, 400);
@@ -1771,7 +1763,7 @@ runner(
           await settle(s, 300);
           // Commit the slash menu's top match (Enter) to fire the command.
           await (await s.waitForElement(CM_CONTENT)).sendKeys(ENTER);
-          await s.waitForElement('[data-testid="voice-record-bar"]', { timeoutMs: 8000 });
+          await s.waitForElement(testIdSelector("voice-record-bar"), { timeoutMs: 8000 });
           await settle(s, 600);
         },
       );
@@ -1782,7 +1774,7 @@ runner(
           [testIdSelector("voice-record.cancel"), testIdSelector("voice-record.stop")],
           4000,
         );
-        await s.waitForGone('[data-testid="voice-record-bar"]');
+        await s.waitForGone(testIdSelector("voice-record-bar"));
       });
 
       // =====================================================================

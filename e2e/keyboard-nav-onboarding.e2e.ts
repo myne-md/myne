@@ -20,6 +20,7 @@ import {
   activeTestId,
 } from "./support/keyboard";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** Index of the recovery-phrase cell that currently has focus (`<base>-cell-N`
  *  id pattern), or -1 when focus is not on a cell. */
@@ -78,7 +79,7 @@ describeE2E("KN-2 recovery phrase grid has a deterministic Tab order (MYND-93)",
         void fixture;
 
         const cells = await app.session.findElements(
-          '[data-testid="recover.phrase-grid"] input',
+          testIdSelector("recover.phrase-grid") + " input",
         );
         expect(cells).toHaveLength(24);
 

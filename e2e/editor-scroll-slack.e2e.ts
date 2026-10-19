@@ -31,10 +31,12 @@ import {
   createNote,
   dismissImporterOffer,
   pageSeatInvoke,
+  selectedNoteId,
   unlockToEditor,
   writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
 
@@ -180,10 +182,7 @@ describeE2E("ss1 the last line can be scrolled clear of the bottom edge (#375)",
         // A 200-line body via page-seat IPC rather than typeIntoEditor: the driver
         // drops keystrokes over that many chars. Same pattern as wd1.
         await createNote(s, "Long");
-        const row = await s.waitForElement(
-          '[data-testid="notes.row"][aria-selected="true"]',
-        );
-        const noteId = (await row.attribute("data-note-id")) ?? "";
+        const noteId = await selectedNoteId(s);
         // `createNote` waits for the title badge, but a latest-wins follow-up can
         // still be in flight; a write under it is rejected or overwritten
         // and the post-refresh tail never appears.
@@ -213,7 +212,7 @@ describeE2E("ss1 the last line can be scrolled clear of the bottom edge (#375)",
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
         await s.waitUntil(
           async () => {
-            const tabs = await s.findElements('[data-testid="editor.tab"][data-active="true"]');
+            const tabs = await s.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
             if (tabs.length > 0) return true;
             await s.execute<number>(
               "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +

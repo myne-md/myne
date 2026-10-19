@@ -36,8 +36,9 @@ import {
   openSettings,
   pageSeatInvoke,
   unlockToEditor,
+  rootInlineStyle,
 } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -47,14 +48,6 @@ const CATPPUCCIN_JSON = readFileSync(
   join(HERE, "fixtures", "themes", "catppuccin-mocha.json"),
   "utf8",
 );
-
-/** The current inline `style` attribute on `<html>` (the custom-theme CSS vars
- *  land here via `setProperty`). Fresh lookup per call — the handle goes stale
- *  across re-render. */
-async function rootInlineStyle(session: Session): Promise<string> {
-  const v = await (await session.findElement("html")).attribute("style").catch(() => null);
-  return v ?? "";
-}
 
 describeE2E("ct1 custom-themes subsection empty state (custom-themes epic, MYND-112)", () => {
   // Vault-count precondition: 1 (weak KDF). No custom themes seeded.

@@ -55,6 +55,7 @@ import {
   ipcOk,
   openSettings,
   runPaletteAction,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -120,19 +121,6 @@ async function columnText(session: Session, side: "left" | "right"): Promise<str
   );
   const texts = await Promise.all(cells.map((c) => c.textContent()));
   return texts.join("\n");
-}
-
-/** Read the `data-note-id` of the currently-selected sidebar row (the note
- *  `createNote` just created and left selected). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    testIdSelector("notes.row", { "aria-selected": "true" }),
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
 }
 
 describeE2E("vd1 conflict compare → split → resolve (MYND-334)", () => {

@@ -324,7 +324,7 @@ runner(
         "An empty tab: what the '+' on the tab strip opens.",
         async () => {
           const [plus] = await s.findElements(
-            '[data-testid="editor.tab-strip-button"][aria-label="New tab"]',
+            testIdSelector("editor.tab-strip-button", { "aria-label": "New tab" }),
           );
           if (plus === undefined) throw new Error("no New tab button on the strip");
           await plus.click();

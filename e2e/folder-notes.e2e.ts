@@ -38,37 +38,24 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewItem,
   nameNewNote,
   createNote,
   dismissImporterOffer,
   editorText,
+  selectedNoteId,
   setFolderNotesEnabled,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
+  contextMenuPick,
+  createFolder,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 // The CodeMirror document surface (mirrors the private const in support/flows.ts
 // — re-declared here so the picker can be driven with raw keystrokes onto the
 // SAME element `typeIntoEditor` types into, without exporting harness internals).
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
-
-/** Right-click an element and pick a context-menu item by its `data-item-id`
- *  (the shared notes/folder menu encoding — `notes.context-menu-item`). */
-async function contextMenuPick(
-  s: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await s.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** Open `target`'s context menu, return whether it offers `itemId`, then dismiss
  *  the menu via an outside click (CodeMirror content — far from the sidebar menu,
@@ -137,21 +124,6 @@ async function menuOffers(
   throw lastErr;
 }
 
-/** Create a folder via the sidebar "New folder" CTA + its inline input (the
- *  `nc4`/`ms1` flow — the input commits on blur/Enter as `notes.folder-row`
- *  materializes). Lowercase-only name: WebKitWebDriver's Send Keys drops the
- *  shift modifier, so an uppercase char would arrive lowercased — name the
- *  folder a value the driver types faithfully (a driver limitation, not a
- *  product one). */
-async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewItem(s, "notes.new-folder");
-  // `` is the W3C Enter code point — it commits the inline new-folder
-  // input. Without it the input never materializes `notes.folder-row` and the
-  // next line times out (the nc4 site in notes.e2e.ts carries the same key).
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}`);
-  await s.byTestId("notes.folder-row");
-}
-
 /** Create a note INSIDE `folder` via its "New note here" context item and commit
  *  `title` through the inline-rename input (the `nc4` pattern). The note's
  *  `folder:` is the folder's path, so it counts toward that folder's index. */
@@ -165,23 +137,6 @@ async function createNoteInFolder(
   // rename input never closes and `waitForGone` below times out. Mirrors the
   // canonical `flows.ts::createNote`, which carries the same commit key.
   await nameNewNote(s, title);
-}
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the row
- *  `createNote`/`createNoteInFolder` just left selected, or the row a navigation
- *  landed on (`aria-selected="true"` + `data-note-id`, the byTestId-only handle;
- *  the random-note suite's idiom). */
-async function selectedNoteId(s: Session): Promise<string> {
-  // Read the OPEN note from the active editor tab, not the sidebar row: a note
-  // filed into a folder lives under a collapsible folder row that may be folded
-  // shut (hiding its row), but the just-created/opened note is always the active
-  // editor tab. The tab carries `data-tab-id="note:<id>"` (Saved Views #4).
-  const tab = await s.waitForElement('[data-testid="editor.tab"][data-active="true"]');
-  const raw = (await tab.attribute("data-tab-id")) ?? "";
-  if (!raw.startsWith("note:")) {
-    throw new Error(`active editor tab is not a note tab: "${raw}"`);
-  }
-  return raw.slice("note:".length);
 }
 
 describeE2E("fn1 folder index: designate → hidden → double-click open → link-resolve → undesignate (MYND-370)", () => {

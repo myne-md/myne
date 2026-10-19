@@ -49,7 +49,7 @@
 // Linux-only — authored on macOS to the conventions and run green in the
 // container (`./scripts/e2e-local.sh`). See e2e/AGENTS.md "definition of done".
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "vitest";
@@ -61,10 +61,10 @@ import {
   pageSeatInvoke,
   searchAndOpenNote,
   seedEmbedIntoNote,
+  selectedNoteId,
   unlockToEditor,
+  importFixturePng,
 } from "./support/flows";
-import { REPO_ROOT } from "./support/session";
-import { type Session } from "./support/webdriver";
 
 
 /** OCR of one small image runs three model passes; generous but bounded. */
@@ -77,38 +77,6 @@ const FILENAME = "fatura-taramasi.png";
  *  deliberately types the accented form so only folding can bridge it. */
 const IMAGE_WORD_EN = "invoice";
 const QUERY_TR_ACCENTED = "şirket";
-
-/** Resolved from `REPO_ROOT` (the fixtures.ts convention) so it works from the
- *  bind-mounted container regardless of the runner's cwd. */
-function fixturePng(): number[] {
-  return Array.from(
-    readFileSync(join(REPO_ROOT, "core", "tests", "fixtures", "ocr-sample.png")),
-  );
-}
-
-/** Import the fixture image from the page seat (real IPC, zero test hooks) and
- *  return its catalog id. Import is where OCR happens on the desktop path. */
-async function importImage(s: Session): Promise<string> {
-  const r = await pageSeatInvoke(
-    s,
-    "plugin:attachments|attachment_import",
-    { source: { kind: "bytes", bytes: fixturePng(), filename: FILENAME } },
-    IPC_TIMEOUT,
-  );
-  expect(r.err, "attachment_import should accept the .png file").toBeUndefined();
-  return (r.ok as { id: string }).id;
-}
-
-/** Read the `data-note-id` of the currently-selected sidebar row — the byTestId
- *  path to a live-created note's id (the sp1 pattern). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /** Type raw source into CM6 without a landed-check (the decoration replaces the
  *  embed source with a widget, so a landed-check would never match). */
@@ -170,7 +138,7 @@ describeE2E("io1 image OCR makes an embedded image searchable (MYND-441)", () =>
         ).toBe(true);
 
         // OCR runs inside this call.
-        const attachmentId = await importImage(s);
+        const attachmentId = await importFixturePng(s, FILENAME);
 
         // **Split the chain before asserting the end of it.** The palette wait
         // reported `the query landed but no row matched; re-running the search`

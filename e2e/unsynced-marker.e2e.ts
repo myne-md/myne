@@ -26,36 +26,16 @@ import { launchDevice, syncConfigSeed } from "./support/multi-device";
 import { seedVault } from "./support/fixtures";
 import { type Session } from "./support/webdriver";
 import {
-  closeSettings,
   createNote,
-  dismissImporterOffer,
   ipcOk,
-  openSettings,
   pageSeatInvoke,
   reopenNoteAfterReload,
   typeIntoEditor,
-  unlockToEditor,
   waitForSaved,
+  unlockAndEnroll,
 } from "./support/flows";
 
 const supported = harnessSupported().ok && syncServerSupported().ok;
-
-/** Unlock, enroll this device (first device self-approves), land back in the editor. */
-async function unlockAndEnroll(
-  session: Session,
-  account: string,
-  password: string,
-): Promise<void> {
-  await unlockToEditor(session, password);
-  await dismissImporterOffer(session);
-  await openSettings(session);
-  await (await session.byTestId("settings.tab-sync")).click();
-  await (await session.byTestId("sync.enroll.account-input")).sendKeys(account);
-  await (await session.byTestId("sync.enroll.password-input")).sendKeys(password);
-  await (await session.byTestId("sync.enroll.submit")).click();
-  await session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
-  await closeSettings(session);
-}
 
 /** How many sidebar rows currently carry the unsynced marker. */
 async function markedRows(session: Session): Promise<number> {

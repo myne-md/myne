@@ -31,6 +31,7 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** Current view mode reflected on the bottom-bar CTA's `data-view-mode`. */
 async function currentViewMode(s: Session): Promise<string | null> {
@@ -71,13 +72,13 @@ describeE2E("rsm1 view-mode CTA cycles + preview companion (reading-source-modes
 
         // In SOURCE mode the bottom-bar preview toggle appears; it opens a
         // side-by-side read-only Reading mirror of the same buffer.
-        await s.waitForGone('[data-testid="editor.preview-companion"]');
+        await s.waitForGone(testIdSelector("editor.preview-companion"));
         await (await s.byTestId("editor.preview-companion-toggle")).click();
         await s.byTestId("editor.preview-companion");
 
         // Toggle again → the companion closes.
         await (await s.byTestId("editor.preview-companion-toggle")).click();
-        await s.waitForGone('[data-testid="editor.preview-companion"]');
+        await s.waitForGone(testIdSelector("editor.preview-companion"));
 
         // Click again → source → live (wraps); the preview toggle is source-only,
         // so it disappears once we leave source mode.
@@ -85,7 +86,7 @@ describeE2E("rsm1 view-mode CTA cycles + preview companion (reading-source-modes
         await s.waitUntil(async () => ((await currentViewMode(s)) === "live" ? true : null), {
           label: "CTA cycles source → live (wraps)",
         });
-        await s.waitForGone('[data-testid="editor.preview-companion-toggle"]');
+        await s.waitForGone(testIdSelector("editor.preview-companion-toggle"));
       },
     );
   });

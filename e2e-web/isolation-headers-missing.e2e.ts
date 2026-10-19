@@ -43,6 +43,7 @@ import { newBrowserSession } from "./support/session";
 import { openApp } from "./support/flows";
 import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -93,7 +94,7 @@ describeE2E("a deployment without the isolation headers", () => {
       ).toBe(false);
 
       // THE assertion: a refusal screen, not the app.
-      await session.waitForElement('[data-testid="web.unsupported-environment"]', {
+      await session.waitForElement(testIdSelector("web.unsupported-environment"), {
         timeoutMs: 30_000,
       });
 

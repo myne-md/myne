@@ -46,8 +46,9 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const CM_CONTENT = `${EDITOR} .cm-content`;
 const CODE_LINE = `${EDITOR} .cm-code-card-body`;
 describeE2E("cbt1 a code block resolves a monospace face (myne-md/myne#555)", () => {

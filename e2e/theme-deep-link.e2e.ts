@@ -35,8 +35,13 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
-import { testIdSelector, type Session } from "./support/webdriver";
+import {
+  dismissImporterOffer,
+  openSettings,
+  rootInlineStyle,
+  unlockToEditor,
+} from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
 
 /** A complete, valid palette — every required-core token, distinctive base. */
 const PALETTE: Record<string, string> = {
@@ -84,14 +89,6 @@ function installLink(overrides: Record<string, string | null> = {}): string {
   const search = new URLSearchParams();
   for (const [k, v] of Object.entries(merged)) if (v !== null) search.set(k, v);
   return `myne://theme/install?${search.toString()}`;
-}
-
-/** The current inline `style` on `<html>` — where a custom palette lands
- *  (`setProperty` via the CSSOM, not a `data-theme` attribute). Fresh lookup
- *  per call: the handle goes stale across re-render. */
-async function rootInlineStyle(session: Session): Promise<string> {
-  const v = await (await session.findElement("html")).attribute("style").catch(() => null);
-  return v ?? "";
 }
 
 describeE2E("td1 a launch-time theme-install link installs after unlock (MYND-567)", () => {

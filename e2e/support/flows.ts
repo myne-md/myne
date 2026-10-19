@@ -6,8 +6,11 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { testIdSelector, WebDriverError, type Element, type Session } from "./webdriver";
 import { KEY, activeTestId, pressChord, pressKey } from "./keyboard";
+import { REPO_ROOT } from "./session";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -1209,6 +1212,29 @@ export async function closeSettings(session: Session): Promise<void> {
   await session.waitForGone(testIdSelector("settings.modal"));
 }
 
+/** Unlock, dismiss the importer offer, and enrol this vault with the sync server
+ *  from Settings → Sync, waiting for the approval. Leaves Settings closed.
+ *
+ *  Three sync suites had their own copy of this sequence. It deliberately does
+ *  NOT start or configure a server: the caller owns that, because only the
+ *  caller knows whether it is enrolling against an ephemeral one or a seeded
+ *  endpoint. */
+export async function unlockAndEnroll(
+  session: Session,
+  account: string,
+  password: string,
+): Promise<void> {
+  await unlockToEditor(session, password);
+  await dismissImporterOffer(session);
+  await openSettings(session);
+  await (await session.byTestId("settings.tab-sync")).click();
+  await (await session.byTestId("sync.enroll.account-input")).sendKeys(account);
+  await (await session.byTestId("sync.enroll.password-input")).sendKeys(password);
+  await (await session.byTestId("sync.enroll.submit")).click();
+  await session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+  await closeSettings(session);
+}
+
 /**
  * Complete the post-recovery password reset (A8f): fill both fields,
  * wait out the zxcvbn gate, submit. Used by the VR-1 drill and the
@@ -1228,7 +1254,7 @@ export async function completePasswordReset(
   await submit.click();
 }
 
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 
 /** The note id of the ACTIVE editor tab, or `null` when the active tab is not a
  *  note tab (graph, settings, …).
@@ -1247,7 +1273,7 @@ const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
  *  The tab strip is the observable that actually carries the answer:
  *  `data-tab-id="note:<id>"` on `[data-active="true"]` (Saved Views #4). */
 export async function activeNoteId(session: Session): Promise<string | null> {
-  const [tab] = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+  const [tab] = await session.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
   if (!tab) return null;
   const raw = (await tab.attribute("data-tab-id")) ?? "";
   return raw.startsWith("note:") ? raw.slice("note:".length) : null;
@@ -1476,7 +1502,7 @@ export async function noteRowIds(
  *  selected row can be absent from the DOM when it is outside the scroll window.
  *  The editor tab remains mounted and carries the same note id. */
 export async function selectedNoteId(session: Session): Promise<string> {
-  const tab = await session.waitForElement('[data-testid="editor.tab"][data-active="true"]');
+  const tab = await session.waitForElement(testIdSelector("editor.tab", { "data-active": "true" }));
   const tabId = (await tab.attribute("data-tab-id")) ?? "";
   if (!tabId.startsWith("note:") || tabId.length === "note:".length) {
     throw new Error("selectedNoteId: the active editor tab is not a note tab");
@@ -1559,6 +1585,27 @@ export async function rowMenuPick(
   itemId: string,
 ): Promise<void> {
   await rightClickBySelector(session, testIdSelector("notes.row", { "data-note-id": noteId }));
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
+}
+
+/** Right-click an ELEMENT handle (a row, a folder row, a tab) and pick a
+ *  context-menu item by its `data-item-id`.
+ *
+ *  The element-taking twin of {@link rowMenuPick}: that one addresses a note row
+ *  by id and re-finds it, which is not what the folder rows, the tab strip or an
+ *  already-resolved handle want. Eight suites had grown their own identical copy
+ *  of this body, so it lives here now; the two coexist deliberately because the
+ *  callers differ in whether they hold an id or an element. */
+export async function contextMenuPick(
+  session: Session,
+  target: { rightClick(): Promise<void> },
+  itemId: string,
+): Promise<void> {
+  await target.rightClick();
   await (
     await session.waitForElement(
       testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
@@ -1767,6 +1814,23 @@ export async function createNote(session: Session, title: string): Promise<void>
   // long body never reaches the buffer (scroll-memory / scroll-slack). Settle
   // the badge first. Non-throwing: a caller that never edited still returns.
   await waitForSaved(session).catch(() => {});
+}
+
+/** Create a folder from the sidebar's "New folder" action and commit `name`
+ *  through the inline input, waiting for the folder row to exist.
+ *
+ *  The `ENTER_KEY` commit is load-bearing: without it the inline input never
+ *  materialises `notes.folder-row` and the caller's next wait burns its whole
+ *  budget. Five suites carried their own copy of these three lines.
+ *
+ *  **Name it in lowercase.** WebKitWebDriver's Send Keys drops the shift
+ *  modifier, so an uppercase character arrives lowercased — a driver
+ *  limitation, not a product one, and a caller that asserted the typed case
+ *  would fail on a working app. */
+export async function createFolder(session: Session, name: string): Promise<void> {
+  await clickNewItem(session, "notes.new-folder");
+  await (await session.byTestId("notes.new-folder-input")).sendKeys(`${name}${ENTER_KEY}`);
+  await session.byTestId("notes.folder-row");
 }
 
 /** Confirm an open delete-confirm dialog with Enter (myne-md/myne#676,
@@ -2046,6 +2110,43 @@ export async function typeIntoEditor(
  * rendered text and sends that many Backspaces, capped at the payload length so
  * a mis-measure can never eat into the note that was already there. */
 /**
+ * The deterministic PNG fixture the attachment/embed suites import: a small
+ * image whose pixels OCR reads (`core/tests/fixtures/ocr-sample.png`).
+ *
+ * Four suites carried their own copy of this reader. Deliberately NOT exported
+ * as a Buffer or a base64 blob — every caller wants `number[]` for the
+ * `attachment_import` bytes source, so this is the shape it hands back.
+ */
+export function fixturePng(): number[] {
+  return Array.from(
+    readFileSync(join(REPO_ROOT, "core", "tests", "fixtures", "ocr-sample.png")),
+  );
+}
+
+/**
+ * Import {@link fixturePng} through the page seat's real
+ * `attachment_import` IPC and return the catalog id.
+ *
+ * `filename` is the caller's, because each suite names the attachment the way
+ * its own assertions read it back. The `expect` on `err` is the whole point of
+ * sharing it: a copy that dropped it would return an id off an undefined body.
+ */
+export async function importFixturePng(
+  session: Session,
+  filename: string,
+  timeoutMs = 60_000,
+): Promise<string> {
+  const r = await pageSeatInvoke(
+    session,
+    "plugin:attachments|attachment_import",
+    { source: { kind: "bytes", bytes: fixturePng(), filename } },
+    timeoutMs,
+  );
+  expect(r.err, "attachment_import should accept the .png fixture").toBeUndefined();
+  return (r.ok as { id: string }).id;
+}
+
+/**
  * Put an attachment embed into a note through the real note IPC, then reopen it.
  *
  * **This replaces typing the embed, and the four rounds it took to get here are
@@ -2099,7 +2200,7 @@ export async function seedEmbedIntoNote(
   // The note `createNote` just made is the highlighted row, and its id is on the
   // row rather than anywhere in the editor. Same reading `editor-scroll-slack`
   // uses.
-  const row = await session.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
+  const row = await session.waitForElement(testIdSelector("notes.row", { "aria-selected": "true" }));
   const noteId = (await row.attribute("data-note-id")) ?? "";
   if (noteId === "") throw new Error("seedEmbedIntoNote: the active note row carries no id");
 
@@ -2122,7 +2223,7 @@ export async function seedEmbedIntoNote(
   // makes every following assertion measure nothing.
   await session.waitUntil(
     async () => {
-      const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+      const tabs = await session.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
       if (tabs.length > 0) return true;
       await session.execute<number>(
         "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
@@ -2148,7 +2249,7 @@ export async function waitForSaved(session: Session): Promise<void> {
   // which reads as a slow save and is really a missing precondition: there is
   // no open note to save. Distinguishing the two costs one query.
   if ((await session.byTestIdAll("editor.save-status")).length === 0) {
-    const tabs = await session.findElements('[data-testid="editor.tab"][data-active="true"]');
+    const tabs = await session.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
     if (tabs.length === 0) {
       throw new Error(
         "waitForSaved: no save status AND no active editor tab — the editor hides " +
@@ -2458,6 +2559,26 @@ export async function openSettledGraphPane(
   );
   const canvas = await session.byTestId("editor.graph-canvas", { timeoutMs: 15_000 });
   return { pane, canvas };
+}
+
+/** The right-panel tab ids in current DOM (display) order.
+ *
+ *  Three suites had their own copy. The filter drops rows whose
+ *  `data-panel-tab-id` is absent rather than yielding a null into the array. */
+export async function tabIds(session: Session): Promise<string[]> {
+  const els = await session.byTestIdAll("editor.right-panel-tab");
+  const ids = await Promise.all(els.map((e) => e.attribute("data-panel-tab-id")));
+  return ids.filter((id): id is string => id !== null);
+}
+
+/** The `<html>` element's inline `style` attribute, or `""` when there is none.
+ *
+ *  The theme suites read this to assert the palette reached the document root.
+ *  Three suites had their own copy; the `catch` is deliberate — a missing
+ *  `style` attribute is a legitimate state (no theme applied), not an error. */
+export async function rootInlineStyle(session: Session): Promise<string> {
+  const v = await (await session.findElement("html")).attribute("style").catch(() => null);
+  return v ?? "";
 }
 
 /**

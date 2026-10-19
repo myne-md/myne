@@ -112,7 +112,7 @@ describeE2E("pf1 theme + auto-lock round-trip (MYND-225)", () => {
         await (await s.byTestId("settings.auto-lock-select")).click();
         await (
           await s.waitForElement(
-            '[data-testid="settings.auto-lock-select-option"][data-value="900"]',
+            testIdSelector("settings.auto-lock-select-option", { "data-value": "900" }),
           )
         ).click();
         if (

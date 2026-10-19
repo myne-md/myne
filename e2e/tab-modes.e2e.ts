@@ -36,6 +36,7 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  noteRowIds,
   runPaletteAction,
   unlockToEditor,
 } from "./support/flows";
@@ -49,18 +50,6 @@ const TM_TITLES = [
 ];
 
 // ── helpers ────────────────────────────────────────────────────────────────
-
-/** The sidebar rows' note-ids, in DOM order, once exactly `expected` exist. */
-async function noteRowIds(session: Session, expected: number): Promise<string[]> {
-  const rows = await session.waitUntil(
-    async () => {
-      const found = await session.byTestIdAll("notes.row");
-      return found.length === expected ? found : null;
-    },
-    { label: `${expected} note rows`, timeoutMs: 15_000 },
-  );
-  return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
-}
 
 async function row(session: Session, noteId: string): Promise<Element> {
   return session.waitForElement(testIdSelector("notes.row", { "data-note-id": noteId }));

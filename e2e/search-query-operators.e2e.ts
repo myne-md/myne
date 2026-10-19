@@ -22,24 +22,12 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** The `data-note-id` of the currently-selected sidebar row (the note
- *  `createNote` just created and left selected). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  const id = await row.attribute("data-note-id");
-  if (id === null || id === "") {
-    throw new Error("selected notes.row carried no data-note-id");
-  }
-  return id;
-}
 
 /** The set of note-hit ids currently rendered in the palette NOTES section
  *  (`data-kind="note"` separates them from COMMAND rows sharing the testid). */

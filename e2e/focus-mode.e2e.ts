@@ -35,7 +35,7 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { type Session } from "./support/webdriver";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 /** Whether focus mode is on, i.e. some element carries `data-focus-active="true"`.
  *  The attribute lives on the editor's center container (a descendant of the
@@ -305,10 +305,10 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
           { label: "the inactive-line dim is applied" },
         );
 
-        const active = await inkOf(s, '[data-testid="editor.content"] .cm-line.cm-activeLine');
+        const active = await inkOf(s, testIdSelector("editor.content") + " .cm-line.cm-activeLine");
         const inactive = await inkOf(
           s,
-          '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+          testIdSelector("editor.content") + " .cm-line:not(.cm-activeLine)",
         );
         expect(active, "no active line to measure").not.toBeNull();
         expect(inactive, "no inactive line to measure").not.toBeNull();
@@ -326,10 +326,10 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
         let prev: { activeRatio: number; inactiveRatio: number } | null = null;
         const settled = await s.waitUntil(
           async () => {
-            const a = await inkOf(s, '[data-testid="editor.content"] .cm-line.cm-activeLine');
+            const a = await inkOf(s, testIdSelector("editor.content") + " .cm-line.cm-activeLine");
             const b = await inkOf(
               s,
-              '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+              testIdSelector("editor.content") + " .cm-line:not(.cm-activeLine)",
             );
             if (a === null || b === null) {
               prev = null;
@@ -400,7 +400,7 @@ describeE2E("fm3 the focus dim stays readable (myne-md/myne#555)", () => {
         });
         const restored = await inkOf(
           s,
-          '[data-testid="editor.content"] .cm-line:not(.cm-activeLine)',
+          testIdSelector("editor.content") + " .cm-line:not(.cm-activeLine)",
         );
         expect(
           effectiveContrast(restored!)!,

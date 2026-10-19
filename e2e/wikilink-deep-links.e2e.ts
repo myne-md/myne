@@ -36,25 +36,19 @@ import {
   dismissImporterOffer,
   editorText,
   pageSeatInvoke,
+  selectedNoteId,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
   writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
 
-/** Read the selected sidebar row's note-id (`createNote` leaves it selected). */
-async function selectedNoteId(s: Session): Promise<string> {
-  const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
-  );
-  return (await row.attribute("data-note-id")) ?? "";
-}
-
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
-const CM_SCROLLER = '[data-testid="editor.content"] .cm-scroller';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
+const CM_SCROLLER = testIdSelector("editor.content") + " .cm-scroller";
 
 /** The MAX `.cm-scroller` scrollTop across every editor pane (the page can hold a
  *  reading-mode mirror or a second pane, so a single `querySelector` may read the
@@ -216,7 +210,7 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
         // The active editor tab's note-id ("note:<id>") — the race-free "which
         // note is open" signal (editorText would false-match the Source link text).
         const activeNoteId = async (): Promise<string | null> => {
-          const tabs = await s.findElements('[data-testid="editor.tab"][data-active="true"]');
+          const tabs = await s.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
           if (tabs.length === 0) return null;
           const raw = (await tabs[0].attribute("data-tab-id")) ?? "";
           return raw.startsWith("note:") ? raw.slice("note:".length) : null;
@@ -241,7 +235,7 @@ describeE2E("wd1 click [[Note#Heading]] scrolls to the heading; not-found → no
         // turns the clicked chip into editable text before the click handler runs,
         // so the navigation never fires). View mode is per-tab + persisted, so
         // Source stays in reading view across the round-trip.
-        const CTA = '[data-testid="editor.view-mode-cta"]';
+        const CTA = testIdSelector("editor.view-mode-cta");
         const viewMode = async (): Promise<string | null> => {
           const ctas = await s.findElements(CTA);
           return ctas.length === 0 ? null : await ctas[0].attribute("data-view-mode");
@@ -343,7 +337,7 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
         // click (the picker inserts on mousedown — a DOM click() never fires it),
         // re-fetched so the row re-rendering as the query filters doesn't stale it.
         await content.sendKeys("[[#setup");
-        await realClickFresh(s, '[data-testid="picker.heading-row"]');
+        await realClickFresh(s, testIdSelector("picker.heading-row"));
         await s.waitUntil(
           async () => ((await editorText(s)).includes("[[#Setup wdsetup]]") ? true : null),
           { label: "[[# inserted the compact heading-anchor form", timeoutMs: 10_000 },
@@ -357,7 +351,7 @@ describeE2E("wd2 [[# / [[## heading autocomplete inserts the hybrid form (MYND-3
         // moves. Assert the bytes the autosave wrote via production
         // note_read IPC (same oracle wd1 already uses).
         await content.sendKeys("\n[[##goals");
-        await realClickFresh(s, '[data-testid="picker.vault-heading-row"]');
+        await realClickFresh(s, testIdSelector("picker.vault-heading-row"));
         await waitForSaved(s);
         await s.waitUntil(
           async () => {

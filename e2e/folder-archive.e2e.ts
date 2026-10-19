@@ -19,38 +19,15 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
-  clickNewItem,
   clickRibbonUntilVisible,
   createNote,
   dismissImporterOffer,
   nameNewNote,
   unlockToEditor,
+  contextMenuPick,
+  createFolder,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
-
-/** Right-click an element and pick a context-menu item by its `data-item-id`. */
-async function contextMenuPick(
-  session: Session,
-  target: { rightClick(): Promise<void> },
-  itemId: string,
-): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
-}
-
-/** Create a folder via the sidebar new-folder input. The trailing ``
- *  (W3C Enter code point) commits the inline input, else `notes.folder-row`
- *  never materializes (the `createFolder` helper in folder-notes.e2e.ts carries
- *  the same commit key). */
-async function createFolder(s: Session, name: string): Promise<void> {
-  await clickNewItem(s, "notes.new-folder");
-  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}`);
-  await s.byTestId("notes.folder-row");
-}
 
 /** Create a note INSIDE `folder` via its "New note here" item and commit `title`
  *  through the inline-rename input (the `nc4` pattern). Trailing `` (W3C

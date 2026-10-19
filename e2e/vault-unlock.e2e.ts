@@ -33,6 +33,7 @@ import { seedProductionVault } from "./support/realistic-fixture";
 import { activeTestId, typeIntoActive } from "./support/keyboard";
 import { ioBanner } from "../src/lib/io-banner";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
+import { testIdSelector } from "./support/webdriver";
 
 /** Full-literal banner copies (SYNC-8 equality asserts). The permission
  *  banner derives from the canonical `ioBanner` mapping the production
@@ -128,7 +129,7 @@ describeE2E("VU-2 compound banner full literal (MYND-125 task 2)", () => {
 
         // …and the next keystroke clears the banner.
         await input.sendKeys("x");
-        await app.session.waitForGone('[data-testid="unlock.error-banner"]');
+        await app.session.waitForGone(testIdSelector("unlock.error-banner"));
 
         // Control: the real password still opens the vault.
         await input.replaceText(fixture.password);

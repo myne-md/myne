@@ -45,6 +45,7 @@ import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { setupTwoSyncedDevices } from "./support/multi-device";
 import { activeNoteId, clickNoteRow, ipcOk, pageSeatInvoke } from "./support/flows";
+import { sleep } from "./support/member-fleet";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -74,10 +75,6 @@ interface AwarenessPayload {
   cursor: number | null;
   selection: { anchor: number; head: number } | null;
   frameType: "join" | "presence";
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function readBody(session: AppSession["session"], noteId: string): Promise<string> {

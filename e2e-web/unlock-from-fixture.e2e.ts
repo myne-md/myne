@@ -30,6 +30,7 @@ import { newBrowserSession } from "./support/session";
 import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { loadVaultFixture, seedVault } from "./support/opfs-seed";
+import { testIdSelector } from "./support/session";
 
 const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
@@ -72,7 +73,7 @@ describeE2E("a seeded vault.meta reaches an unlocked vault with no sync server",
       expect(await session.execute<string>("return location.pathname;")).toContain("/unlock");
 
       await unlockField.sendKeys(vault.password);
-      const submit = await session.findElement('[data-testid="unlock.submit"]');
+      const submit = await session.findElement(testIdSelector("unlock.submit"));
       await submit.click();
 
       // Unlocked = the VAULT SHELL, waited on positively. "The password field
@@ -84,7 +85,7 @@ describeE2E("a seeded vault.meta reaches an unlocked vault with no sync server",
       // notes, so nothing mounts CodeMirror — waiting on `.cm-content` would
       // fail against a perfectly unlocked vault, and did.
       try {
-        await session.waitForElement('[data-testid="editor.bottom-bar"]', {
+        await session.waitForElement(testIdSelector("editor.bottom-bar"), {
           timeoutMs: UNLOCK_TIMEOUT_MS,
         });
       } catch (e) {

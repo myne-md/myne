@@ -380,7 +380,7 @@ describeE2E("tp5 a task's fields are editable from the list (myne-md/myne#884 ta
         // The bytes: the note the task came from now carries a due field on that
         // exact line. Read through the same IPC the app reads with, so this is
         // the note on disk rather than a re-render.
-        const row = await s.waitForElement('[data-testid="notes.row"]');
+        const row = await s.waitForElement(testIdSelector("notes.row"));
         const noteId = (await row.attribute("data-note-id")) ?? "";
         expect(noteId, "the seeded note carries no id in the sidebar").not.toBe("");
 

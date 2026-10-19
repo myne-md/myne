@@ -35,7 +35,7 @@ const ENTER = "\uE007"; // W3C Actions API code point for Enter.
 // thumbnail that could not appear. It read like a broken drawing feature.
 // Four sibling specs already use the escape form for exactly this reason;
 // `tests/scripts/e2eEnterKey.test.ts` now holds every one of them to it.
-const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+const CM_CONTENT = testIdSelector("editor.content") + " .cm-content";
 const EMBED = testIdSelector("editor.drawing-embed");
 const EMBED_EDITING = testIdSelector("editor.drawing-embed", {
   "data-drawing-embed-state": "editing",

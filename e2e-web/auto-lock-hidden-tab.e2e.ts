@@ -58,6 +58,7 @@ import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { openFixtureVault, openSettingsTab } from "./support/fixture-session";
 import type { Session } from "./support/session";
+import { testIdSelector } from "./support/session";
 
 /** The smallest auto-lock the Privacy panel offers, in seconds. */
 const AUTO_LOCK_SECS = 60;
@@ -172,7 +173,7 @@ describeE2E("a tab hidden past its auto-lock deadline is locked on return", () =
       await session.execute(
         "document.querySelector('[data-testid=\"settings.auto-lock-select\"]').click();",
       );
-      await session.waitForElement('[data-testid="settings.auto-lock-select-menu"]', {
+      await session.waitForElement(testIdSelector("settings.auto-lock-select-menu"), {
         timeoutMs: 15_000,
       });
       await session.execute(
@@ -204,7 +205,7 @@ describeE2E("a tab hidden past its auto-lock deadline is locked on return", () =
       await session.execute(
         "document.querySelector('[data-testid=\"settings.close\"]')?.click();",
       );
-      await session.waitForGone('[data-testid="settings.modal"]', { timeoutMs: 15_000 });
+      await session.waitForGone(testIdSelector("settings.modal"), { timeoutMs: 15_000 });
 
       const home = await session.windowHandle();
       expect(
@@ -230,7 +231,7 @@ describeE2E("a tab hidden past its auto-lock deadline is locked on return", () =
 
       // …and the long one.
       await leaveAndReturn(session, home, AWAY_MS);
-      await session.waitForGone('[data-testid="editor.bottom-bar"]', {
+      await session.waitForGone(testIdSelector("editor.bottom-bar"), {
         timeoutMs: 30_000,
       });
       expect(

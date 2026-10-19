@@ -40,8 +40,9 @@ import {
   unlockToEditor,
 } from "./support/flows";
 import type { Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
-const EDITOR = '[data-testid="editor.content"]';
+const EDITOR = testIdSelector("editor.content");
 const TOOLTIP = ".cm-wikilink-hover";
 
 /** The tooltip's text, or "" when it is not up. */

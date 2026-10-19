@@ -85,10 +85,12 @@ import {
   createNote,
   dismissImporterOffer,
   dismissImporterOfferIfPresent,
+  selectedNoteId,
   unlockToEditor,
   writeNoteBody,
 } from "./support/flows";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** The floating toolbar mounts on `document.body` as `.cm-toolbar` — a
  *  CodeMirror-plugin surface with no testid of its own, the `.cm-content`
@@ -180,7 +182,7 @@ async function selectOnLine(s: Session, index: number): Promise<Placement> {
   return await s.waitUntil(
     async () => {
       const lines = await s.findElements(
-        '[data-testid="editor.content"] .cm-content .cm-line',
+        testIdSelector("editor.content") + " .cm-content .cm-line",
       );
       if (lines.length <= index) return null;
       // Re-selecting per iteration is load-bearing, for the reason
@@ -273,8 +275,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         // subject is PLACEMENT, and `e2e/AGENTS.md` records what typing a long
         // body through the driver costs: dropped keystrokes over a few hundred
         // characters, and a body that is not what the scenario meant to write.
-        const row = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-        const noteId = (await row.attribute("data-note-id")) ?? "";
+        const noteId = await selectedNoteId(s);
         expect(noteId, "the created note has no id to write into").not.toBe("");
 
         // Three probe lines and enough filler between them that the third is
@@ -308,7 +309,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         await s.byTestId("editor.root", { timeoutMs: 30_000 });
         await s.waitUntil(
           async () => {
-            const tabs = await s.findElements('[data-testid="editor.tab"][data-active="true"]');
+            const tabs = await s.findElements(testIdSelector("editor.tab", { "data-active": "true" }));
             if (tabs.length > 0) return true;
             await s.execute<number>(
               "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
@@ -323,7 +324,7 @@ describeE2E("ftp1 the floating toolbar stays on screen and off the selection (my
         // fresh-vault overlay is correctly absent and the strict helper would
         // burn its budget on something that is not there.
         await dismissImporterOfferIfPresent(s);
-        await s.waitForElement('[data-testid="editor.content"] .cm-content .cm-line');
+        await s.waitForElement(testIdSelector("editor.content") + " .cm-content .cm-line");
 
         // Line 0 is the first, which is where "directly above the selection"
         // puts the toolbar off the top of the pane — and where an

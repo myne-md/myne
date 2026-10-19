@@ -138,11 +138,13 @@ import {
   notifyNoteWritten,
   dismissImporterOffer,
   runPaletteAction,
+  selectedNoteId,
   unlockToEditor,
   writeNoteBody,
 } from "./support/flows";
 import { KEY } from "./support/keyboard";
 import { type Session } from "./support/webdriver";
+import { testIdSelector } from "./support/webdriver";
 
 /** How far off the pane's vertical centre the caret line may sit, as a fraction
  *  of the pane height. See the header: the no-pin failure is ~0.5 away. */
@@ -381,8 +383,7 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Typewriter");
-        const row1 = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-        const id1 = (await row1.attribute("data-note-id")) ?? "";
+        const id1 = await selectedNoteId(s);
         await preseedLines(s, id1, PRESEED_LINES);
         await s.execute<void>(
           "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
@@ -398,7 +399,7 @@ describeE2E("tw1 the typewriter pin holds across a typing burst (myne-md/myne#55
         // one update per line rather than one for the whole paste — a paste is a
         // single transaction and would prove nothing about holding the pin
         // ACROSS updates, which is the claim.
-        const content = await s.findElement('[data-testid="editor.content"] .cm-content');
+        const content = await s.findElement(testIdSelector("editor.content") + " .cm-content");
 
         let clampReleased = false;
         let settledCount = 0;
@@ -460,8 +461,7 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
         await createNote(s, "Repin");
-        const row2 = await s.waitForElement('[data-testid="notes.row"][aria-selected="true"]');
-        const id2 = (await row2.attribute("data-note-id")) ?? "";
+        const id2 = await selectedNoteId(s);
         await preseedLines(s, id2, PRESEED_LINES);
         await s.execute<void>(
           "var e = document.querySelector('[data-testid=\"notes.row\"][data-note-id=" +
@@ -469,7 +469,7 @@ describeE2E("tw2 scrolling away and typing re-establishes the pin (myne-md/myne#
             "]'); if (e) e.click();",
         );
         await enterTypewriterFocus(s);
-        const content = await s.findElement('[data-testid="editor.content"] .cm-content');
+        const content = await s.findElement(testIdSelector("editor.content") + " .cm-content");
 
         // Get well past the clamp so "scrolled away" and "at the top" are
         // distinguishable.

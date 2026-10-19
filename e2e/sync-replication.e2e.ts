@@ -837,7 +837,7 @@ async function unfocusedPaneIdShowing(session: Session, noteId: string): Promise
 async function paneText(session: Session, paneId: string): Promise<string> {
   const els = await session.findElements(
     `${testIdSelector("editor.pane", { "data-pane-id": paneId })} ` +
-      '[data-testid="editor.content"] .cm-content',
+      testIdSelector("editor.content") + " .cm-content",
   );
   return els.length > 0 ? els[0].textContent() : "";
 }
