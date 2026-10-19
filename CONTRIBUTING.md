@@ -61,8 +61,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 `lefthook install` once per clone activates the git hooks. They are not decoration: the
 `pre-commit` set is the fast half of the rule set (formatting, the platform seam, the token and
 primitive ratchets, the i18n catalogues), and `pre-push` runs the full local battery. CI runs the
-same checks plus the lanes that need a container. `AGENTS.md`'s "Repo guards" table says what each
-one blocks and, more usefully, what it catches that no compiler would.
+same checks plus the lanes that need a container. [`scripts/repo-guards.md`](scripts/repo-guards.md)
+says what each one blocks and, more usefully, what it catches that no compiler would.
 
 ## What your contribution is licensed under
 

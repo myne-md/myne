@@ -13,7 +13,7 @@ body:
         - An undisclosed or exploitable vulnerability → **STOP**, email **security@myne.md** ([SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md)).
         - **This form:** the same mistake has landed more than once, or can land again silently, and you want the tree to stop allowing it.
 
-        Myne's guards are the machine-checked half of the rules `CLAUDE.md` states in prose — see the "Repo guards" table there, and `scripts/check-core-io-seam.mjs` for the house ratchet pattern (a recorded violation list that may shrink but never grow). Prefer a ratchet over a hard gate when existing violations are real: it stops new ones on day one and turns each old one into a one-line deletion.
+        Myne's guards are the machine-checked half of the rules `AGENTS.md` states in prose — see `scripts/repo-guards.md` for the full table, and `scripts/check-core-io-seam.mjs` for the house ratchet pattern (a recorded violation list that may shrink but never grow). Prefer a ratchet over a hard gate when existing violations are real: it stops new ones on day one and turns each old one into a one-line deletion.
   - type: textarea
     id: failure-class
     attributes:
@@ -89,5 +89,5 @@ body:
           required: true
         - label: This does not disclose an exploitable vulnerability (those go privately to security@myne.md).
           required: true
-        - label: If this adds a guard, it belongs in the `CLAUDE.md` "Repo guards" table in the same change.
+        - label: If this adds a guard, it belongs in `scripts/repo-guards.md`, with its compact index row in `AGENTS.md`, in the same change.
           required: true
