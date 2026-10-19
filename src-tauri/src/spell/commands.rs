@@ -18,6 +18,7 @@ use super::sync::{persist_dictionary_with_dir, SpellSyncError};
 use super::SpellWord;
 use crate::paths::vault_dir_for_id;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use myne_core::host::HostCtx as _;
 use serde::Serialize;
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime, State};
@@ -146,6 +147,16 @@ pub async fn spell_set_active_languages(
     Ok(())
 }
 
+/// The host wall clock in epoch-milliseconds, for `vault.dictionary`'s per-word
+/// removal clocks (myne-md/myne#640).
+///
+/// Through the host seam rather than `SystemTime::now()`: the seam is the
+/// project's one clock, and the value is a real wall clock (not monotonic)
+/// because it is compared across devices: the §10.2 skew posture.
+fn now_ms<R: Runtime>(app: &AppHandle<R>) -> u64 {
+    myne_core::host::tauri_host::TauriHost::new(app.clone()).now_unix_millis()
+}
+
 /// `add_to_personal_dictionary` — add `word` to the vault's personal set
 /// (SYNC-7): updates the live engine (squiggle clears immediately) then persists
 /// the `vault.dictionary` blob. Slot::Unlocked-gated.
@@ -164,7 +175,10 @@ pub async fn add_to_personal_dictionary<R: Runtime>(
     if !spell.is_hydrated() {
         return Err(SpellWriteError::DictionaryUnreadable);
     }
-    let snapshot = spell.add_personal(&word).ok_or(SpellWriteError::Io)?;
+    let now_ms = now_ms(&app);
+    let snapshot = spell
+        .add_personal(&word, now_ms)
+        .ok_or(SpellWriteError::Io)?;
     persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await
         .map_err(SpellWriteError::from)
@@ -186,7 +200,8 @@ pub async fn ignore_word_in_vault<R: Runtime>(
     if !spell.is_hydrated() {
         return Err(SpellWriteError::DictionaryUnreadable);
     }
-    let snapshot = spell.add_ignore(&word).ok_or(SpellWriteError::Io)?;
+    let now_ms = now_ms(&app);
+    let snapshot = spell.add_ignore(&word, now_ms).ok_or(SpellWriteError::Io)?;
     persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await
         .map_err(SpellWriteError::from)

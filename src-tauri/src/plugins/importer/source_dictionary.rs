@@ -26,6 +26,7 @@
 //! This command returns the added words only. There is no parameter that would
 //! return the ignore set, because a parameter is how the distinction erodes.
 
+use myne_core::host::HostCtx as _;
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{derive_subkey_versioned, SubkeyRole};
 use serde::Serialize;
@@ -196,7 +197,10 @@ pub async fn import_source_merge_dictionary<R: Runtime>(
     // in the flow, so it is also the one where telling the user the opposite of
     // what happened costs the most.
     let (snapshot, added) = spell
-        .plan_personal_merge(&words)
+        .plan_personal_merge(
+            &words,
+            myne_core::host::tauri_host::TauriHost::new(app.clone()).now_unix_millis(),
+        )
         .ok_or(ImportSourceDictionaryError::Io)?;
     crate::spell::sync::persist_dictionary_with_dir(&dir, state.inner(), &snapshot)
         .await
@@ -221,12 +225,16 @@ pub fn added_words_from_dir(
     account_number_hash: &[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Result<SourceDictionaryWords, ImportSourceDictionaryError> {
     let dict_key = derive_subkey_versioned(version, root_key, SubkeyRole::PersonalDictKey);
-    let data =
-        crate::spell::sync::hydrate_payload_from_dir(vault_root, &dict_key, account_number_hash)
-            .map_err(|e| match e {
-                crate::spell::sync::SpellSyncError::Io => ImportSourceDictionaryError::Io,
-                _ => ImportSourceDictionaryError::Unreadable,
-            })?;
+    let data = crate::spell::sync::hydrate_payload_from_dir(
+        vault_root,
+        &dict_key,
+        account_number_hash,
+        version,
+    )
+    .map_err(|e| match e {
+        crate::spell::sync::SpellSyncError::Io => ImportSourceDictionaryError::Io,
+        _ => ImportSourceDictionaryError::Unreadable,
+    })?;
 
     // The ignore set is dropped HERE, at the one place it could have crossed,
     // rather than being filtered by a caller. A caller that forgets is a bug
@@ -251,6 +259,7 @@ mod tests {
         let data = PersonalDictionaryData {
             personal_words: personal.iter().map(|s| s.to_string()).collect(),
             ignore_words: ignore.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
         };
         let dict_key = derive_subkey_versioned(
             protocol::MetaVersion::V0_1,

@@ -1310,6 +1310,7 @@ fn hkdf_sha256_vectors() {
                 "attachments-id-hmac" => SubkeyRole::AttachmentsIdHmac,
                 "session-state-key" => SubkeyRole::SessionStateKey,
                 "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
+                "personal-dictionary-sync-id" => SubkeyRole::PersonalDictSyncId,
                 "vault-indices-key" => SubkeyRole::VaultIndicesKey,
                 "attachment-text-key" => SubkeyRole::AttachmentTextKey,
                 "catalog-sync-id" => SubkeyRole::CatalogSyncId,

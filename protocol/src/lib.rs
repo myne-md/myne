@@ -222,11 +222,14 @@ pub use device_binding_blob::{
     DEVICE_BINDING_SIGNATURE_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
 };
 pub use dictionary_blob::{
-    decode_dictionary_blob, decode_dictionary_blob_versioned, encode_dictionary_blob,
-    encode_dictionary_blob_raw, encode_dictionary_blob_versioned, DictionaryBlobError,
-    DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_V1, DICTIONARY_BLOB_HEADER_LEN,
-    DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_PROTOCOL_VERSION, DICTIONARY_BLOB_V0_2_MAGIC,
-    MAX_DICTIONARY_PLAINTEXT_LEN,
+    decode_dictionary_blob, decode_dictionary_blob_versioned,
+    decode_dictionary_blob_versioned_with_formats, dict_format_supported, dictionary_blob_format,
+    encode_dictionary_blob, encode_dictionary_blob_raw, encode_dictionary_blob_versioned,
+    encode_dictionary_blob_versioned_with_format, DictionaryBlobError,
+    DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_CURRENT, DICTIONARY_BLOB_FORMAT_V1,
+    DICTIONARY_BLOB_FORMAT_V2, DICTIONARY_BLOB_HEADER_LEN, DICTIONARY_BLOB_MAGIC,
+    DICTIONARY_BLOB_PROTOCOL_VERSION, DICTIONARY_BLOB_SUPPORTED_FORMATS,
+    DICTIONARY_BLOB_V0_2_MAGIC, MAX_DICTIONARY_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
 pub use graph_layout_blob::{
@@ -306,7 +309,7 @@ pub use search_blob::{
     SEARCH_BLOB_HEADER_LEN, SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC,
     SEARCH_BLOB_PROTOCOL_VERSION,
 };
-pub use singleton_migrate::reseal_kek_envelope_v0_2;
+pub use singleton_migrate::{reseal_kek_envelope_v0_2, reseal_kek_envelope_v0_2_with_formats};
 pub use subkey::{
     derive_group_subkey_v0_2, derive_owner_subkey_v0_2, derive_subkey, derive_subkey_v0_2,
     derive_subkey_versioned, GroupKey, GroupRole, OwnerKey, OwnerRole, SubkeyRole,

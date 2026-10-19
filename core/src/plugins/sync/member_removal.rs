@@ -517,8 +517,9 @@ fn address_packages(
 /// vault. Every shared singleton whose sync-id is derived from the GROUP key is
 /// addressed by a group-derived id (decision 0609), so a rotation to a new
 /// `group_key` retires each of them: the attachments catalog, `vault.prefs`,
-/// `vault.themes`, `vault.member-names` (myne-md/myne#851) and
-/// `vault.device-bindings` (`MYU5`, §9.30, myne-md/myne#852).
+/// `vault.themes`, `vault.dictionary` (myne-md/myne#640), `vault.member-names`
+/// (myne-md/myne#851) and `vault.device-bindings` (`MYU5`, §9.30,
+/// myne-md/myne#852).
 ///
 /// **This list and the re-seal set are one decision, not two.** Retiring an id
 /// whose blob was not re-sealed DELETES the family server-side and leaves
@@ -537,6 +538,7 @@ fn group_rotation_reclaim_sync_ids(old_group_key: &[u8; 32]) -> Vec<String> {
         protocol::GroupRole::CatalogSyncId,
         protocol::GroupRole::PrefsSyncId,
         protocol::GroupRole::ThemesSyncId,
+        protocol::GroupRole::PersonalDictSyncId,
         protocol::GroupRole::MemberNamesSyncId,
         protocol::GroupRole::DeviceBindingSyncId,
     ]
@@ -2164,6 +2166,7 @@ mod tests {
             // retired without its blob being re-sealed, and a count would still pass
             // if an unrelated role were swapped in for it.
             for (role, family) in [
+                (protocol::GroupRole::PersonalDictSyncId, "vault.dictionary"),
                 (protocol::GroupRole::MemberNamesSyncId, "vault.member-names"),
                 (
                     protocol::GroupRole::DeviceBindingSyncId,

@@ -869,6 +869,18 @@ pub async fn run_active_cycle_from_host(
                     EventPayload::Unit,
                 );
             }
+            if summary.dictionary_applied_remote {
+                // A remote dictionary change was merged onto disk this cycle
+                // (myne-md/myne#640). The desktop holds the personal/ignore sets
+                // in RAM for spell-checking, so the on-disk merge is invisible
+                // until they are re-read: without this, a word added on a peer
+                // stays a squiggle on this device until the next unlock, and the
+                // next local add would persist the stale RAM view (the spell
+                // write path re-reads and merges, so nothing is LOST, but the
+                // user would not see the peer's words). Desktop's hook hydrates
+                // the sets; mobile and web have no spell state and no-op it.
+                hooks.hydrate_spell(state).await;
+            }
             // The cycle reached the server and finished (myne#583). Stamp it,
             // coalesced, so the staleness banner has a clock to measure from —
             // this is the only place that knows a cycle SUCCEEDED, and until it

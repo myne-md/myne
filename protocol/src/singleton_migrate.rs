@@ -8,8 +8,10 @@
 //! KEK. Because the inner is opaque, a v0.1→v0.2 re-seal never needs to parse it —
 //! it decodes under the old KEK + v0.1 AAD + old magic and re-encodes under the
 //! new v0.2 KEK + v0.2 AAD + new magic. This ONE function migrates any such
-//! family; the caller supplies the family's magics, its AAD role, format version,
-//! and size cap (all of which the family's own codec already owns).
+//! family; the caller supplies the family's magics, its AAD role, the format
+//! version it WRITES (and, for a family whose inner format gained a generation,
+//! the set the source may carry), and size cap (all of which the family's own
+//! codec already owns).
 //!
 //! The caller derives the two KEKs itself — `derive_subkey(old_root, role)` and
 //! `derive_subkey_v0_2(new_root, role)` — so this function chooses no key.
@@ -20,7 +22,7 @@
 //! its own re-seal path. This is the generic KEK-envelope leg only.
 
 use crate::aead::{aad_singleton_blob, aad_singleton_blob_v0_2, AEAD_KEY_LEN};
-use crate::blob_envelope::{decode_blob_envelope, encode_blob_envelope, EnvelopeError};
+use crate::blob_envelope::{decode_blob_envelope_formats, encode_blob_envelope, EnvelopeError};
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
 
@@ -57,11 +59,47 @@ pub fn reseal_kek_envelope_v0_2(
     account_number_hash: &[u8; 16],
     max_plaintext_len: usize,
 ) -> Result<Vec<u8>, ProtocolError> {
+    reseal_kek_envelope_v0_2_with_formats(
+        old_blob,
+        old_kek,
+        new_kek,
+        old_magic,
+        new_magic,
+        &[format_version],
+        format_version,
+        aad_role,
+        account_number_hash,
+        max_plaintext_len,
+    )
+}
+
+/// [`reseal_kek_envelope_v0_2`] for a family whose inner format gained a
+/// generation: `decode_formats` is the set the SOURCE may carry and
+/// `encode_format` is what the re-sealed blob is written with.
+///
+/// `vault.dictionary` is the caller (myne-md/myne#640): a pre-#640 vault's
+/// dictionary is `0x01`, this build writes `0x02`, and a migration must accept
+/// the former while producing the latter. For every single-generation family the
+/// wrapper above passes `&[format_version], format_version`, which is the old
+/// behaviour byte for byte.
+#[allow(clippy::too_many_arguments)]
+pub fn reseal_kek_envelope_v0_2_with_formats(
+    old_blob: &[u8],
+    old_kek: &[u8; AEAD_KEY_LEN],
+    new_kek: &[u8; AEAD_KEY_LEN],
+    old_magic: &[u8; 4],
+    new_magic: &[u8; 4],
+    decode_formats: &[u8],
+    encode_format: u8,
+    aad_role: &[u8],
+    account_number_hash: &[u8; 16],
+    max_plaintext_len: usize,
+) -> Result<Vec<u8>, ProtocolError> {
     let old_aad = aad_singleton_blob(aad_role, account_number_hash);
-    let inner = decode_blob_envelope(
+    let inner = decode_blob_envelope_formats(
         old_kek,
         old_magic,
-        format_version,
+        decode_formats,
         &old_aad,
         max_plaintext_len,
         old_blob,
@@ -71,7 +109,7 @@ pub fn reseal_kek_envelope_v0_2(
     encode_blob_envelope(
         new_kek,
         new_magic,
-        format_version,
+        encode_format,
         &new_aad,
         max_plaintext_len,
         &inner,
@@ -82,7 +120,7 @@ pub fn reseal_kek_envelope_v0_2(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blob_envelope::encode_blob_envelope;
+    use crate::blob_envelope::{decode_blob_envelope, encode_blob_envelope};
 
     const OLD_KEK: [u8; 32] = [0x11; 32];
     const NEW_KEK: [u8; 32] = [0x22; 32];

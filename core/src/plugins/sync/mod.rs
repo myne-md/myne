@@ -56,6 +56,9 @@ pub mod conflict;
 pub mod corpus;
 pub mod crdt_doc;
 pub mod devices;
+/// The typed `vault.dictionary` inner payload (`0x02`) and its §10.2.1 merge
+/// (myne-md/myne#640).
+pub mod dictionary_payload;
 // One orchestrated sync cycle + its side effects, lifted out of the host-gated
 // `commands` module by task 84. See the module doc for what was host-shaped and
 // how each piece became a seam call — in particular why driving the cycle needed
