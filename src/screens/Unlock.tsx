@@ -666,6 +666,7 @@ export function Unlock({
           }}
           inFlight={state.inFlight}
           partialFailContext={state.partialFail}
+          variant={memberVault ? "member" : "owner"}
         />
       </CenteredCard>
     );
@@ -970,7 +971,7 @@ export function Unlock({
             data-testid="unlock.delete-link"
           >
             <Icon name="trash-2" size={14} />
-            {t("unlock.deleteLink")}
+            {memberVault ? t("unlock.memberRemoveLink") : t("unlock.deleteLink")}
           </button>
         </div>
       )}
