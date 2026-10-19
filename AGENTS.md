@@ -133,6 +133,18 @@ worktree, and the companion PR is opened after that, from a session that is no l
 the merge order around it rather than discovering it at the gate. Full rule:
 `myne-agents/reference/worktrees.md`.
 
+**A second trap, and it is not about the worktree's own session: a sibling checkout sits inside the
+tree every guard walks.** `.opencode/worktrees/<name>/` is a full copy of this repository, so a guard
+that enumerates files from the repo root sees a second `core/src`, a second `src/`, and that
+session's half-finished work. The failure is asymmetric and reads as a product defect: a Rust change
+here fails `check-hex-helpers.mjs` naming a file in somebody else's worktree, and the red says
+nothing about the tree it ran in. A guard whose walk root is the repo root must skip `.opencode` in
+its skip list, and one that instead narrows by path (`check-core-task-seam.mjs` walks `core/src`, not
+`.`) needs nothing. Audited 2026-10-19 after the second occurrence: `check-hex-helpers.mjs` carries
+the fix and its `SKIP_DIRS` comment is the worked example, and the injection proof is two-directional
+(a violation planted in the sibling worktree does not fire, the same violation planted here does).
+Deleting the worktree removes the exposure but not the trap, since the next session creates one.
+
 ## OpenCode harness
 
 This repo uses OpenCode only:

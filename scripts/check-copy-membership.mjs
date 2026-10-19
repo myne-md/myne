@@ -32,24 +32,28 @@
 //   - `check-i18n.mjs` refuses a load-bearing literal as a locale VALUE. It says
 //     nothing about where the literal is declared.
 //
-// # The two rules, in the two directions
+// # The rule
 //
-// 1. ERROR — a client tree may not DECLARE an exported binding whose name
-//    `@myne/copy` exports. This is the defect above. It is scoped to shared-tree
-//    roots rather than to the two files that had it, because the next one will be
-//    in a different file and the whole class is "a second place the value can
-//    drift".
-// 2. WARNING — a name `@myne/copy` exports that nothing outside this package
-//    mentions is dead. Deliberately a warning: a shared literal staged for a
-//    surface that has not landed yet is a legitimate state (the beta-terms
-//    clauses sat that way on mobile for months), and gating it would push an
-//    author to delete a reviewed literal rather than keep it.
+// **A client tree may not DECLARE an exported binding whose name `@myne/copy`
+// exports.** That is the defect above, stated as a rule. It is scoped to the
+// shared-tree roots rather than to the two files that had it, because the next
+// one will be in a different file and the whole class is "a second place the
+// value can drift".
 //
-// It deliberately does NOT check, and says so rather than leaving it to be
-// discovered: whether a name `@myne/copy` exports should be shared at all, and
-// whether a client's OWN local constant duplicates one in copy under a different
-// name (a paraphrase is invisible to any name-based check — that is what the
-// by-construction rule exists to make unnecessary rather than to detect).
+// # What it deliberately does NOT check, and who owns each
+//
+//   - **Whether a name `@myne/copy` exports is used at all.** That is
+//     `check-export-callers.mjs`'s question, one file over, and it already had a
+//     budget for this exact file. It was briefly a warning here too; the
+//     duplication was removed rather than kept, because two mechanisms for one
+//     question is the failure `scripts/lib/shared-roots.mjs` and
+//     `scripts/lib/woodpecker-configs.mjs` both exist to prevent.
+//   - **Whether a name should be shared at all.** A judgement, not a scan.
+//   - **A client's own local constant that duplicates one in copy under a
+//     DIFFERENT name.** A paraphrase is invisible to any name-based check, which
+//     is precisely why byte-identity has to be a construction rather than a
+//     detection. This guard is the construction's enforcement, not its
+//     substitute.
 //
 // Zero dependencies, hand-runnable: node scripts/check-copy-membership.mjs
 
@@ -60,25 +64,7 @@ import { presentSharedRoots } from "./lib/shared-roots.mjs";
 const COPY_DIR = join("copy", "src");
 const COPY_ENTRY = join("copy", "src", "index.ts");
 
-/**
- * Directories a name may legitimately be CONSUMED in.
- *
- * The shared roots are the clients; the rest are the test and tooling trees,
- * which import `@myne/copy` directly (a test asserting a pinned literal by
- * identity is a first-class consumer, not a second declaration site — rule 1
- * does not scan these).
- */
-const CONSUMER_EXTRA_ROOTS = [
-  "tests",
-  "e2e",
-  "e2e-web",
-  "scripts",
-  "stories/src",
-  "web/wasm",
-  "web/container",
-];
-
-/** Extensions both walks read. */
+/** Extensions the walk reads. */
 const SOURCE_RE = /\.(ts|tsx)$/;
 
 /**
@@ -136,15 +122,6 @@ export function redefinitions(files, copyNames) {
   return out;
 }
 
-/** Names in `copyNames` that `corpus` never mentions as a word. */
-export function unconsumed(copyNames, corpus) {
-  const out = [];
-  for (const name of copyNames) {
-    if (!new RegExp(`\\b${name}\\b`).test(corpus)) out.push(name);
-  }
-  return out;
-}
-
 /** Every `.ts`/`.tsx` file under `root`, as `[relativePath, source]`. */
 export function readTree(root) {
   const out = [];
@@ -172,7 +149,6 @@ export function readTree(root) {
 
 function main() {
   const errors = [];
-  const warnings = [];
 
   let copySource;
   try {
@@ -216,25 +192,6 @@ function main() {
     );
   }
 
-  // Rule 2. Consumed anywhere outside `copy/`?
-  const consumerRoots = [
-    ...present.filter((r) => r !== COPY_DIR),
-    ...CONSUMER_EXTRA_ROOTS,
-  ];
-  const consumerText = consumerRoots
-    .flatMap((r) => readTree(r))
-    .map(([, source]) => source)
-    .join("\n");
-  for (const name of unconsumed(copyNames, consumerText)) {
-    warnings.push(
-      `\`@myne/copy\` exports \`${name}\`, and nothing outside \`copy/\` mentions it. ` +
-        `Either a surface that should use it does not, or the literal is staged for ` +
-        `one that has not landed yet (a legitimate state — the beta-terms clauses ` +
-        `sat that way on mobile for months). Recorded rather than failed.`,
-    );
-  }
-
-  for (const message of warnings) console.warn(`copy-membership: WARNING — ${message}`);
   if (errors.length > 0) {
     console.error(
       `copy-membership: ${errors.length} problem(s):\n` +
@@ -245,8 +202,7 @@ function main() {
 
   console.log(
     `copy-membership: ok (${copyNames.size} export(s) in @myne/copy, ` +
-      `${clientFiles.length} client file(s) scanned for a redefinition, ` +
-      `${warnings.length} unconsumed export warning(s))`,
+      `${clientFiles.length} client file(s) scanned for a redefinition)`,
   );
 }
 
