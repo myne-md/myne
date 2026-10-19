@@ -123,6 +123,28 @@ describe("what it deliberately does not count", () => {
     }
   });
 
+  it("ignores a tag SPELLED inside a description, because that is prose about it", () => {
+    // The story catalogue describes the switch as "a `<button role=switch
+    // aria-checked>`". Counting that fired this ratchet on a CORRECT file
+    // (measured 2026-10-19), and a guard that fires on a correct file is a guard
+    // people learn to route around.
+    fixture(
+      'export const s = { description: "It is a `<button role=switch aria-checked>`." };\n',
+    );
+    expect(run().out).not.toContain("__primitive_fixture__");
+  });
+
+  it("still counts a real control on the SAME line as such prose", () => {
+    // The non-vacuity belt under the case above: blanking a literal stops at its
+    // closing delimiter, so it cannot swallow the element that follows it. Without
+    // this, "the scanner stopped reporting" would be indistinguishable from "the
+    // scanner stopped looking".
+    fixture(
+      'export function P() { const d = "a `<button>`"; return <button onClick={() => {}}>{d}</button>; }\n',
+    );
+    expect(run().out).toContain("__primitive_fixture__");
+  });
+
   it("is brace-aware, so a style expression cannot hide a later attribute", () => {
     // `style={{ ... }}` contains `>` inside the expression. A scanner that
     // stopped at the first `>` would truncate the tag and miss the className
