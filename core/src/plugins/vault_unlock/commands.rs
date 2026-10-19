@@ -447,6 +447,24 @@ pub(crate) async fn run_post_unlock_pipeline(
     crate::plugins::sync::person_vault_carrier::install_from_carrier_best_effort(host, io, state)
         .await;
 
+    // ---- myne-md/myne#797: drain an unfinished rotation-package delivery ----
+    //
+    // AFTER the carrier install, because the drain needs the owner's person id and
+    // the carrier is what installs the session that carries it: placed before, it
+    // bailed `NotEnrolled` on every unlock and warned while the packages waited for
+    // a sync cycle. Best-effort and a no-op when no outbox exists.
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Err(e) =
+        crate::plugins::sync::rotation_outbox::drain_rotation_outbox_from_host(host, io, state)
+            .await
+    {
+        tracing::warn!(
+            stage = "rotation_outbox_drain",
+            error = ?e,
+            "a pending rotation-package delivery did not drain at unlock"
+        );
+    }
+
     // ---- member-devices: this device claims its own binding ----
     //
     // LAST, and the position is the whole reason this step can work at all. It needs a

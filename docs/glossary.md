@@ -1428,6 +1428,12 @@ The blind, latest-per-recipient relay that carries each remaining member's [grou
 
 Used in: `docs/spec/server-protocol.md` §3.4a; `docs/decisions/protocol/0661-member-rotation-package-delivery-and-awareness-stream-termination.md`
 
+### **rotation outbox** &nbsp; 📋 *Protocol*
+
+The device-local, never-synced record (`vault.rotation-outbox`) an owner writes with each remaining member's opaque, recipient-sealed [group package](#group-package) BEFORE it attempts the delivery of [rotation-package delivery](#rotation-package-delivery) (`collab-b2b-sessions`, `decisions/protocol/0708`). A rotation commits locally before it can reach the network, so a crash between the two would otherwise strand every remaining member on the retired epoch: re-running the removal fails `MemberNotFound`, and nothing else remembered who was owed what. Every sync cycle and unlock drains the outbox until each recipient's `PUT` succeeds, then records the namespace retirement and revokes the removed member; a recipient leaves the record only after its own POST succeeded, so a retry re-POSTs exactly what did not land and never re-runs the rotation. A device-local `vault.content-epoch` marker, its sibling, records the epoch the member's LOCAL content blobs are wrapped at, so an interrupted member-side re-key is resumed rather than misread. See [group package](#group-package).
+
+Used in: `docs/spec/sync-protocol.md` §8.3; `docs/threat-model.md` §7; `docs/decisions/protocol/0708-member-local-rotation-rekey-durable-outbox-and-verified-epoch-hold.md`
+
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
 Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), **pnpm** (the desktop and web clients share one `pnpm-lock.yaml`; pnpm is canonical, never npm or yarn), Go modules (server), and the wasm build's pinned toolchain + crate graph. Updates require explicit review.
@@ -2022,7 +2028,7 @@ Used in: `docs/spec/protocol.md` §9.29.4; `docs/decisions/protocol/0667-the-mem
 
 ### **member removal** &nbsp; 📦 *Product*
 
-The owner action that ends a person's access to a shared vault (myne-md/myne#711 task 14, `decisions/protocol/0607`). It rotates the vault's group hierarchy: a fresh random `group_key` and `itemsKey` at epoch+1, every per-note/per-attachment/snapshot content key rewrapped under the new `itemsKey` with content ciphertext and every identifier byte-identical (`root_key` untouched), the removed member tombstoned in the owner-signed [group roster](#group-key-epoch), the owner-double-signed retirement records emitted, the rotated `vault.meta` pushed under the owner's per-vault token, and the removed member's server binding and per-vault token revoked (`DELETE /b2b/vaults/{hash}/members/{person_id}`). It is a **future-access revocation only**: a removed member keeps whatever they already synced, copied or exported, and nothing recalls it. A peer adopts the new epoch through the sync meta phase's read path.
+The owner action that ends a person's access to a shared vault (myne-md/myne#711 task 14, `decisions/protocol/0607`). It rotates the vault's group hierarchy: a fresh random `group_key` and `itemsKey` at epoch+1, every per-note/per-attachment/snapshot content key rewrapped under the new `itemsKey` with content ciphertext and every identifier byte-identical (`root_key` untouched), the removed member tombstoned in the owner-signed [group roster](#group-key-epoch), the owner-double-signed retirement records emitted, the rotated `vault.meta` pushed under the owner's per-vault token, and the removed member's server binding and per-vault token revoked (`DELETE /b2b/vaults/{hash}/members/{person_id}`). It is a **future-access revocation only**: a removed member keeps whatever they already synced, copied or exported, and nothing recalls it. An OWNER peer adopts the new epoch through the sync meta phase's read path; a MEMBER commits it only after its own delivered package opens at that epoch against the owner half pinned at accept (`decisions/protocol/0708`), because it holds no `root_key` to authenticate the rotated meta itself.
 
 Used in: `docs/decisions/protocol/0607-member-removal-roster-person-id-and-revoke.md`; `docs/spec/sync-protocol.md` §10.3; `myne-md/myne#711`.
 

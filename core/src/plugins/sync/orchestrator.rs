@@ -4517,6 +4517,18 @@ pub(crate) async fn sync_meta_phase(
         // migrated this vault. Adopt the server's `NTV6` bytes verbatim, verified
         // under our root key when we hold one (mirrors the newer-epoch adopt below).
         if !local_is_ntv6 && server_is_ntv6 {
+            // A MEMBER cannot verify an `NTV6` frame at all (no root key), so it
+            // must not adopt one on the server's word (myne-md/myne#797): the
+            // member's own group package, verified against the PINNED owner half,
+            // is the only route to a new generation. Hold and retry.
+            if member {
+                tracing::warn!(
+                    stage = "meta_phase",
+                    event = "ntv6_generation_held_for_member",
+                    "holding an unverified NTV6 generation transition on a member device"
+                );
+                return MetaPhaseOutcome::Skipped;
+            }
             let Ok(server_ntv6) = protocol::parse_vault_meta_ntv6(&server_bytes) else {
                 return MetaPhaseOutcome::Skipped;
             };
@@ -4580,9 +4592,25 @@ pub(crate) async fn sync_meta_phase(
             // and the roster envelope must open under that group key, so a
             // hostile server cannot forge a high epoch and wedge or lock out the
             // vault (the write below is irreversible: the genuine lower epoch is
-            // then refused as a rollback forever). A MEMBER holds no root key, so
-            // it cannot verify and relies on the group package it is delivered
-            // (owed delivery path, task 30); it adopts unverified.
+            // then refused as a rollback forever).
+            //
+            // A MEMBER holds no root key and CANNOT verify these bytes itself, so
+            // it must not commit them on the server's word (myne-md/myne#797): a
+            // hostile server that mints a high epoch would otherwise make the
+            // member write it irreversibly, after which the genuine lower epoch is
+            // refused as a rollback. The member instead HOLDS the adoption and
+            // lets `member_adopt_rotation_from_host` commit it: but only after
+            // its own delivered package has been fetched and opened at exactly
+            // this epoch against the PINNED owner half. If the package is absent,
+            // nothing is written and the next cycle retries.
+            if member {
+                tracing::info!(
+                    stage = "meta_phase",
+                    event = "ntv6_epoch_held_for_member",
+                    "holding a newer group-key epoch until the member's package verifies it"
+                );
+                return MetaPhaseOutcome::Skipped;
+            }
             if let Some(root_key) = root_key {
                 let group = match protocol::unlock_group_key_ntv6(
                     &server_ntv6,
@@ -5102,6 +5130,36 @@ async fn sync_cycle_attempt(
     // is DEFERRED to `summary.deferred_live_pulls` rather than written.
     live_note_ids: &HashSet<[u8; 16]>,
 ) -> Result<SyncSummary, SyncCycleError> {
+    // --- Content-epoch gate (myne-md/myne#797) ---
+    //
+    // A member's adoption installs the rotated tier on the live slot WITHOUT
+    // re-keying local content (it cannot re-seal the credential store: it holds
+    // neither the phrase nor the member password). Until the next credential
+    // unlock runs that re-key, the on-disk blobs are still sealed under the
+    // retired `itemsKey` while the slot holds the new one. Pushing them in that
+    // window uploads ciphertext no peer at the current epoch can open, and
+    // pulling current-epoch blobs would put a second, unreadable key epoch on the
+    // same disk and make the next re-key's single-hop tolerance fail. So the
+    // whole cycle stands down until the marker catches up; the next unlock does
+    // that in the same step it re-seals the store.
+    if let (Ok(Some(content_epoch)), Ok(meta)) = (
+        crate::plugins::sync::state::read_content_epoch(io, vault_root).await,
+        io.read(&vault_root.join("vault.meta")).await,
+    ) {
+        if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta) {
+            if content_epoch < b2b.group_key_epoch {
+                tracing::warn!(
+                    stage = "sync_cycle",
+                    event = "content_epoch_lagging",
+                    content_epoch,
+                    key_epoch = b2b.group_key_epoch,
+                    "local content is still sealed under a retired itemsKey; standing down until the next unlock re-keys it"
+                );
+                return Ok(SyncSummary::default());
+            }
+        }
+    }
+
     // --- PULL (head verify + rollback rejection happen inside) ---
     // A `cursor_expired` (410) means the server GC'd past our stored cursor: reset
     // to a full reconcile from 0 and re-pull ONCE. The re-pull sets `reconcile=true`
@@ -18145,6 +18203,41 @@ mod tests {
                         .iter()
                         .any(|r| r.1 == "/vault.meta" && r.0 == HttpMethod::Put),
                     "a member must never write vault.meta"
+                );
+            });
+        }
+
+        // myne-md/myne#797: a member CANNOT verify a `vault.meta` epoch itself (it
+        // holds no root key), so a strictly-greater server epoch must be HELD, not
+        // written. Writing it unverified is irreversible: the genuine lower epoch
+        // is refused as a rollback afterwards: so a hostile server that mints a
+        // high epoch could wedge the member out of its own vault. The commit is
+        // `member_adopt_rotation_from_host`'s, and only after the member's own
+        // delivered package opens at that exact epoch against the pinned owner.
+        #[test]
+        fn a_member_holds_a_strictly_greater_epoch_until_its_package_verifies() {
+            blocking(async {
+                let local = ntv6_meta_bytes(1);
+                let server = ntv6_meta_bytes(2);
+                let (dir, mut st) = seeded("member-epoch-hold", &local).await;
+                let t = FakeTransport::new();
+                t.on(HttpMethod::Get, "/vault.meta", 200, server);
+                let out = sync_meta_phase(&IO, &t, "tok", dir.path(), &mut st, false, None).await;
+                assert_eq!(
+                    out,
+                    MetaPhaseOutcome::Skipped,
+                    "a member must not commit an unverified epoch"
+                );
+                assert_eq!(
+                    read_local(&dir).await,
+                    local,
+                    "the minted epoch must NOT be written"
+                );
+                assert!(
+                    !t.requests()
+                        .iter()
+                        .any(|r| r.1 == "/vault.meta" && r.0 == HttpMethod::Put),
+                    "and nothing is pushed either"
                 );
             });
         }

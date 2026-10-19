@@ -3053,3 +3053,547 @@ fn member_second_device_joins_from_the_phrase_alone() {
         );
     });
 }
+
+/// The rotation seed: an `NTV6` `vault.meta` at `epoch` with one owner row and
+/// one row per member, plus each member's owner-signed invite package.
+struct RotationSeed {
+    meta: Vec<u8>,
+    group: zeroize::Zeroizing<[u8; 32]>,
+    /// `(person_id_hex, invite_frame)` in the same order as the members given.
+    invites: Vec<(String, Vec<u8>)>,
+}
+
+/// Build the vault the rotation scenario starts from. Unlike `owner_ntv6_meta`
+/// this carries REAL member rows, each with its own wrapped group key, because
+/// `rotate_group_from_host` reads the current signed roster and only a row with
+/// a `person_id_hex` and a public half can be re-wrapped for delivery.
+fn owner_ntv6_meta_with_members(
+    account_hash: &[u8; 16],
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+    owner: &protocol::person_key::PersonKeyPair,
+    epoch: u64,
+    members: &[(String, protocol::person_key::PersonPublicHalf)],
+) -> RotationSeed {
+    use protocol::person_invite as pi;
+
+    let mut group_bytes = zeroize::Zeroizing::new([0u8; 32]);
+    getrandom::getrandom(group_bytes.as_mut()).expect("group key");
+    let group_key = protocol::GroupKey::new(*group_bytes);
+
+    let mut group_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    let mut items_key_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut group_key_nonce).expect("nonce");
+    getrandom::getrandom(&mut items_key_nonce).expect("nonce");
+
+    let enc_group_key = protocol::aead_seal_ctx(
+        &protocol::derive_owner_subkey_v0_2(
+            &protocol::OwnerKey::new([0x77; 32]),
+            protocol::OwnerRole::GroupKeyWrap,
+        ),
+        &group_key_nonce,
+        group_bytes.as_ref(),
+        &protocol::aad_vault_group_key_wrap_v0_2(account_hash, epoch),
+    )
+    .expect("seal the group key to the owner");
+    let enc_items_key = protocol::aead_seal_ctx(
+        &protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::ItemsKeyWrap),
+        &items_key_nonce,
+        items_key,
+        &protocol::aad_vault_items_key_wrap_v0_2(items_key_id),
+    )
+    .expect("seal itemsKey under the group key");
+
+    let owner_public = owner.public_half();
+    let owner_fingerprint_hex =
+        crate::account::person_identity::hex_lower(owner_public.fingerprint());
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+
+    let mut invites = Vec::new();
+    let mut roster_members = Vec::new();
+    for (person_id_hex, public) in members {
+        let package =
+            pi::create_group_package(owner, public, &group_bytes, account_hash, epoch, &mut rng)
+                .expect("wrap the group key to the member");
+        let payload = pi::verify_group_package(&owner.public_half(), &package)
+            .expect("verify the member package");
+        let fingerprint_hex = crate::account::person_identity::hex_lower(public.fingerprint());
+        roster_members.push(pi::GroupRosterMember {
+            fingerprint_hex,
+            person_id_hex: Some(person_id_hex.clone()),
+            display_name: String::new(),
+            role: pi::GroupRosterRole::Member,
+            state: pi::GroupMemberState::Live,
+            wrapped_group_key_hex: Some(payload.wrapped_group_key_hex),
+            member_kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+            member_ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+            member_mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+            previous_fingerprint_hex: None,
+            continuity: pi::GroupKeyContinuity::Current,
+            transition_hex: None,
+        });
+        invites.push((
+            person_id_hex.clone(),
+            pi::encode_signed_group_package(&package).expect("encode invite frame"),
+        ));
+    }
+    roster_members.push(pi::GroupRosterMember {
+        fingerprint_hex: owner_fingerprint_hex.clone(),
+        person_id_hex: None,
+        display_name: String::new(),
+        role: pi::GroupRosterRole::Owner,
+        state: pi::GroupMemberState::Live,
+        wrapped_group_key_hex: None,
+        member_kem_ek_hex: crate::account::person_identity::hex_lower(owner_public.kem_ek()),
+        member_ed_pk_hex: crate::account::person_identity::hex_lower(owner_public.ed_pk()),
+        member_mldsa_vk_hex: crate::account::person_identity::hex_lower(owner_public.mldsa_vk()),
+        previous_fingerprint_hex: None,
+        continuity: pi::GroupKeyContinuity::Current,
+        transition_hex: None,
+    });
+
+    let roster = pi::GroupRosterPayload {
+        account_number_hash_hex: crate::account::person_identity::hex_lower(account_hash),
+        group_key_epoch: epoch,
+        owner_fingerprint_hex,
+        members: roster_members,
+    };
+    let signed = pi::sign_group_roster(owner, &roster, &mut rng).expect("sign the roster");
+    let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
+    getrandom::getrandom(&mut roster_nonce).expect("nonce");
+    let sealed_roster =
+        pi::seal_group_roster(&group_bytes, account_hash, epoch, &roster_nonce, &signed)
+            .expect("seal the roster");
+
+    let mut enc_items = [0u8; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_items.copy_from_slice(&enc_items_key);
+    let mut enc_group = [0u8; protocol::VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+    enc_group.copy_from_slice(&enc_group_key);
+    let bytes = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+        base: protocol::VaultMeta {
+            account_number_hash: *account_hash,
+            kdf_params: crate::test_support::FAST_TEST_KDF,
+            random_salt_password: [0x01; protocol::VAULT_META_SALT_RANDOM_LEN],
+            random_salt_recovery: [0x02; protocol::VAULT_META_SALT_RANDOM_LEN],
+            nonce_password_wrap: [0x03; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_password: [0x04; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            nonce_recovery_wrap: [0x05; protocol::VAULT_META_NONCE_LEN],
+            enc_root_key_recovery: [0x06; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+            items_key_id: *items_key_id,
+            items_key_nonce,
+            enc_items_key: enc_items,
+            membership: None,
+            person_binding: None,
+        },
+        group_key_nonce,
+        enc_group_key: enc_group,
+        group_key_epoch: epoch,
+        signed_roster_envelope: sealed_roster,
+    })
+    .expect("serialize NTV6");
+    RotationSeed {
+        meta: bytes,
+        group: group_bytes,
+        invites,
+    }
+}
+
+/// myne-md/myne#797, the acceptance regression: one owner, TWO members, one of
+/// them offline through the removal. Covers the delivery gap (the offline member
+/// gets the right package), GAP 1 (its unsynced local note survives the re-key),
+/// GAP 2 (its fast password credential re-seals at the new epoch), and the
+/// removal's crypto claim (the removed member's retained key no longer opens
+/// re-keyed content). GAP 3's durable outbox and GAP 4's verified-epoch hold are
+/// unit-tested where they are decidable without a server.
+#[test]
+fn member_rotation_delivery_reaches_an_offline_member_and_rekeys_local_content() {
+    use crate::plugins::sync::http_transport::build_transport;
+    use crate::plugins::sync::member_removal::rotate_group_from_host;
+    use crate::plugins::sync::person_account::{
+        accept_invite_from_host, bind_owner_request, member_adopt_rotation_from_host,
+        person_list_invites_from_host, post_invite_request, set_member_password_from_host,
+        unlock_member_vault_with_password_from_host,
+    };
+    use crate::plugins::sync::state::{read_sync_state, write_sync_state, SyncState};
+    use crate::plugins::vault_unlock::state::UnlockedVault;
+    use crate::vault_io::StdVaultIo;
+
+    const OWNER_PHRASE: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank yellow";
+    const MEMBER_A_PHRASE: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const MEMBER_B_PHRASE: &str = "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong";
+    const MEMBER_PASSWORD: &str = "correct horse battery staple";
+
+    let (_guard, url) = server_or_skip!("member_rotation_delivery_reaches_an_offline_member");
+    let io = StdVaultIo;
+
+    crate::test_support::block_on(async {
+        let acct = Account::new(0xB7);
+        let account_hash = acct.account_hash;
+        let account_hash_hex = hex(&account_hash);
+        let bootstrap = build_transport(&url).expect("transport");
+        enroll::register_verifier(bootstrap.as_ref(), &acct.account_hash, &acct.secret())
+            .expect("register");
+        let device = enroll::enroll(
+            bootstrap.as_ref(),
+            &acct.account_hash,
+            &acct.secret(),
+            EnrollPath::Recovery,
+            "b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7",
+            enroll::generate_device_id(),
+        )
+        .expect("enrol owner device");
+        let device_token = hex(&device.token);
+
+        let owner = person_device("r797-owner", &url, OWNER_PHRASE).await;
+        let owner_pair = crate::account::person_identity::open_person_identity_without_mutation(
+            &owner.host,
+            &io,
+            &protocol::normalize_user_phrase(OWNER_PHRASE),
+        )
+        .await
+        .expect("owner identity");
+
+        // The two members' person accounts and public halves.
+        let member_a = person_device("r797-a", &url, MEMBER_A_PHRASE).await;
+        let member_b = person_device("r797-b", &url, MEMBER_B_PHRASE).await;
+        let a_pub = crate::account::person_identity::open_person_identity_without_mutation(
+            &member_a.host,
+            &io,
+            &protocol::normalize_user_phrase(MEMBER_A_PHRASE),
+        )
+        .await
+        .expect("A identity")
+        .public_half();
+        let b_pub = crate::account::person_identity::open_person_identity_without_mutation(
+            &member_b.host,
+            &io,
+            &protocol::normalize_user_phrase(MEMBER_B_PHRASE),
+        )
+        .await
+        .expect("B identity")
+        .public_half();
+        let a_pid = member_a
+            .identity_code
+            .split(':')
+            .nth(1)
+            .expect("A pid")
+            .to_string();
+        let b_pid = member_b
+            .identity_code
+            .split(':')
+            .nth(1)
+            .expect("B pid")
+            .to_string();
+
+        let seed = owner_ntv6_meta_with_members(
+            &account_hash,
+            &acct.items_key,
+            &acct.items_key_id,
+            &owner_pair,
+            1,
+            &[(a_pid.clone(), a_pub.clone()), (b_pid.clone(), b_pub)],
+        );
+        enroll::put_vault_meta(bootstrap.as_ref(), &device_token, &seed.meta)
+            .expect("seed vault.meta");
+        let owner_token = bind_owner_request(
+            bootstrap.as_ref(),
+            &device_token,
+            &account_hash_hex,
+            owner.identity_code.split(':').nth(1).expect("owner pid"),
+        )
+        .expect("bind owner");
+        for (pid, frame) in &seed.invites {
+            post_invite_request(bootstrap.as_ref(), &owner_token, pid, frame).expect("post invite");
+        }
+
+        // The owner's unlocked session, its vault dir and its enrolled sync plane.
+        let owner_id = crate::vault_id::VaultId::mint();
+        let owner_root = crate::paths::vault_root_for_id_from_base(
+            &owner.host.app_data_dir().expect("data dir"),
+            owner_id,
+        );
+        io.create_dir_all(&owner_root.join("notes"))
+            .await
+            .expect("notes dir");
+        io.write(
+            &owner_root.join("vault.meta"),
+            &seed.meta,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+        .expect("owner meta");
+        let owner_sync = SyncState {
+            account_hash_hex: Some(account_hash_hex.clone()),
+            device_id_hex: Some("ab".repeat(16)),
+            owner_member_token_hex: Some(owner_token.clone()),
+            owner_member_person_id_hex: Some(
+                owner
+                    .identity_code
+                    .split(':')
+                    .nth(1)
+                    .expect("pid")
+                    .to_string(),
+            ),
+            ..SyncState::default()
+        };
+        write_sync_state(&io, &owner_root, &owner_sync)
+            .await
+            .expect("owner sync state");
+        owner
+            .state
+            .set_unlocked(
+                owner_id,
+                UnlockedVault::owner(
+                    zeroize::Zeroizing::new([0x77u8; 32]),
+                    Some(seed.group.clone()),
+                    zeroize::Zeroizing::new(acct.items_key),
+                    acct.items_key_id,
+                    0,
+                    crate::vault_meta_hash::vault_meta_sha256(&seed.meta),
+                ),
+            )
+            .await;
+        owner
+            .state
+            .set_person_identity_and_id(
+                owner_pair.clone(),
+                super::devices::hex16(owner.identity_code.split(':').nth(1).expect("pid"))
+                    .expect("owner pid bytes"),
+            )
+            .await;
+
+        // Both members accept. B then sets its fast password and authors a local
+        // note that never reaches the server.
+        let mut accepted_ids = Vec::new();
+        for (device, phrase, _expected_pid) in [
+            (&member_a, MEMBER_A_PHRASE, &a_pid),
+            (&member_b, MEMBER_B_PHRASE, &b_pid),
+        ] {
+            let listed = person_list_invites_from_host(&device.host, &io)
+                .await
+                .expect("list invites");
+            // The server already filters the inbox to THIS person, so the
+            // single listing is the invite addressed to it.
+            let invite = listed
+                .iter()
+                .find(|i| i.vault_account_hash_hex == account_hash_hex)
+                .expect("the invite addressed to this member")
+                .clone();
+            let accepted = accept_invite_from_host(
+                &device.host,
+                &io,
+                &device.state,
+                &invite.invite_id_hex,
+                &owner.identity_code,
+                phrase,
+                MEMBER_PASSWORD,
+            )
+            .await
+            .expect("accept");
+            accepted_ids.push(accepted.vault_id.clone());
+        }
+        let b_vault_id = crate::vault_id::VaultId::parse(&accepted_ids[1]).expect("B vault id");
+        let b_root = crate::paths::vault_root_for_id_from_base(
+            &member_b.host.app_data_dir().unwrap(),
+            b_vault_id,
+        );
+        set_member_password_from_host(&member_b.host, &io, &member_b.state, MEMBER_PASSWORD)
+            .await
+            .expect("B sets its fast credential");
+
+        let note_uuid = [0xC7u8; 16];
+        let note_path = b_root.join("notes").join(format!(
+            "{}.myn",
+            uuid::Uuid::from_bytes(note_uuid).hyphenated()
+        ));
+        io.create_dir_all(&b_root.join("notes"))
+            .await
+            .expect("B notes dir");
+        let unsynced = protocol::encode_new_note(
+            &acct.items_key,
+            &acct.items_key_id,
+            &note_uuid,
+            b"offline-before-rotation",
+        )
+        .expect("B note blob");
+        io.write(&note_path, &unsynced, crate::vault_io::WriteOpts::default())
+            .await
+            .expect("B writes its unsynced note");
+
+        // The owner removes A. B is "offline": it never touches the network in
+        // this window, and its local content stays under the epoch-1 itemsKey.
+        let a_fp = crate::account::person_identity::hex_lower(a_pub.fingerprint());
+        let rotation = rotate_group_from_host(&owner.host, &io, &owner.state, &owner_pair, &a_fp)
+            .await
+            .expect("owner rotates");
+        assert_eq!(rotation.new_epoch, 2);
+        assert_eq!(
+            rotation.packages.len(),
+            1,
+            "only the remaining member is a recipient"
+        );
+        assert_eq!(rotation.packages[0].person_id_hex, b_pid);
+
+        // GAP 3: the rotation persisted the delivery obligations before any
+        // network call.
+        let outbox = crate::plugins::sync::rotation_outbox::read_rotation_outbox(&io, &owner_root)
+            .await
+            .expect("read outbox")
+            .expect("the rotation wrote a durable outbox");
+        assert_eq!(outbox.replacement_epoch, 2);
+        assert_eq!(outbox.pending.len(), 1);
+
+        // Deliver. The server's retire route may refuse in this harness; the
+        // package POST is what the member needs, so tolerate a delivery error.
+        let drained = crate::plugins::sync::rotation_outbox::drain_rotation_outbox_from_host(
+            &owner.host,
+            &io,
+            &owner.state,
+        )
+        .await;
+        drained.expect("the delivery completes against the real server");
+        {
+            // The rotated meta really reached the server, which is what lets an
+            // offline member learn of the new epoch at all.
+            let resp = bootstrap
+                .request(
+                    crate::plugins::sync::transport::HttpMethod::Get,
+                    "/vault.meta",
+                    &[],
+                    Some(&owner_token),
+                )
+                .expect("get meta");
+            assert_eq!(resp.status, 200);
+            assert_eq!(
+                protocol::parse_vault_meta_ntv6(&resp.body)
+                    .expect("server NTV6")
+                    .group_key_epoch,
+                2,
+                "the rotation's meta is on the server"
+            );
+        }
+
+        // B, back online, adopts. Its local meta advances to epoch 2 and its
+        // unsynced note is re-keyed under the new itemsKey.
+        member_adopt_rotation_from_host(&member_b.host, &io, &member_b.state)
+            .await
+            .expect("B adopts the rotation");
+        let b_meta = io.read(&b_root.join("vault.meta")).await.expect("B meta");
+        let b_b2b = protocol::parse_vault_meta_ntv6(&b_meta).expect("B NTV6");
+        assert_eq!(b_b2b.group_key_epoch, 2, "the verified epoch was committed");
+        // The adoption installs the tier and defers the LOCAL re-key to the next
+        // credential unlock (it holds neither the phrase nor the member password
+        // here, and the store must be re-sealed in the same step as the blobs).
+        // The pre-unlock state is pinned rather than assumed.
+        assert_eq!(
+            crate::plugins::sync::state::read_content_epoch(&io, &b_root)
+                .await
+                .expect("marker readable"),
+            None,
+            "the adoption does NOT claim the local content was re-keyed"
+        );
+        let (_, new_items_key, _) = member_b
+            .state
+            .peek_unlocked_member_keys_clone()
+            .await
+            .expect("B member slot");
+        let before_unlock = io.read(&note_path).await.expect("B note");
+        assert!(
+            crate::plugins::notes::decode::decode_note_any(
+                &before_unlock,
+                &note_uuid,
+                &acct.items_key,
+                &acct.items_key_id
+            )
+            .is_ok(),
+            "the offline note is still sealed under the retired key until the unlock"
+        );
+
+        // GAP 2: a fresh unlock with the SAME password succeeds, and the durable
+        // store now agrees with the installed key.
+        unlock_member_vault_with_password_from_host(
+            &member_b.host,
+            &io,
+            &member_b.state,
+            b_vault_id,
+            MEMBER_PASSWORD,
+        )
+        .await
+        .expect("the fast credential re-seals at the new epoch");
+        assert_eq!(
+            crate::plugins::sync::state::read_content_epoch(&io, &b_root)
+                .await
+                .expect("marker readable"),
+            Some(2),
+            "the unlock re-keyed the local content and recorded the epoch"
+        );
+        let after_unlock = io.read(&note_path).await.expect("B note");
+        assert!(
+            crate::plugins::notes::decode::decode_note_any(
+                &after_unlock,
+                &note_uuid,
+                &new_items_key,
+                &acct.items_key_id
+            )
+            .is_ok(),
+            "and the offline note now opens under the installed itemsKey"
+        );
+        assert!(
+            crate::plugins::notes::decode::decode_note_any(
+                &after_unlock,
+                &note_uuid,
+                &acct.items_key,
+                &acct.items_key_id
+            )
+            .is_err(),
+            "the removed member's retained epoch-1 key no longer opens it"
+        );
+        let store = crate::plugins::sync::member_unlock_store::read_member_unlock_password(
+            &io,
+            &b_root,
+            b_vault_id.as_uuid().as_bytes(),
+            &crate::test_support::FAST_TEST_KDF,
+            MEMBER_PASSWORD,
+        )
+        .await
+        .expect("the store opens with the same password");
+        assert_eq!(
+            store.group_key_epoch, 2,
+            "the store's epoch matches the vault"
+        );
+        assert_eq!(
+            &store.items_key[..],
+            &new_items_key[..],
+            "and so does the key it holds"
+        );
+
+        // A wrong password stays a wrong-password failure, not a repair.
+        assert!(unlock_member_vault_with_password_from_host(
+            &member_b.host,
+            &io,
+            &member_b.state,
+            b_vault_id,
+            "not the password"
+        )
+        .await
+        .is_err());
+
+        // The removed member is never a recipient: its own GET is a 404, and the
+        // owner's outbox never addressed it.
+        let a_vault_id = crate::vault_id::VaultId::parse(&accepted_ids[0]).expect("A vault id");
+        let a_root = crate::paths::vault_root_for_id_from_base(
+            &member_a.host.app_data_dir().unwrap(),
+            a_vault_id,
+        );
+        let a_sync = read_sync_state(&io, &a_root).await.expect("A sync state");
+        assert!(
+            a_sync.owner_identity_code.is_some(),
+            "A really is a joined member device"
+        );
+        assert_eq!(
+            outbox.pending[0].person_id_hex, b_pid,
+            "A is not a recipient of the rotation"
+        );
+    });
+}

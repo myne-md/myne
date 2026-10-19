@@ -23,6 +23,7 @@ use super::enroll::{
 use super::person_auth::{
     person_auth_path, person_auth_path_for_read, read_person_auth, write_person_auth, PersonAuth,
 };
+use super::token_store::TokenStore as _;
 use super::transport::{HttpMethod, SyncTransport, TransportResponse};
 use crate::host::HostCtx;
 use crate::plugins::quick_unlock::provider::QuickUnlockProvider;
@@ -505,7 +506,7 @@ pub async fn sync_person_list_invites<R: tauri::Runtime>(
 }
 
 /// The endpoint URL, the precondition every relay call needs.
-async fn endpoint_from_host(
+pub(crate) async fn endpoint_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
 ) -> Result<String, SyncDeviceError> {
@@ -1747,6 +1748,35 @@ pub async fn unlock_member_vault_from_host(
                 .as_ref()
                 .map(|k| k.items_key_id)
                 .unwrap_or(b2b.base.items_key_id);
+            // Re-key this device's LOCAL content from the retired itemsKey to the
+            // new one BEFORE the new keys are installed or the phrase store is
+            // re-sealed (myne-md/myne#797). An unsynced local note is wrapped
+            // under the retired key and has no server copy, so skipping this
+            // makes it unreadable the moment the slot moves: and the store's
+            // epoch advancing past the blobs would remove the trigger that would
+            // otherwise notice. The content-epoch marker makes the step
+            // idempotent across a crash.
+            if let Some(old) = other.as_ref() {
+                // A read failure is a refusal, not a guess: answering the
+                // retired epoch re-runs a re-key that already landed.
+                let content_epoch = crate::plugins::sync::state::read_content_epoch(io, &vault_dir)
+                    .await
+                    .map_err(|_| SyncDeviceError::Internal)?
+                    .unwrap_or(old.group_key_epoch);
+                if content_epoch < b2b.group_key_epoch {
+                    crate::plugins::sync::member_removal::rekey_local_content_for_member(
+                        io,
+                        &vault_dir,
+                        &items_key_id,
+                        &old.items_key,
+                        &items_key,
+                        &meta_bytes,
+                        b2b.group_key_epoch,
+                    )
+                    .await
+                    .map_err(|_| SyncDeviceError::Internal)?;
+                }
+            }
             super::member_key_store::write_member_key_store(
                 io,
                 &vault_dir,
@@ -1908,23 +1938,136 @@ async fn member_seal_material(
     })
 }
 
-/// Install the member slot + person session from an opened credential, refusing a
-/// stale `group_key_epoch` (the cache is a generation behind after an owner
-/// group-key rotation; the caller falls back to the recovery phrase). Deliberately
-/// does NOT open the process-global owner quick-unlock gate: a member credential
-/// must not let a PIN quick-unlock on another owner vault skip its password after
-/// a restart (MYND-641/A6).
+/// The secret a member-unlock credential is (re)sealed under. Carried into
+/// [`install_member_unlock_credential`] so a stale-epoch credential can be
+/// re-sealed under the SAME secret without the caller re-deriving it
+/// (myne-md/myne#797).
+enum MemberUnlockSecret<'a> {
+    Password(&'a str),
+    Provider {
+        method: &'a str,
+        salt: &'a [u8; 16],
+        wrap_key: &'a [u8; 32],
+    },
+}
+
+/// Install the member slot + person session from an opened credential
+/// (myne-md/myne#797).
+///
+/// A stale `group_key_epoch`: the credential is a generation behind after an
+/// owner group-key rotation: is repaired rather than refused: the member
+/// re-fetches its delivered package at the current epoch, verifies it against the
+/// PINNED owner half, re-keys the local content, and re-seals this store under
+/// the SAME password / PIN / biometric wrap key, then installs. Before this the
+/// only recovery was the 24-word phrase, so a member who had set a fast
+/// credential was locked out of it by any rotation.
+///
+/// A WRONG secret stays a wrong-secret failure: the store is opened (AEAD) by the
+/// caller BEFORE this function runs, so reaching the stale branch proves the
+/// secret was right. A package that has not landed yet is a retryable
+/// [`SyncDeviceError::Transport`], never a silent install of retired keys.
+///
+/// Deliberately does NOT open the process-global owner quick-unlock gate: a
+/// member credential must not let a PIN quick-unlock on another owner vault skip
+/// its password after a restart (MYND-641/A6).
+#[allow(clippy::too_many_arguments)]
 async fn install_member_unlock_credential(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_id: crate::vault_id::VaultId,
-    cred: super::member_unlock_store::MemberUnlockCredential,
+    mut cred: super::member_unlock_store::MemberUnlockCredential,
     meta_bytes: &[u8],
     current_epoch: u64,
+    vault_root: &std::path::Path,
+    b2b: &protocol::B2bVaultMeta,
+    secret: MemberUnlockSecret<'_>,
 ) -> Result<(), SyncDeviceError> {
     if cred.group_key_epoch != current_epoch {
-        return Err(SyncDeviceError::BadRequest);
+        // The vault rotated past this credential. Re-fetch and verify the
+        // member's own package at the CURRENT epoch; the owner half is PINNED.
+        let sync_state = super::state::read_sync_state(io, vault_root)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let owner_code = sync_state
+            .owner_identity_code
+            .clone()
+            .filter(|s| !s.is_empty())
+            .ok_or(SyncDeviceError::NotEnrolled)?;
+        let Some((new_group_key, new_items_key)) =
+            fetch_and_open_rotation_package(host, io, b2b, current_epoch, &owner_code, &cred.pair)
+                .await?
+        else {
+            // Not delivered yet: the credential stays stale and the caller may
+            // fall back to the phrase. Retryable, not a refusal.
+            return Err(SyncDeviceError::Transport);
+        };
+        // Re-key local content BEFORE the store is re-sealed, so a crash leaves
+        // the old credential still describing the old key (and the marker
+        // records whichever step actually landed).
+        let content_epoch = crate::plugins::sync::state::read_content_epoch(io, vault_root)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .unwrap_or(cred.group_key_epoch);
+        if content_epoch < current_epoch {
+            crate::plugins::sync::member_removal::rekey_local_content_for_member(
+                io,
+                vault_root,
+                &cred.items_key_id,
+                &cred.items_key,
+                &new_items_key,
+                meta_bytes,
+                current_epoch,
+            )
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        }
+        let vault_id_bytes = vault_id.as_uuid().as_bytes();
+        let sealed = match secret {
+            MemberUnlockSecret::Password(password) => {
+                super::member_unlock_store::write_member_unlock_password(
+                    io,
+                    vault_root,
+                    vault_id_bytes,
+                    &cred.account_hash,
+                    current_epoch,
+                    &cred.items_key_id,
+                    &cred.person_id,
+                    &b2b.base.kdf_params,
+                    password,
+                    &new_group_key,
+                    &new_items_key,
+                    &cred.pair,
+                )
+                .await
+            }
+            MemberUnlockSecret::Provider {
+                method,
+                salt,
+                wrap_key,
+            } => {
+                super::member_unlock_store::write_member_unlock_provider(
+                    io,
+                    vault_root,
+                    vault_id_bytes,
+                    &cred.account_hash,
+                    method,
+                    salt,
+                    wrap_key,
+                    current_epoch,
+                    &cred.items_key_id,
+                    &cred.person_id,
+                    &new_group_key,
+                    &new_items_key,
+                    &cred.pair,
+                )
+                .await
+            }
+        };
+        sealed.map_err(|_| SyncDeviceError::Internal)?;
+        cred.group_key = new_group_key;
+        cred.items_key = new_items_key;
+        cred.group_key_epoch = current_epoch;
     }
     use sha2::Digest as _;
     let generation = state.person_session_generation().await;
@@ -2146,6 +2289,9 @@ pub async fn unlock_member_vault_with_password_from_host(
         cred,
         &meta_bytes,
         b2b.group_key_epoch,
+        &vault_dir,
+        &b2b,
+        MemberUnlockSecret::Password(password),
     )
     .await
 }
@@ -2360,6 +2506,13 @@ pub async fn unlock_member_vault_with_pin_from_host(
                 cred,
                 &meta_bytes,
                 b2b.group_key_epoch,
+                &vault_dir,
+                &b2b,
+                MemberUnlockSecret::Provider {
+                    method: super::member_unlock_store::METHOD_PIN,
+                    salt: &salt,
+                    wrap_key: &wrap,
+                },
             )
             .await?;
             write_member_attempts(
@@ -2461,6 +2614,13 @@ pub async fn unlock_member_vault_with_biometric_from_host(
             cred,
             &meta_bytes,
             b2b.group_key_epoch,
+            &vault_dir,
+            &b2b,
+            MemberUnlockSecret::Provider {
+                method: super::member_unlock_store::METHOD_BIOMETRIC,
+                salt: &zero_salt,
+                wrap_key: &wrap,
+            },
         )
         .await
     }
@@ -2856,7 +3016,22 @@ pub async fn push_and_revoke_removed_member_from_host(
         Ok(())
     })
     .await
-    .map_err(|_| SyncDeviceError::Internal)?
+    .map_err(|_| SyncDeviceError::Internal)??;
+    // The delivery is finished: drop the durable outbox THE ROTATION WROTE, and
+    // only if it is still that one. A second removal can commit while this
+    // delivery is in flight, and deleting its record would destroy the only copy
+    // of its packages (myne-md/myne#797). Best-effort: leaving it repeats an
+    // idempotent retire/revoke, which is harmless.
+    let still_ours = super::rotation_outbox::read_rotation_outbox(io, &root)
+        .await
+        .ok()
+        .flatten()
+        .map(|r| r.replacement_epoch == replacement_epoch)
+        .unwrap_or(false);
+    if still_ours {
+        let _ = super::rotation_outbox::clear_rotation_outbox(io, &root).await;
+    }
+    Ok(())
 }
 
 /// Fetch, verify and OPEN this member's delivered rotation package for
@@ -2934,20 +3109,25 @@ async fn fetch_and_open_rotation_package(
 /// (`collab-b2b-sessions` task 1). Idempotent and cheap when there is nothing to
 /// do.
 ///
-/// Trigger: this device's `vault.meta` carries a group-key epoch STRICTLY
-/// GREATER than the epoch its device-local member-key store was sealed at, i.e.
-/// the owner rotated and the sync meta phase has already adopted the new
-/// `vault.meta` bytes. On that signal the member fetches its OWN package from
-/// the vault-scoped delivery route with its person session, verifies the owner
-/// double signature against the PINNED owner public half, unwraps the new group
-/// key, derives the vault's `itemsKey` at the new epoch, and installs both on
-/// the live slot so the running session re-keys.
+/// **Trigger: the SERVER's `vault.meta` epoch, not the local one** (myne-md/myne#797).
+/// A member device cannot verify a `vault.meta` epoch itself, so the sync meta
+/// phase deliberately HOLDS a strictly-greater server epoch instead of writing
+/// it (a hostile server that mints one must not make the member commit it
+/// irreversibly). This function is what commits it, and only after the member's
+/// OWN delivered package has been fetched and opened at exactly that epoch
+/// against the PINNED owner public half. If the package is absent it writes
+/// nothing and retries next cycle.
+///
+/// On a verified package it: (1) writes the server's `vault.meta` verbatim and
+/// clears the per-blob CAS baselines so the next pull re-fetches every content
+/// header the owner rewrapped; (2) re-keys this device's LOCAL content blobs
+/// from the retired `itemsKey` to the new one: an unsynced local note has no
+/// server copy, so installing the new keys without this makes it unreadable
+/// forever (myne-md/myne#797); (3) installs the new group + items keys on the
+/// live slot so the running session re-keys.
 ///
 /// Delivery-tolerant: a member whose package has not landed yet, or a transport
-/// hiccup, returns `Ok(())` and retries on the next cycle. The `vault.member-key`
-/// store is re-sealed on the next unlock, where the member's phrase is available
-/// (`unlock_member_vault_from_host`); between the rotation and that unlock the
-/// live slot holds the new keys and the sync plane stays on the new epoch.
+/// hiccup, returns `Ok(())` and retries on the next cycle.
 pub async fn member_adopt_rotation_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
@@ -2957,24 +3137,54 @@ pub async fn member_adopt_rotation_from_host(
         &host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?,
         state.active_vault_id().await,
     );
-    let Ok(meta_bytes) = io.read(&root.join("vault.meta")).await else {
+    let Ok(local_bytes) = io.read(&root.join("vault.meta")).await else {
         return Ok(());
     };
-    if meta_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+    if local_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
         return Ok(());
     }
-    let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta_bytes) else {
+    let Ok(local_b2b) = protocol::parse_vault_meta_ntv6(&local_bytes) else {
         return Ok(());
     };
-    let meta_epoch = b2b.group_key_epoch;
-    let Some(store_epoch) = member_key_store_epoch(io, &root).await else {
+    let local_epoch = local_b2b.group_key_epoch;
+    // What the local CONTENT is wrapped at. Absent marker → the keys this device
+    // last held (the store's epoch), falling back to the local meta's own epoch
+    // for a device that has never held keys (a fresh second device).
+    let store_epoch = member_key_store_epoch(io, &root)
+        .await
+        .unwrap_or(local_epoch);
+    let content_epoch = crate::plugins::sync::state::read_content_epoch(io, &root)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .unwrap_or(store_epoch);
+
+    // The server's epoch is the trigger. A member holds no root key, so it never
+    // writes a meta epoch it has not verified through its own package.
+    let Some(server_bytes) = fetch_server_vault_meta_from_host(host, io, &root).await? else {
         return Ok(());
     };
-    if meta_epoch <= store_epoch {
+    if server_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return Ok(());
+    }
+    let Ok(server_b2b) = protocol::parse_vault_meta_ntv6(&server_bytes) else {
+        return Ok(());
+    };
+    let server_epoch = server_b2b.group_key_epoch;
+    // A lower server epoch is a rollback; equal with the content already re-keyed
+    // is nothing to do.
+    if server_epoch < local_epoch {
+        tracing::warn!(
+            stage = "member_rotation_adopt",
+            event = "ntv6_epoch_rollback_refused",
+            "refusing a lower group-key epoch as a rollback"
+        );
+        return Ok(());
+    }
+    if server_epoch == local_epoch && content_epoch >= local_epoch {
         return Ok(()); // nothing to adopt
     }
 
-    let sync_state = super::state::read_sync_state(io, &root)
+    let sync_state = crate::plugins::sync::state::read_sync_state(io, &root)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
     let owner_code = sync_state
@@ -2986,18 +3196,100 @@ pub async fn member_adopt_rotation_from_host(
         .clone_person_identity()
         .await
         .ok_or(SyncDeviceError::NotEnrolled)?;
+    // The live slot must still be on the member tier: the new keys are installed
+    // only at the end, so a crash before that leaves the slot (and the next
+    // unlock's derivation) where it was.
+    if state.peek_unlocked_member_keys_clone().await.is_none() {
+        return Ok(());
+    }
+    let target_b2b = if server_epoch > local_epoch {
+        &server_b2b
+    } else {
+        &local_b2b
+    };
     let Some((new_group_key, new_items_key)) =
-        fetch_and_open_rotation_package(host, io, &b2b, meta_epoch, &owner_code, &member).await?
+        fetch_and_open_rotation_package(host, io, target_b2b, server_epoch, &owner_code, &member)
+            .await?
     else {
-        return Ok(()); // not delivered yet: retry next cycle
+        // Not delivered yet. Nothing is written: the member stays on the old
+        // epoch, coherently, and retries next cycle.
+        return Ok(());
     };
 
     let Some(id) = state.active_vault_id().await else {
         return Ok(());
     };
+
+    // (1) Commit the verified meta verbatim, then move the slot. The LOCAL
+    // content re-key is deliberately NOT here: it needs the key that sealed the
+    // blobs, which lives in a store sealed under a credential this path does not
+    // hold (the phrase or the member password). Doing it here rewrote the blobs
+    // while leaving the store behind, so a second rotation before the next unlock
+    // left blobs sealed under an intermediate key nothing could derive, and the
+    // unlock then failed forever (myne-md/myne#797). It runs at the next unlock,
+    // where the credential is in hand, and it re-seals that store in the same
+    // step. The cost is stated rather than implied: until that unlock, a session
+    // cannot read blobs written before the rotation, and nothing is lost.
+    //
+    // The per-blob CAS baselines are KEPT for the same reason they were removed
+    // before: a rewrap preserves `content_nonce`, so they still describe the
+    // server's copy, and clearing them makes the next cycle present every note as
+    // a create at base 0.
+    if server_epoch > local_epoch {
+        io.write(
+            &root.join("vault.meta"),
+            &server_bytes,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+        let mut next = sync_state;
+        use sha2::Digest as _;
+        let hash: [u8; 32] = sha2::Sha256::digest(&server_bytes).into();
+        next.meta_baseline_hex = Some(crate::plugins::sync::to_hex(&hash));
+        crate::plugins::sync::state::write_sync_state(io, &root, &next)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let _ = crate::plugins::sync::state::clear_vault_meta_dirty(io, &root).await;
+    }
+
+    // (3) The running session moves to the new tiers.
     state.replace_items_key(id, new_items_key).await;
     state.set_group_key(id, new_group_key).await;
     Ok(())
+}
+
+/// Read the server's current `vault.meta` with this device's token. `Ok(None)`
+/// when the device is not enrolled, the server holds no meta, or the endpoint is
+/// unconfigured; `Err` only for a transport failure.
+async fn fetch_server_vault_meta_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    root: &std::path::Path,
+) -> Result<Option<Vec<u8>>, SyncDeviceError> {
+    let token = match super::token_store::default_store().read(io, root).await {
+        Ok(Some(t)) if !t.is_empty() => crate::plugins::sync::to_hex(&t),
+        _ => return Ok(None),
+    };
+    let url = match endpoint_from_host(host, io).await {
+        Ok(u) => u,
+        Err(_) => return Ok(None),
+    };
+    crate::task::run_blocking(move || {
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
+        let resp = transport
+            .request(HttpMethod::Get, "/vault.meta", &[], Some(&token))
+            .map_err(|_| SyncDeviceError::Transport)?;
+        match resp.status {
+            200 => Ok(Some(resp.body)),
+            404 => Ok(None),
+            401 | 403 => Err(SyncDeviceError::Unauthenticated),
+            _ => Err(SyncDeviceError::Transport),
+        }
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
 }
 
 /// The active vault's `account_number_hash`, from its `vault.meta`.

@@ -960,6 +960,34 @@ pub async fn run_active_cycle_from_host(
         }
     }
 
+    // An owner's unfinished rotation-package delivery (myne-md/myne#797). The
+    // rotation writes the sealed packages to a device-local outbox before it
+    // touches the network, so a crash between the two leaves the recipients on
+    // the retired epoch with nothing to retry: unless this drains it. Best
+    // effort: a no-op when the outbox is absent, and a failure here never fails
+    // the content cycle.
+    #[cfg(not(target_arch = "wasm32"))]
+    if is_owner {
+        match crate::plugins::sync::rotation_outbox::drain_rotation_outbox_from_host(
+            host, io, state,
+        )
+        .await
+        {
+            // A drain that actually delivered means the rotation's re-keyed blobs
+            // are the ones the server must serve: arm the push window, or a
+            // poll-only tick never sends them. `Ok(false)` is the common "no
+            // outbox" answer and must NOT arm it, or every owner cycle becomes a
+            // push (myne-md/myne#797).
+            Ok(true) => hooks.bump_local_change(),
+            Ok(false) => {}
+            Err(e) => tracing::warn!(
+                stage = "rotation_outbox_drain",
+                error = ?e,
+                "an owner rotation-package delivery is still pending"
+            ),
+        }
+    }
+
     outcome
 }
 
