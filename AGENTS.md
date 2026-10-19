@@ -53,6 +53,15 @@ those files are read only through a skill's standing-obligations block: a sessio
 skill reads none of them, which is exactly the session that then skips them. This file is loaded for
 every session in this tree, so the lane is stated here and the mechanics stay there.
 
+**The lane spans sessions; starting is not a promise to finish today.** These five obligations are
+on the work, not a single-session checklist. Never refuse, defer, or hand off a job because it looks
+larger than one session: begin the first concrete task. Partial state is legitimate and already has a
+home: leave the tree dirty and record what is done and what remains in `progress.md` (the `do-work`
+Partial Completion shape); the compaction plugin carries the session state. The `/pr-review` then
+`/done` tail closes the branch when it is ready, not before the work starts. An analysis-only answer
+to an implementation request is a failed turn. The user-owned decision gate in item 5 still stops the
+work; that is authority, not size.
+
 1. **No issue, no work, and the setup is asked for.** Work that changes a repository binds to a
    tracked issue (`issue: myne-md/<repo>#<n>`), and when none exists the issue is filed through the
    `issue-pm` subagent. But before either the issue or the worktree is created, the skill asks a
@@ -127,10 +136,10 @@ tool refuses to resolve through it; the answer is one Bash write to the absolute
 the companion in. A copy lands the file in a tree nobody commits, so it looks written and is
 invisible everywhere else. **And editing is the only thing that works through it**: git in a
 companion repo is refused outright from a worktree session, `!` included, because a worktree
-session's git may only target its own worktree. So a change spanning the main repo and a companion
-cannot be closed out in one sitting. `/done` commits and PRs the main repo, Gate 5 removes the
-worktree, and the companion PR is opened after that, from a session that is no longer isolated. Plan
-the merge order around it rather than discovering it at the gate. Full rule:
+session's git may only target its own worktree. The companion's own worktree is created from the
+companion itself (`worktrees.md` §2), and its PR is opened from there. `/done` commits and PRs the
+main repo, Gate 5 removes the main worktree, and the companion PR follows. That is the merge order;
+it is not a session-size judgment and it is not a reason to refuse the work. Full rule:
 `agent-tooling/reference/worktrees.md`.
 
 **A second trap, and it is not about the worktree's own session: a sibling checkout sits inside the
