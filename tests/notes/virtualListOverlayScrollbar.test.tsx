@@ -6,23 +6,11 @@
 // opts into the app's own `ScrollArea`, whose indicator shows on hover, focus
 // and scroll only. The saved views keep the native bar, so the mode is opt-in.
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { VirtualList } from "../../src/notes/components/VirtualList";
 
 afterEach(cleanup);
-
-// jsdom has no `ResizeObserver`, and VirtualList observes its container; a
-// no-op stub is enough for asserting which scroller it mounted.
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 const ITEMS = ["a", "b", "c"];
 

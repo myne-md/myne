@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// The browser clipper's three load-bearing identifiers, held across four files
-// and two REPOSITORIES (myne-md/myne#558).
+// The browser clipper's load-bearing identifiers, held across five files and two
+// REPOSITORIES (myne-md/myne#558; the fifth file added by audit 2026-10-18 B3).
 //
 // The failure this prevents: every clipper pairing token binds to an extension
 // ID, and the native-messaging host manifests are generated from these
@@ -17,6 +17,13 @@
 //   3. all three constants      ==  the values the root `AGENTS.md`
 //                                   load-bearing-identifiers table publishes
 //   4. the generated manifests   reference the constants rather than literals
+//   5. `HOST_NAME`              ==  the extension's OWN copy of it
+//                                   (`myne-clipper/src/background/host-name.ts`),
+//                                   which is the string `connectNative` is
+//                                   called with — renaming one side only leaves
+//                                   the browser opening a name no installed
+//                                   manifest is keyed by, and the connection
+//                                   fails silently to open
 //
 // # Why this guard did not exist, and why that is the interesting part
 //
@@ -90,6 +97,20 @@ const COMPANION = process.env.MYNE_CLIPPER_DIR
     COMPANION_CANDIDATES[0]);
 const COMPANION_MANIFEST = join(COMPANION, "src", "manifest.json");
 
+/**
+ * The extension's OWN copy of the host rendezvous name (B3, audit 2026-10-18).
+ *
+ * `host-name.ts` is a THIRD copy of `HOST_NAME` beside the Rust constant and
+ * the value the root table publishes, and it is the copy `connectNative` is
+ * actually called with (`background/clip.ts`), so it is the one whose drift the
+ * user sees. Its own comment says it "mirrors the desktop" and changes "in
+ * lock-step" — a promise, until this guard, that nothing checked: the guard
+ * read the extension's `manifest.json` and the Rust constants and never this
+ * file, so renaming the host on one side left `connectNative` opening a name no
+ * installed manifest is keyed by, and the connection fails silently to open.
+ */
+const COMPANION_HOST_NAME = join(COMPANION, "src", "background", "host-name.ts");
+
 const MANIFEST_RS = "src-tauri/src/clipper/manifest.rs";
 const AGENTS_MD = "AGENTS.md";
 
@@ -105,6 +126,20 @@ function rustStrConst(source, where, name) {
       `${where}: could not find \`const ${name}: &str = "…"\`. A renamed constant ` +
         `is not a smaller check — it is this guard reporting ok on an input it ` +
         `could not read.`,
+    );
+    return null;
+  }
+  return m[1];
+}
+
+/** `export const NAME = "value";` out of a TypeScript source. */
+function tsStrConst(source, where, name) {
+  const m = source.match(new RegExp(`export\\s+const\\s+${name}\\s*=\\s*"([^"]*)"`));
+  if (!m) {
+    fail(
+      `${where}: could not find \`export const ${name} = "…"\`. The extension's ` +
+        `copy of the host name has to be READ, not assumed — a renamed export ` +
+        `is this guard reporting ok on a file it could not parse.`,
     );
     return null;
   }
@@ -212,9 +247,10 @@ if (!existsSync(COMPANION_MANIFEST)) {
   const message =
     `the myne-clipper companion is not checked out at ${COMPANION}, so the ` +
     `DERIVATION of CHROMIUM_EXTENSION_ID from the extension's own manifest key ` +
-    `was NOT checked — which is the half no single repository can verify. ` +
-    `Clone it with ./workspace/setup.sh, or pass --require-companion to make ` +
-    `this a failure.`;
+    `and the extension's OWN \`HOST_NAME\` copy (src/background/host-name.ts) ` +
+    `were NOT checked — and those are the halves no single repository can ` +
+    `verify. Clone it with ./workspace/setup.sh, or pass --require-companion to ` +
+    `make this a failure.`;
   if (requireCompanion) fail(message);
   else notes.push(message);
 } else {
@@ -262,6 +298,41 @@ if (!existsSync(COMPANION_MANIFEST)) {
       );
     }
   }
+
+  // ── 4b. The extension's OWN HOST_NAME copy (B3, audit 2026-10-18) ──────────
+  //
+  // `src/background/host-name.ts` is the copy `connectNative` is actually
+  // called with, and until this guard nothing read it — the guard checked the
+  // extension's manifest `key`/`gecko.id` and the Rust constants, and the file
+  // whose drift the USER sees was the one input missing. It is compared against
+  // the desktop constant in BOTH directions by a single `!==` (a rename on
+  // either side fails), and a file that cannot be parsed fails BY NAME rather
+  // than reading as a smaller check.
+  if (!existsSync(COMPANION_HOST_NAME)) {
+    fail(
+      `${COMPANION_HOST_NAME} is missing from the companion checkout, so the ` +
+        `extension's own \`HOST_NAME\` copy — the string \`connectNative\` is ` +
+        `called with — was NOT read. This is a FAILURE rather than a note: the ` +
+        `file is a fixed part of the extension, and a missing one is a check ` +
+        `that silently stopped checking.`,
+    );
+  } else {
+    const extHostName = tsStrConst(
+      readFileSync(COMPANION_HOST_NAME, "utf8"),
+      COMPANION_HOST_NAME,
+      "HOST_NAME",
+    );
+    if (extHostName !== null && hostName !== null && extHostName !== hostName) {
+      fail(
+        `HOST_NAME drift: ${MANIFEST_RS} pins "${hostName}", but the ` +
+          `extension's ${COMPANION_HOST_NAME} exports "${extHostName}". ` +
+          `\`connectNative\` uses the extension's copy and the browser keys the ` +
+          `installed native-host manifest by the desktop's, so the connection ` +
+          `fails silently to open — "clipping does nothing", with no error on ` +
+          `either side.`,
+      );
+    }
+  }
 }
 
 if (failures.length > 0) {
@@ -272,5 +343,9 @@ if (failures.length > 0) {
 for (const note of notes) console.warn(`clipper identifiers: NOT CHECKED — ${note}`);
 console.log(
   `clipper identifiers: ok (host "${hostName}", chromium "${chromiumId}", ` +
-    `firefox "${firefoxId}"${notes.length === 0 ? ", derivation verified against the companion" : ""})`,
+    `firefox "${firefoxId}"${
+      notes.length === 0
+        ? ", derivation verified against the companion + the extension's own host-name copy"
+        : ""
+    })`,
 );

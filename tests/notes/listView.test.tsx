@@ -5,23 +5,13 @@
 // inline typed detail), group headings, the empty state, the read-only
 // guarantee, and the navigation click matrix.
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ListView } from "../../src/notes/views/listView";
 import type { SavedView } from "../../src/lib/prefs";
 import type { StoredProperty, ViewResult, ViewRow } from "../../src/notes/queryEngine";
 
 afterEach(cleanup);
-
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 function listDef(over: Partial<SavedView> = {}): SavedView {
   return {

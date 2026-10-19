@@ -6,7 +6,7 @@
 // headings + counts, the empty state, the viewType dispatch fallback, and the
 // read-only guarantee (no contenteditable / input). Pure components — no IPC.
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   buildGalleryStream,
@@ -27,21 +27,6 @@ import type {
 } from "../../src/notes/queryEngine";
 
 afterEach(cleanup);
-
-// jsdom has no `ResizeObserver`; the cards gallery + the VirtualList it reuses
-// (task 9) both observe their container. A no-op stub is enough — jsdom reports
-// `clientWidth`/`clientHeight` as 0, so the gallery falls back to 1 column and
-// VirtualList mounts only its buffer slice (which is exactly what the windowing
-// assertion below exercises).
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 function cardsDef(over: Partial<SavedView> = {}): SavedView {
   return {

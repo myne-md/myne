@@ -22,7 +22,7 @@
 // reach), the key handlers including the modifier matrix (the operation), and
 // axe over a rendered card with the cover button revealed (the nesting).
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ListView } from "../../src/notes/views/listView";
 import { TableView } from "../../src/notes/views/tableView";
@@ -32,16 +32,6 @@ import type { ViewResult, ViewRow } from "../../src/notes/queryEngine";
 import { formatViolations, runAxe } from "./axe-config";
 
 afterEach(cleanup);
-
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 const row = (noteId: string, title: string): ViewRow => ({
   noteId,

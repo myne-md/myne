@@ -68,8 +68,10 @@ function tree(): string {
   return dir;
 }
 
-/** A companion checkout carrying `key` and `gecko.id`. */
-function companion(opts: { key?: string; gecko?: string | null } = {}): string {
+/** A companion checkout carrying `key`, `gecko.id` and the extension's own `HOST_NAME` copy. */
+function companion(
+  opts: { key?: string; gecko?: string | null; hostName?: string | null } = {},
+): string {
   const dir = mkdtempSync(join(tmpdir(), "clipper-companion-"));
   scratch.push(dir);
   mkdirSync(join(dir, "src"), { recursive: true });
@@ -84,6 +86,26 @@ function companion(opts: { key?: string; gecko?: string | null } = {}): string {
     delete manifest.applications;
   }
   writeFileSync(join(dir, "src", "manifest.json"), JSON.stringify(manifest, null, 2));
+
+  // The extension's own `HOST_NAME` copy (B3): the guard READS this file, so a
+  // fixture that omitted it would make every companion-present assertion fail on
+  // a missing input rather than on the drift under test. `hostName: null` is the
+  // deliberate omission the missing-file test drives; `undefined` keeps the real
+  // one; a string is the injected value.
+  if (opts.hostName !== null) {
+    const realHostName = join(REAL_COMPANION, "src", "background", "host-name.ts");
+    const source =
+      realHostName !== undefined && existsSync(realHostName)
+        ? readFileSync(realHostName, "utf8")
+        : 'export const HOST_NAME = "md.myne.clipper";\n';
+    mkdirSync(join(dir, "src", "background"), { recursive: true });
+    writeFileSync(
+      join(dir, "src", "background", "host-name.ts"),
+      opts.hostName === undefined
+        ? source
+        : `// injected fixture\nexport const HOST_NAME = ${JSON.stringify(opts.hostName)};\n`,
+    );
+  }
   return dir;
 }
 
@@ -256,5 +278,64 @@ describe("the clipper-identifier guard", () => {
     const r = run(dir, { companionDir: c });
     expect(r.ok).toBe(false);
     expect(r.out).toContain("no `key` field");
+  });
+
+  // ── B3: the extension's OWN host-name copy (audit 2026-10-18) ──────────────
+  //
+  // `myne-clipper/src/background/host-name.ts` is the string `connectNative` is
+  // called with, and it was the one input this guard never read. Both
+  // directions matter and both are exercised: the extension renamed with the
+  // desktop unchanged, and the desktop renamed with the extension unchanged.
+
+  it("names a host name that drifted on the EXTENSION side", { skip: !HAS_COMPANION }, () => {
+    const dir = tree();
+    const c = companion({ hostName: "md.myne.clipper-OLD" });
+    const r = run(dir, { companionDir: c });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain("HOST_NAME drift");
+    expect(r.out).toContain("md.myne.clipper-OLD");
+  });
+
+  it("names a host name that drifted on the DESKTOP side", { skip: !HAS_COMPANION }, () => {
+    // The mirror direction: the Rust constant moves and the extension's copy
+    // does not, so `connectNative` opens the old name against a host manifest
+    // keyed by the new one. (This also trips the published-table check, which is
+    // correct — the table still carries the old value — so the assertion is on
+    // the drift message specifically.)
+    const dir = tree();
+    patchManifestRs(
+      dir,
+      'pub const HOST_NAME: &str = "md.myne.clipper";',
+      'pub const HOST_NAME: &str = "md.myne.clipper-new";',
+    );
+    const c = companion({ hostName: undefined });
+    const r = run(dir, { companionDir: c });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain("HOST_NAME drift");
+    expect(r.out).toContain("md.myne.clipper-new");
+  });
+
+  it("names a missing host-name.ts rather than checking nothing", { skip: !HAS_COMPANION }, () => {
+    // A companion whose `host-name.ts` is gone (a partial checkout, a rename)
+    // must FAIL rather than pass with one fewer input read — the "pattern that
+    // stopped matching reports ok" failure this guard exists not to have.
+    const dir = tree();
+    const c = companion({ hostName: null });
+    const r = run(dir, { companionDir: c });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain("host-name.ts is missing");
+  });
+
+  it("names a host-name.ts whose const cannot be parsed", { skip: !HAS_COMPANION }, () => {
+    const dir = tree();
+    const c = companion({ hostName: undefined });
+    writeFileSync(
+      join(c, "src", "background", "host-name.ts"),
+      'const HOST = "md.myne.clipper";\nexport { HOST };\n',
+    );
+    const r = run(dir, { companionDir: c });
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain("could not find");
+    expect(r.out).toContain("host-name.ts");
   });
 });

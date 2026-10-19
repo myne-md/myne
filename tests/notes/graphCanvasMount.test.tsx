@@ -81,14 +81,6 @@ beforeEach(() => {
     () => stub2dContext() as never,
   );
   vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    },
-  );
-  vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({
       matches: false,

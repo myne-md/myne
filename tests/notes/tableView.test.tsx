@@ -5,26 +5,13 @@
 // note, typed cells, group headings, the empty state, the sticky Name column,
 // the read-only guarantee, and the navigation click matrix.
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TableView } from "../../src/notes/views/tableView";
 import type { SavedView } from "../../src/lib/prefs";
 import type { StoredProperty, ViewResult, ViewRow } from "../../src/notes/queryEngine";
 
 afterEach(cleanup);
-
-// jsdom lacks ResizeObserver; VirtualList observes its container. A no-op stub
-// is enough (clientHeight 0 → VirtualList mounts its buffer slice, which covers
-// the small fixtures below).
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === "undefined") {
-    globalThis.ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-  }
-});
 
 function tableDef(over: Partial<SavedView> = {}): SavedView {
   return {
