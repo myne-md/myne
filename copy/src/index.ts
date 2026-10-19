@@ -392,33 +392,39 @@ export const AI_TRUST_A7_RESIDUAL =
 
 export const CONSENT_DEVICE_SUFFIX = "@device";
 
-/** The value stored when this device records consent for `provider`. */
-export function deviceScopedConsent(provider: string): string {
+/** The value stored when this device records consent for `provider`.
+ *
+ *  Private, and it was an export until audit R0.1's membership guard asked who
+ *  consumed it: the answer was `consentIsDeviceScoped` two functions down. No
+ *  client composes this value — the consent is WRITTEN by the Rust side
+ *  (`protocol::prefs` owns the grammar) and a client only ever compares what it
+ *  reads. An export nobody outside the file can use is an affordance that reads
+ *  as a contract. */
+function deviceScopedConsent(provider: string): string {
   return `${provider}${CONSENT_DEVICE_SUFFIX}`;
 }
 
 /** Whether `stored` is a consent recorded on THIS device for `provider`.
  *
  *  A legacy bare-name value is deliberately false here, so a surface that asks
- *  this question shows the consent screen for the two populations that hold
- *  one. Use `consentIsLegacy` to say the true thing about them. */
+ *  this question shows the consent screen for the two populations that hold one
+ *  (an install that turned Developer mode off, and a device enrolled before the
+ *  reclassification). Both desktop and mobile call exactly this, and both
+ *  comments at the call sites say why it is not an equality against the provider
+ *  name: an equality would read a legacy value as current and start sending note
+ *  text with no act by this device.
+ *
+ *  The distinction between "legacy" and "no consent at all" is deliberately NOT
+ *  surfaced, and saying so is the point of this paragraph. A `consentIsLegacy`
+ *  sibling existed to make it sayable, had no caller, and was removed in audit
+ *  R0.1's follow-up: a second function with a doc comment describing a surface
+ *  nobody built is the shape this audit exists to find. Add it back with the
+ *  surface that needs it. */
 export function consentIsDeviceScoped(
   stored: string | null | undefined,
   provider: string,
 ): boolean {
   return stored === deviceScopedConsent(provider);
-}
-
-/** Whether `stored` is a LEGACY consent for `provider`: the bare wire name.
- *
- *  Separate from "no consent at all" so a surface can say the user agreed once,
- *  to this provider, under a build where a second host-side precondition also
- *  had to hold, rather than implying Myne forgot. */
-export function consentIsLegacy(
-  stored: string | null | undefined,
-  provider: string,
-): boolean {
-  return stored === provider;
 }
 
 export const CONSENT_DEVICE_SCOPE =

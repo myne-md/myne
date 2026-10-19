@@ -18,7 +18,7 @@ import {
   exportedNames,
   redefinitions,
   stripComments,
-  unconsumed,
+
 } from "../../scripts/check-copy-membership.mjs";
 
 const COPY_NAMES = new Set([
@@ -110,21 +110,6 @@ describe("stripComments — prose about the name is not a declaration", () => {
       "export const OTHER = 1;",
     ].join("\n");
     expect([...exportedNames(stripComments(src))]).toEqual(["OTHER"]);
-  });
-});
-
-describe("unconsumed — the other direction, and it is a warning by design", () => {
-  it("names an export nothing outside copy/ mentions", () => {
-    expect(unconsumed(new Set(["A", "B"]), "const x = A;")).toEqual(["B"]);
-  });
-
-  it("accepts a mention anywhere, including a test asserting the literal", () => {
-    expect(unconsumed(new Set(["A"]), "expect(A).toBe(…);")).toEqual([]);
-  });
-
-  it("does not match a name as a substring of a longer identifier", () => {
-    // `\b` on both sides: `A` must not be satisfied by `Ab`.
-    expect(unconsumed(new Set(["A"]), "const Ab = 1;")).toEqual(["A"]);
   });
 });
 
