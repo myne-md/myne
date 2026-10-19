@@ -304,32 +304,14 @@ pub fn live_row_count(map: &DeviceBindingsMap) -> usize {
     protocol::live_device_bindings(map).len()
 }
 
+// Lenient (`protocol::hex::decode_ci`): both values arrive inside a peer's
+// device-binding row, so their case is not this client's to fix (R1.2).
 fn decode_device_id_hex(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32 {
-        return None;
-    }
-    let raw = s.as_bytes();
-    let mut out = [0u8; 16];
-    for (i, pair) in raw.chunks_exact(2).enumerate() {
-        let hi = (pair[0] as char).to_digit(16)? as u8;
-        let lo = (pair[1] as char).to_digit(16)? as u8;
-        out[i] = (hi << 4) | lo;
-    }
-    Some(out)
+    protocol::hex::decode_ci(s)
 }
 
 fn decode_fingerprint_hex(s: &str) -> Option<[u8; protocol::person_key::PERSON_FINGERPRINT_LEN]> {
-    if s.len() != protocol::person_key::PERSON_FINGERPRINT_LEN * 2 {
-        return None;
-    }
-    let raw = s.as_bytes();
-    let mut out = [0u8; protocol::person_key::PERSON_FINGERPRINT_LEN];
-    for (i, pair) in raw.chunks_exact(2).enumerate() {
-        let hi = (pair[0] as char).to_digit(16)? as u8;
-        let lo = (pair[1] as char).to_digit(16)? as u8;
-        out[i] = (hi << 4) | lo;
-    }
-    Some(out)
+    protocol::hex::decode_ci(s)
 }
 
 #[cfg(test)]

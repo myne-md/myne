@@ -205,32 +205,14 @@ pub fn hex_encode(bytes: &[u8]) -> String {
 /// Decode a 64-char lowercase-hex attachment-id string into its 32-byte
 /// value. Returns `None` on any malformation (wrong length, non-hex, or
 /// uppercase — the canonical form is lowercase). Strict: this is the
-/// inverse of [`hex_encode`] for an [`ATTACHMENT_ID_LEN`]-byte id.
+/// inverse of [`hex_encode`] for an [`ATTACHMENT_ID_LEN`]-byte id, and
+/// `protocol::hex::decode_lower` is the one implementation of that policy
+/// (R1.2; the attachment id is a filename this client minted).
 /// `pub(crate)`: also consumed by the notes plugin's
 /// `note_export_attachments` (MYND-115 task 4 — cross-plugin reuse, the
 /// `VaultRuntimeState`-borrow precedent).
 pub fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
-    if s.len() != ATTACHMENT_ID_LEN * 2 {
-        return None;
-    }
-    let bytes = s.as_bytes();
-    let mut out = [0u8; ATTACHMENT_ID_LEN];
-    for (i, out_byte) in out.iter_mut().enumerate() {
-        let hi = hex_val(bytes[i * 2])?;
-        let lo = hex_val(bytes[i * 2 + 1])?;
-        *out_byte = (hi << 4) | lo;
-    }
-    Some(out)
-}
-
-/// Map one lowercase-hex ASCII digit to its value, rejecting uppercase
-/// (canonical attachment-ids are lowercase) and non-hex bytes.
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        _ => None,
-    }
+    protocol::hex::decode_lower(s)
 }
 
 /// Read `vault.meta` and return its 16-byte `account_number_hash`

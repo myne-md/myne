@@ -229,19 +229,6 @@ macro_rules! server_or_skip {
 
 use super::to_hex as hex;
 
-/// Parse a 32-hex note id back to its 16 raw bytes (the inverse of `hex` over a
-/// note id). `None` on a malformed id.
-fn id_hex_to_bytes(h: &str) -> Option<[u8; 16]> {
-    if h.len() != 32 {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, slot) in out.iter_mut().enumerate() {
-        *slot = u8::from_str_radix(&h[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
-}
-
 // ---------------------------------------------------------------------------
 // Account + virtual device model.
 // ---------------------------------------------------------------------------
@@ -574,8 +561,10 @@ impl Device {
     fn resolve_all_conflicts(&self) -> Vec<NoteId> {
         let mut copies = Vec::new();
         for id_hex in self.pending_conflicts() {
+            // Strict: the staged conflict filenames are this client's own
+            // writer's output (R1.2).
             if let (Some(idb), Some(blob)) = (
-                id_hex_to_bytes(&id_hex),
+                protocol::hex::decode_lower::<16>(&id_hex),
                 crate::test_support::block_on(read_staged_conflict_blob(
                     &crate::vault_io::StdVaultIo,
                     &self.vault_dir,

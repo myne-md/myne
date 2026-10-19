@@ -529,17 +529,11 @@ fn hex_to_vec(s: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
+/// Strict (`protocol::hex::decode_lower`): a conversation id in the sync
+/// manifest is minted lowercase, so an uppercase id is a second identity
+/// rather than a spelling to accept (R1.2).
 fn hex16(s: &str) -> Option<[u8; 16]> {
-    if s.len() != 32 || s.chars().any(|c| c.is_ascii_uppercase()) {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (slot, pair) in out.iter_mut().zip(s.as_bytes().chunks(2)) {
-        let hi = (pair[0] as char).to_digit(16)?;
-        let lo = (pair[1] as char).to_digit(16)?;
-        *slot = ((hi << 4) | lo) as u8;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 #[cfg(test)]

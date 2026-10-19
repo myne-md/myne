@@ -255,26 +255,10 @@ fn enumerate_notes_dir(notes_dir: &Path) -> std::io::Result<Vec<NoteId>> {
 }
 
 /// Decode a 64-char lowercase-hex attachment-id string into its 32-byte value.
+/// Strict (`protocol::hex::decode_lower`): the id is a filename in
+/// `attachments/`, so the one lowercase spelling is canonical (R1.2).
 fn hex_decode_id(s: &str) -> Option<[u8; 32]> {
-    if s.len() != 64 {
-        return None;
-    }
-    let bytes = s.as_bytes();
-    let mut out = [0u8; 32];
-    for (i, out_byte) in out.iter_mut().enumerate() {
-        let hi = hex_val(bytes[i * 2])?;
-        let lo = hex_val(bytes[i * 2 + 1])?;
-        *out_byte = (hi << 4) | lo;
-    }
-    Some(out)
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        _ => None,
-    }
+    protocol::hex::decode_lower(s)
 }
 
 fn stage_export_tree_inner(

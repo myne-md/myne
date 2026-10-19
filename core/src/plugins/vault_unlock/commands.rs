@@ -634,17 +634,12 @@ async fn stamp_person_binding_best_effort(
 /// Decode a lowercase-hex `person_id_hex` (32 chars) into its 16 bytes. Returns
 /// an error on any length or nibble problem; the caller treats it as "no
 /// identity to bind" and does nothing.
+///
+/// Strict (`protocol::hex::decode_lower`): the value comes from this device's
+/// own `person-auth.json`, which this client wrote lowercase, so an uppercase
+/// id is a second identity rather than a spelling to accept (R1.2).
 fn decode_person_id_hex(hex: &str) -> Result<[u8; protocol::PERSON_BINDING_ID_LEN], ()> {
-    if hex.len() != protocol::PERSON_BINDING_ID_LEN * 2 {
-        return Err(());
-    }
-    let mut out = [0u8; protocol::PERSON_BINDING_ID_LEN];
-    for (i, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
-        let hi = (chunk[0] as char).to_digit(16).ok_or(())?;
-        let lo = (chunk[1] as char).to_digit(16).ok_or(())?;
-        out[i] = ((hi << 4) | lo) as u8;
-    }
-    Ok(out)
+    protocol::hex::decode_lower(hex).ok_or(())
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend

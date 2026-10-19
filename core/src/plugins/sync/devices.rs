@@ -1143,13 +1143,9 @@ pub async fn account_status_from_host(
 /// `head-fingerprint` golden vector without a live vault.
 pub(crate) fn head_fingerprint_of_hex(head_id_hex: &str) -> Option<String> {
     use protocol::HEAD_ID_LEN;
-    if head_id_hex.len() != HEAD_ID_LEN * 2 || !head_id_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut head_id = [0u8; HEAD_ID_LEN];
-    for (i, b) in head_id.iter_mut().enumerate() {
-        *b = u8::from_str_radix(&head_id_hex[i * 2..i * 2 + 2], 16).ok()?;
-    }
+    // Lenient (`protocol::hex::decode_ci`): a head id arrives from the server,
+    // so its case is not this client's to fix (R1.2).
+    let head_id = protocol::hex::decode_ci::<HEAD_ID_LEN>(head_id_hex)?;
     Some(protocol::head_fingerprint(&head_id))
 }
 

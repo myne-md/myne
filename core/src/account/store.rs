@@ -136,7 +136,11 @@ fn parse_record(bytes: &[u8]) -> Option<AccountRecord> {
         .iter()
         .map(|a| {
             let a = a.as_object()?;
-            let account_id = unhex(a.get("account_id")?.as_str()?)?;
+            // Strict: this record is this device's own writer's output, so an
+            // uppercase id is a second identity for one account rather than a
+            // spelling to accept (protocol::hex::decode_lower, R1.2).
+            let account_id =
+                protocol::hex::decode_lower::<ACCOUNT_ID_LEN>(a.get("account_id")?.as_str()?)?;
             let label = a.get("label")?.as_str()?.to_string();
             let vaults = a
                 .get("vaults")?
@@ -160,17 +164,6 @@ pub(crate) fn hex(bytes: [u8; ACCOUNT_ID_LEN]) -> String {
         s.push_str(&format!("{b:02x}"));
     }
     s
-}
-
-fn unhex(s: &str) -> Option<[u8; ACCOUNT_ID_LEN]> {
-    if s.len() != ACCOUNT_ID_LEN * 2 {
-        return None;
-    }
-    let mut out = [0u8; ACCOUNT_ID_LEN];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
 }
 
 /// Seal a record into the on-disk blob under the account wrap key.
