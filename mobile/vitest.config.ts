@@ -32,6 +32,11 @@ export default defineConfig({
       // specs happen to reach it.
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
+      // The legal-document URL table (myne-ops#15) - mirror of vite.config.ts,
+      // which carries the rationale. `SettingsSheet.tsx` imports it, so without
+      // this line the sheet cannot be mounted in a component test and appears in
+      // no count, passing or failing.
+      { find: /^@myne\/legal-urls$/, replacement: sib("../src/lib/legal-urls.ts") },
       // Shared react-i18next runtime (MYND-485) - mirror of vite.config.ts.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
       { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },

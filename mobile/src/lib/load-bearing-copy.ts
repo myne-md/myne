@@ -93,6 +93,14 @@ export {
   CONNECTED_EXTENSIONS_EMPTY,
   CONNECTED_EXTENSIONS_REVOKE_LABEL,
   CONNECTED_EXTENSIONS_REPAIR_HINT,
+  // What removing a SHARED (member) vault from this device means (audit K2-i,
+  // 2026-10-19). The phone renders the OWNER's destructive copy to a member today
+  // ("Delete this vault?", the lost-both-secrets sentence), which is false twice
+  // in the dangerous direction: the vault is not the member's to destroy and the
+  // removal is reversible. Re-exported here so both mobile surfaces reach the
+  // shared literal verbatim rather than composing a second sentence, exactly as
+  // `src/lib/load-bearing-copy.ts` already does.
+  MEMBER_VAULT_REMOVAL_DISCLOSURE,
 } from "@myne/copy";
 
 // Android precise delivery (MYND-619 task 6). Same discipline as the desktop
