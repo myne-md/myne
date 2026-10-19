@@ -54,6 +54,14 @@ export interface JoinFlowProps {
    *  shell maps this to the `*.join-success` action of whichever stage opened
    *  the flow (welcome / picker / editor), all of which land in the editor. */
   onComplete: (vaultId?: VaultId) => void;
+  /**
+   * The join used the recovery phrase (myne-md/myne#837). The vault is then
+   * `Slot::Recovering`, NOT unlocked, so the shell mounts the mandatory chained
+   * password reset (`recover`, `subStep: "password-reset"`) addressed at the
+   * joined vault instead of routing to the editor. The same door desktop's
+   * `JoinDeviceModal.onRecovering` opens.
+   */
+  onRecovering: (vaultId?: VaultId) => void;
   onCancel: () => void;
   /**
    * A scanned member-vault code: the shell closes this overlay and opens the
@@ -97,6 +105,15 @@ export interface UnlockFlowProps {
 
 export interface RecoverFlowProps {
   initialSubStep: RecoverSubStep;
+  /**
+   * The vault this recovery is already pointed at, for the entries that know it
+   * before the screen mounts. Today that is the recovery-phrase DEVICE JOIN
+   * (myne-md/myne#837): the joined vault is `Recovering` and the chained password
+   * reset must target it explicitly, because the sole-vault fallback cannot
+   * resolve once the device holds more than one vault. `undefined` on every
+   * other entry: the recover screen's own reducer resolves or omits the target.
+   */
+  initialVaultId?: VaultId;
   onComplete: (vaultId?: VaultId) => void;
   onCancel: () => void;
 }

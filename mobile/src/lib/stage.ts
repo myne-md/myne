@@ -224,7 +224,20 @@ export type Stage =
        */
       vaultId?: VaultId;
     }
-  | { name: "recover"; subStep: RecoverSubStep }
+  | {
+      name: "recover";
+      subStep: RecoverSubStep;
+      /**
+       * Optional vault-targeting id for the RESUME entry (myne-md/myne#837).
+       * A recovery-phrase device join leaves the newly bootstrapped vault
+       * `Recovering`; the shell lands there with this id so the chained
+       * password reset targets that exact vault rather than the sole-vault
+       * fallback, which cannot resolve on a device that already holds others.
+       * Every other entry leaves it undefined (the recover screen's own
+       * reducer resolves or omits the target).
+       */
+      vaultId?: VaultId;
+    }
   | { name: "picker" }
   | {
       /**
@@ -864,6 +877,11 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "recover", subStep: "phrase-entry" },
   { name: "recover", subStep: "decrypting" },
   { name: "recover", subStep: "password-reset" },
+  // Coverage entry for the recover stage's optional `vaultId` payload
+  // (myne-md/myne#837): the chained password reset targets the vault the join
+  // bootstrapped. Payload, not the discriminator: presence changes no
+  // transition outcome.
+  { name: "recover", subStep: "password-reset", vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "recover", subStep: "delete-confirm" },
   { name: "picker" },
 ];

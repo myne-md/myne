@@ -6137,6 +6137,10 @@ export const ROSTER = Object.freeze([
       "e2e/member-roster.e2e.ts",
       "e2e/sync-identity-block.e2e.ts",
       "e2e/member-onboarding.e2e.ts",
+      // The recovery-phrase arm and the pending escape (myne-md/myne#837). It
+      // drives both surfaces against mock IPC and records the credential each
+      // one forwards, which is the half a mocked lane can honestly hold.
+      "mobile/tests/flow-logic/sync/join.flow.ts",
     ],
      manual: [
        {
@@ -6159,6 +6163,13 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 8,
         tier: "standard",
+      },
+      {
+        see: "Join a fresh phone to an existing account with the 24-word recovery phrase instead of the password (myne-md/myne#837), on both a real iPhone and a real Android device. Type the phrase into the 24-cell grid and confirm the on-screen keyboard does not cover the cell you are typing into and that pasting all 24 words at once distributes them in order; confirm the warning naming the phrase as full account takeover renders BEFORE the grid. Submit, and confirm the device lands on the SET-A-NEW-PASSWORD step rather than in the editor, that the new password opens the vault after the app is killed and relaunched, and that the OLD password no longer does. Then walk the second door: start a password join that comes back waiting for approval, and use the waiting screen's escape to confirm with the phrase instead. Confirm it self-approves without any other device acting and lands in the editor, and that the password typed moments earlier still opens the vault. Finally, on the same screen, enter a wrong phrase and confirm the one non-distinguishing message appears rather than a message naming the phrase as wrong.",
+        whyNotAutomated: "The flow-logic tier (mobile/tests/flow-logic/sync/join.flow.ts) drives both surfaces against a mocked IPC and asserts the two arguments each one forwards, but the pass conditions here are statements about real key material and real hardware: the phrase join derives root_key through Argon2id host-side and leaves the vault Slot::Recovering, so 'the new password opens it after a relaunch and the old one does not' cannot be answered by a mock; the recovery-path enrolment self-approves against a real relay, which is the property that makes the phrase a door for a user with no device left to approve from; the 24-cell grid sits under an on-screen keyboard whose height no lane here supplies; and the surface is WKWebView on iOS and Android System WebView, neither of which any lane in this tree drives.",
+        clients: ["ios", "android"],
+        estimateMin: 12,
+        tier: "core",
       },
     ],
     exemptionReason: "",

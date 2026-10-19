@@ -2076,6 +2076,12 @@ One record in [agent memory](#agent-memory): a 16-byte UUIDv7 id (the `memories/
 
 Used in: `protocol.md` §9.26; `decisions/ai/0590`
 
+### **meta baseline** &nbsp; 🗝️ *Key/identifier*
+
+The device-local `meta_baseline_hex` in `sync-state.json`: the SHA-256 of the `vault.meta` bytes this device last wrote or adopted, and the field the sync meta phase compares the server's copy against to decide whether the `vault.meta` divergence is local-only, server-only, or concurrent. It is device-local and never synced. A join records it **only when the bytes now on disk are the ones that join wrote**; a re-run over an existing container keeps the baseline it already held, because its kept local copy may be newer than the server's and claiming the fetched hash would make the phase push the older wrap over the newer one. Missing or stale, the phase falls back to adopting the server's copy, which is the safe direction (`spec/sync-protocol.md` §10.3; `core/src/plugins/sync/orchestrator.rs`).
+
+Used in: `sync-protocol.md` §10.3; `decisions/sync/0712`
+
 ### **merge version** &nbsp; 📋 *Protocol*
 
 The monotonic causal counter carried per entry by the synced tombstone-guarded singletons — the [`vault.themes`](#vaultthemes) per-name map (`spec/protocol.md` §9.21.2) and the [`vault.attachments`](#vaultattachments) catalog (§9.10.2) — and the **primary key of their per-entry merge join** (`spec/sync-protocol.md` §10.2.2 / §11.4). On any local mutation of a key it is bumped to `max(versions this device has observed for that key) + 1`; the greater `version` wins a reconcile, and the wall-clock fields (`created_at`/`updated_at`/`deleted_at`) only break an equal-`version` tie (**remove-wins** on tombstone-ness). Because "pick the maximum under a total order" is associative, this closes the three-device CAS ping-pong the earlier `created_at`-vs-`deleted_at` guard admitted (myne-md/myne#405). An additive optional field (`#[serde(default)]`, absent = 0), introducing no `MYC1`/`MYT1` magic, AAD, or version change. Causal, not a wall-clock — it orders edits, it is not a security property. Phase 2.

@@ -481,7 +481,7 @@ mod bootstrap_meta_tests {
     //! not — and this is where the three acceptance criteria about re-running
     //! actually live, so it is where they get asserted rather than argued.
 
-    use super::{validate_fetched_meta, write_bootstrap_meta};
+    use super::{validate_fetched_meta, write_bootstrap_meta, BootstrapOutcome};
     use crate::plugins::sync::devices::SyncDeviceError;
     use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
     use crate::test_support::{ScopedTempDir, FAST_TEST_KDF};
@@ -515,9 +515,10 @@ mod bootstrap_meta_tests {
             let path = tmp.path().join("vault.meta");
             let (bytes, hash) = a_meta("CanaryPass-9-animals!");
 
-            write_bootstrap_meta(&IO, &path, &bytes, &hash)
+            let outcome = write_bootstrap_meta(&IO, &path, &bytes, &hash)
                 .await
                 .expect("first run writes");
+            assert_eq!(outcome, BootstrapOutcome::Written);
 
             // Byte-identical to what the server sent — the criterion says
             // byte-identical, so this compares BYTES rather than re-parsing and
@@ -548,9 +549,13 @@ mod bootstrap_meta_tests {
             let mut server_bytes = newer_server_bytes;
             server_bytes[6..22].copy_from_slice(&hash); // same account, new wraps
 
-            write_bootstrap_meta(&IO, &path, &server_bytes, &hash)
+            let outcome = write_bootstrap_meta(&IO, &path, &server_bytes, &hash)
                 .await
                 .expect("a second run must re-authenticate, not fail");
+            // The erase and the baseline both hang off this answer: a re-run
+            // over a LIVE container must neither be erased nor claim the
+            // server's hash as its basline, because its local copy was kept.
+            assert_eq!(outcome, BootstrapOutcome::AlreadyPresent);
 
             assert_eq!(
                 IO.read(&path).await.unwrap(),
@@ -1765,6 +1770,54 @@ fn join_tls_error(e: TransportError) -> SyncDeviceError {
     }
 }
 
+/// What a join may claim about the server's meta, given what the bootstrap did.
+///
+/// `Written` means the bytes on disk ARE the fetched bytes, so their hash is a
+/// true baseline. `AlreadyPresent` means a local copy was deliberately kept and
+/// may be newer, so there is no baseline to claim.
+fn join_baseline_bytes(outcome: BootstrapOutcome, fetched_meta: &[u8]) -> Option<&[u8]> {
+    (outcome == BootstrapOutcome::Written).then_some(fetched_meta)
+}
+
+/// Whether a refused credential may erase the container it met.
+///
+/// Only a container THIS attempt minted: the browser pins its container to a
+/// constant id and re-enters the join over a live vault, where the same erase
+/// would take the user's notes.
+fn may_erase_container(minted: bool) -> bool {
+    minted
+}
+
+/// Record the identity a join establishes, and the meta baseline **only when
+/// this attempt is the one that wrote the bytes**.
+///
+/// The baseline is not bookkeeping: a phrase join leaves the vault in
+/// `Slot::Recovering`, the chained reset rewrites `vault.meta` and pushes it,
+/// and the sync meta phase decides "did the server change?" by comparing the
+/// server's bytes to this field. A joining device with no baseline therefore
+/// reads the owner's pre-reset wrap as a concurrent change, may adopt it, and
+/// silently restores the OLD password over the one the user just set (the
+/// adjudication is lexical, so the old side wins about half the time).
+///
+/// `written_meta` is `Some` of the exact bytes this attempt wrote, or `None` on
+/// the already-bootstrapped arm, where the local copy was deliberately left
+/// alone and may legitimately be newer than the server's. Stamping the FETCHED
+/// hash there would claim "I reconciled with the server" about a device that
+/// did not, and the meta phase would then read a genuine divergence as
+/// local-only and push the stale wrap over the newer one.
+fn record_joined_identity(
+    st: &mut super::state::SyncState,
+    account_hash_hex: &str,
+    device_id_hex: &str,
+    written_meta: Option<&[u8]>,
+) {
+    st.account_hash_hex = Some(account_hash_hex.to_string());
+    st.device_id_hex = Some(device_id_hex.to_string());
+    if let Some(bytes) = written_meta {
+        st.meta_baseline_hex = Some(super::orchestrator::sha256_hex(bytes));
+    }
+}
+
 /// The two answers a CLIENT brings to the bootstrap — grouped rather than passed
 /// loose, because they are one idea ("what kind of client is doing this") and
 /// because they are the only two things that differ between the desktop and the
@@ -1897,12 +1950,32 @@ pub struct JoinResult {
 /// "Already there" is separated from a genuine IO failure by asking (`exists`)
 /// rather than by widening the closed `IoFailureKind` enum, the same shape
 /// `note_create` uses for its create-new refusal.
+///
+/// What the write did. NOTE the scope: this says whether the bytes ON DISK are
+/// now the fetched ones, NOT whether this attempt created the container. The
+/// browser's double-buffered store ignores the create-only flag, so an existing
+/// container answers `Written` whenever the fetched bytes reached it; the erase
+/// decision therefore probes the store before writing instead of reading this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BootstrapOutcome {
+    ///
+    /// The distinction is load-bearing on the browser's constant vault id: only
+    /// `Written` means the container was minted by THIS attempt, so only `Written`
+    /// may be erased when the credential is then refused, and only `Written` may
+    /// claim the server's meta as the device's baseline.
+    /// The bytes on disk are the fetched ones, whether the create-only write
+    /// succeeded or it met unparseable rubble and the fetched bytes replaced it.
+    Written,
+    /// A meta for the same account was already there and was left untouched.
+    AlreadyPresent,
+}
+
 pub(crate) async fn write_bootstrap_meta(
     io: &dyn crate::vault_io::VaultIo,
     meta_path: &std::path::Path,
     meta_bytes: &[u8],
     account_hash: &[u8; 16],
-) -> Result<(), SyncDeviceError> {
+) -> Result<BootstrapOutcome, SyncDeviceError> {
     let Err(kind) = io
         .write(
             meta_path,
@@ -1914,7 +1987,7 @@ pub(crate) async fn write_bootstrap_meta(
         )
         .await
     else {
-        return Ok(());
+        return Ok(BootstrapOutcome::Written);
     };
     if !io.exists(meta_path).await.unwrap_or(false) {
         tracing::error!(
@@ -1954,7 +2027,7 @@ pub(crate) async fn write_bootstrap_meta(
         )
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-        return Ok(());
+        return Ok(BootstrapOutcome::Written);
     };
     if &local_meta.account_number_hash != account_hash {
         tracing::warn!(
@@ -1969,7 +2042,7 @@ pub(crate) async fn write_bootstrap_meta(
         event = "already_bootstrapped",
         "join_account: container exists for this account; re-authenticating"
     );
-    Ok(())
+    Ok(BootstrapOutcome::AlreadyPresent)
 }
 
 /// Everything that must be true of a server-supplied `vault.meta` BEFORE a byte
@@ -2155,8 +2228,15 @@ pub async fn join_account_from_host(
     // alone — a password change on another device rewrites `vault.meta`, and the
     // local copy may legitimately be the newer of the two. The sync meta phase
     // reconciles them; a bootstrap must not adjudicate it by overwriting.
-    write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await?;
-    let opened = open_joined_vault(
+    // Ask the store BEFORE the write, because the write's own answer cannot
+    // tell us: on the browser `vault.meta` is double-buffered, so the
+    // create-only flag never reaches OPFS and the write succeeds over a live
+    // container. "Was the container there?" is the only reliable evidence that
+    // this attempt minted it, and the erase below must never touch one it did
+    // not create.
+    let minted = !io.exists(&meta_path).await.unwrap_or(false);
+    let bootstrap = write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await?;
+    let opened = match open_joined_vault(
         credential_kind,
         (*password).clone(),
         vault_id,
@@ -2165,7 +2245,31 @@ pub async fn join_account_from_host(
         host,
         io,
     )
-    .await?;
+    .await
+    {
+        Ok(opened) => opened,
+        Err(err) => {
+            // Erase ONLY a container this attempt minted. A 24-word phrase typed
+            // on a phone is where a first-attempt typo is the norm, and leaving
+            // one vault row per typo would make the picker lie about what the
+            // account holds. But the browser pins its container to a constant
+            // id and re-enters this function over a LIVE vault, where the same
+            // erase would delete the user's notes on a mistyped password. The
+            // pre-write probe is what distinguishes the two: `bootstrap` cannot,
+            // because the double-buffered write never refuses.
+            if may_erase_container(minted) {
+                if let Err(cleanup) = io.remove_dir_all(&vault_dir).await {
+                    tracing::warn!(
+                        stage = "join_cleanup",
+                        event = "orphan_container_left",
+                        error = ?cleanup,
+                        "a refused credential left the container it minted behind"
+                    );
+                }
+            }
+            return Err(err);
+        }
+    };
     let JoinedVault {
         root_key,
         path: enroll_path,
@@ -2237,8 +2341,13 @@ pub async fn join_account_from_host(
             );
             SyncDeviceError::Internal
         })?;
-    st.account_hash_hex = Some(acct_hex);
-    st.device_id_hex = Some(device_id_hex.clone());
+    // Baseline only when the bytes ON DISK are the ones this attempt wrote.
+    record_joined_identity(
+        &mut st,
+        &acct_hex,
+        &device_id_hex,
+        join_baseline_bytes(bootstrap, meta_bytes.as_slice()),
+    );
     // #267 — the join path's byte-identical twin of the discard above. Same
     // ordering, same reason: identity first, token only if it landed.
     super::state::write_sync_state(io, &token_dir, &st)
@@ -2493,6 +2602,67 @@ mod join_credential_tests {
         let scratch = ScratchVault::new("join_credential");
         scratch.write_meta(&bytes);
         (scratch, id, root, phrase)
+    }
+
+    #[test]
+    fn a_joined_device_records_the_meta_baseline_of_the_bytes_it_wrote() {
+        // Without this baseline the chained password reset is adjudicated as a
+        // concurrent meta change and can restore the old password (the finding
+        // this test exists for). The join must therefore record the hash of the
+        // bytes it just fetched and wrote.
+        let meta = b"the vault.meta bytes the join fetched and wrote";
+        let mut st = crate::plugins::sync::state::SyncState::default();
+        super::record_joined_identity(&mut st, "acct", "dev", Some(meta));
+        assert_eq!(st.account_hash_hex.as_deref(), Some("acct"));
+        assert_eq!(st.device_id_hex.as_deref(), Some("dev"));
+        assert_eq!(
+            st.meta_baseline_hex.as_deref(),
+            Some(crate::plugins::sync::orchestrator::sha256_hex(meta).as_str()),
+            "a join that records no meta baseline lets the reset be overruled"
+        );
+    }
+
+    #[test]
+    fn only_a_container_this_attempt_wrote_may_be_erased_or_claimed() {
+        // The two verdicts hang off the same answer, and both are destructive
+        // in opposite directions: erasing a re-run deletes the user's notes,
+        // and claiming the fetched baseline on a re-run makes the meta phase
+        // push the kept (possibly older) local wrap over the server's newer
+        // one. Pin both mappings, not just the helper they feed.
+        let fetched = b"the server's vault.meta bytes";
+        // The erase hangs off a PRE-WRITE store probe, not off the write's
+        // answer: the browser's double-buffered write succeeds over a live
+        // container, so `Written` there does not mean "this attempt minted it".
+        assert!(super::may_erase_container(true));
+        assert!(!super::may_erase_container(false));
+        assert_eq!(
+            super::join_baseline_bytes(super::BootstrapOutcome::Written, fetched),
+            Some(&fetched[..])
+        );
+        assert_eq!(
+            super::join_baseline_bytes(super::BootstrapOutcome::AlreadyPresent, fetched),
+            None
+        );
+    }
+
+    #[test]
+    fn a_re_join_over_a_live_container_keeps_the_baseline_it_had() {
+        // `AlreadyPresent` means the local meta was deliberately kept, so it may
+        // be NEWER than the server's. Stamping the fetched hash here would make
+        // the meta phase read a genuine divergence as local-only and push the
+        // stale wrap over the newer one, which is the same lockout in reverse.
+        let mut st = crate::plugins::sync::state::SyncState {
+            meta_baseline_hex: Some("the-baseline-this-device-already-had".to_string()),
+            ..Default::default()
+        };
+        super::record_joined_identity(&mut st, "acct", "dev", None);
+        assert_eq!(
+            st.meta_baseline_hex.as_deref(),
+            Some("the-baseline-this-device-already-had")
+        );
+        // The identity half is still recorded: a re-auth does establish it.
+        assert_eq!(st.account_hash_hex.as_deref(), Some("acct"));
+        assert_eq!(st.device_id_hex.as_deref(), Some("dev"));
     }
 
     #[test]
