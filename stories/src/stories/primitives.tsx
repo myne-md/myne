@@ -90,8 +90,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Button",
     state: "variants",
-    description: "Button, a variants state.",
-    tags: ["primitives", "button", "variants"],
+    description:
+      "The four text-button variants side by side, plus an icon-prefixed secondary: primary, secondary, ghost and danger. Appearance and every interactive state live in the shared stylesheet, so this is the place to check each variant's resting weight and that a leading glyph keeps its baseline.",
+    tags: ["primitives", "button", "variants", "primary", "secondary", "ghost", "danger", "icon"],
     render: () => (
       <Row>
         {BUTTON_VARIANTS.map((variant) => (
@@ -110,8 +111,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Button",
     state: "disabled",
-    description: "Button, a disabled state.",
-    tags: ["primitives", "button", "disabled"],
+    description:
+      "The same four variants in their disabled state: the dimmed fill and non-interactive cursor a caller gets by passing `disabled`. Look for a disabled control that stays legible rather than fading into the panel.",
+    tags: ["primitives", "button", "disabled", "dimmed", "non-interactive", "states"],
     render: () => (
       <Row>
         {BUTTON_VARIANTS.map((variant) => (
@@ -127,8 +129,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "IconButton",
     state: "default",
-    description: "Icon Button, a default state.",
-    tags: ["primitives", "iconbutton", "default"],
+    description:
+      "Icon-only square buttons on the app's surface: settings, search and delete. Each carries an accessible label, and the stylesheet pairs focus-visible with hover so a tabbing user gets more than a ring on a rail of identical glyphs. A glyph whose meaning needs a word is the wrong control here.",
+    tags: ["primitives", "iconbutton", "icon-only", "accessible-name", "focus-ring", "rail"],
     // The authored half of the Documentation page, on the surface where the
     // judgement is real: an icon-only control is the wrong choice the moment the
     // action needs a word (myne-md/myne#847).
@@ -151,8 +154,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "IconButton",
     state: "disabled",
-    description: "Icon Button, a disabled state.",
-    tags: ["primitives", "iconbutton", "disabled"],
+    description:
+      "Two icon buttons in their disabled state: the dimmed glyph a caller gets by passing `disabled`, still carrying its accessible label so it stays announceable while it is unreachable.",
+    tags: ["primitives", "iconbutton", "disabled", "dimmed", "glyph"],
     render: () => (
       <Row>
         <IconButton icon="settings" label="Settings" onClick={action("onClick")} disabled />
@@ -165,8 +169,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "default",
-    description: "Input, a default state.",
-    tags: ["primitives", "input", "default"],
+    description:
+      "The single-line text field at rest, inside a width-constrained box: the shared input fill, hairline and radius. Focus is `:focus` rather than `:focus-visible`, because a clicked-into text field IS focused and must say so.",
+    tags: ["primitives", "input", "text-field", "empty", "placeholder", "form"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
@@ -180,8 +185,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "invalid",
-    description: "Input, an invalid state.",
-    tags: ["primitives", "input", "invalid"],
+    description:
+      "The field marked invalid: a value the caller rejected, carrying the flagged border and an explicit `aria-label` so the error is announced as well as painted. Look for the invalid treatment to be distinct from the focus ring.",
+    tags: ["primitives", "input", "invalid", "error", "validation", "aria"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
@@ -195,8 +201,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Input",
     state: "mono-disabled",
-    description: "Input, a mono-disabled state.",
-    tags: ["primitives", "input", "mono-disabled"],
+    description:
+      "A monospaced, disabled field holding a sample account number in its grouped display form. Monospace is what keeps the dash-separated groups aligned, and disabled is how a known value is shown rather than edited.",
+    tags: ["primitives", "input", "mono", "disabled", "account-number", "read-only"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
@@ -210,8 +217,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Segmented",
     state: "default",
-    description: "Segmented, a default state.",
-    tags: ["primitives", "segmented", "default"],
+    description:
+      "A three-way segmented control (radiogroup) with a sliding selection thumb: the shared discrete-choice control for settings, used for up to four options. It measures the active segment's box pre-paint and re-observes its container, so the thumb travels. Look for the fill sitting under the selected segment with each segment as `role=\"radio\"`.",
+    tags: ["primitives", "segmented", "radiogroup", "discrete-choice", "thumb", "settings"],
     render: () => (
       <Row>
         <Segmented
@@ -232,8 +240,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Switch",
     state: "on-off-and-disabled",
-    description: "Switch, an on-off-and-disabled state.",
-    tags: ["primitives", "switch", "on-off-and-disabled"],
+    description:
+      "The toggle control in all three shapes: on, off, and the disabled placeholder a caller renders by omitting `onChange` or passing `disabled`. It is a button carrying `role="switch"` and `aria-checked`, so the painted state and the announced state come from one attribute. Look for `aria-checked` to match the knob's side.",
+    tags: ["primitives", "switch", "toggle", "on-off", "disabled", "aria-checked"],
     render: () => (
       <Row>
         <Switch checked ariaLabel="On" onChange={action("onChange")} />
@@ -247,8 +256,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Select",
     state: "default",
-    description: "Select, a default state.",
-    tags: ["primitives", "select", "default"],
+    description:
+      "The custom dropdown that replaces the operating system select: a trigger matching the input chrome, and a menu rendered through a portal so no scroll or wrap container can clip it. Look for `role=\"listbox\"` and keyboard movement (↑/↓ to move, Enter to choose, Esc to close).",
+    tags: ["primitives", "select", "dropdown", "listbox", "portal", "form"],
     render: () => (
       <Row>
         <Select
@@ -269,8 +279,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Tooltip",
     state: "default",
-    description: "Tooltip, a default state.",
-    tags: ["primitives", "tooltip", "default"],
+    description:
+      "A themed hover/focus label on a button. It appears quickly, follows the pointer's x, flips above or below to stay on screen, shows on keyboard focus too, and portals to the body so an `overflow: hidden` ancestor cannot clip it. The trigger keeps its own `aria-label`; the bubble is a visual affordance, not the a11y name.",
+    tags: ["primitives", "tooltip", "hover", "focus", "portal", "viewport-aware"],
     render: () => (
       <Row>
         <Tooltip label="Tooltip label" delayMs={0}>
@@ -284,8 +295,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "AnchoredPanel",
     state: "open",
-    description: "Anchored Panel, an open state.",
-    tags: ["primitives", "anchoredpanel", "open"],
+    description:
+      "A small panel hanging open off its trigger: a portal-to-body surface that escapes any clipping ancestor and owns its own placement, portal and the three ways out. Look for the anchor being the trigger and the panel taking no layout space in the flow.",
+    tags: ["primitives", "anchoredpanel", "popover", "portal", "open", "menu"],
     // The authored half of the Documentation page, on the surface where the
     // judgement is real (myne-md/myne#848).
     docs: {
@@ -302,8 +314,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Spinner",
     state: "default",
-    description: "Spinner, a default state.",
-    tags: ["primitives", "spinner", "default"],
+    description:
+      "The indeterminate progress spinner, for a wait with no known shape or duration. Skeleton states the sibling decisions: under ~200ms show nothing, a known layout gets a skeleton, and an unknown blocking wait is what this is for.",
+    tags: ["primitives", "spinner", "loading", "progress", "indeterminate"],
     render: () => (
       <Row>
         <Spinner />
@@ -315,8 +328,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "CredentialField",
     state: "default",
-    description: "Credential Field, a default state.",
-    tags: ["primitives", "credentialfield", "default"],
+    description:
+      "The credential field: the shared Input and a primary Button composed for the auth screens, empty, with the submit disabled rather than absent so the layout does not reflow under the caret mid-keystroke. Look for the submit staying visible while the field is empty.",
+    tags: ["primitives", "credentialfield", "auth", "submit", "disabled", "composed"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>
@@ -336,8 +350,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "EmptyState",
     state: "first-run",
-    description: "Empty State, a first-run state.",
-    tags: ["primitives", "emptystate", "first-run"],
+    description:
+      "The first-run zero state inside a width-constrained card: a glyph, a title and one body sentence pointing at the first action. It is the `firstRun` variant; the component also carries the loading and no-results treatments.",
+    tags: ["primitives", "emptystate", "zero-state", "first-run", "placeholder", "onboarding"],
     render: () => (
       <Row>
         <div style={{ width: 360 }}>
@@ -356,8 +371,9 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     group: "primitives",
     surface: "Skeleton",
     state: "default",
-    description: "Skeleton, a default state.",
-    tags: ["primitives", "skeleton", "default"],
+    description:
+      "The loading placeholder drawing three text lines: the shape of an answer arriving into its outline rather than shoving the page down when it lands. The convention it serves is in the component header: under ~200ms show nothing, a known layout is a skeleton, an unknown wait is a spinner.",
+    tags: ["primitives", "skeleton", "loading", "placeholder", "shimmer", "latency"],
     render: () => (
       <Row>
         <div style={{ width: 280 }}>

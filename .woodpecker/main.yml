@@ -631,6 +631,12 @@ steps:
       # drift ratchet fires only on a pair that STARTS differing). This fails by
       # naming the file that re-declares an exported name.
       - node scripts/check-copy-membership.mjs
+      # The clipper's wire vocabulary: envelope field names, `capture_kind`, the
+      # handoff kinds and the reply statuses, across `src-tauri/src/clipper` and
+      # `src/dialect/clip`. The Rust<->dialect half needs no companion so it gates
+      # here; the extension's copies print NOT CHECKED on the runner (audit Aşama 6
+      # B4, 2026-10-19).
+      - node scripts/check-clipper-wire.mjs
       # The sync request deadline, written in Rust (`http_transport.rs::
       # SOCKET_TIMEOUT`, 180 s) and in the browser's blocking XHR bridge
       # (`web/src/worker/sync-transport.ts::REQUEST_TIMEOUT_MS`), which had

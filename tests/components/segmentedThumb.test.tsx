@@ -16,7 +16,7 @@
 // stubbing them is how the transition from "measured while hidden" to "measured
 // while visible" gets driven at all.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Segmented } from "../../src/components/primitives/Segmented";
 
@@ -31,6 +31,14 @@ const OPTIONS = [
 beforeEach(() => {
   stubWidth = 0;
   stubLeft = 0;
+  // This file proves the WINDOW-resize fallback, which is the live path only
+  // where `ResizeObserver` is absent. The shared setup in `vitest.config.ts`
+  // installs a no-op observer for every spec (so mount-time observers stop
+  // throwing), so the absence this file needs is forced back explicitly here
+  // rather than left to jsdom. With the observer present the component would
+  // attach it and register no window listener, and the resize-driven assertion
+  // below would pass without re-measuring.
+  vi.stubGlobal("ResizeObserver", undefined);
   Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
     configurable: true,
     get() {

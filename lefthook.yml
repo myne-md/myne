@@ -756,7 +756,7 @@ pre-commit:
       #
       # Whole-contract, like cli-sidecar above: a rename on one side never
       # touches the other side's file.
-      glob: "*.{rs,json,md}"
+      glob: "*.{rs,json,md,ts}"
       run: node scripts/check-clipper-identifiers.mjs
 
     server-env-roster:
@@ -848,6 +848,49 @@ pre-commit:
       # REACH and says its closing line is not a verdict rather than reporting a pass.
       glob: "*.{md,mjs,yml,yaml,json,example,toml}"
       run: node scripts/check-referenced-digests.mjs
+
+    clipper-wire:
+      # Audit Aşama 6 B4 (2026-10-19). The clipper's envelope field names and its
+      # `capture_kind` / handoff-kind / reply-status literals are written in two
+      # repos and were read by nothing on the extension's side. `deny_unknown_fields`
+      # turns a renamed field into a hard reject and a dropped one into a silent
+      # default, and a typo'd capture_kind satisfies every compiler and every test.
+      #
+      # The Rust<->dialect half runs UNCONDITIONALLY (both files are in this repo), so
+      # this gate is real in CI; the extension half prints NOT CHECKED where
+      # `myne-clipper` is absent and `--require-companion` turns that into a failure.
+      glob: "*.{rs,ts,mjs}"
+      run: node scripts/check-clipper-wire.mjs
+
+    stream-timeout-drift:
+      # Audit Aşama 6 B1+B2 (2026-10-19). The server heartbeats every 30 s (two
+      # separate constants in `myne-server`) while the client consumes the stream
+      # under one deadline, and the two blob-fetch window caps are mirrored the same
+      # way. Both repos say so in prose and neither compared them: raising the
+      # heartbeat past the client's timeout tears down a healthy stream, which reads
+      # as a network problem rather than as a version skew.
+      #
+      # Same companion-trigger caveat as `server-env-roster` above: the inputs live in
+      # another repository, so it is a local periodic check that prints
+      # `NOTHING COMPARED` on the runner.
+      glob: "*.{rs,go,mjs}"
+      run: node scripts/check-stream-timeout-drift.mjs
+
+    branding-parity:
+      # Audit Aşama 6 B5+B6+B7 (2026-10-19). The app token sheet is the source for
+      # three companion projections: `myne-branding`'s palette/type-scale (the brand
+      # handoff), `myne-clipper`'s token sheet and icon ink, and `myne-website`'s
+      # theme builder roster. Nothing read any of them, and two had already drifted:
+      # the clipper carried an invented `--danger: #b54034` (5.09:1 against the panel
+      # it tints, where the canon value is 7.83:1) and the builder could not
+      # serialize 8 of the app's 13 highlight tokens, so an exported theme dropped
+      # them silently.
+      #
+      # It locks only the OVERLAP (the name-pair mapping); the branding repo's ramps,
+      # brand names and prose are different artefacts on purpose. Companion-only, so
+      # pre-commit and never CI, like `selfhost-bundle-drift` above.
+      glob: "*.{css,json,mjs,md,ts,tsx}"
+      run: node scripts/check-branding-parity.mjs
 
     npm-license-mirror:
       # myne#527: the npm allowlist in check-npm-licenses.mjs claims, in a

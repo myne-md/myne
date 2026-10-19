@@ -20,9 +20,10 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "Welcome",
     state: "default",
-    description: "Welcome, a default state.",
+    description:
+      "The zero-vault entry screen: the mark, the tagline and the four doors in one card. Identity comes first (make a person invitable before owning a vault), then a local vault, a restore from a `.myne-backup`, and joining an existing device; the language picker and version sit below. Look for the ordered fork and that every door is a real button.",
     fullBleed: true,
-    tags: ["screens", "welcome", "default"],
+    tags: ["screens", "welcome", "first-run", "zero-vault", "vault-creation", "restore-backup", "join-device", "identity", "onboarding", "language"],
     fixture: "no-vault",
     render: () => (
       <Welcome
@@ -38,9 +39,10 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "AccountNumberEntry",
     state: "default",
-    description: "Account Number Entry, a default state.",
+    description:
+      "The web client's first-run identity step. An empty browser has to be told which account to pull, so this is the 27-character account number (`MY-` plus five groups) in its grouped display form; the Damm-32 check character is validated locally before any request, and one message is shown whatever fails.",
     fullBleed: true,
-    tags: ["screens", "accountnumberentry", "default"],
+    tags: ["screens", "account-number", "accountnumberentry", "web-only", "first-run", "identity", "damm-32", "validation", "offline"],
     render: () => <AccountNumberEntry onValid={action("onValid")} onCreateAccount={action("onCreateAccount")} />,
   },
   {
@@ -48,9 +50,10 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "StorageLost",
     state: "evicted-with-unsynced-notes",
-    description: "Storage Lost, an evicted-with-unsynced-notes state.",
+    description:
+      "The browser lost its local store to an origin eviction, and three notes from the last unsynced answer are listed as gone rather than pending: nothing on the server is damaged and the remedy is a re-download. Look for the honest loss list, and the note that this browser re-enrols as a NEW device and waits for approval.",
     fullBleed: true,
-    tags: ["screens", "storagelost", "evicted-with-unsynced-notes"],
+    tags: ["screens", "storage-lost", "evicted", "web-only", "unsynced", "data-loss", "re-download", "opfs", "re-enrol"],
     render: () => (
       <StorageLost
         kind="evicted"
@@ -65,9 +68,10 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "StorageLost",
     state: "unopenable-local-only",
-    description: "Storage Lost, an unopenable-local-only state.",
+    description:
+      "`vault.meta` in the local container cannot be read as a vault and there is no unsynced list to show, so the card says that plainly and points at the backup route rather than offering a repair it cannot perform.",
     fullBleed: true,
-    tags: ["screens", "storagelost", "unopenable-local-only"],
+    tags: ["screens", "storage-lost", "unopenable", "web-only", "corrupted", "meta-unreadable", "backup", "recovery"],
     render: () => (
       <StorageLost
         kind="unopenable"
@@ -82,9 +86,10 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     group: "screens",
     surface: "DeviceRevoked",
     state: "default",
-    description: "Device Revoked, a default state.",
+    description:
+      "This browser was removed from the account elsewhere, so it locked, erased its own local copy and is saying so. It is deliberately not described as a remote wipe: the copy names the real loss (anything unsynced here is gone), and the CTA reloads, which also releases the single-tab Web Lock.",
     fullBleed: true,
-    tags: ["screens", "devicerevoked", "default"],
+    tags: ["screens", "device-revoked", "web-only", "removed-device", "erase", "lock", "reload", "web-lock"],
     render: () => (
       <DeviceRevoked onEraseLocalCopy={async () => {}} onDismiss={action("onDismiss")} />
     ),

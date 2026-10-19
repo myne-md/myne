@@ -70,6 +70,7 @@ export default defineConfig({
     // `useTranslation()` render with real source strings (see the file).
     setupFiles: [
       "./tests/setup-jsdom-cm6.ts",
+      "./tests/setup-jsdom-observer.ts",
       "./tests/setup-i18n.ts",
       "./tests/setup-editor-host.ts",
     ],
