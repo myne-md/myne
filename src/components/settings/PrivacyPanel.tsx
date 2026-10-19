@@ -26,11 +26,7 @@ import {
   type HideNamesNotice,
   type KeychainStatus,
 } from "../../lib/vault-label";
-import {
-  useScreenCaptureOverride,
-  type ScreenCaptureOverrideStatus,
-} from "../../hooks/useScreenCaptureOverride";
-import type { ScreenCaptureOverrideView } from "../../lib/screen-capture-override";
+import { useScreenCaptureOverride } from "../../hooks/useScreenCaptureOverride";
 import { has } from "../../platform/capabilities";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -59,87 +55,6 @@ function screenCaptureHelperText(
     return t("settings.privacy.screenCaptureHelperOn");
   }
   return t("settings.privacy.screenCaptureHelperOff");
-}
-
-// ── The device-local override (myne-md/myne#482) ────────────────────────────
-//
-// The per-vault switch above is a `vault.prefs` field, so it is unreadable
-// before unlock. And "unreadable before unlock" is exactly the state that
-// locked a remote-desktop or magnifier user out of every pre-unlock screen. The
-// escape hatch therefore lives in a device-local file, is reachable from the
-// pre-unlock skip link in `src/components/ScreenCaptureEscape.tsx`, and is
-// mirrored HERE so a user who took it has an obvious way back.
-//
-// # It supersedes the switch above rather than fighting it
-//
-// The override is device-wide, before unlock and after (a pre-unlock-only one
-// would put the black window straight back in front of the person it exists
-// for), so while it is on the per-vault switch governs nothing. Rendering both
-// as live controls over one native state is how a settings screen comes to
-// disagree with the window beside it, so the switch is disabled and says why,
-// the same shape `hide-vault-names-unavailable` uses when its option cannot
-// work on this device.
-//
-// # `via_flag` is reported apart from the file, and has to be
-//
-// A run launched with `--disable-screen-capture-protection` has an empty file
-// and an unprotected window. A row that showed only the file's value would
-// offer to "turn protection back on", write `disabled: false`, report success,
-// and leave the window exactly as it was.
-
-function ScreenCaptureOverrideRow({
-  view,
-  status,
-  onSave,
-}: {
-  /** The last read of the override, or `null` before the first read lands. */
-  view: ScreenCaptureOverrideView | null;
-  status: ScreenCaptureOverrideStatus;
-  /** Persist and adopt. The panel owns the value because the row ABOVE needs it
-   *  to know it is superseded, so this row is presentational. */
-  onSave: (disabled: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const busy = status === "saving";
-  const disabled = view?.disabled ?? false;
-  const viaFlag = view?.via_flag ?? false;
-
-  return (
-    <SettingRow
-      anchorId="privacy.screen-capture-override"
-      testId="settings.screen-capture-override"
-      stateAttrs={{
-        "data-disabled": String(disabled),
-        "data-via-flag": String(viaFlag),
-      }}
-      label={t("settings.privacy.screenCaptureOverrideLabel")}
-      helper={t("settings.privacy.screenCaptureOverrideHelper")}
-      // Through SettingRow's own error slot rather than a paragraph in
-      // `children`: that slot renders ERROR_STYLE with role="alert", which is
-      // announced on insertion, where a helper-coloured status line reads as
-      // explanatory text. Twelve sibling panels use it.
-      error={
-        status === "failed"
-          ? t("screenCaptureEscape.saveFailed")
-          : null
-      }
-      control={(helperId) => (
-        <Switch
-          checked={disabled}
-          onChange={busy ? undefined : onSave}
-          ariaLabel={t("settings.privacy.screenCaptureOverrideLabel")}
-          ariaDescribedBy={helperId}
-          testId="settings.screen-capture-override-toggle"
-        />
-      )}
-    >
-      {viaFlag && (
-        <p style={HELPER_STYLE} data-testid="settings.screen-capture-override-flag">
-          {t("screenCaptureEscape.flagNotice")}
-        </p>
-      )}
-    </SettingRow>
-  );
 }
 
 // MYND-121 auto-lock-on-idle timeout selector. Options sit within the backend
@@ -398,13 +313,19 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { t } = useTranslation();
   const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
 
-  // The device-local override (myne-md/myne#482). Owned by the panel rather
-  // than by its row, because the per-vault switch above has to know when it is
-  // superseded. Two live controls over one native state is how a settings
-  // screen comes to disagree with the window beside it. The read, the write and
-  // the "no optimistic flip" rule live in the hook, shared with the pre-unlock
-  // escape (`src/components/ScreenCaptureEscape.tsx`), because a rule with two
-  // homes is a rule that drifts.
+  // The device half of the setting (myne-md/myne#482). It is a device-local
+  // plaintext file rather than a `vault.prefs` field because the preference is
+  // AEAD-sealed and therefore unreadable before unlock, and "unreadable before
+  // unlock" is the state that puts a black window in front of a screen-magnifier
+  // or remote-desktop user with no way past it. The read, the write and the "no
+  // optimistic flip" rule live in the hook, shared with the pre-unlock escape
+  // (`src/components/ScreenCaptureEscape.tsx`), because a rule with two homes is
+  // a rule that drifts.
+  //
+  // ONE row drives BOTH halves now, so it reads the EFFECTIVE state rather than
+  // the preference: a user who took the pre-unlock escape arrives here with the
+  // file off and the sealed preference untouched, and a switch reading the
+  // preference would claim protection that is not there.
   const {
     view: override,
     status: overrideStatus,
@@ -412,44 +333,54 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   } = useScreenCaptureOverride();
   // `null` is UNKNOWN, not "no override", and the two must not collapse here.
   // The hook deliberately leaves `view === null` on a failed read rather than
-  // asserting a position it could not read. Treating that as `false` rendered
-  // this switch LIVE on a device whose override may be on, and its `onChange`
-  // writes `vault.prefs`, which is AEAD-sealed and SYNCED, then reports success
-  // while the window stays capturable. That is the exact failure the block
-  // comment above says this row exists to prevent, and it is the same
-  // fail-towards-protection direction `protection_disabled_at_rest` takes on the
-  // Rust side, inverted. So an unread override supersedes too.
+  // asserting a position it could not read, and a click in that state writes
+  // `vault.prefs`, which is AEAD-sealed and SYNCED, then reports success while
+  // the window stays capturable. Same fail-towards-protection direction
+  // `protection_disabled_at_rest` takes on the Rust side, inverted.
   //
-  // **Gated on the capability, which is what keeps the per-vault switch alive on
-  // the web client** (myne-md/myne#482, found by review). The hook returns
-  // early on a client with no capture affinity to suppress, so `override` is
-  // `null` there PERMANENTLY, not transiently: nothing will ever publish. Read
-  // as "unknown" that made `superseded` true forever, so the switch this same
-  // diff rosters in `check-web-surfaces.mjs` and indexes in
-  // `settingsSearchIndex.ts` was inert on web with a sentence about a control
-  // that client does not have.
-  //
-  // The distinction is between "the override could not be read" (fail towards
-  // protection, above) and "no override exists on this client" (not applicable,
-  // so it supersedes nothing). Only the first is unknown.
+  // **Gated on the capability, because the hook returns early on a client with
+  // no capture affinity to suppress** (myne-md/myne#482, found by review): there
+  // `override` is `null` PERMANENTLY, not transiently, so reading it as
+  // "unknown" would lock a control on a client that has nothing to suppress.
+  // "Could not be read" and "no override exists on this client" are different
+  // states, and only the first is unknown.
   const overrideApplies = has("screenCaptureProtection");
   const overrideUnknown = overrideApplies && override === null;
-  const superseded = overrideApplies ? (override?.effective ?? true) : false;
-  // The switch goes inert on `effective`, which is the union, but the SENTENCE
-  // cannot: the two ways to be superseded have different ways back. When only
-  // the process flag holds, the row below reads OFF, so pointing the user at
-  // "turn that off" names a control that is already off and offers no route at
-  // all. When the file says so, the row below is the route, and the row's own
-  // helper carries the flag caveat if both hold.
-  const supersededByFlagOnly =
-    !overrideUnknown && superseded && !(override?.disabled ?? false);
+  const fileDisabled = override?.disabled ?? false;
+  // An argv cannot be un-passed, so a flag-launched run can never be turned back
+  // on from here: the control would write, report success, and leave the window
+  // exactly as capturable. The helper says so instead.
+  const viaFlag = override?.via_flag ?? false;
+  // `!== false` rather than a truthiness test: the preference defaults to ON and
+  // the backend always writes the field, so a value that is absent (a truncated
+  // read, a fixture that stubs `prefs_read` with `{}`) means "not turned off"
+  // rather than "off". Failing towards protection is the same direction
+  // `protection_disabled_at_rest` takes on the Rust side.
+  const protectionOn =
+    prefs.screen_capture_protection !== false && !fileDisabled && !viaFlag;
+  const toggleLocked = overrideUnknown || viaFlag;
+
+  /**
+   * The ONE write path of the user-facing setting: BOTH halves, device file
+   * first. The file is what governs the window immediately, and it is the half
+   * the pre-unlock surface reads, so a failure there means nothing was written
+   * anywhere and the switch does not move. The preference then goes through
+   * `usePrefs`, which owns the cache, the optimistic flip and the error toast.
+   *
+   * `!next` is the file's own polarity: it stores `disabled`, inverted from the
+   * switch's "protection is on".
+   */
+  const applyScreenCapture = async (next: boolean) => {
+    if (overrideApplies && !(await saveOverride(!next))) return;
+    await toggleScreenCapture(next);
+  };
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      {/* **Access**: who or what can get at the notes. Three rows about a human
-          looking at this machine - what the screen shows, whether this device
-          may be captured, and whether the lock screen names the vault - plus the
-          terminal block below.
+      {/* **Access**: who or what can get at the notes. Two rows about a human
+          looking at this machine - whether this device may be captured, and
+          whether the lock screen names the vault - plus the terminal block
+          below.
 
           The terminal is here rather than in a topic of its own. It is the
           panel's third concern on its own terms, but it is omitted whenever
@@ -464,7 +395,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           convention the AI panel set, so the diff is about which rows moved
           rather than about whitespace. */}
       <SettingsTopicPanel panelId="privacy" topicId="access">
-      {/* Two sections (myne-md/myne#885 visual pass): the three rows about a
+      {/* Two sections (myne-md/myne#885 visual pass): the rows about a
           human looking at this machine, and the terminal block, which is its own
           trust boundary. The terminal section is gated WITH its block, so on a
           client or a vault where it is hidden the screen section is the topic's
@@ -480,38 +411,47 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           `decisions.md` 2026-07-26 makes normative for an absent capability: a
           greyed control is an offer the platform cannot honour.
 
-          The row's own superseded/override states are a DIFFERENT question -
-          they say why a capability the client HAS is not governing right now -
-          so they do not stand in for this gate, and the override row below
-          carrying the same `has()` is not this row's gate either. Reading that
-          one as this one is how the gate came to be dropped in a merge. */}
+          ONE row, TWO stores, and the change is worth stating. The setting used
+          to render as two peer rows here: `vault.prefs`' synced field and the
+          device-local file. They are not peers (different storage, different
+          scope, different reach before unlock) and the user had to work that out
+          from two helper sentences. This control writes both, and reads
+          whichever one is suppressing protection right now. */}
       {has("screenCaptureProtection") && (
         <SettingRow
           label={t("settings.privacy.screenCaptureLabel")}
           helper={
             overrideUnknown
               ? t("settings.privacy.screenCaptureOverrideUnknown")
-              : supersededByFlagOnly
+              : viaFlag
                 ? t("settings.privacy.screenCaptureSupersededByFlag")
-                : superseded
-                  ? t("settings.privacy.screenCaptureSuperseded")
-                  : screenCaptureHelperText(prefs.screen_capture_protection, t)
+                : screenCaptureHelperText(protectionOn, t)
+          }
+          // The device write is the one that can fail with nothing written
+          // anywhere, so its error goes in the row's own alert slot. The
+          // preference half reports through the toast surface `usePrefs` owns.
+          error={
+            overrideStatus === "failed"
+              ? t("screenCaptureEscape.saveFailed")
+              : null
           }
           anchorId="privacy.screen-capture"
           testId="settings.screen-capture"
-          stateAttrs={{ "data-superseded": String(superseded) }}
+          stateAttrs={{
+            "data-protection-on": String(protectionOn),
+            "data-locked": String(toggleLocked),
+          }}
           control={(helperId) => (
             <Switch
-              checked={prefs.screen_capture_protection}
-              // Inert while the device override is on: the per-vault preference
-              // still records what the user wants, and it still governs nothing.
-              // Disabling it is the honest state; leaving it live would let a
-              // click report a change the window does not make.
+              checked={protectionOn}
+              // Locked on an UNREAD override (fail towards protection: a click
+              // must not report a change we cannot make) and on the process flag
+              // (an argv cannot be un-passed).
               onChange={
-                superseded
+                toggleLocked
                   ? undefined
                   : (next) => {
-                      void toggleScreenCapture(next);
+                      void applyScreenCapture(next);
                     }
               }
               ariaLabel={t("settings.privacy.screenCaptureLabel")}
@@ -519,13 +459,6 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
               testId="settings.screen-capture-toggle"
             />
           )}
-        />
-      )}
-      {has("screenCaptureProtection") && (
-        <ScreenCaptureOverrideRow
-          view={override}
-          status={overrideStatus}
-          onSave={(next) => void saveOverride(next)}
         />
       )}
       {/* Beside screen-capture protection rather than beside the lock timers:

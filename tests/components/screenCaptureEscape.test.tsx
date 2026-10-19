@@ -325,47 +325,71 @@ describe("pre-unlock escape: reachable without being visible", () => {
   });
 });
 
-describe("Privacy panel: the override supersedes the per-vault switch", () => {
+describe("Privacy panel: one switch, two stores (myne-md/myne#482)", () => {
   const PREFS_SET = "plugin:prefs|set_screen_capture_protection";
 
-  it("leaves the per-vault switch live while no override is set", async () => {
-    // The positive half. Without it, "the switch does nothing while
-    // superseded" would pass for a switch that does nothing ever.
-    stub({ [PREFS_SET]: () => Promise.resolve(undefined) });
-    render(<PrivacyPanel />);
-    const row = await screen.findByTestId("settings.screen-capture");
-    await waitFor(() =>
-      expect(row.getAttribute("data-superseded")).toBe("false"),
-    );
-    fireEvent.click(screen.getByTestId("settings.screen-capture-toggle"));
-    await waitFor(() =>
-      expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(true),
-    );
-  });
+  /** Index of the first invocation of `cmd`, or -1. */
+  function callIndex(cmd: string): number {
+    return invokeMock.mock.calls.findIndex(([c]) => c === cmd);
+  }
 
-  it("makes the per-vault switch inert while the override is on", async () => {
-    // Asserted as a STATE, not as an attribute: a click must not reach the
-    // `vault.prefs` setter. Checking `aria-disabled` alone would pass for a
-    // switch that renders disabled and still fires.
+  it("turns BOTH halves off, device file first", async () => {
+    // The merge this spec exists for: the setting used to render as two peer
+    // rows, which read as one setting duplicated. ORDER is asserted rather than
+    // only the pair, because the device file is what governs the window
+    // immediately and what the pre-unlock surface reads. It goes first, and a
+    // failure there writes nothing anywhere.
     stub({
-      [GET]: () =>
+      [SET]: () =>
         Promise.resolve({ disabled: true, via_flag: false, effective: true }),
       [PREFS_SET]: () => Promise.resolve(undefined),
     });
     render(<PrivacyPanel />);
     const row = await screen.findByTestId("settings.screen-capture");
     await waitFor(() =>
-      expect(row.getAttribute("data-superseded")).toBe("true"),
+      expect(row.getAttribute("data-protection-on")).toBe("true"),
     );
-    expect(screen.getByText(t("settings.privacy.screenCaptureSuperseded"))).toBeTruthy();
 
-    const toggle = screen.getByTestId("settings.screen-capture-toggle");
-    expect(toggle.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(toggle);
-    expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
+    fireEvent.click(screen.getByTestId("settings.screen-capture-toggle"));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(SET, { disabled: true }),
+    );
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(PREFS_SET, { enabled: false }),
+    );
+    expect(callIndex(SET)).toBeLessThan(callIndex(PREFS_SET));
   });
 
-  it("renders NO per-vault switch on a client without the capability", async () => {
+  it("reads the DEVICE state: a device already opted out shows OFF and restores both", async () => {
+    // The half a preference-keyed switch would get wrong. A user who took the
+    // pre-unlock escape has the file off and the sealed preference untouched, so
+    // a switch reading the preference would claim protection that is not there.
+    stub({
+      [GET]: () =>
+        Promise.resolve({ disabled: true, via_flag: false, effective: true }),
+      [SET]: () =>
+        Promise.resolve({ disabled: false, via_flag: false, effective: false }),
+      [PREFS_SET]: () => Promise.resolve(undefined),
+    });
+    render(<PrivacyPanel />);
+    const row = await screen.findByTestId("settings.screen-capture");
+    await waitFor(() =>
+      expect(row.getAttribute("data-protection-on")).toBe("false"),
+    );
+    expect(
+      screen.getByText(t("settings.privacy.screenCaptureHelperOff")),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("settings.screen-capture-toggle"));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(SET, { disabled: false }),
+    );
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(PREFS_SET, { enabled: true }),
+    );
+  });
+
+  it("renders NO row on a client without the capability", async () => {
     // **myne-md/myne#556 supersedes myne-md/myne#482's web arm, and both halves
     // of that are worth stating.**
     //
@@ -378,7 +402,7 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     // #556 asked the prior question and answered it differently: a page cannot
     // stop a screenshot at all, so `screenCaptureProtection` is absent on web
     // and `decisions.md` 2026-07-26 makes OMISSION normative for an absent
-    // capability. A live switch there is worse than an inert one — it reports a
+    // capability. A live switch there is worse than an inert one - it reports a
     // change the platform never makes, on the one panel whose whole job is
     // saying what is and is not protected. So the row is not rendered, which
     // removes #482's state rather than fixing it.
@@ -408,79 +432,43 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     }
   });
 
-  it("names the process flag rather than the row below when only the flag holds", async () => {
-    // `{disabled: false, via_flag: true, effective: true}`: the switch is inert
-    // on `effective`, but the SENTENCE cannot key off it. The general helper
-    // sends the user to "Allow screen capture on this device" below, which in
-    // this state reads OFF, so it names a control that is already off and
-    // offers no route back at all. Both directions are asserted: the flag
-    // sentence present AND the file sentence absent.
+  it("names the process flag and stays locked when only the flag holds", async () => {
+    // `{disabled: false, via_flag: true, effective: true}`. The flag is an argv,
+    // so it cannot be un-passed from here: a click could only write a preference
+    // the window will not follow, which is a report of a change that did not
+    // happen. Locked as a STATE rather than as an attribute, so a switch that
+    // renders disabled and still fires fails here.
     stub({
       [GET]: () =>
         Promise.resolve({ disabled: false, via_flag: true, effective: true }),
+      [PREFS_SET]: () => Promise.resolve(undefined),
     });
     render(<PrivacyPanel />);
     const row = await screen.findByTestId("settings.screen-capture");
-    await waitFor(() =>
-      expect(row.getAttribute("data-superseded")).toBe("true"),
-    );
+    await waitFor(() => expect(row.getAttribute("data-locked")).toBe("true"));
     expect(
       screen.getByText(t("settings.privacy.screenCaptureSupersededByFlag")),
     ).toBeTruthy();
-    expect(
-      screen.queryByText(t("settings.privacy.screenCaptureSuperseded")),
-    ).toBeNull();
-    // Still inert: the flag governs the window whatever the vault preference says.
-    expect(
-      screen
-        .getByTestId("settings.screen-capture-toggle")
-        .getAttribute("aria-disabled"),
-    ).toBe("true");
+
+    const toggle = screen.getByTestId("settings.screen-capture-toggle");
+    expect(toggle.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(toggle);
+    expect(invokeMock.mock.calls.some(([cmd]) => cmd === SET)).toBe(false);
+    expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
   });
 
-  it("retries the read on this surface after it failed on the other one", async () => {
-    // The shared cell used to mark the read STARTED before awaiting it, so one
-    // failure was permanent for the process: every later surface rendered
-    // `null` as "no override" and asserted protection was on because nobody
-    // could find out. Opening Settings after a failed boot read is the ordinary
-    // way out, so it has to ask again.
-    let reads = 0;
-    stub({
-      [GET]: () => {
-        reads += 1;
-        return reads === 1
-          ? Promise.reject({ kind: "Io" })
-          : Promise.resolve({ disabled: true, via_flag: false, effective: true });
-      },
-    });
-
-    const first = render(<ScreenCaptureEscape />);
-    await waitFor(() => expect(reads).toBe(1));
-    first.unmount();
-
-    render(<PrivacyPanel />);
-    const row = await screen.findByTestId("settings.screen-capture");
-    await waitFor(() =>
-      expect(row.getAttribute("data-superseded")).toBe("true"),
-    );
-    expect(reads).toBe(2);
-  });
-
-  it("holds the per-vault switch inert when the override could not be read", async () => {
-    // `null` is UNKNOWN, and collapsing it to "no override" left this switch
-    // LIVE on a device whose override may be on. Its `onChange` writes
-    // `vault.prefs`, which is AEAD-sealed and synced, then reports success
-    // while the window stays capturable. Asserted as the STATE: a click must
-    // not reach the setter.
+  it("locks the switch when the override could not be read", async () => {
+    // `null` is UNKNOWN, and collapsing it to "no override" would leave this
+    // switch LIVE on a device whose override may be on: a click would write
+    // `vault.prefs`, which is AEAD-sealed and synced, then report success while
+    // the window stays capturable.
     stub({
       [GET]: () => Promise.reject({ kind: "Io" }),
       [PREFS_SET]: () => Promise.resolve(undefined),
     });
     render(<PrivacyPanel />);
     const row = await screen.findByTestId("settings.screen-capture");
-    await waitFor(() =>
-      expect(row.getAttribute("data-superseded")).toBe("true"),
-    );
+    await waitFor(() => expect(row.getAttribute("data-locked")).toBe("true"));
     expect(
       screen.getByText(t("settings.privacy.screenCaptureOverrideUnknown")),
     ).toBeTruthy();
@@ -488,10 +476,33 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     const toggle = screen.getByTestId("settings.screen-capture-toggle");
     expect(toggle.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(toggle);
+    expect(invokeMock.mock.calls.some(([cmd]) => cmd === SET)).toBe(false);
     expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
   });
 
-  it("a write on one surface reaches the other without a remount", async () => {
+  it("writes no preference when the device write fails, and says so", async () => {
+    // The device write is the one that can fail with nothing written anywhere,
+    // so it must not be reported as a change: the switch stays where it was, the
+    // sealed preference is untouched, and the row carries the failure.
+    stub({
+      [SET]: () => Promise.reject({ kind: "Io" }),
+      [PREFS_SET]: () => Promise.resolve(undefined),
+    });
+    render(<PrivacyPanel />);
+    const row = await screen.findByTestId("settings.screen-capture");
+    await waitFor(() =>
+      expect(row.getAttribute("data-protection-on")).toBe("true"),
+    );
+
+    fireEvent.click(screen.getByTestId("settings.screen-capture-toggle"));
+    await waitFor(() =>
+      expect(screen.getByText(t("screenCaptureEscape.saveFailed"))).toBeTruthy(),
+    );
+    expect(invokeMock.mock.calls.some(([cmd]) => cmd === PREFS_SET)).toBe(false);
+    expect(row.getAttribute("data-protection-on")).toBe("true");
+  });
+
+  it("a write on this surface reaches the pre-unlock escape without a remount", async () => {
     // The regression the shared module cell was introduced for, and the half
     // nobody asserted: two independent `view` cells meant turning the override
     // ON in Settings left the Unlock screen's escape still reporting it off,
@@ -499,12 +510,11 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     // and offering no way back on the one surface that has no Settings.
     //
     // Both surfaces are mounted in ONE tree here, which is the arrangement the
-    // module header says is real. The nearest existing case unmounts the first
-    // before rendering the second, so it exercises the initial read rather than
-    // the fan-out.
+    // module header says is real.
     stub({
       [SET]: () =>
         Promise.resolve({ disabled: true, via_flag: false, effective: true }),
+      [PREFS_SET]: () => Promise.resolve(undefined),
     });
     render(
       <>
@@ -518,7 +528,7 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
       expect(trigger.getAttribute("data-override")).toBe("false"),
     );
 
-    fireEvent.click(screen.getByTestId("settings.screen-capture-override-toggle"));
+    fireEvent.click(screen.getByTestId("settings.screen-capture-toggle"));
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith(SET, { disabled: true }),
     );
@@ -527,25 +537,13 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     await waitFor(() =>
       expect(trigger.getAttribute("data-override")).toBe("true"),
     );
-    // And the per-vault switch above the row goes inert in the same paint,
-    // which is what the panel needs the shared cell for.
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("settings.screen-capture").getAttribute("data-superseded"),
-      ).toBe("true"),
-    );
-  });
-
-  it("mirrors the override as its own row, and writes through it", async () => {
-    stub();
-    render(<PrivacyPanel />);
-    const row = await screen.findByTestId("settings.screen-capture-override");
-    await waitFor(() => expect(row.getAttribute("data-disabled")).toBe("false"));
-
-    fireEvent.click(screen.getByTestId("settings.screen-capture-override-toggle"));
-    await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith(SET, { disabled: true }),
-    );
+    // And the switch itself follows the device, not the preference it just also
+    // wrote: the panel reads whichever store is suppressing protection.
+    expect(
+      screen
+        .getByTestId("settings.screen-capture")
+        .getAttribute("data-protection-on"),
+    ).toBe("false");
   });
 
   it("is mounted by App without a stage predicate", () => {
@@ -579,16 +577,20 @@ describe("Privacy panel: the override supersedes the per-vault switch", () => {
     ).toBe("<ScreenCaptureEscape />");
   });
 
-  it("is in the settings search index and is NOT developer-gated", () => {
-    // The person this exists for is on a black window. A setting behind
-    // Developer mode cannot be found by them, and search resolves straight to a
-    // panel id, so a `developerGated` tag there would hide it from the one
-    // surface a user reaches for when they cannot find a setting.
+  it("has ONE settings-search entry, and it is not developer-gated", () => {
+    // The device override no longer has an entry of its own, because its row is
+    // gone and an entry would navigate to an anchor that is never rendered. The
+    // single row keeps its entry, and it has to stay out of Developer mode: the
+    // person this setting is about is on a black window, and a mode-gated
+    // setting cannot be found by them.
+    expect(
+      SETTINGS_SEARCH_INDEX.find((e) => e.id === "privacy.screen-capture-override"),
+      "the device override must not keep an entry with no row behind it",
+    ).toBeUndefined();
     const entry = SETTINGS_SEARCH_INDEX.find(
-      (e) => e.id === "privacy.screen-capture-override",
+      (e) => e.id === "privacy.screen-capture",
     );
-    expect(entry, "no settings-search entry for privacy.screen-capture-override")
-      .toBeDefined();
+    expect(entry, "no settings-search entry for privacy.screen-capture").toBeDefined();
     expect(entry!.panelId).toBe("privacy");
     expect(entry!.capability).toBe("screenCaptureProtection");
     expect(entry!.developerGated ?? false).toBe(false);

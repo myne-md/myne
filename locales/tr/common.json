@@ -3624,7 +3624,7 @@
       "hideVaultNamesErrorRead": "Geçerli ayar okunamadı. Yeniden belirlemek için düğmeyi kapatıp açın.",
       "hideVaultNamesErrorSave": "Ayar kaydedilemedi, bu yüzden değişmedi. Açmaya çalışıyorduysanız saklanan bazı adlar çoktan yok edilmiş olabilir; tamamlamak için yeniden açın.",
       "hideVaultNamesErrorErase": "Saklanan bir ad yok edilemedi; gerçekleşmemiş bir silme iddia edilmesin diye ayar kapalı bırakıldı. Tekrar deneyin.",
-      "screenCaptureHelperOff": "Koruma, kilit açılmadan önce her zaman geçerlidir. Kilit açıldıktan sonra bu tercihi izler.",
+      "screenCaptureHelperOff": "Bu cihazda kapalı; kasanın kilidini açmadan önce de sonra da. Buradan ya da kilit ekranında klavyeyle geri açabilirsiniz.",
       "screenCaptureHelperOn": "Windows 10’da (Mayıs 2020 Güncellemesi) ve sonrasında etkilidir. macOS ve Linux bunun için bir sistem API’si sunmaz, bu yüzden orada yakalamayı engelleyemez.",
       "screenCaptureLabel": "Ekran görüntüsü koruması",
       "screenCaptureSubtitle": "Ekran görüntülerini ve ekran kaydını engelle",

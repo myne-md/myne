@@ -3768,7 +3768,7 @@
       "hideVaultNamesErrorRead": "Couldn't read the current setting. Flip the switch to set it again.",
       "hideVaultNamesErrorSave": "Couldn't save the setting, so it is unchanged. If you were turning it on, some stored names may already have been destroyed; turn it on again to finish.",
       "hideVaultNamesErrorErase": "One stored name couldn't be destroyed, so the setting was left off rather than claiming an erase that did not happen. Try again.",
-      "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
+      "screenCaptureHelperOff": "Off on this device, before you unlock and after. Turn it back on here, or from the lock screen with the keyboard.",
       "screenCaptureHelperOn": "Effective on Windows 10 (May 2020 Update) and later. macOS and Linux have no system API for this, so it cannot block capture there.",
       "screenCaptureLabel": "Screen-capture protection",
       "screenCaptureOverrideHelper": "Turns screen-capture protection off on this device only, before you unlock a vault and after. Set it if a screen magnifier, remote-desktop software or someone helping you remotely sees a black window. It is not synced.",

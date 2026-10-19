@@ -30,7 +30,6 @@ import {
   setEditorVimMode,
   setSpellEnabled,
   setAiEnabled,
-  setScreenCaptureProtection,
   setArchiveDisabled,
   setShowNoteTimestamps,
   setEditorFocusTypewriter,
@@ -45,6 +44,7 @@ import {
 } from "../lib/prefs";
 import { applyTheme } from "../lib/theme";
 import { screenCaptureOverrideIsActive } from "../hooks/useScreenCaptureOverride";
+import { applyScreenCaptureSetting } from "../lib/screen-capture-override";
 import { viewsEnabled } from "../lib/viewsEnabled";
 import i18n from "../i18n";
 
@@ -255,16 +255,22 @@ const toggleScreenCaptureAction: CommandAction = {
     return i18n.t("commands.actions.category.app");
   },
   // Hidden while the device-local override is on (myne-md/myne#482), the same
-  // state that renders the Privacy switch inert. Without this the palette
+  // state that renders the Privacy switch locked. Without this the palette
   // reopens the door the panel just closed: the write lands in `vault.prefs`,
   // reports success, and `screen_capture::resolve` turns it into `false` at the
   // native call, so the user is told protection changed over a window that did
   // not. Hidden rather than disabled because the palette has nowhere to put the
   // helper sentence the panel uses to explain it.
+  //
+  // The write goes through `applyScreenCaptureSetting` rather than the prefs
+  // setter, because the panel's row now writes BOTH halves of the setting
+  // (myne-md/myne#482's device file first, then the sealed preference) and a
+  // palette that wrote one of them would leave the device in a different state
+  // from the panel for the same setting.
   visibility: (ctx) =>
     screenCaptureOverrideIsActive() ? "hidden" : editorOnly(ctx),
   run: (ctx) => {
-    void setScreenCaptureProtection(!ctx.prefs.screen_capture_protection);
+    void applyScreenCaptureSetting(!ctx.prefs.screen_capture_protection);
   },
 };
 

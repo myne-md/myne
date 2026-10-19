@@ -305,31 +305,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
-    // myne-md/myne#482. The device-local escape hatch, mirrored here so a user
-    // who took it pre-unlock has an obvious way back. `capability`-tagged
-    // because `PrivacyPanel` wraps THIS row in `has("screenCaptureProtection")`
-    // and an untagged entry would navigate to an anchor that was never
-    // rendered. The per-vault row above is NOT gated, so the two differ: this
-    // comment claimed they matched, and the web verdict in
-    // `check-web-surfaces.mjs` said the same, both wrongly. The gate is new and
-    // one-sided, and it stays that way deliberately: the per-vault field is
-    // vault content that a user may want to read and set on a client where the
-    // native call does nothing, while this row writes a device-local file whose
-    // only purpose is suppressing a call that client never makes.
-    //
-    // No `developerGated`: the person this exists for is a low-vision or
-    // remote-desktop user on a black window, and a setting behind Developer
-    // mode cannot be found by them.
-    id: "privacy.screen-capture-override",
-    agentWritability: WRITABILITY_CONTROL,
-    capability: "screenCaptureProtection",
-    panelId: "privacy",
-    topic: "access",
-    titleKey: "settings.privacy.screenCaptureOverrideLabel",
-    descriptionKey: "settings.privacy.screenCaptureOverrideHelper",
-    keywordsKey: "settings.search.keywords.screenCaptureOverride",
-  },
-  {
     // myne-md/myne#411. One gate, and deliberately not the other.
     //
     // `capability`, because PrivacyPanel omits the row where
