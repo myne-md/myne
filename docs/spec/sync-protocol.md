@@ -412,8 +412,12 @@ A device learns "something changed, come pull" via a **contentless poke**: a sig
 
 A **second, separate SSE stream** carries live-awareness frames (`server-protocol.md` §3.5; `live-collab`, `decisions/sync/0655`). `GET /sync/awareness` fans opaque, end-to-end-sealed frames out to a note room's subscribers (matched on a note-unlinkable per-note room id) and `POST /sync/awareness` publishes them; the two are one session-bound pair, and the client's initial room set is the GET's `?rooms=` query. This is distinct from the poke, the poke stays **literally zero-payload**, and it is **not** a WebSocket. The relay's server obligations (the room filter, the frame/batch caps, the separate account-keyed rate sub-bucket, the RAM-only never-logged room table and the member-removal stream termination) are `server-protocol.md` §3.5. **Client stream hygiene** mirrors the poke's: the stream is open only while the vault is **unlocked AND foregrounded** (`SYNC-30`, the same predicate the poke gate uses); on each (re)connect the client emits a **join control frame** so peers re-announce their presence (`SYNC-29`); reconnects use jittered exponential backoff (base doubling to 60 s, ±25%); a `401` parks the stream until the device's `(endpoint, token)` identity changes; and a dead connection is detected by a read timeout above the server's 30 s heartbeat (65 s). Upstream frames are coalesced on a ~100 ms window before the `POST` (`SYNC-5`), and the client subscribes to its open notes' rooms over one stream per device, not one per note (`SYNC-9`). **Room addressing is tier-derived.** The per-note room id and its seal key are derived client-side through the `awareness-room-id` / `awareness-key` roles (`protocol.md` §3.4) from the session's shared tier: `root_key` in a pre-B2B (`NTV5`) vault, the current `group_key` in a shared (`NTV6`) vault (`collab-b2b-sessions`). An owner and every member of the same `NTV6` vault therefore derive the SAME room id and seal key for a note, which is what lets them share one relay; the room id stays a 16-byte identifier derivation, never a truncated key. Granularity is **one room per note**, not one per vault. Because a rotation moves `group_key`, it moves every room id and key: a participant re-derives and rejoins on the new tier, and a frame sealed under a **retired group-key epoch** is refused by the frame AAD, which binds the epoch (`SYNC-21`), so a post-removal straggler fails closed rather than joining the rotated room.
 
-### 8.4 Robustness
+**Group-rotation delivery is durable, and a member re-keys its own local content at the next credential unlock after it moves tier** (`collab-b2b-sessions`, `decisions/protocol/0661` + `0708`). Two client-side obligations ride beside the relay of `server-protocol.md` §3.4a:
 
+- **The owner's delivery is a device-local outbox, not a call frame.** A removal commits locally (the journaled re-key of §9.2 / §10.3 content and the rotated `vault.meta`) before it can reach the network, and the per-member `SignedGroupPackage`s are written to `vault.rotation-outbox` BEFORE the first POST. Every sync cycle and unlock drains the outbox until each remaining recipient's `PUT` has succeeded, then records the namespace retirement and revokes the removed member. A recipient leaves the record only after its own POST succeeded, so a retry re-POSTs exactly what did not land and never re-runs the rotation; a duplicate across the crash window is the same epoch and the same frame, which the server's latest-per-recipient rule ignores.
+- **A member never commits an epoch it cannot verify, and its local re-key runs at the next credential unlock.** The member commits a `vault.meta` epoch ONLY after its own delivered package opens at exactly that epoch against the owner public half pinned at accept: the meta phase HOLDS a strictly-greater server epoch (and a one-sided generation transition) on a member device rather than writing it, because a member cannot authenticate those bytes and the write is irreversible. A member's unsynced notes, attachments and snapshots are wrapped under the retired `itemsKey` and have no server copy, so they must be re-wrapped (`rekey_note_blob` / `rekey_attachment_blob`, content ciphertext and `items_key_id` byte-identical) through the same two-phase journal. The adoption does NOT do it: it holds neither the phrase nor the member password, so it could not re-seal the credential store that survives a lock, and a second rotation before that unlock would leave blobs sealed under an intermediate key nothing can derive. It writes the verified meta, installs the tier, keeps its CAS baselines, and leaves the content plane standing down until the next phrase or fast-credential unlock re-keys the blobs and re-seals the store in one step; `vault.content-epoch` records where the content is, so an interrupted re-key is resumed rather than misread.
+
+### 8.4 Robustness
 - **Idempotent push** — the CAS (§8.1) plus content-addressing makes a retried push a no-op rather than a duplicate.
 - **Certificate trust.** Native clients verify the TLS certificate chain against bundled public CA roots and the server hostname on every connection, including Tor and first enrollment; no leaf certificate is pinned. A browser delegates the same trust decision to its own certificate store and exposes neither a pinning API nor a TLS-exporter to page JavaScript. The four residuals this model owns (a compromised or compelled CA, a root distrusted after a mis-issuance, revocation never being checked, and a private-CA certificate being refused on first connect) are enumerated in `threat-model.md` §1's A4 amendment, and the operator-facing consequences are in `self-host-policy.md` §6; `decisions/sync/0620` is the decision that withdrew pinning and owns the trade-off. A MitM on the sync origin still sees only encrypted note content; a MitM on the web bundle origin is a separate A15/TB11 code-delivery adversary. The SCRAM channel-binding deployment limits are in `server-protocol.md` §3.1.
 - **Deferred:** contentless mobile-wake push (Phase 3) remains a documented forward path, not part of this wire spec. **Real-time co-edit is no longer deferred.** It ships in the next release as the live-awareness plane of §8.3 (`GET`/`POST /sync/awareness`; `server-protocol.md` §3.5): an SSE-down plus authenticated-POST relay of opaque frames, **not** a WebSocket (`decisions/sync/0655`).
@@ -741,14 +745,26 @@ epoch** as a rollback. A retired epoch is recorded by an owner-double-signed
 `myne.group-retirement v1|` record (`protocol.md` §9.3.4) that carries no timestamp,
 so the server can neither forge a retirement nor order one against a removed
 member's package stream. **Live propagation of a new epoch is delivered by the sync meta phase's `NTV6`
-read path** (myne-md/myne#711 task 13): a peer whose local epoch is strictly lower
-adopts the server's rotated `vault.meta` **verbatim** (a re-serialize would drop the
-B2B tail and downgrade the vault), clears its per-blob CAS baselines so the next pull
-re-fetches every content header the owner rewrapped at the same ids, and only then
-decrypts (content ciphertext and `content_nonce` are unchanged by a rewrap). A
-strictly-lower server epoch is refused as a rollback, an equal epoch adopts a
-server-only roster change and refuses a concurrent one, and a member device adopts
-but never writes `vault.meta`.
+read path** (myne-md/myne#711 task 13, revised by myne-md/myne#797): an OWNER peer
+whose local epoch is strictly lower adopts the server's rotated `vault.meta`
+**verbatim** (a re-serialize would drop the B2B tail and downgrade the vault) and
+only then decrypts (content ciphertext and `content_nonce` are unchanged by a
+rewrap). A strictly-lower server epoch is refused as a rollback, and an equal epoch
+adopts a server-only roster change and refuses a concurrent one.
+
+**A member device does NOT adopt through that path.** It holds no `root_key`, so it
+cannot authenticate a rotated meta itself; the sync meta phase instead **HOLDS** a
+strictly-greater server epoch (and a one-sided `NTV5`→`NTV6` generation transition)
+without writing it. The member commits the epoch only through
+`member_adopt_rotation_from_host`, after its own delivered group package opens at
+exactly that epoch against the owner public half **pinned at accept**
+(`decisions/protocol/0675`). A strictly-greater epoch the server mints without a
+matching, verifying package is therefore held rather than written, which is a real
+refusal and not a delay: the epoch write is irreversible (a genuine lower epoch is
+refused as a rollback forever), so the hold is what keeps a hostile server from
+wedging the vault. On commit the member re-keys its own local content under the new
+`itemsKey` first, then writes the verified meta verbatim, then installs the keys,
+keeping its per-blob CAS baselines because the rewrap preserves `content_nonce`.
 
 **Per-person private AI profiles ride a separate plane** (myne-md/myne#711 task 16,
 `decisions/protocol/0608`). A `profiles/<profile-id>` blob (`MYY5`, `protocol.md`

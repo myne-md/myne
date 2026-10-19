@@ -356,14 +356,15 @@ async fn rekey_content_blobs(
         let note_uuid = parse_uuid(uuid_hex).ok_or(MemberRemovalError::InvalidVaultMeta)?;
         let path = notes_dir.join(&entry.name);
         let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = rekey_note(
+        if let Some(rekeyed) = rekey_note_maybe(
             &blob,
             &note_uuid,
             items_key_id,
             old_items_key,
             new_items_key,
-        )?;
-        staged.push((path, rekeyed));
+        )? {
+            staged.push((path, rekeyed));
+        }
     }
 
     let attachments_dir = vault_root.join("attachments");
@@ -378,16 +379,15 @@ async fn rekey_content_blobs(
         };
         let path = attachments_dir.join(&entry.name);
         let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = protocol::person_rekey::rekey_attachment_blob(
+        if let Some(rekeyed) = rekey_attachment_maybe(
             &blob,
             &attachment_id,
             items_key_id,
             old_items_key,
             new_items_key,
-            &fresh_nonce()?,
-        )
-        .map_err(|_| MemberRemovalError::CannotDecrypt)?;
-        staged.push((path, rekeyed));
+        )? {
+            staged.push((path, rekeyed));
+        }
     }
 
     // Snapshots hold byte-verbatim note blobs sealed under the SAME `itemsKey`,
@@ -407,14 +407,15 @@ async fn rekey_content_blobs(
         let note_uuid = parse_uuid(&note_uuid_str).ok_or(MemberRemovalError::InvalidVaultMeta)?;
         let path = snapshots_dir.join(&entry.name);
         let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-        let rekeyed = rekey_note(
+        if let Some(rekeyed) = rekey_note_maybe(
             &blob,
             &note_uuid,
             items_key_id,
             old_items_key,
             new_items_key,
-        )?;
-        staged.push((path, rekeyed));
+        )? {
+            staged.push((path, rekeyed));
+        }
     }
 
     // `conflicts/<id>.myn` and `quarantine/<uuid>.myn` hold full note blobs
@@ -437,18 +438,145 @@ async fn rekey_content_blobs(
                 .ok_or(MemberRemovalError::InvalidVaultMeta)?;
             let path = dir.join(&entry.name);
             let blob = io.read(&path).await.map_err(|_| MemberRemovalError::Io)?;
-            let rekeyed = rekey_note(
+            if let Some(rekeyed) = rekey_note_maybe(
                 &blob,
                 &note_uuid,
                 items_key_id,
                 old_items_key,
                 new_items_key,
-            )?;
-            staged.push((path, rekeyed));
+            )? {
+                staged.push((path, rekeyed));
+            }
         }
     }
 
     Ok(staged)
+}
+
+/// Test-only fault-injection points for the member-local re-key (myne-md/myne#797).
+/// In non-test builds the enum has only [`MemberRekeyFault::None`], so the matches
+/// compile out and the production path is byte-identical to a seam-free one.
+#[derive(Clone, Copy)]
+enum MemberRekeyFault {
+    None,
+    /// Every blob staged, no journal yet: a crash before the commit point, which
+    /// recovery must ROLL BACK.
+    #[cfg(test)]
+    StopAfterStage,
+    /// Journal written, nothing published: a crash after the commit point, which
+    /// recovery must ROLL FORWARD.
+    #[cfg(test)]
+    StopAfterJournal,
+    /// Every blob published, marker not yet written: the state a transient I/O
+    /// error or a process death leaves, where the next attempt must SKIP the
+    /// already-re-keyed blobs rather than fail on them (myne-md/myne#797).
+    #[cfg(test)]
+    StopAfterPublish,
+}
+
+/// Re-key this device's LOCAL content blobs from the retired `itemsKey` to the
+/// new one, as part of a member's adoption of an owner group rotation
+/// (myne-md/myne#797).
+///
+/// **Why this exists at all.** The owner-side rotation already rewrites every
+/// blob it holds, but a MEMBER's device may hold notes, attachments and
+/// snapshots the server has never seen. Those per-entry key wraps are sealed
+/// under the retired `itemsKey`, so installing the new keys on the slot without
+/// re-wrapping them makes every unsynced local blob unreadable: and there is no
+/// server copy to re-pull. This is the member-side counterpart of
+/// [`rekey_content_blobs`], with the same two-phase journal and the same
+/// `items_key_id` / content-ciphertext invariants.
+///
+/// `journal_meta_bytes` is the `vault.meta` the re-keyed blobs belong to. It is
+/// what [`recover_pending_rekey`] writes on roll-forward; writing the bytes
+/// already on disk is a byte-identical no-op for a member, and it keeps ONE
+/// recovery path and ONE `.rekeytmp` suffix shared with the owner pipeline.
+///
+/// Idempotency comes from the epoch marker, not from re-trying the crypto: a
+/// caller that has already completed a re-key for `epoch` skips it (the blobs
+/// no longer open under the retired key). `epoch` advances the device-local
+/// [`crate::plugins::sync::state::CONTENT_EPOCH_FILE`] only after every staged
+/// blob has been published and the journal still records the same meta.
+pub async fn rekey_local_content_for_member(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    items_key_id: &[u8; 16],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+    journal_meta_bytes: &[u8],
+    epoch: u64,
+) -> Result<(), MemberRemovalError> {
+    member_rekey_inner(
+        io,
+        vault_root,
+        items_key_id,
+        old_items_key,
+        new_items_key,
+        journal_meta_bytes,
+        epoch,
+        MemberRekeyFault::None,
+        false,
+    )
+    .await
+}
+
+#[cfg_attr(not(test), allow(unused_variables))]
+#[allow(clippy::too_many_arguments)]
+async fn member_rekey_inner(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    items_key_id: &[u8; 16],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+    journal_meta_bytes: &[u8],
+    epoch: u64,
+    fault: MemberRekeyFault,
+    holds_notes_lock: bool,
+) -> Result<(), MemberRemovalError> {
+    let _notes_guard = if holds_notes_lock {
+        None
+    } else {
+        Some(
+            crate::plugins::notes::commands::notes_write_mutex()
+                .lock()
+                .await,
+        )
+    };
+    let staged =
+        rekey_content_blobs(io, vault_root, items_key_id, old_items_key, new_items_key).await?;
+    if staged.is_empty() {
+        // No local content under the retired key (a fresh member device, or a
+        // re-key that already completed). Record the epoch so the caller stops
+        // treating the content as stale.
+        crate::plugins::sync::state::write_content_epoch(io, vault_root, epoch)
+            .await
+            .map_err(|_| MemberRemovalError::Io)?;
+        return Ok(());
+    }
+    stage_all(io, &staged).await?;
+    #[cfg(test)]
+    if let MemberRekeyFault::StopAfterStage = fault {
+        return Err(MemberRemovalError::Io);
+    }
+    write_journal(io, &vault_root.join(REKEY_JOURNAL), journal_meta_bytes).await?;
+    #[cfg(test)]
+    if let MemberRekeyFault::StopAfterJournal = fault {
+        return Err(MemberRemovalError::Io);
+    }
+    publish_all(io, &staged).await?;
+    #[cfg(test)]
+    if let MemberRekeyFault::StopAfterPublish = fault {
+        return Err(MemberRemovalError::Io);
+    }
+    // Marker BEFORE the journal is removed: a crash between the two leaves the
+    // journal for recovery, which re-publishes (idempotently) and re-writes the
+    // marker. A marker written after the journal would be the ambiguous order.
+    crate::plugins::sync::state::write_content_epoch(io, vault_root, epoch)
+        .await
+        .map_err(|_| MemberRemovalError::Io)?;
+    let _ = io.remove_file(&vault_root.join(REKEY_JOURNAL)).await;
+    drop(_notes_guard);
+    Ok(())
 }
 
 /// One remaining member's delivery package, addressed by its server-side
@@ -511,6 +639,53 @@ fn address_packages(
         });
     }
     Ok(addressed)
+}
+
+/// Persist a committed rotation's per-recipient delivery packages to the
+/// device-local outbox (myne-md/myne#797). A device with no sync plane has no
+/// account address and nothing to deliver, so it is a no-op there.
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
+async fn record_rotation_outbox_for_delivery(
+    io: &dyn VaultIo,
+    vault_root: &Path,
+    packages: &[GroupPackageDelivery],
+    account_number_hash: &[u8; 16],
+    replacement_epoch: u64,
+    removed_person_id_hex: Option<&str>,
+    reclaim_sync_ids_hex: &[String],
+) -> Result<(), super::devices::SyncDeviceError> {
+    use super::rotation_outbox::{PendingRotationPackage, RotationOutbox};
+    use base64::Engine as _;
+    let sync_state = crate::plugins::sync::state::read_sync_state(io, vault_root)
+        .await
+        .map_err(|_| super::devices::SyncDeviceError::Internal)?;
+    if sync_state
+        .account_hash_hex
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return Ok(());
+    }
+    let mut pending = Vec::with_capacity(packages.len());
+    for delivery in packages {
+        let frame = protocol::person_invite::encode_signed_group_package(&delivery.package)
+            .ok_or(super::devices::SyncDeviceError::Internal)?;
+        pending.push(PendingRotationPackage {
+            person_id_hex: delivery.person_id_hex.clone(),
+            package_b64: base64::engine::general_purpose::STANDARD.encode(&frame),
+        });
+    }
+    let record = RotationOutbox::new(
+        crate::plugins::sync::to_hex(account_number_hash),
+        replacement_epoch.saturating_sub(1),
+        replacement_epoch,
+        reclaim_sync_ids_hex.to_vec(),
+        removed_person_id_hex.map(str::to_string),
+        pending,
+    );
+    super::rotation_outbox::record_rotation_outbox(io, vault_root, record).await
 }
 
 /// The retired epoch's shared-singleton sync-plane blob-ids (hex) in an `NTV6`
@@ -656,6 +831,19 @@ pub async fn rotate_group_from_host(
             &person_id,
         );
     }
+
+    // Captured from the CURRENT roster before the rotate consumes it: the
+    // outbox needs the removed member's server address for the revoke, exactly
+    // as the command does today.
+    // Only the non-wasm outbox consumes this; the wasm build casts no record and
+    // must not carry an unused binding (the `wasm-protocol` clippy gate is `-D
+    // warnings`, myne-md/myne#797).
+    #[cfg(not(target_arch = "wasm32"))]
+    let removed_person_id_hex = current_roster
+        .members
+        .iter()
+        .find(|m| m.fingerprint_hex == removed_fingerprint_hex)
+        .and_then(|m| m.person_id_hex.clone());
 
     // (2) Fresh keys + nonces.
     let new_group_key = Zeroizing::new(random_key()?);
@@ -924,6 +1112,28 @@ pub async fn rotate_group_from_host(
     })
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
 
+    // (6b) Persist the delivery obligations BEFORE the first mutation. This is
+    // the record the rotation exists to survive: a crash after the commit with no
+    // outbox strands every remaining member on the retired epoch, because
+    // re-running removal answers `MemberNotFound` (myne-md/myne#797). Writing it
+    // here is what makes its failure abortable: nothing has changed yet, so the
+    // caller can retry. A record whose meta never reaches `replacement_epoch` is
+    // discarded by the drain rather than delivered.
+    let reclaim_sync_ids_hex = group_rotation_reclaim_sync_ids(&old_group_key);
+    #[cfg(not(target_arch = "wasm32"))]
+    if !packages.is_empty() || removed_person_id_hex.is_some() {
+        record_rotation_outbox_for_delivery(
+            io,
+            &vault_root,
+            &packages,
+            &account_number_hash,
+            rotated.new_epoch,
+            removed_person_id_hex.as_deref(),
+            &reclaim_sync_ids_hex,
+        )
+        .await
+        .map_err(|_| MemberRemovalError::Io)?;
+    }
     // (7) Journaled commit: stage, journal, publish, meta LAST.
     stage_all(io, &staged).await?;
     write_journal(io, &vault_root.join(REKEY_JOURNAL), &new_meta_bytes).await?;
@@ -931,6 +1141,11 @@ pub async fn rotate_group_from_host(
     io.write(&meta_path, &new_meta_bytes, WriteOpts::default())
         .await
         .map_err(|_| MemberRemovalError::Io)?;
+    // The local content is now wrapped under the new epoch. Recorded before the
+    // journal is removed so a crash between the two has recovery write the same
+    // fact (myne-md/myne#797); a member's re-key uses the same marker.
+    let _ =
+        crate::plugins::sync::state::write_content_epoch(io, &vault_root, rotated.new_epoch).await;
     let _ = io.remove_file(&vault_root.join(REKEY_JOURNAL)).await;
     // Release notes BEFORE touching the slot (`slot→notes` order).
     drop(_notes_guard);
@@ -960,7 +1175,6 @@ pub async fn rotate_group_from_host(
     // (10) Re-base the sync plane: the shared-singleton sync-ids are group-derived
     // in an `NTV6` vault, so the rotation moved them. Queue the retired epoch's
     // ids for server reclaim and drop their baselines (decision 0609).
-    let reclaim_sync_ids_hex = group_rotation_reclaim_sync_ids(&old_group_key);
     rebase_sync_plane_for_group_rotation(io, &vault_root, &old_group_key).await;
 
     Ok(GroupRotationOutput {
@@ -1169,6 +1383,18 @@ pub async fn recover_pending_rekey(
                 {
                     failed = true;
                 } else {
+                    // The committed batch is a rotation when its meta is NTV6;
+                    // record that the local content is now at that epoch, so a
+                    // member's adoption (and the owner's own next cycle) can tell
+                    // "keys installed, blobs still retired" from "both landed".
+                    if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&new_meta) {
+                        let _ = crate::plugins::sync::state::write_content_epoch(
+                            io,
+                            vault_root,
+                            b2b.group_key_epoch,
+                        )
+                        .await;
+                    }
                     recovered_meta = Some(new_meta);
                 }
             }
@@ -1218,6 +1444,66 @@ fn rekey_note(
     )
     .map(|r| r.blob)
     .map_err(|_| MemberRemovalError::CannotDecrypt)
+}
+
+/// Re-wrap a note-shaped blob, **tolerating a blob already re-keyed**.
+///
+/// A crash between `publish_all` and the content-epoch marker leaves the live
+/// blobs under the NEW key with the journal still present and no marker, so the
+/// next attempt opens the first blob with the retired key and would answer
+/// `CannotDecrypt`. That turned one I/O error into a permanent lockout: the
+/// journal's own roll-forward runs after a successful unlock, and this path runs
+/// inside the unlock (myne-md/myne#797). `Ok(None)` therefore means "already
+/// under the new key, nothing to stage", proved by re-wrapping under that key
+/// rather than guessed from the marker.
+fn rekey_note_maybe(
+    blob: &[u8],
+    note_uuid: &[u8; 16],
+    items_key_id: &[u8; 16],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+) -> Result<Option<Vec<u8>>, MemberRemovalError> {
+    match rekey_note(blob, note_uuid, items_key_id, old_items_key, new_items_key) {
+        Ok(rekeyed) => Ok(Some(rekeyed)),
+        Err(MemberRemovalError::CannotDecrypt) => {
+            // Same shape, same keys: an open that succeeds here is proof the blob
+            // is already wrapped under the new key.
+            match rekey_note(blob, note_uuid, items_key_id, new_items_key, new_items_key) {
+                Ok(_) => Ok(None),
+                Err(_) => Err(MemberRemovalError::CannotDecrypt),
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Attachment-shaped twin of [`rekey_note_maybe`], same contract and same reason.
+fn rekey_attachment_maybe(
+    blob: &[u8],
+    attachment_id: &[u8; 32],
+    items_key_id: &[u8; 16],
+    old_items_key: &[u8; AEAD_KEY_LEN],
+    new_items_key: &[u8; AEAD_KEY_LEN],
+) -> Result<Option<Vec<u8>>, MemberRemovalError> {
+    let attempt = |old: &[u8; AEAD_KEY_LEN]| {
+        protocol::person_rekey::rekey_attachment_blob(
+            blob,
+            attachment_id,
+            items_key_id,
+            old,
+            new_items_key,
+            &fresh_nonce()?,
+        )
+        .map_err(|_| MemberRemovalError::CannotDecrypt)
+    };
+    match attempt(old_items_key) {
+        Ok(rekeyed) => Ok(Some(rekeyed)),
+        Err(MemberRemovalError::CannotDecrypt) => match attempt(new_items_key) {
+            Ok(_) => Ok(None),
+            Err(_) => Err(MemberRemovalError::CannotDecrypt),
+        },
+        Err(e) => Err(e),
+    }
 }
 
 fn fresh_nonce() -> Result<[u8; AEAD_NONCE_LEN], MemberRemovalError> {
@@ -1456,8 +1742,249 @@ mod tests {
         );
     }
 
-    // ── Local canonical group rotation (myne-md/myne#712 task 7) ─────────────
+    /// myne-md/myne#797, GAP 1. A member's own unsynced note is wrapped under
+    /// the retired `itemsKey`; adopting a rotation without re-keying it makes it
+    /// unreadable forever (no server copy). This drives the re-key directly,
+    /// through both crash points, and proves the blob moves and recovery is
+    /// coherent in each direction.
+    #[test]
+    fn member_local_rekey_moves_an_unsynced_note_and_recovers_from_a_crash() {
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::StdVaultIo;
 
+        block_on(async {
+            let dir = ScopedTempDir::new("member-rekey").expect("tempdir");
+            let root = dir.path().to_path_buf();
+            std::fs::create_dir_all(root.join("notes")).expect("notes dir");
+            let old_items = [0x11u8; 32];
+            let new_items = [0x22u8; 32];
+            let note_uuid = [0xAAu8; 16];
+            let note_path = root.join("notes").join(format!(
+                "{}.myn",
+                uuid::Uuid::from_bytes(note_uuid).hyphenated()
+            ));
+            let blob = protocol::encode_new_note_blob_raw(
+                &old_items,
+                &ROT_ITEMS_ID,
+                &note_uuid,
+                &[0x55u8; 32],
+                &[8u8; 24],
+                &[9u8; 24],
+                b"unsynced-body",
+            )
+            .expect("note blob");
+            std::fs::write(&note_path, &blob).expect("write note");
+
+            // A crash BEFORE the journal (staged, not committed) rolls BACK: the
+            // note must still open under the retired key.
+            member_rekey_inner(
+                &StdVaultIo,
+                &root,
+                &ROT_ITEMS_ID,
+                &old_items,
+                &new_items,
+                b"member-meta",
+                2,
+                MemberRekeyFault::StopAfterStage,
+                false,
+            )
+            .await
+            .expect_err("staged-only is an aborted batch");
+            assert!(!root.join(REKEY_JOURNAL).exists());
+            recover_pending_rekey(&StdVaultIo, &root)
+                .await
+                .expect("roll back");
+            let bytes = std::fs::read(&note_path).expect("note read");
+            assert!(
+                crate::plugins::notes::decode::decode_note_any(
+                    &bytes,
+                    &note_uuid,
+                    &old_items,
+                    &ROT_ITEMS_ID
+                )
+                .is_ok(),
+                "an aborted re-key leaves the retired-key blob intact"
+            );
+
+            // A crash AFTER the journal rolls FORWARD: the note must open under
+            // the NEW key, and the content-epoch marker must record it.
+            member_rekey_inner(
+                &StdVaultIo,
+                &root,
+                &ROT_ITEMS_ID,
+                &old_items,
+                &new_items,
+                b"member-meta",
+                2,
+                MemberRekeyFault::StopAfterJournal,
+                false,
+            )
+            .await
+            .expect_err("journal-without-publish is a committed pending batch");
+            assert!(root.join(REKEY_JOURNAL).exists());
+            recover_pending_rekey(&StdVaultIo, &root)
+                .await
+                .expect("roll forward");
+            let bytes = std::fs::read(&note_path).expect("note read");
+            assert!(
+                crate::plugins::notes::decode::decode_note_any(
+                    &bytes,
+                    &note_uuid,
+                    &new_items,
+                    &ROT_ITEMS_ID
+                )
+                .is_ok(),
+                "recovery republishes the staged blob under the new itemsKey"
+            );
+            assert!(
+                crate::plugins::notes::decode::decode_note_any(
+                    &bytes,
+                    &note_uuid,
+                    &old_items,
+                    &ROT_ITEMS_ID
+                )
+                .is_err(),
+                "the retired key no longer opens it"
+            );
+            assert!(!root.join(REKEY_JOURNAL).exists());
+
+            // The direct success path records the epoch marker (the recovery
+            // above cannot: its journal is a non-NTV6 sentinel, which is
+            // deliberately not treated as a rotation).
+            let dir2 = ScopedTempDir::new("member-rekey-marker").expect("tempdir");
+            let root2 = dir2.path().to_path_buf();
+            std::fs::create_dir_all(root2.join("notes")).expect("notes dir");
+            let uuid2 = [0xBBu8; 16];
+            let blob2 = protocol::encode_new_note_blob_raw(
+                &old_items,
+                &ROT_ITEMS_ID,
+                &uuid2,
+                &[0x56u8; 32],
+                &[0x18u8; 24],
+                &[0x19u8; 24],
+                b"second-body",
+            )
+            .expect("note blob");
+            std::fs::write(
+                root2.join("notes").join(format!(
+                    "{}.myn",
+                    uuid::Uuid::from_bytes(uuid2).hyphenated()
+                )),
+                &blob2,
+            )
+            .expect("write note");
+            rekey_local_content_for_member(
+                &StdVaultIo,
+                &root2,
+                &ROT_ITEMS_ID,
+                &old_items,
+                &new_items,
+                b"member-meta",
+                2,
+            )
+            .await
+            .expect("re-key commits");
+            assert_eq!(
+                crate::plugins::sync::state::read_content_epoch(&StdVaultIo, &root2)
+                    .await
+                    .expect("marker readable"),
+                Some(2),
+                "the content-epoch marker advanced with the re-key"
+            );
+        });
+    }
+
+    /// A transient I/O error (or a process death) between publishing the re-keyed
+    /// blobs and writing the content-epoch marker used to brick the vault: the
+    /// next attempt opened the first already-re-keyed blob with the RETIRED key,
+    /// answered `CannotDecrypt`, and aborted the whole batch inside the unlock,
+    /// where the journal's roll-forward is unreachable (myne-md/myne#797). The
+    /// retry must skip what already landed and finish.
+    #[test]
+    fn a_rekey_retried_after_a_crash_before_the_marker_finishes() {
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::StdVaultIo;
+
+        block_on(async {
+            let dir = ScopedTempDir::new("member-rekey-retry").expect("tempdir");
+            let root = dir.path().to_path_buf();
+            std::fs::create_dir_all(root.join("notes")).expect("notes dir");
+            let old_items = [0x11u8; 32];
+            let new_items = [0x22u8; 32];
+            let note_uuid = [0xBBu8; 16];
+            let note_path = root.join("notes").join(format!(
+                "{}.myn",
+                uuid::Uuid::from_bytes(note_uuid).hyphenated()
+            ));
+            let blob = protocol::encode_new_note_blob_raw(
+                &old_items,
+                &ROT_ITEMS_ID,
+                &note_uuid,
+                &[0x55u8; 32],
+                &[8u8; 24],
+                &[9u8; 24],
+                b"unsynced-body",
+            )
+            .expect("note blob");
+            std::fs::write(&note_path, &blob).expect("write note");
+
+            // Published, marker NOT written: the exact torn state.
+            member_rekey_inner(
+                &StdVaultIo,
+                &root,
+                &ROT_ITEMS_ID,
+                &old_items,
+                &new_items,
+                b"member-meta",
+                2,
+                MemberRekeyFault::StopAfterPublish,
+                false,
+            )
+            .await
+            .expect_err("simulated crash after publish");
+            assert!(
+                crate::plugins::sync::state::read_content_epoch(&StdVaultIo, &root)
+                    .await
+                    .expect("marker readable")
+                    .is_none(),
+                "the fixture must leave the marker unwritten"
+            );
+
+            // The retry must complete rather than fail on the published blob.
+            rekey_local_content_for_member(
+                &StdVaultIo,
+                &root,
+                &ROT_ITEMS_ID,
+                &old_items,
+                &new_items,
+                b"member-meta",
+                2,
+            )
+            .await
+            .expect("a retry after the torn publish completes");
+
+            assert_eq!(
+                crate::plugins::sync::state::read_content_epoch(&StdVaultIo, &root)
+                    .await
+                    .expect("marker readable"),
+                Some(2),
+                "and records the epoch"
+            );
+            let bytes = std::fs::read(&note_path).expect("note read");
+            assert!(
+                crate::plugins::notes::decode::decode_note_any(
+                    &bytes,
+                    &note_uuid,
+                    &new_items,
+                    &ROT_ITEMS_ID
+                )
+                .is_ok(),
+                "the note now opens under the new key"
+            );
+        });
+    }
+
+    // ── Local canonical group rotation (myne-md/myne#712 task 7) ─────────────
     use crate::plugins::vault_unlock::state::UnlockedVault;
     use crate::test_support::{block_on, ScopedTempDir, FAST_TEST_KDF};
     use crate::vault_io::StdVaultIo;

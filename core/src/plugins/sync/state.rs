@@ -339,6 +339,74 @@ pub async fn read_device_actor(
     super::devices::hex16(st.device_id_hex.as_deref()?)
 }
 
+/// The device-local record of the `group_key_epoch` the vault's CONTENT blobs
+/// are sealed at (myne-md/myne#797).
+///
+/// A rotation rewrites every note, attachment and snapshot's per-entry key wrap
+/// under the new `itemsKey`, and that local re-key is a separate step from
+/// installing the new keys on the slot. Both can be interrupted, and a session
+/// that installs the new keys while a blob is still wrapped under the retired
+/// one cannot open it and has no server copy to fall back on (the blob may not
+/// have synced yet). This marker is what makes the two steps resumable rather
+/// than ambiguous: it advances only after every staged blob has been published
+/// AND the recovery journal has recorded the same epoch, so a retry knows
+/// whether the blobs still need re-keying.
+///
+/// Device-local, never synced, never backed up: the same class as
+/// `sync-state.json`, and magic-less for the same reason: it is bookkeeping
+/// about this device's files, not a §10.3 blob family.
+pub const CONTENT_EPOCH_FILE: &str = "vault.content-epoch";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ContentEpochRecord {
+    version: u64,
+    epoch: u64,
+}
+
+/// The epoch the local content blobs are wrapped under.
+///
+/// `Ok(None)` means the marker was never written (a vault created or joined
+/// before it existed, or one that has never rotated). A read or decode FAILURE is
+/// an `Err`, not `None`: the marker is the only thing that distinguishes "content
+/// at epoch N" from "content at epoch N-1", and a caller that guesses N-1 re-runs
+/// the re-key against blobs already under N, which fails and (before the idempotent
+/// pass landed) locked the vault. Refusing is retryable; guessing is not
+/// (myne-md/myne#797).
+pub async fn read_content_epoch(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Result<Option<u64>, SyncConfigError> {
+    match io.read(&vault_root.join(CONTENT_EPOCH_FILE)).await {
+        Ok(bytes) => {
+            let rec: ContentEpochRecord =
+                serde_json::from_slice(&bytes).map_err(|_| SyncConfigError::Parse)?;
+            if rec.version != 1 {
+                return Err(SyncConfigError::Parse);
+            }
+            Ok(Some(rec.epoch))
+        }
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(None),
+        Err(e) => Err(SyncConfigError::Io { io_error_kind: e }),
+    }
+}
+
+/// Record the epoch the local content blobs are now wrapped under.
+pub async fn write_content_epoch(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    epoch: u64,
+) -> Result<(), SyncConfigError> {
+    let bytes = serde_json::to_vec(&ContentEpochRecord { version: 1, epoch })
+        .map_err(|_| SyncConfigError::Parse)?;
+    io.write(
+        &vault_root.join(CONTENT_EPOCH_FILE),
+        &bytes,
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(SyncConfigError::from)
+}
+
 /// Remove the device-local sync baseline files (`sync-state.json` + `vault.head-state`)
 /// for a vault — the "reset sync on this device" primitive. Idempotent (absent files
 /// are fine). NEVER touches `notes/`, attachments, or `vault.meta`: it only drops the

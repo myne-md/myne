@@ -74,6 +74,13 @@ pub mod identity_resolver;
 pub mod integrity;
 pub mod invite;
 pub mod member_removal;
+// The owner-side durable outbox for rotation-package delivery (myne-md/myne#797):
+// the rotation writes the sealed packages here before it touches the network, and
+// every sync cycle / unlock drains it until each recipient's POST has succeeded.
+// Host-only for the same reason `person_account` is: it drives the rustls
+// transport.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod rotation_outbox;
 // Ungated as of phase3-web-client task 84 — but only half of it compiles for a
 // browser. `loop_control`'s decision state machine (`SyncScheduler`, the retry
 // ladder, the constants) is pure and target-independent; its runtime glue
