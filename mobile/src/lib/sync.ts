@@ -71,24 +71,33 @@ export interface JoinResult {
    *  its own local prefs; a pending device holds no token, so it cannot read the
    *  roster to find its own row. */
   device_id_hex: string;
+  /** The join used the recovery phrase (myne-md/myne#837): the vault is then
+   *  `Slot::Recovering`, NOT unlocked, and the mandatory chained password reset
+   *  is owed before the device can be used. False on the password path. */
+  needs_password_reset: boolean;
 }
 
 /** **Add this device to an existing account.** On a fresh device, bootstrap the
  *  whole local vault from the server: verify the endpoint, fetch the
- *  account's `vault.meta` pre-auth, derive `root_key` from `{account# + password}`,
- *  write the meta to a NEW local vault + unlock it, then SCRAM-enroll (password →
- *  pending until an existing device approves). Password-only (no 24-word phrase —
- *  that variant is the deferred F3-T5 follow-up). The credential is passed straight
- *  to IPC and never parked in module/hook state (secret discipline). */
+ *  account's `vault.meta` pre-auth, derive `root_key` from `{credential +
+ *  account#}`, write the meta to a NEW local vault + unlock it, then SCRAM-enroll
+ *  (password → pending until an existing device approves; the recovery phrase
+ *  self-approves by design). `credentialKind` picks which of the two the
+ *  credential is; the wire value is the Rust enum's own lowercase spelling
+ *  (`core/src/plugins/sync/enroll.rs::EnrollCredential`). The credential is
+ *  passed straight to IPC and never parked in module/hook state (secret
+ *  discipline). */
 export function syncJoinAccount(
   serverUrl: string,
   accountNumber: string,
-  password: string,
+  credential: string,
+  credentialKind: EnrollCredentialKind = "password",
 ): Promise<JoinResult> {
   return invoke<JoinResult>("plugin:sync|sync_join_account", {
     serverUrl,
     accountNumber,
-    password,
+    password: credential,
+    credentialKind,
   });
 }
 

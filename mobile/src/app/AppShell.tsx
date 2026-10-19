@@ -213,6 +213,13 @@ function StageSwitch() {
             setJoinFrom(null);
             dispatch({ type: JOIN_SUCCESS[joinFrom], vaultId });
           }}
+          // A recovery-phrase join leaves the vault `Recovering`, so the editor
+          // would be a fail-closed screen: land on the chained password reset
+          // instead, addressed at the vault this join just bootstrapped.
+          onRecovering={(vaultId) => {
+            setJoinFrom(null);
+            void enterStage({ name: "recover", subStep: "password-reset", vaultId });
+          }}
           onCancel={() => setJoinFrom(null)}
           // A scanned member-vault code: this overlay has nothing more to show
           // (no account number to confirm), so it closes and the identity flow
@@ -331,6 +338,7 @@ function StageSwitch() {
         <PhoneColumn>
           <RecoverFlow
             initialSubStep={stage.subStep}
+            initialVaultId={stage.vaultId}
             onComplete={(vaultId?: VaultId) => dispatch({ type: "recover.complete-success", vaultId })}
             onCancel={() => dispatch({ type: "recover.cancel" })}
           />

@@ -304,11 +304,13 @@ function reducer(s: State, a: Action): State {
   }
 }
 
-export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlowProps) {
+export function RecoverFlow({ initialSubStep, initialVaultId, onComplete, onCancel }: RecoverFlowProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, initialSubStep, (sub): State => ({
     step: initStep(sub),
-    resolvedVaultId: undefined,
+    // The recovery-phrase device join knows its target up front (myne-md/myne#837):
+    // the vault it bootstrapped is `Recovering`, so A8f targets it explicitly.
+    resolvedVaultId: initialVaultId,
     accountInput: "",
     accountError: false,
     accountBusy: false,
@@ -623,7 +625,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
       <div style={{ flex: "none", padding: "56px 20px 0" }}>
         <Eyebrow>{t("recover.restoreVaultHeader")}</Eyebrow>
       </div>
-      <div style={{ flex: 1, padding: "14px 22px 0" }}>
+      <div style={{ flex: 1, padding: "14px 22px 0" }} data-testid="recover.password-reset">
         <Title>{t("recover.newPasswordTitle")}</Title>
         <Lead>{t("recover.newPasswordLead")}</Lead>
         <div style={{ marginTop: 20 }}>

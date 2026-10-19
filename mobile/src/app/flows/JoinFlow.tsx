@@ -2,11 +2,34 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
-import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
-import { syncJoinAccount, syncResetLocal, errKind, syncDecodeJoinQr, scanQr, type JoinResult, type JoinQrView } from "../../lib/sync";
+import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
+import {
+  Screen,
+  FlowHeader,
+  Title,
+  Lead,
+  FooterBar,
+  Button,
+  Banner,
+  BlockingOverlay,
+  Icon,
+  PhraseEntryGrid,
+  Segmented,
+} from "../../components";
+import {
+  syncJoinAccount,
+  syncResetLocal,
+  useEnroll,
+  errKind,
+  syncDecodeJoinQr,
+  scanQr,
+  type JoinResult,
+  type JoinQrView,
+} from "../../lib/sync";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { setDeviceName } from "../../lib/prefs";
+import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
 import { ENROLL_NON_DISTINGUISHING_BANNER, ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -16,18 +39,28 @@ import type { JoinFlowProps } from "./types";
 /**
  * JoinFlow — the wired "Connect to my account" flow, launched from the Welcome
  * screen (`onJoin`). A fresh device joins an existing account by proving ownership
- * with {server URL + account number + password}; `sync_join_account` fetches
- * `vault.meta` pre-auth, bootstraps + unlocks a NEW local vault, and SCRAM-enrolls
- * (password → pending). On success the device lands in the editor via
- * `welcome.join-success` (sync pulls the notes once an existing device approves).
+ * with {server URL + account number + password OR 24-word recovery phrase};
+ * `sync_join_account` fetches `vault.meta` pre-auth, bootstraps the NEW local
+ * vault, and SCRAM-enrolls. The password arm waits for an existing device to
+ * approve; the phrase arm self-approves (it is the door for a user who has lost
+ * every device) and leaves the vault `Recovering`, so the shell routes it into
+ * the mandatory chained password reset.
  *
- * Password-only (the 24-word-phrase variant is the deferred F3-T5 follow-up).
- * The password is a secret: held in local state, mirrored to a wipe ref, and
+ * The phrase arm mirrors the desktop `JoinDeviceModal` (myne-md/myne#468), and
+ * the pending screen carries the same escape: a device already joined with the
+ * password can complete enrolment with the phrase instead of waiting for an
+ * approval nobody is left to give. This is native-client code, so the A18
+ * phishing hazard that governs served pages does not apply: there is no origin
+ * to impersonate.
+ *
+ * Both credentials are secrets: held in local state, mirrored to a wipe ref, and
  * cleared on every exit path + unmount (the load-bearing zeroize is Rust-side).
- * Honesty (SYNC-8): a wrong account#, a wrong password, and "no such account"
- * all collapse to the ONE non-distinguishing banner — only a transport fault is
- * distinguished (it leaks nothing about the account).
+ * Honesty (SYNC-8): a wrong account#, a wrong password, a wrong phrase and "no
+ * such account" all collapse to the ONE non-distinguishing banner. Only a
+ * transport fault is distinguished (it leaks nothing about the account).
  */
+
+const emptyCells = (): string[] => Array.from({ length: PHRASE_CELL_COUNT }, () => "");
 
 // Crockford base32 omits I/L/O/U; the canonical account body is 20 chars. A
 // presentation-only typo aid (the authoritative Damm-32 check is server-side).
@@ -235,16 +268,22 @@ async function persistDeviceNameWithRetry(
   return false;
 }
 
-export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) {
+export function JoinFlow({ onComplete, onRecovering, onCancel, onMemberJoin }: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [password, setPassword] = useState("");
+  // Which credential proves ownership (myne-md/myne#837, mirroring the desktop
+  // `JoinDeviceModal`): the password waits for approval, the phrase self-approves.
+  const [mode, setMode] = useState<"password" | "recovery">("password");
+  const [cells, setCells] = useState<string[]>(emptyCells);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // "form" collects the credentials; "pending" waits for an existing device to
-  // approve; "verify" shows the head-fingerprint SAS for the mandatory eye-compare.
-  const [step, setStep] = useState<"form" | "confirm" | "pending" | "verify">("form");
+  // approve; "pending-phrase" is the escape from it (the same device, already
+  // unlocked with the password, confirms with the phrase instead); "verify"
+  // shows the head-fingerprint SAS for the mandatory eye-compare.
+  const [step, setStep] = useState<"form" | "confirm" | "pending" | "pending-phrase" | "verify">("form");
   const [joinedVaultId, setJoinedVaultId] = useState<VaultId | undefined>(undefined);
   const [aborting, setAborting] = useState(false);
   /** The un-enrol failed — the device is STILL enrolled, and the screen must
@@ -262,25 +301,52 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
   // once its first pull lands (never before — see the enroll hook's note).
   const joinedDeviceId = useRef<string | null>(null);
 
-  // Secret-wipe artefact — mirrors the in-flight password so unmount can drop it.
+  // Secret-wipe artefacts: mirror the in-flight password and phrase cells so
+  // unmount can drop them. Both are best-effort on the JS side (V8 strings are
+  // immutable); the load-bearing zeroize is Rust-side.
   const pwRef = useRef("");
+  const cellsRef = useRef<string[]>([]);
   const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     pwRef.current = password;
   });
   useEffect(() => {
+    cellsRef.current = cells;
+  });
+  useEffect(() => {
     return () => {
       pwRef.current = "";
+      cellsRef.current = [];
       if (demoTimer.current !== null) clearTimeout(demoTimer.current);
     };
   }, []);
 
-  const canSubmit = serverUrl.trim() !== "" && accountNumber.trim() !== "" && password !== "" && !busy;
+  /** Clear the phrase grid and its wipe mirror. Every exit path calls this. */
+  function clearPhrase() {
+    cellsRef.current = [];
+    setCells(emptyCells());
+  }
+
+  /** Clear both credentials. Used on every path that leaves the flow. */
+  function wipeSecrets() {
+    pwRef.current = "";
+    setPassword("");
+    clearPhrase();
+  }
+
+  // The pending screen's escape (myne-md/myne#837). The device is already joined
+  // and unlocked with the password, so this re-proves the account with the phrase
+  // on the same vault; the server self-approves the recovery path.
+  const phraseEnroll = useEnroll();
+
+  const credentialFilled =
+    mode === "password" ? password !== "" : cells.every((c) => c !== "");
+  const canSubmit =
+    serverUrl.trim() !== "" && accountNumber.trim() !== "" && credentialFilled && !busy;
 
   function landOn(result: JoinResult) {
     const vaultId = result.vault_id as VaultId;
-    pwRef.current = "";
-    setPassword("");
+    wipeSecrets();
     setJoinedVaultId(vaultId);
     if (result.pending) {
       // Password join → wait for approval, then the mandatory fingerprint verify.
@@ -306,14 +372,31 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
           pending: true,
           fingerprint: null,
           device_id_hex: "00".repeat(16),
+          needs_password_reset: false,
         });
       }, 700);
       return;
     }
     try {
-      const result = await syncJoinAccount(serverUrl.trim(), accountNumber.trim(), password);
+      const credential =
+        mode === "password" ? password : normalizeBip39Phrase(cells.join(" "));
+      const result = await syncJoinAccount(
+        serverUrl.trim(),
+        accountNumber.trim(),
+        credential,
+        mode,
+      );
       joinedDeviceId.current = result.device_id_hex;
       setBusy(false);
+      // A phrase join leaves the vault `Recovering`, not unlocked: the mandatory
+      // chained password reset is the next step, and only the shell can mount it.
+      if (result.needs_password_reset) {
+        const vaultId = result.vault_id as VaultId;
+        wipeSecrets();
+        setJoinedVaultId(vaultId);
+        onRecovering(vaultId);
+        return;
+      }
       landOn(result);
     } catch (e) {
       setBusy(false);
@@ -322,8 +405,7 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
   }
 
   function onBack() {
-    pwRef.current = "";
-    setPassword("");
+    wipeSecrets();
     onCancel();
   }
 
@@ -419,6 +501,29 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
     setStep("verify");
   }, [step, fingerprint, deviceNameField.resolved]);
 
+  // The pending-phrase escape's terminal edge. Approval on the recovery path is
+  // SELF-approval, so there is no second device to eye-compare against and the
+  // device goes straight in, the same reason a first device does.
+  useEffect(() => {
+    if (step !== "pending-phrase") return;
+    if (phraseEnroll.outcome?.state === "approved" && joinedVaultId) {
+      wipeSecrets();
+      onComplete(joinedVaultId);
+    }
+  }, [step, phraseEnroll.outcome, joinedVaultId, onComplete]);
+
+  function submitPendingPhrase() {
+    if (!cells.every((c) => c !== "") || phraseEnroll.busy) return;
+    const credential = normalizeBip39Phrase(cells.join(" "));
+    clearPhrase();
+    void phraseEnroll.enroll(
+      accountNumber.trim(),
+      credential,
+      "recovery",
+      deviceNameField.resolved,
+    );
+  }
+
   // SAS mismatch → ABORT the join: un-enroll this device so it stops trusting the
   // (possibly forked) synced data, then back out.
   //
@@ -494,10 +599,116 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
           <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", maxWidth: 320 }}>
             {t("join.waitingHint")}
           </div>
+          {/* The escape (myne-md/myne#837, mirroring myne-md/myne#468 task 8).
+              Before this the only control was Cancel, so a user whose other
+              device is gone waited forever with nothing saying a second door
+              existed. */}
+          <div
+            data-testid="sync.join.no-device"
+            style={{
+              marginTop: "var(--space-4)",
+              paddingTop: "var(--space-3)",
+              borderTop: "1px solid var(--line-1)",
+              maxWidth: 320,
+            }}
+          >
+            <div style={{ fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)", color: "var(--fg-2)" }}>
+              {t("sync.join.noDeviceBody")}
+            </div>
+            <div style={{ marginTop: "var(--space-3)" }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  clearPhrase();
+                  phraseEnroll.reset();
+                  setStep("pending-phrase");
+                }}
+                data-testid="sync.join.use-phrase"
+              >
+                {t("sync.join.usePhrase")}
+              </Button>
+            </div>
+          </div>
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
           <Button variant="ghost" onClick={onBack} data-testid="sync.join.cancel">
             {t("common.prompt.cancel")}
+          </Button>
+        </FooterBar>
+      </Screen>
+    );
+  }
+
+  // ── Escape from waiting: confirm with the recovery phrase instead ────────────
+  // The same device, the same unlocked vault; only the enrolment is re-run on the
+  // recovery path, so there is no password reset afterwards.
+  if (step === "pending-phrase") {
+    const filled = cells.every((c) => c !== "");
+    return (
+      <Screen>
+        <FlowHeader
+          label={t("sync.join.phraseTitle")}
+          onBack={() => {
+            clearPhrase();
+            phraseEnroll.reset();
+            setStep("pending");
+          }}
+        />
+        <div style={{ flex: 1, padding: "var(--space-4) var(--space-5) 0", overflowY: "auto" }} data-testid="sync.join.pending-phrase">
+          <Title>{t("sync.join.phraseTitle")}</Title>
+          {/* Not the form's warning: that one promises a password reset, and
+              here there is none, because the vault is already open with the
+              password the user just typed. */}
+          <div
+            style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)", lineHeight: "var(--leading-relaxed)", color: "var(--fg-2)" }}
+            data-testid="sync.join.phrase-escape-warning"
+          >
+            {t("sync.join.phraseEscapeBody")}
+          </div>
+          <PhraseEntryGrid
+            cells={cells}
+            onCells={(next) => setCells(next.map((cell) => cell.replace(/\s+/g, "")))}
+            testIdPrefix="sync.join.pending-phrase"
+            cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
+            disabled={phraseEnroll.busy}
+            style={{ marginTop: "var(--space-4)" }}
+          />
+          {phraseEnroll.outcome?.state === "error" && (
+            <div style={{ marginTop: "var(--space-4)" }} data-testid="sync.join.phrase-error">
+              <Banner kind="danger">{ENROLL_NON_DISTINGUISHING_BANNER}</Banner>
+            </div>
+          )}
+          {/* A still-pending answer on the recovery path means the server did
+              not self-approve it, so say so rather than looping back to
+              waiting. */}
+          {phraseEnroll.outcome?.state === "pending" && (
+            <div
+              style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)", color: "var(--fg-2)" }}
+              data-testid="sync.join.phrase-still-pending"
+            >
+              {ENROLL_PENDING_NOTICE}
+            </div>
+          )}
+        </div>
+        <FooterBar style={{ padding: "var(--space-4) var(--space-5) calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none", flexDirection: "column", gap: "var(--space-3)" }}>
+          <Button
+            disabled={!filled || phraseEnroll.busy}
+            onClick={submitPendingPhrase}
+            data-testid="sync.join.phrase-submit"
+          >
+            {phraseEnroll.busy ? t("sync.join.submitting") : t("sync.join.submit")}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={phraseEnroll.busy}
+            onClick={() => {
+              clearPhrase();
+              phraseEnroll.reset();
+              setStep("pending");
+            }}
+            data-testid="sync.join.phrase-back"
+          >
+            {t("sync.join.backToWaiting")}
           </Button>
         </FooterBar>
       </Screen>
@@ -661,18 +872,60 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
           </div>
         </div>
 
-        <div style={{ marginTop: 18 }}>
-          <FieldLabel>{t("sync.join.passwordLabel")}</FieldLabel>
-          <PasswordField
-            value={password}
-            onChange={(v) => {
+        <div style={{ marginTop: "var(--space-5)" }}>
+          <FieldLabel>{t("sync.enroll.signInWith")}</FieldLabel>
+          <Segmented
+            options={[t("sync.join.modePassword"), t("sync.join.modePhrase")]}
+            optionValues={["password", "recovery"]}
+            active={mode === "password" ? 0 : 1}
+            onChange={(i: number) => {
               setError(null);
-              setPassword(v);
+              setMode(i === 0 ? "password" : "recovery");
             }}
-            onEnter={() => void onSubmit()}
-            testId="sync.join.password-input"
+            ariaLabel={t("sync.enroll.credentialTypeAria")}
+            testIdPrefix="sync.join.mode"
           />
         </div>
+
+        {mode === "password" ? (
+          <div style={{ marginTop: "var(--space-5)" }}>
+            <FieldLabel>{t("sync.join.passwordLabel")}</FieldLabel>
+            <PasswordField
+              value={password}
+              onChange={(v) => {
+                setError(null);
+                setPassword(v);
+              }}
+              onEnter={() => void onSubmit()}
+              testId="sync.join.password-input"
+            />
+          </div>
+        ) : (
+          <div style={{ marginTop: "var(--space-5)" }}>
+            {/* The warning carries the server's own assessment: the phrase is
+                full account takeover, which is WHY this path needs no approval
+                from another device. Stated before the grid, not after submit. */}
+            <div
+              data-testid="sync.join.phrase-warning"
+              style={{ marginBottom: "var(--space-3)", fontSize: "var(--text-sm)", lineHeight: "var(--leading-relaxed)", color: "var(--fg-2)" }}
+            >
+              {t("sync.join.phraseWarning")}
+            </div>
+            <PhraseEntryGrid
+              cells={cells}
+              onCells={(next) => {
+                setError(null);
+                // §3.2: no typed whitespace. The field is stripped here rather
+                // than in the primitive, because "what a phrase cell may
+                // contain" is a rule about this credential.
+                setCells(next.map((cell) => cell.replace(/\s+/g, "")));
+              }}
+              testIdPrefix="sync.join.phrase"
+              cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
+              disabled={busy}
+            />
+          </div>
+        )}
 
         {error && (
           <div style={{ marginTop: 14 }} data-testid="sync.join.error">
@@ -680,9 +933,17 @@ export function JoinFlow({ onComplete, onCancel, onMemberJoin }: JoinFlowProps) 
           </div>
         )}
 
-        <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-          {t("join.approvalHint")}
-        </div>
+        {/* Password joins wait for another device's approval; a recovery-phrase
+            join self-approves (the grid's own warning says so), so telling that
+            user to await an approval would name a request nobody makes. */}
+        {mode === "password" && (
+          <div
+            style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}
+            data-testid="sync.join.approval-hint"
+          >
+            {t("join.approvalHint")}
+          </div>
+        )}
       </div>
       <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
         <Button disabled={!canSubmit} onClick={() => void onSubmit()} data-testid="sync.join.submit">

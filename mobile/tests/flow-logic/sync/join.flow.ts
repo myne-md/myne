@@ -219,6 +219,196 @@ test.describe("sync join flow", () => {
     await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
   });
 
+  // ── The recovery-phrase arm (myne-md/myne#837) ─────────────────────────────
+  //
+  // The mobile client had no phrase path at all: `JoinFlow` said "Password-only
+  // (the 24-word-phrase variant is the deferred F3-T5 follow-up)" while the
+  // desktop half shipped it. These two specs drive the two surfaces the issue
+  // asks for, and, because the mock records the argument, hold the ONE thing
+  // the UI cannot show: which credential reached `sync_join_account`, and
+  // whether it is the normalised phrase rather than the raw cells.
+  // ONE cell is spelled the way a phone keyboard produces it, so the wire
+  // assertion below can fail on a dropped normaliser: 24 copies of "abandon"
+  // are byte-identical before and after `normalizeBip39Phrase`, which made the
+  // original fixture unable to hold the defect it claimed to pin.
+  const PHRASE_WORDS = ["ABANDON", ...Array.from({ length: 23 }, () => "abandon")];
+  const PHRASE_CREDENTIAL = PHRASE_WORDS.map((w) => w.toLowerCase()).join(" ");
+
+  test("recovery phrase join → chained password reset", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      // A phrase join self-approves and leaves the vault `Recovering`, so the
+      // result carries `needs_password_reset` rather than `pending`.
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: false,
+        fingerprint: null,
+        needs_password_reset: true,
+      },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await expect(page.getByTestId("sync.join")).toBeVisible();
+
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+
+    // Switch to the phrase credential; the password field yields to the grid,
+    // and so does the approval hint: a phrase join self-approves, so telling
+    // this user to wait for another device names a request nobody makes.
+    await expect(page.getByTestId("sync.join.approval-hint")).toBeVisible();
+    await page.getByTestId("sync.join.mode-recovery").click();
+    await expect(page.getByTestId("sync.join.phrase-grid")).toBeVisible();
+    await expect(page.getByTestId("sync.join.password-input")).toHaveCount(0);
+    await expect(page.getByTestId("sync.join.approval-hint")).toHaveCount(0);
+
+    for (let i = 0; i < PHRASE_WORDS.length; i++) {
+      await page.getByTestId("sync.join.phrase-cell").nth(i).fill(PHRASE_WORDS[i]);
+    }
+    await page.getByTestId("sync.join.submit").click();
+
+    // The ONE difference the wire shape cannot show: the Rust command names the
+    // argument `password` either way, so `credentialKind` is the whole of it.
+    const args = await page.evaluate(
+      () => (window as unknown as { __joinArgs?: { credentialKind?: string; password?: string } }).__joinArgs,
+    );
+    expect(args?.credentialKind).toBe("recovery");
+    expect(args?.password).toBe(PHRASE_CREDENTIAL);
+
+    // A `Recovering` vault is not an unlocked one: the shell must land on the
+    // chained password reset, not on an editor that would fail closed.
+    await expect(page.getByTestId("recover.password-reset")).toBeVisible();
+
+    // And the reset must commit against the vault the join just bootstrapped.
+    // On a device already holding vaults the sole-vault fallback cannot
+    // resolve, so a lost id strands this vault in `Slot::Recovering` while the
+    // screen reports a reset failure.
+    const reset = page.getByTestId("recover.password-reset").locator("input");
+    await reset.nth(0).fill("a brand new password");
+    await reset.nth(1).fill("a brand new password");
+    await reset.nth(1).press("Enter");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __completeRecoveryArgs?: { vaultId?: string } }).__completeRecoveryArgs,
+        ),
+      )
+      .toMatchObject({ vaultId: "joined-vault" });
+  });
+
+  test("pending → escape with the phrase → editor", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+        needs_password_reset: false,
+      },
+      // An array is the only spelling the mock takes literally: a bare `null`
+      // falls back to its default fingerprint, which would advance the pending
+      // screen to the SAS compare before the escape could be taken.
+      headFingerprint: [null, null],
+      enrollResult: { approved: true, device_id_hex: "bb11cc22dd33ee44ff55667788990011" },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+
+    // Waiting for an approval nobody is left to give: the escape is offered.
+    await expect(page.getByTestId("sync.join.pending")).toBeVisible();
+    await page.getByTestId("sync.join.use-phrase").click();
+    await expect(page.getByTestId("sync.join.pending-phrase")).toBeVisible();
+
+    for (let i = 0; i < PHRASE_WORDS.length; i++) {
+      await page.getByTestId("sync.join.pending-phrase-cell").nth(i).fill(PHRASE_WORDS[i]);
+    }
+    await page.getByTestId("sync.join.phrase-submit").click();
+
+    // Approved on the recovery path, so there is no second device to compare
+    // against and the device goes straight in.
+    const enrollArgs = await page.evaluate(
+      () => (window as unknown as { __enrollArgs?: { credentialKind?: string; credential?: string } }).__enrollArgs,
+    );
+    expect(enrollArgs?.credentialKind).toBe("recovery");
+    expect(enrollArgs?.credential).toBe(PHRASE_CREDENTIAL);
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+  });
+
+  test("escape with a refused phrase: one non-distinguishing banner, cells kept", async ({
+    page,
+  }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+        needs_password_reset: false,
+      },
+      headFingerprint: [null, null],
+      // The escape re-enrols with the phrase instead of waiting; a refusal must
+      // be the SAME banner the form shows, so a typo cannot become an oracle.
+      enrollError: { kind: "BadRequest" },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+    await expect(page.getByTestId("sync.join.pending")).toBeVisible();
+    await page.getByTestId("sync.join.use-phrase").click();
+    for (let i = 0; i < PHRASE_WORDS.length; i++) {
+      await page.getByTestId("sync.join.pending-phrase-cell").nth(i).fill(PHRASE_WORDS[i]);
+    }
+    await page.getByTestId("sync.join.phrase-submit").click();
+
+    await expect(page.getByTestId("sync.join.phrase-error")).toBeVisible();
+    // The grid survives a refusal, so the user can correct the one bad cell
+    // rather than retyping all 24.
+    await expect(page.getByTestId("sync.join.pending-phrase-cell").first()).toBeVisible();
+  });
+
+  test("escape with a phrase the server did not self-approve: still pending, said so", async ({
+    page,
+  }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      joinResult: {
+        vault_id: "joined-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+        needs_password_reset: false,
+      },
+      headFingerprint: [null, null],
+      enrollResult: { approved: false, device_id_hex: "bb11cc22dd33ee44ff55667788990011" },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
+    await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+    await expect(page.getByTestId("sync.join.pending")).toBeVisible();
+    await page.getByTestId("sync.join.use-phrase").click();
+    for (let i = 0; i < PHRASE_WORDS.length; i++) {
+      await page.getByTestId("sync.join.pending-phrase-cell").nth(i).fill(PHRASE_WORDS[i]);
+    }
+    await page.getByTestId("sync.join.phrase-submit").click();
+
+    // A server that does not self-approve the recovery path is a state this
+    // client must surface rather than silently land in an empty editor.
+    await expect(page.getByTestId("sync.join.phrase-still-pending")).toBeVisible();
+  });
+
   test("vault switcher → Connect to my account → pending → editor", async ({ page }) => {
     // Deliberately NOT `multiVault` (its Empty slot boots to the picker, so the
     // editor and its switcher never mount) — the default config is the unlocked

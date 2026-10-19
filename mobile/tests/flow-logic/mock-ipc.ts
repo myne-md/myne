@@ -84,8 +84,16 @@ export interface MockConfig {
   /** Boot to the Welcome screen (empty slot + no vaults) instead of straight to
    *  the editor — for the fresh-device join flow. */
   freshDevice?: boolean;
-  /** `sync_join_account` outcome. */
-  joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null; device_id_hex?: string };
+  /** `sync_join_account` outcome. `needs_password_reset` models the recovery
+   *  phrase arm (myne-md/myne#837): the vault comes back `Recovering`, so the
+   *  flow must land on the chained password reset rather than the editor. */
+  joinResult?: {
+    vault_id: string;
+    pending: boolean;
+    fingerprint: string | null;
+    device_id_hex?: string;
+    needs_password_reset?: boolean;
+  };
   joinError?: { kind: string };
   // ── The person plane (myne-md/myne#851 tasks 14 and 15) ──────────────────
   /** `sync_person_status`. The default is an unenrolled device, which is what
@@ -1997,7 +2005,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.enrollError) throw config.enrollError;
         return { approved: false, device_id_hex: DEFAULT_DEVICE_ID, ...config.enrollResult };
       },
-      "plugin:sync|sync_join_account": () => {
+      "plugin:sync|sync_join_account": (args) => {
+        // Recorded so a spec can assert WHICH credential the form sent and what
+        // it carried: the Rust command takes every join as `password`, so the
+        // argument shape alone cannot tell a phrase join from a password one and
+        // `credentialKind` is the whole of the difference (myne-md/myne#837).
+        (window as unknown as { __joinArgs?: unknown }).__joinArgs = args;
         if (config.joinError) throw config.joinError;
         return (
           config.joinResult ?? {
@@ -2005,8 +2018,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
             pending: true,
             fingerprint: null,
             device_id_hex: DEFAULT_DEVICE_ID,
+            needs_password_reset: false,
           }
         );
+      },
+      "plugin:vault-recover|complete_recovery": (args) => {
+        // Recorded so a spec can assert WHICH vault the chained password reset
+        // committed against: on a device already holding vaults, the sole-vault
+        // fallback cannot resolve, so a lost id strands the joined vault in
+        // `Slot::Recovering` (myne-md/myne#837).
+        (window as unknown as { __completeRecoveryArgs?: unknown }).__completeRecoveryArgs = args;
+        return null;
       },
       "plugin:qr-scan|scan": () => {
         if (config.qrScanError) throw config.qrScanError;
