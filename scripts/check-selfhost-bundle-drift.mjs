@@ -214,13 +214,10 @@ if (!websitePresent && !opsPresent) {
     }
   } else {
     const span = guideBlockSpan(guide, "name: myne-server");
-    if (!span) {
-      fail(
-        `the guide carries no fenced yaml block containing "name: myne-server", so the\n` +
-          `         compose file it tells a self-hoster to run could not be found at ${GUIDE}.\n` +
-          `         If the block moved or changed its project name, this guard's marker is stale.`,
-      );
-    } else if (span.body !== projected) {
+    // No span here is NOT failed from this branch: the block-presence check below
+    // owns that message, and two failures describing one absence read as two
+    // problems.
+    if (span && span.body !== projected) {
       fail(
         `the guide's compose block is not the bundle's file. The page says "Save it as\n` +
           `         docker-compose.yml" and "bundle.env.example is the file you edit"; a block\n` +
