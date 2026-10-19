@@ -6,7 +6,7 @@
 // observing the real tree stay green proves nothing.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -66,6 +66,11 @@ volumes:
 `;
 }
 
+/** The guide file's path inside a fixture tree. */
+function guidePath(website: string): string {
+  return join(website, "src", "content", "user-guide", "sync-and-devices", "run-your-own-sync-server.md");
+}
+
 /** The annotated env example. */
 function envExample(addr = ":8080"): string {
   return `# --- knobs ---
@@ -103,12 +108,68 @@ function runGuard(website: string, ops: string, args: string[] = []) {
   }
 }
 
+/**
+ * A pair whose guide block was written by the guard itself, the way the shipped
+ * tree's is.
+ *
+ * Rule 0 says the guide's block IS the bundle's file (comments stripped), and the
+ * fixture's hand-written block is not — so a fixture meant to be GREEN must be
+ * emitted first. Driving `--emit` rather than re-implementing the projection here
+ * is deliberate: a second implementation in the test would be a second place the
+ * projection can be wrong, and it would keep passing while the guard's own
+ * projection drifted.
+ */
+function emitted(compose: string, env: string) {
+  const t = makeTrees(guideMarkdown(), compose, env);
+  const emit = runGuard(t.website, t.ops, ["--emit"]);
+  return { t, emit };
+}
+
 describe("check-selfhost-bundle-drift", () => {
   it("passes when the guide, the bundle and the env example agree", () => {
-    const t = makeTrees(guideMarkdown(), bundleCompose(), envExample());
+    const { t, emit } = emitted(bundleCompose(), envExample());
+    expect(emit.code).toBe(0);
+    expect(emit.out).toContain("--emit finished");
     const r = runGuard(t.website, t.ops);
     expect(r.code).toBe(0);
     expect(r.out).toContain("agree about what a self-hoster can set");
+  });
+
+  // --- rule 0: one compose file, two copies ------------------------------------------
+
+  it("regenerates the guide's block from the bundle's file", () => {
+    const { t } = emitted(bundleCompose(), envExample());
+    // The bundle's own forwarding form, which the hand-written fixture block did
+    // not have: this is what made the page's "edit .env" sentence true.
+    expect(readFileSync(guidePath(t.website), "utf8")).toContain(
+      'MYNE_SERVER_ADDR: "${MYNE_SERVER_ADDR:-:8080}"',
+    );
+    // ...and the bundle's header comment, which carries internal ids and a private
+    // path, is NOT copied into a public page.
+    expect(readFileSync(guidePath(t.website), "utf8")).not.toContain("myne-ops");
+  });
+
+  it("names the guide's block when it is not the bundle's file", () => {
+    // The state the shipped tree was in: a hand-written block with literal values.
+    const t = makeTrees(guideMarkdown(), bundleCompose(), envExample());
+    const r = runGuard(t.website, t.ops);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("the guide's compose block is not the bundle's file");
+    expect(r.out).toContain("--emit");
+  });
+
+  it("is idempotent: a second --emit reports that it left the block alone", () => {
+    const { t } = emitted(bundleCompose(), envExample());
+    const again = runGuard(t.website, t.ops, ["--emit"]);
+    expect(again.code).toBe(0);
+    expect(again.out).toContain("already matches the bundle");
+  });
+
+  it("fails --emit by name when there is no block to overwrite", () => {
+    const t = makeTrees("---\ntitle: x\n---\n\nNo block here.\n", bundleCompose(), envExample());
+    const r = runGuard(t.website, t.ops, ["--emit"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("nothing to overwrite");
   });
 
   // --- rule 1: one image pin, two copies --------------------------------------------
@@ -177,7 +238,7 @@ MYNE_SERVER_ADDR=:8080
 # kind: server
 # MYNE_BACKUP_ENABLED=true
 `;
-    const t = makeTrees(guideMarkdown(), bundleCompose(), env);
+    const { t } = emitted(bundleCompose(), env);
     expect(runGuard(t.website, t.ops).code).toBe(0);
   });
 
