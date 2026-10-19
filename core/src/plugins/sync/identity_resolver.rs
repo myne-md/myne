@@ -159,14 +159,11 @@ impl IdentityIndex {
 /// not fail the whole listing).
 #[must_use]
 pub fn actor_from_hex(hex: &str) -> Option<[u8; 16]> {
-    if hex.len() != 32 {
-        return None;
-    }
-    let mut out = [0u8; 16];
-    for (i, slot) in out.iter_mut().enumerate() {
-        *slot = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    // Lenient (`protocol::hex::decode_ci`): an actor id arrives from another
+    // device's revision, so its case is not this client's to fix — and the
+    // index is keyed by lowercase hex, so an upper-cased id must still find its
+    // binding rather than silently losing it (R1.2).
+    protocol::hex::decode_ci(hex)
 }
 
 /// Lowercase hex of a 16-byte actor id, the key form every map here is keyed by.
@@ -670,15 +667,10 @@ fn parse_actor_hex(hex: &str) -> Result<Option<[u8; 16]>, ResolveIdentityError> 
     if hex.is_empty() {
         return Ok(None);
     }
-    if hex.len() != 32 {
-        return Err(ResolveIdentityError::InvalidActor);
-    }
-    let mut out = [0u8; 16];
-    for (i, slot) in out.iter_mut().enumerate() {
-        *slot = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
-            .map_err(|_| ResolveIdentityError::InvalidActor)?;
-    }
-    Ok(Some(out))
+    // Lenient, for the same reason as `actor_from_hex` (R1.2).
+    protocol::hex::decode_ci::<16>(hex)
+        .map(Some)
+        .ok_or(ResolveIdentityError::InvalidActor)
 }
 
 /// Resolve an Automerge actor (hex) to a closed `{Device, Person, Unknown}` identity,

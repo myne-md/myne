@@ -1144,17 +1144,6 @@ pub struct PendingAttachmentTombstone {
     pub content_nonce: [u8; 24],
 }
 
-fn hex_to_arr<const N: usize>(s: &str) -> Option<[u8; N]> {
-    if s.len() != N * 2 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut out = [0u8; N];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
-}
-
 /// Push the tombstones that let the server reclaim the blobs a whole-vault
 /// re-key stranded (`sync-protocol.md` §5.6.1, myne-md/myne#443).
 ///
@@ -1193,9 +1182,11 @@ async fn drain_orphan_tombstones(
     }
     let mut blobs = Vec::new();
     for t in &state.pending_orphan_tombstones {
+        // Strict: the orphan-tombstone queue is this client's own writer's
+        // output (R1.2).
         let (Some(id), Some(content_nonce)) = (
-            hex_to_arr::<16>(&t.blob_id_hex),
-            hex_to_arr::<24>(&t.content_nonce_hex),
+            protocol::hex::decode_lower::<16>(&t.blob_id_hex),
+            protocol::hex::decode_lower::<24>(&t.content_nonce_hex),
         ) else {
             continue;
         };
@@ -1267,10 +1258,12 @@ pub async fn read_pending_attachment_tombstones(
         let (Some(p), Some(f), Some(n)) = (parts.next(), parts.next(), parts.next()) else {
             continue;
         };
+        // Strict: the attachment-tombstone queue is this client's own writer's
+        // output (R1.2).
         let (Some(sync_id), Some(id), Some(content_nonce)) = (
-            hex_to_arr::<16>(p),
-            hex_to_arr::<32>(f),
-            hex_to_arr::<24>(n),
+            protocol::hex::decode_lower::<16>(p),
+            protocol::hex::decode_lower::<32>(f),
+            protocol::hex::decode_lower::<24>(n),
         ) else {
             continue;
         };
@@ -6628,7 +6621,10 @@ async fn sync_cycle_attempt(
                             let nonce = state
                                 .blobs
                                 .get(&hex(&pid))
-                                .and_then(|b| hex_to_arr::<24>(&b.content_nonce_hex));
+                                // Lenient: `state.blobs` records the nonce as the
+                                // SERVER last served it, so its case is not this
+                                // client's to fix (R1.2).
+                                .and_then(|b| protocol::hex::decode_ci::<24>(&b.content_nonce_hex));
                             if let Some(content_nonce) = nonce {
                                 to_push.push(PushBlob {
                                     id: pid,

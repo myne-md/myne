@@ -916,21 +916,12 @@ async fn write_pending_chats_tombstones(
     .await
 }
 
+/// Parse a 48-hex tombstone `content_nonce`. **Strict**
+/// (`protocol::hex::decode_lower`): the pending-tombstone line is written by
+/// this client's own delete path, so an uppercase nonce is a second identity
+/// rather than a spelling to accept (R1.2).
 fn hex_decode_24(s: &str) -> Option<[u8; 24]> {
-    if s.len() != 48
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return None;
-    }
-    let mut out = [0u8; 24];
-    for (i, pair) in s.as_bytes().chunks(2).enumerate() {
-        let hi = (pair[0] as char).to_digit(16)?;
-        let lo = (pair[1] as char).to_digit(16)?;
-        out[i] = (hi * 16 + lo) as u8;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 fn hex_encode_24(bytes: &[u8; 24]) -> String {

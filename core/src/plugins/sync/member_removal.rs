@@ -371,7 +371,9 @@ async fn rekey_content_blobs(
         if entry.is_dir {
             continue;
         }
-        let Some(attachment_id) = parse_hex_32(&entry.name) else {
+        // Strict: the attachment filename is this client's own writer's output,
+        // so an uppercase id is a second identity for one blob (R1.2).
+        let Some(attachment_id) = protocol::hex::decode_lower::<32>(&entry.name) else {
             continue;
         };
         let path = attachments_dir.join(&entry.name);
@@ -1349,31 +1351,6 @@ fn parse_uuid(s: &str) -> Option<[u8; 16]> {
     Some(*uuid.as_bytes())
 }
 
-fn parse_hex_32(hex: &str) -> Option<[u8; 32]> {
-    parse_hex_n::<32>(hex)
-}
-
-fn parse_hex_n<const N: usize>(s: &str) -> Option<[u8; N]> {
-    if s.len() != N * 2 {
-        return None;
-    }
-    let mut out = [0u8; N];
-    for (i, pair) in s.as_bytes().chunks(2).enumerate() {
-        let hi = hex_val(pair[0])?;
-        let lo = hex_val(pair[1])?;
-        out[i] = (hi << 4) | lo;
-    }
-    Some(out)
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1429,9 +1406,9 @@ mod tests {
 
     #[test]
     fn parse_hex_rejects_uppercase_and_short() {
-        assert!(parse_hex_32(&"ab".repeat(32)).is_some());
-        assert!(parse_hex_32(&"AB".repeat(32)).is_none());
-        assert!(parse_hex_32("abcd").is_none());
+        assert!(protocol::hex::decode_lower::<32>(&"ab".repeat(32)).is_some());
+        assert!(protocol::hex::decode_lower::<32>(&"AB".repeat(32)).is_none());
+        assert!(protocol::hex::decode_lower::<32>("abcd").is_none());
     }
 
     /// The rekey temp name is OUTSIDE the note/rename grammar, so
@@ -1557,8 +1534,12 @@ mod tests {
         // accepted on a tombstone alone. A row signed by the owner here would make the
         // `verify_device_binding_removal` assertion below pass for the wrong reason.
         let mut fingerprint = [0u8; protocol::person_key::PERSON_FINGERPRINT_LEN];
-        fingerprint
-            .copy_from_slice(&decode_hex_32(person_fingerprint_hex).expect("a 64-hex fingerprint"));
+        fingerprint.copy_from_slice(
+            &protocol::hex::decode_lower::<{ protocol::person_key::PERSON_FINGERPRINT_LEN }>(
+                person_fingerprint_hex,
+            )
+            .expect("a 64-hex fingerprint"),
+        );
         let row = sign_device_binding(claimant, device_id, &fingerprint, 1, false, &mut rng)
             .expect("sign binding row");
         let mut map = DeviceBindingsMap::new();
@@ -1573,15 +1554,6 @@ mod tests {
             blob,
         )
         .expect("write bindings blob");
-    }
-
-    fn decode_hex_32(s: &str) -> Option<Vec<u8>> {
-        if s.len() != 64 {
-            return None;
-        }
-        (0..32)
-            .map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok())
-            .collect()
     }
 
     fn rot_pair(seed: u8) -> PersonKeyPair {

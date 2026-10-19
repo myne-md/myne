@@ -1583,18 +1583,7 @@ pub async fn reseal_attachment(
 /// and accepting uppercase here would let two spellings of the same id name one
 /// file on a case-insensitive filesystem and two on a case-sensitive one.
 fn decode_attachment_id_hex(s: &str) -> Option<[u8; 32]> {
-    if s.len() != 64
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return None;
-    }
-    let mut out = [0u8; 32];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 /// IPC wrapper for [`reseal_attachment`].

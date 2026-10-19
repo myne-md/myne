@@ -703,15 +703,13 @@ pub(crate) fn notes_write_mutex() -> &'static Mutex<()> {
 /// malformation — the only writer is our own autosave hook, so a bad value is
 /// a frontend bug; the caller logs the canary and skips the guard (fail-open
 /// to legacy overwrite beats manufacturing a spurious conflict from a bug).
+///
+/// Strict now means STRICT (`protocol::hex::decode_lower`): the doc above
+/// always said so, but the body accepted uppercase `A`–`F` through
+/// `is_ascii_hexdigit` and the idea that one hash had two spellings is exactly
+/// the divergence R1.2 removed.
 fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
-    if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut out = [0u8; 32];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_lower(s)
 }
 
 /// Update an existing encrypted `.myn` note in place. See module-level
@@ -3504,7 +3502,9 @@ mod tests {
     fn parse_base_hash_hex_is_strict() {
         let valid = "ab".repeat(32);
         assert!(super::parse_base_hash_hex(&valid).is_some());
-        assert!(super::parse_base_hash_hex(&valid.to_uppercase()).is_some());
+        // The one spelling: uppercase was previously accepted through
+        // `is_ascii_hexdigit`, which is what the test name always denied.
+        assert!(super::parse_base_hash_hex(&valid.to_uppercase()).is_none());
         assert!(super::parse_base_hash_hex("").is_none());
         assert!(super::parse_base_hash_hex(&"ab".repeat(31)).is_none());
         assert!(super::parse_base_hash_hex(&"ab".repeat(33)).is_none());

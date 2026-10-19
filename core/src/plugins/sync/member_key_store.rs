@@ -43,8 +43,10 @@ fn hex_lower(bytes: &[u8]) -> String {
     crate::account::person_identity::hex_lower(bytes)
 }
 
+/// Strict (`protocol::hex::decode_lower`): the envelope is this device's own
+/// writer's output, so an uppercase id is a second identity (R1.2).
 fn hex16(s: &str) -> Option<[u8; 16]> {
-    super::devices::hex16(s)
+    protocol::hex::decode_lower(s)
 }
 
 fn hex_n(s: &str, n: usize) -> Option<Vec<u8>> {

@@ -222,15 +222,11 @@ fn is_device_revoked(body: &[u8]) -> bool {
         .unwrap_or(false)
 }
 
+/// Lenient (`protocol::hex::decode_ci`): every call site decodes a field of a
+/// SERVER response (`head_id_hex`, `uuid_hex`, `content_nonce_hex`,
+/// `blob_id_hex`), so its case is not this client's to fix (R1.2).
 fn hex_to_array<const N: usize>(s: &str) -> Option<[u8; N]> {
-    if s.len() != N * 2 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut out = [0u8; N];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(out)
+    protocol::hex::decode_ci(s)
 }
 
 /// Issue one `/sync/pull` request and verify the response (head verify +

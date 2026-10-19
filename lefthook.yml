@@ -459,13 +459,16 @@ pre-commit:
       run: node scripts/check-token-adoption.mjs
 
     hex-helpers:
-      glob: "**/*.rs,scripts/check-hex-helpers.mjs,scripts/hex-helpers.json"
-      # Audit T6.10(c): the lowercase-hex encoder and its predicate were
-      # re-derived by hand across a dozen blob families and client modules, and
-      # the copies had drifted on the empty string and on whether uppercase is
-      # accepted. `protocol/src/hex.rs` is the one contract; this is the
-      # shrink-only ratchet over what still re-derives it. A new local
-      # `fn hex_lower` / `fn is_lower_hex` fails by name.
+      glob: "**/*.rs,scripts/check-hex-helpers.mjs,scripts/hex-helpers.json,scripts/hex-helpers-decoders.json"
+      # Audit T6.10(c) + R1.2: the lowercase-hex encoder, its predicate AND the
+      # decoders were all re-derived by hand across a dozen blob families and
+      # client modules, and the copies had drifted on the empty string, on
+      # whether uppercase is accepted, and on whether a 32-hex id is one
+      # spelling or two. `protocol/src/hex.rs` is the one contract
+      # (`encode_lower`, `is_lower_hex`, `is_ascii_hex_ci`, `decode_lower`,
+      # `decode_ci`); this is the shrink-only ratchet over both halves. A new
+      # local `fn hex_lower` / `fn is_lower_hex` / `fn hex_decode_*` fails by
+      # name.
       run: node scripts/check-hex-helpers.mjs
 
     target-size:
