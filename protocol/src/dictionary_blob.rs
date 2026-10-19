@@ -11,12 +11,24 @@
 //!
 //! This codec is **payload-agnostic**, exactly like `search_blob.rs`: the
 //! inner plaintext is an opaque byte string produced by the desktop layer
-//! (the `dict_format_version 0x01` format is a postcard-serialized
-//! `{personal_words, ignore_words}` struct — both are plaintext-derived
-//! AS3-Sensitive user vocabulary and so MUST live INSIDE this AEAD envelope,
-//! never in the cleartext header). The protocol crate owns only the crypto
-//! framing (magic, format/version, AEAD, AAD) — the load-bearing parts — while
-//! the word-set serialization is the desktop layer's concern.
+//! (the `dict_format_version` format is a postcard serialized word-set struct ,
+//! both are plaintext-derived AS3-Sensitive user vocabulary and so MUST live
+//! INSIDE this AEAD envelope, never in the cleartext header). The protocol crate
+//! owns only the crypto framing (magic, format/version, AEAD, AAD): the
+//! load-bearing parts: while the word-set serialization is the client's
+//! concern.
+//!
+//! ## Two inner generations, one codec
+//!
+//! `0x01` is the original `{personal_words, ignore_words}` payload.
+//! `0x02` (myne-md/myne#640) adds a **per-word removal clock** map so a deleted
+//! word stops being restored by a peer's unchanged copy; the shape and the
+//! merge rule are normative in `protocol.md` §9.13.2 and `sync-protocol.md`
+//! §10.2.1, and the typed payload lives in
+//! `myne_core::plugins::sync::dictionary_payload` (the crypto crate keeps its
+//! opaque contract). This build WRITES `0x02` and DECODES both; a `0x01`-only
+//! build gets [`DictionaryBlobError::DictFormatUnsupported`] on a `0x02` blob,
+//! which is the mixed-fleet fall-back the spec states.
 //!
 //! ## On-disk layout (spec § 9.13.1)
 //!
@@ -25,8 +37,9 @@
 //! ------  ----  -------------------  ------------------------------------
 //! 0       4     magic                ASCII "MYD1"
 //! 4       1     protocol_version     0x01
-//! 5       1     dict_format_version  0x01 (inner word-set serialization;
-//!                                     a future format bumps this so an old
+//! 5       1     dict_format_version  0x02 (inner word-set serialization;
+//!                                     this build decodes 0x01 and 0x02, and a
+//!                                     future format bumps this so an old
 //!                                     decoder cleanly rejects → empty)
 //! 6       24    nonce                XChaCha20-Poly1305 nonce
 //! 30      4     ciphertext_len       big-endian uint32, plaintext_len + 32
@@ -50,7 +63,7 @@
 
 use crate::aead::{aad_personal_dictionary_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use crate::blob_envelope::{
-    decode_singleton_versioned, encode_blob_envelope, encode_blob_envelope_raw,
+    decode_singleton_versioned_formats, encode_blob_envelope, encode_blob_envelope_raw,
     encode_singleton_versioned, EnvelopeError,
 };
 use crate::error::ProtocolError;
@@ -73,10 +86,46 @@ const DICTIONARY_BLOB_AAD_ROLE: &[u8] = b"personal-dictionary-blob";
 pub const DICTIONARY_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 
 /// `dict_format_version` byte at offset 5 — the serialization format of the
-/// inner word-set plaintext. `0x01` = the v0.1 postcard `{personal_words,
-/// ignore_words}` format (host-side). A future format bumps this so an older
-/// decoder rejects cleanly and the caller falls back to the empty dictionary.
+/// inner plaintext.
+///
+/// `0x01` = the v0.1 postcard `{personal_words, ignore_words}` format
+/// (host-side, decode-only since myne-md/myne#640).
 pub const DICTIONARY_BLOB_FORMAT_V1: u8 = 0x01;
+
+/// `dict_format_version 0x02`: the current inner format (myne-md/myne#640):
+/// the same two canonical word sets PLUS a per-word removal-clock map
+/// (`protocol.md` §9.13.2, `sync-protocol.md` §10.2.1). A removal is a stamped
+/// absence, exactly the rule myne-md/myne#613 established for the `vault.prefs`
+/// set fields; without it a deleted word was restored by any peer that still
+/// held it, because a clockless union cannot distinguish "deleted" from "never
+/// had it".
+///
+/// The codec stays payload-agnostic: this byte is the only thing it knows about
+/// the inner serialization. The typed payload lives in
+/// `myne_core::plugins::sync::dictionary_payload` because the sync merge and the
+/// desktop spell layer both consume it.
+pub const DICTIONARY_BLOB_FORMAT_V2: u8 = 0x02;
+
+/// The inner format this build WRITES. A future format bumps this value (and
+/// appends to [`DICTIONARY_BLOB_SUPPORTED_FORMATS`]) so an older decoder rejects
+/// cleanly and the caller falls back to empty rather than mis-parsing
+/// (§9.13.4).
+pub const DICTIONARY_BLOB_FORMAT_CURRENT: u8 = DICTIONARY_BLOB_FORMAT_V2;
+
+/// Every `dict_format_version` this build can DECODE. The old generation stays
+/// here while any vault can still hold one; dropping it is a separate decision
+/// (a reader that cannot open a `0x01` blob answers `DictFormatUnsupported`,
+/// which the caller treats as the #255 "exists but unreadable" case rather than
+/// as empty, so it refuses to overwrite it).
+pub const DICTIONARY_BLOB_SUPPORTED_FORMATS: [u8; 2] =
+    [DICTIONARY_BLOB_FORMAT_V1, DICTIONARY_BLOB_FORMAT_V2];
+
+/// Is `format` a `dict_format_version` this build implements? The one predicate
+/// behind [`DICTIONARY_BLOB_SUPPORTED_FORMATS`], so a call site cannot grow its
+/// own idea of the set.
+pub fn dict_format_supported(format: u8) -> bool {
+    DICTIONARY_BLOB_SUPPORTED_FORMATS.contains(&format)
+}
 
 /// Length of the 16-byte `account_number_hash` bound into the AAD.
 pub const DICTIONARY_BLOB_ACCOUNT_HASH_LEN: usize = 16;
@@ -155,7 +204,36 @@ pub fn encode_dictionary_blob_raw(
     encode_blob_envelope_raw(
         personal_dictionary_key,
         &DICTIONARY_BLOB_MAGIC,
-        DICTIONARY_BLOB_FORMAT_V1,
+        DICTIONARY_BLOB_FORMAT_CURRENT,
+        &aad,
+        MAX_DICTIONARY_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(DictionaryBlobError::from)
+}
+
+/// [`encode_dictionary_blob_raw`] with an EXPLICIT `dict_format_version`,
+/// crate-internal and test-only.
+///
+/// Production must never choose the inner format at the crypto layer: the caller
+/// that produced the payload is the only one that knows which serialization it
+/// wrote. This exists because the vector family has to pin a `0x01` blob as a
+/// *decode* input after the writer moved to `0x02`, and a legacy input cannot be
+/// produced by the current writer.
+#[cfg(test)]
+pub(crate) fn encode_dictionary_blob_raw_with_format(
+    personal_dictionary_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
+    format_version: u8,
+    plaintext: &[u8],
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Vec<u8>, DictionaryBlobError> {
+    let aad = aad_personal_dictionary_blob(account_number_hash);
+    encode_blob_envelope_raw(
+        personal_dictionary_key,
+        &DICTIONARY_BLOB_MAGIC,
+        format_version,
         &aad,
         MAX_DICTIONARY_PLAINTEXT_LEN,
         plaintext,
@@ -176,7 +254,7 @@ pub fn encode_dictionary_blob(
     encode_blob_envelope(
         personal_dictionary_key,
         &DICTIONARY_BLOB_MAGIC,
-        DICTIONARY_BLOB_FORMAT_V1,
+        DICTIONARY_BLOB_FORMAT_CURRENT,
         &aad,
         MAX_DICTIONARY_PLAINTEXT_LEN,
         plaintext,
@@ -221,7 +299,36 @@ pub fn encode_dictionary_blob_versioned(
         personal_dictionary_key,
         &DICTIONARY_BLOB_MAGIC,
         &DICTIONARY_BLOB_V0_2_MAGIC,
-        DICTIONARY_BLOB_FORMAT_V1,
+        DICTIONARY_BLOB_FORMAT_CURRENT,
+        DICTIONARY_BLOB_AAD_ROLE,
+        account_number_hash,
+        MAX_DICTIONARY_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(DictionaryBlobError::from)
+}
+
+/// [`encode_dictionary_blob_versioned`] with the inner `dict_format_version`
+/// chosen by the caller.
+///
+/// A re-seal that carries an inner payload through opaquely MUST write the byte
+/// that describes THAT payload. Production writers use the current generation
+/// and the plain wrapper above; this exists for the migration and rotation
+/// re-seals, where a pre-myne#640 `0x01` body would otherwise be relabelled
+/// `0x02` and refused by every reader (myne-md/myne#640).
+pub fn encode_dictionary_blob_versioned_with_format(
+    version: MetaVersion,
+    personal_dictionary_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
+    plaintext: &[u8],
+    format_version: u8,
+) -> Result<Vec<u8>, DictionaryBlobError> {
+    encode_singleton_versioned(
+        version,
+        personal_dictionary_key,
+        &DICTIONARY_BLOB_MAGIC,
+        &DICTIONARY_BLOB_V0_2_MAGIC,
+        format_version,
         DICTIONARY_BLOB_AAD_ROLE,
         account_number_hash,
         MAX_DICTIONARY_PLAINTEXT_LEN,
@@ -238,18 +345,59 @@ pub fn decode_dictionary_blob_versioned(
     account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, DictionaryBlobError> {
-    decode_singleton_versioned(
+    decode_dictionary_blob_versioned_with_formats(
+        version,
+        personal_dictionary_key,
+        account_number_hash,
+        &DICTIONARY_BLOB_SUPPORTED_FORMATS,
+        blob,
+    )
+}
+
+/// [`decode_dictionary_blob_versioned`] against an EXPLICIT set of decodable
+/// inner formats: the seam the mixed-fleet rule is measured through.
+///
+/// A `0x01`-only client is modelled by passing `&[DICTIONARY_BLOB_FORMAT_V1]`,
+/// which is exactly what a build that predates the `0x02` bump implements. On a
+/// `0x02` blob it must return [`DictionaryBlobError::DictFormatUnsupported`],
+/// which the host collapses to the empty dictionary (§9.13.4) and refuses to
+/// write over (#255), rather than mis-parsing the payload.
+///
+/// Public because the companion-vector runner and an independent implementation
+/// both need to exercise the legacy view; production callers use the wrapper
+/// above and never choose a subset.
+pub fn decode_dictionary_blob_versioned_with_formats(
+    version: MetaVersion,
+    personal_dictionary_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
+    format_versions: &[u8],
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, DictionaryBlobError> {
+    decode_singleton_versioned_formats(
         version,
         personal_dictionary_key,
         &DICTIONARY_BLOB_MAGIC,
         &DICTIONARY_BLOB_V0_2_MAGIC,
-        DICTIONARY_BLOB_FORMAT_V1,
+        format_versions,
         DICTIONARY_BLOB_AAD_ROLE,
         account_number_hash,
         MAX_DICTIONARY_PLAINTEXT_LEN,
         blob,
     )
     .map_err(DictionaryBlobError::from)
+}
+
+/// The `dict_format_version` byte of a `vault.dictionary` blob, WITHOUT
+/// decrypting it.
+///
+/// The host needs it to pick the inner decoder (`0x01` opaque word sets vs the
+/// `0x02` payload with removal clocks) after
+/// [`decode_dictionary_blob_versioned`] has already accepted the header. `None`
+/// for anything too short to carry offset 5; a blob that gets this far has
+/// passed the codec's own checks, so a `None` is a caller error rather than a
+/// judgement about the blob.
+pub fn dictionary_blob_format(blob: &[u8]) -> Option<u8> {
+    blob.get(5).copied()
 }
 
 #[cfg(test)]
@@ -288,7 +436,8 @@ mod tests {
         let blob = encode(b"abc");
         assert_eq!(&blob[0..4], b"MYD1");
         assert_eq!(blob[4], DICTIONARY_BLOB_PROTOCOL_VERSION);
-        assert_eq!(blob[5], DICTIONARY_BLOB_FORMAT_V1);
+        assert_eq!(blob[5], DICTIONARY_BLOB_FORMAT_CURRENT);
+        assert_eq!(blob[5], DICTIONARY_BLOB_FORMAT_V2);
         assert_eq!(&blob[6..30], &NONCE);
         // ciphertext_len = plaintext (3) + CTX tag (32) = 35.
         assert_eq!(
@@ -296,6 +445,68 @@ mod tests {
             35
         );
         assert_eq!(blob.len(), DICTIONARY_BLOB_HEADER_LEN + 35);
+    }
+
+    #[test]
+    fn format_of_reads_the_header_without_decrypting() {
+        let blob = encode(b"abc");
+        assert_eq!(
+            dictionary_blob_format(&blob),
+            Some(DICTIONARY_BLOB_FORMAT_V2)
+        );
+        assert_eq!(dictionary_blob_format(b"MYD1"), None);
+    }
+
+    /// `0x01` stays fully decodable: the bump added a writer, not a reader
+    /// break. A vault that has not yet been re-written still opens.
+    #[test]
+    fn v1_blob_still_decodes() {
+        let payload = b"legacy v1 word-set payload";
+        let blob = encode_dictionary_blob_raw_with_format(
+            &KEY,
+            &ACCOUNT_HASH,
+            DICTIONARY_BLOB_FORMAT_V1,
+            payload,
+            &NONCE,
+        )
+        .expect("encode v1");
+        assert_eq!(blob[5], DICTIONARY_BLOB_FORMAT_V1);
+        assert_eq!(
+            decode_dictionary_blob(&KEY, &ACCOUNT_HASH, &blob)
+                .expect("v1 decodes")
+                .as_slice(),
+            payload
+        );
+    }
+
+    /// The mixed-fleet hook, MEASURED rather than asserted: a decoder that
+    /// implements only `0x01` (which is what a client predating this change is)
+    /// returns `DictFormatUnsupported` on a `0x02` blob, so the host's §9.13.4
+    /// fall-back runs instead of a mis-parse.
+    #[test]
+    fn v1_only_decoder_rejects_v2_with_format_unsupported() {
+        let blob = encode(b"v2 payload with removal clocks");
+        assert_eq!(blob[5], DICTIONARY_BLOB_FORMAT_V2);
+        assert_eq!(
+            decode_dictionary_blob_versioned_with_formats(
+                MetaVersion::V0_1,
+                &KEY,
+                &ACCOUNT_HASH,
+                &[DICTIONARY_BLOB_FORMAT_V1],
+                &blob,
+            ),
+            Err(DictionaryBlobError::DictFormatUnsupported)
+        );
+    }
+
+    #[test]
+    fn unsupported_dict_format_rejects_for_empty() {
+        let mut blob = encode(b"abc");
+        blob[5] = 0x03; // a FUTURE word-set format (0x02 is this build's)
+        assert_eq!(
+            decode_dictionary_blob(&KEY, &ACCOUNT_HASH, &blob),
+            Err(DictionaryBlobError::DictFormatUnsupported)
+        );
     }
 
     #[test]
@@ -315,16 +526,6 @@ mod tests {
         assert_eq!(
             decode_dictionary_blob(&KEY, &ACCOUNT_HASH, &blob),
             Err(DictionaryBlobError::ProtocolVersionMismatch)
-        );
-    }
-
-    #[test]
-    fn unsupported_dict_format_rejects_for_empty() {
-        let mut blob = encode(b"abc");
-        blob[5] = 0x02; // a future word-set format
-        assert_eq!(
-            decode_dictionary_blob(&KEY, &ACCOUNT_HASH, &blob),
-            Err(DictionaryBlobError::DictFormatUnsupported)
         );
     }
 
@@ -490,6 +691,21 @@ mod tests {
         )
         .expect("encode 1kb");
 
+        // A `0x01` legacy blob, produced only through the crate-internal
+        // explicit-format writer: after myne-md/myne#640 the production writer
+        // emits `0x02`, so the vector family has to construct the old
+        // generation deliberately to keep pinning that a `0x01` blob still
+        // opens (the same plaintext, a different format byte).
+        let blob_small_v1 = encode_dictionary_blob_raw_with_format(
+            &personal_dictionary_key,
+            &account_hash,
+            DICTIONARY_BLOB_FORMAT_V1,
+            &plaintext_small,
+            &nonce,
+        )
+        .expect("encode v1 small");
+        assert_eq!(blob_small_v1[5], DICTIONARY_BLOB_FORMAT_V1);
+
         // Round-trip sanity on the small blob.
         let decoded = decode_dictionary_blob(&personal_dictionary_key, &account_hash, &blob_small)
             .expect("decode small round-trip");
@@ -517,7 +733,7 @@ mod tests {
         let mut pf_version = blob_small.clone();
         pf_version[4] = 0x02;
         let mut pf_dict_format = blob_small.clone();
-        pf_dict_format[5] = 0x02;
+        pf_dict_format[5] = 0x03; // a FUTURE format: 0x02 is current
         let pf_header_short: alloc::vec::Vec<u8> = DICTIONARY_BLOB_MAGIC.to_vec(); // 4 < 34
         let mut pf_truncated = blob_small.clone();
         pf_truncated.truncate(pf_truncated.len() - 1);
@@ -562,7 +778,7 @@ mod tests {
         dump.push_str("  \"schema\": \"vault-dictionary\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §9.13 + §3.4 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::encode_dictionary_blob_raw + protocol::decode_dictionary_blob byte mapping for the MYD1 vault.dictionary encrypted personal-dictionary codec (MYND-266; §9.13). The inner plaintext is OPAQUE (the desktop layer's serialized {personal_words, ignore_words} word sets) — no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search/vault.workspace/vault.indices. personal_dictionary_key = derive_subkey(root_key, SubkeyRole::PersonalDictKey) (HKDF role 'personal-dictionary-key'); account_number_hash binds via aad_personal_dictionary_blob (AAD role 'personal-dictionary-blob' — a DISTINCT load-bearing string from the HKDF role). 12 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook, §9.13.4). Cases generated by `cargo test -p protocol --lib emit_vault_dictionary_vectors_for_paste -- --ignored` (in protocol/src/dictionary_blob.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_dictionary_blob_raw + protocol::decode_dictionary_blob byte mapping for the MYD1 vault.dictionary encrypted personal-dictionary codec (MYND-266; §9.13; inner format bumped to 0x02 by myne-md/myne#640). The inner plaintext is OPAQUE (the host layer's serialized word sets: the 0x01 {personal_words, ignore_words} postcard, or the 0x02 payload that adds a per-word removal-clock map): no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search/vault.workspace/vault.indices. personal_dictionary_key = derive_subkey(root_key, SubkeyRole::PersonalDictKey) (HKDF role 'personal-dictionary-key'); account_number_hash binds via aad_personal_dictionary_blob (AAD role 'personal-dictionary-blob': a DISTINCT load-bearing string from the HKDF role). This build WRITES dict_format_version 0x02 and DECODES 0x01 and 0x02; a 0x01-only decoder returns format_unsupported on a 0x02 blob (the mixed-fleet hook, §9.13.4). 13 cases: 3 encrypt (empty / small descriptor / 1-KB, all 0x02) + 2 decrypt_ok (the small 0x02 blob + a 0x01 LEGACY blob that must still open) + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook, which now uses 0x03 since 0x02 is supported, §9.13.4). Cases generated by `cargo test -p protocol --lib emit_vault_dictionary_vectors_for_paste -- --ignored` (in protocol/src/dictionary_blob.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // ---- encrypt closure ----------------------------------------
@@ -674,7 +890,36 @@ mod tests {
         ));
         dump.push_str("    },\n");
 
-        // ---- decrypt_aead_fail closure ------------------------------
+        // The LEGACY generation, which the bump must not have broken: the same
+        // plaintext sealed with `dict_format_version 0x01`. A decoder that
+        // implements only the new format would reject this, so the case is what
+        // pins that "0x01 stays fully decodable" (myne-md/myne#640).
+        dump.push_str("    {\n");
+        dump.push_str(
+            "      \"vector_id\": \"vault-dictionary/v0.1/decrypt-ok-v1-legacy-blob\",\n",
+        );
+        dump.push_str(&alloc::format!(
+            "      \"description\": \"{}\",\n",
+            json_escape("Round-trip a 0x01 (pre-myne-md/myne#640) blob: same plaintext, dict_format_version byte = 0x01. The current build decodes 0x01 and 0x02, so the format bump added a writer rather than breaking a reader. A port that implements only 0x02 MUST return format_unsupported here instead, and its caller MUST treat that as the #255 refuse-to-overwrite case rather than as an empty dictionary.")
+        ));
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_small_v1)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            root_key_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            account_hash_hex
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_hex\": \"{}\"\n",
+            hex_lower(&plaintext_small)
+        ));
+        dump.push_str("    },\n");
         let emit_aead_fail = |dump: &mut alloc::string::String,
                               slug: &str,
                               description: &str,
@@ -787,7 +1032,7 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-format-unsupported",
-            "dict_format_version byte (offset 5) set to 0x02 — a future word-set serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls back to the empty dictionary (§9.13.4). This is the forward-migration hook and is load-bearing (Rust reference: DictionaryBlobError::DictFormatUnsupported).",
+            "dict_format_version byte (offset 5) set to 0x03: a FUTURE word-set serialization a build implementing 0x01/0x02 does not understand. The decoder rejects cleanly so the caller falls back to the empty dictionary (§9.13.4). This is the forward-migration hook and is load-bearing (Rust reference: DictionaryBlobError::DictFormatUnsupported). NOTE 0x02 is NOT this case any more: myne-md/myne#640 made it the current format, so a case still using 0x02 would assert nothing.",
             &pf_dict_format,
             "format_unsupported",
             true,

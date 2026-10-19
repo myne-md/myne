@@ -192,6 +192,7 @@ mod tests {
             GroupRole::CatalogSyncId,
             GroupRole::PrefsSyncId,
             GroupRole::ThemesSyncId,
+            GroupRole::PersonalDictSyncId,
         ] {
             assert_ne!(
                 names_sync_id(&GROUP),

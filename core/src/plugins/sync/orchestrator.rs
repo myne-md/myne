@@ -23,6 +23,7 @@ use super::conflict::{
     merge_attachments_catalog, merge_custom_themes, merge_vault_meta, meta_password_side_winner,
     plan_note_keep_both, ConflictCopyPlan, MetaWinner,
 };
+use super::dictionary_payload::{merge_personal_dictionaries, PersonalDictionaryData};
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
 use super::head_authority::{HeadAuthority, SignedHeadCtx};
 use super::state::{
@@ -41,9 +42,9 @@ use protocol::{
     AGENT_MEMORY_CATALOG_BLOB_MAGIC, AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC,
     AGENT_PERSONALITY_BLOB_MAGIC, AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CATALOG_BLOB_MAGIC,
     CATALOG_BLOB_V0_2_MAGIC, CHATS_BLOB_MAGIC, CHATS_BLOB_V0_2_MAGIC, CHATS_CATALOG_BLOB_MAGIC,
-    CHATS_CATALOG_BLOB_V0_2_MAGIC, DEVICE_BINDING_BLOB_MAGIC, MEMBER_NAMES_BLOB_MAGIC,
-    PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC, THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC,
-    VAULT_HEAD_FORMAT_V1,
+    CHATS_CATALOG_BLOB_V0_2_MAGIC, DEVICE_BINDING_BLOB_MAGIC, DICTIONARY_BLOB_MAGIC,
+    DICTIONARY_BLOB_V0_2_MAGIC, MEMBER_NAMES_BLOB_MAGIC, PREFS_BLOB_MAGIC, PREFS_BLOB_V0_2_MAGIC,
+    THEMES_BLOB_MAGIC, THEMES_BLOB_V0_2_MAGIC, VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -95,6 +96,12 @@ pub struct SyncSummary {
     /// emits the prefs-changed event off this (the orchestrator stays
     /// AppHandle-free).
     pub prefs_applied_remote: bool,
+    /// A remote `vault.dictionary` change was merged onto the on-disk dictionary
+    /// this cycle (myne-md/myne#640). Reported for the same reason as
+    /// `prefs_applied_remote`: the desktop holds the words in RAM for
+    /// spell-checking, so the caller re-hydrates the spell state off this rather
+    /// than leaving the open editor on a stale set until the next unlock.
+    pub dictionary_applied_remote: bool,
     /// A remote `vault.themes` change was merged onto the on-disk store this
     /// cycle (MYND-486) — a theme added, edited or deleted on a peer. Reported
     /// for the same reason as `prefs_applied_remote` (the orchestrator stays
@@ -745,10 +752,10 @@ pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 /// the superseded namespace.
 ///
 /// `role` MUST be an identifier derivation (`catalog-sync-id` /
-/// `prefs-sync-id` / `themes-sync-id` / `chats-catalog-sync-id` /
-/// `agent-memory-catalog-sync-id` / `agent-personality-sync-id`), never a KEK
-/// role: the id is server-visible, so truncating a key derivation into it
-/// would leak key material to the sync plane.
+/// `prefs-sync-id` / `themes-sync-id` / `personal-dictionary-sync-id` /
+/// `chats-catalog-sync-id` / `agent-memory-catalog-sync-id` /
+/// `agent-personality-sync-id`), never a KEK role: the id is server-visible, so
+/// truncating a key derivation into it would leak key material to the sync plane.
 fn shared_sync_id(shared: &SharedSingletonKey, role: SubkeyRole) -> [u8; 16] {
     match shared {
         SharedSingletonKey::OwnerRoot(root) => sync_id_for(root, role),
@@ -767,8 +774,9 @@ fn shared_sync_id(shared: &SharedSingletonKey, role: SubkeyRole) -> [u8; 16] {
 
 /// Read a vault singleton blob's outer nonce (offset 6, `AEAD_NONCE_LEN` bytes)
 /// decryption-free: the sync-plane change discriminator shared by the
-/// `MYC1`/`MYC5` catalog, `MYP1`/`MYP5` prefs and `MYT1`/`MYT5` themes
-/// envelopes. `None` unless `bytes` opens with one of that family's magics.
+/// `MYC1`/`MYC5` catalog, `MYP1`/`MYP5` prefs, `MYT1`/`MYT5` themes and
+/// `MYD1`/`MYD5` dictionary envelopes. `None` unless `bytes` opens with one of
+/// that family's magics.
 ///
 /// Both are always `protocol` registry constants at the call sites below,
 /// never a re-typed literal (`protocol.md` §10.3 is the single source of truth
@@ -897,6 +905,23 @@ pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
 /// The themes blob's sync discriminator (`read_singleton_nonce` over MYT1).
 fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, &THEMES_BLOB_MAGIC, &[&THEMES_BLOB_V0_2_MAGIC])
+}
+
+/// `vault.dictionary`'s reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "personal-dictionary-sync-id")[0..16]`
+/// (`protocol.md` §3.4, myne-md/myne#640): the `prefs_sync_id` twin, and
+/// group-derived on an `NTV6` session exactly like it.
+pub fn dictionary_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::PersonalDictSyncId)
+}
+
+/// The dictionary blob's sync discriminator (`read_singleton_nonce` over MYD1).
+fn read_dictionary_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(
+        bytes,
+        &DICTIONARY_BLOB_MAGIC,
+        &[&DICTIONARY_BLOB_V0_2_MAGIC],
+    )
 }
 
 /// `vault.member-names`' reserved 16-byte sync-plane blob-id, derived through the
@@ -1612,6 +1637,46 @@ fn set_prefs_gate_baseline(vault_root: &Path, hash: String) {
         .insert(vault_root.to_path_buf(), hash);
 }
 
+/// The dictionary phase's RAM push-gate baselines, keyed by vault root: the
+/// `prefs_gate_baselines` shape for `vault.dictionary` (myne-md/myne#640).
+///
+/// A separate map rather than the prefs one: the two families' discriminators
+/// are different objects, and sharing a map would let one family's baseline
+/// answer for the other's gate.
+fn dictionary_gate_baselines() -> &'static std::sync::Mutex<HashMap<std::path::PathBuf, String>> {
+    static M: std::sync::OnceLock<std::sync::Mutex<HashMap<std::path::PathBuf, String>>> =
+        std::sync::OnceLock::new();
+    M.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+/// The current RAM push-gate baseline for this vault, if any.
+fn dictionary_gate_baseline(vault_root: &Path) -> Option<String> {
+    dictionary_gate_baselines()
+        .lock()
+        .expect("dictionary gate baseline lock")
+        .get(vault_root)
+        .cloned()
+}
+
+/// Record `hash` as the RAM push-gate baseline for this vault.
+fn set_dictionary_gate_baseline(vault_root: &Path, hash: String) {
+    dictionary_gate_baselines()
+        .lock()
+        .expect("dictionary gate baseline lock")
+        .insert(vault_root.to_path_buf(), hash);
+}
+
+/// The dictionary push gate's discriminator: SHA-256 (lowercase hex) of the
+/// canonical `0x02` payload bytes.
+///
+/// RAM-only and never at rest, exactly like `shared_subset_hash`: persisting an
+/// unkeyed digest of decrypted words would hand a filesystem observer a
+/// confirmation oracle over the user's private vocabulary (SYNC-3).
+fn dictionary_payload_hash(view: &PersonalDictionaryData) -> String {
+    use sha2::{Digest, Sha256};
+    super::to_hex(&Sha256::digest(view.canonicalized().encode()))
+}
+
 /// The prefs phase's outcome (MYND-478; `sync-protocol.md` §10.2.1).
 struct PrefsPhase {
     /// The prefs blob needs a push: the shared subset changed vs the synced
@@ -1802,7 +1867,7 @@ async fn sync_prefs_phase(
         })
         .unwrap_or(false);
 
-    // §11.3 gate — before the write and before the baseline adoption.
+    // §11.3 gate: before the write and before the baseline adoption.
     let verified = verified_singleton_download(
         transport,
         token,
@@ -3283,6 +3348,298 @@ async fn sync_themes_phase(
         // `dirty` already implies `local_bytes.is_some()`, and these are the
         // VERIFIED bytes (myne#301): the same ones the push must carry.
         push_bytes: if dirty { local_bytes } else { None },
+    })
+}
+
+/// The dictionary phase's outcome (myne-md/myne#640; `sync-protocol.md` §10.2.1).
+struct DictionaryPhase {
+    /// The dictionary blob needs a push: a local-only change, a merge that beat
+    /// the server's payload, or the server has never held one.
+    dirty: bool,
+    /// A remote change was merged onto the on-disk dictionary this cycle: the
+    /// caller re-hydrates the desktop spell state off this.
+    applied_remote: bool,
+    /// The exact bytes to push, carried out of the phase whenever `dirty` (the
+    /// myne#436 single-derivation discipline: the push site never re-derives a
+    /// key).
+    push_bytes: Option<Vec<u8>>,
+    /// `dictionary_payload_hash` of the view the phase settled on; the push site
+    /// records it as the RAM push-gate baseline once the push lands (the
+    /// `PrefsPhase::shared_hash` shape).
+    gate_hash: String,
+}
+
+impl DictionaryPhase {
+    /// No reconciliation ran: an EXISTING local blob could not be read, so
+    /// nothing is dirty, nothing is adopted and nothing pushes. See
+    /// [`sync_dictionary_phase`] for why this is a refusal rather than an empty
+    /// dictionary.
+    fn skipped() -> Self {
+        Self {
+            dirty: false,
+            applied_remote: false,
+            push_bytes: None,
+            gate_hash: String::new(),
+        }
+    }
+}
+
+/// `<vault>/vault.dictionary`: the MYD1/MYD5 dictionary singleton.
+fn dictionary_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.dictionary")
+}
+
+/// Decode a `vault.dictionary` inner plaintext under its `dict_format_version`.
+///
+/// The codec is payload-agnostic, so the caller that has just opened the
+/// envelope asks it which generation the bytes are and dispatches here. A `0x01`
+/// payload promotes to the `0x02` shape with no clocks, which is exactly how a
+/// pre-feature entry loses to the first clocked write.
+fn parse_dictionary_payload(
+    format: Option<u8>,
+    plaintext: &[u8],
+) -> Option<PersonalDictionaryData> {
+    crate::plugins::sync::dictionary_payload::decode_dictionary_payload(format, plaintext)
+}
+
+/// Pull-side `vault.dictionary` reconciliation (myne-md/myne#640).
+///
+/// The `sync_prefs_phase` twin: a synced singleton outside the vault-head
+/// manifest, pushed and pulled verbatim on the generic `/sync/blob` channel with
+/// CAS, merged post-decrypt by `sync-protocol.md` §10.2.1's union-with-per-word-
+/// removal-clocks. Three things are the family's own rather than inherited:
+///
+/// 1. **The blob is `root_key`-derived and `itemsKey`-independent**
+///    (`SubkeyRole::PersonalDictKey`), like prefs/search/themes: the phase does
+///    not ride the group tier for its KEK. Its sync id DOES route through
+///    [`shared_sync_id`], so an `NTV6` member addresses the same blob under the
+///    group key; the decision entry (`docs/decisions/protocol/`) states the
+///    member consequence (one shared vault dictionary).
+/// 2. **An EXISTING but unreadable local blob is a REFUSAL, not an empty
+///    dictionary** (myne#255). The prefs phase answers a local decode failure
+///    with `PrefsView::default()`; doing that here would merge the peer's copy
+///    against nothing and write the result over the user's real words. So a
+///    decode or parse failure on the local blob returns
+///    [`DictionaryPhase::skipped`]: no reconciliation, nothing dirty, nothing
+///    pushed, the rest of the cycle proceeds. "Absent" and "unreadable" are
+///    different facts and only the first means empty.
+/// 3. **The push gate is the blob nonce plus a RAM payload hash.** The
+///    dictionary has no device-local field (unlike prefs), so a local write
+///    always changes the payload; the hash is there to absorb a re-encrypt of
+///    identical content (the import path persists even when every word was
+///    already present), which would otherwise push once for nothing. It is
+///    RAM-only for the `shared_subset_hash` reason: an at-rest digest of
+///    decrypted words would be a confirmation oracle over the user's private
+///    vocabulary (SYNC-3).
+#[allow(clippy::too_many_arguments)]
+async fn sync_dictionary_phase(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    shared: &SharedSingletonKey,
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    dictionary_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+    version: MetaVersion,
+) -> Result<DictionaryPhase, SyncCycleError> {
+    // Hold the shared-singleton barrier across the WHOLE read-merge-write
+    // (myne-md/myne#711 task 15). The desktop spell plugin writes this file from
+    // outside this crate and already takes the shared side, so without this a
+    // group rotation's exclusive reseal could interleave with the sync write.
+    let _quiesce = crate::singleton_quiesce::shared().await;
+    // Order this read-merge-write against the desktop spell plugin, which holds
+    // the same mutex. `shared()` above only keeps a reseal out (myne-md/myne#640).
+    let _write_guard = crate::plugins::sync::dictionary_payload::write_mutex()
+        .lock()
+        .await;
+
+    let key = shared.derive(version, SubkeyRole::PersonalDictKey);
+    let path = dictionary_file_path(vault_root);
+    // ABSENT is the empty dictionary; a read that FAILED is not. Collapsing the
+    // two is the "default on error, then persist" shape (#255): the empty view
+    // would be merged and written over a file this device never read.
+    let local_bytes = match io.read(&path).await {
+        Ok(bytes) => Some(bytes),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => None,
+        Err(_) => {
+            tracing::warn!(
+                stage = "dictionary",
+                event = "phase_skipped",
+                "vault.dictionary could not be read; refusing to treat the failure as empty"
+            );
+            return Ok(DictionaryPhase::skipped());
+        }
+    };
+    let local_nonce = local_bytes.as_deref().and_then(read_dictionary_nonce);
+
+    // §9.13.4 / #255 read semantic, stated as code: ABSENT is the empty
+    // dictionary, an EXISTING blob that will not open is a refusal.
+    let local_view = match local_bytes.as_deref() {
+        None => PersonalDictionaryData::default(),
+        Some(bytes) => {
+            let opened = protocol::decode_dictionary_blob_versioned(
+                version,
+                &key,
+                account_number_hash,
+                bytes,
+            )
+            .map_err(|_| ())
+            .and_then(|plaintext| {
+                parse_dictionary_payload(protocol::dictionary_blob_format(bytes), &plaintext)
+                    .ok_or(())
+            });
+            match opened {
+                Ok(view) => view.canonicalized(),
+                Err(()) => {
+                    tracing::warn!(
+                        stage = "dictionary",
+                        event = "phase_skipped",
+                        "vault.dictionary exists but could not be read; refusing to treat it as empty"
+                    );
+                    return Ok(DictionaryPhase::skipped());
+                }
+            }
+        }
+    };
+
+    let id_hex = hex(dictionary_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // A remote revision is worth reconciling only when it is neither our own
+    // bytes nor a server revision we already reconciled.
+    let remote_changed = remote_record
+        .map(|r| {
+            Some(r.content_nonce) != local_nonce
+                && Some(hex(&r.content_nonce)) != baseline_nonce_hex
+        })
+        .unwrap_or(false);
+
+    // §11.3 gate: before the write and before the baseline adoption.
+    let verified = verified_singleton_download(
+        transport,
+        token,
+        remote_record,
+        remote_changed,
+        read_dictionary_nonce,
+        "dictionary",
+    )?;
+    let refused = matches!(verified, SingletonPull::Refused);
+
+    if let SingletonPull::Verified(rec, remote_bytes) = verified {
+        // A remote payload that will not open is a REFUSAL, not empty-remote
+        // (myne-md/myne#640). Collapsing it is the asymmetric case the spec
+        // forbids: with no local words `merge(empty, empty) == remote_view` is
+        // true, so the undecodable bytes would be adopted verbatim; with local
+        // words the same collapse re-pushes a `0x02` blob over a newer peer's
+        // record and destroys it. `sync_member_names_phase` takes this posture
+        // for the same reason.
+        let remote_view = match protocol::decode_dictionary_blob_versioned(
+            version,
+            &key,
+            account_number_hash,
+            &remote_bytes,
+        )
+        .ok()
+        .and_then(|plaintext| {
+            parse_dictionary_payload(protocol::dictionary_blob_format(&remote_bytes), &plaintext)
+        }) {
+            Some(view) => view.canonicalized(),
+            None => {
+                tracing::warn!(
+                    stage = "dictionary",
+                    event = "phase_skipped",
+                    "a remote vault.dictionary could not be read; refusing to overwrite it"
+                );
+                return Ok(DictionaryPhase::skipped());
+            }
+        };
+
+        let merged = merge_personal_dictionaries(&local_view, &remote_view);
+        let applied_remote = merged != local_view;
+        let merged_hash = dictionary_payload_hash(&merged);
+
+        if merged == remote_view {
+            // Adopt the server bytes VERBATIM: byte-identical blob + baseline ==
+            // server (version, nonce); nothing to push. Re-encrypting an
+            // already-agreeing dictionary would churn the nonce and push forever.
+            io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
+            record_blob_baseline(state, &id_hex, &rec);
+            set_dictionary_gate_baseline(vault_root, merged_hash.clone());
+            return Ok(DictionaryPhase {
+                dirty: false,
+                applied_remote,
+                push_bytes: None,
+                gate_hash: merged_hash,
+            });
+        }
+
+        // The merge beat the server's payload (or upgraded a legacy one) → write
+        // it fresh and push it this cycle against the server's current version.
+        // The local file (freshly re-encrypted) intentionally carries a different
+        // nonce from the recorded CAS base.
+        let merged_plain = merged.try_encode().ok_or(SyncCycleError::Io)?;
+        let merged_bytes = protocol::encode_dictionary_blob_versioned(
+            version,
+            &key,
+            account_number_hash,
+            &merged_plain,
+        )
+        .map_err(|_| SyncCycleError::Io)?;
+        io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+        record_blob_baseline(state, &id_hex, &rec);
+        // NOT `set_dictionary_gate_baseline` here: the push has not landed yet,
+        // and a lost-CAS retry re-enters this phase with the server nonce equal
+        // to the baseline and `dirty` false, so the tombstone would never be
+        // re-sent. The push site records the gate baseline on success (the prefs
+        // phase has the same split). myne-md/myne#640.
+        return Ok(DictionaryPhase {
+            dirty: true,
+            applied_remote,
+            push_bytes: Some(merged_bytes),
+            gate_hash: merged_hash,
+        });
+    }
+
+    // No (changed) remote record. Self-heal the CAS baseline so a re-enrolled or
+    // migrated device stops registering as never-synced. Skipped when the pull was
+    // REFUSED: §11.3 bars the baseline adoption as well as the disk write.
+    if let Some(rec) = remote_record.filter(|_| !refused) {
+        record_blob_baseline(state, &id_hex, rec);
+    }
+    let never_synced = !state.blobs.contains_key(&id_hex);
+    let payload_hash = dictionary_payload_hash(&local_view);
+    // No-change short-circuit: every dictionary write re-encrypts under a fresh
+    // nonce, so a local blob whose outer nonce still equals the synced baseline's
+    // is provably byte-untouched since the last sync.
+    let baseline_nonce_now = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+    let nonce_clean =
+        baseline_nonce_now.is_some() && local_nonce.map(|n| hex(&n)) == baseline_nonce_now;
+    // §10.2.1 initial publish, the prefs shape: a server that has never held a
+    // dictionary receives this device's unconditionally. A vault with NO local
+    // file stays dictionary-silent (an empty dictionary is the absent file), so
+    // `local_bytes.is_some()` is a conjunct rather than an afterthought.
+    let dirty = local_bytes.is_some()
+        && (never_synced
+            || (!nonce_clean
+                && dictionary_gate_baseline(vault_root).as_deref() != Some(payload_hash.as_str())));
+    Ok(DictionaryPhase {
+        dirty,
+        applied_remote: false,
+        // The VERIFIED local bytes: the same ones the push must carry.
+        push_bytes: if dirty { local_bytes } else { None },
+        gate_hash: payload_hash,
     })
 }
 
@@ -4768,6 +5125,10 @@ async fn sync_cycle_attempt(
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| shared_sync_id(shared, SubkeyRole::CatalogSyncId));
     let themes_id = shared_sync_id(shared, SubkeyRole::ThemesSyncId);
+    // `vault.dictionary` is the fourth shared singleton on this plane
+    // (myne-md/myne#640). Same derivation shape as prefs/themes, so an `NTV6`
+    // member addresses the owner's dictionary blob under the group key.
+    let dictionary_id = shared_sync_id(shared, SubkeyRole::PersonalDictSyncId);
     // `vault.member-names` is addressed through the GROUP tier only (`None` on a
     // pre-B2B `OwnerRoot` session), and it is the one shared singleton with no
     // `SubkeyRole` counterpart, which is why it does not go through `shared_sync_id`.
@@ -4881,6 +5242,15 @@ async fn sync_cycle_attempt(
         .and_then(read_themes_nonce)
     {
         local.insert(themes_id, n);
+    }
+    if let Some(n) = io
+        .read(&dictionary_file_path(vault_root))
+        .await
+        .ok()
+        .as_deref()
+        .and_then(read_dictionary_nonce)
+    {
+        local.insert(dictionary_id, n);
     }
     if let Some(nid) = names_id {
         if let Some(n) = io
@@ -5560,6 +5930,44 @@ async fn sync_cycle_attempt(
     )
     .await?;
 
+    // --- dictionary phase (myne-md/myne#640): unconditional, every cycle ---
+    // The fourth shared singleton: `vault.dictionary` is never head-committed and
+    // its dirty blob rides the push batch below, exactly like prefs/themes. The
+    // phase REFUSES rather than emptying when an existing local blob cannot be
+    // read (#255), so a failure here is a skipped reconciliation, never a
+    // destructive one; it does not take the cycle with it (the prefs-phase
+    // reasoning: a settings-like blob that cannot be written must not stop the
+    // notes phase).
+    let remote_dictionary_rec = page
+        .all_metas
+        .iter()
+        .find(|m| m.id == dictionary_id && m.attachment_id.is_none());
+    let mut dictionary_phase = match sync_dictionary_phase(
+        io,
+        transport,
+        token,
+        shared,
+        &account_number_hash,
+        vault_root,
+        state,
+        &dictionary_id,
+        remote_dictionary_rec,
+        version,
+    )
+    .await
+    {
+        Ok(phase) => phase,
+        Err(err) => {
+            tracing::warn!(
+                stage = "dictionary",
+                event = "phase_skipped",
+                error = ?err,
+                "the dictionary phase failed; syncing notes anyway and retrying next cycle"
+            );
+            DictionaryPhase::skipped()
+        }
+    };
+
     // --- member-names phase (task 3b-ii), only on a group-held (`NTV6`) session ---
     // Like the other shared singletons it is never head-committed; its dirty blob rides
     // the push batch below so the CAS/409 machinery covers it. `names_id` is `None` on a
@@ -5625,6 +6033,7 @@ async fn sync_cycle_attempt(
                 && Some(c.id) != cat_id
                 && c.id != prefs_id
                 && c.id != themes_id
+                && c.id != dictionary_id
                 && Some(c.id) != names_id
                 && Some(c.id) != bindings_id
                 && Some(c.id) != chats_catalog_id
@@ -5670,6 +6079,7 @@ async fn sync_cycle_attempt(
                 || Some(c.id) == cat_id
                 || c.id == prefs_id
                 || c.id == themes_id
+                || c.id == dictionary_id
                 || Some(c.id) == names_id
                 || Some(c.id) == chats_catalog_id
                 || chats_scan.contains_key(&c.id))
@@ -5893,6 +6303,7 @@ async fn sync_cycle_attempt(
                     && Some(m.id) != cat_id
                     && m.id != prefs_id
                     && m.id != themes_id
+                    && m.id != dictionary_id
                     && Some(m.id) != names_id
                     && Some(m.id) != chats_catalog_id
                     && !chats_scan.contains_key(&m.id)
@@ -6399,6 +6810,30 @@ async fn sync_cycle_attempt(
                         .unwrap_or(0);
                     to_push.push(PushBlob {
                         id: themes_id,
+                        base_version: base,
+                        content_nonce: nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+            }
+        }
+
+        // A dirty dictionary blob (local-only change, a merge that beat the
+        // server's payload, or the initial publish) rides the same batch
+        // (myne-md/myne#640). Same single-derivation discipline as themes
+        // (myne#436): the bytes come from the phase, never re-derived here.
+        if dictionary_phase.dirty {
+            if let Some(bytes) = dictionary_phase.push_bytes.take() {
+                if let Some(nonce) = read_dictionary_nonce(&bytes) {
+                    let base = state
+                        .blobs
+                        .get(&hex(&dictionary_id))
+                        .map(|b| b.version)
+                        .unwrap_or(0);
+                    to_push.push(PushBlob {
+                        id: dictionary_id,
                         base_version: base,
                         content_nonce: nonce,
                         ciphertext: bytes,
@@ -6933,6 +7368,11 @@ async fn sync_cycle_attempt(
             if outcome.results.iter().any(|(id, _)| *id == prefs_id) {
                 set_prefs_gate_baseline(vault_root, prefs_phase.shared_hash.clone());
             }
+            // The dictionary push landed → its payload hash is the new push-gate
+            // baseline (myne-md/myne#640, §10.2.1).
+            if outcome.results.iter().any(|(id, _)| *id == dictionary_id) {
+                set_dictionary_gate_baseline(vault_root, dictionary_phase.gate_hash.clone());
+            }
             // The queued tombstones are now flagged on the server → drop them from the
             // device-local queue so they aren't re-flagged every cycle.
             let pushed_tombstones: Vec<String> = chunk
@@ -7056,6 +7496,7 @@ async fn sync_cycle_attempt(
         // deliberately outside the 409-retry loop this summary is built in.
         credential_ambiguous: false,
         prefs_applied_remote: prefs_phase.applied_remote,
+        dictionary_applied_remote: dictionary_phase.applied_remote,
         themes_applied_remote: themes_phase.applied_remote,
         chats_applied_remote: chats_phase.applied_remote,
         memory_entries_pulled: entries_pulled,
@@ -12068,6 +12509,524 @@ mod tests {
 
     // ---- F1 Faz B: vault.meta reconcile (sync_meta_phase) --------------------
 
+    // ---- myne-md/myne#640: vault.dictionary phase (sync_dictionary_phase) ----
+
+    mod dictionary_phase {
+        // The parent module's seam shims (task 86).
+        use super::{blocking, IO};
+
+        use super::super::*;
+        use crate::plugins::sync::dictionary_payload::{
+            clock_key, merge_personal_dictionaries, PersonalDictionaryData, PERSONAL_WORDS_FIELD,
+        };
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+
+        const ROOT: [u8; 32] = [0x42; 32];
+        const HASH: [u8; 16] = [0x33; 16];
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-dictphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn dict_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey(&ROOT, SubkeyRole::PersonalDictKey)
+        }
+
+        fn encode(view: &PersonalDictionaryData) -> Vec<u8> {
+            protocol::encode_dictionary_blob_versioned(
+                MetaVersion::V0_1,
+                &dict_key(),
+                &HASH,
+                &view.encode(),
+            )
+            .unwrap()
+        }
+
+        fn write_local(dir: &Path, view: &PersonalDictionaryData) {
+            std::fs::write(dir.join("vault.dictionary"), encode(view)).unwrap();
+        }
+
+        fn read_local(dir: &Path) -> PersonalDictionaryData {
+            let bytes = std::fs::read(dir.join("vault.dictionary")).unwrap();
+            let format = protocol::dictionary_blob_format(&bytes);
+            let plaintext = protocol::decode_dictionary_blob_versioned(
+                MetaVersion::V0_1,
+                &dict_key(),
+                &HASH,
+                &bytes,
+            )
+            .unwrap();
+            match format {
+                Some(protocol::DICTIONARY_BLOB_FORMAT_V1) => {
+                    crate::plugins::sync::dictionary_payload::PersonalDictionaryV1::decode(
+                        &plaintext,
+                    )
+                    .unwrap()
+                    .into_current()
+                }
+                _ => PersonalDictionaryData::decode(&plaintext).unwrap(),
+            }
+        }
+
+        /// Serve `bytes` under the dictionary id and return the record a puller
+        /// sees.
+        fn serve(t: &FakeTransport, id: &[u8; 16], bytes: &[u8]) -> ChangedBlob {
+            let nonce = read_dictionary_nonce(bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(id)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *id,
+                content_nonce: nonce,
+                version: 7,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        fn shared() -> SharedSingletonKey {
+            SharedSingletonKey::OwnerRoot(zeroize::Zeroizing::new(ROOT))
+        }
+
+        /// `StdVaultIo` with `vault.dictionary` reads failing as a NON-NotFound
+        /// error, which is the state `.ok()` used to mistake for "no file".
+        struct ReadFailsIo;
+
+        #[async_trait::async_trait]
+        impl crate::vault_io::VaultIo for ReadFailsIo {
+            async fn read(&self, path: &Path) -> crate::vault_io::IoResult<Vec<u8>> {
+                if path.file_name().and_then(|n| n.to_str()) == Some("vault.dictionary") {
+                    return Err(crate::io_failure_kind::IoFailureKind::Other);
+                }
+                IO.read(path).await
+            }
+            async fn read_prefix(
+                &self,
+                path: &Path,
+                len: usize,
+            ) -> crate::vault_io::IoResult<Vec<u8>> {
+                IO.read_prefix(path, len).await
+            }
+            async fn write(
+                &self,
+                path: &Path,
+                bytes: &[u8],
+                opts: crate::vault_io::WriteOpts,
+            ) -> crate::vault_io::IoResult<()> {
+                IO.write(path, bytes, opts).await
+            }
+            async fn remove_file(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+                IO.remove_file(path).await
+            }
+            async fn remove_dir_all(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+                IO.remove_dir_all(path).await
+            }
+            async fn create_dir_all(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+                IO.create_dir_all(path).await
+            }
+            async fn read_dir(
+                &self,
+                path: &Path,
+            ) -> crate::vault_io::IoResult<Vec<crate::vault_io::DirEntry>> {
+                IO.read_dir(path).await
+            }
+            async fn stat(
+                &self,
+                path: &Path,
+            ) -> crate::vault_io::IoResult<Option<crate::vault_io::FileStat>> {
+                IO.stat(path).await
+            }
+            async fn exists(&self, path: &Path) -> crate::vault_io::IoResult<bool> {
+                IO.exists(path).await
+            }
+            async fn is_dir(&self, path: &Path) -> crate::vault_io::IoResult<bool> {
+                IO.is_dir(path).await
+            }
+            async fn rename(&self, from: &Path, to: &Path) -> crate::vault_io::IoResult<()> {
+                IO.rename(from, to).await
+            }
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        fn run_with_io(
+            io: &dyn crate::vault_io::VaultIo,
+            t: &FakeTransport,
+            dir: &Path,
+            st: &mut SyncState,
+            id: &[u8; 16],
+            remote: Option<&ChangedBlob>,
+        ) -> DictionaryPhase {
+            blocking(sync_dictionary_phase(
+                io,
+                t,
+                "tok",
+                &shared(),
+                &HASH,
+                dir,
+                st,
+                id,
+                remote,
+                MetaVersion::V0_1,
+            ))
+            .unwrap()
+        }
+
+        fn run(
+            t: &FakeTransport,
+            dir: &Path,
+            st: &mut SyncState,
+            id: &[u8; 16],
+            remote: Option<&ChangedBlob>,
+        ) -> DictionaryPhase {
+            blocking(sync_dictionary_phase(
+                &IO,
+                t,
+                "tok",
+                &shared(),
+                &HASH,
+                dir,
+                st,
+                id,
+                remote,
+                MetaVersion::V0_1,
+            ))
+            .unwrap()
+        }
+
+        /// A vault with no dictionary and a server that has never held one stays
+        /// dictionary-silent: an empty dictionary is the ABSENT file, so there is
+        /// nothing to publish.
+        #[test]
+        fn no_local_file_and_no_remote_record_stays_silent() {
+            let dir = scratch("silent");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = dictionary_sync_id(&ROOT);
+            let phase = run(&t, &dir, &mut st, &id, None);
+            assert!(!phase.dirty);
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert!(!dir.join("vault.dictionary").exists());
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A read that FAILED is not "no dictionary" (myne-md/myne#640). The old
+        /// `.ok()` collapsed every IO error into `None`, which becomes the empty
+        /// view; with a remote record present that view merges to the remote and
+        /// the ADOPT arm writes the server bytes over a file this device never
+        /// read, destroying the local words. `ReadFailsIo` fails only the
+        /// dictionary read, which is exactly the state the defect needs.
+        #[test]
+        fn an_unreadable_local_blob_is_a_refusal_not_an_empty_dictionary() {
+            let dir = scratch("unreadable");
+            let id = dictionary_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut st = SyncState::default();
+
+            let mut local = PersonalDictionaryData::default();
+            local.add_personal("mine", 50);
+            write_local(&dir, &local);
+            let before = std::fs::read(dir.join("vault.dictionary")).unwrap();
+
+            let mut remote = PersonalDictionaryData::default();
+            remote.add_personal("theirs", 90);
+            let remote_bytes =
+                protocol::encode_dictionary_blob(&dict_key(), &HASH, &remote.encode())
+                    .expect("seal remote");
+            let rec = serve(&t, &id, &remote_bytes);
+
+            let phase = run_with_io(&ReadFailsIo, &t, &dir, &mut st, &id, Some(&rec));
+
+            assert!(!phase.dirty, "a failed read must not publish");
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert_eq!(
+                std::fs::read(dir.join("vault.dictionary")).unwrap(),
+                before,
+                "the unreadable file must be untouched, not overwritten with the server's copy"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A remote blob that opens but does not parse is a REFUSAL, not
+        /// empty-remote (myne-md/myne#640): adopting it writes bytes this build
+        /// cannot read over the local file, and re-pushing over it destroys a
+        /// newer peer's record. `sync_member_names_phase` takes the same posture.
+        #[test]
+        fn an_undecodable_remote_blob_is_refused_rather_than_adopted() {
+            let dir = scratch("remote-garbage");
+            let id = dictionary_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut st = SyncState::default();
+
+            let mut local = PersonalDictionaryData::default();
+            local.add_personal("mine", 50);
+            write_local(&dir, &local);
+            let before = std::fs::read(dir.join("vault.dictionary")).unwrap();
+
+            // Sealed under the right key, so it decrypts, but the plaintext is
+            // not a postcard payload of either generation.
+            let garbage = protocol::encode_dictionary_blob(&dict_key(), &HASH, b"not postcard")
+                .expect("seal a bad remote payload");
+            let rec = serve(&t, &id, &garbage);
+            let phase = run(&t, &dir, &mut st, &id, Some(&rec));
+
+            assert!(!phase.dirty);
+            assert!(!phase.applied_remote);
+            assert!(phase.push_bytes.is_none());
+            assert_eq!(
+                std::fs::read(dir.join("vault.dictionary")).unwrap(),
+                before,
+                "the local dictionary is untouched and nothing is pushed over the remote"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A local dictionary with no server copy is published once (the initial
+        /// publish), and the pushed bytes are the phase's own.
+        #[test]
+        fn initial_publish_when_server_never_held_a_dictionary() {
+            let dir = scratch("initpub");
+            let mut local = PersonalDictionaryData::default();
+            local.add_personal("myne", 100);
+            write_local(&dir, &local);
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = dictionary_sync_id(&ROOT);
+            let phase = run(&t, &dir, &mut st, &id, None);
+            assert!(phase.dirty, "never-synced server ⇒ initial publish");
+            let pushed = phase.push_bytes.expect("dirty carries its bytes");
+            let plaintext = protocol::decode_dictionary_blob_versioned(
+                MetaVersion::V0_1,
+                &dict_key(),
+                &HASH,
+                &pushed,
+            )
+            .unwrap();
+            assert_eq!(
+                PersonalDictionaryData::decode(&plaintext)
+                    .unwrap()
+                    .personal_words,
+                vec!["myne"]
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// The acceptance criterion through the REAL phase: a word added on one
+        /// device reaches the other within one round.
+        #[test]
+        fn a_word_added_on_a_reaches_b_in_one_round() {
+            let a_dir = scratch("add-a");
+            let b_dir = scratch("add-b");
+            let id = dictionary_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut a_st = SyncState::default();
+            let mut b_st = SyncState::default();
+
+            // A adds and publishes.
+            let mut a = PersonalDictionaryData::default();
+            a.add_personal("vodozemac", 100);
+            write_local(&a_dir, &a);
+            let phase_a = run(&t, &a_dir, &mut a_st, &id, None);
+            assert!(phase_a.dirty);
+            let server_bytes = phase_a.push_bytes.unwrap();
+
+            // B pulls it.
+            let rec = serve(&t, &id, &server_bytes);
+            let phase_b = run(&t, &b_dir, &mut b_st, &id, Some(&rec));
+            assert!(phase_b.applied_remote);
+            assert_eq!(read_local(&b_dir).personal_words, vec!["vodozemac"]);
+            std::fs::remove_dir_all(&a_dir).ok();
+            std::fs::remove_dir_all(&b_dir).ok();
+        }
+
+        /// The reproduction sequence through the real phase: add on A, sync,
+        /// remove on A, two rounds: the word stays gone.
+        #[test]
+        fn a_removed_word_stays_gone_over_two_rounds() {
+            let a_dir = scratch("rm-a");
+            let b_dir = scratch("rm-b");
+            let id = dictionary_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut a_st = SyncState::default();
+            let mut b_st = SyncState::default();
+
+            // Round 1: add on A, publish, B pulls.
+            let mut a = PersonalDictionaryData::default();
+            a.add_personal("myne", 100);
+            write_local(&a_dir, &a);
+            let server_bytes = run(&t, &a_dir, &mut a_st, &id, None).push_bytes.unwrap();
+            let rec1 = serve(&t, &id, &server_bytes);
+            run(&t, &b_dir, &mut b_st, &id, Some(&rec1));
+            assert_eq!(read_local(&b_dir).personal_words, vec!["myne"]);
+
+            // Round 2: remove on A at a later clock, publish, B pulls.
+            a.remove_personal("myne", 300);
+            write_local(&a_dir, &a);
+            let removed_bytes = run(&t, &a_dir, &mut a_st, &id, Some(&rec1))
+                .push_bytes
+                .expect("the removal must push");
+            let rec2 = serve(&t, &id, &removed_bytes);
+            let phase_b = run(&t, &b_dir, &mut b_st, &id, Some(&rec2));
+            assert!(phase_b.applied_remote, "the removal must reach B");
+            assert!(
+                read_local(&b_dir).personal_words.is_empty(),
+                "the word must be gone on B"
+            );
+
+            // Round 3 (the second round after the removal): B reconciles against
+            // the same server revision again and the word must NOT come back.
+            let phase_b2 = run(&t, &b_dir, &mut b_st, &id, Some(&rec2));
+            assert!(!phase_b2.applied_remote);
+            assert!(read_local(&b_dir).personal_words.is_empty());
+
+            // And A keeps its tombstone, which is what makes the removal survive
+            // a third device that still holds the word.
+            let a_view = read_local(&a_dir);
+            assert_eq!(
+                a_view
+                    .removal_clocks
+                    .get(&clock_key(PERSONAL_WORDS_FIELD, "myne")),
+                Some(&300)
+            );
+            assert!(a_view.personal_words.is_empty());
+            std::fs::remove_dir_all(&a_dir).ok();
+            std::fs::remove_dir_all(&b_dir).ok();
+        }
+
+        /// #255 through the phase: an EXISTING local blob that cannot be read is
+        /// a refusal, not an empty dictionary, so the peer's copy is never merged
+        /// over it.
+        #[test]
+        fn an_unreadable_local_blob_skips_rather_than_emptying() {
+            let dir = scratch("unreadable");
+            std::fs::write(dir.join("vault.dictionary"), b"not a MYD1 blob").unwrap();
+            let before = std::fs::read(dir.join("vault.dictionary")).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = dictionary_sync_id(&ROOT);
+            // A peer DOES have a dictionary; the refusal must still win.
+            let mut peer = PersonalDictionaryData::default();
+            peer.add_personal("peer-word", 500);
+            let rec = serve(&t, &id, &encode(&peer));
+
+            let phase = run(&t, &dir, &mut st, &id, Some(&rec));
+            assert!(!phase.dirty, "a refused read must not push");
+            assert!(!phase.applied_remote, "a refused read must not adopt");
+            assert_eq!(
+                std::fs::read(dir.join("vault.dictionary")).unwrap(),
+                before,
+                "the unreadable blob must be untouched"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// A `0x01` local blob meets a `0x02` peer: the merge runs, the local
+        /// words survive, and the file is rewritten as `0x02` with clocks.
+        #[test]
+        fn a_v1_local_blob_upgrades_when_it_merges() {
+            let dir = scratch("upgrade");
+            let v1_plain = crate::plugins::sync::dictionary_payload::PersonalDictionaryV1 {
+                personal_words: vec!["legacy-word".into()],
+                ignore_words: vec![],
+            }
+            .encode();
+            let mut v1 = protocol::encode_dictionary_blob_versioned(
+                MetaVersion::V0_1,
+                &dict_key(),
+                &HASH,
+                &v1_plain,
+            )
+            .unwrap();
+            // The `dict_format_version` byte is not in the AAD, so relabelling a
+            // freshly sealed blob is exactly how a pre-myne#640 writer's output
+            // looks: the same envelope with a `0x01` inner format.
+            v1[5] = protocol::DICTIONARY_BLOB_FORMAT_V1;
+            std::fs::write(dir.join("vault.dictionary"), &v1).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = dictionary_sync_id(&ROOT);
+            let mut peer = PersonalDictionaryData::default();
+            peer.add_personal("new-word", 900);
+            let rec = serve(&t, &id, &encode(&peer));
+
+            let phase = run(&t, &dir, &mut st, &id, Some(&rec));
+            assert!(phase.dirty);
+            let after = std::fs::read(dir.join("vault.dictionary")).unwrap();
+            assert_eq!(
+                protocol::dictionary_blob_format(&after),
+                Some(protocol::DICTIONARY_BLOB_FORMAT_V2),
+                "the merge must rewrite the legacy blob as 0x02"
+            );
+            let back = read_local(&dir);
+            assert_eq!(back.personal_words, vec!["legacy-word", "new-word"]);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// The push gate: a re-encrypt of IDENTICAL content does not push.
+        #[test]
+        fn an_identical_re_encrypt_does_not_push() {
+            let dir = scratch("gate");
+            let mut local = PersonalDictionaryData::default();
+            local.add_personal("myne", 100);
+            write_local(&dir, &local);
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = dictionary_sync_id(&ROOT);
+
+            // First cycle publishes and records the gate baseline.
+            let phase = run(&t, &dir, &mut st, &id, None);
+            assert!(phase.dirty);
+            let nonce =
+                read_dictionary_nonce(&std::fs::read(dir.join("vault.dictionary")).unwrap())
+                    .unwrap();
+            st.blobs.insert(
+                hex(&id),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: hex(&nonce),
+                    doc_heads_hex: Vec::new(),
+                },
+            );
+            set_dictionary_gate_baseline(&dir, phase.gate_hash.clone());
+
+            // Re-encrypt the SAME content under a fresh nonce (the import path
+            // persists even when every word was already present).
+            let bytes = encode(&local);
+            std::fs::write(dir.join("vault.dictionary"), &bytes).unwrap();
+            let phase2 = run(&t, &dir, &mut st, &id, None);
+            assert!(!phase2.dirty, "identical content must not push");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// Commutativity over the phase's merge, asserted here as well as on the
+        /// payload module so the two cannot drift.
+        #[test]
+        fn the_phase_merge_is_commutative() {
+            let mut a = PersonalDictionaryData::default();
+            a.add_personal("alpha", 10);
+            let mut b = PersonalDictionaryData::default();
+            b.add_personal("beta", 10);
+            assert_eq!(
+                merge_personal_dictionaries(&a, &b),
+                merge_personal_dictionaries(&b, &a)
+            );
+        }
+    }
+
     // ---- MYND-478: vault.prefs phase (sync_prefs_phase) ----------------------
 
     mod prefs_phase {
@@ -13984,6 +14943,10 @@ mod tests {
                 ),
                 (SubkeyRole::PrefsSyncId, protocol::GroupRole::PrefsSyncId),
                 (SubkeyRole::ThemesSyncId, protocol::GroupRole::ThemesSyncId),
+                (
+                    SubkeyRole::PersonalDictSyncId,
+                    protocol::GroupRole::PersonalDictSyncId,
+                ),
             ] {
                 // The owner id is unchanged by this switch.
                 assert_eq!(shared_sync_id(&owner, role), sync_id_for(&root, role));

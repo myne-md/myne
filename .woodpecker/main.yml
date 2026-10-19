@@ -1735,6 +1735,11 @@ steps:
       - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
       # Native lane: the desktop and mobile execution target.
       - cargo test -p protocol --test vectors
+      # The core-side merge runners read the same clone (`core/../myne-test-vectors`)
+      # and skip when it is absent, which is every lane but this one. Naming it
+      # here is what makes "a wrong tombstone rule fails the published cases by
+      # name" true of a pipeline rather than of a lucky checkout (myne-md/myne#640).
+      - cargo test -p myne-core --lib dictionary_merge_matches_every_published_vector
       # Browser lane: the web client's. Same runners, same fixtures, a different
       # wasm engine. The script fails rather than skips when either the fixtures
       # or a driver are missing.

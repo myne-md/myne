@@ -35,7 +35,7 @@ use protocol::{
     decode_attachments_catalog, decode_note, decode_prefs_blob, derive_subkey, derive_subkey_v0_2,
     encode_attachments_catalog_versioned, encode_prefs_blob_versioned, encode_vault_meta_v0_2_raw,
     reseal_agent_memory_blob_v0_2, reseal_attachment_v0_2, reseal_chats_blob_v0_2,
-    reseal_kek_envelope_v0_2, KdfParams, MetaVersion, SubkeyRole,
+    reseal_kek_envelope_v0_2_with_formats, KdfParams, MetaVersion, SubkeyRole,
     AGENT_MEMORY_CATALOG_BLOB_AAD_ROLE, AGENT_MEMORY_CATALOG_BLOB_MAGIC,
     AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC, AGENT_PERSONALITY_BLOB_AAD_ROLE,
     AGENT_PERSONALITY_BLOB_MAGIC, AGENT_PERSONALITY_BLOB_V0_2_MAGIC, CHATS_CATALOG_BLOB_AAD_ROLE,
@@ -53,8 +53,19 @@ struct KekSingleton {
     /// v0.1 magic and its v0.2 (`MY?5`) successor.
     old_magic: &'static [u8; 4],
     new_magic: &'static [u8; 4],
-    /// The family's `blob_envelope` format-version byte (carried through).
+    /// The family's `blob_envelope` format-version byte: what the re-sealed
+    /// blob is WRITTEN with.
     format_version: u8,
+    /// The `format_version` values the SOURCE blob may carry. `None` means
+    /// "exactly `format_version`" (the single-generation case, which is every
+    /// family but one). `Some` is for a family whose inner format gained a
+    /// generation while its on-disk blobs from the previous build still exist:
+    /// `vault.dictionary` is `0x01` on a pre-myne#640 vault and `0x02` today, so
+    /// a migration must accept both while producing the current one. A single
+    /// value here would make the migration abort on every vault that had not yet
+    /// re-written its dictionary, which is the silent-loss shape the migration
+    /// exists to avoid.
+    decode_formats: Option<&'static [u8]>,
     /// The family's AAD role string, imported from `protocol` rather than
     /// spelled here. The registry is `docs/spec/protocol.md` §5.2 and a drift
     /// between the two spellings is invisible to every compiler.
@@ -74,6 +85,7 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &THEMES_BLOB_MAGIC,
         new_magic: &THEMES_BLOB_V0_2_MAGIC,
         format_version: 0x01,
+        decode_formats: None,
         aad_role: ROLE_STR_CUSTOM_THEMES_BLOB,
         kek_role: SubkeyRole::CustomThemesKey,
         cap: 4 * 1024 * 1024,
@@ -82,7 +94,13 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         filename: "vault.dictionary",
         old_magic: &DICTIONARY_BLOB_MAGIC,
         new_magic: &DICTIONARY_BLOB_V0_2_MAGIC,
-        format_version: 0x01,
+        // myne-md/myne#640: a pre-#640 vault's dictionary is `0x01` and this
+        // build writes `0x02`, so the SOURCE accepts both and the re-seal
+        // produces the current one. A single expected format here aborts the
+        // whole migration on every vault whose dictionary had not been
+        // re-written yet.
+        format_version: protocol::DICTIONARY_BLOB_FORMAT_CURRENT,
+        decode_formats: Some(&protocol::DICTIONARY_BLOB_SUPPORTED_FORMATS),
         aad_role: ROLE_STR_PERSONAL_DICT_BLOB,
         kek_role: SubkeyRole::PersonalDictKey,
         cap: 4 * 1024 * 1024,
@@ -96,6 +114,7 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &CHATS_CATALOG_BLOB_MAGIC,
         new_magic: &CHATS_CATALOG_BLOB_V0_2_MAGIC,
         format_version: 0x01,
+        decode_formats: None,
         aad_role: CHATS_CATALOG_BLOB_AAD_ROLE,
         kek_role: SubkeyRole::ChatsCatalogKey,
         cap: 4 * 1024 * 1024,
@@ -109,6 +128,7 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &AGENT_MEMORY_CATALOG_BLOB_MAGIC,
         new_magic: &AGENT_MEMORY_CATALOG_BLOB_V0_2_MAGIC,
         format_version: 0x01,
+        decode_formats: None,
         aad_role: AGENT_MEMORY_CATALOG_BLOB_AAD_ROLE,
         kek_role: SubkeyRole::AgentMemoryCatalogKey,
         // The codec's own cap, not a copy of it: a drift between the re-seal
@@ -121,11 +141,58 @@ const KEK_SINGLETONS: &[KekSingleton] = &[
         old_magic: &AGENT_PERSONALITY_BLOB_MAGIC,
         new_magic: &AGENT_PERSONALITY_BLOB_V0_2_MAGIC,
         format_version: 0x01,
+        decode_formats: None,
         aad_role: AGENT_PERSONALITY_BLOB_AAD_ROLE,
         kek_role: SubkeyRole::AgentPersonalityKey,
         cap: MAX_AGENT_PERSONALITY_PLAINTEXT_LEN,
     },
 ];
+/// Re-seal ONE [`KekSingleton`] from the old root tier to the new one.
+///
+/// Factored out so the fail-closed PRE-FLIGHT (step 3b) and the real re-seal
+/// (step 5) cannot drift: they used to be two hand-copied calls, and the
+/// `decode_formats` half of this change had to be applied to both or the
+/// pre-flight would have aborted a vault the real pass would have accepted
+/// (myne-md/myne#640).
+fn reseal_kek_singleton(
+    fam: &KekSingleton,
+    old_blob: &[u8],
+    old_root_key: &[u8; 32],
+    new_root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+) -> Result<Vec<u8>, protocol::ProtocolError> {
+    // The re-seal is inner-opaque by design (it decodes the envelope and
+    // re-encodes the plaintext unchanged), so the header MUST keep describing the
+    // payload it carries. For a multi-generation family the source byte is
+    // preserved and the next local write performs the real upgrade; writing the
+    // current byte over an older payload is a relabel the reader then rejects,
+    // which is a silent loss of the family on the upgrade path
+    // (myne-md/myne#640).
+    let single = [fam.format_version];
+    let supported = fam.decode_formats.unwrap_or(&single);
+    let source_format = old_blob
+        .get(5)
+        .copied()
+        .filter(|f| supported.contains(f))
+        .unwrap_or(fam.format_version);
+    let encode_format = if fam.decode_formats.is_some() {
+        source_format
+    } else {
+        fam.format_version
+    };
+    reseal_kek_envelope_v0_2_with_formats(
+        old_blob,
+        &derive_subkey(old_root_key, fam.kek_role),
+        &derive_subkey_v0_2(new_root_key, fam.kek_role),
+        fam.old_magic,
+        fam.new_magic,
+        supported,
+        encode_format,
+        fam.aad_role,
+        account_number_hash,
+        fam.cap,
+    )
+}
 /// A note re-encrypted from `MY01` to `NC05` by the migration.
 #[derive(Debug, Clone)]
 pub struct MigratedNote {
@@ -1045,16 +1112,12 @@ pub async fn migrate_vault_notes_on_disk(
         let Ok(old_blob) = io.read(&vault_root.join(fam.filename)).await else {
             continue; // family not present in this vault
         };
-        reseal_kek_envelope_v0_2(
+        reseal_kek_singleton(
+            fam,
             &old_blob,
-            &derive_subkey(old_root_key, fam.kek_role),
-            &derive_subkey_v0_2(&out.new_root_key, fam.kek_role),
-            fam.old_magic,
-            fam.new_magic,
-            fam.format_version,
-            fam.aad_role,
+            old_root_key,
+            &out.new_root_key,
             account_number_hash,
-            fam.cap,
         )
         .map_err(|_| OnDiskMigrationError::Crypto(MigrationError::Crypto))?;
     }
@@ -1120,18 +1183,12 @@ pub async fn migrate_vault_notes_on_disk(
         io.write(&legacy.join(fam.filename), &old_blob, WriteOpts::default())
             .await
             .map_err(|_| Io)?;
-        let old_kek = derive_subkey(old_root_key, fam.kek_role);
-        let new_kek = derive_subkey_v0_2(&out.new_root_key, fam.kek_role);
-        let resealed = reseal_kek_envelope_v0_2(
+        let resealed = reseal_kek_singleton(
+            fam,
             &old_blob,
-            &old_kek,
-            &new_kek,
-            fam.old_magic,
-            fam.new_magic,
-            fam.format_version,
-            fam.aad_role,
+            old_root_key,
+            &out.new_root_key,
             account_number_hash,
-            fam.cap,
         )
         .map_err(|_| OnDiskMigrationError::Crypto(MigrationError::Crypto))?;
         io.write(&path, &resealed, WriteOpts::default())
@@ -1726,9 +1783,20 @@ mod tests {
             // dictionary KEK, so the migration re-seals it to MYD5.
             let old_dict_kek =
                 protocol::derive_subkey(&OLD_ROOT, protocol::SubkeyRole::PersonalDictKey);
-            let dict_blob =
-                protocol::encode_dictionary_blob(&old_dict_kek, &ACCT, b"opaque dict bytes")
-                    .expect("seed MYD1");
+            // A GENUINE pre-myne#640 payload: the `0x01` shape is the two word
+            // sets with no clock map, so the fixture can actually be parsed back
+            // and a relabel is distinguishable from a faithful re-seal. The
+            // earlier fixture was `b"opaque dict bytes"`, which parses as neither
+            // generation and so passed while the migration stamped `0x02` over
+            // `0x01` bytes (myne-md/myne#640).
+            let v1_payload = crate::plugins::sync::dictionary_payload::PersonalDictionaryV1 {
+                personal_words: vec!["myne".to_string()],
+                ignore_words: vec!["kubectl".to_string()],
+            }
+            .encode();
+            let mut dict_blob = protocol::encode_dictionary_blob(&old_dict_kek, &ACCT, &v1_payload)
+                .expect("seed MYD1");
+            dict_blob[5] = protocol::DICTIONARY_BLOB_FORMAT_V1;
             io.write(
                 &vault_root.join("vault.dictionary"),
                 &dict_blob,
@@ -1760,6 +1828,13 @@ mod tests {
             // legacy/ preserves the original MYD1 (still decodable under the old KEK).
             let new_dict = io.read(&vault_root.join("vault.dictionary")).await.unwrap();
             assert_eq!(&new_dict[0..4], b"MYD5");
+            assert_eq!(
+                protocol::dictionary_blob_format(&new_dict),
+                Some(protocol::DICTIONARY_BLOB_FORMAT_V1),
+                "a v0.1 payload must keep a v0.1 header: the inner re-seal is opaque, so \
+                 stamping the current byte over old bytes is a relabel the reader then \
+                 refuses (myne-md/myne#640)"
+            );
             assert!(protocol::decode_dictionary_blob(&old_dict_kek, &ACCT, &new_dict).is_err());
             let legacy_dict = io
                 .read(&vault_root.join("legacy/vault.dictionary"))

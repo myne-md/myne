@@ -201,6 +201,33 @@ pub(crate) fn decode_blob_envelope(
     max_plaintext_len: usize,
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, EnvelopeError> {
+    decode_blob_envelope_formats(
+        key,
+        expected_magic,
+        &[expected_format_version],
+        aad,
+        max_plaintext_len,
+        blob,
+    )
+}
+
+/// [`decode_blob_envelope`] with a REGISTERED SET of decodable `format_version`
+/// bytes rather than one.
+///
+/// A family whose inner format gained a generation (`vault.dictionary`, whose
+/// `dict_format_version` moved `0x01` → `0x02` for per-word removal clocks)
+/// must keep the old generation readable in the SAME build, so the check is
+/// "is this value in the set this client implements", not "does it equal the
+/// value this client writes". Every other caller keeps the single-value form,
+/// which is why the strict shape did not have to be abandoned.
+pub(crate) fn decode_blob_envelope_formats(
+    key: &[u8; AEAD_KEY_LEN],
+    expected_magic: &[u8; 4],
+    supported_format_versions: &[u8],
+    aad: &[u8],
+    max_plaintext_len: usize,
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, EnvelopeError> {
     // ---- parse the 34-byte header (all checks BEFORE decryption) -------
     if blob.len() < BLOB_ENVELOPE_HEADER_LEN {
         return Err(EnvelopeError::HeaderTooShort);
@@ -211,7 +238,7 @@ pub(crate) fn decode_blob_envelope(
     if blob[4] != BLOB_ENVELOPE_PROTOCOL_VERSION {
         return Err(EnvelopeError::ProtocolVersionMismatch);
     }
-    if blob[5] != expected_format_version {
+    if !supported_format_versions.contains(&blob[5]) {
         return Err(EnvelopeError::FormatUnsupported);
     }
 
@@ -314,6 +341,35 @@ pub(crate) fn decode_singleton_versioned(
     max_plaintext_len: usize,
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, EnvelopeError> {
+    decode_singleton_versioned_formats(
+        version,
+        key,
+        v0_1_magic,
+        v0_2_magic,
+        &[format_version],
+        aad_role,
+        account_number_hash,
+        max_plaintext_len,
+        blob,
+    )
+}
+
+/// [`decode_singleton_versioned`] over a registered SET of decodable inner
+/// formats: the multi-generation variant `vault.dictionary` needs while its
+/// `0x01` payloads remain readable beside `0x02` (see
+/// [`decode_blob_envelope_formats`]).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn decode_singleton_versioned_formats(
+    version: MetaVersion,
+    key: &[u8; AEAD_KEY_LEN],
+    v0_1_magic: &[u8; 4],
+    v0_2_magic: &[u8; 4],
+    format_versions: &[u8],
+    aad_role: &[u8],
+    account_number_hash: &[u8; 16],
+    max_plaintext_len: usize,
+    blob: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, EnvelopeError> {
     let (magic, aad) = singleton_family_for(
         version,
         v0_1_magic,
@@ -321,5 +377,5 @@ pub(crate) fn decode_singleton_versioned(
         aad_role,
         account_number_hash,
     );
-    decode_blob_envelope(key, magic, format_version, &aad, max_plaintext_len, blob)
+    decode_blob_envelope_formats(key, magic, format_versions, &aad, max_plaintext_len, blob)
 }

@@ -210,6 +210,7 @@ mod tests {
             GroupRole::CatalogSyncId,
             GroupRole::PrefsSyncId,
             GroupRole::ThemesSyncId,
+            GroupRole::PersonalDictSyncId,
             GroupRole::MemberNamesSyncId,
         ] {
             assert_ne!(

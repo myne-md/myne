@@ -474,6 +474,10 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
         &'a self,
         _: &'a crate::plugins::vault_unlock::state::VaultRuntimeState,
     ) -> crate::hooks::BoxFuture<'a> {
+        // Recorded like the other live-state hooks, or a cycle test could not
+        // tell that a remote dictionary was hydrated into the running spell
+        // engine (myne-md/myne#640).
+        self.record("hydrate_spell");
         Box::pin(std::future::ready(()))
     }
     fn reclaim_stray_attachment_blobs<'a>(

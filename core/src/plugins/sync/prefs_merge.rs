@@ -231,8 +231,28 @@ fn single_sided_survives(
     absent: &PrefsView,
     clocks: &mut BTreeMap<String, u64>,
 ) -> bool {
-    let present_clock = clock_of(present, clock_key);
-    let absent_clock = clock_of(absent, clock_key);
+    single_sided_clock_rule(
+        clock_key,
+        clock_of(present, clock_key),
+        clock_of(absent, clock_key),
+        clocks,
+    )
+}
+
+/// The stamped-absence rule itself, over raw clocks rather than a `PrefsView`.
+///
+/// Split out so a SECOND family with the same shape can call the one rule
+/// instead of re-deriving it: `vault.dictionary`'s per-word removal clocks
+/// (`dictionary_payload::merge_personal_dictionaries`, myne-md/myne#640) are the
+/// same single-sided decision over a `word -> clock` map, and a second copy of
+/// this comparison is exactly how the two would drift. Everything above is the
+/// prefs-shaped adapter; this is the normative rule.
+pub(super) fn single_sided_clock_rule(
+    clock_key: &str,
+    present_clock: u64,
+    absent_clock: u64,
+    clocks: &mut BTreeMap<String, u64>,
+) -> bool {
     if absent_clock > present_clock {
         clocks.insert(clock_key.to_string(), absent_clock);
         return false;

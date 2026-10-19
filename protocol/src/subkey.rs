@@ -45,6 +45,7 @@
 //! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
 //! | [`SubkeyRole::CatalogSyncId`]          | `catalog-sync-id`         |
 //! | [`SubkeyRole::PrefsSyncId`]            | `prefs-sync-id`           |
+//! | [`SubkeyRole::PersonalDictSyncId`]     | `personal-dictionary-sync-id` |
 //! | [`SubkeyRole::CustomThemesKey`]           | `custom-themes-key`       |
 //! | [`SubkeyRole::ThemesSyncId`]              | `themes-sync-id`          |
 //! | [`SubkeyRole::ChatsCatalogKey`]           | `chats-catalog-key`       |
@@ -125,6 +126,18 @@ const ROLE_STR_SESSION_STATE_KEY: &[u8] = b"session-state-key";
 /// KEK. `root_key`-derived (like prefs/search/workspace), so it is
 /// `itemsKey`-independent and survives a later epoch rotation.
 const ROLE_STR_PERSONAL_DICT_KEY: &[u8] = b"personal-dictionary-key";
+
+/// Registered role string for the Phase 2 sync blob-id of `vault.dictionary`
+/// (myne-md/myne#640; `protocol.md` §3.4, `sync-protocol.md` §10.2.1). The
+/// dictionary is a synced singleton outside the vault-head manifest like
+/// `vault.prefs` / `vault.themes`, so it needs the same deterministic,
+/// device-independent 16-byte identifier:
+/// `dictionary_sync_id = derive_subkey(root_key, PersonalDictSyncId)[0..16]`.
+/// Like `prefs-sync-id` / `themes-sync-id` this derives an **identifier**, NOT
+/// key material: the dictionary KEK stays `personal-dictionary-key`.
+/// Load-bearing: drift silently splits `vault.dictionary` into a second sync
+/// record on every existing account.
+const ROLE_STR_PERSONAL_DICT_SYNC_ID: &[u8] = b"personal-dictionary-sync-id";
 
 /// Registered role string for the v0.1 vault-indices blob KEK
 /// (MYND-271; design MYND-31; encrypts the `vault.indices` structured-metadata
@@ -513,10 +526,20 @@ pub enum GroupRole {
     /// the new epoch; re-sealing without reclaiming leaves the retired record readable to
     /// the member just removed, who still holds the old group key.
     DeviceBindingSyncId,
+    /// Deterministic sync blob-id for `vault.dictionary` (myne-md/myne#640;
+    /// `protocol.md` §3.4, `sync-protocol.md` §10.2.1): the
+    /// [`SubkeyRole::PersonalDictSyncId`] companion, exactly as
+    /// [`GroupRole::ThemesSyncId`] is the `ThemesSyncId` one. A member holds
+    /// the shared `group_key`, so this is what lets it address the vault's
+    /// dictionary blob; the KEK side already had [`GroupRole::PersonalDictKey`]
+    /// registered, which is why the family's member consequence (one shared
+    /// vault dictionary) is stated in the decision entry rather than introduced
+    /// here. Derives an identifier, NOT key material.
+    PersonalDictSyncId,
 }
 
 impl GroupRole {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::ItemsKeyWrap,
         Self::PrefsKey,
         Self::SearchIndexKey,
@@ -538,6 +561,7 @@ impl GroupRole {
         Self::MemberNamesSyncId,
         Self::DeviceBindingKey,
         Self::DeviceBindingSyncId,
+        Self::PersonalDictSyncId,
     ];
 
     fn role_str(self) -> &'static [u8] {
@@ -563,6 +587,7 @@ impl GroupRole {
             Self::MemberNamesSyncId => ROLE_STR_MEMBER_NAMES_SYNC_ID,
             Self::DeviceBindingKey => ROLE_STR_DEVICE_BINDING_KEY,
             Self::DeviceBindingSyncId => ROLE_STR_DEVICE_BINDING_SYNC_ID,
+            Self::PersonalDictSyncId => ROLE_STR_PERSONAL_DICT_SYNC_ID,
         }
     }
 }
@@ -604,6 +629,7 @@ impl SubkeyRole {
             Self::PrefsSyncId => Some(GroupRole::PrefsSyncId),
             Self::CustomThemesKey => Some(GroupRole::CustomThemesKey),
             Self::ThemesSyncId => Some(GroupRole::ThemesSyncId),
+            Self::PersonalDictSyncId => Some(GroupRole::PersonalDictSyncId),
             Self::GraphLayoutKey => Some(GroupRole::GraphLayoutKey),
             Self::AwarenessRoomId => Some(GroupRole::AwarenessRoomId),
             Self::AwarenessKey => Some(GroupRole::AwarenessKey),
@@ -841,6 +867,18 @@ pub enum SubkeyRole {
     /// `GroupRole::AwarenessKey`, so a member removal rotates it with the group
     /// key.
     AwarenessKey,
+    /// Phase 2 sync blob-id derivation for `vault.dictionary`
+    /// (myne-md/myne#640; `protocol.md` §3.4, `sync-protocol.md` §10.2.1).
+    /// The first 16 bytes of the derived output are the dictionary blob's
+    /// reserved sync-plane blob-id: deterministic across the fleet,
+    /// indistinguishable from a note UUID to the server. Derives an
+    /// **identifier**, NOT key material (like `PrefsSyncId` /
+    /// `ThemesSyncId` / `CatalogSyncId`); the dictionary KEK stays
+    /// `PersonalDictKey`. `shared_group_role` maps it to
+    /// [`GroupRole::PersonalDictSyncId`], so an `NTV6` member addresses the
+    /// same shared dictionary the owner wrote. Domain-separated from every
+    /// other role.
+    PersonalDictSyncId,
 }
 
 impl SubkeyRole {
@@ -856,7 +894,7 @@ impl SubkeyRole {
     ///
     /// **Adding a `SubkeyRole` variant means adding it here too** — the
     /// `all_covers_every_registered_role` test fails compilation until you do.
-    pub const ALL: [SubkeyRole; 28] = [
+    pub const ALL: [SubkeyRole; 29] = [
         SubkeyRole::ItemsKeyWrap,
         SubkeyRole::PrefsKey,
         SubkeyRole::SearchIndexKey,
@@ -885,6 +923,7 @@ impl SubkeyRole {
         SubkeyRole::PersonVaultCarrier,
         SubkeyRole::AwarenessRoomId,
         SubkeyRole::AwarenessKey,
+        SubkeyRole::PersonalDictSyncId,
     ];
 
     /// Registered role string (the part appended after the
@@ -920,6 +959,7 @@ impl SubkeyRole {
             SubkeyRole::PersonVaultCarrier => ROLE_STR_PERSON_VAULT_CARRIER,
             SubkeyRole::AwarenessRoomId => ROLE_STR_AWARENESS_ROOM_ID,
             SubkeyRole::AwarenessKey => ROLE_STR_AWARENESS_KEY,
+            SubkeyRole::PersonalDictSyncId => ROLE_STR_PERSONAL_DICT_SYNC_ID,
         }
     }
 }
@@ -1069,6 +1109,7 @@ mod tests {
                 SubkeyRole::PersonVaultCarrier => 25,
                 SubkeyRole::AwarenessRoomId => 26,
                 SubkeyRole::AwarenessKey => 27,
+                SubkeyRole::PersonalDictSyncId => 28,
             }
         }
 
@@ -1528,6 +1569,7 @@ mod tests {
                 SubkeyRole::PrefsSyncId => "prefs-sync-id",
                 SubkeyRole::CustomThemesKey => "custom-themes-key",
                 SubkeyRole::ThemesSyncId => "themes-sync-id",
+                SubkeyRole::PersonalDictSyncId => "personal-dictionary-sync-id",
                 SubkeyRole::GraphLayoutKey => "graph-layout-key",
                 SubkeyRole::ChatsCatalogKey => "chats-catalog-key",
                 SubkeyRole::ChatsCatalogSyncId => "chats-catalog-sync-id",
@@ -1569,7 +1611,7 @@ mod tests {
         let chats_agent_root: [u8; 32] = [0x42; 32];
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 46] = [
+        let cases: [Case<'_>; 48] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -1834,6 +1876,20 @@ mod tests {
                 "Pseudorandom alpha root with the ThemesSyncId role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.1 themes-sync-id') so independent implementers can verify this role's info assembly without re-parsing the spec. Domain-separation pair with the alpha custom-themes-key vector (same input_root_key_hex, byte-different outputs): the themes blob-id derivation and the themes KEK must never coincide — and with the alpha catalog-sync-id / prefs-sync-id vectors, the three singleton sync-id lineages must never coincide either.",
                 &alpha,
                 SubkeyRole::ThemesSyncId,
+                true,
+            ),
+            (
+                "zero-root-personal-dictionary-sync-id",
+                "All-zero root_key with the PersonalDictSyncId role (myne-md/myne#640, §3.4; sync-protocol.md §10.2.1). Derives the reserved sync-plane blob-id of vault.dictionary: the FIRST 16 BYTES of this 32-byte output are the id; role string 'personal-dictionary-sync-id' (27 ASCII bytes). An identifier derivation like prefs-sync-id / themes-sync-id, NOT a KEK; the dictionary KEK stays personal-dictionary-key. Pairs with the other zero-root vectors under the same trivial root.",
+                &zero_root,
+                SubkeyRole::PersonalDictSyncId,
+                false,
+            ),
+            (
+                "prn-alpha-personal-dictionary-sync-id",
+                "Pseudorandom alpha root with the PersonalDictSyncId role. The informational_info_utf8_hex field carries the canonical 37-byte HKDF info bytes ('myne.v0.1 personal-dictionary-sync-id') so independent implementers can verify this role's info assembly without re-parsing the spec. Domain-separation pair with the alpha personal-dictionary-key vector (same input_root_key_hex, byte-different outputs): the dictionary blob-id derivation and the dictionary KEK must never coincide: and with the alpha catalog-sync-id / prefs-sync-id / themes-sync-id vectors, the four singleton sync-id lineages must never coincide either.",
+                &alpha,
+                SubkeyRole::PersonalDictSyncId,
                 true,
             ),
             // ---- the `chats-*` and `agent-*` appends -----------------------
@@ -2188,6 +2244,7 @@ mod tests {
                 GroupRole::MemberNamesSyncId => 18,
                 GroupRole::DeviceBindingKey => 19,
                 GroupRole::DeviceBindingSyncId => 20,
+                GroupRole::PersonalDictSyncId => 21,
             }
         }
 

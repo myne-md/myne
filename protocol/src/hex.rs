@@ -96,6 +96,26 @@ pub fn decode_ci<const N: usize>(s: &str) -> Option<[u8; N]> {
     decode_pairs(s)
 }
 
+/// Decode a variable-length lowercase-hex string (strict, even length).
+///
+/// The `Vec` sibling of [`decode_lower`], for a value whose width is not a
+/// compile-time constant: vector fixtures, and any call site that decodes a whole
+/// record rather than one id. Same policy as its fixed-width twin, so a caller
+/// does not grow a fourth hand-written nibble walk.
+pub fn decode_lower_vec(s: &str) -> Option<alloc::vec::Vec<u8>> {
+    if !s.len().is_multiple_of(2) || !is_lower_hex(s) {
+        return None;
+    }
+    let mut out = alloc::vec::Vec::with_capacity(s.len() / 2);
+    let bytes = s.as_bytes();
+    for pair in bytes.chunks_exact(2) {
+        let hi = (pair[0] as char).to_digit(16)?;
+        let lo = (pair[1] as char).to_digit(16)?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+    Some(out)
+}
+
 /// The shared body, reached only after a predicate and a byte-length gate have
 /// passed.
 ///

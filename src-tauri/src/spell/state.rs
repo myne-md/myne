@@ -29,8 +29,8 @@ struct SpellRuntime {
     /// `false` means "we do not know what is on disk" — either nothing has been
     /// hydrated yet, or the hydrate failed on a blob that exists. Both are
     /// states in which a write would persist an empty set over a file nobody
-    /// managed to read; `vault.dictionary` is not synced, so only a
-    /// `.myne-backup` restore would bring it back.
+    /// managed to read; a `.myne-backup` restore, or a sync pull from another
+    /// device, would bring it back.
     hydrated: bool,
 }
 
@@ -115,9 +115,9 @@ impl SpellState {
     /// Add a personal word; returns the updated canonical data for the caller to
     /// persist (or `None` on a poisoned lock). Updates the engine's folded set
     /// immediately so the squiggle clears without waiting for the disk write.
-    pub fn add_personal(&self, word: &str) -> Option<PersonalDictionaryData> {
+    pub fn add_personal(&self, word: &str, now_ms: u64) -> Option<PersonalDictionaryData> {
         let mut rt = self.inner.lock().ok()?;
-        rt.data.add_personal(word);
+        rt.data.add_personal(word, now_ms);
         let snapshot = rt.data.clone();
         rt.engine
             .set_personal_words(snapshot.personal_words.iter().cloned());
@@ -159,7 +159,11 @@ impl SpellState {
     /// Plan, persist, then commit. A failed persist now changes nothing, which
     /// is what makes `myneDictionary.ts`'s "either the whole union landed or
     /// none of it did" true of the in-memory half as well as the on-disk one.
-    pub fn plan_personal_merge(&self, words: &[String]) -> Option<(PersonalDictionaryData, usize)> {
+    pub fn plan_personal_merge(
+        &self,
+        words: &[String],
+        now_ms: u64,
+    ) -> Option<(PersonalDictionaryData, usize)> {
         let rt = self.inner.lock().ok()?;
         let mut planned = rt.data.clone();
         let mut present: std::collections::HashSet<String> = rt
@@ -173,7 +177,7 @@ impl SpellState {
             if !present.insert(word.to_lowercase()) {
                 continue;
             }
-            planned.add_personal(word);
+            planned.add_personal(word, now_ms);
             added += 1;
         }
         Some((planned, added))
@@ -191,7 +195,11 @@ impl SpellState {
     }
 
     #[cfg(test)]
-    pub fn merge_personal(&self, words: &[String]) -> Option<(PersonalDictionaryData, usize)> {
+    pub fn merge_personal(
+        &self,
+        words: &[String],
+        now_ms: u64,
+    ) -> Option<(PersonalDictionaryData, usize)> {
         let mut rt = self.inner.lock().ok()?;
         let mut present: std::collections::HashSet<String> = rt
             .data
@@ -204,7 +212,7 @@ impl SpellState {
             if !present.insert(word.to_lowercase()) {
                 continue;
             }
-            rt.data.add_personal(word);
+            rt.data.add_personal(word, now_ms);
             added += 1;
         }
         let snapshot = rt.data.clone();
@@ -214,9 +222,9 @@ impl SpellState {
     }
 
     /// Add an ignore word; returns the updated canonical data to persist.
-    pub fn add_ignore(&self, word: &str) -> Option<PersonalDictionaryData> {
+    pub fn add_ignore(&self, word: &str, now_ms: u64) -> Option<PersonalDictionaryData> {
         let mut rt = self.inner.lock().ok()?;
-        rt.data.add_ignore(word);
+        rt.data.add_ignore(word, now_ms);
         let snapshot = rt.data.clone();
         rt.engine
             .set_ignore_words(snapshot.ignore_words.iter().cloned());
@@ -278,7 +286,7 @@ mod tests {
         let s = loaded();
         let words = langs(&["Alpha", "Beta"]);
 
-        let (planned, added) = s.plan_personal_merge(&words).expect("plan");
+        let (planned, added) = s.plan_personal_merge(&words, 1_000).expect("plan");
         assert_eq!(added, 2);
         assert_eq!(planned.personal_words, vec!["Alpha", "Beta"]);
 
@@ -297,7 +305,7 @@ mod tests {
     fn add_personal_makes_word_correct_and_returns_snapshot() {
         let s = loaded();
         assert!(s.check_batch(&langs(&["Myne"]), &langs(&["en-US"]))[0].misspelled);
-        let snap = s.add_personal("Myne").expect("add");
+        let snap = s.add_personal("Myne", 1_000).expect("add");
         assert_eq!(snap.personal_words, vec!["Myne"]);
         // Folded match: "myne"/"MYNE" also correct now.
         assert!(!s.check_batch(&langs(&["myne"]), &langs(&["en-US"]))[0].misspelled);
@@ -307,7 +315,7 @@ mod tests {
     fn add_ignore_suppresses_misspelling() {
         let s = loaded();
         assert!(s.check_batch(&langs(&["helllo"]), &langs(&["en-US"]))[0].misspelled);
-        s.add_ignore("helllo").expect("ignore");
+        s.add_ignore("helllo", 1_000).expect("ignore");
         assert!(!s.check_batch(&langs(&["helllo"]), &langs(&["en-US"]))[0].misspelled);
     }
 
@@ -317,6 +325,7 @@ mod tests {
         let data = PersonalDictionaryData {
             personal_words: vec!["Foo".into()],
             ignore_words: vec!["bar".into()],
+            ..Default::default()
         };
         s.hydrate_words(data);
         assert!(!s.check_batch(&langs(&["foo"]), &langs(&["en-US"]))[0].misspelled);
@@ -326,7 +335,7 @@ mod tests {
     #[test]
     fn clear_wipes_engine_and_data() {
         let s = loaded();
-        s.add_personal("Myne").unwrap();
+        s.add_personal("Myne", 1_000).unwrap();
         s.clear();
         assert!(s.snapshot_data().is_empty());
         // With dicts cleared too, every word is now "misspelled".

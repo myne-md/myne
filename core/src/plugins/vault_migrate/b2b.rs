@@ -403,11 +403,20 @@ pub(crate) fn reseal_shared_singleton(
                 blob,
             )
             .map_err(|_| B2bMigrationError::CannotDecrypt)?;
-            protocol::encode_dictionary_blob_versioned(
+            // The re-seal is payload-opaque, so the inner generation byte must
+            // keep describing the bytes it carries: a pre-#640 `0x01` body stays
+            // `0x01` and the next local write upgrades it. Stamping the current
+            // byte over it is a relabel every reader then refuses
+            // (myne-md/myne#640; the same rule as `reseal_kek_singleton`).
+            let format = protocol::dictionary_blob_format(blob)
+                .filter(|f| protocol::DICTIONARY_BLOB_SUPPORTED_FORMATS.contains(f))
+                .unwrap_or(protocol::DICTIONARY_BLOB_FORMAT_CURRENT);
+            protocol::encode_dictionary_blob_versioned_with_format(
                 MetaVersion::V0_2,
                 &new,
                 account_hash,
                 &value,
+                format,
             )
             .map_err(|_| B2bMigrationError::CannotDecrypt)
         }
@@ -772,6 +781,61 @@ mod tests {
             assert_eq!(
                 owner_row.person_id_hex.as_deref(),
                 Some("11".repeat(16).as_str())
+            );
+        });
+    }
+
+    /// The re-seal is payload-opaque, so a pre-#640 `0x01` dictionary must come
+    /// out of the NTV6 migration still labelled `0x01`: stamping the current byte
+    /// over old bytes makes every reader refuse the family for good
+    /// (myne-md/myne#640, the same rule `reseal_kek_singleton` states).
+    #[test]
+    fn a_v0_1_dictionary_keeps_its_generation_byte_across_the_migration() {
+        block_on(async {
+            let dir = ScopedTempDir::new("b2b-dict-format").expect("tempdir");
+            let root = dir.path();
+            let owner_root = [7u8; 32];
+            let items = [9u8; 32];
+            let account = [1u8; 16];
+            std::fs::write(
+                root.join("vault.meta"),
+                fixture_meta(&owner_root, &items, &account),
+            )
+            .expect("meta");
+            std::fs::create_dir_all(root.join("notes")).expect("notes dir");
+            std::fs::create_dir_all(root.join("attachments")).expect("attachments dir");
+
+            let v1 = crate::plugins::sync::dictionary_payload::PersonalDictionaryV1 {
+                personal_words: vec!["myne".to_string()],
+                ignore_words: vec![],
+            }
+            .encode();
+            let kek = protocol::derive_subkey_v0_2(&owner_root, SubkeyRole::PersonalDictKey);
+            let mut blob =
+                protocol::encode_dictionary_blob_versioned(MetaVersion::V0_2, &kek, &account, &v1)
+                    .expect("seed MYD5");
+            // A genuine pre-#640 body: the format byte is not in the AAD, so this
+            // is exactly what an older writer's blob looks like.
+            blob[5] = protocol::DICTIONARY_BLOB_FORMAT_V1;
+            std::fs::write(root.join("vault.dictionary"), &blob).expect("dictionary");
+
+            migrate_owner_vault_to_ntv6(
+                &StdVaultIo,
+                root,
+                &owner_root,
+                &items,
+                &owner(),
+                &[0x11u8; 16],
+                "Owner",
+            )
+            .await
+            .expect("migration");
+
+            let out = std::fs::read(root.join("vault.dictionary")).unwrap();
+            assert_eq!(
+                protocol::dictionary_blob_format(&out),
+                Some(protocol::DICTIONARY_BLOB_FORMAT_V1),
+                "the header must keep describing the payload the re-seal carried"
             );
         });
     }

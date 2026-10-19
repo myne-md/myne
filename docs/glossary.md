@@ -598,6 +598,7 @@ A test whose assertions pin the code's **current** behaviour rather than the beh
 
 Used in: `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#750
 
+
 ### **chat turn** &nbsp; 📦 *Product*
 
 One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
@@ -1008,6 +1009,12 @@ An **opt-in, device-local plaintext log** for the desktop client, OFF by default
 Used in: `decisions/ops/0690`, `src/platform/diagnostics.ts`, `src-tauri/src/logging/`, `threat-model.md` §7
 
 
+
+### **dictionary sync-id** &nbsp; 📋 *Protocol*
+
+The reserved sync-plane blob-id of the [personal dictionary](#personal-dictionary), derived as `DeriveSubkey(root_key, "personal-dictionary-sync-id")[0..16]` on an owner vault and as the group-key derivation of `GroupRole::PersonalDictSyncId` on an `NTV6` member vault (myne-md/myne#640). An identifier derivation like prefs-sync-id and themes-sync-id, NOT a KEK: the dictionary's content key stays `personal-dictionary-key`. Its existence is what makes the dictionary a Class-1 synced singleton rather than a device-local file; because it is group-addressed on a member vault, a shared vault has ONE dictionary and any member may add or remove a word for everyone.
+
+Used in: `spec/protocol.md` §3.4, §9.13; `spec/sync-protocol.md` §10.2.1; `decisions/protocol/0710`
 
 ### **domain separation** &nbsp; 📋 *Protocol*
 
@@ -2867,11 +2874,11 @@ Used in: `vision.md`; `decisions/sync/0655`; `myne-agents/epics/live-collab/`
 
 The per-entry timestamp that lets a set-union preference express a DELETION (myne-md/myne#613). A union alone cannot: an entry removed on one device is an absence, indistinguishable from "this device never had the entry", so the peer's copy is restored by the next union and the deletion undoes itself within two rounds, with no concurrency required. The clock is the tombstone that makes the difference legible.
 
-Stamped on `<field>/<entry>` in the [field clock](#field-clock) map for the three CLOCKED set fields, [deliberate folder](#deliberate-folder), [archived folder](#archived-folder) and the spell-language set. **A removal is a stamped absence**: the removing side stamps the key, and a single-sided entry is dropped when the absent side's clock is strictly greater than the present side's. Equal clocks keep the entry, "absent sorts lowest", which is the recoverable direction. **An addition is stamped too**, which the per-key maps do not need: without an add stamp a re-added entry carries no clock of its own and loses to its own tombstone permanently, so a folder deleted and later refilled could never come back. A clock is retained even when neither side holds the entry, indefinitely, because dropping it lets a third device that still holds the entry at an older clock resurrect what two others deleted.
+Stamped on `<field>/<entry>` in the [field clock](#field-clock) map for the three CLOCKED set fields, [deliberate folder](#deliberate-folder), [archived folder](#archived-folder) and the spell-language set. A fourth instance lives OUTSIDE `vault.prefs`: the [personal dictionary](#personal-dictionary) carries its own `removal_clocks` map keyed `"<set>/<word>"` inside the `MYD1`/`MYD5` payload (`spec/protocol.md` §9.13.2), with the same rule and the same indefinite retention (myne-md/myne#640). **A removal is a stamped absence**: the removing side stamps the key, and a single-sided entry is dropped when the absent side's clock is strictly greater than the present side's. Equal clocks keep the entry, "absent sorts lowest", which is the recoverable direction. **An addition is stamped too**, which the per-key maps do not need: without an add stamp a re-added entry carries no clock of its own and loses to its own tombstone permanently, so a folder deleted and later refilled could never come back. A clock is retained even when neither side holds the entry, indefinitely, because dropping it lets a third device that still holds the entry at an older clock resurrect what two others deleted.
 
 **The two egress controls deliberately have none.** [AI-excluded folder](#ai-excluded-folder) and [CLI-excluded folder](#cli-excluded-folder) keep the clockless monotone union: a removal clock orders un-exclusion by wall clock, so a forward-skewed device could unexclude a folder no correctly-clocked device can restore, and the failure direction there is note plaintext leaving the device. The cost, stated rather than implied, is that once a second device holds an exclusion it is add-only. See [set-field byte budget](#set-field-byte-budget), which the retained clocks are measured against.
 
-Used in: `spec/sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; myne-md/myne#613
+Used in: `spec/sync-protocol.md` §10.2, §10.2.1, `spec/protocol.md` §9.5.2, §9.13.2; myne-md/myne#613, myne-md/myne#640
 
 ### **recovery kit** &nbsp; 📦 *Product*
 

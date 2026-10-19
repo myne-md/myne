@@ -286,6 +286,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 attachments-catalog-key"` | KEK for `vault.attachments` catalog blob (§9.10) | Active when `vault.attachments` is written. |
 | `"myne.v0.1 attachments-id-hmac"` | HMAC-SHA-256 key for content-addressed attachment-id derivation (§9.9) | Active when an attachment is imported. Keys the id over file plaintext; not a blob KEK. |
 | `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
+| `"myne.v0.1 personal-dictionary-sync-id"` | Reserved sync blob-id for `vault.dictionary` (Phase 2 sync; `sync-protocol.md` §10.2.1). **Not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.dictionary` (myne-md/myne#640). Like `vault.prefs` / `vault.themes`, the dictionary is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier: `dictionary_sync_id = DeriveSubkey(root_key, "personal-dictionary-sync-id")[0..16]`, group-derived on an `NTV6` session (`GroupRole::PersonalDictSyncId`) so a member addresses the owner's blob. This derives an *identifier*, not key material: the dictionary KEK remains `personal-dictionary-key`. |
 | `"myne.v0.1 attachment-text-key"` | KEK for the per-attachment extracted-text blobs (§9.15, `MYE1`) | Active when an attachment's extracted text is cached (MYND-328). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. One KEK for all attachment-text blobs; per-blob separation comes from the `attachment_id` AAD binding (§9.15.3). |
 | `"myne.v0.1 graph-layout-key"` | KEK for `vault.graph` blob (§9.19, `MYG1`) | Active when the knowledge-graph layout cache is written. `root_key`-derived (itemsKey-independent), like prefs/search/indices. A rebuildable cache — never synced, never backed up. |
 | `"myne.v0.1 vault-head-mac"` | HMAC-SHA-256 key for the sync **vault head** fork-consistency MAC (§9.16; full primitive in `sync-protocol.md`) — **placeholder, Phase 2** | Derived locally; **not used in Phase 1** (no sync server exists), exactly like `server-auth`. Keys the monotonic, git-like hash-DAG vault head that hardens multi-device sync against a malicious server (rollback / withholding / equivocation; TB5). The context string is **allocated now** so it stays stable and **activates when Phase 2 sync ships**. The device-local last-seen baseline (`vault.head-state`, `MYH1`, §9.16) re-verifies the head's own MAC under this **same** key — no second context. **HMAC-not-signature** is deliberate: single-user → all devices share `root_key` → a symmetric MAC suffices and stays in the closed RustCrypto primitive set (no Ed25519, no new dependency; `head_mac_key = DeriveSubkey(root_key, "vault-head-mac")`, used like `attachments-id-hmac`). See `sync-protocol.md` (MYND-416). |
@@ -314,6 +315,7 @@ its shared singleton material and its roster under roles derived from the shared
 `prefs-key`, `search-index-key`, `attachments-catalog-key`, `session-state-key`,
 `personal-dictionary-key`, `vault-indices-key`, `attachment-text-key`,
 `catalog-sync-id`, `prefs-sync-id`, `custom-themes-key`, `themes-sync-id`,
+`personal-dictionary-sync-id`,
 `graph-layout-key`, `group-roster-key`, `awareness-room-id`, `awareness-key`,
 `member-names-key`, `member-names-sync-id`, `device-binding-key` and
 `device-binding-sync-id`
@@ -2050,7 +2052,10 @@ the AEAD envelope like every other vault blob (the `vault.prefs`/`vault.search` 
 The blob is **payload-agnostic at the protocol layer**, exactly like `vault.search`
 (§9.6.2): this spec fixes the crypto framing (magic, version, AEAD, AAD) — the
 load-bearing part — while the inner word-set serialization is the client's concern,
-tagged by a `dict_format_version` byte.
+tagged by a `dict_format_version` byte. Two inner generations exist: `0x01` (two
+canonical word sets) and `0x02` (the same two sets plus a **per-word removal
+clock** map, myne-md/myne#640, §9.13.2). A client MUST write `0x02` and MUST still
+decode `0x01`; the version byte is the forward hook of §9.13.4.
 
 #### 9.13.1 On-disk layout
 
@@ -2061,11 +2066,15 @@ Offset  Size       Field                  Description
 ------  ---------  ---------------------  -------------------------------------
 0       4 bytes    magic                  ASCII "MYD1"
 4       1 byte     protocol_version       0x01 for this specification
-5       1 byte     dict_format_version    0x01 = the v0.1 inner word-set format
-                                          (§9.13.2). Distinct from protocol_version:
-                                          a future serialization bumps THIS byte so an
-                                          old decoder rejects + falls back to empty
-                                          (§9.13.4) rather than mis-parsing it.
+5       1 byte     dict_format_version    0x02 = the current inner word-set format
+                                          (§9.13.2; two canonical word sets + a
+                                          per-word removal-clock map). 0x01 = the
+                                          original two-set-only format, which a
+                                          client MUST still decode. Distinct from
+                                          protocol_version: a future serialization
+                                          bumps THIS byte so an old decoder rejects
+                                          + falls back to empty (§9.13.4) rather
+                                          than mis-parsing it.
 6       24 bytes   dict_nonce             192-bit random nonce (OS CSPRNG) for the
                                           inner AEAD under personal_dictionary_key.
 30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
@@ -2084,21 +2093,56 @@ consuming header bytes, exactly as for `vault.prefs`/`vault.search`. Magic +
 `protocol_version` + `dict_format_version` MUST all be checked **before** any decryption
 (the magic-byte-before-decrypt discipline of §9.2/§9.3/§9.6.1).
 
-#### 9.13.2 Inner plaintext (`dict_format_version 0x01`)
+#### 9.13.2 Inner plaintext
 
-A [postcard](https://docs.rs/postcard)-serialized struct of two **set-semantics string
-arrays**: `personal_words` (added words that count as correct) and `ignore_words` (the
-vault-wide ignore set). Each array is canonical: elements **NFC-normalized**,
-**lexicographically sorted**, **exact-deduped** (the `deliberate_folders` discipline,
-§9.5.2). Both rest INSIDE the AEAD envelope by necessity — the words are confidential
-vault vocabulary; none may appear in the cleartext header.
+**`dict_format_version 0x01`**: a [postcard](https://docs.rs/postcard)-serialized
+struct of two **set-semantics string arrays**: `personal_words` (added words that
+count as correct) and `ignore_words` (the vault-wide ignore set). Each array is
+canonical: elements **NFC-normalized**, **lexicographically sorted**,
+**exact-deduped** (the `deliberate_folders` discipline, §9.5.2). A client MUST
+still decode this generation; it carries no clock, so every entry counts as
+unstamped (clock 0) and loses to the first clocked write.
 
-Postcard (not the canonical JSON of §9.5.2) because the payload is unbounded
-user-generated content — the same rationale §9.6.2 gives for the search index; a
-sorted+deduped `Vec<String>` is deterministic, so cross-implementation golden vectors
-stay byte-stable. Case-insensitive **lookup** (does adding "Myne" suppress
-"myne"/"MYNE"?) is the client's set-management layer's job — the codec stores exact NFC
-bytes and never folds (the §9.5.2 codec-vs-set-layer separation).
+**`dict_format_version 0x02`** (current, myne-md/myne#640): the same two canonical
+arrays plus a **`removal_clocks`** map: `"<set>/<NFC word>" -> u64`, where `<set>`
+is `personal_words` or `ignore_words` and the value is the epoch-**milliseconds** at
+which that entry's membership last changed. The map is **per word**, not per set: a
+per-set clock would make one word's removal race every other word's add in the same
+set, so an add on one device and a removal on another could not both be represented.
+Keys are NFC-normalized and lexicographically ordered (a `BTreeMap` on encode), so
+two devices cannot derive different keys for one word. An absent key counts as 0.
+
+Three rules travel with the clock, and all three are normative:
+
+- **A removal is a stamped absence.** Removing a word drops it from its array and
+  writes a clock for it. A word present on exactly ONE side is therefore KEPT
+  unless the absent side's clock for it is **strictly greater** than the present
+  side's; equal clocks keep it ("absent sorts lowest", the recoverable direction).
+  The union half is unchanged and still conflict-free: an entry either side holds
+  survives.
+- **Adding a word stamps it too.** Without an add stamp a re-added word carries no
+  clock of its own and loses to its own tombstone forever.
+- **A clock is retained indefinitely, even when NEITHER side holds the word.** That
+  is the tombstone, and dropping it lets a third device that still holds the word
+  at an older clock resurrect what two others deleted. A horizon was considered and
+  rejected for the §10.2 reason: a device offline longer than the horizon is exactly
+  the case the clock exists for. The cost is bounded by the §9.13.4 budget note.
+
+A payload holding **only** tombstones is NOT empty and MUST be written: the
+"omit the file when both sets are empty" rule below applies to a payload with no
+words AND no clocks, or a removal would delete the only bytes that make it
+converge.
+
+Both generations rest INSIDE the AEAD envelope by necessity: the words are
+confidential vault vocabulary; none may appear in the cleartext header. Postcard
+(not the canonical JSON of §9.5.2) because the payload is unbounded user-generated
+content: the same rationale §9.6.2 gives for the search index; a sorted+deduped
+`Vec<String>` and a sorted map are deterministic, so cross-implementation golden
+vectors stay byte-stable. Case-insensitive **lookup** (does adding "Myne" suppress
+"myne"/"MYNE"?) is the client's set-management layer's job: the codec stores exact
+NFC bytes and never folds (the §9.5.2 codec-vs-set-layer separation).
+
+The merge itself is normative in `sync-protocol.md` §10.2.1, not here.
 
 #### 9.13.3 AAD construction
 
@@ -2129,19 +2173,34 @@ Read semantic is **fall-back-to-empty** on ANY failure (file absent / truncated 
 magic-or-version-or-format mismatch / AEAD verification failure / inner-parse failure) →
 both sets empty, per the §9.5.5 / §6.4 non-distinguishing-error discipline. A vault that
 never used the feature simply has **no `vault.dictionary` file** (it is written only when
-non-empty), so a pre-MYND-266 vault is byte-identical.
+non-empty), so a pre-MYND-266 vault is byte-identical. **A client that is about to WRITE
+MUST distinguish an absent blob from an existing one it could not read** (myne#255): an
+absent file is the empty dictionary, but an existing file this build cannot open (a
+permission error, an AEAD failure, or a `dict_format_version` from a future build) MUST
+NOT be treated as empty and overwritten, because a later build may still read it. The
+reference behaviour is to refuse the write.
 
 The blob is **non-load-bearing** (the two-class prefs taxonomy, `threat-model.md` §7): a
 replayed / tampered / stale blob can at worst restore an older word set or flag/unflag
 words — it weakens no security guarantee — so it carries **no protective-envelope clamp**
-and inherits the documented best-effort local-prefs-replay limitation. Phase-2 sync
-conflict semantics are a **clockless union + add-wins** (AS6-safe, no
-wall-clock), which means they **cannot express a removal**: a word the user
-deleted is restored by any peer that still holds it. That is the same defect
-myne-md/myne#613 fixed for the prefs sets, and it is NOT fixed here
-(`sync-protocol.md` §10.2 records it). Formerly compared to
-`deliberate_folders` (§9.5.2). A v0.1 client MUST reject `MYD5` and any unregistered
-magic; a next-major-version client MUST refuse `MYD1` (§10.4).
+and inherits the documented best-effort local-prefs-replay limitation. Sync conflict
+semantics are the `0x02` **union with per-word removal clocks** of §9.13.2, normative in
+`sync-protocol.md` §10.2.1 (AS6-safe, no wall-clock on the wire; the clock is a plaintext
+field inside the AEAD). Wall-clock skew is accepted for the same reason it is accepted for
+catalog filenames and the prefs sets: the dictionary is non-load-bearing and a skewed
+winner is repaired by the next genuine edit.
+
+**Size budget.** The `0x02` clock map is content-scaled like `deliberate_folders`
+(myne-md/myne#613): its size grows with the number of words the user has ever changed,
+and a tombstone is retained indefinitely, so the plaintext is larger than the word list
+alone. The 4 MiB cap above leaves orders of magnitude of headroom for a personal
+dictionary (a tombstone is a word plus a clock, tens of bytes against a hundreds-of-
+thousands-of-words ceiling), and an over-cap write is refused rather than truncated. A
+future format that needed a tombstone GC would be a new `dict_format_version`, not a
+change to this one.
+
+A v0.1 client MUST reject `MYD5` and any unregistered magic; a next-major-version client
+MUST refuse `MYD1` (§10.4).
 
 ### 9.14 Quick-unlock credential blob (`vault.quickunlock`, `MYQ1`)
 

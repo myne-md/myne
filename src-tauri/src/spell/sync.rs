@@ -16,9 +16,11 @@
 use super::dictionary::PersonalDictionaryData;
 use super::state::SpellState;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use myne_core::plugins::sync::dictionary_payload::merge_personal_dictionaries;
 use protocol::{
-    decode_dictionary_blob, encode_dictionary_blob_versioned, meta_version_of,
-    parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_dictionary_blob_versioned, dictionary_blob_format, encode_dictionary_blob_versioned,
+    meta_version_of, parse_vault_meta_any, MetaVersion, SubkeyRole, AEAD_KEY_LEN,
+    VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
@@ -65,10 +67,54 @@ fn read_account_number_hash(
     Ok((version, meta.account_number_hash))
 }
 
+/// PURE CORE: decode a `vault.dictionary` blob into its typed `0x02` payload.
+///
+/// The codec is payload-agnostic and this build decodes both inner generations,
+/// so the dispatch on `dict_format_version` lives here: `0x01` promotes to the
+/// `0x02` shape with no clocks (an entry that predates the clock loses to the
+/// first clocked write), `0x02` is the payload itself.
+///
+/// Every failure maps to [`SpellSyncError::Unreadable`] rather than to empty: an
+/// existing blob this build cannot open is exactly the #255 case: a later build
+/// may still read it, and overwriting it would destroy the user's words.
+fn decode_payload(
+    version: MetaVersion,
+    blob: &[u8],
+    dict_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> Result<PersonalDictionaryData, SpellSyncError> {
+    let plaintext = decode_dictionary_blob_versioned(version, dict_key, account_number_hash, blob)
+        .map_err(|_| {
+            tracing::warn!(
+                event = "dictionary_undecryptable",
+                "vault.dictionary exists but could not be decrypted; refusing to treat it as empty"
+            );
+            SpellSyncError::Unreadable
+        })?;
+    myne_core::plugins::sync::dictionary_payload::decode_dictionary_payload(
+        dictionary_blob_format(blob),
+        &plaintext,
+    )
+    .ok_or_else(|| {
+        tracing::warn!(
+            event = "dictionary_unparseable",
+            "vault.dictionary decrypted but did not parse; refusing to treat it as empty"
+        );
+        SpellSyncError::Unreadable
+    })
+}
+
 /// PURE CORE — encrypt `data` to the `vault.dictionary` blob and atomically
-/// write it under `vault_dir`. When `data` is empty, the file is removed
-/// (best-effort) so an empty dictionary leaves no file (fall-back-to-empty on
-/// read; keeps a no-dictionary vault byte-clean).
+/// write it under `vault_dir`.
+///
+/// **Read-merge-write, not write** (myne-md/myne#640). The caller's `data` is a
+/// RAM snapshot taken from the live spell state; the sync engine merges a peer's
+/// words into this same file behind it, so writing the snapshot verbatim would
+/// drop the peer's words until the next sync pulled them back. Merging the
+/// on-disk payload into the snapshot with the same §10.2.1 rule keeps both. When
+/// the merged payload is empty (no words AND no tombstones), the file is removed
+/// so an empty dictionary leaves no file: note that a tombstone-only payload is
+/// NOT empty and IS written, or a removal could never converge.
 pub(crate) fn persist_payload_to_dir(
     version: MetaVersion,
     vault_dir: &Path,
@@ -77,12 +123,20 @@ pub(crate) fn persist_payload_to_dir(
     data: &PersonalDictionaryData,
 ) -> Result<(), SpellSyncError> {
     let path = vault_dir.join("vault.dictionary");
-    if data.is_empty() {
+    let on_disk = match std::fs::read(&path) {
+        Ok(blob) => decode_payload(version, &blob, dict_key, account_number_hash)?,
+        // Absent == empty (the one benign absence; anything else is a read that
+        // FAILED, not a vault with no words).
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => PersonalDictionaryData::default(),
+        Err(_) => return Err(SpellSyncError::Io),
+    };
+    let merged = merge_personal_dictionaries(&on_disk, data);
+    if merged.is_empty() {
         // Best-effort remove; absent == empty on read.
         let _ = std::fs::remove_file(&path);
         return Ok(());
     }
-    let payload = data.encode();
+    let payload = merged.try_encode().ok_or(SpellSyncError::Io)?;
     // Write in the vault's OWN generation: `MYD5` on a migrated (v0.2) vault so a
     // word-add never downgrades the migrated blob back to `MYD1`. The `dict_key`
     // the caller passes is derived for the same generation.
@@ -101,9 +155,10 @@ pub(crate) fn persist_payload_to_dir(
 /// to every failure alike, so a blob that existed and could not be read this
 /// once (a Windows AV/backup tool holding an exclusive handle, a permission
 /// change, an EIO) also became "empty" — and the next `add_to_personal_dictionary`
-/// persisted that empty over the user's real file. `vault.dictionary` is not in
-/// the sync blob set, so there is no peer copy to pull back: only a
-/// `.myne-backup` restore recovers it.
+/// persisted that empty over the user's real file. Since myne-md/myne#640 the
+/// blob DOES sync, so a peer copy can pull a loss back, but only if that peer
+/// still holds the word; the refusal is still the correct answer and the peer is
+/// not a licence to guess.
 ///
 /// So: `NotFound` → the empty default. Every other outcome is an error the
 /// caller must NOT paper over with a write.
@@ -111,33 +166,14 @@ pub(crate) fn hydrate_payload_from_dir(
     vault_dir: &Path,
     dict_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+    version: MetaVersion,
 ) -> Result<PersonalDictionaryData, SpellSyncError> {
     let blob = match std::fs::read(vault_dir.join("vault.dictionary")) {
         Ok(b) => b,
-        // The one benign absence. Anything else — permission denied, EIO, a
-        // sharing violation — is a read that FAILED, not a vault with no words.
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Default::default()),
         Err(_) => return Err(SpellSyncError::Io),
     };
-    // An AEAD failure means the ciphertext was already unrecoverable, so no
-    // write can make it worse — but an intact blob a future build cannot parse
-    // is exactly what `dict_format_version` exists for, and overwriting it
-    // would destroy a file a later version could still read. Both stay errors:
-    // the caller declines to write rather than guessing which one it hit.
-    let plaintext = decode_dictionary_blob(dict_key, account_number_hash, &blob).map_err(|_| {
-        tracing::warn!(
-            event = "dictionary_undecryptable",
-            "vault.dictionary exists but could not be decrypted; refusing to treat it as empty"
-        );
-        SpellSyncError::Unreadable
-    })?;
-    PersonalDictionaryData::decode(&plaintext).ok_or_else(|| {
-        tracing::warn!(
-            event = "dictionary_unparseable",
-            "vault.dictionary decrypted but did not parse; refusing to treat it as empty"
-        );
-        SpellSyncError::Unreadable
-    })
+    decode_payload(version, &blob, dict_key, account_number_hash)
 }
 
 /// Persist the given `data` for the currently-unlocked vault (holds the write
@@ -155,6 +191,11 @@ pub(crate) async fn persist_dictionary_with_dir(
     // (myne-md/myne#711 task 15). The desktop spell plugin is the dictionary's
     // writer, so the barrier has to be taken here.
     let _quiesce = myne_core::singleton_quiesce::shared().await;
+    // Order this read-merge-write against the sync engine, which holds the same
+    // mutex; `shared()` above keeps a reseal out but does not order two writers.
+    let _dict_guard = myne_core::plugins::sync::dictionary_payload::write_mutex()
+        .lock()
+        .await;
     let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
         shared.derive(version, SubkeyRole::PersonalDictKey);
@@ -177,7 +218,7 @@ pub(crate) async fn hydrate_dictionary_with_dir(
     let (version, account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta"))?;
     let dict_key: Zeroizing<[u8; AEAD_KEY_LEN]> =
         shared.derive(version, SubkeyRole::PersonalDictKey);
-    let data = hydrate_payload_from_dir(vault_dir, &dict_key, &account_number_hash)?;
+    let data = hydrate_payload_from_dir(vault_dir, &dict_key, &account_number_hash, version)?;
     spell.hydrate_words(data);
     Ok(())
 }
@@ -242,10 +283,11 @@ mod tests {
         let data = PersonalDictionaryData {
             personal_words: vec!["Myne".into(), "tokio".into()],
             ignore_words: vec!["helllo".into()],
+            ..Default::default()
         };
         persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         assert!(dir.join("vault.dictionary").exists());
-        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("hydrate");
+        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1).expect("hydrate");
         assert_eq!(back.personal_words, vec!["Myne", "tokio"]);
         assert_eq!(back.ignore_words, vec!["helllo"]);
         std::fs::remove_dir_all(&dir).ok();
@@ -261,13 +303,15 @@ mod tests {
         let data = PersonalDictionaryData {
             personal_words: vec!["Automerge".into()],
             ignore_words: vec!["teh".into()],
+            ..Default::default()
         };
         persist_payload_to_dir(MetaVersion::V0_2, &dir, &KEY, &HASH, &data).expect("persist v0.2");
         // It is the MYD5 family on disk, not MYD1.
         let blob = std::fs::read(dir.join("vault.dictionary")).unwrap();
         assert_eq!(&blob[0..4], protocol::DICTIONARY_BLOB_V0_2_MAGIC.as_slice());
         // The magic-detecting hydrate reads it under the same key.
-        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("hydrate v0.2");
+        let back =
+            hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_2).expect("hydrate v0.2");
         assert_eq!(back.personal_words, vec!["Automerge"]);
         assert_eq!(back.ignore_words, vec!["teh"]);
         std::fs::remove_dir_all(&dir).ok();
@@ -278,21 +322,17 @@ mod tests {
         // The ONE benign absence: a vault that has never added a word has no
         // dictionary, and empty is the correct answer rather than a fallback.
         let dir = tmp();
-        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("absent is not an error");
+        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1)
+            .expect("absent is not an error");
         assert!(back.is_empty());
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn empty_data_removes_the_file() {
+        // A payload with no words AND no tombstones leaves no file. The directory
+        // is fresh, so the read-merge-write has nothing on disk to keep.
         let dir = tmp();
-        let data = PersonalDictionaryData {
-            personal_words: vec!["x".into()],
-            ignore_words: vec![],
-        };
-        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
-        assert!(dir.join("vault.dictionary").exists());
-        // Now persist empty → file removed.
         persist_payload_to_dir(
             MetaVersion::V0_1,
             &dir,
@@ -305,12 +345,66 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    /// The read-merge-write (myne-md/myne#640): the caller's RAM snapshot must
+    /// not delete a word the sync engine already merged onto disk. Before this,
+    /// `persist_payload_to_dir` wrote the snapshot verbatim, so a peer's word
+    /// that arrived by sync and had not yet been re-hydrated into RAM was
+    /// dropped by the next local add.
+    #[test]
+    fn a_local_write_does_not_delete_a_word_the_sync_engine_merged() {
+        let dir = tmp();
+        // On disk: a word that arrived from a peer.
+        let on_disk = PersonalDictionaryData {
+            personal_words: vec!["from-peer".into()],
+            ..Default::default()
+        };
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &on_disk).expect("seed disk");
+        // RAM: a snapshot taken before the peer's word arrived, holding only the
+        // local add.
+        let stale_ram = PersonalDictionaryData {
+            personal_words: vec!["local-add".into()],
+            ..Default::default()
+        };
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &stale_ram).expect("persist");
+        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1).expect("hydrate");
+        assert_eq!(
+            back.personal_words,
+            vec!["from-peer", "local-add"],
+            "the peer's word must survive a local write"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A tombstone-only payload must NOT be treated as empty: deleting the file
+    /// would delete the only bytes that make the removal converge.
+    #[test]
+    fn a_tombstone_only_payload_is_written_not_deleted() {
+        let dir = tmp();
+        let mut data = PersonalDictionaryData::default();
+        data.remove_personal("gone", 42);
+        persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
+        assert!(
+            dir.join("vault.dictionary").exists(),
+            "a tombstone-only payload must be persisted"
+        );
+        let back = hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1).expect("hydrate");
+        assert_eq!(back.personal_words, Vec::<String>::new());
+        assert!(back.removal_clocks.contains_key(
+            &myne_core::plugins::sync::dictionary_payload::clock_key(
+                myne_core::plugins::sync::dictionary_payload::PERSONAL_WORDS_FIELD,
+                "gone"
+            )
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     #[test]
     fn wrong_key_is_unreadable_not_empty() {
         let dir = tmp();
         let data = PersonalDictionaryData {
             personal_words: vec!["secret".into()],
             ignore_words: vec![],
+            ..Default::default()
         };
         persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         // #255: a blob that EXISTS and does not decrypt is an error, not an
@@ -318,13 +412,13 @@ mod tests {
         // persist empty over a file that was merely unread.
         let other = [0x11; AEAD_KEY_LEN];
         assert!(matches!(
-            hydrate_payload_from_dir(&dir, &other, &HASH),
+            hydrate_payload_from_dir(&dir, &other, &HASH, MetaVersion::V0_1),
             Err(SpellSyncError::Unreadable)
         ));
         // A different account-hash (cross-vault AAD) — same verdict.
         let other_hash = [0x22; VAULT_META_ACCOUNT_HASH_LEN];
         assert!(matches!(
-            hydrate_payload_from_dir(&dir, &KEY, &other_hash),
+            hydrate_payload_from_dir(&dir, &KEY, &other_hash, MetaVersion::V0_1),
             Err(SpellSyncError::Unreadable)
         ));
         std::fs::remove_dir_all(&dir).ok();
@@ -335,7 +429,7 @@ mod tests {
         let dir = tmp();
         std::fs::write(dir.join("vault.dictionary"), b"not a MYD1 blob").expect("write");
         assert!(matches!(
-            hydrate_payload_from_dir(&dir, &KEY, &HASH),
+            hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1),
             Err(SpellSyncError::Unreadable)
         ));
         std::fs::remove_dir_all(&dir).ok();
@@ -349,20 +443,22 @@ mod tests {
         let data = PersonalDictionaryData {
             personal_words: vec!["irreplaceable".into()],
             ignore_words: vec![],
+            ..Default::default()
         };
         persist_payload_to_dir(MetaVersion::V0_1, &dir, &KEY, &HASH, &data).expect("persist");
         let before = std::fs::read(dir.join("vault.dictionary")).expect("read blob");
 
         // Hydrate with the wrong key — the "could not read it this once" case.
         let wrong = [0x11; AEAD_KEY_LEN];
-        assert!(hydrate_payload_from_dir(&dir, &wrong, &HASH).is_err());
+        assert!(hydrate_payload_from_dir(&dir, &wrong, &HASH, MetaVersion::V0_1).is_err());
 
         // The file is untouched; the words are still recoverable with the real
         // key. Before #255 the caller would have hydrated empty and the next
         // add would have written that empty over these bytes.
         let after = std::fs::read(dir.join("vault.dictionary")).expect("read blob");
         assert_eq!(before, after, "a failed read must not touch the blob");
-        let recovered = hydrate_payload_from_dir(&dir, &KEY, &HASH).expect("still readable");
+        let recovered =
+            hydrate_payload_from_dir(&dir, &KEY, &HASH, MetaVersion::V0_1).expect("still readable");
         assert_eq!(recovered.personal_words, vec!["irreplaceable"]);
         std::fs::remove_dir_all(&dir).ok();
     }
