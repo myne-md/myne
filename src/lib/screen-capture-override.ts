@@ -26,6 +26,8 @@
 // typed refusal.
 
 import { invoke } from "../platform/core";
+import { has } from "../platform/capabilities";
+import { setScreenCaptureProtection } from "./prefs";
 
 /** Mirrors `plugins::screen_capture::commands::ScreenCaptureOverrideView`. */
 export interface ScreenCaptureOverrideView {
@@ -104,4 +106,40 @@ export async function setScreenCaptureOverride(
  */
 export async function showWindowProtected(): Promise<void> {
   await invoke<void>("plugin:screen-capture|screen_capture_show_protected");
+}
+
+/**
+ * The write rule of the ONE user-facing screen-capture control, for callers
+ * outside React: BOTH halves, device file first.
+ *
+ * The file is what governs the window immediately and what the pre-unlock
+ * surface reads, so a failure there means nothing was written anywhere and this
+ * resolves `false` rather than writing the other half. The sealed preference is
+ * written second, through the same setter the Privacy row's `usePrefs` path
+ * ends at.
+ *
+ * `PrivacyPanel` follows the same rule with the hook in place of
+ * `setScreenCaptureOverride`, because that path must also publish the shared
+ * device cell the pre-unlock escape reads.
+ *
+ * The capability guard is what keeps this working on the web client, where the
+ * override commands are a typed refusal and there IS nothing to suppress: the
+ * preference is still a real preference there, and the palette action that
+ * reaches it stays live.
+ *
+ * `!enabled` is the file's own polarity: it stores `disabled`, inverted from
+ * "protection is on".
+ */
+export async function applyScreenCaptureSetting(
+  enabled: boolean,
+): Promise<boolean> {
+  if (has("screenCaptureProtection")) {
+    try {
+      await setScreenCaptureOverride(!enabled);
+    } catch {
+      return false;
+    }
+  }
+  await setScreenCaptureProtection(enabled);
+  return true;
 }

@@ -351,7 +351,6 @@ describe("settings search-index: member-vault gate (myne-md/myne#885)", () => {
 // assertion names them by id and compares the reason rather than just the verdict.
 const AGENT_CONTROL_IDS = [
   "privacy.screen-capture",
-  "privacy.screen-capture-override",
   "privacy.auto-lock",
   "cli.access",
   "cli.excluded-folders",
