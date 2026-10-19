@@ -2390,7 +2390,7 @@ The gate over the [declared payload](#declared-payload): it may shrink freely an
 
 **It is not a promise to users.** It bounds drift between releases; it says nothing about what the download will be next year. Three structural assertions keep the number honest: a Git-LFS **pointer** where a blob was expected fails by name (a smudge-skipped checkout would otherwise report a tiny payload and pass forever), a missing declared path fails rather than counting zero, and the bundled-model set is compared against a recorded set **in both directions** — an addition is a decision, and a silent removal of `models/ocr` would break OCR-backed search.
 
-Used in: `scripts/check-desktop-payload-budget.mjs`, `AGENTS.md` (guard table)
+Used in: `scripts/check-desktop-payload-budget.mjs`, `scripts/repo-guards.md` (guard table)
 
 ---
 
