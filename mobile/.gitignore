@@ -46,3 +46,10 @@ playwright-report/
 src-tauri/**/.tauri/
 src-tauri/**/.build/
 **/Package.resolved
+
+# Store-listing captures staged here before they are mirrored to myne-branding.
+# The published copies live in branding; this is the scratch the harness writes.
+store/
+
+# Joined review renders (one image per set). Review artefacts, never shipped.
+panorama/

@@ -15,6 +15,9 @@ import { settingsScreens } from "../screens/settings";
 import { backupScreens } from "../screens/backup";
 import { importScreens } from "../screens/importing";
 import { systemScreens } from "../screens/system";
+import { agentScreens } from "../screens/agent";
+import { memberScreens } from "../screens/members";
+import { portableScreens } from "../screens/portable";
 import { ipadScreens } from "../ipad";
 
 /**
@@ -39,5 +42,8 @@ export const SECTIONS: Section[] = [
   { title: "Backup", prefix: "BK", screens: backupScreens },
   { title: "Import", prefix: "IM", screens: importScreens },
   { title: "System states", prefix: "SYS", screens: systemScreens },
+  { title: "Agent", prefix: "AG", screens: agentScreens },
+  { title: "Collaboration", prefix: "MB", screens: memberScreens },
+  { title: "Plain files", prefix: "PT", screens: portableScreens },
   { title: "iPad · workspace shell", prefix: "WS", screens: ipadScreens },
 ];

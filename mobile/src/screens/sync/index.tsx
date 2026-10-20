@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Screen, ScreenScroll, FooterBar, Button } from "../../components";
+import { Screen, ScreenScroll, FooterBar, Button, ACCOUNT_NUMBER_SPECIMEN } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
 import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
 
@@ -302,7 +302,7 @@ function EnrollDevice() {
           }}
         >
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--fg-1)" }}>
-            MY‑4F2A‑9C17‑8E2D‑1B5F‑K
+            {ACCOUNT_NUMBER_SPECIMEN}
           </span>
         </div>
 

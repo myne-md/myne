@@ -295,6 +295,50 @@ pre-commit:
       glob: "{fastlane/**,mobile/fdroid/**,mobile/src-tauri/tauri.conf.json,mobile/package.json,scripts/check-fdroid-metadata.mjs}"
       run: node scripts/check-fdroid-metadata.mjs
 
+    store-publishable:
+      # myne#896: a publishable store root may hold only frames whose surface a
+      # mobile user can actually reach (Apple 2.3.1 and Play's equivalent), and
+      # what is on disk must match the plan both ways. A frame is a PNG: nothing
+      # in the file says which screen it came from, and nothing in the screen
+      # says whether the app can reach it, so the guard compares the story
+      # against two reason-carrying rosters and the fastlane directory against
+      # the plan. This is the arm that catches a stale `tenInchScreenshots/`
+      # frame the plan no longer writes.
+      #
+      # Globbed like its `fdroid-metadata` neighbour above: every input is under
+      # `fastlane/**` or the store-shots library, so a protocol- or docs-only
+      # commit cannot change the verdict. The `run:` takes no {staged_files}:
+      # the glob decides WHETHER it runs and it sweeps the whole plan when it does.
+      glob: "{fastlane/**,scripts/lib/store-shots/**,scripts/check-store-publishable.mjs}"
+      run: node scripts/check-store-publishable.mjs
+
+    store-frame-identifiers:
+      # myne#896: no store frame may carry an identifier that is not pinned. A
+      # listing is permanent and public, so an account number or recovery-phrase
+      # specimen that reached one could never be retracted. Deliberately a SOURCE
+      # check rather than OCR over the PNGs: it reads the screens the story
+      # renders AND `captions.en.json`, whose strings are drawn onto the frame,
+      # and fails by name on any account-number-shaped value that is not the one
+      # pinned constant. Globbed to the trees those sources live in.
+      glob: "{mobile/src/screens/**,mobile/src/ipad/**,mobile/src/components/**,scripts/lib/store-shots/**,scripts/check-store-frame-identifiers.mjs}"
+      run: node scripts/check-store-frame-identifiers.mjs
+
+    store-set-freshness:
+      # myne#896: a committed store set must still depict the app. The frames are
+      # built FROM the app, but they are committed PNGs, so a screen change with
+      # no re-render drifts silently, which is the failure the hand-set it
+      # replaced had. Failure for a COMMITTED set whose bytes moved without a
+      # --record (bytes against bytes, no browser involved); a warning for a
+      # re-render comparison, which reddens on a browser bump (the precedent is
+      # `preview-freshness` below), because a byte-exact gate needs a pinned
+      # browser and reddens on a font-hinting or GPU-path difference, and a
+      # permanently-red gate gets routed around. `--render` launches a browser and
+      # is a by-hand step; the hook runs the tree-to-record comparison with no
+      # flags. Globbed like its `preview-freshness` sibling; the record it reads
+      # is a committed file named in the glob so a `--record` run fires it too.
+      glob: "{fastlane/**,scripts/store-shots-record.json,scripts/lib/store-shots/**,scripts/check-store-set-freshness.mjs}"
+      run: node scripts/check-store-set-freshness.mjs
+
     twin-inventory:
       # myne#472: every desktop/mobile twin module carries a verdict, and no
       # verdict outlives its files. `check-twin-drift.mjs` (#261) warns when a

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Screen, ScreenScroll, Button } from "../../components";
+import { Screen, ScreenScroll, Button, ACCOUNT_NUMBER_SPECIMEN } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
 
 /**
@@ -243,7 +243,7 @@ function Account() {
           <Row first>
             <span style={{ fontSize: 16 }}>Account no.</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-2)" }}>
-              MY‑4F2A‑9C17‑8E2D‑1B5F‑K
+              {ACCOUNT_NUMBER_SPECIMEN}
             </span>
           </Row>
           <Row>

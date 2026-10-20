@@ -319,6 +319,9 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-twin-inventory.mjs` | every desktop/mobile twin module carries a verdict (`decision` / `screen` / `absent` /… | `pre-commit` + CI `twin-inventory` |
 | `check-manual-test-roster.mjs` | the half of a release CI does not run, gated the way the automated half is | `pre-commit` + CI `manual-test-roster` |
 | `check-fdroid-metadata.mjs` | the F-Droid store metadata against the Android build it describes, which is three… | `pre-commit` + CI `fdroid-metadata` |
+| `check-store-publishable.mjs` | a publishable store root may hold only frames whose surface a mobile user can reach (Apple 2.3.1, Play's equivalent), and every PNG in one is a frame the plan writes… | `pre-commit` + CI `pnpm-build` |
+| `check-store-frame-identifiers.mjs` | no store frame may carry an identifier that is not pinned; it scans the screens the story renders and `captions.en.json`, whose text is drawn onto the frame… | `pre-commit` + CI `pnpm-build` |
+| `check-store-set-freshness.mjs` | a committed store set that no longer matches its append-only record fails; a re-render comparison warns… | `pre-commit` + CI `pnpm-build` |
 | `check-prefs-parity.mjs` | every Rust prefs command in `core/src/plugins/prefs/commands.rs` carries a per-client… | `pre-commit` + CI `prefs-parity` |
 | `check-twin-drift-ratchet.mjs` | ratchet: the recorded SET of twin pairs that differ SEMANTICALLY may shrink, never grow | `pre-commit` + CI `pnpm-build` |
 | `check-twin-drift.mjs` | warns (never fails) when a change touches one side of a twin module pair and not the… | `pre-commit` + CI `pnpm-build` |

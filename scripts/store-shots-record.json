@@ -1,0 +1,683 @@
+{
+ "$comment": "Append-only record of every store set this repository has published, one entry per SET PER RENDER. scripts/check-store-set-freshness.mjs reads the LATEST entry per set and warns when the committed frames differ from it (a re-render nobody recorded) or when `--render` finds a frame whose pixels moved. Entries are never rewritten: the history is what makes a drift report readable. Written by `--record`, read by everything else.",
+ "entries": [
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "3fa165dc9097df6f",
+   "frames": {
+    "01-notes.png": "2f4701577156131d",
+    "02-markdown.png": "2e96711badea0f54",
+    "03-plainfile.png": "29b2de858c88725f",
+    "04-find.png": "278bbae6c84d339b",
+    "05-privacy.png": "583dd3f05340b2fc",
+    "06-server.png": "345db874d2a52c90",
+    "07-agent.png": "2b44a4d0ffe9004f",
+    "08-collab.png": "6a1d7bfebb437b7d"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "e9e2ef8a3735861f",
+   "frames": {
+    "01-notes.png": "ee518fae96396906",
+    "02-markdown.png": "824712dcf069e508",
+    "04-find.png": "eab416bbb03f91f5"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "4cb26494fe3ae355",
+   "frames": {
+    "1.png": "f82276399e7e9482",
+    "2.png": "fd5755b8adfbdf03",
+    "3.png": "3cf37f978b28c206",
+    "4.png": "590260d56cec8672",
+    "5.png": "4b685be0c2735b4f",
+    "6.png": "7ab5a23d01c1d9e2",
+    "7.png": "80db00343ca6979c",
+    "8.png": "7376b32f292fb4db"
+   }
+  },
+  {
+   "set": "play-feature-graphic",
+   "at": "2026-10-17",
+   "hash": "c4c9563b719f22f8",
+   "frames": {
+    "featureGraphic.png": "addea66aff8842c4"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "0f92040683cf58b5",
+   "frames": {
+    "01-notes.png": "2f4701577156131d",
+    "02-markdown.png": "2e96711badea0f54",
+    "03-plainfile.png": "e17d9626cc7485ee",
+    "04-find.png": "21587a4f5f7f0679",
+    "05-privacy.png": "0067e926c2792380",
+    "06-server.png": "cef66a946237e830",
+    "07-agent.png": "fd9cd4837f64f74c",
+    "08-collab.png": "6a1d7bfebb437b7d"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "e8b5f2281cb1ce0b",
+   "frames": {
+    "1.png": "f82276399e7e9482",
+    "2.png": "fd5755b8adfbdf03",
+    "3.png": "3cf37f978b28c206",
+    "4.png": "590260d56cec8672",
+    "5.png": "4b685be0c2735b4f",
+    "6.png": "7ab5a23d01c1d9e2",
+    "7.png": "43217a53ac37469f",
+    "8.png": "7376b32f292fb4db"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "e3bb006aaaf46cca",
+   "frames": {
+    "01-notes.png": "ff493e328433e15e",
+    "02-markdown.png": "4c476a4f801c7892",
+    "03-plainfile.png": "ee041a655e015c70",
+    "04-find.png": "3b80d14c82181fcb",
+    "05-privacy.png": "a6069352b353f758",
+    "06-server.png": "5a0552c746ffea2b",
+    "07-agent.png": "871af7cbe6775423",
+    "08-collab.png": "a855b1eaf3cd6f2e"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "15df7d19aae1a2a8",
+   "frames": {
+    "01-notes.png": "ca25f7f5b8571099",
+    "02-markdown.png": "718de0f603d436f8",
+    "04-find.png": "e36ca89c682f09ee"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "5b6a4a586e7f7d46",
+   "frames": {
+    "1.png": "6474c8be8e9be25f",
+    "2.png": "1553c60e7497df4d",
+    "3.png": "6a5b7ced76cf948a",
+    "4.png": "fef2f8e11177f060",
+    "5.png": "bcc167d901b40dcf",
+    "6.png": "df6f443c74391bf2",
+    "7.png": "2ffd5509ca2aab4a",
+    "8.png": "f6fafbab47b951d0"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "ceb9033df455666f",
+   "frames": {
+    "01-notes.png": "084464da8bf76ee2",
+    "02-markdown.png": "61ba8f7c8fb70bc9",
+    "03-plainfile.png": "19f71b49f6b8a12b",
+    "04-find.png": "c9420b3852ec7935",
+    "05-privacy.png": "f06626a2663074e7",
+    "06-server.png": "b15fe4fbafecf6e1",
+    "07-agent.png": "39bb9600cf6e99c9",
+    "08-collab.png": "3b522f79cb16d4ef"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "7b7747affd2a64ad",
+   "frames": {
+    "01-notes.png": "65853e5d3318140d",
+    "02-markdown.png": "1c01efbae29f1c9a",
+    "04-find.png": "6b84279cbf33a257"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "8c72362f075096c3",
+   "frames": {
+    "1.png": "1444be297b4b4977",
+    "2.png": "a57382e8a881d2ea",
+    "3.png": "9e857dd6112259d5",
+    "4.png": "76202bc4e1797cff",
+    "5.png": "d29361f2075741b5",
+    "6.png": "bc438c81c279a513",
+    "7.png": "9f26c7bf1414145b",
+    "8.png": "0257f3ca13347a6e"
+   }
+  },
+  {
+   "set": "play-feature-graphic",
+   "at": "2026-10-17",
+   "hash": "f911e4911b64fbbc",
+   "frames": {
+    "featureGraphic.png": "49de16c80b8194b4"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "86ee8c252f3efdb7",
+   "frames": {
+    "01-notes.png": "7a9cf2ddec43ca56",
+    "02-markdown.png": "2d1ceecdf66a8f68",
+    "03-plainfile.png": "ca29d3247ee79a13",
+    "04-find.png": "87bc08098d49939f",
+    "05-privacy.png": "18c27739dcbeb391",
+    "06-server.png": "c5a5903635c3259d",
+    "07-agent.png": "6b9e0893e266612c",
+    "08-collab.png": "9c8657bbef8b0170"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "0cfdcbfe535bc8e9",
+   "frames": {
+    "01-notes.png": "7d3cede54444266a",
+    "02-markdown.png": "94cac5ca91b6180a",
+    "04-find.png": "655ac5452a6fbadc"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "d8d8681fb5e3cd84",
+   "frames": {
+    "1.png": "f16f8502d6a38d37",
+    "2.png": "697f97fe94a64769",
+    "3.png": "97c5222c0ec894e3",
+    "4.png": "e715786ce35f640c",
+    "5.png": "9fa93ee3cce9d9ab",
+    "6.png": "139d1b6ef92ef4b9",
+    "7.png": "5d6d851bee7c881e",
+    "8.png": "caa879beef97f0a6"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "aac1a4f01c600d9c",
+   "frames": {
+    "01-notes.png": "bd33693bdee2926f",
+    "02-markdown.png": "1c0eceacad303f1c",
+    "03-plainfile.png": "c18bfff8962c581d",
+    "04-find.png": "67637f2395866878",
+    "05-privacy.png": "ad2ebcb4c5238647",
+    "06-server.png": "117ef40c719b087c",
+    "07-agent.png": "29ba7e2f9d695985",
+    "08-collab.png": "46091459565c9e14"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "d3fc559e1501aca9",
+   "frames": {
+    "01-notes.png": "af8f218a8e988a7d",
+    "02-markdown.png": "5c63b4ca2d9eb877",
+    "04-find.png": "375f968c8ce8f082"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "52739b882bd8fdef",
+   "frames": {
+    "1.png": "776d8b2268f10f0c",
+    "2.png": "ada60ffcd707210a",
+    "3.png": "19e7c3ea4044ef7b",
+    "4.png": "c29639d7e346b7c6",
+    "5.png": "93e683c216b98b2d",
+    "6.png": "3486e89992a7e076",
+    "7.png": "fc23f4fac8e7bfa2",
+    "8.png": "a1d849295ab71abf"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "be2778be18488c0a",
+   "frames": {
+    "01-notes.png": "e3d54219ff4cf5e8",
+    "02-markdown.png": "f710f1790e9b10c0",
+    "03-plainfile.png": "2f78875c13ac8539",
+    "04-find.png": "0578ee9f684c1bc0",
+    "05-privacy.png": "79223994561d4844",
+    "06-server.png": "ad57c8b2828f2021",
+    "07-agent.png": "3f697214c5011cb5",
+    "08-collab.png": "870b5b1c5b784dbd"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "3bcc2138718cb255",
+   "frames": {
+    "01-notes.png": "f625e1343ed8e615",
+    "02-markdown.png": "08e117ca16138931",
+    "04-find.png": "07be799de5efaf28"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "790d6c8272c7c10b",
+   "frames": {
+    "1.png": "aad50826ebbe69a3",
+    "2.png": "a57605de4604b5bd",
+    "3.png": "39c2769d8c51d7ab",
+    "4.png": "f75d0007db1f439c",
+    "5.png": "6c80f46a2faa1933",
+    "6.png": "cee583666fef51dc",
+    "7.png": "b3a6bc269e059497",
+    "8.png": "30c0c6443a47b9ba"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "d5c8e3e46ace5da0",
+   "frames": {
+    "01-notes.png": "2e1c807ac09d9c88",
+    "02-markdown.png": "3f295f9174037076",
+    "03-plainfile.png": "2dd884b356a82891",
+    "04-find.png": "dc2322bdda85c189",
+    "05-privacy.png": "0266998c55f0c988",
+    "06-server.png": "a6e31a9d5f0d1a11",
+    "07-agent.png": "c0894fefaa5862a1",
+    "08-collab.png": "0c75153556d1029e"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "9c3f32b0bcccb3ac",
+   "frames": {
+    "01-notes.png": "ac89f465dad5cbf6",
+    "02-markdown.png": "692d399be910e7b3",
+    "04-find.png": "187d434fbc0b13b5"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "0539c03f3acad7a3",
+   "frames": {
+    "1.png": "4679468e514f7599",
+    "2.png": "ded1b6bac0641da3",
+    "3.png": "21b53b3809d16e38",
+    "4.png": "3e145ffaba15ed66",
+    "5.png": "d1e199b2bceba6e4",
+    "6.png": "4f07c39a81e216e7",
+    "7.png": "b0976a767fe32d9e",
+    "8.png": "930822c52b47308d"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "3347d92b122470fc",
+   "frames": {
+    "01-notes.png": "ad9fead3db594585",
+    "02-markdown.png": "a9b0fa42eaaf0a96",
+    "03-plainfile.png": "30595e38275f601a",
+    "04-find.png": "e0c840e43ab18e8e",
+    "05-privacy.png": "b6855ab8d3ee3fa8",
+    "06-server.png": "91ca8285abf35795",
+    "07-agent.png": "48431073997ee98d",
+    "08-collab.png": "5c71f5e20a7840f3"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "1301d1258eb4b467",
+   "frames": {
+    "01-notes.png": "2cf94256291dda3a",
+    "02-markdown.png": "c69a9389419fb685",
+    "04-find.png": "10a90aa0c8f9a7e3"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "1311db4fa5f03971",
+   "frames": {
+    "1.png": "1fb174904b17b9cf",
+    "2.png": "4800b22ce77d3b34",
+    "3.png": "f55a5c981abc9dee",
+    "4.png": "70c0945a0ac41883",
+    "5.png": "db90c406a4eca8e2",
+    "6.png": "2be8791c7046b49d",
+    "7.png": "995a15ac3b336b94",
+    "8.png": "7f361eeb1dd055d4"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "685c66d2fbe89c17",
+   "frames": {
+    "01-notes.png": "a32e105fb1457041",
+    "02-markdown.png": "a9b0fa42eaaf0a96",
+    "03-plainfile.png": "727975fbc599630f",
+    "04-find.png": "e0c840e43ab18e8e",
+    "05-privacy.png": "108b173c4ad78ad7",
+    "06-server.png": "91e9d1582e9a48e7",
+    "07-agent.png": "48431073997ee98d",
+    "08-collab.png": "f777cb41ed0d7463"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "c68592431ad28718",
+   "frames": {
+    "01-notes.png": "d630f818ccb29cc7",
+    "02-markdown.png": "cd7e7214f01bb9e1",
+    "04-find.png": "95eade25154820b1"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "07bfceccdce9fff0",
+   "frames": {
+    "1.png": "b2beb4c9a45f0cf9",
+    "2.png": "4800b22ce77d3b34",
+    "3.png": "d6a0a8f0f6960bd0",
+    "4.png": "70c0945a0ac41883",
+    "5.png": "c3d3633e895eb15f",
+    "6.png": "f3bbb32cc226cc3c",
+    "7.png": "995a15ac3b336b94",
+    "8.png": "7df71068ad539ffb"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "59a53085ef2cfa22",
+   "frames": {
+    "01-notes.png": "23b1c81879f088c5",
+    "02-markdown.png": "34ddf97662377631",
+    "03-plainfile.png": "efba6490ebe9e61e",
+    "04-find.png": "270cb11bcc4c790a",
+    "05-privacy.png": "91c20510f5e3a4a2",
+    "06-server.png": "c164f638d1683b8e",
+    "07-agent.png": "a36929465f232d55",
+    "08-collab.png": "b35f1e365c15d46f"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "b3a59d8feb2d397f",
+   "frames": {
+    "01-notes.png": "74d16788e4513608",
+    "02-markdown.png": "e4daad682a6313e6",
+    "04-find.png": "35d94129caf0e034"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "e2a5f582ee7440b0",
+   "frames": {
+    "1.png": "587da4f01a43e212",
+    "2.png": "2fa3e685d2fad37f",
+    "3.png": "c280047ecc30d0ed",
+    "4.png": "43eac3b9d1d10d80",
+    "5.png": "b4c18135166a8d0b",
+    "6.png": "b80b9fffc8364083",
+    "7.png": "603fb55ac2b5b5c7",
+    "8.png": "fd68774808475270"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "5a9d9cab819960ce",
+   "frames": {
+    "01-notes.png": "23b1c81879f088c5",
+    "02-markdown.png": "34ddf97662377631",
+    "03-plainfile.png": "efba6490ebe9e61e",
+    "04-find.png": "270cb11bcc4c790a",
+    "05-agent.png": "34124f6def8b0375",
+    "06-collab.png": "4b4a0963a3bcd2e5",
+    "07-privacy.png": "757569f46b7267fd",
+    "08-server.png": "038069292f44152e"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "b6c5d3d98f1449bf",
+   "frames": {
+    "1.png": "587da4f01a43e212",
+    "2.png": "2fa3e685d2fad37f",
+    "3.png": "c280047ecc30d0ed",
+    "4.png": "43eac3b9d1d10d80",
+    "5.png": "b3f424ef99dbe3dd",
+    "6.png": "d5f5fe2b53ceae43",
+    "7.png": "cd65b9f28b7a45a9",
+    "8.png": "73ada0cc863b4dd3"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "30f74045baea5173",
+   "frames": {
+    "01-notes.png": "23b1c81879f088c5",
+    "02-markdown.png": "34ddf97662377631",
+    "03-plainfile.png": "efba6490ebe9e61e",
+    "04-find.png": "270cb11bcc4c790a",
+    "05-agent.png": "247c2512814d80a5",
+    "06-collab.png": "e0bc9e2f6944e594",
+    "07-privacy.png": "757569f46b7267fd",
+    "08-server.png": "038069292f44152e"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "7fe43bde9df61383",
+   "frames": {
+    "1.png": "587da4f01a43e212",
+    "2.png": "2fa3e685d2fad37f",
+    "3.png": "c280047ecc30d0ed",
+    "4.png": "43eac3b9d1d10d80",
+    "5.png": "3ba26d921038da10",
+    "6.png": "c643326b5ec1deee",
+    "7.png": "cd65b9f28b7a45a9",
+    "8.png": "73ada0cc863b4dd3"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "48707363741100f3",
+   "frames": {
+    "01-notes.png": "23b1c81879f088c5",
+    "02-markdown.png": "34ddf97662377631",
+    "03-agent.png": "a7404c38717bdbad",
+    "04-collab.png": "bac367db21a709a7",
+    "05-plainfile.png": "0fa96905865ed610",
+    "06-find.png": "3ebcc166aad5bcdd",
+    "07-privacy.png": "8700f3b4ecb77ecc",
+    "08-server.png": "038069292f44152e"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "f05a7efeaba4ef78",
+   "frames": {
+    "01-notes.png": "74d16788e4513608",
+    "02-markdown.png": "e4daad682a6313e6",
+    "06-find.png": "35d94129caf0e034"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "d0357006d6bb358a",
+   "frames": {
+    "1.png": "587da4f01a43e212",
+    "2.png": "2fa3e685d2fad37f",
+    "3.png": "f6525e6ba5a5638c",
+    "4.png": "91b3eb80e2e4d2e6",
+    "5.png": "954f28eb87ea11b6",
+    "6.png": "322318b062494200",
+    "7.png": "c4d1835439720d46",
+    "8.png": "73ada0cc863b4dd3"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "dfb899d3f91e275d",
+   "frames": {
+    "01-notes.png": "ade7f9a8ed433f31",
+    "02-markdown.png": "76272914a9a2acde",
+    "03-agent.png": "22aa575f10a431b8",
+    "04-collab.png": "0914a5853ec5dbdf",
+    "05-plainfile.png": "1c25d7c13a5df9c9",
+    "06-find.png": "4d020730ddf752a4",
+    "07-privacy.png": "5ee14fc4a8bb8eec",
+    "08-server.png": "fd122c69c5f27440"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "0fe9a74240a71515",
+   "frames": {
+    "01-notes.png": "51f5b943940813f5",
+    "02-markdown.png": "19120f880aaedc9a",
+    "06-find.png": "ab94b9ce22bcef2b"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "acea45e98a121f51",
+   "frames": {
+    "1.png": "27f04f03d4795a16",
+    "2.png": "f154d1b704f22bcc",
+    "3.png": "1dee43a09bacc374",
+    "4.png": "0c93208501fa551d",
+    "5.png": "9a364f6819a772cb",
+    "6.png": "a2a42f07c17081b8",
+    "7.png": "e0c61f7cb96707de",
+    "8.png": "3cc6da2815eba755"
+   }
+  },
+  {
+   "set": "play-feature-graphic",
+   "at": "2026-10-17",
+   "hash": "63e4780c5357c748",
+   "frames": {
+    "featureGraphic.png": "29d565d34e12fb0e"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "57fdf1836b383397",
+   "frames": {
+    "01-notes.png": "ade7f9a8ed433f31",
+    "02-markdown.png": "76272914a9a2acde",
+    "03-agent.png": "22aa575f10a431b8",
+    "04-collab.png": "0914a5853ec5dbdf",
+    "05-plainfile.png": "74c9da40f2fd0e7e",
+    "06-find.png": "4d020730ddf752a4",
+    "07-privacy.png": "5ee14fc4a8bb8eec",
+    "08-server.png": "fd122c69c5f27440"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "5a99a413ba6f758b",
+   "frames": {
+    "1.png": "27f04f03d4795a16",
+    "2.png": "f154d1b704f22bcc",
+    "3.png": "1dee43a09bacc374",
+    "4.png": "0c93208501fa551d",
+    "5.png": "2e8c36874053949f",
+    "6.png": "a2a42f07c17081b8",
+    "7.png": "e0c61f7cb96707de",
+    "8.png": "3cc6da2815eba755"
+   }
+  },
+  {
+   "set": "iphone-6.9",
+   "at": "2026-10-17",
+   "hash": "6274a33d15f974b2",
+   "frames": {
+    "01-notes.png": "99f1f979114098a6",
+    "02-markdown.png": "e08ca3431cc5ac8b",
+    "03-agent.png": "13d6a6e2bd01466f",
+    "04-collab.png": "3f97adf39dd978cc",
+    "05-plainfile.png": "c71796e0e0dfb2a9",
+    "06-find.png": "416dfe3aae85c5ac",
+    "07-privacy.png": "14141527e404e789",
+    "08-server.png": "00f5698e2727a394"
+   }
+  },
+  {
+   "set": "ipad-13",
+   "at": "2026-10-17",
+   "hash": "8fcaad7b144a2051",
+   "frames": {
+    "01-notes.png": "ed03a221c48050c3",
+    "02-markdown.png": "5f4a7985b3a6ea8a",
+    "06-find.png": "6ea71552e9122f2e"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-17",
+   "hash": "4369ef5ef0b9fa7a",
+   "frames": {
+    "1.png": "c6973d61b5d0ed4d",
+    "2.png": "5602876975e17066",
+    "3.png": "764f932f164bd73e",
+    "4.png": "9d78853186c8e719",
+    "5.png": "bdfa8abcfc5271f8",
+    "6.png": "ba4908797ca0677e",
+    "7.png": "f0631bbd403ecfd4",
+    "8.png": "3a4b65d9d6861dc7"
+   }
+  },
+  {
+   "set": "android-phone",
+   "at": "2026-10-20",
+   "hash": "f80ce21f7ac430ab",
+   "frames": {
+    "1.png": "d761785de96d306d",
+    "2.png": "96866623f8c1ac47",
+    "3.png": "e54a7e1f2a98aae1",
+    "4.png": "d00b4111344774c1",
+    "5.png": "1aa7fd302769d6ed",
+    "6.png": "d7db7d65e9f52dda",
+    "7.png": "8d58fd0587da7e9e"
+   }
+  }
+ ]
+}
