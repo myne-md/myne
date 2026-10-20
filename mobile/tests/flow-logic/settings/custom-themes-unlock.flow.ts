@@ -89,9 +89,15 @@ test.describe("mobile custom-themes across the lock boundary", () => {
     const applied = await rootCustomProps(page);
     expect(applied["--paper"]).toBe("#101014");
     expect(applied["--accent"]).toBe("#7aa2f7");
-    // The dark palette's syntax roles come from the shared derivation, so the
-    // unlock path goes through the same applier the Appearance tap uses.
-    expect(applied["--syntax-keyword"]).toBe("var(--_syntax-keyword-dark)");
+    // The dark palette's syntax roles come from the canon seed, so the unlock
+    // path goes through the same applier the Appearance tap uses. The inline
+    // value is the resolved dark ramp, compared against the stylesheet's own
+    // value rather than a literal.
+    const darkSyntaxRamp = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--_syntax-keyword-dark").trim(),
+    );
+    expect(darkSyntaxRamp).not.toBe("");
+    expect(applied["--syntax-keyword"]).toBe(darkSyntaxRamp);
     // Painted first, editor second — the editor never rendered a frame under the
     // built-in appearance.
     expect(await page.evaluate(() => (window as unknown as { __paintOrder: string[] }).__paintOrder)).toEqual([
@@ -209,7 +215,11 @@ test.describe("mobile custom-themes across the lock boundary", () => {
 
     const applied = await rootCustomProps(page);
     expect(applied["--paper"]).toBe("#101014");
-    expect(applied["--syntax-keyword"]).toBe("var(--_syntax-keyword-dark)");
+    const darkSyntaxRamp = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--_syntax-keyword-dark").trim(),
+    );
+    expect(darkSyntaxRamp).not.toBe("");
+    expect(applied["--syntax-keyword"]).toBe(darkSyntaxRamp);
     expect(await page.evaluate(() => (window as unknown as { __paintOrder: string[] }).__paintOrder)).toEqual([
       "palette",
       "editor",

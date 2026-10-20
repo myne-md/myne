@@ -52,7 +52,6 @@ export default defineConfig({
       { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
       // The custom-theme syntax derivation (MYND-598) - mirror of
       // vite.config.ts, which carries the rationale for sharing it.
-      { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
       // The ornament role contract and the measure-token clamp (myne#394) -
       // mirror of vite.config.ts. `src/lib/customTheme.ts` imports both, so
       // without these two lines every test that reaches custom-theme code fails
@@ -60,6 +59,7 @@ export default defineConfig({
       // count, passing or failing. This file's own header says why the mirror
       // exists, and it is exactly the failure it warns about.
       { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
+      { find: /^@myne\/theme-canon$/, replacement: sib("../src/lib/themeCanon.ts") },
       { find: /^@myne\/ornaments$/, replacement: sib("../ornaments/src/index.ts") },
       { find: /^@myne\/ornaments\/(.*)$/, replacement: sib("../ornaments/src/$1") },
       // The shared knowledge-graph overlay builder (myne-md/myne#727) - mirror of

@@ -1,19 +1,13 @@
-// MYND-356 (design-neutral half): pick the ALREADY-DESIGNED light-vs-dark code-
-// syntax palette for a custom theme by its background's WCAG luminance.
+// Colour-math helpers for the theme apply path: parse a CSS colour, measure its
+// WCAG relative luminance, and answer whether a background counts as dark.
 //
-// The FULL 356 — deriving syntax HUES from a theme's accent/palette — is a
-// design decision owned by the theme gallery (MYND-346), and this module does
-// NOT invent colors. It closes the concrete readability gap: a custom theme that
-// omits its own `--syntax-*` tokens currently inherits the built-in LIGHT syntax
-// palette, which is unreadable on a dark theme. Here we detect whether the
-// theme's background is dark and, if so, alias the syntax tokens to the existing
-// `--_syntax-*-dark` raw ramp (the same design-tuned, AA-checked values the
-// built-in dark theme uses, defined unconditionally in `:root`) — reusing
-// approved colors, inventing none. The fill is PER-ROLE: a role the theme
-// defines itself is kept; only the roles it omits are aliased to the dark ramp.
-// A light theme keeps the light default. (MYND-527: the earlier all-or-nothing
-// gate — any `--syntax-*` → no derivation — left the 7 roles that the shipped
-// gallery themes omit on the unreadable light `:root` defaults.)
+// They exist so the appearance of a custom theme is decided by MEASUREMENT of the
+// theme's own `--paper`, not by whichever built-in was active when it was applied
+// (MYND-356). `theme.ts::applyCustomTheme` uses `isDarkBackground` to pick which
+// built-in colour canon to seed the tokens the theme omits; `SYNTAX_TOKEN_ROLES`
+// is the syntax third of the optional-token roster that seed walks.
+//
+// Pure by design: no DOM here, so the arithmetic is testable on its own.
 
 /** The 12 code-syntax token roles — mirrors `--syntax-*` in `styles/tokens.css`. */
 export const SYNTAX_TOKEN_ROLES = [
@@ -31,30 +25,50 @@ export const SYNTAX_TOKEN_ROLES = [
   "invalid",
 ] as const;
 
-/** Parse a CSS color (`#rgb` / `#rrggbb` / `rgb()`/`rgba()`) to 0–255 RGB, or
- *  `null` when the form is not one this detector understands. */
+/** Parse a CSS color to 0–255 RGB, or `null` when the form is not one this
+ *  detector understands.
+ *
+ *  Covers every form the theme value allowlist admits (`theme-validator`:
+ *  three-, four-, six- and eight-digit hex, `rgb()`/`rgba()` with commas or
+ *  spaces, `hsl()`/`hsla()`), because appearance classification reads the
+ *  theme's own `--paper`: a form it mis-reads as unparseable makes a dark theme
+ *  take the light canon, which is the defect this detector exists to prevent.
+ *  A genuinely unknown form still answers `null` (the safe no-change fallback).
+ */
 export function parseColorToRgb(value: string): [number, number, number] | null {
-  const v = value.trim();
-  const hex = v.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  const v = value.trim().toLowerCase();
+  const hex = v.match(/^#([0-9a-f]{3,8})$/);
   if (hex !== null) {
     let h = hex[1]!;
-    if (h.length === 3) {
+    if (h.length === 3 || h.length === 4) {
       h = h
         .split("")
         .map((c) => c + c)
         .join("");
     }
-    const n = Number.parseInt(h, 16);
-    return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
-  }
-  const rgb = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
-  if (rgb !== null) {
-    const c: [number, number, number] = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-    if (c.every((x) => Number.isFinite(x))) {
-      return c.map((x) => Math.max(0, Math.min(255, x))) as [number, number, number];
+    if (h.length === 6 || h.length === 8) {
+      const n = Number.parseInt(h.slice(0, 6), 16);
+      return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
     }
+    return null;
   }
-  return null;
+  const fn = v.match(/^(rgba?|hsla?)\(([^)]*)\)$/);
+  if (fn === null) return null;
+  const parts = (fn[2]!.match(/[-+]?[\d.]+%?/g) ?? []).slice(0, 3);
+  if (parts.length < 3) return null;
+  const nums = parts.map((t) => Number.parseFloat(t));
+  if (!nums.every((n) => Number.isFinite(n))) return null;
+  if (fn[1]!.startsWith("rgb")) {
+    const channels = nums.map((n, i) => (parts[i]!.endsWith("%") ? (n * 255) / 100 : n));
+    return channels.map((x) => Math.max(0, Math.min(255, x))) as [number, number, number];
+  }
+  const h = ((nums[0]! % 360) + 360) % 360;
+  const sat = Math.max(0, Math.min(100, nums[1]!)) / 100;
+  const light = Math.max(0, Math.min(100, nums[2]!)) / 100;
+  const a = sat * Math.min(light, 1 - light);
+  const k = (n: number): number => (n + h / 30) % 12;
+  const f = (n: number): number => light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)].map((x) => Math.round(x * 255)) as [number, number, number];
 }
 
 /** WCAG relative luminance (0 = black … 1 = white) of an sRGB color. */
@@ -72,34 +86,4 @@ export function relativeLuminance([r, g, b]: [number, number, number]): number {
 export function isDarkBackground(background: string): boolean {
   const rgb = parseColorToRgb(background);
   return rgb !== null && relativeLuminance(rgb) < 0.5;
-}
-
-/**
- * The `--syntax-*` overrides to apply for a custom-theme `palette`, or `{}` for
- * none. On a dark background (`--paper`, a required core token) aliases each of
- * the 12 syntax roles the theme does NOT define itself to the built-in dark
- * syntax ramp; roles the theme defines are left to its own value. Returns `{}`
- * for a light theme, a theme with no `--paper`, or a dark theme that already
- * defines all 12 roles. Pure — no DOM; the apply path
- * (`theme.ts::applyCustomTheme`) writes the result via the CSSOM.
- *
- * Per-role rather than all-or-nothing (MYND-527): the shipped gallery themes
- * define only 5 of the 12 roles, so an all-or-nothing gate disengaged entirely
- * and left the other 7 on the light `:root` defaults — unreadable on a dark
- * surface. Filling only the omitted roles closes that partial-set gap without
- * ever overriding a color the theme chose for itself.
- */
-export function deriveSyntaxTokensForTheme(
-  palette: Record<string, string>,
-): Record<string, string> {
-  const background = palette["--paper"];
-  if (background === undefined || !isDarkBackground(background)) return {};
-  const out: Record<string, string> = {};
-  for (const role of SYNTAX_TOKEN_ROLES) {
-    const key = `--syntax-${role}`;
-    if (palette[key] === undefined) {
-      out[key] = `var(--_syntax-${role}-dark)`;
-    }
-  }
-  return out;
 }

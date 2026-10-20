@@ -115,7 +115,6 @@ export default defineConfig(async () => ({
       // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
       // imports at all - pure functions over a `Record<string, string>`, no DOM,
       // no host calls. Exact specifier, no wildcard (same reasoning as above).
-      { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
       // The measure-token CLAMP (deep-customization, myne#394). Shared for the
       // same reason as the syntax derivation, and for a stronger one: the clamp
       // is a protective envelope, so two clients disagreeing about it means one
@@ -123,6 +122,7 @@ export default defineConfig(async () => ({
       // Tauri-coupled `../src/lib/` because the module's only environmental
       // touch is `getComputedStyle` on an element the caller passes in.
       { find: /^@myne\/theme-measure$/, replacement: sib("../src/lib/themeMeasure.ts") },
+      { find: /^@myne\/theme-canon$/, replacement: sib("../src/lib/themeCanon.ts") },
       // The CLIPBOARD COPY CONTRACT (myne-md/myne#390 + myne-md/myne#455). Shared
       // because "what does a Copy tell the user" is not a per-client preference:
       // eleven call sites across three trees each answered it alone and produced

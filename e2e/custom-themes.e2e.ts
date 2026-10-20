@@ -115,6 +115,25 @@ describeE2E("ct2 vault-content custom theme lists + applies (MYND-486)", () => {
         await s.waitUntil(async () => (await rootInlineStyle(s)).includes("#1e1e2e") || null, {
           label: ":root inline style carries the Catppuccin --paper base (#1e1e2e)",
         });
+
+        // A theme is a PARTIAL palette: Catppuccin Mocha omits every label colour
+        // and every highlight. Those families must come from the DARK canon,
+        // because applying a custom theme drops `data-theme` and an omitted token
+        // would otherwise resolve to the light `:root` value: `--label-clay`
+        // arrived as the light #b0543f on a dark theme.
+        //
+        // Compared against the sheet's own dark ramp rather than against a literal,
+        // because the shipped sheet reaches this value through `var(...)`
+        // indirection (`--label-clay: var(--_label-clay-dark)`), which no unit
+        // fixture exercises. Comparing the two readings holds whichever way the
+        // engine answers, and still fails on the light value.
+        const clay = await s.execute<{ painted: string; darkRamp: string }>(
+          "const cs = getComputedStyle(document.documentElement);" +
+            "return { painted: cs.getPropertyValue('--label-clay').trim()," +
+            " darkRamp: cs.getPropertyValue('--_label-clay-dark').trim() };",
+        );
+        expect(clay.darkRamp, "the sheet declares a dark label ramp").not.toBe("");
+        expect(clay.painted, "an omitted family takes the DARK canon value").toBe(clay.darkRamp);
       },
     );
   });

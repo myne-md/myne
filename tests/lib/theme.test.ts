@@ -10,6 +10,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyCustomTheme, clearCustomTheme } from "../../src/lib/theme";
+import { APPEARANCE_VARYING_TOKENS, readAppearanceCanon } from "../../src/lib/themeCanon";
 
 /** Stand in for `tokens.css`, which no test environment loads. */
 function installDefaults(css: string): HTMLStyleElement {
@@ -154,5 +155,109 @@ describe("ornament reflection", () => {
     // The host filters the prefix; this pins that it stays filtered.
     applyCustomTheme({ "--paper": "#fff", "--_o-ceiling": "1" } as Record<string, string>);
     expect(document.documentElement.style.getPropertyValue("--_o-ceiling")).toBe("");
+  });
+});
+
+// ── The canon seed ───────────────────────────────────────────────────────────
+//
+// A theme file is a PARTIAL palette: it carries the 21 required tokens plus
+// whichever optional ones its author set, and the twelve shipped gallery themes
+// carry 27 of the 44 colour tokens on average. Painting only the file's keys left
+// the omitted families on the built-in LIGHT values, because `applyCustomTheme`
+// drops `data-theme` first, so a dark theme came out with light-mode label chips
+// and highlights. The fix seeds the omitted tokens from the canon for the
+// appearance the theme DECLARES.
+describe("applyCustomTheme seeds the appearance canon for omitted tokens", () => {
+  let canon: HTMLStyleElement;
+
+  beforeEach(() => {
+    canon = installDefaults(`
+      :root { --paper: #fbfbfa; --highlight: #f3e7c4; --label-clay: #b0543f; --syntax-keyword: #7a3b8c; }
+      :root[data-theme="dark"] { --paper: #141412; --highlight: #4f4422; --label-clay: #d99683; --syntax-keyword: #c58cd8; }
+    `);
+  });
+
+  afterEach(() => canon.remove());
+
+  it("gives a DARK theme the dark canon for the families it omits", () => {
+    applyCustomTheme({ "--paper": "#1e1e2e" });
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue("--paper")).toBe("#1e1e2e");
+    // The three families a dark gallery theme omits, each of which used to arrive
+    // as the light value.
+    expect(root.style.getPropertyValue("--highlight")).toBe("#4f4422");
+    expect(root.style.getPropertyValue("--label-clay")).toBe("#d99683");
+    expect(root.style.getPropertyValue("--syntax-keyword")).toBe("#c58cd8");
+  });
+
+  it("gives a LIGHT theme the light canon", () => {
+    applyCustomTheme({ "--paper": "#fdfdfc" });
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue("--highlight")).toBe("#f3e7c4");
+    expect(root.style.getPropertyValue("--label-clay")).toBe("#b0543f");
+  });
+
+  it("never overrides a token the theme sets itself", () => {
+    applyCustomTheme({ "--paper": "#1e1e2e", "--highlight": "#123456", "--label-clay": "#654321" });
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue("--highlight")).toBe("#123456");
+    expect(root.style.getPropertyValue("--label-clay")).toBe("#654321");
+  });
+
+  it("reverts the seeded canon on clear, so a locked screen keeps none of it", () => {
+    applyCustomTheme({ "--paper": "#1e1e2e" });
+    clearCustomTheme();
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue("--paper")).toBe("");
+    expect(root.style.getPropertyValue("--highlight")).toBe("");
+    expect(root.style.getPropertyValue("--syntax-keyword")).toBe("");
+  });
+
+  it("readAppearanceCanon puts back the attribute it borrowed", () => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", "amoled");
+    const dark = readAppearanceCanon(root, { "--paper": "#1e1e2e" });
+    expect(root.getAttribute("data-theme")).toBe("amoled");
+    expect(dark["--highlight"]).toBe("#4f4422");
+
+    root.removeAttribute("data-theme");
+    const light = readAppearanceCanon(root, { "--paper": "#fdfdfc" });
+    expect(root.hasAttribute("data-theme")).toBe(false);
+    expect(light["--highlight"]).toBe("#f3e7c4");
+  });
+});
+
+// The COMPLETENESS half of the roster is `themeCanon.test.ts`, which derives the
+// expected set from the sheet and the validator and compares both ways. What this
+// one asserts is that a sheet declaring every roster token leaves none of them
+// unpainted, which is the wiring the roster is useless without.
+describe("the seed paints a value for every token in the roster", () => {
+  let canon: HTMLStyleElement;
+  beforeEach(() => {
+    // The fixture's list IS the roster, deliberately: this test asserts the wiring
+    // (a declared token reaches the root), and the roster's own completeness is
+    // held to the sheet by `themeCanon.test.ts`. Spelling a second list here is
+    // what made the first version of this test unable to fail.
+    const light = APPEARANCE_VARYING_TOKENS.map((name) => `${name}: #111111;`).join(" ");
+    const dark = APPEARANCE_VARYING_TOKENS.map((name) => `${name}: #222222;`).join(" ");
+    canon = installDefaults(`:root { ${light} } :root[data-theme="dark"] { ${dark} }`);
+  });
+  afterEach(() => canon.remove());
+
+  it("leaves no roster token unpainted for a dark theme, and paints the dark value", () => {
+    // The defect this pins: the shipped gallery themes omit whole families, so a
+    // theme that omits one must still end up with a value for it.
+    applyCustomTheme({ "--paper": "#1e1e2e" });
+    const root = document.documentElement;
+    const missing = APPEARANCE_VARYING_TOKENS.filter((k) => root.style.getPropertyValue(k).trim() === "");
+    expect(missing).toEqual([]);
+    expect(root.style.getPropertyValue("--highlight-teal")).toBe("#222222");
+  });
+
+  it("falls back to the light canon when the theme carries no --paper", () => {
+    // `isDarkBackground("")` is false by design, so an unreadable or absent
+    // background takes the light canon rather than throwing.
+    applyCustomTheme({ "--ink-1": "#111111" });
+    expect(document.documentElement.style.getPropertyValue("--highlight-teal")).toBe("#111111");
   });
 });
