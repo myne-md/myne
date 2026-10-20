@@ -152,3 +152,75 @@ describe("tombstoneNote — direct tombstone write", () => {
     });
   });
 });
+
+// myne-md/myne#849 review (D9): the evict-before-delete and the refusal under a
+// session that survived its close had no test, so removing either left the suite
+// green. Driven over the REAL desktop shim (`src/notes/liveNote.ts`) with only the
+// IPC mocked, so the hold the policy keeps is the one `deleteNoteRouted` reads.
+describe("deleteNoteRouted: a note with an open live session", () => {
+  function routeLive(closeFails: boolean): void {
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "plugin:live|live_session_open") return Promise.resolve(undefined);
+      if (cmd === "plugin:live|live_session_close")
+        return closeFails ? Promise.reject({ kind: "Io", detail: "disk full" }) : Promise.resolve(undefined);
+      if (cmd === "plugin:sync|sync_get_endpoint") return Promise.resolve({ endpoint_url: null });
+      if (cmd === "plugin:notes|note_delete") return Promise.resolve(undefined);
+      if (cmd === "plugin:notes|note_update") return Promise.resolve(undefined);
+      if (cmd === "plugin:notes|note_read") return Promise.resolve("# Hello\n");
+      return Promise.resolve(undefined);
+    });
+  }
+
+  it("evicts the session before the erase reaches the backend", async () => {
+    const { isLiveNote, openLiveNote } = await import("../../src/notes/liveNote");
+    routeLive(false);
+    await openLiveNote("live-close-first");
+    invokeMock.mockClear();
+    await deleteNoteRouted("live-close-first");
+    const cmds = calledCommands();
+    expect(cmds).toContain("plugin:live|live_session_close");
+    expect(cmds.indexOf("plugin:live|live_session_close")).toBeLessThan(
+      cmds.indexOf("plugin:notes|note_delete"),
+    );
+    expect(isLiveNote("live-close-first")).toBe(false);
+  });
+
+  it("refuses, reaches no erase command, and keeps the pane's hold when the session survived its close", async () => {
+    const { closeLiveNote, isLiveNote, openLiveNote } = await import("../../src/notes/liveNote");
+    routeLive(true);
+    await openLiveNote("live-survives");
+    invokeMock.mockClear();
+    await expect(deleteNoteRouted("live-survives")).rejects.toMatchObject({ kind: "LiveSessionOpen" });
+    expect(calledCommands()).not.toContain("plugin:notes|note_delete");
+    expect(calledCommands()).not.toContain("plugin:notes|note_update");
+    // The pane's hold came back, so the pane's own release is still the one that
+    // closes the session rather than a no-op against a count the delete spent.
+    expect(isLiveNote("live-survives")).toBe(true);
+    routeLive(false);
+    invokeMock.mockClear();
+    await closeLiveNote("live-survives");
+    expect(calledCommands()).toContain("plugin:live|live_session_close");
+    expect(isLiveNote("live-survives")).toBe(false);
+  });
+
+  it("with TWO panes holding the note, still evicts in one step and erases (review D7)", async () => {
+    // The defect this pins: a delete path owns no hold, so `closeLiveNote` from it
+    // released ONE pane's hold, left the other's, and the refusal then fired on a
+    // note whose session was open only because the count was off by one.
+    const { closeLiveNote, isLiveNote, openLiveNote } = await import("../../src/notes/liveNote");
+    routeLive(false);
+    await openLiveNote("live-two-panes");
+    await openLiveNote("live-two-panes");
+    invokeMock.mockClear();
+    await deleteNoteRouted("live-two-panes");
+    const cmds = calledCommands();
+    expect(cmds.filter((c) => c === "plugin:live|live_session_close")).toHaveLength(1);
+    expect(cmds).toContain("plugin:notes|note_delete");
+    expect(isLiveNote("live-two-panes")).toBe(false);
+    // The two panes' later releases find nothing to release and close nothing.
+    invokeMock.mockClear();
+    await closeLiveNote("live-two-panes");
+    await closeLiveNote("live-two-panes");
+    expect(calledCommands()).not.toContain("plugin:live|live_session_close");
+  });
+});

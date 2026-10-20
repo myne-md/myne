@@ -12,7 +12,7 @@
 fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new()
-            // Agentic note editing (myne-md/myne#456). Every one of the eight
+            // Agentic note editing (myne-md/myne#456). Every one of the nine
             // reaches decrypted note plaintext and two of them WRITE, so the
             // capability that bundles them is main-window-only.
             .plugin(
@@ -190,7 +190,7 @@ fn main() {
                     "seal_staged",
                     "take_pending",
                     "ack",
-                    // The watch meeting lane. All three are declared (not just
+                    // The watch meeting lane. Every lane command is declared (not just
                     // the seal) so the `InlinedPlugin` roster matches the
                     // `generate_handler!` registration and the ACL grant: a command
                     // reachable through two of the three and absent from this list
@@ -402,8 +402,8 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["workspace_read", "workspace_write"]),
             )
             .plugin(
-                // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`
-                // — the SAME 19 commands the desktop registers, deny-by-default.
+                // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`.
+                // The SAME commands the desktop registers, deny-by-default.
                 // (MYND-459 T12: `sync_head_fingerprint` added — the SY-05 SAS
                 // eye-compare substrate, exposed on mobile to match desktop F3-T4.
                 // MYND-427 follow-up: the recovered-notes quarantine quartet —
@@ -411,7 +411,9 @@ fn main() {
                 // surfaces it yet.)
                 // This list, the `generate_handler!` in `plugins/sync/mod.rs`, and
                 // `permissions/sync/default.toml` `commands.allow` MUST match
-                // exactly (all 21) or the ACL resolver fails closed. Adding a
+                // exactly, or the ACL resolver fails closed. Read those three for
+                // the count: this comment said 21 long after the list had passed
+                // fifty (myne-md/myne#849 review). Adding a
                 // command here without a matching permission entry is a security
                 // bug (SYNC-15). The lifecycle pair is mobile-only (desktop
                 // never manages the SyncLifecycleSignal).
@@ -470,6 +472,36 @@ fn main() {
                     "sync_lifecycle_suspend",
                     "sync_lifecycle_resume",
                     "sync_decode_join_qr",
+                    // myne-md/myne#849 task 7: the identity resolver the presence
+                    // labels ride on. A peer's `join`/`presence` frame carries an
+                    // Automerge actor and no name the store may use
+                    // (`awarenessUpsert` discards the wire's), so the roster and the
+                    // caret label come from this command alone. Desktop has granted
+                    // it since `collab-provenance` task 2; mobile registered neither
+                    // the command nor the grant, so a peer's row rendered the
+                    // degraded device form on this client with every gate green.
+                    "resolve_identity",
+                ]),
+            )
+            .plugin(
+                // Live co-editing sessions (epic live-collab, `collab-editor-bridge`):
+                // the six shared-core live-session commands the desktop registers.
+                // `lib.rs` already managed the `LiveSessionRegistry` and spawned the
+                // awareness supervisor; without this registration the plugin's
+                // commands are unreachable from the mobile WebView and a peer's
+                // presence reaches no surface. The `InlinedPlugin` mirror is
+                // load-bearing: without it the `live:` permissions flatten into
+                // `__app-acl__` and never match the `plugin:live|<cmd>` authorize
+                // form. Keep lock-stepped with the `generate_handler!` in
+                // `plugins/live/mod.rs` AND with `permissions/live/default.toml`.
+                "live",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "live_session_open",
+                    "live_session_patch_frontmatter",
+                    "live_session_take_remote_splices",
+                    "live_session_read",
+                    "live_session_set_presence",
+                    "live_session_close",
                 ]),
             )
             .plugin(

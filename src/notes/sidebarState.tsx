@@ -965,9 +965,9 @@ export function SidebarStateProvider({
           // the rename/move/delete writers here so exactly one change graph writes
           // the note"); this is that funnel where the batch is composed. It
           // partitions by ATTEMPT rather than by a predicate: `patchLiveNote`
-          // answers false when no session owns the note, which is exactly the
-          // case the batch must handle, and it also releases a session it finds
-          // already closed.
+          // answers the session's text, or `null` when no session owns the note,
+          // which is exactly the case the batch must handle, and it also releases
+          // a session it finds already closed.
           //
           // **The residual, stated rather than discovered.** The session half
           // flushes per note and the batch half is transactional, so a failure
@@ -977,8 +977,19 @@ export function SidebarStateProvider({
           // not land at all.
           const remaining: NoteBatchEntry[] = [];
           for (const entry of plan.batch) {
-            const routed = await patchLiveNote(entry.noteId, entry.plaintext);
-            if (!routed) remaining.push(entry);
+            // `patchLiveNote` answers the session's text after the patch, or
+            // `null` when this note has no session. Tested against `null` rather
+            // than truthiness, because an EMPTY note's text is `""`, which is a
+            // successful route and a falsy value: read as "not routed" it would
+            // hand the note to the batch that refuses it (`SYNC-33`).
+            // The base is what this batch's body was derived from, so a peer
+            // merge that landed in the session since the read is merged rather
+            // than replaced (myne-md/myne#849 review). Only the RENAMED note's
+            // pre-image is in this scope: the inbound bodies are read inside
+            // `planRenameBatch`, so those entries still replace.
+            const base = entry.noteId === id ? currentBytes : undefined;
+            const routed = await patchLiveNote(entry.noteId, entry.plaintext, { base });
+            if (routed === null) remaining.push(entry);
           }
           if (remaining.length > 0) await noteWriteBatchTransactional(remaining);
         } catch (err) {

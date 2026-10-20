@@ -557,6 +557,7 @@ function healthyFiles(): Record<string, string> {
 
     "mobile/src/lib/vault-delete.ts": `export async function deleteVault(vaultId?: string): Promise<void> {
   resetDateTimeDisplayForLock();
+  clearAwareness();
   await invoke("plugin:vault-unlock|vault_delete");
 }
 `,
@@ -623,14 +624,46 @@ export function resetMermaidZoom(): void {}\n`,
   resetTranscripts();
   resetMermaidZoom();
   resetDateTimeDisplayForLock();
+  clearAwareness();
 }
 `,
     "mobile/src/app/flows/EditorFlow.tsx": `const flushAll = () => {
   endAgentRun("background", notice);
+  clearAwareness();
 };
 `,
     "mobile/src/lib/agent-lifetime.ts": `export function endAgentRun(): void {
   clearAgentForLock();
+}
+`,
+    // The two editor exits that skip `lockVault` (myne-md/myne#849 review, D9),
+    // named functions so the roster can hold them. Both in one file, as in the
+    // real `AppShell.tsx`, so the extraction is exercised on a file holding two.
+    "mobile/src/app/AppShell.tsx": `function StageSwitch() {
+  const leaveForCreateVault = () => {
+    endAgentRun("lock", "");
+    clearAwareness();
+    clearHandoffCaches();
+    dispatch({ type: "editor.create-vault" });
+  };
+
+  const leaveForJoinAccount = () => {
+    endAgentRun("lock", "");
+    clearAwareness();
+    clearHandoffCaches();
+    setJoinFrom("editor");
+  };
+}
+`,
+    // The one hop the five re-derivable editor caches go through on those two
+    // exits (myne-md/myne#849 review): a named wrapper, like `lockVault`, so the
+    // guard's second hop can hold it rather than ten inline calls.
+    "mobile/src/app/vaultHandoff.ts": `export function clearHandoffCaches(): void {
+  resetDecodedAspects();
+  resetPreviewCache();
+  resetTranscripts();
+  resetMermaidZoom();
+  resetDateTimeDisplayForLock();
 }
 `,
   };
@@ -801,6 +834,56 @@ describe("check-frontend-lock-teardown: the cross product", () => {
     expect(errors).toHaveLength(2);
     expect(errors[0]).toContain("lockVault does not call clearChat()");
     expect(errors[1]).toContain("leaveActiveVault does not call clearChat()");
+  });
+
+  // The presence store on every mobile leaving path (myne-md/myne#849 review, D9).
+  // Each case removes the ONE `clearAwareness();` a mobile path carries and expects
+  // the guard to name that path, so a call deleted from any of them reddens this
+  // suite rather than leaving the previous vault's peers resident.
+  it.each([
+    ["mobile/src/lib/vault-unlock.ts", "mobile/src/lib/vault-unlock.ts::lockVault"],
+    ["mobile/src/lib/vault-delete.ts", "mobile/src/lib/vault-delete.ts::deleteVault"],
+    ["mobile/src/app/flows/EditorFlow.tsx", "mobile/src/app/flows/EditorFlow.tsx::flushAll"],
+  ])("names clearAwareness removed from %s", (file, path) => {
+    const files = healthyFiles();
+    expect(files[file].split("clearAwareness();")).toHaveLength(2);
+    files[file] = files[file].replace("  clearAwareness();\n", "");
+    expect(run(files)).toEqual([
+      expect.stringContaining(`${path} does not call clearAwareness()`),
+    ]);
+  });
+
+  it.each([
+    ["leaveForCreateVault", "dispatch"],
+    ["leaveForJoinAccount", "setJoinFrom"],
+  ])("names clearAwareness removed from AppShell's %s", (fn, tail) => {
+    // The file holds both exits, so the removal is scoped to the one function's
+    // own call: the line just before its distinctive tail.
+    const files = healthyFiles();
+    const file = "mobile/src/app/AppShell.tsx";
+    const before = files[file];
+    files[file] = before.replace(
+      `    clearAwareness();\n    clearHandoffCaches();\n    ${tail}(`,
+      `    clearHandoffCaches();\n    ${tail}(`,
+    );
+    expect(files[file]).not.toBe(before);
+    expect(run(files)).toEqual([
+      expect.stringContaining(`${file}::${fn} does not call clearAwareness()`),
+    ]);
+  });
+
+  it("names the agent run dropped from the create exit", () => {
+    // `leaveForCreateVault` gained `endAgentRun` with its roster row: as an inline
+    // prop it had the presence clear and not this one.
+    const files = healthyFiles();
+    const file = "mobile/src/app/AppShell.tsx";
+    files[file] = files[file].replace(
+      `    endAgentRun("lock", "");\n    clearAwareness();\n    clearHandoffCaches();\n    dispatch(`,
+      `    clearAwareness();\n    clearHandoffCaches();\n    dispatch(`,
+    );
+    expect(run(files)).toEqual([
+      expect.stringContaining(`${file}::leaveForCreateVault does not call endAgentRun()`),
+    ]);
   });
 
   it("rejects a skip that gives no reason", () => {

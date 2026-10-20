@@ -4,6 +4,7 @@
 // Mirror of the desktop `src/notes/conflictCopy.ts`.
 
 import { noteCreate, noteRead, noteUpdate } from "./notes";
+import { evictLiveNote } from "./liveNote";
 import { readNoteFolder } from "./note-organize";
 import { prefsRead as ioPrefsRead, setFavorites, setItemOrder } from "./prefs";
 import { patchDeletedField } from "../dialect/surgery";
@@ -28,6 +29,17 @@ const host: ConflictCopyHost = {
   // SYNCS to other devices rather than a local-only hard unlink — the mobile
   // mirror of the desktop `deleteNoteRouted` → `patchDeletedField`/`tombstoneNote`.
   deleteNoteRouted: async (uuid) => {
+    // Evict the note's LIVE SESSION first, mirroring `mobile/src/lib/notes.ts`
+    // and the desktop shim (myne-md/myne#849 review). A live session holds the
+    // document and re-writes `<vault>/notes/<id>.myn` on its next flush, so a
+    // tombstone written underneath one lands and is then undone by the very next
+    // keystroke. Reachable from "use this version", which tombstones the ORIGINAL
+    // (`dialect/src/conflictCopy.ts`) while its pane is still open. Evict rather
+    // than `closeLiveNote`, because this path holds no hold and a release would
+    // spend the pane's (review D7); a failed flush keeps the session, so refuse.
+    if (!(await evictLiveNote(uuid))) {
+      throw { kind: "LiveSessionOpen", noteId: uuid };
+    }
     const body = await noteRead(uuid);
     // `patchDeletedField` operates on bytes; encode in, decode out for the
     // string-based note IO. RFC3339 UTC now = the sync deletion tombstone.
@@ -46,7 +58,10 @@ export { clearConflictMarkers };
 
 /** Keep the conflict copy as a separate ordinary note (clears its `conflict:` markers). */
 export async function keepAsSeparate(copyId: string): Promise<void> {
-  await noteUpdate(copyId, clearConflictMarkers(await noteRead(copyId)));
+  // The read is the write's base: with a live session open the read comes from
+  // the session, and a `noteUpdate` with no base would replace it.
+  const content = await noteRead(copyId);
+  await noteUpdate(copyId, clearConflictMarkers(content), undefined, content);
 }
 
 /** Discard the conflict copy (routed tombstone — recoverable + propagating). */

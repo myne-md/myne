@@ -213,13 +213,18 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     /// durable flush. So a session still dirty here means a writer already failed
     /// (the chain is best-effort by design and cannot skip the lock), and dropping
     /// it is the right call: a locked vault must hold no plaintext.
+    ///
+    /// It also forgets the participant label `live_session_set_presence` stored on
+    /// the awareness signal (myne-md/myne#849): that is the name this device shows
+    /// peers in the vault being left, and it must not ride into the next one.
     fn live_session_teardown_on_lock(&self) {
-        if let Some(reg) = self
+        let registry = self
             .app
-            .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
-        {
-            reg.clear();
-        }
+            .try_state::<myne_core::plugins::live::LiveSessionRegistry>();
+        let signal = self
+            .app
+            .try_state::<myne_core::plugins::sync::awareness_listener::AwarenessSignal>();
+        myne_core::plugins::live::teardown_on_lock(registry.as_deref(), signal.as_deref());
     }
     fn clear_staged_descriptor(&self) {
         crate::plugins::workspace::commands::clear_staged_descriptor();

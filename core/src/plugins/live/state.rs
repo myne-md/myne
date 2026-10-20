@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use super::apply_local::LocalSplice;
+use super::compose::compose_splices;
 use super::session::{LiveSession, LiveSessionKey};
 
 /// The process's live sessions, keyed by `(vault_id, note_id)`.
@@ -48,6 +49,12 @@ impl LiveSessionRegistry {
         if guard.contains_key(&key) {
             return false;
         }
+        // A batch queued for an EARLIER session of this note describes that
+        // session's merges, not this one's: composed onto this session's first
+        // batch it would replay a merge the freshly loaded document already holds
+        // (myne-md/myne#849). Dropped under the `sessions` guard, the same lock
+        // order as `apply_and_queue`.
+        self.drop_pending_splices(&key.1);
         guard.insert(key, session);
         true
     }
@@ -99,16 +106,35 @@ impl LiveSessionRegistry {
     }
 
     /// Remove and return the session for this note (caller then flushes/closes).
+    ///
+    /// The note's queued splices go with it: they are in the coordinates of a
+    /// pane over THIS session, and left behind they would compose onto the next
+    /// session's first batch and replay a merge twice (myne-md/myne#849).
     pub fn remove(&self, vault_id: &str, note_id: &str) -> Option<LiveSession> {
         let key = (vault_id.to_string(), note_id.to_string());
-        self.sessions.lock().ok()?.remove(&key)
+        let mut guard = self.sessions.lock().ok()?;
+        let removed = guard.remove(&key)?;
+        self.drop_pending_splices(note_id);
+        Some(removed)
     }
 
-    /// Remove and return the session for this note id in any vault.
+    /// Remove and return the session for this note id in any vault, dropping its
+    /// queued splices like [`remove`](Self::remove).
     pub fn remove_note(&self, note_id: &str) -> Option<LiveSession> {
         let mut guard = self.sessions.lock().ok()?;
         let k = guard.keys().find(|(_, n)| n == note_id).cloned()?;
-        guard.remove(&k)
+        let removed = guard.remove(&k)?;
+        self.drop_pending_splices(note_id);
+        Some(removed)
+    }
+
+    /// Forget whatever is queued for `note_id`. Takes only the `pending_splices`
+    /// lock, so a caller may hold the `sessions` guard (the one lock order).
+    fn drop_pending_splices(&self, note_id: &str) {
+        self.pending_splices
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(note_id);
     }
 
     /// Ask every open session to re-announce itself on the next drain (`SYNC-29`).
@@ -122,14 +148,74 @@ impl LiveSessionRegistry {
         }
     }
 
-    /// Queue the body splices a sync pull merged into `note_id`'s session, for the
-    /// pane to drain and dispatch (`collab-editor-bridge` task 7). Empty clears it.
+    /// Queue the body splices a merge moved into `note_id`'s session, for the pane
+    /// to drain and dispatch (`collab-editor-bridge` task 7).
+    ///
+    /// A list already queued is COMPOSED with the new one, never replaced
+    /// (myne-md/myne#849). The queued list maps the pane's document to the
+    /// session's state after the first merge, and the new list is in THAT state's
+    /// coordinates, so replacing it would drop the first merge's text from the
+    /// pane, and the pane's next whole-markdown save would then delete that peer
+    /// text from the note. [`compose_splices`] keeps one list over the pane's
+    /// document, so it still dispatches as one `ChangeSet`. An empty list is the
+    /// identity and leaves the queue as it is; a composition that cancels out
+    /// (a second merge undoing the first) empties the slot.
     pub fn set_pending_splices(&self, note_id: &str, splices: Vec<LocalSplice>) {
+        self.queue_splices(note_id, splices);
+    }
+
+    /// Mutate `note_id`'s open session with `f` and queue the body splices it
+    /// returns, ATOMICALLY with respect to every other producer (myne-md/myne#849).
+    ///
+    /// Two producers merge into a session: the awareness supervisor (a live peer
+    /// change) and the sync cycle (a durable pull). Each list is in the coordinates
+    /// of the session state its OWN apply started from, so the queue is only right
+    /// if lists are queued in the order the applies ran. Applying under the
+    /// `sessions` guard, releasing it, and then queueing under `pending_splices`
+    /// let the two interleave as apply A, apply B, queue B, queue A, and
+    /// [`compose_splices`] then composed B's list as if it came first, placing
+    /// text at the wrong offsets in the pane, whose next whole-markdown save would
+    /// write that misplacement back. Here the queue happens while the `sessions`
+    /// guard is still held, so the order of applies IS the order of queueing.
+    ///
+    /// Lock order is `sessions` then `pending_splices`, the order
+    /// [`insert`](Self::insert), [`remove`](Self::remove) and
+    /// [`remove_note`](Self::remove_note) nest them in too. No path takes them the
+    /// other way round: [`take_pending_splices`](Self::take_pending_splices) and
+    /// [`set_pending_splices`](Self::set_pending_splices) take only the inner lock,
+    /// and [`clear`](Self::clear) takes them one after the other, never nested.
+    ///
+    /// `f` returns the splices to queue (empty leaves the queue as it is) plus any
+    /// extra result for the caller. `None` when no session is open for the note;
+    /// on `Err` nothing is queued.
+    pub fn apply_and_queue<R, E>(
+        &self,
+        note_id: &str,
+        f: impl FnOnce(&mut LiveSession) -> Result<(Vec<LocalSplice>, R), E>,
+    ) -> Option<Result<R, E>> {
+        let mut guard = self.sessions.lock().ok()?;
+        let session = guard.values_mut().find(|s| s.key().1 == note_id)?;
+        Some(f(session).map(|(splices, extra)| {
+            self.queue_splices(note_id, splices);
+            extra
+        }))
+    }
+
+    /// The queueing half of [`set_pending_splices`](Self::set_pending_splices),
+    /// taking only the `pending_splices` lock, so
+    /// [`apply_and_queue`](Self::apply_and_queue) may call it with the `sessions`
+    /// guard held.
+    fn queue_splices(&self, note_id: &str, splices: Vec<LocalSplice>) {
+        if splices.is_empty() {
+            return;
+        }
         if let Ok(mut g) = self.pending_splices.lock() {
-            if splices.is_empty() {
-                g.remove(note_id);
-            } else {
-                g.insert(note_id.to_string(), splices);
+            let composed = match g.remove(note_id) {
+                Some(queued) => compose_splices(&queued, &splices),
+                None => splices,
+            };
+            if !composed.is_empty() {
+                g.insert(note_id.to_string(), composed);
             }
         }
     }
@@ -191,6 +277,26 @@ impl LiveSessionRegistry {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+/// The whole live-collab teardown a client's `live_session_teardown_on_lock` owes:
+/// drop every session (and its queued splices) AND forget the participant label
+/// `live_session_set_presence` stored on the awareness signal. The label is the
+/// user's chosen display name for the vault being left, so it may not survive a
+/// lock or a vault switch into the next vault's presence frames. Both arguments
+/// are optional because a client reaches each through `try_state`, and an
+/// unmanaged one is simply nothing to clear.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+pub fn teardown_on_lock(
+    registry: Option<&LiveSessionRegistry>,
+    signal: Option<&crate::plugins::sync::awareness_listener::AwarenessSignal>,
+) {
+    if let Some(reg) = registry {
+        reg.clear();
+    }
+    if let Some(sig) = signal {
+        sig.set_local_label(None);
     }
 }
 

@@ -114,6 +114,17 @@ export default defineConfig({
       // which `mobile/src/components/MentionText.tsx` imports. The mirror is
       // kept complete rather than only where today's specs happen to reach it.
       { find: /^@myne\/note-mentions$/, replacement: sib("../src/notes/ai/noteMentions.ts") },
+      // The live-collaboration awareness cluster (myne-md/myne#849) - mirror of
+      // vite.config.ts, which carries the rationale. `mobile/src/lib/awareness.ts`
+      // imports four of these, so without the mirror every spec that reaches it
+      // fails to TRANSFORM, and the store a spec drives would be a DIFFERENT module
+      // instance from the one the app reads.
+      { find: /^@myne\/awareness-store$/, replacement: sib("../src/notes/collab/awarenessStore.ts") },
+      { find: /^@myne\/participant$/, replacement: sib("../src/notes/collab/participant.ts") },
+      { find: /^@myne\/identity-label$/, replacement: sib("../src/notes/collab/identityLabel.ts") },
+      { find: /^@myne\/presence-labels$/, replacement: sib("../src/notes/collab/presenceLabels.ts") },
+      { find: /^@myne\/presence-jump$/, replacement: sib("../src/notes/collab/presenceJump.ts") },
+      { find: /^@myne\/resolved-identity$/, replacement: sib("../src/types/resolved-identity.ts") },
     ],
   },
   test: {

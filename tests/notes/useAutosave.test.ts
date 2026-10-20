@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAutosave } from "../../src/notes/useAutosave";
+import type { LiveSaveContext } from "../../src/notes/saveNote";
 import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS } from "../../src/notes/saveNote";
 
 // Deterministic expected-base fingerprint: jsdom's `crypto.subtle` availability
@@ -23,6 +24,13 @@ import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS } from "../../src/notes/saveNote";
 // hash so the third `saveImpl` argument is assertable ("h:<base body>").
 vi.mock("../../src/notes/baseHash", () => ({
   sha256Hex: (text: string) => Promise.resolve(`h:${text}`),
+}));
+
+// Whether a live session owns the note. Off by default, so every other case runs
+// the hook exactly as before; the live-session case below turns it on.
+const live = vi.hoisted(() => ({ isLiveNote: (_id: string): boolean => false }));
+vi.mock("../../src/notes/liveNote", () => ({
+  isLiveNote: (id: string) => live.isLiveNote(id),
 }));
 
 type Deferred = {
@@ -349,6 +357,24 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
       await result.current.flushOutgoing();
     });
     expect(saveImpl).toHaveBeenCalledWith("note-1", "v1");
+  });
+
+  it("flushOutgoing() hands the OUTGOING note's live context to its save (myne-md/myne#849 review round 5)", async () => {
+    // Without it the note-switch save replaced the session's text, deleting a
+    // peer edit the drain had not delivered before the switch.
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const onSent = () => {};
+    const liveSaveFor = (id: string) => ({ base: `${id}:mirror`, onSent });
+    const { result, rerender } = renderHook(
+      ({ id, body }: { id: string | null; body: string }) =>
+        useAutosave(id, body, saveImpl, undefined, undefined, false, liveSaveFor),
+      { initialProps: { id: "note-1" as string | null, body: "v0" } },
+    );
+    rerender({ id: "note-1" as string | null, body: "v1" });
+    await act(async () => {
+      await result.current.flushOutgoing();
+    });
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "v1", undefined, { base: "note-1:mirror", onSent });
   });
 
   it("flushIfDirty() awaits pending save when one is in flight", async () => {
@@ -740,6 +766,86 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     expect(saveImpl).toHaveBeenCalledTimes(1);
     // Third arg (the expected-base hash) is undefined — guard skipped.
     expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit", undefined);
+  });
+
+  it("a note a live session owns sends no expected-base hash (myne-md/myne#849 review, D8)", async () => {
+    // The live path now carries the hash to the session, which checks it against
+    // its OWN text. The pane applies peer edits as remote splices without moving
+    // `savedBodyRef`, so a hash of it would refuse every save after the first
+    // peer keystroke and mint a conflict copy. Guard ENABLED here, so only the
+    // live-session check can be what drops the hash.
+    live.isLiveNote = (id) => id === "note-1";
+    try {
+      const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+      const { rerender } = renderHook(
+        ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+        { initialProps: { body: "initial" } },
+      );
+      rerender({ body: "initial edit" });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+      });
+      expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit", undefined);
+    } finally {
+      live.isLiveNote = () => false;
+    }
+  });
+
+  it("hands each save the caller's live context for THAT note (myne-md/myne#849 review round 4)", async () => {
+    // The pane's mirror of the session goes to the core as the merge base, so a
+    // save from a buffer the drain has not caught up with merges rather than
+    // replaces. Asked per save, so a mirror moved since the last one is the one sent.
+    const saveImpl = vi.fn(
+      (_id: string, body: string, _hash?: string, _live?: LiveSaveContext) =>
+        Promise.resolve(body),
+    );
+    let base = "mirror-1";
+    const onSent = () => {};
+    const liveSaveFor = vi.fn((id: string) => ({ base: `${id}:${base}`, onSent }));
+    const { rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, undefined, false, liveSaveFor),
+      { initialProps: { body: "initial" } },
+    );
+    rerender({ body: "initial edit" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    base = "mirror-2";
+    rerender({ body: "second edit" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl.mock.calls.map((c) => c[3])).toEqual([
+      { base: "note-1:mirror-1", onSent },
+      { base: "note-1:mirror-2", onSent },
+    ]);
+  });
+
+  it("falls back to the text it last wrote as the base when the pane knows no mirror (round 5)", async () => {
+    // A save with no base REPLACES the session's text; with the last-written text
+    // as the base it still merges, which is what keeps a peer edit the drain
+    // could not place.
+    const saveImpl = vi.fn(
+      (_id: string, body: string, _hash?: string, _live?: LiveSaveContext) =>
+        Promise.resolve(body),
+    );
+    const onSent = () => {};
+    const liveSaveFor = () => ({ base: undefined, onSent });
+    const { rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, undefined, false, liveSaveFor),
+      { initialProps: { body: "initial" } },
+    );
+    rerender({ body: "first" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    rerender({ body: "second" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(saveImpl.mock.calls[1]?.[3]).toEqual({ base: "first", onSent });
   });
 });
 

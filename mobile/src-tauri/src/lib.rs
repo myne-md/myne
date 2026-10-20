@@ -10,7 +10,7 @@
 // side-effect; screen-capture protection is LIVE through that seam — see
 // `screen_guard`, MYND-469). The
 // `sync` plugin (MYND-458) IS registered here — a thin shim over
-// `myne_core::plugins::sync` (all 14 commands, one deny-by-default
+// `myne_core::plugins::sync` (the whole shared roster, one deny-by-default
 // `sync:default` capability, SYNC-15); its `bump_local_change` hook stays a
 // no-op until the SyncLocalChange wiring lands (MYND-458 task 4). The
 // snapshots subsystem lives in `myne-core`, so `MobileHooks` wires its two
@@ -147,8 +147,9 @@ pub fn run() {
         // registers the command surface but returns Unsupported (SYNC-46; Android
         // decode is MYND-465).
         .plugin(tauri_plugin_qr_scan::init())
-        // MYND-619: the task-reminder scheduler. Four WebView-facing commands
-        // (`schedule` / `cancel` / `cancel_all` / `list_pending`) under the
+        // MYND-619: the task-reminder scheduler. The scheduling quartet
+        // (`schedule` / `cancel` / `cancel_all` / `list_pending`) plus the
+        // notification-permission pair and Android's precise-delivery pair, under the
         // deny-by-default `reminders:default` capability, bridging to the
         // in-repo Swift (iOS) and Kotlin (Android) halves. It is a TRANSPORT —
         // which reminders should be registered is decided by the pure TS core
@@ -253,11 +254,25 @@ pub fn run() {
         // nothing under `mobile/src` reaches `plugin:path|*` any more.
         .plugin(plugins::export_dir::init())
         // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync` — the
-        // same 14 commands the desktop registers, gated by a single
+        // same commands the desktop registers, gated by a single
         // deny-by-default `sync:default` capability (SYNC-15). Command bodies are
         // the shared-core compiled code; this crate adds only the wrapper +
         // capability entry. The scheduler/loop stays out (MYND-460).
         .plugin(plugins::sync::init())
+        // Live co-editing sessions (epic live-collab, `collab-editor-bridge`):
+        // the six shared-core commands the desktop registers, gated by a single
+        // deny-by-default `live:default` capability. The registry below was
+        // already managed and the awareness supervisor already spawned; what was
+        // missing was this registration, so the commands could not be invoked
+        // from the mobile WebView at all. Which gate each command carries is
+        // stated per command in `plugins/live/mod.rs` rather than as one sentence
+        // here (myne-md/myne#849 review): three are `Slot::Unlocked`-gated, while
+        // `live_session_take_remote_splices`, `live_session_read` and
+        // `live_session_set_presence` hold no vault authority and take no slot
+        // check. `live_session_read` returns note plaintext, and what bounds all
+        // three is the lock-teardown hook that clears the `LiveSessionRegistry`,
+        // so on a locked vault there is no session and `read` answers `NotOpen`.
+        .plugin(plugins::live::init())
         // B2B member display names (MYO5, §9.29; myne-md/myne#851 task 15): the
         // three shared-core commands the desktop registers, gated by a single
         // deny-by-default `member-names:default` capability. The phone's name step

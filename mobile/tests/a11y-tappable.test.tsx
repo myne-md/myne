@@ -304,6 +304,8 @@ describe("no clickable element in the mobile flows is left unannounced", () => {
         "The Row primitive is a control only when it is given an onClick, and the rows that hold a Switch or a button are the ones that do not take one.",
       "mobile/src/app/flows/editor/sheets/FilterSheet.tsx":
         "The tappable rows carry an inline check glyph (an svg), never a control; the sheet's own buttons are outside the rows.",
+      "mobile/src/app/flows/editor/chrome/EditorTopBar.tsx":
+        "The tappable presence chip and the bar's icon buttons are SIBLINGS in one flex row (myne-md/myne#849 task 6). The chip contains a dot and a count and nothing else, so the nested-interactive shape is not reachable here; making the chip a sibling rather than a wrapper is what keeps the note-details and more-menu labels their own.",
     };
     const offenders: string[] = [];
     for (const root of SCAN_ROOTS) {

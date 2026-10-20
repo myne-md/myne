@@ -43,7 +43,7 @@ export async function trashNote(noteId: string): Promise<void> {
   // archive ⊥ trash invariant when deleting straight from the Archive view.
   const unarchived = patchArchivedField(encoder.encode(current), null);
   const trashed = patchTrashedField(unarchived, new Date().toISOString());
-  await noteUpdate(noteId, decoder.decode(trashed));
+  await noteUpdate(noteId, decoder.decode(trashed), undefined, current);
 }
 
 /**
@@ -59,7 +59,7 @@ export async function restoreNote(noteId: string): Promise<void> {
   await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const restored = patchTrashedField(encoder.encode(current), null);
-  await noteUpdate(noteId, decoder.decode(restored));
+  await noteUpdate(noteId, decoder.decode(restored), undefined, current);
 }
 
 /** Outcome of a {@link bulkTrashNotes} call — trashed IDs + per-note failures. */

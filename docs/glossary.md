@@ -1900,6 +1900,18 @@ The images a store listing shows, on App Store, Play and F-Droid, and the one su
 
 Used in: `decisions/ui/0714`; `PRODUCT.md` (the anti-pattern scope paragraph)
 
+### **live-note policy** &nbsp; 📦 *Product*
+
+The one module on a client that decides when a [live session](#live-session) is open and where a save goes while it is: a per-note refcount (a second view of the same note attaches rather than opening a second session, and only the last view to leave closes it), an open when a note is shown and a release when it leaves, and a **save funnel** that routes every write through the session and falls back to the stateless note path when no session owns the note. It is a decision both clients make identically, so it lives in `@myne/client-core` (`live-note.ts`) with the five transport calls and the two capability answers INJECTED through its host seam, each client keeping only that binding. Why it is a term rather than an implementation detail: while a session owns a note the backend REFUSES a stateless `note_update` for it (`LiveSessionOpen`), so a client that opens a session without the funnel refuses every save of the open note, and a client that keeps the funnel without opening anything stops being a co-editor. See [live session](#live-session).
+
+Used in: `decisions/clients/0716`; `@myne/client-core` (`live-note.ts`)
+
+### **live resync** &nbsp; 📦 *Product*
+
+What an editor does when a peer change arrives that its [merge drain](#merge-drain) could not place over the buffer: the buffer is rebuilt from the [live session](#live-session)'s whole text after a keep-both copy is written, rather than the peer's edit being dropped or the local text overwritten. It is the last resort of the three-way save, distinct from a [full-resync](#full-resync) (the tombstone-GC sweep over the sync plane) and from the drain itself, which applies a merge as one editor change when the mapping succeeds. It exists because losing text is worse than a second copy the user can throw away.
+
+Used in: `src/notes/liveResync.ts`; `mobile/src/lib/liveResync.ts`; `decisions/clients/0716`
+
 ### **live session** &nbsp; 📋 *Protocol*
 
 The per-note single durable writer of the live-collaboration editor plane (`collab-editor-bridge`; `SYNC-33`/`SYNC-34`). Keyed `(vault, note)`, it holds one Automerge document and is the ONLY writer for its note while open: a stateless `note_update` on the same note is refused, and a second open attaches to the existing session rather than opening a second. Its live frame path is **body-only into the editor**, the managed frontmatter is a [reserved frontmatter region](#reserved-frontmatter-region) whose splices are clamped so a peer change touching it is never dispatched into the editor, and a tombstone routes to the §11.1 remove-wins rule on the durable plane rather than being text-merged, so the live plane adds no third conflict-resolution path. Each revision is authored under the device's Automerge actor (`SYNC-42`). See [awareness frame](#awareness-frame).
@@ -2089,6 +2101,12 @@ Used in: `design-notes/protocol/0592`; `myne-md/myne#698`.
 One record in [agent memory](#agent-memory): a 16-byte UUIDv7 id (the `memories/<id-hex>` filename), one ≤2000-character distilled text, and a roster row (timestamps + causal `version` + tombstone + quarantine marker) in the `vault.agent-memory` catalog. Written by the model through the `remember` verb (one per run) or by the user through the memory UI, rewritten whole rather than append-merged, and removed everywhere by the tombstone. Model writes carry the writing run's id as the `source_conversation` link, user writes carry none, and a model write naming a user-authored row is refused rather than applied. Sealed as `MYX1` (§9.26) with the entry id + `account_number_hash` bound into the AAD, the `MYE1` archetype.
 
 Used in: `protocol.md` §9.26; `decisions/ai/0590`
+
+### **merge drain** &nbsp; 📦 *Product*
+
+How an editor's buffer catches up with a peer's change that was merged into its open [live session](#live-session). On a merge event the drain reads the session's whole text, diffs it against the editor's **mirror** (what the session held as far as the buffer knows: the text it loaded, the text each of its own saves sent, and each change it applied), maps that remote change over the user's unsaved edits, and applies it as one editor change. It deliberately does NOT apply the body splices the core queues: those are clamped to the body, so a peer's rename, move or trash never reached the buffer and the next save wrote the old frontmatter back over it. Every editor save also hands the core its mirror as the merge base, so a save from a buffer the drain has not caught up with merges rather than replaces. One module, `editor/src/live-remote-merge.ts`, run by the desktop pane and the mobile editor. See [live-note policy](#live-note-policy).
+
+Used in: `decisions/clients/0716`; `agent-tooling/features/mobile-live-presence/`
 
 ### **meta baseline** &nbsp; 🗝️ *Key/identifier*
 

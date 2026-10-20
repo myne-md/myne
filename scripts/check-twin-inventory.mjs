@@ -245,6 +245,34 @@ const TYPE_SHIM_REASON =
 
 const CURATED_TWINS = [
   {
+    a: "src/notes/components/WhoIsHereTab.tsx",
+    b: "mobile/src/app/flows/editor/sheets/PresenceSheet.tsx",
+    what: "the live-presence roster: one row per peer editing the open note, with the shared label rule's name and the colour that peer's caret uses (myne-md/myne#849)",
+    why:
+      "The two files answer the same product question at different paths, so the path " +
+      "sweep cannot pair them (the same reason the MemorySection and MemoryPopover entries " +
+      "above are here). `screen` rather than `decision`: the STORE and the label rule are one " +
+      "shared implementation in `src/notes/collab/` and one shared presentation rule in " +
+      "`@myne/client-core`, while the container is per-client by necessity, a right-panel tab " +
+      "against a bottom sheet. The mobile sheet deliberately shares the store and the label " +
+      "rule rather than the markup, because the desktop component pulls desktop primitives and " +
+      "desktop sidebar state. Recorded at entry time rather than discovered later by the drift " +
+      "ratchet, and the pair exists only because this feature created the mobile side.",
+  },
+  {
+    a: "src/notes/liveNote.ts",
+    b: "mobile/src/lib/liveNote.ts",
+    what: "the per-client HOST WIRING for the shared live-note policy: the five transport bindings and the two capability answers the policy consults (myne-md/myne#849)",
+    why:
+      "Cross-path, so the sweep cannot see it. `delegated`: the POLICY it wires is one module in " +
+      "`@myne/client-core` (`live-note.ts`, the refcount and the save funnel), and what each file " +
+      "holds is the binding plus two descriptor reads. The two differ in exactly what a per-client " +
+      "host must differ in (`../platform/capabilities` on mobile for the answers, `./live` against " +
+      "`../lib/live` for the transports) and in nothing else. This is also the pair whose wiring the " +
+      "review had to repair on the mobile side: the funnel belongs in the note PRIMITIVE rather than " +
+      "at a call site, which is a property of the policy's consumers rather than of this host.",
+  },
+  {
     a: "src/components/settings/MemorySection.tsx",
     b: "mobile/src/app/flows/MemorySection.tsx",
     what: "the agent-memory management surface: list, edit, delete, clear-all-with-confirm, and the personality editor (myne-md/myne#697)",
@@ -1524,6 +1552,54 @@ const ROSTER = [
     destination: "myne-core",
     reason:
       "Host-registration shim, the same instance of `SHIM_REASON` its `member_names` sibling above records, measured the same way rather than inherited: both files carry `pub use myne_core::plugins::device_binding::commands`, both `generate_handler!` rosters list the same two commands (`device_bindings_list` / `device_bindings_claim`), and the two `init()` bodies are the same builder over the same plugin name, `Builder::<R>::new(\"device-binding\")`. What differs is one doc paragraph: mobile's says why the phone needs the family at all (a member's SECOND device is the case it exists for, and `claim_own_binding_best_effort` is how that device becomes legible to its peers). Mobile's shim entered the record rather than being dropped as trivial for the reason the sibling's did: the family's whole shared core already sat in `myne-core` while the phone registered nothing, so the feature was reachable from no mobile surface. `member_names`' entry declines to claim the two ACLs match, deferring to myne-md/myne#473; this pair's claim is one step stronger and worth stating precisely rather than by analogy. Each host's THREE-way lockstep IS machine-checked, by a self-test in each shim that reads `OUT_DIR/acl-manifests.json` and asserts the `default` bundle, the registered commands and the capability grant agree. The two hosts are deliberately NOT compared to each other, by that test or by `scripts/check-mobile-plugin-acl.mjs`, which walks one tree. So what is verified is that neither side is inert, not that the two sides agree, and the difference is one permission list. What is not a claim here at all: either command has a caller today. Neither does, and both shims say so.",
+  },
+  {
+    a: "src/notes/components/WhoIsHereTab.tsx",
+    b: "mobile/src/app/flows/editor/sheets/PresenceSheet.tsx",
+    verdict: "screen",
+    destination: "stays per-client",
+    reason:
+      "The live-presence roster at two paths the sweep cannot pair: a right-panel tab on desktop, a bottom sheet on a phone (myne-md/myne#849). `screen` because the STORE (`src/notes/collab/awarenessStore.ts`, aliased into mobile rather than copied) and the label rule (`@myne/client-core` + `identityLabelText`) are one implementation each, while the container is per-client by necessity. The mobile sheet deliberately shares the store and the rule rather than the markup: the desktop component pulls desktop primitives and desktop sidebar state. Recorded at entry time, and the pair exists only because this feature wrote the mobile side.",
+  },
+  {
+    a: "src/notes/liveNote.ts",
+    b: "mobile/src/lib/liveNote.ts",
+    verdict: "delegated",
+    destination: "@myne/client-core",
+    reason:
+      "The per-client HOST WIRING for the shared live-note policy: the five transport bindings and the two capability answers, over a POLICY that is one module in `@myne/client-core` (`live-note.ts`) consumed by both clients with their own host injected (myne-md/myne#849, `design-notes/clients/0716`). Cross-path, so the sweep cannot see it. `delegated` because neither file holds an answer: one wires `./live` and `../lib/live`, the other `../platform/capabilities`. Worth knowing when reading this pair: the review that produced it found the funnel in the WRONG PLACE on mobile (one call site in the editor screen rather than in the note primitive every writer inherits), which is a property of the policy's CONSUMERS rather than of either host, so a future reader looking for that class of defect should not look here.",
+  },
+  {
+    a: "src-tauri/src/plugins/live/mod.rs",
+    b: "mobile/src-tauri/src/plugins/live/mod.rs",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "Host-registration shim, `SHIM_REASON`'s instance again and measured the same way: both files carry the same `pub use` over `myne_core::plugins::live`, both `generate_handler!` rosters list the same commands (`live_session_open`, `live_session_patch_frontmatter`, `live_session_take_remote_splices`, `live_session_close`, `live_session_set_presence`, `live_session_read`), and both `init()` bodies are the same builder over the same plugin name. Both now register a SIXTH, `live_session_read` (myne-md/myne#849 review): the session's current text, which each client's note primitive reads for a note a session owns, because a live peer edit is not flushed to disk and a read-modify-write writer that read disk would patch stale text over it. **Mobile's shim is new in myne-md/myne#849 task 2, and the state it replaced is the reason it earns a row rather than being dropped as trivial**: `mobile/src-tauri/src/lib.rs` already managed the `LiveSessionRegistry` and spawned the awareness supervisor, while the plugin was registered nowhere, so the supervisor watched the rooms of sessions that no WebView could open and `plugin:live|*` was refused by the ACL. A whole subsystem was wired and inert, on a green build, which is the failure shape this guard's own header is about. What differs between the two files is one comment block explaining the ACL lockstep in mobile's words; the commands, the permission set and the grant are the desktop set copied rather than re-derived. Not claimed here: that the two ACLs are identical (myne-md/myne#473's comparison). What IS checked is mobile's three-way lockstep, by `scripts/check-mobile-plugin-acl.mjs`. **The desktop half is checked by nothing** (myne-md/myne#849 review): that guard walks one tree, and unlike its `device_binding` sibling (the ONLY shim pair in either Rust tree that reads `OUT_DIR/acl-manifests.json`; `member_names` carries none, an earlier form of this sentence claimed it did and was wrong) this pair's shims carry no such self-test, so the earlier form of this sentence claimed an automation that does not exist.",
+  },
+  {
+    a: "src/lib/live.ts",
+    b: "mobile/src/lib/live.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "The per-client TRANSPORT BINDING for the same six shared-core live-session commands, so this pair is the `memberNames` shape one layer down: the command bodies, the session registry and the `SYNC-33` writer refusal are all `myne-core`, and what each file holds is an `invoke` wrapper and nothing else. It is the two names `scripts/check-platform-seam.mjs` requires each tree to reach through its own seam. Both carry `liveSessionRead` for the sixth command. The files differ in two import specifiers and one export: `invoke` comes from each tree's own `platform/core`; desktop re-exports the splice type (`export type { LocalSplice } from the shared module`) where mobile names it inline in the return type, so the two export surfaces are not identical even though both resolve the same shared type. That third difference is what the sibling ratchet entry's comment used to call only-import-specifiers, corrected here. `delegated` rather than `decision` for the same reason as its sibling: neither file holds an answer. The POLICY that decides when a session is opened is NOT in either file and is not a twin at all: it is one module in `@myne/client-core` (`live-note.ts`) that both clients consume with their own host injected, which is what makes this pair a transport rather than a second copy of a rule (myne-md/myne#849, `design-notes/clients/0716`).",
+  },
+  {
+    a: "src/lib/identity.ts",
+    b: "mobile/src/lib/identity.ts",
+    verdict: "delegated",
+    destination: "myne-core",
+    reason:
+      "One `invoke` wrapper over one shared-core command (`plugin:sync|resolve_identity`), and the pair exists because mobile had never registered it: myne-md/myne#849 task 7 found that the shared label rule (`resolvePeerLabels`) had nothing to call on this client, so every presence roster row and caret label rendered the degraded device form there while every gate stayed green. Unlike its `live.ts` sibling the two files differ in ONE line, the type import: desktop reaches `../types/resolved-identity`, mobile reaches `@myne/resolved-identity`, an alias to the same file, precisely so the wire mirror is not retyped. The answer the command returns (`Device` / `Person` / `Unknown`) and the rule that turns it into a name are shared (`@myne/client-core`'s label descriptor, rendered by `identityLabelText`), so what is per-client here is the transport and the import path.",
+  },
+  {
+    a: "src/platform/capabilities.ts",
+    b: "mobile/src/platform/capabilities.ts",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "**The one pair in this record whose divergence IS the decision.** A capability descriptor answers \"does THIS client provide X\", which is the question that genuinely differs per client, so the two answer sets must differ and converging them would be the defect. What myne-md/myne#849 task 3 changed is the layer above: the VOCABULARY (`Capability`, and `CAPABILITY_KEYS` as a `Readonly<Record<Capability, true>>`) moved into `@myne/client-core/capabilities.ts`, so this pair now differs only in its ANSWERS. Before the move mobile had no implementation of this module at all, which made the desktop file's own claim (\"the list is closed, so adding a capability forces every implementation of this module to answer for it\") true of exactly one client: the union sat in a file the phone cannot compile. The desktop module re-exports the type, so its importers are unchanged, and **the mobile record is the one that makes a missing capability a TS2739 at its own file** (myne-md/myne#849 review corrected this sentence, which had claimed all three). Desktop is a blanket `ReadonlySet<Capability>` built from `ALL_CAPABILITIES` and web derives its answer from an `ABSENT` set (`!ABSENT.has(cap)`), so a capability added to the shared union lands PRESENT on web with nobody answering for it. That is a real residual of the same class this pair exists to record, and it is named here rather than left to the word closure. Mobile answers all thirty-seven, twenty-five `true` and twelve `false`, each `false` carrying the reason it is false in the file. Not a claim here: that either set is RIGHT. A wrong `true` ships an affordance against a command that refuses, and the four mobile answers this change could not settle from code alone are named in `progress.md` as candidates for correction.",
   },
 ];
 

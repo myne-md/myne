@@ -50,5 +50,5 @@ export async function renameNote(
   currentBytes: string,
   newTitle: string,
 ): Promise<void> {
-  await noteUpdate(noteId, renamedTitleBody(currentBytes, newTitle));
+  await noteUpdate(noteId, renamedTitleBody(currentBytes, newTitle), undefined, currentBytes);
 }

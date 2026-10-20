@@ -20,6 +20,7 @@ fn main() {
                 "live_session_open",
                 "live_session_patch_frontmatter",
                 "live_session_take_remote_splices",
+                "live_session_read",
                 "live_session_set_presence",
                 "live_session_close",
             ]),

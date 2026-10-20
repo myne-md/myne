@@ -475,6 +475,26 @@ export function deadBindings({ bindings, callers }) {
        * a different name, and asking it twice by copy would be a second place
        * for the alias rule and the re-export rule to drift apart. */
       function reachedFromAnotherFile(wanted) {
+        // A MENTION, and that is now a measured decision rather than an oversight
+        // (myne-md/myne#849 review). The class it misses is real and is how two
+        // unwired mobile bindings passed: `takeRemoteSplices: liveSessionTakeRemoteSplices`
+        // is a property VALUE, and the guard counted the name (this guard's own
+        // recorded lesson is that an import does not count as a caller; a wiring
+        // value is that lesson one step further). Requiring a call shape here was
+        // TRIED in that review round and reverted: it reddens 19 bindings across
+        // the tree (20 once the alias arm below is tightened the same way, which a
+        // full call-shape rule has to do), and nearly all of them (desktop's
+        // `src/lib/live.ts`, `prefs.ts`, `agent-run.ts`, `voice-record.ts`,
+        // `identity.ts`) are legitimately wired as values into a host object,
+        // because that is the host-seam shape this repo uses. Turning the arm
+        // strict would therefore need that many reasoned exemptions in other
+        // features' territory, which is a change with its own
+        // argument rather than a line in someone else's branch. What THIS feature
+        // owes is that its own bindings are called, and they are: the host wiring in
+        // `mobile/src/lib/liveNote.ts` wraps each transport in an arrow, so the five
+        // `plugin:live|*` bindings have real call sites and the two that had none
+        // (`takeRemoteSplices`, `setPresence`) now have real consumers too (the
+        // remote-merge drain and the cursor reporter).
         const w = new RegExp(`\\b${wanted}\\b`);
         const dec = new RegExp(
           `(?:function|const|let|var)\\s+${wanted}\\b|\\b${wanted}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`,

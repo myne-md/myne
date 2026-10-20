@@ -18,6 +18,7 @@
 // narrow a caught rejection.
 
 import { invoke } from "../platform/core";
+import { evictLiveNote, isLiveNote, patchLiveNote, readLiveNote } from "./liveNote";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { mutateDeliberateFolders } from "./prefs";
 import { patchDeletedField, patchTitleField } from "../dialect/surgery";
@@ -84,9 +85,25 @@ export async function noteCreate(
  * Read + AEAD-decrypt an existing `.myn` note by `NoteId`. Returns the
  * UTF-8 plaintext.
  *
+ * **A note with an open live session is read from the SESSION, not from disk**
+ * (myne-md/myne#849 review, D8). A live peer edit is applied to the session and
+ * not flushed (`core/src/plugins/live/awareness.rs`), so disk lags the session
+ * until this device's next write. Every read-modify-write writer here (move,
+ * trash, archive, restore, the cover, the template flag, the task toggle, the
+ * conflict apply) reads through this function and then writes through
+ * `noteUpdate`, which routes a live note through the session as a whole-text
+ * replace. Reading disk there patched stale text over the session and deleted the
+ * peer's edit, then broadcast the deletion. Reading the session makes the base the
+ * text the patch is applied to. A session that closed between the check and the
+ * read answers `null`, and disk is then current again, because closing flushes.
+ *
  * Rejects with a {@link NoteReadError}.
  */
 export async function noteRead(noteId: string): Promise<string> {
+  if (isLiveNote(noteId)) {
+    const live = await readLiveNote(noteId);
+    if (live !== null) return live;
+  }
   return await invoke<string>("plugin:notes|note_read", { noteId });
 }
 
@@ -113,19 +130,77 @@ export async function noteRead(noteId: string): Promise<string> {
  * Omitting it keeps the legacy last-write-wins behaviour, so every existing
  * caller compiles and behaves exactly as before.
  *
+ * `base` (live path only): the text `plaintext` was derived from. While a live
+ * session owns the note and has moved past `base`, the core three-way merges
+ * instead of replacing, so a save from a stale buffer keeps a peer's edit. The
+ * stateless command has no use for it and does not receive it.
+ *
+ * `onApplied` (live path only): called with the session's text once the write
+ * went through a session, before the call settles. The editor's own saves use it
+ * to move their mirror of the session (`LivePatchOptions.onApplied`).
+ *
  * Rejects with a {@link NoteUpdateError}.
  */
 export async function noteUpdate(
   noteId: string,
   plaintext: string,
   expectedBaseHashHex?: string,
+  base?: string,
+  onApplied?: (after: string) => void,
 ): Promise<void> {
+  // Live funnel (myne-md/myne#849 review, C1). While a live session owns the note
+  // it is the SINGLE durable writer (`SYNC-33`), and the backend refuses this
+  // stateless overwrite with `NoteUpdateError::LiveSessionOpen`. The funnel belongs
+  // HERE rather than at the call site: this is the one place the command is
+  // invoked, so every writer inherits it, which is exactly what the desktop twin
+  // does (`src/notes/updateNote.ts`) and what mobile got wrong by funnelling only
+  // the editor's autosave closure. Without this, the cover flush, the move flush,
+  // trash/archive/restore, the task write, the explicit Save and the save-then-open
+  // every list surface uses are all REFUSED on the note that is on screen.
+  //
+  // **The caller's `expectedBaseHashHex` goes WITH it** (myne-md/myne#849 review,
+  // D8). The live path is the DEFAULT for whatever note is on screen, since a
+  // session opens for any text note while the slot is unlocked, and a caller does
+  // pass the hash: the task panel's `setTaskCompleted` (`mobile/src/lib/tasks.ts`),
+  // whose whole sequence exists because a `BaseMismatch` preserves a keep-both copy
+  // instead of clobbering a raced change. A live peer edit sits unflushed in the
+  // session, so the text a caller hashed can be behind the session even though no
+  // durable pull raced it. The session therefore evaluates the hash against its OWN
+  // current text and rejects with the same `{kind:"BaseMismatch"}` the stateless
+  // command uses, writing nothing, so the caller's keep-both branch fires on either
+  // path. `noteRead` above reads a live note from the session, so an unguarded
+  // read-modify-write writer patches the session's own text too, on both clients.
+  if ((await patchLiveNote(noteId, plaintext, { expectedBaseHashHex, base, onApplied })) !== null) {
+    return;
+  }
+  // The session can vanish DURING the call (a delete or a conflict-copy apply
+  // evicting it while this write is in flight), and the funnel then answers
+  // `null`. The caller skipped the §11.3 hash because a session owned the note, or
+  // because it was told none does, so the stateless write below would land its
+  // whole text unguarded (myne-md/myne#849 review). Whenever the caller said what
+  // its text derives from, guard the fallback with that base: the resulting
+  // `BaseMismatch` sends it down the keep-both path instead of over a peer's text.
+  // The condition is about the CALL, not about `isLiveNote` at entry: the
+  // evict-on-delete paths create exactly the state where no session owns the note
+  // while an editor still holds the buffer, and that write is the one to protect.
+  if (expectedBaseHashHex === undefined && base !== undefined) {
+    expectedBaseHashHex = await sha256Hex(base);
+  }
+
   await invoke<void>(
     "plugin:notes|note_update",
     expectedBaseHashHex === undefined
       ? { noteId, plaintext }
       : { noteId, plaintext, expectedBaseHashHex },
   );
+}
+
+/** SHA-256 of the UTF-8 encoding of `text`, as 64 lowercase hex chars (the §11.3 base hash). */
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**
@@ -179,6 +254,22 @@ async function isSyncConfigured(): Promise<boolean> {
  * (a bare `note_delete` would drop the blob locally only and resurrect on next pull).
  */
 export async function deleteNoteRouted(noteId: string): Promise<void> {
+  // Evict the note's live session first (myne-md/myne#849 review). A session holds
+  // the document and re-writes `<vault>/notes/<id>.myn` on its next flush, so
+  // deleting or tombstoning under a live session means the erase lands and the very
+  // next keystroke puts the note back, on the same device, under a user who was
+  // told it was gone. Reachable from the Trash list, whose row both opens the note
+  // and purges it. A no-op for a note no session owns.
+  //
+  // Evict, not `closeLiveNote` (review D7): this path holds no hold of its own, so
+  // a release here released the editor's hold instead, and with two views on the
+  // note the count stayed one short of the views for good. `evictLiveNote` drops
+  // every hold and closes once. When the flush FAILS the session is still in the
+  // registry and its next flush would undo the erase, so the holds come back and
+  // this refuses visibly rather than deleting under it.
+  if (!(await evictLiveNote(noteId))) {
+    throw { kind: "LiveSessionOpen", noteId };
+  }
   if (await isSyncConfigured()) {
     await tombstoneNote(noteId);
   } else {

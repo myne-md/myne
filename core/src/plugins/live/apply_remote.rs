@@ -151,6 +151,33 @@ pub fn diff_splices(before: &str, after: &str) -> Vec<LocalSplice> {
         .collect()
 }
 
+/// Whether [`diff_splices`] would build a real LCS table for this pair rather
+/// than fall back to ONE range covering the whole changed window. The fallback is
+/// correct for applying a diff and wrong for MERGING two: every edit of the other
+/// side inside that window reads as overlapping it (myne-md/myne#849 review).
+#[must_use]
+pub fn diff_within_budget(before: &str, after: &str) -> bool {
+    if before == after {
+        return true;
+    }
+    let b_lines: Vec<&str> = before.split_inclusive('\n').collect();
+    let a_lines: Vec<&str> = after.split_inclusive('\n').collect();
+    let mut p = 0;
+    while p < b_lines.len() && p < a_lines.len() && b_lines[p] == a_lines[p] {
+        p += 1;
+    }
+    let mut s = 0;
+    while s < b_lines.len() - p
+        && s < a_lines.len() - p
+        && b_lines[b_lines.len() - 1 - s] == a_lines[a_lines.len() - 1 - s]
+    {
+        s += 1;
+    }
+    let n = b_lines.len() - p - s;
+    let m = a_lines.len() - p - s;
+    (n + 1).saturating_mul(m + 1) <= MAX_LCS_CELLS
+}
+
 /// Tighten a line-aligned hunk to the minimal char range: trim the common char
 /// prefix and suffix of `before_hunk`/`after_hunk`, and return the (from, to)
 /// byte range within the before text (offset by `before_hunk_start`) plus the

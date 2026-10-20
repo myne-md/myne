@@ -402,6 +402,7 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:live|live_session_open",
     "plugin:live|live_session_patch_frontmatter",
     "plugin:live|live_session_take_remote_splices",
+    "plugin:live|live_session_read",
     "plugin:live|live_session_close",
 ];
 

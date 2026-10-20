@@ -27,7 +27,7 @@ describe("chatReducer", () => {
     const out = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "hello",
       insertable: false,
     });
@@ -41,7 +41,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "hi",
       insertable: false,
     });
@@ -74,7 +74,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "q",
       insertable: false,
     });
@@ -90,7 +90,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "q",
       insertable: false,
     });
@@ -103,7 +103,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "q",
       insertable: false,
     });
@@ -118,7 +118,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "q",
       insertable: false,
     });
@@ -221,7 +221,7 @@ describe("an ask terminal may not close an agent run's turn", () => {
     let s = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      agentId: "a1",
+      assistantId: "a1",
       text: "what is this note about",
       insertable: false,
     });

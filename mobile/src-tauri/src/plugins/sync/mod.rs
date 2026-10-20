@@ -12,9 +12,9 @@
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
-//! `sync:default` bundles all thirty-four commands into ONE narrow,
-//! main-window-only grant — the nineteen-command desktop `sync:default` surface
-//! (including the recovered-notes quarantine quartet
+//! `sync:default` bundles every command below into ONE narrow, main-window-only
+//! grant: desktop's own `sync:default` surface (including the recovered-notes
+//! quarantine quartet
 //! `sync_list_quarantine`/`sync_read_quarantine`/`sync_restore_quarantine`/
 //! `sync_delete_quarantine`, registered here for parity even though no mobile
 //! UI surfaces it yet) plus the mobile-only lifecycle pair
@@ -26,7 +26,7 @@
 //! push/pull/status/device commands are gated on an authenticated session inside
 //! the shared core. The `build.rs` `InlinedPlugin` command list, the
 //! `permissions/sync/default.toml` `commands.allow` entries, and the
-//! `generate_handler!` list below MUST match exactly (all thirty-four), a
+//! `generate_handler!` list below MUST match exactly, a
 //! mismatch makes Tauri **fail closed** (the ACL resolver denies the invoke).
 //!
 //! ## R3 transport review-debt (registration ≠ verified crypto)
@@ -60,8 +60,10 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
 /// Construct the mobile `sync` plugin — registers the client command surface
-/// over the shared-core command bodies. All thirty-four commands, matching the
+/// over the shared-core command bodies. The whole roster, matching the
 /// `build.rs` `InlinedPlugin` + `permissions/sync/default.toml` lists exactly.
+/// Read those two for the count rather than a number here: this docstring said
+/// "thirty-four" while the lists held forty-nine (myne-md/myne#849).
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("sync")
         .invoke_handler(tauri::generate_handler![
@@ -111,6 +113,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_lifecycle_suspend,
             commands::sync_lifecycle_resume,
             commands::sync_decode_join_qr,
+            // myne-md/myne#849 task 7. The presence label rule
+            // (`resolvePeerLabels`) asks this for each un-attributed peer, so
+            // without it the roster and the caret label render the degraded
+            // device form on this client only.
+            identity_resolver::resolve_identity,
         ])
         .build()
 }

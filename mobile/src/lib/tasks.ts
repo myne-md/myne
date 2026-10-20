@@ -31,11 +31,19 @@ import { createConflictCopy } from "./conflictCopy";
 
 export type { VaultTask };
 
-/** Mobile note IO for the note-task `done:` patcher. */
-const completionIo: NoteCompletionIo = {
-  readNote: noteRead,
-  writeNote: (noteId, body) => noteUpdate(noteId, body),
-};
+/**
+ * Mobile note IO for the note-task `done:` patcher, one per call, so the write
+ * carries the text ITS read returned as the merge base (myne-md/myne#849 review
+ * round 5): a peer edit landing between the read and the write is then merged
+ * rather than replaced.
+ */
+function completionIoForOneCall(): NoteCompletionIo {
+  let read: string | undefined;
+  return {
+    readNote: async (noteId) => (read = await noteRead(noteId)),
+    writeNote: (noteId, body) => noteUpdate(noteId, body, undefined, read),
+  };
+}
 
 /**
  * The whole vault's line-tasks and note-tasks.
@@ -79,10 +87,10 @@ export async function setTaskCompleted(task: VaultTask, completed: boolean): Pro
     readNote: noteRead,
     writeNote: (noteId, body, baseHashHex) => noteUpdate(noteId, body, baseHashHex),
     completeNoteTask: (noteId) =>
-      patchNoteCompletion(completionIo, noteId, new Date().toISOString()),
+      patchNoteCompletion(completionIoForOneCall(), noteId, new Date().toISOString()),
     // `null` DELETES the field rather than writing a falsy value, so a note is
     // never left carrying `done: false` — the shared rule, not a mobile one.
-    uncompleteNoteTask: (noteId) => patchNoteCompletion(completionIo, noteId, null),
+    uncompleteNoteTask: (noteId) => patchNoteCompletion(completionIoForOneCall(), noteId, null),
     announce: announceTaskWrite,
     createConflictCopy,
   });

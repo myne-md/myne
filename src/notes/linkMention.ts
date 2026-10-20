@@ -123,6 +123,6 @@ export async function linkMention(
   const body = await noteRead(targetNoteId);
   const next = insertWikilink(body, titleToLink);
   if (next === body) return false; // nothing inserted — caller restores the row
-  await saveNote(targetNoteId, next);
+  await saveNote(targetNoteId, next, undefined, { base: body, onSent: () => {} });
   return true;
 }

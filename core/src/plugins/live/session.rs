@@ -168,6 +168,17 @@ pub struct PendingPresence {
     pub selection: Option<(u32, u32)>,
 }
 
+/// What applying a received live change did to the session
+/// ([`LiveSession::apply_remote_change`]). No `Debug`: the splices carry note
+/// plaintext.
+pub struct RemoteChangeOutcome {
+    /// The body splices for the pane, clamped to the body span.
+    pub splices: Vec<crate::plugins::live::apply_local::LocalSplice>,
+    /// Whether the note's raw text moved at all, frontmatter included. `false` is
+    /// a true no-op (this device's own change echoed back by the relay).
+    pub text_moved: bool,
+}
+
 impl std::fmt::Debug for LiveSession {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Never print the document (it is plaintext).
@@ -286,9 +297,16 @@ impl LiveSession {
     }
 
     /// Apply a received opaque Automerge change and return the body splices the
-    /// editor must dispatch as one `ChangeSet`. Empty for a self-echo / no-op. The
-    /// returned splices are clamped to the body span, so a peer's change that
-    /// reached the reserved frontmatter region is never carried into the editor.
+    /// editor must dispatch as one `ChangeSet`, plus whether the note's text moved
+    /// at all. The splices are empty for a self-echo / no-op, and they are clamped
+    /// to the body span, so a peer's change that reached the reserved frontmatter
+    /// region is never carried into the editor as a splice.
+    ///
+    /// [`RemoteChangeOutcome::text_moved`] is the raw-text comparison, taken BEFORE
+    /// the clamp, so a frontmatter-only change (a peer's rename, retag, move or
+    /// trash) reports `true` with no splices. The caller must still signal it: the
+    /// pane holds the old frontmatter, and its next whole-markdown save would
+    /// write that back over the peer's change (myne-md/myne#849).
     ///
     /// The LIVE CHANNEL content path: `AwarenessRoute` routes a frame's opaque
     /// change into the open session through this, then queues the returned splices
@@ -296,10 +314,7 @@ impl LiveSession {
     pub fn apply_remote_change(
         &mut self,
         change_bytes: &[u8],
-    ) -> Result<
-        Vec<crate::plugins::live::apply_local::LocalSplice>,
-        crate::plugins::live::apply_remote::ApplyRemoteError,
-    > {
+    ) -> Result<RemoteChangeOutcome, crate::plugins::live::apply_remote::ApplyRemoteError> {
         // Clamp against the pre-change text: the boundary is a property of the
         // frontmatter block, which a body-only live change does not move.
         let current = self
@@ -307,10 +322,14 @@ impl LiveSession {
             .map_err(|_| crate::plugins::live::apply_remote::ApplyRemoteError::Malformed)?;
         let splices =
             crate::plugins::live::apply_remote::apply_remote_change(&mut self.doc, change_bytes)?;
+        // `apply_remote_change` answers an empty list exactly when the raw text did
+        // not move, so this is the before/after comparison without a second read.
+        let text_moved = !splices.is_empty();
         self.observe_updated();
-        Ok(crate::plugins::live::body_guard::clamp_to_body(
-            &current, &splices,
-        ))
+        Ok(RemoteChangeOutcome {
+            splices: crate::plugins::live::body_guard::clamp_to_body(&current, &splices),
+            text_moved,
+        })
     }
 
     /// Merge a pulled durable `NC05` blob into the open session (`collab-editor-bridge`
@@ -459,6 +478,15 @@ impl LiveSession {
         self.doc
             .text(&text)
             .map_err(|_| crate::plugins::live::apply_local::ApplyLocalError::Malformed)
+    }
+
+    /// The session's whole current markdown (frontmatter included). This is the
+    /// note as the live channel has it, which runs AHEAD of the disk: a live peer
+    /// change lands here without a durable flush, so a client that must read a
+    /// live note reads it through this rather than from the blob
+    /// (`live_session_read`, myne-md/myne#849).
+    pub fn markdown(&self) -> Result<String, LiveSessionError> {
+        self.current_text().map_err(|_| LiveSessionError::Malformed)
     }
 
     /// The document's current heads (the `NC05` convergence marker).

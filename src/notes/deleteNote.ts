@@ -15,6 +15,7 @@
 import { invoke } from "../platform/core";
 import { patchDeletedField } from "../dialect";
 import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
+import { evictLiveNote } from "./liveNote";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";
 
@@ -87,6 +88,24 @@ export async function deleteNoteRouted(
   // save recreates the file). Same reason and same losing direction as
   // `trashNote`'s flush.
   await flushBeforeFrontmatterWrite();
+  // Then EVICT the note's LIVE SESSION (myne-md/myne#849 review, mirroring
+  // `mobile/src/lib/notes.ts`). A live session holds the document and re-writes
+  // `<vault>/notes/<id>.myn` on its next flush, so an erase underneath one lands
+  // and is then undone by the very next keystroke, on the same device, under a user
+  // who was told the note was gone. The pane's flush above does NOT cover it: that
+  // flush goes THROUGH the session, whose durable write is deferred to close. The
+  // reachable desktop path is the conflict-copy apply, which tombstones the ORIGINAL
+  // while its pane is still open.
+  //
+  // Evict, not `closeLiveNote` (review D7): this path holds no hold of its own, so
+  // a release here released the open pane's hold instead, and with two panes on
+  // the note the count stayed one short of the panes for good. `evictLiveNote`
+  // drops every hold and closes once. When the flush FAILS the session is still in
+  // the registry and its next flush would undo the erase, so the holds come back
+  // and this refuses visibly rather than erasing under it.
+  if (!(await evictLiveNote(noteId))) {
+    throw { kind: "LiveSessionOpen", noteId };
+  }
   const tombstone = forceTombstone ?? (await isSyncConfigured());
   if (tombstone) {
     await tombstoneNote(noteId);

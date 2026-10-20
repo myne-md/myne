@@ -343,3 +343,40 @@ builds for iOS or Android, so this table is the only thing between the unit test
 | 12.9 | **External keyboard, Space does not scroll.** Focus a list row and press Space | the row activates and the list does NOT jump a screen. A `role="button"` div gets no default suppression from the browser; this is the one the helper handles by hand |
 | 12.10 | **Announcements.** Trigger a toast, a sync banner and a failed snapshot | each is spoken without the user having to go looking for it |
 | 12.11 | **The scrim is not a control.** With the command palette open, swipe the screen reader through it | no full-screen unnamed button is announced in front of the palette; Escape (or the reader's dismiss) closes it |
+
+## 13. Live-collaboration presence checklist (myne-md/myne#849)
+
+The phone's half of the `live-collab` epic's presence plane. The epic's own ledger
+(`agent-tooling/epics/live-collab/sync-ledger.md`, its `SYNC-51` and `SYNC-52` rows:
+ledger ids, which resolve in the agents repository and not here) recorded the mobile
+surface as **OWED** rather than implied, because the desktop and web clients rendered
+a peer's caret while `mobile/src` imported no awareness store at all: the shared core
+was wired, the supervisor ran, and nothing on the phone drew anything.
+Task 12 of the feature covers the parts a suite can reach (the roster's empty,
+populated and cleared states, the top bar's chip, and the lock path dropping the store,
+all under mock IPC), and the rows below are what no tier in this tree can answer.
+
+**Why no tier can answer them, stated rather than left to be inferred.**
+`mobile/tests/flow-logic/mock-ipc.ts` stubs `@tauri-apps/api/event`'s `listen` as a
+no-op, so no flow-logic spec can deliver a `sync://awareness` frame: the store has to
+be driven directly, which is what the Vitest specs do. Whether a frame crosses the
+network, whether the OS keeps the stream open while the app is backgrounded, and
+whether a colour tint is legible on a phone's WebView are all observations. Neither CI
+lane builds for iOS or Android.
+
+> **Not run as of 2026-10-16, on either platform.** Recorded rather than implied by the
+> table's existence, in the voice sections 11 and 12 use: nothing schedules this
+> checklist, so it verifies nothing until somebody runs it and writes the result
+> (device model, OS build) below.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 13.1 | **Alone, no affordance.** Unlock with a vault nobody else is in and open a note | the top bar carries NO presence chip. An always-present chip is the defect: the affordance is the arrival of a peer, and `decisions.md` 2026-07-26 makes an offer the client cannot honour an omission rather than a disabled control |
+| 13.2 | **A peer arrives.** On a second device (or the desktop) open the SAME note | the chip appears with a count of 1, without any other change to the screen |
+| 13.3 | **The roster matches the caret.** Tap the chip | the sheet opens and lists that peer. The colour dot on the row is the SAME colour as the caret that peer draws in the note, and the name is the one the shared rule resolved (the synced device name, or the member display name in a shared vault) rather than a degraded "Someone" |
+| 13.4 | **Jump.** Tap the peer's row | the sheet closes and the editor moves to that peer's line. The jump is one-shot: the view does not follow their caret afterwards |
+| 13.5 | **A peer with no position yet.** Have a peer join and tap their row before they have typed or moved | nothing moves in the editor. This is the arm that would otherwise scroll a long note to its first line |
+| 13.6 | **Background and return.** Background Myne on one device for longer than the grace window | the peer disappears from the other device's roster within the grace window, and returning to the foreground puts them back. A flicker on return (peer gone then back in the same second) is the grace window failing |
+| 13.7 | **Lock.** Lock the vault on one device | its peers are dropped and the roster empties. A peer that survives a lock is other people's names resident in a locked vault's memory |
+| 13.8 | **Three surfaces at once.** Desktop plus two phones, one shared vault, the same note open on all three | each surface shows the other two, and an edit made on any of them lands on the other two. This is the SYNC-51 "all three clients" claim observed rather than assumed |
+| 13.9 | **No artefacts.** After a session with peers present, lock the vault and inspect the phone's storage | no awareness file is written: the awareness plane is RAM-only and never at rest (`sync-protocol.md` §10.1) |

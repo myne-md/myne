@@ -177,11 +177,12 @@ async function writeMeetingNote(
   // append is idempotent on the attachment id, so a chunk already embedded (a
   // re-imported, content-addressed duplicate) is left alone.
   if (session.note_id) {
-    let body = await noteRead(session.note_id);
+    const current = await noteRead(session.note_id);
+    let body = current;
     for (const c of chunkTexts) {
       body = appendMeetingChunk(body, { attachmentId: c.attachmentId }, c.text, copy);
     }
-    await noteUpdate(session.note_id, body);
+    await noteUpdate(session.note_id, body, undefined, current);
     return { created: false, noteId: session.note_id };
   }
 

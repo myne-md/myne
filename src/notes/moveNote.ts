@@ -60,7 +60,7 @@ async function moveNoteWithoutRegistering(
   const moved = patchFolderField(encoder.encode(current), norm);
   const stamped = patchUpdatedField(moved, new Date().toISOString());
   const next = decoder.decode(stamped);
-  await noteUpdate(noteId, next);
+  await noteUpdate(noteId, next, undefined, current);
   // MYND-31: the folder changed → re-index (live, decrypt-free) so
   // collision-disambiguation tracks the new folder. Best-effort.
   void reindexNoteFromBody(noteId, next);

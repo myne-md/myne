@@ -529,9 +529,16 @@ export async function renameFolder(
       // record. It is strictly narrower than the defect: before this, a rename
       // of a folder holding an open note could not land at all.
       const remaining: NoteBatchEntry[] = [];
+      // Each entry's pre-image, so a peer merge that landed in the session since
+      // the read above is merged rather than replaced (myne-md/myne#849 review).
+      const baseById = new Map(withBodies.map((n) => [n.noteUuid, n.body]));
       for (const entry of plan.batch) {
-        const routed = await patchLiveNote(entry.noteId, entry.plaintext);
-        if (!routed) remaining.push(entry);
+        // `null` means no session owns the note; an empty string is a routed
+        // empty note and must NOT go to the batch (see `sidebarState.commitRename`).
+        const routed = await patchLiveNote(entry.noteId, entry.plaintext, {
+          base: baseById.get(entry.noteId),
+        });
+        if (routed === null) remaining.push(entry);
       }
       if (remaining.length > 0) await noteWriteBatchTransactional(remaining);
     } catch (error) {

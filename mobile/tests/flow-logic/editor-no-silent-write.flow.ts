@@ -22,6 +22,15 @@ const NOTE = {
   text: "---\ntitle: Alpha\nupdated: 2026-07-01T10:00:00.000Z\n---\n\nalpha body line\n",
 };
 
+/** The writes that went through the LIVE SESSION rather than the stateless
+ *  command. A live session owns the note while it is on screen (`SYNC-33`), so
+ *  this is where an open note's save must land (myne-md/myne#849 review). */
+async function readSessionPatches(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __liveSessionPatches?: string[] }).__liveSessionPatches ?? [],
+  );
+}
+
 async function readNoteUpdates(page: Page): Promise<string[]> {
   return page.evaluate(
     () => (window as unknown as { __noteUpdates?: string[] }).__noteUpdates ?? [],
@@ -74,6 +83,23 @@ test.describe("editor never writes silently", () => {
     const [update] = await readNoteUpdates(page);
     expect(update).toContain("edited marker");
     expect(update).toContain("alpha body line");
+  });
+
+  test("an open note's save goes through the LIVE SESSION, not the stateless command", async ({
+    page,
+  }) => {
+    // The C1 defect this pins: the funnel used to live in the editor's flush
+    // closure, so a spec could pass with the routing removed. Here the routing IS
+    // the assertion, and the mock's patch handler refuses a note nothing opened, so
+    // this also proves something opened it first.
+    await bootAndOpenNote(page);
+    await page.locator(".cm-content").click();
+    await page.keyboard.type("session-routed edit");
+    await firePagehide(page);
+
+    await expect.poll(() => readSessionPatches(page)).toHaveLength(1);
+    const [patched] = await readSessionPatches(page);
+    expect(patched).toContain("session-routed edit");
   });
 
   test("a failed read never binds the editor", async ({ page }) => {

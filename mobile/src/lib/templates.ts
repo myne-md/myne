@@ -13,14 +13,16 @@ const dec = new TextDecoder();
 
 /** Mark an existing note as a template (value-strict `template: true`). */
 export async function markAsTemplate(id: string): Promise<void> {
-  const t = patchTemplateField(enc.encode(await noteRead(id)), "true");
-  await noteUpdate(id, dec.decode(t));
+  const current = await noteRead(id);
+  const t = patchTemplateField(enc.encode(current), "true");
+  await noteUpdate(id, dec.decode(t), undefined, current);
 }
 
 /** Convert a template back into an ordinary note (drops the flag). */
 export async function unmarkTemplate(id: string): Promise<void> {
-  const t = patchTemplateField(enc.encode(await noteRead(id)), null);
-  await noteUpdate(id, dec.decode(t));
+  const current = await noteRead(id);
+  const t = patchTemplateField(enc.encode(current), null);
+  await noteUpdate(id, dec.decode(t), undefined, current);
 }
 
 /** Create a new empty template note titled `name`; resolves to its id. */

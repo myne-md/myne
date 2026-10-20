@@ -1214,6 +1214,10 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             struct Args {
                 note_id: String,
                 markdown: String,
+                #[serde(default)]
+                expected_base_hash_hex: Option<String>,
+                #[serde(default)]
+                base: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -1232,10 +1236,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 vault_io(),
                 a.note_id,
                 a.markdown,
+                a.expected_base_hash_hex,
+                a.base,
             )
             .await
             {
-                Ok(()) => Outcome::ok(&()),
+                Ok(markdown) => Outcome::ok(&markdown),
                 Err(e) => Outcome::error(&e),
             }
         }
@@ -1292,6 +1298,32 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 a.note_id,
             ) {
                 Ok(splices) => Outcome::ok(&splices),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // myne-md/myne#849: the open session's whole current markdown, which runs
+        // ahead of the stored note while a live peer edits. Reads the in-RAM
+        // registry only, which every vault-leaving hook empties, so a locked vault
+        // answers `NotOpen`.
+        "plugin:live|live_session_read" => {
+            use myne_core::plugins::live::commands::live_session_read_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match live_session_read_from_host(crate::session::live_sessions(), a.note_id) {
+                Ok(markdown) => Outcome::ok(&markdown),
                 Err(e) => Outcome::error(&e),
             }
         }

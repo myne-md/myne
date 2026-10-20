@@ -21,6 +21,7 @@ pub mod apply_remote;
 pub mod awareness;
 pub mod body_guard;
 pub mod commands;
+pub mod compose;
 pub mod frontmatter;
 pub mod session;
 pub mod state;
@@ -34,6 +35,8 @@ mod awareness_test;
 #[cfg(test)]
 mod body_guard_test;
 #[cfg(test)]
+mod compose_test;
+#[cfg(test)]
 mod drawing_test;
 #[cfg(test)]
 mod frontmatter_test;
@@ -42,4 +45,6 @@ mod session_test;
 
 pub use commands::LiveSessionCommandError;
 pub use session::{LiveSession, LiveSessionError, LiveSessionKey};
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+pub use state::teardown_on_lock;
 pub use state::LiveSessionRegistry;

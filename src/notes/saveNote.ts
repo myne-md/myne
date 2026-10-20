@@ -54,10 +54,30 @@ export async function saveNote(
   noteId: string,
   body: string,
   expectedBaseHashHex?: string,
+  live?: LiveSaveContext,
 ): Promise<string> {
   const stamped = decoder.decode(
     patchUpdatedField(encoder.encode(body), new Date().toISOString()),
   );
-  await noteUpdate(noteId, stamped, expectedBaseHashHex);
+  await noteUpdate(
+    noteId,
+    stamped,
+    expectedBaseHashHex,
+    live?.base,
+    live === undefined ? undefined : () => live.onSent(stamped),
+  );
   return stamped;
+}
+
+/**
+ * What an editor's save hands a live session (myne-md/myne#849 review round 4).
+ * `base` is the editor's mirror of the session, the text its buffer derives from,
+ * so the core merges a save from a buffer that has not caught up rather than
+ * replacing the session with it. `onSent` runs with the STAMPED text once the
+ * session took it, before the save settles, so the editor moves its mirror to
+ * exactly what it sent. Ignored when no session owns the note.
+ */
+export interface LiveSaveContext {
+  base: string | undefined;
+  onSent: (sent: string) => void;
 }
