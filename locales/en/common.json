@@ -2786,6 +2786,10 @@
     },
     "workspace": {
       "defaultSlotName": "Default"
+    },
+    "autoTag": {
+      "applied": "Tags added: {{tags}}",
+      "undo": "Undo"
     }
   },
   "plainFile": {
@@ -3561,7 +3565,7 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
-      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion, unless you turn on the row below.",
       "historyBudgetInline": "How much of the recent conversation each request carries, in characters.",
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
@@ -3713,7 +3717,9 @@
         "memory": "Memory",
         "excluded": "What AI can read",
         "history": "Chat history"
-      }
+      },
+      "autoApplyLabel": "Apply suggested tags automatically",
+      "autoApplyHelper": "Writes the tags into the note without asking, once per note each session, only after you edit it. On this device only. Undo sits under the note after it writes."
     },
     "memory": {
       "heading": "What the assistant remembers",
