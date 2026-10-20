@@ -18,7 +18,7 @@
 // whole reason the write below is where it is.)
 
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { Transaction, type Extension } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 
 import { resolveScrollHost } from "./scroll-slack";
 
@@ -26,64 +26,6 @@ import { resolveScrollHost } from "./scroll-slack";
  *  currently enabled (EditorChrome sets the attr = focusActive && pref). */
 function typewriterEnabled(view: EditorView): boolean {
   return view.dom.closest('[data-focus-typewriter="true"]') !== null;
-}
-
-/** The re-centre decision, as a pure function so it can be held to its own
- *  rule without layout. `update()` is the adapter that fills it in.
- *
- *  The `userDriven` term is myne-md/myne#908 item 9: the plugin used to
- *  re-centre on ANY document change that was not a pointer selection, and an
- *  autosave echo arrives as a programmatic dispatch (the frontmatter `updated:`
- *  patch), so pausing to save moved the page under a reader who had not moved.
- *  A programmatic transaction carries no user event, which is exactly what this
- *  distinguishes. */
-export function shouldRecenterOnChange(input: {
-  selectionSet: boolean;
-  docChanged: boolean;
-  pointerSelection: boolean;
-  userDriven: boolean;
-  hasFocus: boolean;
-  typewriterEnabled: boolean;
-}): boolean {
-  if (!input.selectionSet && !input.docChanged) return false;
-  if (input.pointerSelection) return false;
-  if (!input.hasFocus || !input.typewriterEnabled) return false;
-  return input.userDriven;
-}
-
-/** True when at least one transaction in the update came from the user (typing,
- *  deleting, a keyboard caret move, paste, undo) rather than from code. */
-export function transactionsAreUserDriven(
-  transactions: readonly Transaction[],
-): boolean {
-  return transactions.some((t) => t.annotation(Transaction.userEvent) !== undefined);
-}
-
-/** The adapter the plugin calls: a ViewUpdate plus the two view facts, reduced
- *  to the decision. Extracted rather than inlined so the SPEC can drive the
- *  wiring with a real programmatic transaction, not just the predicate. An
- *  inlined `userDriven: transactionsAreUserDriven(...)` left the plugin free to
- *  pass `true` and every spec still green, which is exactly the vacuity a review
- *  caught. */
-export function typewriterDecision(
-  update: {
-    selectionSet: boolean;
-    docChanged: boolean;
-    transactions: readonly Transaction[];
-  },
-  view: { hasFocus: boolean; dom: { closest(selector: string): Element | null } },
-): boolean {
-  return shouldRecenterOnChange({
-    selectionSet: update.selectionSet,
-    docChanged: update.docChanged,
-    pointerSelection: update.transactions.some((t) =>
-      t.isUserEvent("select.pointer"),
-    ),
-    userDriven: transactionsAreUserDriven(update.transactions),
-    hasFocus: view.hasFocus,
-    typewriterEnabled:
-      view.dom.closest('[data-focus-typewriter="true"]') !== null,
-  });
 }
 
 /**
@@ -102,13 +44,15 @@ const typewriterPlugin = ViewPlugin.fromClass(
   class {
     constructor(readonly view: EditorView) {}
     update(u: ViewUpdate) {
-      const view = this.view;
+      if (!u.selectionSet && !u.docChanged) return;
       // Never re-center on a MOUSE selection/click. Scrolling mid-click moves the
       // content between mousedown and mouseup, which CM6 then reads as a drag —
       // selecting the span between the two click points. Typewriter centering is
       // for KEYBOARD caret movement + typing only; a mouse click places the caret
       // where the user aimed and must not yank the viewport.
-      if (!typewriterDecision(u, view)) return;
+      if (u.transactions.some((t) => t.isUserEvent("select.pointer"))) return;
+      const view = this.view;
+      if (!view.hasFocus || !typewriterEnabled(view)) return;
       // Center the caret's line by writing the scroll host's `scrollTop` DIRECTLY
       // in CM's measure cycle — NOT by dispatching a `scrollIntoView`
       // transaction. A per-keystroke transaction redraws the selection (the brief

@@ -1,33 +1,39 @@
-// myne-md/myne#908 item 3 — the unfocused pane must be legible as "not this one".
+// myne-md/myne#908 item 3 — the unfocused pane must read as "not this one".
 //
-// The rule under test is the style decision, not the render: a split workspace
-// dims the pane you are NOT in, and a single pane has nothing to contrast with.
-// The load-bearing half is that note TEXT is never dimmed, so the scrim is a
-// token wash at a low opacity over the whole section rather than an opacity on
-// the body. Asserting the token keeps a hardcoded rgba from creeping back in.
+// The treatment is a BRIGHTNESS reduction, and that is the whole finding: an
+// overlay has to pick a colour, and every colour is wrong on some theme. A
+// foreground wash lightened a dark pane (a highlight, not a recession) and a
+// black wash is invisible on AMOLED. Lowering brightness means the same thing
+// everywhere.
 
 import { describe, expect, it } from "vitest";
-import { paneScrimStyle } from "../../src/notes/components/sharedStyles";
+import { paneDimStyle } from "../../src/notes/components/sharedStyles";
 
-describe("paneScrimStyle", () => {
+describe("paneDimStyle", () => {
   it("returns nothing for the focused pane", () => {
-    expect(paneScrimStyle(true, 2)).toBeNull();
+    expect(paneDimStyle(true, 2)).toBeNull();
   });
 
   it("returns nothing when there is only one pane", () => {
-    expect(paneScrimStyle(false, 1)).toBeNull();
+    expect(paneDimStyle(false, 1)).toBeNull();
   });
 
-  it("washes an unfocused pane in a split, from a token and below 10%", () => {
-    const style = paneScrimStyle(false, 2);
-    expect(style).not.toBeNull();
-    expect(style?.background).toBe("var(--scrim)");
-    expect(Number(style?.opacity)).toBeLessThan(0.1);
-    // No colour literal: the wash must follow the theme.
-    expect(String(style?.background)).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i);
+  it("lowers the unfocused pane's brightness in a split", () => {
+    expect(paneDimStyle(false, 2)).toEqual({ filter: "brightness(0.8)" });
   });
 
-  it("does not swallow pointer events meant for the note", () => {
-    expect(paneScrimStyle(false, 3)?.pointerEvents).toBe("none");
+  it("is not an overlay: no colour, no box shadow, no stacking level", () => {
+    const style = paneDimStyle(false, 3);
+    expect(style?.background).toBeUndefined();
+    expect(style?.boxShadow).toBeUndefined();
+    expect(style?.zIndex).toBeUndefined();
+    expect(style?.position).toBeUndefined();
+  });
+
+  it("keeps the other pane readable rather than hiding it", () => {
+    const filter = String(paneDimStyle(false, 2)?.filter);
+    const value = Number(filter.match(/brightness\(([\d.]+)\)/)?.[1]);
+    expect(value).toBeGreaterThanOrEqual(0.75);
+    expect(value).toBeLessThan(1);
   });
 });

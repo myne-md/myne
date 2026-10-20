@@ -213,8 +213,11 @@ describe("tab title reveal (myne-md/myne#908 item 6)", () => {
     const label = screen.getAllByTestId("editor.tab-label")[0];
     expect(label).toBeTruthy();
     expect(label?.style.overflow).toBe("hidden");
-    // Ellipsis is gone: the marquee is what reveals the rest, and an ellipsis
-    // would re-truncate the moving text.
-    expect(label?.style.textOverflow).toBe("");
+    // The ellipsis stays at REST and is dropped only while the reveal runs:
+    // removing it outright deleted every truncation mark in the strip.
+    expect(label?.style.textOverflow).toBe("ellipsis");
+    // And the text is `inline` at rest, because an inline-block child is an
+    // atomic box that swallows the parent's ellipsis.
+    expect(label?.firstElementChild?.style.display).toBe("inline");
   });
 });
