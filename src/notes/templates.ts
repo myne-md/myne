@@ -68,7 +68,7 @@ export async function convertNoteToTemplate(noteId: string): Promise<void> {
   await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const marked = patchTemplateField(encoder.encode(current), TEMPLATE_FLAG_VALUE);
-  await noteUpdate(noteId, decoder.decode(marked));
+  await noteUpdate(noteId, decoder.decode(marked), undefined, current);
 }
 
 /**
@@ -84,7 +84,7 @@ export async function convertTemplateToNote(noteId: string): Promise<void> {
   await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const demoted = patchTemplateField(encoder.encode(current), null);
-  await noteUpdate(noteId, decoder.decode(demoted));
+  await noteUpdate(noteId, decoder.decode(demoted), undefined, current);
 }
 
 /**

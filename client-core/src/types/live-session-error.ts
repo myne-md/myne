@@ -32,6 +32,13 @@ export type LiveSessionCommandError =
   | { kind: "NotOpen" }
   /** The note is a `kind: drawing` note; the CM6 live bridge does not apply. */
   | { kind: "DrawingNotApplicable" }
+  /**
+   * The caller's expected-base hash did not match the session's current text on
+   * `live_session_patch_frontmatter`. Nothing was written. The same shape as
+   * `NoteUpdateError::BaseMismatch`, so a keep-both caller reads one
+   * discriminator on either write path (myne-md/myne#849).
+   */
+  | { kind: "BaseMismatch" }
   /** Entropy unavailable re-sealing the `NC05` blob. */
   | { kind: "Csprng" }
   /** A filesystem failure on the blob read or the durable write. */

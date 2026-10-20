@@ -28,6 +28,7 @@ import {
   resetTranscripts,
 } from "@myne/editor/attachments/session-caches";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
+import { clearAwareness } from "@myne/awareness-store";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -82,6 +83,18 @@ export async function lockVault(
   // vault's conversation into the next session's RAM. Synchronous like the
   // drop above, before the first await.
   clearChatHistoryPersistForLock();
+  // The live-presence store (myne-md/myne#849 task 9), on the SAME pre-await leg
+  // as the two drops above and for the same reason. It is module scope in the
+  // shared `@myne/awareness-store`, so it outlives this screen, and on mobile
+  // every vault change comes through here, so a survivor would carry the previous
+  // vault's peers (their names, carets and selections) into the next session's
+  // RAM. It holds no note plaintext, but a name and a cursor are still a record
+  // of who was editing what. It cannot throw and it must not be skip-able: the
+  // flushes below it can reject, and a store holding OTHER PEOPLE's names is not
+  // something a failed write may leave resident. `mobile/tests/vaultLockTeardown.test.ts`
+  // asserts exactly that ordering, and `scripts/check-frontend-lock-teardown.mjs`
+  // asserts this call by name.
+  clearAwareness();
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
   // MYI1: manual lock and a vault switch MAY flush it before the slot drops,

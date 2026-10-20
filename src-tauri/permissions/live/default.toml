@@ -4,19 +4,36 @@
 # an `InlinedPlugin`. Capability files reference these as `live:default` (or
 # `live:allow-live-session-open` / … individually).
 #
-# Every command is Slot::Unlocked-gated and operates on the encrypted .myn
-# blob through the single-writer `LiveSessionRegistry`. They inherit the
-# main-window-only invariant shared by the other vault plugins: v0.2 multi-window
-# MUST NOT grant a live write permission to any non-main window.
+# Which gate each command actually carries, stated per command because one
+# sentence cannot hold it. The three commands that touch vault content
+# (`live_session_open`, `live_session_patch_frontmatter`, `live_session_close`)
+# are `Slot::Unlocked`-gated. The other three (`live_session_take_remote_splices`,
+# `live_session_read`, `live_session_set_presence`) hold NO vault authority and
+# no slot check: they read or write the in-RAM `LiveSessionRegistry`
+# (`take_remote_splices` reads it and returns queued body insert text; `read`
+# reads it and returns the open session's whole markdown, which is note
+# plaintext; `set_presence` writes it AND the awareness signal's local label),
+# and what keeps them safe on a locked vault is the lock-teardown hook
+# (`live_session_teardown_on_lock`, `scripts/check-lock-teardown.mjs`), not the
+# ACL: it CLEARS the registry and resets that label to none
+# (`myne_core::plugins::live::teardown_on_lock`), so neither a session nor the
+# label survives a lock or a vault switch, and after a lock `read` answers
+# NotOpen. `take_remote_splices` and `read` both return note text, so that
+# teardown hook is load-bearing for them.
+#
+# They inherit the main-window-only invariant shared by the other vault plugins:
+# v0.2 multi-window MUST NOT grant a live write permission to any non-main
+# window.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the live plugin: the collaborative-editor live-session commands (open / patch-frontmatter / close)."
+description = "Default permission set for the live plugin: the collaborative-editor live-session commands (open / patch-frontmatter / take-remote-splices / read / set-presence / close)."
 permissions = [
     "allow-live-session-open",
     "allow-live-session-patch-frontmatter",
     "allow-live-session-take-remote-splices",
+    "allow-live-session-read",
     "allow-live-session-set-presence",
     "allow-live-session-close",
 ]
@@ -37,11 +54,16 @@ description = "Allow invoking live:live_session_take_remote_splices (drains the 
 commands.allow = ["live_session_take_remote_splices"]
 
 [[permission]]
+identifier = "allow-live-session-read"
+description = "Allow invoking live:live_session_read (no slot; returns the open session's whole current markdown, which runs ahead of disk while a live peer edits; NotOpen when no session, and the lock teardown empties the registry so a locked vault has none)."
+commands.allow = ["live_session_read"]
+
+[[permission]]
 identifier = "allow-live-session-close"
 description = "Allow invoking live:live_session_close (Slot::Unlocked-gated; flushes the pending durable write then drops the session)."
 commands.allow = ["live_session_close"]
 
 [[permission]]
 identifier = "allow-live-session-set-presence"
-description = "Allow invoking live:live_session_set_presence (records this device's local caret/selection for an open note so peers render its cursor; infallible, a no-op with no open session)."
+description = "Allow invoking live:live_session_set_presence (records this device's local caret/selection for an open note so peers render its cursor, AND unconditionally sets the awareness signal's local label; infallible, and only the caret half is a no-op with no open session)."
 commands.allow = ["live_session_set_presence"]

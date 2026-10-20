@@ -62,6 +62,10 @@ beforeEach(() => {
   flushMock.mockReset();
   flushMock.mockResolvedValue(undefined);
   patchLiveMock.mockReset();
+  // `patchLiveNote` answers the session's text, or `null` when no session owns
+  // the note (myne-md/myne#849). A bare `mockReset` leaves it resolving
+  // `undefined`, which is neither, so the default has to say which it is.
+  patchLiveMock.mockResolvedValue(null);
 });
 afterEach(() => {
   noteReadMock.mockReset();
@@ -329,7 +333,7 @@ describe("renameFolder — async apply (transactional)", () => {
   // function over.
   it("routes a live-session note through its session and batches only the rest", async () => {
     noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
-    patchLiveMock.mockImplementation((id: string) => Promise.resolve(id === "live"));
+    patchLiveMock.mockImplementation((id: string) => Promise.resolve(id === "live" ? "# B\n" : null));
     const notes: Note[] = [
       { noteUuid: "live", folder: "P/" },
       { noteUuid: "closed", folder: "P/" },
@@ -351,7 +355,7 @@ describe("renameFolder — async apply (transactional)", () => {
 
   it("sends no batch at all when every note in the subtree is live", async () => {
     noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
-    patchLiveMock.mockResolvedValue(true);
+    patchLiveMock.mockResolvedValue("# B\n");
 
     const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], []);
 

@@ -1,0 +1,75 @@
+# Permissions for the in-app `live` Tauri plugin (epic live-collab,
+# `collab-editor-bridge` task 3).
+# Picked up under the `live:` ACL namespace because `build.rs` declares this as
+# an `InlinedPlugin`. This mobile capability references it as `live:default`.
+#
+# Ported from the desktop `src-tauri/permissions/live/default.toml`: the SAME
+# six commands, `live_session_read` included, under the same deny-by-default
+# shape. The command bodies are the shared `myne-core` code,
+# so this is a registration and not a second policy.
+#
+# Which gate each command actually carries, stated per command because one
+# sentence cannot hold it. The three commands that touch vault content on disk
+# (`live_session_open`, `live_session_patch_frontmatter`, `live_session_close`)
+# are `Slot::Unlocked`-gated: they resolve the vault slot and refuse a locked
+# vault. The other three (`live_session_take_remote_splices`,
+# `live_session_read`, `live_session_set_presence`) hold NO vault authority and
+# no slot check. `take_remote_splices` reads the in-RAM `LiveSessionRegistry` and
+# returns queued body insert text; `read` reads it and returns the open
+# session's whole markdown, which is note plaintext; `set_presence` writes it AND
+# the awareness signal's local label, which is the value the supervisor puts into
+# the presence frame it publishes. What keeps all three safe on a locked vault is
+# therefore the lock-teardown hook (`live_session_teardown_on_lock`, which
+# `scripts/check-lock-teardown.mjs` holds), not the ACL: it CLEARS that registry
+# and resets the label to none (`myne_core::plugins::live::teardown_on_lock`), so
+# after a lock `read` answers NotOpen and no label survives into the next vault.
+# A later command added to this list must say which of the two it is rather than
+# inheriting the sentence. `take_remote_splices` and `read` both return note
+# text, so that teardown hook is load-bearing for them.
+#
+# `lib.rs` already managed that registry and the awareness signal. They inherit
+# the main-window-only invariant shared by the other vault plugins: no non-main
+# window may be granted a live write permission.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the live plugin: the collaborative-editor live-session commands (open / patch-frontmatter / take-remote-splices / read / set-presence / close)."
+permissions = [
+    "allow-live-session-open",
+    "allow-live-session-patch-frontmatter",
+    "allow-live-session-take-remote-splices",
+    "allow-live-session-read",
+    "allow-live-session-set-presence",
+    "allow-live-session-close",
+]
+
+[[permission]]
+identifier = "allow-live-session-open"
+description = "Allow invoking live:live_session_open (Slot::Unlocked-gated; loads the note's NC05 blob into a live session under the device actor; idempotent, a second open attaches)."
+commands.allow = ["live_session_open"]
+
+[[permission]]
+identifier = "allow-live-session-patch-frontmatter"
+description = "Allow invoking live:live_session_patch_frontmatter (Slot::Unlocked-gated; the durable frontmatter entry point, persists a re-derived note through the session)."
+commands.allow = ["live_session_patch_frontmatter"]
+
+[[permission]]
+identifier = "allow-live-session-take-remote-splices"
+description = "Allow invoking live:live_session_take_remote_splices (drains the body splices a sync pull merged into the open session, for the pane to dispatch as one ChangeSet; task 7)."
+commands.allow = ["live_session_take_remote_splices"]
+
+[[permission]]
+identifier = "allow-live-session-read"
+description = "Allow invoking live:live_session_read (no slot; returns the open session's whole current markdown, which runs ahead of disk while a live peer edits; NotOpen when no session, and the lock teardown empties the registry so a locked vault has none)."
+commands.allow = ["live_session_read"]
+
+[[permission]]
+identifier = "allow-live-session-close"
+description = "Allow invoking live:live_session_close (Slot::Unlocked-gated; flushes the pending durable write then drops the session)."
+commands.allow = ["live_session_close"]
+
+[[permission]]
+identifier = "allow-live-session-set-presence"
+description = "Allow invoking live:live_session_set_presence (records this device's local caret/selection for an open note so peers render its cursor, AND unconditionally sets the awareness signal's local label; infallible, and only the caret half is a no-op with no open session)."
+commands.allow = ["live_session_set_presence"]

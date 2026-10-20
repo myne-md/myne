@@ -362,10 +362,36 @@ pub async fn sync_lifecycle_suspend<R: Runtime>(app: AppHandle<R>) {
 /// flag and arms the one-shot resume-immediate poll, so returning to the app
 /// pulls fresh state without waiting out the poll interval. Same no-op
 /// contract on hosts without the managed signal.
+///
+/// It also asks every open live session to re-announce itself (`SYNC-29`,
+/// myne-md/myne#849): each one sends a `FrameType::Join` on the awareness
+/// supervisor's next drain, and peers answer a join by re-announcing their own
+/// presence. The mobile WebView drops its presence store when the app is hidden
+/// (threat-model AS24), while the supervisor tears the awareness stream down
+/// only on its next tick after suspension, so a hide shorter than one tick
+/// leaves the stream up and the reconnect path that re-joins never runs; without this an
+/// idle peer stays missing from the participant list until they move their
+/// caret. Desktop never invokes this command, so the rejoin is mobile-effective
+/// only. Best-effort like the rest: an unmanaged registry is a no-op.
 #[tauri::command]
 pub async fn sync_lifecycle_resume<R: Runtime>(app: AppHandle<R>) {
-    if let Some(sig) = app.try_state::<super::loop_control::SyncLifecycleSignal>() {
+    let signal = app.try_state::<super::loop_control::SyncLifecycleSignal>();
+    let live = app.try_state::<crate::plugins::live::LiveSessionRegistry>();
+    sync_lifecycle_resume_from_host(signal.as_deref(), live.as_deref());
+}
+
+/// The body of [`sync_lifecycle_resume`], taking the two managed states it
+/// touches so a test can drive it without an `AppHandle`. Either may be absent
+/// (a host that manages neither), and each absent one is skipped.
+pub fn sync_lifecycle_resume_from_host(
+    signal: Option<&super::loop_control::SyncLifecycleSignal>,
+    live: Option<&crate::plugins::live::LiveSessionRegistry>,
+) {
+    if let Some(sig) = signal {
         sig.resume();
+    }
+    if let Some(reg) = live {
+        reg.mark_all_join_pending();
     }
 }
 

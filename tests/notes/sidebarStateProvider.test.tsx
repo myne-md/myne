@@ -466,7 +466,7 @@ describe("useSelectedNote — rename re-sync", () => {
       batch: [{ noteId: "rn-live", plaintext: "# New\n" }],
       inboundIds: [],
     });
-    liveSessionPatchFrontmatter.mockResolvedValue(undefined);
+    liveSessionPatchFrontmatter.mockResolvedValue("# New\n");
     noteWriteBatchTransactional.mockResolvedValue(undefined);
     await act(async () => {
       await result.current.commitRename("rn-live", "# Old\n", "New");
@@ -475,7 +475,7 @@ describe("useSelectedNote — rename re-sync", () => {
     expect(
       liveSessionPatchFrontmatter,
       "a live-owned note must be written THROUGH its session",
-    ).toHaveBeenCalledWith("rn-live", "# New\n");
+    ).toHaveBeenCalledWith("rn-live", "# New\n", { base: "# Old\n" });
     expect(
       noteWriteBatchTransactional,
       "and must not be handed to the batch that refuses it",

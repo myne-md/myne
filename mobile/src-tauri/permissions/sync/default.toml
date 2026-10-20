@@ -8,10 +8,12 @@
 # substrate) PLUS the mobile-only lifecycle pair (`sync_lifecycle_suspend` /
 # `sync_lifecycle_resume` — in-RAM scheduler flag flips driven by the WebView's
 # visibilitychange; desktop never manages the signal so it does not register
-# them). 30 commands total (the recovered-notes quarantine quartet:
-# `sync_list_quarantine` / `sync_read_quarantine` / `sync_restore_quarantine` /
-# `sync_delete_quarantine` — is registered for parity even though the mobile UI
-# does not surface it yet).
+# them). The recovered-notes quarantine quartet: `sync_list_quarantine` /
+# `sync_read_quarantine` / `sync_restore_quarantine` / `sync_delete_quarantine`
+# is registered for parity even though the mobile UI does not surface it yet.
+# Read the `[default]` list below for the count rather than a number here: this
+# header said "30 commands total" while the list held forty-nine BEFORE the
+# `resolve_identity` grant this change adds (myne-md/myne#849).
 #
 # Deny-by-default (SYNC-15): the data-plane commands (push/pull/sync-now/status)
 # each get their own `commands.allow` entry AND remain gated on an authenticated
@@ -71,6 +73,7 @@ permissions = [
     "allow-sync-lifecycle-suspend",
     "allow-sync-lifecycle-resume",
     "allow-sync-decode-join-qr",
+    "allow-resolve-identity",
 ]
 
 [[permission]]
@@ -303,3 +306,8 @@ commands.allow = ["sync_verify_hold_begin"]
 identifier = "allow-sync-verify-hold-end"
 description = "Allow invoking sync:sync_verify_hold_end (myne#462 — release the push hold engaged by sync_verify_hold_begin, on match, on mismatch or on unmount). Idempotent; in-RAM flag only, no vault access, no IO, no server call. Releasing early only restores the ordinary push cadence."
 commands.allow = ["sync_verify_hold_end"]
+
+[[permission]]
+identifier = "allow-resolve-identity"
+description = "Allow invoking sync:resolve_identity (map an Automerge actor to a {Device, Person, Unknown} identity, so the presence roster and a peer's caret label carry a resolved name instead of the degraded device form; myne-md/myne#849 task 7). Read-only: it reads the vault's `device_names` pref and the device-binding join and returns a label. NO id hash crosses to the frontend and the WebView hashes or truncates nothing; where a device has no user-chosen name the BACKEND derives a six-character device code from the actor, so what arrives is a label rather than an identifier to interpret. The command is the only place that maps an actor to a person. Desktop has granted it since `collab-provenance` task 2; the desktop permission is byte-identical in intent."
+commands.allow = ["resolve_identity"]

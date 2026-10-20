@@ -35,6 +35,7 @@
     "secret-export:default",
     "export-dir:default",
     "sync:default",
+    "live:default",
     "member-names:default",
     "device-binding:default",
     "qr-scan:default",

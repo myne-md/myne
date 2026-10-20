@@ -26,9 +26,11 @@ use zeroize::Zeroizing;
 /// What routing one inbound frame did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AwarenessRoute {
-    /// The frame carried a content change and it was applied to the open session for
-    /// its note (the carried id); the body diff is queued in the registry for the
-    /// pane to dispatch.
+    /// The frame carried a content change that moved the open session's text for
+    /// its note (the carried id); the body diff, if any survived the frontmatter
+    /// clamp, is queued in the registry for the pane to dispatch. A
+    /// frontmatter-only change lands here with nothing queued, so the pane still
+    /// learns the note moved (myne-md/myne#849).
     ChangeApplied([u8; 16]),
     /// The frame carried presence only (cursor / selection / label), for the
     /// presence store. Returned whole so the caller keeps the payload.
@@ -40,8 +42,9 @@ pub enum AwarenessRoute {
     /// guard). Distinguished from [`Self::NoRoom`] so a peer leg that delivers
     /// nothing is not confused with one that delivers and is dropped.
     SelfEcho,
-    /// The frame carried a change for a note with no open session, a no-op (the
-    /// durable blob plane reconciles it).
+    /// The frame carried a change for a note with no open session, or one that
+    /// did not move the session's text (a self-echo), a no-op (the durable blob
+    /// plane reconciles it).
     NoSession,
     /// The frame arrived while NO note had an open session at all, so there was no
     /// room to match even in principle. Split from [`Self::NoRoom`] so a session that
@@ -415,8 +418,8 @@ pub fn route_awareness_frame(
         // back. Comparing the frame's actor against the open session's local actor
         // drops it here, so an editing device never renders a participant row for
         // itself. The content branch below needs no actor compare: a re-applied
-        // own change moves no text and yields an empty splice list, which it now
-        // treats as a no-op too (myne-md/myne#857).
+        // own change moves no text at all, which it treats as a no-op too
+        // (myne-md/myne#857).
         let note_id = uuid::Uuid::from_bytes(payload.note_id).to_string();
         let is_echo = registry
             .with_note_mut(&note_id, |s| s.actor_id())
@@ -431,19 +434,28 @@ pub fn route_awareness_frame(
     // for the frame's note; a stale or unapplicable change is a no-op (the durable
     // blob plane reconciles it), never an error the caller must handle.
     let note_id = uuid::Uuid::from_bytes(payload.note_id).to_string();
-    let applied = registry.with_note_mut(&note_id, |s| s.apply_remote_change(&change));
+    // The apply and the queue run under ONE hold of the registry's session lock
+    // (`apply_and_queue`), so a sync-cycle merge into the same session cannot queue
+    // its splices between this apply and this queue, which would compose the two
+    // lists in the wrong coordinate order (myne-md/myne#849).
+    let applied = registry.apply_and_queue(&note_id, |s| {
+        s.apply_remote_change(&change)
+            .map(|outcome| (outcome.splices, outcome.text_moved))
+    });
     match applied {
-        // An empty splice list means the text did not move: most often THIS
-        // device's own change, echoed back by the relay, but also a change that
-        // touched only frontmatter. Neither is a remote edit the user must be told
-        // about, so it is a no-op rather than `ChangeApplied`, which is what made
-        // an editing device raise its own "updated from another device" notice
-        // (`collab-verification`; myne-md/myne#857).
-        Some(Ok(splices)) if !splices.is_empty() => {
-            registry.set_pending_splices(&note_id, splices);
-            Ok(AwarenessRoute::ChangeApplied(payload.note_id))
-        }
-        // No session, or the change did not move the text, a no-op.
-        Some(Ok(_)) | Some(Err(_)) | None => Ok(AwarenessRoute::NoSession),
+        // The text moved, so the pane must hear of it even when no BODY splice
+        // survived the clamp: a frontmatter-only change (a peer's rename, retag,
+        // move or trash) has an empty splice list, and staying silent left the pane
+        // holding the old frontmatter, which its next whole-markdown save wrote back
+        // over the peer's change (myne-md/myne#849). An empty list leaves the queue
+        // as it is, so the pane drains whatever body splices exist, possibly none.
+        Some(Ok(true)) => Ok(AwarenessRoute::ChangeApplied(payload.note_id)),
+        // The text did not move: most often THIS device's own change, echoed back
+        // by the relay. That is not a remote edit the user must be told about, so
+        // it is a no-op rather than `ChangeApplied`, which is what made an editing
+        // device raise its own "updated from another device" notice
+        // (`collab-verification`; myne-md/myne#857). No session, or a change the
+        // document refuses, is a no-op too.
+        Some(Ok(false)) | Some(Err(_)) | None => Ok(AwarenessRoute::NoSession),
     }
 }

@@ -22,25 +22,41 @@ export async function liveSessionOpen(noteId: string): Promise<void> {
 
 /**
  * The durable frontmatter entry point: persist a re-derived note through the
- * session.
+ * session. Resolves with the session's WHOLE markdown after the patch.
+ *
+ * `expectedBaseHashHex` is the §11.3 expected-base guard on the live path: when
+ * the session's own current text hashes differently, the command rejects with
+ * `{kind:"BaseMismatch"}` and writes nothing. `base` is the text `markdown` was
+ * derived from: when the session has moved past it, the core three-way merges
+ * instead of replacing, so a save from a stale buffer keeps a peer's edit. Each
+ * optional key is sent only when defined, so an unguarded write carries exactly
+ * the two keys it always did.
  */
 export async function liveSessionPatchFrontmatter(
   noteId: string,
   markdown: string,
-): Promise<void> {
-  return invoke("plugin:live|live_session_patch_frontmatter", { noteId, markdown });
+  opts?: { expectedBaseHashHex?: string; base?: string },
+): Promise<string> {
+  const args: Record<string, string> = { noteId, markdown };
+  if (opts?.expectedBaseHashHex !== undefined) {
+    args.expectedBaseHashHex = opts.expectedBaseHashHex;
+  }
+  if (opts?.base !== undefined) args.base = opts.base;
+  return invoke("plugin:live|live_session_patch_frontmatter", args);
 }
 
 /**
  * One local edit: replace the UTF-16 range `[from, to)` with `insert`. These are
  * the splices a sync pull merged into an open session hands the pane, which
  * dispatches them as one multi-range `ChangeSet`.
+ *
+ * The SHAPE is declared once, in `@myne/client-core/live-note`, because the
+ * policy that drains them lives there and both clients receive the same one.
+ * Re-exported here so this binding module's own importers are unchanged.
  */
-export interface LocalSplice {
-  from: number;
-  to: number;
-  insert: string;
-}
+export type { LocalSplice } from "@myne/client-core/live-note";
+import type { LocalSplice } from "@myne/client-core/live-note";
+
 
 /**
  * Drain the body splices a sync pull merged into this note's open session
@@ -50,6 +66,18 @@ export interface LocalSplice {
  */
 export async function liveSessionTakeRemoteSplices(noteId: string): Promise<LocalSplice[]> {
   return invoke("plugin:live|live_session_take_remote_splices", { noteId });
+}
+
+/**
+ * The open session's current whole markdown, which is ahead of disk whenever a
+ * live peer edit has landed since this device last wrote (myne-md/myne#849
+ * review, D8). Rejects with `{kind:"NotOpen"}` for a note no session owns.
+ *
+ * The mobile twin is `mobile/src/lib/live.ts`; both clients register the command
+ * and both read-modify-write funnels read a live note through it.
+ */
+export async function liveSessionRead(noteId: string): Promise<string> {
+  return invoke("plugin:live|live_session_read", { noteId });
 }
 
 /** Flush the pending durable write and drop the session. */

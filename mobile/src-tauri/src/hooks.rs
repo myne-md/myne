@@ -191,13 +191,18 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     /// Drop every open live co-editing session (epic live-collab,
     /// `collab-editor-bridge`): a session holds decrypted note plaintext, so none
     /// may survive a lock, a switch, a delete or a force-relock.
+    ///
+    /// It also forgets the participant label `live_session_set_presence` stored on
+    /// the awareness signal (myne-md/myne#849): that is the name this device shows
+    /// peers in the vault being left, and it must not ride into the next one.
     fn live_session_teardown_on_lock(&self) {
-        if let Some(reg) = self
+        let registry = self
             .app
-            .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
-        {
-            reg.clear();
-        }
+            .try_state::<myne_core::plugins::live::LiveSessionRegistry>();
+        let signal = self
+            .app
+            .try_state::<myne_core::plugins::sync::awareness_listener::AwarenessSignal>();
+        myne_core::plugins::live::teardown_on_lock(registry.as_deref(), signal.as_deref());
     }
     fn clear_staged_descriptor(&self) {}
     fn apply_screen_capture(&self, enabled: bool, site: &'static str) {

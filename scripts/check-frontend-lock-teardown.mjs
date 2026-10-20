@@ -99,6 +99,18 @@ export const LEAVING_PATHS = [
     why: "Mobile's delete, which bypasses `lockVault` exactly as desktop's bypasses both of its chokepoints. Worse here than on desktop: the stage leaves the editor without advancing the prefs nonce, so mobile's publisher never re-reads and the erased vault's values stay resident for the rest of the process.",
   },
   {
+    id: "mobile-create",
+    file: "mobile/src/app/AppShell.tsx",
+    fn: "leaveForCreateVault",
+    why: "The editor's create-another-vault exit, which bypasses `lockVault`: the create -> auto-unlock chain locks the current vault at the IPC layer instead. It was an inline prop until myne-md/myne#849 review D9, so it called `clearAwareness` with nothing holding it there.",
+  },
+  {
+    id: "mobile-join",
+    file: "mobile/src/app/AppShell.tsx",
+    fn: "leaveForJoinAccount",
+    why: "The editor's join-an-account exit, which bypasses `lockVault`: `sync_join_account` unlocks the vault it bootstraps and evicts this one at the IPC layer (SYNC-1). Rostered with `mobile-create` for the same reason.",
+  },
+  {
     id: "mobile-background",
     file: "mobile/src/app/flows/EditorFlow.tsx",
     fn: "flushAll",
@@ -135,6 +147,9 @@ const SKIP_NO_SPELL_LAYER =
 const SKIP_CREATE =
   "the create-vault callback has no prior editor session to clear: the old vault, when present, is left through the normal switch path before creation, and this callback only publishes the newly created vault.";
 
+const SKIP_MOBILE_HANDOFF =
+  "NOT CLEARED on this path, recorded as an open gap rather than argued away (myne-md/myne#849 review). The callback hands the screen to a vault flow WITHOUT locking the slot, and the join overlay's cancel returns to the SAME unlocked session, so a clear here would discard state the user comes back to (a staged conversation write above all, which the background flush exists to save). The previous vault's value therefore stays resident until the next `lockVault`, which is of the NEW vault when the flow completes (or, for a store with a publisher, until the new vault's publisher overwrites it). Closing it needs a teardown at the flow's completion, which is its own change.";
+
 export const TEARDOWN_CALLS = [
   {
     call: "clearAgentForLock",
@@ -146,7 +161,14 @@ export const TEARDOWN_CALLS = [
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
     // `lockVault` without anything noticing.
-    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock", "mobile-background"],
+    appliesTo: [
+      "desktop-lock",
+      "desktop-switch",
+      "mobile-lock",
+      "mobile-background",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
       "mobile-delete": SKIP_DESKTOP_ONLY,
@@ -162,6 +184,8 @@ export const TEARDOWN_CALLS = [
     via: {
       "mobile-lock": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
       "mobile-background": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
+      "mobile-create": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
+      "mobile-join": { fn: "endAgentRun", file: "mobile/src/lib/agent-lifetime.ts" },
     },
   },
   {
@@ -174,20 +198,44 @@ export const TEARDOWN_CALLS = [
     // session. It holds no note plaintext, but a name and a cursor are still a record
     // of who was editing what. Asserted at the lock choke point and on the switch and
     // delete paths, which reach the editor without the pane necessarily unmounting.
-    appliesTo: ["desktop-lock", "desktop-switch", "desktop-delete"],
+    //
+    // **On mobile the three skips that used to sit here are GONE**, and that is
+    // myne-md/myne#849 task 9 rather than a tidy-up. Each said the same thing: the
+    // channel was not wired on this client, so the store was always empty there and
+    // there was nothing resident to drop. Task 5 wired the channel and task 9 wired
+    // the paths, so the premise the skips rested on is false. The queue they left
+    // behind is the reason they are deleted here rather than reworded: a skip whose
+    // reason has stopped being true is a store this guard has stopped checking, and
+    // `mobile-background` has no desktop analogue to catch it later.
+    //
+    // `mobile-create` and `mobile-join` joined in the D9 review round: both already
+    // called this, as inline props no roster could name, so removing either call
+    // left every gate green.
+    appliesTo: [
+      "desktop-lock",
+      "desktop-switch",
+      "desktop-delete",
+      "mobile-lock",
+      "mobile-background",
+      "mobile-delete",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
-      "mobile-lock":
-        "mobile compiles `src/notes/collab/awarenessStore.ts` (shared tree), but its live-awareness channel is not wired yet, so nothing populates the store on mobile and there is nothing resident to drop. When mobile's channel lands, this row MUST wire `clearAwareness()` into mobile's `lockVault` and delete this skip.",
-      "mobile-background":
-        "same as mobile-lock: mobile's live-awareness channel is not wired, so the store is always empty there. The skip is coupled to the mobile-lock one; both go together when the channel lands.",
-      "mobile-delete":
-        "same as mobile-lock: mobile's live-awareness channel is not wired, so the store is always empty there.",
     },
   },
   {
     call: "resetDateTimeDisplayForLock",
     declaredIn: "editor/src/host/lib/datetimeFormat.ts",
+    // One hop, through the named handoff helper (myne-md/myne#849 review): the
+    // two create/join paths drop the re-derivable editor caches in ONE function
+    // rather than ten inline calls, and the guard follows `via` the way it
+    // follows the desktop's `lockVault`.
+    via: {
+      "mobile-create": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+      "mobile-join": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+    },
     holds:
       "the reader's date format, time format and TIME ZONE, all derived from decrypted vault.prefs",
     // Every leaving path, and the ONLY entry here that is asserted on the two
@@ -209,6 +257,8 @@ export const TEARDOWN_CALLS = [
       "desktop-delete",
       "mobile-lock",
       "mobile-delete",
+      "mobile-create",
+      "mobile-join",
     ],
     skips: {
       "desktop-create": SKIP_CREATE,
@@ -225,6 +275,8 @@ export const TEARDOWN_CALLS = [
        "desktop-switch": { fn: "lockVault", file: "src/lib/vault-unlock.ts" },
      },
      skips: {
+       "mobile-create": "the person identity store is DESKTOP-only in this tree: mobile has no production import of src/components/sync/personIdentityState.ts, so there is no state to clear on the mobile create path.",
+       "mobile-join": "the person identity store is DESKTOP-only in this tree: mobile has no production import of src/components/sync/personIdentityState.ts, so there is no state to clear on the mobile join path.",
       "mobile-lock":
         "the person identity store is DESKTOP-only in this tree: mobile has no production import of src/components/sync/personIdentityState.ts, so there is no state to clear on the mobile lock path.",
       "mobile-delete":
@@ -247,6 +299,8 @@ export const TEARDOWN_CALLS = [
     // format" argument on this transcript being RAM-only and dropped on lock.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
@@ -269,6 +323,8 @@ export const TEARDOWN_CALLS = [
     // in-session clears where the stash and the flag are still owed.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
@@ -277,7 +333,7 @@ export const TEARDOWN_CALLS = [
         "the store is DESKTOP-only (it lives under `src/notes/`, which mobile does not compile), so there is nothing on either mobile path to clear.",
     },
   },
-  {
+    {
     call: "resetScrollMemory",
     declaredIn: "src/notes/scrollMemory.ts",
     holds: "the per-note scroll positions: which notes this vault has and how far into each one the user had read",
@@ -289,6 +345,8 @@ export const TEARDOWN_CALLS = [
     // callers, which is how it earned an entry rather than a comment.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
@@ -307,6 +365,8 @@ export const TEARDOWN_CALLS = [
     // that produced it (myne-md/myne#601).
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "mobile-lock": SKIP_DESKTOP_ONLY,
       "mobile-delete": SKIP_DESKTOP_ONLY,
@@ -318,6 +378,14 @@ export const TEARDOWN_CALLS = [
   {
     call: "resetDecodedAspects",
     declaredIn: "editor/src/attachments/decoded-aspect.ts",
+    // One hop, through the named handoff helper (myne-md/myne#849 review): the
+    // two create/join paths drop the re-derivable editor caches in ONE function
+    // rather than ten inline calls, and the guard follows `via` the way it
+    // follows the desktop's `lockVault`.
+    via: {
+      "mobile-create": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+      "mobile-join": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+    },
     holds: "the decoded shape of every image this vault has rendered, keyed by attachment id",
     // Every leaving path. It shipped in review with NO production caller and a
     // comment arguing it off this roster, on the grounds that an aspect ratio is
@@ -329,7 +397,10 @@ export const TEARDOWN_CALLS = [
     // in the same sense. The cost of clearing it is one first-paint settle after
     // a re-unlock, which is the thing the cache exists to avoid and not the
     // thing it is worth keeping a locked vault's roster in memory for.
-    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
@@ -341,6 +412,14 @@ export const TEARDOWN_CALLS = [
   {
     call: "resetPreviewCache",
     declaredIn: "editor/src/attachments/session-caches.ts",
+    // One hop, through the named handoff helper (myne-md/myne#849 review): the
+    // two create/join paths drop the re-derivable editor caches in ONE function
+    // rather than ten inline calls, and the guard follows `via` the way it
+    // follows the desktop's `lockVault`.
+    via: {
+      "mobile-create": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+      "mobile-join": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+    },
     holds: "up to 24 decrypted attachment previews, each capped at the host's 2 MiB read cap, plus the reads still in flight for them",
     // Every leaving path, and this one holds the decrypted CONTENT rather than a
     // shape derived from it, so it is the stronger case of the entry above. It
@@ -350,7 +429,10 @@ export const TEARDOWN_CALLS = [
     // the larger store beside it is missing. The in-flight map is cleared with
     // the cache so a read crossing a lock cannot resolve into the next
     // session's entries.
-    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
@@ -362,6 +444,14 @@ export const TEARDOWN_CALLS = [
   {
     call: "resetMermaidZoom",
     declaredIn: "editor/src/attachments/session-caches.ts",
+    // One hop, through the named handoff helper (myne-md/myne#849 review): the
+    // two create/join paths drop the re-derivable editor caches in ONE function
+    // rather than ten inline calls, and the guard follows `via` the way it
+    // follows the desktop's `lockVault`.
+    via: {
+      "mobile-create": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+      "mobile-join": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+    },
     holds:
       "the session zoom percentage per rendered mermaid diagram, keyed by a hash of the diagram source",
     // Same paths as `resetPreviewCache`, and for the same class of reason: a
@@ -369,7 +459,10 @@ export const TEARDOWN_CALLS = [
     // so the map enumerates the diagrams this vault holds. Left uncleared it
     // would also restore the PREVIOUS vault's scale onto a diagram whose source
     // hash happened to collide. myne-md/myne#708.
-    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
@@ -391,6 +484,8 @@ export const TEARDOWN_CALLS = [
     // whose content the stash describes.
     appliesTo: ["mobile-lock"],
     skips: {
+      "mobile-create": SKIP_MOBILE_HANDOFF,
+      "mobile-join": SKIP_MOBILE_HANDOFF,
       "desktop-create": SKIP_CREATE,
       "desktop-lock":
         "the store is MOBILE-only (it lives under `mobile/src/lib/`, which the desktop client does not compile), so there is nothing on the desktop paths to clear. Verified by searching the desktop tree for the symbol rather than assumed from the path.",
@@ -405,6 +500,14 @@ export const TEARDOWN_CALLS = [
   {
     call: "resetTranscripts",
     declaredIn: "editor/src/attachments/session-caches.ts",
+    // One hop, through the named handoff helper (myne-md/myne#849 review): the
+    // two create/join paths drop the re-derivable editor caches in ONE function
+    // rather than ten inline calls, and the guard follows `via` the way it
+    // follows the desktop's `lockVault`.
+    via: {
+      "mobile-create": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+      "mobile-join": { fn: "clearHandoffCaches", file: "mobile/src/app/vaultHandoff.ts" },
+    },
     holds: "the text of every completed voice-note transcription this session produced",
     // Every leaving path. Its own comment used to argue it off this roster by
     // asserting the module unloads on lock, and that premise is false: a JS
@@ -413,7 +516,10 @@ export const TEARDOWN_CALLS = [
     // AS7 classes this surface as AS1-class in-RAM plaintext whose exposure is
     // "not widened" beyond A6/A7/A10, and carrying it into a DIFFERENT vault's
     // session is wider than that.
-    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock"],
+    appliesTo: ["desktop-lock", "desktop-switch", "mobile-lock",
+      "mobile-create",
+      "mobile-join",
+    ],
     skips: {
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
@@ -429,6 +535,8 @@ export const TEARDOWN_CALLS = [
       "the transcript of every clip this session transcribed, plus the body-mounted session bar. The transcript is other people's speech decoded from vault attachments, so it is the same class as `resetTranscripts` above and carries the same failure if it survives: the text of a locked vault's meeting staying resident into the next vault's session, and a bar left on the unlock screen showing it.",
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
@@ -452,6 +560,8 @@ export const TEARDOWN_CALLS = [
       "desktop-switch": { fn: "teardownMeetingSessionForLock", file: "src/notes/meetingSession.ts" },
     },
     skips: {
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
       "desktop-create": SKIP_CREATE,
       "desktop-delete": SKIP_ERASED,
       "mobile-delete": SKIP_ERASED,
@@ -467,6 +577,8 @@ export const TEARDOWN_CALLS = [
     holds: "the session's ignored-word set, which is vault-scoped user vocabulary",
     appliesTo: ["desktop-switch"],
     skips: {
+      "mobile-create": SKIP_NO_SPELL_LAYER,
+      "mobile-join": SKIP_NO_SPELL_LAYER,
       "desktop-create": SKIP_CREATE,
       "desktop-lock":
         "A plain lock does not change vault, and the ignore-this-session set is scoped to the session the user is still in. Clearing it at the lock choke point would discard a choice they made about the vault they are about to re-open. The store's own comment states the reason as a vault CHANGE, which is why this one is asserted on the switch path only.",

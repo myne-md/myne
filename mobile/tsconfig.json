@@ -54,6 +54,15 @@
       "@myne/engine-error": ["../src/lib/engine-error.ts"],
       "@myne/decorations": ["../src/notes/decorations.ts"],
       "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"],
+      // The live-collaboration awareness cluster (myne-md/myne#849). See the alias
+      // block in mobile/vite.config.ts for why these five are shared rather than
+      // reimplemented; this list and that one are edited together.
+      "@myne/awareness-store": ["../src/notes/collab/awarenessStore.ts"],
+      "@myne/participant": ["../src/notes/collab/participant.ts"],
+      "@myne/identity-label": ["../src/notes/collab/identityLabel.ts"],
+      "@myne/presence-labels": ["../src/notes/collab/presenceLabels.ts"],
+      "@myne/presence-jump": ["../src/notes/collab/presenceJump.ts"],
+      "@myne/resolved-identity": ["../src/types/resolved-identity.ts"],
       // The shared meeting-note body builder (myne-md/myne#798). Pure — no
       // imports at all — so a watch meeting drained on mobile produces the SAME
       // note shape the desktop meeting session produces. A hand-copy is how the

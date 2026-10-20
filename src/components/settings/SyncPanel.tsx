@@ -387,7 +387,9 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       void (async () => {
         try {
           const content = await noteRead(copyId);
-          await noteUpdate(copyId, clearConflictMarkers(content));
+          // `content` is this write's base, so a live session merges rather than
+          // being replaced (myne-md/myne#849).
+          await noteUpdate(copyId, clearConflictMarkers(content), undefined, content);
           await refreshSidebar();
         } catch {
           // Surfaced via the unchanged Conflicts list — the user can retry.

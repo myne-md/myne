@@ -43,7 +43,7 @@ export async function archiveNote(noteId: string): Promise<void> {
   // patchers touch independent lines, so composing them enforces archive ⊥ trash.
   const untrashed = patchTrashedField(encoder.encode(current), null);
   const archived = patchArchivedField(untrashed, new Date().toISOString());
-  await noteUpdate(noteId, decoder.decode(archived));
+  await noteUpdate(noteId, decoder.decode(archived), undefined, current);
 }
 
 /**
@@ -58,7 +58,7 @@ export async function unarchiveNote(noteId: string): Promise<void> {
   await flushBeforeFrontmatterWrite();
   const current = await noteRead(noteId);
   const restored = patchArchivedField(encoder.encode(current), null);
-  await noteUpdate(noteId, decoder.decode(restored));
+  await noteUpdate(noteId, decoder.decode(restored), undefined, current);
 }
 
 /** Outcome of a {@link bulkArchiveNotes} call — archived IDs + per-note failures. */

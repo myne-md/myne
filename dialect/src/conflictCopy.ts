@@ -20,8 +20,19 @@ const decoder = new TextDecoder();
 export interface ConflictCopyHost {
   /** Read a note's plaintext by id. */
   noteRead(id: string): Promise<string>;
-  /** Overwrite a note's plaintext. */
-  noteUpdate(id: string, content: string): Promise<void>;
+  /** Overwrite a note's plaintext.
+   *
+   *  `expectedBaseHashHex` and `base` are optional because a caller on a client
+   *  without the three-way live save passes neither; where they exist they are
+   *  what lets a write through a [live session](#live-session) MERGE a peer edit
+   *  instead of replacing it (`myne-md/myne#849`).
+   */
+  noteUpdate(
+    id: string,
+    content: string,
+    expectedBaseHashHex?: string,
+    base?: string,
+  ): Promise<void>;
   /** Create a new note from plaintext; returns the new note id. */
   noteCreate(plaintext: string): Promise<string>;
   /** Tombstone a note via the routed/propagating delete path (recoverable). */
@@ -116,7 +127,11 @@ export async function applyConflictVersion(
 ): Promise<void> {
   // 1. Promote the copy → ordinary surviving note.
   const copyContent = await host.noteRead(copyId);
-  await host.noteUpdate(copyId, clearConflictMarkers(copyContent));
+  // The text this writes was derived from `copyContent`, and with a live session
+  // open the read may have come FROM the session, so the same value is the base
+  // the write must carry (`myne-md/myne#849`): without it a peer merge that landed
+  // between the two is replaced rather than merged.
+  await host.noteUpdate(copyId, clearConflictMarkers(copyContent), undefined, copyContent);
   // 2. Carry the original's favorites/item_order membership onto the copy.
   await migratePrefsMembership(host, originalUuid, copyId);
   // 3. Tombstone the original last (recoverable + propagating, like Discard).
@@ -142,8 +157,15 @@ export async function undoConflictVersion(
     host.noteUpdate(
       originalUuid,
       decoder.decode(patchDeletedField(encoder.encode(original), null)),
+      undefined,
+      original,
     ),
-    host.noteUpdate(copyId, buildConflictCopyContent(copyContent, originalUuid)),
+    host.noteUpdate(
+      copyId,
+      buildConflictCopyContent(copyContent, originalUuid),
+      undefined,
+      copyContent,
+    ),
   ]);
   await migratePrefsMembership(host, copyId, originalUuid);
 }

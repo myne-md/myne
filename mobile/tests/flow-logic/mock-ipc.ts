@@ -566,6 +566,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     };
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
     /** Next `note_create` id suffix — 0 reproduces the long-standing constant. */
+    /** Notes with an OPEN live session (myne-md/myne#849). */
+    const liveNotes = new Set<string>();
     let mintedNotes = 0;
     // MYND-619 reminder state — STATEFUL for the same reason savedViews is: the
     // switch is only meaningful if a write survives into the next `prefs_read`.
@@ -1747,6 +1749,85 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           if (row !== undefined) row.text = text;
           if (noteText.has(id)) noteText.set(id, text);
         }
+        // The core answers with the session's text after the patch, which the
+        // editor takes as its record of what the session holds. With no peer in
+        // this tier nothing merges, so it is the text that was sent.
+        return text;
+      },
+      // The live-session commands (epic live-collab; mobile asks for them since
+      // myne-md/myne#849). The EDITOR routes an open note's saves through the
+      // session when one exists, and the backend refuses a stateless
+      // `note_update` for that note, so a mock that does not answer these leaves
+      // every edited-note spec observing ZERO durable writes: `patchLiveNote`
+      // resolves against the default `[]` arm, the funnel returns true, and the
+      // stateless path is never taken.
+      //
+      // What is modelled is the DURABLE OUTCOME, which is what a spec can observe:
+      // a patch is recorded in the SAME `__noteUpdates` list, because a live
+      // session IS the note's durable writer (`SYNC-33`) and "how many times was
+      // this note written" is one question rather than two. `__liveSessionPatches`
+      // records the same writes separately so a spec can tell which path carried
+      // them.
+      //
+      // What is deliberately NOT modelled: the backend's
+      // `NoteUpdateError::LiveSessionOpen` refusal of a stateless update for a live
+      // note. It cannot fire in this tier, since the app's own funnel routes every
+      // open-note save through the session, and modelling it would make 44 spec
+      // files depend on that rehearsal being exact.
+      "plugin:live|live_session_open": (args) => {
+        liveNotes.add(String(args.noteId ?? ""));
+        return null;
+      },
+      "plugin:live|live_session_patch_frontmatter": (args) => {
+        const id = String(args.noteId ?? "");
+        // The core answers `NotOpen` for a note with no session, and reading the
+        // set is what keeps it from being decorative: without this, a handler that
+        // recorded a write for a note nothing ever opened would look correct.
+        if (!liveNotes.has(id)) throw { kind: "NotOpen" };
+        const text = String(args.markdown ?? "");
+        const w = window as unknown as { __noteUpdates?: string[]; __liveSessionPatches?: string[] };
+        (w.__liveSessionPatches ??= []).push(text);
+        (w.__noteUpdates ??= []).push(text);
+        if (config.statefulNoteWrites === true) {
+          const row = seededNotes.find((n) => n.id === id);
+          if (row !== undefined) row.text = text;
+          if (noteText.has(id)) noteText.set(id, text);
+        }
+        // The core answers with the session's text after the patch, which the
+        // editor takes as its record of what the session holds. With no peer in
+        // this tier nothing merges, so it is the text that was sent.
+        return text;
+      },
+      // The session's current text (myne-md/myne#849 review). With no peer in this
+      // tier the session never runs ahead of disk, so the answer is the same text
+      // `note_read` serves; `NotOpen` for a note nothing opened, as the core does.
+      "plugin:live|live_session_read": (args) => {
+        const id = String(args.noteId ?? "");
+        if (!liveNotes.has(id)) throw { kind: "NotOpen" };
+        const w = window as unknown as { __liveSessionReads?: string[] };
+        (w.__liveSessionReads ??= []).push(id);
+        return noteText.get(id) ?? config.noteBodies?.[id] ?? "";
+      },
+      // No peer ever merges into an open session in this tier: there is no sync
+      // server and therefore no remote change to splice.
+      "plugin:live|live_session_take_remote_splices": () => [],
+      "plugin:live|live_session_close": (args) => {
+        liveNotes.delete(String(args.noteId ?? ""));
+        return null;
+      },
+      // Best-effort by contract (`live_session_set_presence` is a no-op for a note
+      // with no open session), and this tier renders one device.
+      "plugin:live|live_session_set_presence": (args) => {
+        // Recorded, so a spec can assert the phone REPORTS its caret: without the
+        // reporter a peer sees the phone's join frame and never a position
+        // (myne-md/myne#849 review).
+        const w = window as unknown as {
+          __livePresence?: { noteId: string; cursor: number | null }[];
+        };
+        (w.__livePresence ??= []).push({
+          noteId: String(args.noteId ?? ""),
+          cursor: typeof args.cursor === "number" ? args.cursor : null,
+        });
         return null;
       },
       "plugin:notes|note_delete": (args) => {

@@ -33,7 +33,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isBaseMismatchError } from "../types/note-update-error";
 import { sha256Hex } from "./baseHash";
-import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, saveNote } from "./saveNote";
+import { isLiveNote as isLiveSessionNote } from "./liveNote";
+import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, saveNote, type LiveSaveContext } from "./saveNote";
 import { reindexNoteFromBody } from "./vaultIndices";
 
 export type SaveStatus =
@@ -120,6 +121,7 @@ export type SaveFn = (
   noteId: string,
   body: string,
   expectedBaseHashHex?: string,
+  live?: LiveSaveContext,
 ) => Promise<string>;
 
 const DEFAULT_SAVE_FN: SaveFn = saveNote;
@@ -175,6 +177,10 @@ export function useAutosave(
   // disabled/not-enrolled, restoring plain last-write-wins. Defaults `true` so
   // existing unit tests (and any guard-opted caller) keep their behavior.
   guardEnabled = true,
+  /** The live-session context for a save of `noteId` (`LiveSaveContext`): the
+   *  editor's mirror as the merge base, and the hook that moves it. Omitted, a
+   *  save through a session replaces the session's text, as before. */
+  liveSaveFor?: (noteId: string) => LiveSaveContext,
 ): UseAutosaveReturn {
   const [status, setStatus] = useState<SaveStatus>({ status: "clean" });
 
@@ -261,6 +267,18 @@ export function useAutosave(
    *  `onSaved` would be the one captured at first render. */
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
+  const liveSaveForRef = useRef(liveSaveFor);
+  liveSaveForRef.current = liveSaveFor;
+  /** The caller's live context for a save of `id`. With no mirror (the pane has
+   *  not loaded the note, or a resync forgot it) the buffer derives from the text
+   *  this hook last wrote or loaded, so that is the base: the save still merges
+   *  rather than replaces. Reads refs only, so the callbacks below may close over it. */
+  const liveContextFor = (id: string): LiveSaveContext | undefined => {
+    const asked = liveSaveForRef.current?.(id);
+    return asked !== undefined && asked.base === undefined && savedBodyRef.current !== null
+      ? { ...asked, base: savedBodyRef.current }
+      : asked;
+  };
 
   const clearTimers = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -303,7 +321,14 @@ export function useAutosave(
     // once the bytes are down (title/H1 edits must reach the row label even
     // though the user has already switched away). Still best-effort: a failed
     // save resolves, because a switch must never be blocked by it.
-    return saveImplRef.current(id, text).then(
+    // The outgoing note's live context, asked NOW, while the pane still holds the
+    // outgoing note's mirror (myne-md/myne#849 review round 5). Without it this
+    // save replaced the session's text, deleting a peer edit the drain had not
+    // delivered before the switch.
+    const live = liveContextFor(id);
+    const save =
+      live === undefined ? saveImplRef.current(id, text) : saveImplRef.current(id, text, undefined, live);
+    return save.then(
       () => undefined,
       () => undefined,
       /* best-effort — a switch must never be blocked by a failed save */
@@ -405,15 +430,32 @@ export function useAutosave(
         // believes is on disk (`savedBodyRef`). Fail-open on any hashing
         // hiccup — autosave must never break on the guard's plumbing;
         // an omitted hash just means legacy last-write-wins for this fire.
+        //
+        // NOT sent while a live session owns the note (myne-md/myne#849 review,
+        // D8). The live path now carries the hash to the session, which checks it
+        // against its OWN text, and that text includes every peer edit merged in
+        // since this hook last saved: the pane applies those as remote splices
+        // without moving `savedBodyRef`, so a hash of `savedBodyRef` would refuse
+        // every save after the first peer keystroke and mint a conflict copy for
+        // it. The session is the single writer and the pane's buffer tracks it, so
+        // there is no raced disk write for the guard to catch here.
         let expectedBaseHashHex: string | undefined;
-        if ((guardEnabled || forceGuardRef.current) && savedBodyRef.current !== null) {
+        if (
+          (guardEnabled || forceGuardRef.current) &&
+          savedBodyRef.current !== null &&
+          !isLiveSessionNote(id)
+        ) {
           try {
             expectedBaseHashHex = await sha256Hex(savedBodyRef.current);
           } catch {
             expectedBaseHashHex = undefined;
           }
         }
-        const patchedBody = await saveImpl(id, bodyAtFire, expectedBaseHashHex);
+        // A caller that wires no live context keeps the three-argument call.
+        const live = liveContextFor(id);
+        const patchedBody = await (live === undefined
+          ? saveImpl(id, bodyAtFire, expectedBaseHashHex)
+          : saveImpl(id, bodyAtFire, expectedBaseHashHex, live));
         // Latest-wins gate: if the body changed during the IPC, the
         // current body differs from `bodyAtFire`. Re-arm the idle timer
         // (the body change handler would have armed it if it fired

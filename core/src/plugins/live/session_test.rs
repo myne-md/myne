@@ -534,7 +534,9 @@ fn live_command_inners_return_typed_errors() {
                 &hooks,
                 &IO,
                 id.clone(),
-                String::new()
+                String::new(),
+                None,
+                None
             )
             .await,
             Err(LiveSessionCommandError::NotOpen)
@@ -1213,5 +1215,326 @@ fn a_flush_that_outlives_a_lock_does_not_reindex_the_note() {
             )),
             "a flush that outlives a lock must not index the note, got {calls:?}"
         );
+    });
+}
+
+/// myne-md/myne#849: a whole-text save from a buffer that never saw a peer's
+/// change no longer deletes it. With `base` declared, the save is merged over the
+/// session instead of replacing it.
+#[test]
+fn a_stale_whole_text_save_keeps_a_peers_change() {
+    use super::commands::patch_session;
+    let reg = LiveSessionRegistry::new();
+    let (s, id) = session_over("first\nsecond\n");
+    assert!(reg.insert(s));
+    // A peer's change lands in the session; the client's buffer never saw it.
+    reg.with_note_mut(&id, |s| s.apply_body_markdown("first\nsecond\npeer\n", 1))
+        .expect("open")
+        .expect("peer");
+    patch_session(
+        &reg,
+        &id,
+        "first, edited\nsecond\n".into(),
+        None,
+        Some("first\nsecond\n"),
+        2,
+    )
+    .expect("merge");
+    assert_eq!(session_text(&reg, &id), "first, edited\nsecond\npeer\n");
+    // Without `base` the save replaces, as before (the legacy contract).
+    patch_session(&reg, &id, "first\n".into(), None, None, 3).expect("replace");
+    assert_eq!(session_text(&reg, &id), "first\n");
+}
+
+/// myne-md/myne#849 D7: two producers (the awareness supervisor and the sync
+/// cycle) merge into one session from two threads while a pane drains. Every
+/// queued list must be in the order its apply ran, so the pane's document,
+/// replayed from the drains alone, ends equal to the session's text. Applying and
+/// queueing under separate lock holds let them interleave as apply A, apply B,
+/// queue B, queue A, and the pane then placed text at the wrong offsets.
+#[test]
+fn concurrent_appliers_queue_in_apply_order() {
+    use crate::plugins::live::apply_remote::diff_splices;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    for round in 0..20u64 {
+        let reg = LiveSessionRegistry::new();
+        let start = "body\n";
+        let (session, note_id) = session_over(start);
+        assert!(reg.insert(session));
+        let done = AtomicBool::new(false);
+        let applier = |seed: u64, tag: char| {
+            let mut x = seed;
+            for i in 0..150u64 {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                reg.apply_and_queue(&note_id, |s| {
+                    let before = s.markdown()?;
+                    let chars: Vec<char> = before.chars().collect();
+                    let at = (x as usize) % (chars.len() + 1);
+                    let mut after: String = chars[..at].iter().collect();
+                    after.push(tag);
+                    after.extend(&chars[at..]);
+                    s.apply_body_markdown(&after, i)?;
+                    let now = s.markdown()?;
+                    Ok::<_, crate::plugins::live::LiveSessionError>((
+                        diff_splices(&before, &now),
+                        (),
+                    ))
+                })
+                .expect("open")
+                .expect("apply");
+            }
+        };
+        let pane = std::thread::scope(|scope| {
+            let a = scope.spawn(|| applier(0x9E37_79B9 ^ round, 'a'));
+            let b = scope.spawn(|| applier(0x85EB_CA6B ^ (round << 7), 'b'));
+            let drainer = scope.spawn(|| {
+                let mut pane = start.to_string();
+                while !done.load(Ordering::Acquire) {
+                    pane = replay(&pane, &reg.take_pending_splices(&note_id));
+                    std::thread::yield_now();
+                }
+                pane
+            });
+            a.join().expect("a");
+            b.join().expect("b");
+            done.store(true, Ordering::Release);
+            drainer.join().expect("drainer")
+        });
+        let pane = replay(&pane, &reg.take_pending_splices(&note_id));
+        let session_text = reg
+            .with_note_mut(&note_id, |s| s.markdown())
+            .expect("open")
+            .expect("text");
+        assert_eq!(pane.chars().count(), start.chars().count() + 300);
+        assert_eq!(pane, session_text, "round {round}");
+    }
+}
+
+/// `live_session_read` (myne-md/myne#849) answers from the SESSION, not the disk:
+/// an open note returns its current whole markdown, including text applied to the
+/// session that was never flushed, and a note with no session is `NotOpen`.
+#[test]
+fn live_session_read_returns_the_session_text_or_not_open() {
+    use super::commands::{live_session_read_from_host, LiveSessionCommandError};
+    let host = TestHost::new("/base");
+    let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+    let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+        .as_uuid()
+        .as_bytes();
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+    let blob = encode_note_blob("body\n", &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
+    let reg = LiveSessionRegistry::new();
+
+    assert!(matches!(
+        live_session_read_from_host(&reg, note_id.clone()),
+        Err(LiveSessionCommandError::NotOpen)
+    ));
+    assert!(matches!(
+        live_session_read_from_host(&reg, "not-a-uuid".into()),
+        Err(LiveSessionCommandError::InvalidNoteId)
+    ));
+
+    assert!(reg.insert(
+        LiveSession::open_from_blob(&blob, "v".into(), note_id.clone(), uuid, None, &ik, &ikid)
+            .expect("open")
+    ));
+    assert_eq!(
+        live_session_read_from_host(&reg, note_id.clone()).expect("open session"),
+        "body\n"
+    );
+    // An edit applied to the session but not flushed is what the read returns.
+    reg.with_note_mut(&note_id, |s| s.apply_body_markdown("body\npeer\n", 1))
+        .expect("open")
+        .expect("apply");
+    assert_eq!(
+        live_session_read_from_host(&reg, note_id.clone()).expect("open session"),
+        "body\npeer\n"
+    );
+    // After the lock teardown there is no session to read.
+    reg.clear();
+    assert!(matches!(
+        live_session_read_from_host(&reg, note_id),
+        Err(LiveSessionCommandError::NotOpen)
+    ));
+}
+
+/// myne-md/myne#849 D8: the expected-base guard on the live write path. A
+/// matching hash (either hex case) applies; a mismatch writes nothing and answers
+/// `BaseMismatch`; an absent hash applies as before.
+#[test]
+fn patch_session_honours_the_expected_base_hash() {
+    use super::commands::{patch_session, LiveSessionCommandError};
+    let reg = LiveSessionRegistry::new();
+    let (s, id) = session_over("body\n");
+    assert!(reg.insert(s));
+
+    patch_session(
+        &reg,
+        &id,
+        "body\nmine\n".into(),
+        Some(&sha_hex("body\n").to_uppercase()),
+        None,
+        1,
+    )
+    .expect("a matching hash applies");
+    assert_eq!(session_text(&reg, &id), "body\nmine\n");
+
+    let err = patch_session(
+        &reg,
+        &id,
+        "clobber\n".into(),
+        Some(&sha_hex("body\n")),
+        None,
+        2,
+    )
+    .expect_err("a stale hash is refused");
+    assert!(matches!(err, LiveSessionCommandError::BaseMismatch));
+    assert_eq!(
+        serde_json::to_string(&err).unwrap(),
+        r#"{"kind":"BaseMismatch"}"#,
+        "the same JSON the note_update keep-both path reads"
+    );
+    assert_eq!(session_text(&reg, &id), "body\nmine\n", "nothing written");
+
+    patch_session(&reg, &id, "no guard\n".into(), None, None, 3).expect("absent hash");
+    assert_eq!(session_text(&reg, &id), "no guard\n");
+}
+
+/// myne-md/myne#849: a batch queued for a session must not outlive it. Composed
+/// onto the next session's first batch it would replay a merge the reopened
+/// document already holds.
+#[test]
+fn pending_splices_are_dropped_with_their_session() {
+    let x = || {
+        vec![crate::plugins::live::apply_local::LocalSplice {
+            from: 0,
+            to: 0,
+            insert: "x".into(),
+        }]
+    };
+    // Closing (`remove_note`) drops the queue.
+    let reg = LiveSessionRegistry::new();
+    let (s, id) = session_over("body\n");
+    assert!(reg.insert(s));
+    reg.set_pending_splices(&id, x());
+    assert!(reg.remove_note(&id).is_some());
+    assert!(reg.take_pending_splices(&id).is_empty(), "remove_note");
+
+    // `remove` by key drops it too.
+    let (s, id) = session_over("body\n");
+    assert!(reg.insert(s));
+    reg.set_pending_splices(&id, x());
+    assert!(reg.remove("v", &id).is_some());
+    assert!(reg.take_pending_splices(&id).is_empty(), "remove");
+
+    // A fresh session for a note with a stale queued batch starts empty.
+    let (s, id) = session_over("body\n");
+    reg.set_pending_splices(&id, x());
+    assert!(reg.insert(s));
+    assert!(reg.take_pending_splices(&id).is_empty(), "insert");
+
+    // An ATTACH (the key is already open) keeps the live session's queue.
+    let (s, id) = session_over("body\n");
+    // A second `LiveSession` for the SAME note id, which is what an attach offers.
+    let dup_key_session = {
+        let host = TestHost::new("/base");
+        let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+        let uuid = *uuid::Uuid::parse_str(&id).unwrap().as_bytes();
+        let blob = encode_note_blob("body\n", &ik, &ikid, &uuid, &[0xAAu8; 16], &host).unwrap();
+        LiveSession::open_from_blob(&blob, "v".into(), id.clone(), uuid, None, &ik, &ikid).unwrap()
+    };
+    assert!(reg.insert(s));
+    reg.set_pending_splices(&id, x());
+    assert!(!reg.insert(dup_key_session), "already open");
+    assert_eq!(reg.take_pending_splices(&id), x(), "attach keeps the queue");
+}
+
+/// Apply `splices` to `doc` (UTF-16 offsets), the pane's side of a drain.
+fn replay(doc: &str, splices: &[crate::plugins::live::apply_local::LocalSplice]) -> String {
+    crate::plugins::live::compose::apply_splices_to_text(doc, splices)
+}
+
+/// A session for a fresh v7 note over `text`, plus its note id.
+fn session_over(text: &str) -> (LiveSession, String) {
+    let host = TestHost::new("/base");
+    let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+    let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+        .as_uuid()
+        .as_bytes();
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+    let blob = encode_note_blob(text, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
+    let s = LiveSession::open_from_blob(&blob, "v".into(), note_id.clone(), uuid, None, &ik, &ikid)
+        .expect("open");
+    (s, note_id)
+}
+
+fn session_text(reg: &LiveSessionRegistry, id: &str) -> String {
+    reg.with_note_mut(id, |s| s.markdown())
+        .expect("open")
+        .expect("text")
+}
+
+fn sha_hex(s: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex_lower(&Sha256::digest(s.as_bytes()))
+}
+
+/// The lock teardown both clients call forgets the presence label too
+/// (myne-md/myne#849): `live_session_set_presence` writes it onto the awareness
+/// signal, and clearing only the registry left it alive into the next vault.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[test]
+fn the_lock_teardown_clears_sessions_and_the_presence_label() {
+    use crate::plugins::sync::awareness_listener::AwarenessSignal;
+    let reg = LiveSessionRegistry::new();
+    let sig = AwarenessSignal::default();
+    sig.set_local_label(Some("Furkan's phone".into()));
+    reg.set_pending_splices(
+        "n1",
+        vec![crate::plugins::live::apply_local::LocalSplice {
+            from: 0,
+            to: 0,
+            insert: "x".into(),
+        }],
+    );
+    super::teardown_on_lock(Some(&reg), Some(&sig));
+    assert_eq!(sig.local_label(), None, "the label must not survive a lock");
+    assert!(reg.take_pending_splices("n1").is_empty());
+    // A client that manages neither is a no-op, not a panic.
+    super::teardown_on_lock(None, None);
+}
+
+/// The command itself refuses a mismatch BEFORE its flush, so nothing reaches the
+/// disk either: on a locked state the flush's preamble would answer
+/// `VaultNotUnlocked`, and the answer is `BaseMismatch` instead.
+#[test]
+fn the_patch_command_refuses_a_stale_base_before_any_write() {
+    use super::commands::{live_session_patch_frontmatter_from_host, LiveSessionCommandError};
+    block_on(async {
+        let host = TestHost::new("/base");
+        let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
+        let reg = LiveSessionRegistry::new();
+        let hooks: crate::hooks::Hooks = std::sync::Arc::new(crate::hooks::NoopHooks);
+        let (s, id) = session_over("body\n");
+        assert!(reg.insert(s));
+        let r = live_session_patch_frontmatter_from_host(
+            &host,
+            &state,
+            &reg,
+            &hooks,
+            &IO,
+            id.clone(),
+            "clobber\n".into(),
+            Some(sha_hex("something else\n")),
+            None,
+        )
+        .await;
+        assert!(
+            matches!(r, Err(LiveSessionCommandError::BaseMismatch)),
+            "{r:?}"
+        );
+        assert_eq!(session_text(&reg, &id), "body\n");
     });
 }

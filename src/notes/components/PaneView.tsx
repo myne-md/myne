@@ -40,11 +40,24 @@ const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { saveNote } from "../saveNote";
-import { closeLiveNote, isLiveNote, openLiveNote, reportLivePresence, takeRemoteSplices } from "../liveNote";
-import { PRESENCE_JUMP_EVENT, type PresenceJumpDetail } from "../collab/presenceJump";
+import {
+  closeLiveNote,
+  openLiveNote,
+  patchEpoch,
+  readLiveNote,
+  reportLivePresence,
+  settledPatches,
+  takeRemoteSplices,
+} from "../liveNote";
+import { PRESENCE_JUMP_EVENT, presenceRevealFor, type PresenceJumpDetail } from "../collab/presenceJump";
 import { resolveIdentity } from "../../lib/identity";
 import { listen } from "../../platform/event";
 import { remoteDispatchSpec } from "@myne/editor/live-bridge";
+import {
+  applySplicesToText,
+  installRemoteMergeDrain,
+  type RemoteMergeDrain,
+} from "@myne/editor/live-remote-merge";
 import {
   AWARENESS_GRACE_MS,
   awarenessOnDrop,
@@ -60,6 +73,7 @@ import { colorVarForIndex } from "../collab/participant";
 import { identityLabelText } from "../collab/identityLabel";
 import { resolvePeerLabels } from "../collab/presenceLabels";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
+import { runPaneResync } from "../liveResync";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
 import { peekRevealTask, useRevealTaskNonce } from "../views/revealTaskSignal";
@@ -78,6 +92,7 @@ import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type FlushOptions, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
+import type { LiveSaveContext } from "../saveNote";
 import { dispatchNoteRemoved, isRemovedFromLiveTree } from "../noteRemoved";
 import { computeDocStats, statsOfPlain, type DocStats } from "../documentStats";
 import { refreshThenOpen } from "../openFreshNote";
@@ -708,37 +723,61 @@ export function PaneView({
     },
     [],
   );
-  // Deliver a sync pull's merge into the OPEN live note (`collab-editor-bridge`
-  // task 7): the cycle already merged it into the session + disk and queued the body
-  // diff; here the pane drains it and dispatches it as ONE CodeMirror ChangeSet, so
-  // the buffer catches up WITHOUT the reload a dirty pane skips, and its next
-  // whole-markdown save therefore cannot delete the merged-in peer text.
+  // Deliver a merge into the OPEN live note (`collab-editor-bridge` task 7). The
+  // cycle merged it into the session; the shared drain reads the session, maps
+  // the remote change over this pane's unsaved text and applies it as ONE
+  // CodeMirror change, so the buffer catches up WITHOUT the reload a dirty pane
+  // skips. It replaced applying the queued body splices at their raw offsets
+  // (myne-md/myne#849 review round 4): those are clamped to the body, so a peer's
+  // rename, retag, move or trash never reached this buffer and the next autosave
+  // wrote the old frontmatter back over it. `@myne/editor/live-remote-merge`
+  // carries the full argument; the mobile editor runs the same module.
+  //
+  // `sessionMirrorRef` is this pane's record of what the session holds as far as
+  // the buffer knows: the text it loaded or adopted, the text each of its own
+  // autosaves SENT (`liveSaveFor` below), and each merge the drain applied.
+  // Another writer's patch does not move it, so the drain still delivers that
+  // change; the autosave hands it to the core as `base`, which is what makes a
+  // save from a buffer that has not caught up merge rather than replace.
+  // Keyed per note rather than holding the open note's alone (myne-md/myne#849
+  // review round 5): the note-switch flush saves the OUTGOING note after the
+  // incoming one has loaded, and it needs the outgoing note's mirror as its base.
+  const sessionMirrorRef = useRef<Map<string, string>>(new Map());
+  const drainRef = useRef<RemoteMergeDrain | null>(null);
+  const resyncRef = useRef<(id: string) => void>(() => {});
   useEffect(() => {
-    let disposed = false;
-    const unlisten: Array<() => void> = [];
-    const onRemote = (event: { payload: string }) => {
-      const id = activeIdRef.current;
-      if (disposed || id === null || event.payload !== id || !isLiveNote(id)) return;
-      void takeRemoteSplices(id).then((splices) => {
+    const drain = installRemoteMergeDrain({
+      listen: (event, handler) => listen<string>(event, handler),
+      currentNoteId: () => activeIdRef.current,
+      takeSplices: takeRemoteSplices,
+      settled: settledPatches,
+      patchEpoch,
+      readSession: readLiveNote,
+      sessionText: (id) => sessionMirrorRef.current.get(id) ?? null,
+      setSessionText: (id, text) => {
+        sessionMirrorRef.current.set(id, text);
+      },
+      buffer: () => outlineViewRef.current?.state.doc.toString() ?? contentRef.current,
+      deliver: (splices) => {
         const view = outlineViewRef.current;
-        if (disposed || splices.length === 0 || view === null) return;
-        view.dispatch(remoteDispatchSpec(view.state, splices));
-      });
-    };
-    // BOTH events carry one note id: the durable merge (`sync://remote-merged`,
-    // which also raises the calm hint) and the live peer edit
-    // (`sync://live-remote-merged`, silent on purpose, because the change is landing in
-    // front of the user, myne-md/myne#857).
-    for (const name of ["sync://remote-merged", "sync://live-remote-merged"]) {
-      void listen<string>(name, onRemote).then((fn) => {
-        if (disposed) fn();
-        else unlisten.push(fn);
-      });
-    }
+        if (view !== null) {
+          view.dispatch(remoteDispatchSpec(view.state, splices));
+          return;
+        }
+        // No view (a drawing note, or the body still loading): the change goes to
+        // the buffer string, so the next save carries it rather than deleting it.
+        const next = applySplicesToText(contentRef.current, splices);
+        contentRef.current = next;
+        setContent(next);
+      },
+      resync: (id) => resyncRef.current(id),
+    });
+    drainRef.current = drain;
     return () => {
-      disposed = true;
-      for (const fn of unlisten) fn();
+      drainRef.current = null;
+      drain.dispose();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // The awareness store (`collab-presence-ui` task 3): the peers editing THIS pane's
   // note, fed from the live channel (`sync://awareness`) and pushed into the editor.
@@ -865,13 +904,9 @@ export function PaneView({
       const detail = (e as CustomEvent<PresenceJumpDetail>).detail;
       const id = activeIdRef.current;
       if (detail === undefined || id === null || detail.noteId !== id) return;
-      const before = contentRef.current.slice(0, Math.max(0, detail.offset));
-      setRevealLine({
-        noteId: id,
-        line: before.split("\n").length - 1,
-        text: before.slice(before.lastIndexOf("\n") + 1),
-        nonce: Date.now(),
-      });
+      // The shared derivation, the same one the mobile screen calls, so the two
+      // cannot drift (myne-md/myne#849 review).
+      setRevealLine(presenceRevealFor(id, contentRef.current, detail.offset, Date.now()));
     };
     window.addEventListener(PRESENCE_JUMP_EVENT, onPresenceJump);
     return () => {
@@ -1335,7 +1370,13 @@ export function PaneView({
     // to the one session), and the outgoing note's session is closed AFTER its
     // buffer is flushed, in the `flushOutgoing().then` blocks below. Best-effort:
     // a drawing note or a locked vault stays on the durable path.
-    if (activeId !== null) void openLiveNote(activeId);
+    const opened = activeId !== null ? openLiveNote(activeId) : null;
+    // Once the session is open AND the buffer is baselined, drain once with no
+    // event: a durable pull that landed between the body's read and the session's
+    // open is in the session and raised no merge event for this pane.
+    const catchUpOnceOpen = (id: NoteId) => {
+      void opened?.then(() => drainRef.current?.catchUp(id));
+    };
 
     if (activeId === null) {
       setContent("");
@@ -1370,6 +1411,10 @@ export function PaneView({
       if (swapped) {
         const doc = cached.doc.toString();
         setContent(doc);
+        // The cached state was flushed when the pane left this note, so it is
+        // what the session was opened from; the catch-up brings in anything since.
+        sessionMirrorRef.current.set(activeId, doc);
+        catchUpOnceOpen(activeId);
         // myne#288 - flush the OUTGOING note before baselining the incoming one.
         //
         // This effect is registered before `useAutosave`'s own note-change
@@ -1392,6 +1437,9 @@ export function PaneView({
           // the session (task 8). Closing before the flush would drop the session
           // before the autosave lands and fall the save back to the stateless path.
           if (outgoingId !== null) void closeLiveNote(outgoingId);
+          if (outgoingId !== null && outgoingId !== activeIdRef.current) {
+            sessionMirrorRef.current.delete(outgoingId);
+          }
           if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
         });
         autosaveRef.current?.acceptReloadedBody(doc);
@@ -1425,6 +1473,8 @@ export function PaneView({
         const body = await noteRead(activeId);
         if (cancelled) return;
         setContent(body);
+        sessionMirrorRef.current.set(activeId, body);
+        catchUpOnceOpen(activeId);
         // Same ordering hazard as the cached-swap path above (myne#288).
         // Flush the outgoing note, THEN refresh its row title: a title/H1 edit
         // made just before the switch flushes here (not through the saved-status
@@ -1436,6 +1486,9 @@ export function PaneView({
           // the session (task 8). Closing before the flush would drop the session
           // before the autosave lands and fall the save back to the stateless path.
           if (outgoingId !== null) void closeLiveNote(outgoingId);
+          if (outgoingId !== null && outgoingId !== activeIdRef.current) {
+            sessionMirrorRef.current.delete(outgoingId);
+          }
           if (outgoingId !== null) void ctx.refreshOne(outgoingId).catch(() => {});
         });
         autosaveRef.current?.acceptReloadedBody(body);
@@ -1490,8 +1543,14 @@ export function PaneView({
           // another note's disk body into this buffer would be the same class of
           // mistake in the other direction.
           if (activeIdRef.current !== rejected.noteId) return;
+          // Typing landed while the copy was being made (myne-md/myne#849 review
+          // round 5): adopting now would drop it, since the copy holds the body as
+          // it was. Keep the buffer; its next save merges or conflicts again, and
+          // either way nothing typed is lost.
+          if (contentRef.current !== rejected.body) return;
           autosaveRef.current.acceptReloadedBody(diskBody);
           setContent(diskBody);
+          sessionMirrorRef.current.set(rejected.noteId, diskBody);
         }, (copyId) => ctx.refreshOne(copyId)),
       );
     },
@@ -1510,6 +1569,21 @@ export function PaneView({
     syncStatus !== null &&
     syncStatus.state !== "disabled" &&
     syncStatus.state !== "not_enrolled";
+  // What each autosave hands the live session: the mirror as `base`, so a save
+  // from a buffer the drain has not caught up yet merges instead of replacing,
+  // and a hook that moves the mirror to the text SENT once the session took it.
+  // Not the text the core returns: when the core merged a peer edit into this
+  // save the returned text holds it and the buffer does not, so a mirror there
+  // would hide it from the next drain and the save after would delete it.
+  const liveSaveFor = useCallback(
+    (id: string): LiveSaveContext => ({
+      base: sessionMirrorRef.current.get(id),
+      onSent: (sent) => {
+        sessionMirrorRef.current.set(id, sent);
+      },
+    }),
+    [],
+  );
   const autosave = useAutosave(
     loading ? null : activeId,
     content,
@@ -1517,6 +1591,7 @@ export function PaneView({
     handleSaveEcho,
     onBaseMismatch,
     syncGuardEnabled,
+    liveSaveFor,
   );
 
   // Render-surface dispatch (drawing-notes SF2, MYND-499; SYNC-2): a value-strict
@@ -1536,6 +1611,28 @@ export function PaneView({
   // reload below is most likely to resolve.
   const contentRef = useRef(content);
   contentRef.current = content;
+  // The drain could not place a merge (it did not know what the session held, or
+  // the delivery threw). `runPaneResync` rebuilds a clean buffer from the session,
+  // sends a dirty one through the keep-both handler, and on a failure forgets the
+  // mirror and says so rather than leaving it silently stale.
+  resyncRef.current = (id: string) => {
+    void runPaneResync({
+      stillOn: () => activeIdRef.current === id,
+      hasPendingWork: () => autosaveRef.current.hasPendingWork(),
+      keepBoth: () => onBaseMismatch({ noteId: id, body: contentRef.current }),
+      readSession: () => readLiveNote(id),
+      adopt: (text) => {
+        autosaveRef.current.acceptReloadedBody(text);
+        setContent(text);
+        sessionMirrorRef.current.set(id, text);
+      },
+      forgetMirror: () => {
+        sessionMirrorRef.current.delete(id);
+      },
+      reportFailure: () => setLiveNotice(t("editor.flow.liveResyncFailed")),
+    });
+  };
+  const [liveNotice, setLiveNotice] = useState<string | null>(null);
 
   // Re-sync this pane's body when the open note's `.myn` changed out of band -
   // a rename (MYND-140), a snapshot restore, OR a sync pull (`sync://changed` →
@@ -1620,6 +1717,10 @@ export function PaneView({
         // Compare-and-swap, not a bare set: the ONLY buffer these disk bytes may
         // replace is the one the guard above was answered for.
         setContent((prev) => (prev === before ? body : prev));
+        // The mirror follows only an ADOPTED body. When the swap is refused the
+        // buffer still derives from the old one, and moving the mirror would read
+        // this reload's change as something the user typed away.
+        if (contentRef.current === before) sessionMirrorRef.current.set(activeId, body);
       } catch {
         /* re-sync failure is non-fatal */
       }
@@ -2454,6 +2555,7 @@ export function PaneView({
           )}
         </div>
       )}
+      <Toast message={liveNotice} onDone={() => setLiveNotice(null)} variant="error" />
     </section>
   );
 }

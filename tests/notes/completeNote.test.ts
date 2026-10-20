@@ -136,3 +136,27 @@ describe("uncompleteNote", () => {
     await expect(uncompleteNote("n1")).rejects.toBeInstanceOf(NotATaskNoteError);
   });
 });
+
+describe("completing a note a live session owns (myne-md/myne#849 review round 5)", () => {
+  it("writes with the text it READ as the merge base", async () => {
+    // A peer edit can land in the session between the read and the write; with
+    // no base the write replaced the session's text and deleted it.
+    const live = await import("../../src/notes/liveNote");
+    invoke.mockReset();
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "plugin:live|live_session_open") return Promise.resolve(undefined);
+      if (cmd === "plugin:live|live_session_read") return Promise.resolve(TASK_NOTE);
+      if (cmd === "plugin:live|live_session_patch_frontmatter") return Promise.resolve("merged");
+      if (cmd === "plugin:live|live_session_close") return Promise.resolve(undefined);
+      return Promise.reject(new Error(`unexpected command ${cmd}`));
+    });
+    await live.openLiveNote("task-live");
+    try {
+      await completeNote("task-live");
+      const call = invoke.mock.calls.find(([cmd]) => cmd === "plugin:live|live_session_patch_frontmatter");
+      expect((call?.[1] as { base?: string }).base).toBe(TASK_NOTE);
+    } finally {
+      await live.evictLiveNote("task-live");
+    }
+  });
+});

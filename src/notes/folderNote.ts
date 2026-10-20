@@ -57,7 +57,7 @@ export async function createFolderNote(folderPath: string): Promise<string> {
 export async function setFolderIndex(noteId: string): Promise<void> {
   const current = await noteRead(noteId);
   const marked = patchFolderIndexField(encoder.encode(current), true);
-  await noteUpdate(noteId, decoder.decode(marked));
+  await noteUpdate(noteId, decoder.decode(marked), undefined, current);
 }
 
 /**
@@ -70,7 +70,7 @@ export async function setFolderIndex(noteId: string): Promise<void> {
 export async function unsetFolderIndex(noteId: string): Promise<void> {
   const current = await noteRead(noteId);
   const cleared = patchFolderIndexField(encoder.encode(current), false);
-  await noteUpdate(noteId, decoder.decode(cleared));
+  await noteUpdate(noteId, decoder.decode(cleared), undefined, current);
 }
 
 /** The default title for a freshly-created folder note: the folder's last

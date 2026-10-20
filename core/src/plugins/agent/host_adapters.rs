@@ -237,6 +237,8 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
                 &StdVaultIo,
                 note_id,
                 plaintext,
+                None,
+                None,
             )
             .await
             .map_err(|err| {

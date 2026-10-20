@@ -598,6 +598,8 @@ pub(crate) async fn snapshot_restore_in(
             io,
             note_id_parsed.to_string(),
             (*plaintext).clone(),
+            None,
+            None,
         )
         .await
         .map_err(|_| SnapshotError::LiveSessionOpen)?;

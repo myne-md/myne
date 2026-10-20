@@ -51,5 +51,5 @@ export async function setNoteCover(
   // Byte-identical to desktop's guard, which is the property this file claims.
   if (bytesEqual(patched, enc.encode(current))) return;
   const stamped = patchUpdatedField(patched, new Date().toISOString());
-  await noteUpdate(noteId, dec.decode(stamped));
+  await noteUpdate(noteId, dec.decode(stamped), undefined, current);
 }

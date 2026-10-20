@@ -7828,6 +7828,13 @@ export const ROSTER = Object.freeze([
       "src/notes/components/PaneView.tsx",
       "editor/src/decorations/awareness.ts",
       "editor/src/CMEditor.tsx",
+      // The mobile presence surface (myne-md/myne#849): the roster sheet, the top
+      // bar's presence chip and the one-shot jump. It reads the SAME store
+      // (`src/notes/collab/`, already above) through exact aliases, which is why
+      // this is a path on this entry rather than an entry of its own: the rule is
+      // one rule, and a separate entry would let the two halves be walked apart.
+      "mobile/src/app/flows/editor/sheets/PresenceSheet.tsx",
+      "mobile/src/lib/awareness.ts",
     ],
     clients: [
       "desktop-macos",
@@ -7880,8 +7887,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On a real iPhone and a real Android phone, with a shared vault and another live participant: co-edit the same note and confirm each phone renders the remote caret and the roster. Then background Myne on one phone and confirm the other stops showing it as present within the grace window; foreground it and confirm it returns. Lock the vault on one phone and confirm it leaves the roster. Finally confirm no awareness artefact is written to either phone's storage.",
-        whyNotAutomated: "The foreground/background presence gate is an OS lifecycle event: iOS suspension and Android activity recreation decide whether the stream stays open, and the Playwright flow tier runs in desktop Chromium with mock IPC and produces neither transition. No CI lane builds for either platform.",
+        see: "On a real iPhone and a real Android phone, with a shared vault and another live participant: co-edit the same note and confirm each phone renders the remote caret and the roster. **The mobile surface this item exists for is myne-md/myne#849, and a device walk must confirm four things it cannot check anywhere else.** One: the top bar grows a COUNT CHIP while a peer is present and the chip is absent when you are alone (an always-present chip would be the defect, since the affordance is the arrival of a peer). Two: tapping the chip opens the roster sheet, and each row carries that peer's name and a colour dot matching the caret they draw in the note, which is the pairing no jsdom test can judge. Three: tapping a row moves the editor to that peer's line and closes the sheet, and tapping a row for a peer that has just joined and reported no position moves nothing. Four: backgrounding Myne, and locking the vault, each drop the peer from the roster within the grace window, and foregrounding brings them back, including a peer who has not moved their caret since (the resume re-announce, not their next frame). Finally confirm no awareness artefact is written to either phone's storage.",
+        whyNotAutomated: "The foreground/background presence gate is an OS lifecycle event: iOS suspension and Android activity recreation decide whether the stream stays open, and the Playwright flow tier runs in desktop Chromium with mock IPC and produces neither transition. No CI lane builds for either platform. The chip's APPEARANCE, the dot-to-caret colour pairing and the jump are perceptual or engine-specific the same way the desktop items above are: what the suite pins is the store binding and the row's accessible name, and what a person must see is that the tint on a phone's WebView matches the caret it is paired with and that the row lands on the right line in a document the phone is rendering. **The FRAME that would drive the first three points is also out of reach today, and this names it rather than leaving it implied:** `mobile/tests/flow-logic/mock-ipc.ts` stubs `@tauri-apps/api/event`'s `listen` as a no-op, so no spec in the flow-logic tier can deliver a `sync://awareness` frame and the presence store cannot be populated from a scenario. The chip, the sheet and the jump ARE covered where they can be (component specs over the shared store, and the row's accessible name and colour source asserted by injection), and extending that harness with an event bus is the change that would move these three points out of this table.",
         clients: ["ios", "android"],
         estimateMin: 15,
         tier: "standard",

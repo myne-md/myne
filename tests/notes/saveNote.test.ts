@@ -122,3 +122,17 @@ describe("saveNote — error propagation", () => {
     });
   });
 });
+
+describe("saveNote: the live context (myne-md/myne#849 review round 4)", () => {
+  it("leaves the stateless payload unchanged when no session owns the note", async () => {
+    invokeMock.mockResolvedValue(undefined);
+    const sent: string[] = [];
+    await saveNote("note-1", "body", undefined, { base: "old", onSent: (t) => sent.push(t) });
+    const [cmd, payload] = invokeMock.mock.calls.at(-1) as [string, object];
+    expect(cmd).toBe("plugin:notes|note_update");
+    // `base` is a live-path argument only; the stateless command never sees it,
+    // and onSent does not fire, because no session took the text.
+    expect("base" in payload).toBe(false);
+    expect(sent).toEqual([]);
+  });
+});

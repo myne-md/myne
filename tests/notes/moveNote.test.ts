@@ -276,3 +276,27 @@ describe("bulkMoveNotes: one prefs write per operation (myne-md/myne#613)", () =
     expect(deliberateWrites()[0]?.add).toEqual(["Projects/"]);
   });
 });
+
+describe("moveNote: the merge base it hands a live session (myne-md/myne#849 review round 4)", () => {
+  it("passes the text it READ as the base, so a peer edit landing between the read and the write survives", async () => {
+    // A session owns the note. Its read answers through the session, and the write
+    // goes through `live_session_patch_frontmatter`; the base it carries is what
+    // lets the core merge rather than replace when a peer edit lands in between.
+    const live = await import("../../src/notes/liveNote");
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "plugin:live|live_session_open") return Promise.resolve(undefined);
+      if (cmd === "plugin:live|live_session_read") return Promise.resolve("# Hello\nbody\n");
+      if (cmd === "plugin:live|live_session_patch_frontmatter") return Promise.resolve("merged");
+      if (cmd === "plugin:live|live_session_close") return Promise.resolve(undefined);
+      return Promise.reject(new Error(`unexpected command ${cmd}`));
+    });
+    await live.openLiveNote("id-live");
+    try {
+      await moveNote("id-live", "Projects/");
+      const call = invokeMock.mock.calls.find(([cmd]) => cmd === "plugin:live|live_session_patch_frontmatter");
+      expect((call?.[1] as { base?: string }).base).toBe("# Hello\nbody\n");
+    } finally {
+      await live.evictLiveNote("id-live");
+    }
+  });
+});

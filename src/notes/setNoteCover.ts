@@ -78,7 +78,7 @@ export async function setNoteCover(
   if (bytesEqual(patched, encoder.encode(current))) return;
   const stamped = patchUpdatedField(patched, new Date().toISOString());
   const next = decoder.decode(stamped);
-  await noteUpdate(noteId, next);
+  await noteUpdate(noteId, next, undefined, current);
   // The cover property changed → re-index (live, decrypt-free) so the view's
   // property lookup — and the rendered card — picks it up. Best-effort.
   void reindexNoteFromBody(noteId, next);

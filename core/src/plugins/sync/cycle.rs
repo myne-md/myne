@@ -697,15 +697,18 @@ pub async fn run_active_cycle_from_host(
             // for tombstones) rather than clobbering in-flight typing.
             for (id, bytes, baseline_nonce) in &summary.deferred_live_pulls {
                 let note_id = uuid::Uuid::from_bytes(*id).to_string();
-                let merged = live_registry.with_note_mut(&note_id, |s| {
+                // Merge, and queue the merge's body diff for the pane to dispatch as
+                // ONE `ChangeSet` (`live_session_take_remote_splices`), so its buffer
+                // catches up WITHOUT a reload and its next whole-markdown save cannot
+                // delete the merged-in peer text. Both run under one hold of the
+                // registry's session lock (`apply_and_queue`), so a live peer change
+                // routed by the awareness supervisor cannot queue between them and
+                // compose the two lists in the wrong order (myne-md/myne#849).
+                let merged = live_registry.apply_and_queue(&note_id, |s| {
                     s.merge_pulled(bytes, &live_merge_keys.0, &live_merge_keys.1)
+                        .map(|splices| (splices, ()))
                 });
-                if let Some(Ok(splices)) = merged {
-                    // Queue the merge's body diff for the pane to dispatch as ONE
-                    // `ChangeSet` (`live_session_take_remote_splices`), so its buffer
-                    // catches up WITHOUT a reload and its next whole-markdown save
-                    // cannot delete the merged-in peer text.
-                    live_registry.set_pending_splices(&note_id, splices);
+                if let Some(Ok(())) = merged {
                     // Persist the merged document so the on-disk blob carries the
                     // peer's revision too, then raise the calm "updated from another
                     // device" signal (the same one the durable merge path uses).

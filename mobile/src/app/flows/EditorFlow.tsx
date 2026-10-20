@@ -30,6 +30,31 @@ import {
 } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import {
+  closeLiveNote,
+  openLiveNote,
+  patchEpoch,
+  readLiveNote,
+  reportLivePresence,
+  settledPatches,
+  takeRemoteSplices,
+} from "../../lib/liveNote";
+import {
+  applySplicesToText,
+  installRemoteMergeDrain,
+  type RemoteMergeDrain,
+} from "../../lib/liveRemoteMerge";
+import { runLiveResync } from "../../lib/liveResync";
+import { createConflictCopy } from "../../lib/conflictCopy";
+import { remoteDispatchSpec } from "@myne/editor/live-bridge";
+import { useAwarenessChannel, useAwarenessForNote, useAwarenessLabelResolution, useAwarenessPeers } from "../../lib/awareness";
+import {
+  presenceRevealFor,
+  requestPresenceJump,
+  PRESENCE_JUMP_EVENT,
+  type PresenceJumpDetail,
+} from "@myne/presence-jump";
+import { PresenceSheet } from "./editor/sheets/PresenceSheet";
+import {
   DrawingCanvasLazy,
   extractSceneJson,
   writeSceneJson,
@@ -93,6 +118,7 @@ import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expan
 import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
 import { flushChatHistoryNow } from "../../lib/chatHistory";
 import { endAgentRun } from "../../lib/agent-lifetime";
+import { clearAwareness } from "@myne/awareness-store";
 import { resolvePeriodNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
 import { periodSettings, zonedNow } from "../../lib/daily";
 import type { Period } from "../../lib/daily";
@@ -381,6 +407,12 @@ const EMPTY_ROWS = Object.freeze([]) as readonly never[];
  *  not move that fixture's count, so re-measure rather than deriving it. */
 const PICKER_FETCH_RETRIES = 3;
 
+/** Trailing throttle for reporting this device's caret to peers. The same 100 ms
+ *  the desktop pane uses, which is the awareness coalescing floor (`SYNC-5`): a
+ *  caret moved faster than this is reported once, and the supervisor coalesces
+ *  further anyway. */
+const PRESENCE_REPORT_MS = 100;
+
 /** Delay between those attempts. Long enough that a relock-then-unlock can
  *  complete inside the budget, short enough that a user who opens `[[##`
  *  straight after unlocking does not watch an empty picker. */
@@ -521,6 +553,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [editorText, setEditorText] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
+  // A calm notice, distinct from `editorError`: the live resync rebuilt the note
+  // from its session, which is information rather than a failure.
+  const [editorNotice, setEditorNotice] = useState<string | null>(null);
   // Drawing dispatch (SF2): a value-strict `kind: drawing` body routes the editor
   // pane to the shared Excalidraw canvas instead of CMEditor (parity w/ PaneView).
   const isDrawing = useMemo(() => isDrawingBody(editorText), [editorText]);
@@ -573,9 +608,177 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // listeners register once. A brand-new note is create-flushed at most once
   // (guarded) to avoid duplicate blobs across repeated backgrounding.
   const newNoteFlushedRef = useRef(false);
+  const liveNoteIdRef = useRef<string | null>(null);
   useEffect(() => {
     newNoteFlushedRef.current = false;
+    // Live co-editing: the note on screen holds a live session, and leaving it
+    // releases that session. While one is open this device is the note's SINGLE
+    // durable writer (`SYNC-33`), and the backend refuses a stateless
+    // `note_update` for it, which is why `flushRef` routes through the session
+    // below. Best-effort: a drawing note or a locked vault leaves the note
+    // untracked and the durable path runs unchanged.
+    const next = editing?.id ?? null;
+    if (liveNoteIdRef.current !== next) {
+      if (liveNoteIdRef.current !== null) void closeLiveNote(liveNoteIdRef.current);
+      // Once the session exists, drain it once: a pull that landed between the
+      // editor's read and this open is in the session and raised no merge event.
+      if (next !== null) void openLiveNote(next).then(() => drainRef.current?.catchUp(next));
+      liveNoteIdRef.current = next;
+    }
   }, [editing?.id]);
+  // The editor leaving the screen releases the session too. Its own effect, so
+  // the close is not conditional on a change of `editing.id`.
+  useEffect(() => {
+    return () => {
+      if (liveNoteIdRef.current !== null) void closeLiveNote(liveNoteIdRef.current);
+      liveNoteIdRef.current = null;
+    };
+  }, []);
+  // Live-collaboration presence (myne-md/myne#849). The channel is installed for as
+  // long as this screen is mounted. The supervisor emits on `sync://awareness` only
+  // for notes with an OPEN live session, which is why the session wiring above comes
+  // first: before it existed there was nothing for this to consume. The push is bound
+  // to the note ON SCREEN, which is what makes a peer editing a different note render
+  // nothing here rather than land as a caret on this one.
+  useAwarenessChannel();
+  useAwarenessLabelResolution(editing?.id ?? null);
+  const awarenessPush = useAwarenessForNote(editing?.id ?? null);
+  // The roster's peer count (task 6): the same store read the sheet lists from, so
+  // the chip cannot appear while the sheet would show nothing.
+  const awarenessPeers = useAwarenessPeers(editing?.id ?? null);
+  const [presenceOpen, setPresenceOpen] = useState(false);
+  // This device's caret/selection, trailing-throttled to the awareness coalescing
+  // floor the desktop pane uses, so a fast caret does not flood the IPC and a note
+  // with no live session is a no-op at the policy. The refs are what let the
+  // timer read the LATEST position rather than the one the first keystroke saw.
+  const presenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const presenceLastRef = useRef<{
+    noteId: string | null;
+    cursor: number | null;
+    selection: [number, number] | null;
+  } | null>(
+    null,
+  );
+  const handleCursorChange = useCallback(
+    (cursor: number | null, selection: [number, number] | null) => {
+      // The note is captured WITH the position: the timer fires up to one throttle
+      // later, and a note switch inside that window would otherwise report this
+      // note's offset as presence on the next one (myne-md/myne#849 review).
+      presenceLastRef.current = { noteId: liveNoteIdRef.current, cursor, selection };
+      if (presenceTimerRef.current !== null) return;
+      presenceTimerRef.current = setTimeout(() => {
+        presenceTimerRef.current = null;
+        const id = liveNoteIdRef.current;
+        const latest = presenceLastRef.current;
+        if (id === null || latest === null || latest.noteId !== id) return;
+        reportLivePresence(id, latest.cursor, latest.selection);
+      }, PRESENCE_REPORT_MS);
+    },
+    [],
+  );
+  useEffect(
+    () => () => {
+      if (presenceTimerRef.current !== null) clearTimeout(presenceTimerRef.current);
+    },
+    [],
+  );
+  // Deliver a sync pull's merge into the OPEN live note (myne-md/myne#849 review,
+  // C2). The cycle already merged it into the session and queued the body diff;
+  // this drains it, maps it over the unsaved text this screen holds, and applies it
+  // as ONE editor change, so the buffer catches up WITHOUT the reload this screen
+  // does not perform, and the next whole-markdown save therefore cannot delete the
+  // merged-in peer text. `./lib/liveRemoteMerge.ts` states why the mapping is
+  // needed here and not on desktop: this screen does not autosave.
+  //
+  // `sessionMirrorRef` is the screen's record of what the session holds as far as
+  // this buffer knows: the text it loaded, then the text each of the screen's OWN
+  // saves sent (`editorSave` below), then each merge it applied. Another writer's
+  // patch (the cover, a move, a template flag) does NOT move it: the buffer does
+  // not hold that change, so the next drain must still see it as remote. The buffer's own
+  // latest value is read from the view when one is mounted, and from
+  // `editorTextRef` in reading mode, where there is no view to dispatch into.
+  const sessionMirrorRef = useRef<{ id: string; text: string } | null>(null);
+  const editorTextRef = useRef(editorText);
+  editorTextRef.current = editorText;
+  // The text this screen's buffer was derived from, handed to every save of the
+  // note on screen so the core three-way merges a save from a stale buffer
+  // instead of replacing the session's text with it (myne-md/myne#849 review):
+  // a peer's change that landed after the last drain survives the save.
+  // `undefined` when the screen does not know, which is the plain replace.
+  const sessionBaseFor = (id: string): string | undefined =>
+    sessionMirrorRef.current?.id === id ? sessionMirrorRef.current.text : undefined;
+  const resyncRef = useRef<(id: string) => void>(() => {});
+  const drainRef = useRef<RemoteMergeDrain | null>(null);
+  // Every save of the buffer goes through here. The mirror moves to the text SENT,
+  // not the text the core returns (myne-md/myne#849 review round 4): when the core
+  // merged a peer edit into this save, the returned text holds it and the buffer
+  // does not, so a mirror at the returned text would hide it from the next drain
+  // and the save after that would delete it. At the sent text, the drain diffs the
+  // merged-in edit as remote and delivers it. It moves before the save settles,
+  // which is what a drain waiting on `settledPatches` relies on.
+  const editorSave = (id: string, text: string): Promise<void> =>
+    noteUpdate(id, text, undefined, sessionBaseFor(id), () => {
+      if (liveNoteIdRef.current === id) sessionMirrorRef.current = { id, text };
+    });
+  useEffect(() => {
+    const drain = installRemoteMergeDrain({
+      currentNoteId: () => liveNoteIdRef.current,
+      takeSplices: takeRemoteSplices,
+      settled: settledPatches,
+      patchEpoch,
+      readSession: readLiveNote,
+      sessionText: (id) =>
+        sessionMirrorRef.current?.id === id ? sessionMirrorRef.current.text : null,
+      setSessionText: (id, text) => {
+        sessionMirrorRef.current = { id, text };
+      },
+      buffer: () => editorViewRef.current?.state.doc.toString() ?? editorTextRef.current,
+      deliver: (splices) => {
+        const view = editorViewRef.current;
+        if (view !== null) {
+          view.dispatch(remoteDispatchSpec(view.state, splices));
+          return;
+        }
+        const next = applySplicesToText(editorTextRef.current, splices);
+        editorTextRef.current = next;
+        setEditorText(next);
+      },
+      resync: (id) => resyncRef.current(id),
+    });
+    drainRef.current = drain;
+    return () => {
+      drainRef.current = null;
+      drain.dispose();
+    };
+  }, []);
+  // The roster's jump target (task 8): the line a peer's caret sits on, revealed
+  // once. `nonce` makes a second jump to the SAME line act again, and the shared
+  // editor applies it only when `noteId` matches the note it holds.
+  const [revealLine, setRevealLine] = useState<{
+    noteId: string;
+    line: number;
+    text: string;
+    nonce: number;
+  } | null>(null);
+  // The listener registers ONCE, so it cannot read `editing`/`editorText` from its
+  // closure: this ref is what makes the newest pair visible to it.
+  const presenceJumpRef = useRef<{ id: string | null; text: string }>({ id: null, text: "" });
+  presenceJumpRef.current = { id: editing?.id ?? null, text: editorText };
+  useEffect(() => {
+    const onPresenceJump = (e: Event) => {
+      const detail = (e as CustomEvent<PresenceJumpDetail>).detail;
+      const cur = presenceJumpRef.current;
+      // A jump for a note this screen is not showing is IGNORED rather than
+      // applied, which is the whole reason the event carries a note id.
+      if (detail === undefined || cur.id === null || detail.noteId !== cur.id) return;
+      setRevealLine(presenceRevealFor(cur.id, cur.text, detail.offset, Date.now()));
+    };
+    window.addEventListener(PRESENCE_JUMP_EVENT, onPresenceJump);
+    return () => window.removeEventListener(PRESENCE_JUMP_EVENT, onPresenceJump);
+    // Deliberately empty: the ref above carries the live values, so re-registering
+    // per keystroke is not needed and would be a listener churn this screen cannot
+    // afford. The repo has no eslint, so the empty array is the whole convention.
+  }, []);
   /** One corpus item, from the same derivation the boot hydrate and the sweep
    *  use, so the tracker's signature means one thing everywhere. */
   const indexCorpusItem = useCallback(
@@ -628,8 +831,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       // + pagehide double-fire into a single write.
       if (editorUnchanged(id)) return true;
       loadedTextRef.current = { id, text: raw };
+      // Through `editorSave`, like every other save on this screen (review
+      // finding): this is the one write that runs when the OS is about to kill
+      // the WebView, and a bare `noteUpdate` passes no merge base, so a peer edit
+      // merged into the session and not yet drained would be replaced rather than
+      // merged, and the mirror would not move, which makes the next save duplicate
+      // the text it flushed.
       try {
-        await noteUpdate(id, stampUpdated(raw));
+        await editorSave(id, stampUpdated(raw));
       } catch {
         // Failed write: drop the baseline so a later flush/save retries.
         if (loadedTextRef.current?.id === id) loadedTextRef.current = null;
@@ -692,6 +901,18 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       // a notice: the user is coming back to this screen and is owed a reason
       // for it being empty.
       endAgentRun("background", t("agent.progress.cancelledBackground"));
+      // The live-presence store too (myne-md/myne#849 task 9), and for the same
+      // reason the run above is cancelled rather than flushed: the OS suspends a
+      // backgrounded WebView and may reclaim the process, so peers' names and
+      // carets left in a module-scope store are a record of who was editing what,
+      // resident in a process nobody is watching. Desktop has no analogue of this
+      // moment, so this is the one leaving path that exists on this client alone.
+      // Coming back repopulates it: `sync_lifecycle_resume` marks every open session
+      // as owing a JOIN, and a join is what makes peers re-announce (`SYNC-29`), so
+      // an idle peer who never moved their caret reappears too. Without that, a hide
+      // too short to tear the stream down left them missing until they moved
+      // (myne-md/myne#849 review, D7).
+      clearAwareness();
     };
     const onHidden = () => {
       if (document.visibilityState === "hidden") flushAll();
@@ -721,6 +942,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // The live CMEditor view, handed over via <CMEditor onReady>. Drives the
   // above-keyboard FormatBar through the shared @myne/editor commands.
   const [editorView, setEditorView] = useState<EditorView | null>(null);
+  // The same view, in a ref, for the listeners below: they are registered ONCE, so
+  // they cannot read a state value from their closure.
+  const editorViewRef = useRef<EditorView | null>(null);
   const [manageAttachments, setManageAttachments] = useState(false);
   // Voice-note recording sheet open (mic button / widget voice capture / the
   // shared editor's `/record` slash all raise this).
@@ -1818,6 +2042,45 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     [applyOne, dropOne, devStore],
   );
 
+  // The resync for a change the drain could not place (myne-md/myne#849 review).
+  // The rule and every arm live in `../../lib/liveResync.ts`, where a spec drives
+  // them; this is the screen's half. A failure is an error, a reload is a calm
+  // notice: nothing failed when a note is rebuilt from the session, and in a
+  // shared vault the change may come from a person rather than a device.
+  resyncRef.current = (id: string) => {
+    void runLiveResync(id, {
+      currentNoteId: () => liveNoteIdRef.current,
+      readSession: readLiveNote,
+      readDisk: noteRead,
+      buffer: () => editorViewRef.current?.state.doc.toString() ?? editorTextRef.current,
+      persisted: (noteId) => (loadedTextRef.current?.id === noteId ? loadedTextRef.current.text : null),
+      createCopy: (text, noteId) => createConflictCopy(text, noteId),
+      // The copy is a separate note no session owns, so this is a plain write.
+      updateCopy: (copyId, text) => noteUpdate(copyId, text),
+      rebuild: (noteId, text) => {
+        loadedTextRef.current = { id: noteId, text };
+        sessionMirrorRef.current = { id: noteId, text };
+        editorTextRef.current = text;
+        setEditorText(text);
+      },
+      report: (outcome, copyId) => {
+        if (copyId !== undefined) void refreshOne(copyId);
+        if (outcome === "readFailed" || outcome === "copyFailed") {
+          // The mirror is dropped so the next change resyncs again rather than
+          // being placed against a base the screen no longer trusts.
+          sessionMirrorRef.current = null;
+          setEditorError(
+            t(outcome === "readFailed" ? "editor.flow.liveResyncFailed" : "editor.flow.liveCopyFailed"),
+          );
+          return;
+        }
+        setEditorNotice(
+          t(outcome === "reloadedKept" ? "editor.flow.liveResyncedKept" : "editor.flow.liveResynced"),
+        );
+      },
+    });
+  };
+
   // Returns the bodies it loaded, or null when the load failed. The boot caller
   // needs them to register the folders they prove (myne-md/myne#613 back-fill),
   // and re-reading every note would be a whole extra decrypt pass over the vault.
@@ -2267,6 +2530,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const openNote = useCallback(
     async (id: string) => {
       setEditorError(null);
+      setEditorNotice(null);
       let text: string;
       try {
         text = HAS_TAURI ? await noteRead(id) : devStore().get(id) ?? "";
@@ -2279,6 +2543,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         return;
       }
       loadedTextRef.current = { id, text };
+      // The session opens from the same text (or already holds it, since
+      // `noteRead` reads a live note from its session), so this is the base the
+      // first merge's splices are measured against.
+      sessionMirrorRef.current = { id, text };
       setEditorText(text);
       setEditing({ id });
       setLastNoteId(id);
@@ -2314,7 +2582,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         if (!HAS_TAURI) devStore().set(id, stamped);
         applyOne(id, stamped);
       } else {
-        if (HAS_TAURI) await noteUpdate(editing.id, stamped);
+        if (HAS_TAURI) await editorSave(editing.id, stamped);
         else devStore().set(editing.id, stamped);
         loadedTextRef.current = { id: editing.id, text: editorText };
         applyOne(editing.id, stamped);
@@ -2348,12 +2616,19 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     if (editing?.id != null && !editorUnchanged(editing.id)) {
       try {
         const stamped = stampUpdated(editorText);
-        if (HAS_TAURI) await noteUpdate(editing.id, stamped);
+        if (HAS_TAURI) await editorSave(editing.id, stamped);
         else devStore().set(editing.id, stamped);
         loadedTextRef.current = { id: editing.id, text: editorText };
         applyOne(editing.id, stamped);
       } catch {
-        // Best-effort save; still navigate so the backlink isn't a dead tap.
+        // STAY on the note. `openNote` replaces the buffer and clears the error in
+        // the same batch, so navigating here discarded the unsaved text AND hid
+        // the message saying so (myne-md/myne#849 review, D7): this client has no
+        // autosave and no snapshot, so that text existed nowhere else. A dead tap
+        // with a visible reason is the recoverable outcome; the user can retry or
+        // copy the text out.
+        setEditorError(t("editor.flow.saveFailed"));
+        return;
       }
     }
     await openNote(id);
@@ -2467,7 +2742,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const isOpenNote = id === editing?.id;
     try {
       if (isOpenNote && !editorUnchanged(id)) {
-        if (HAS_TAURI) await noteUpdate(id, editorText);
+        if (HAS_TAURI) await editorSave(id, editorText);
         loadedTextRef.current = { id, text: editorText };
       }
       await setNoteCover(id, choice);
@@ -2475,6 +2750,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         const next = await noteRead(id);
         setEditorText(next);
         loadedTextRef.current = { id, text: next };
+        // The buffer now holds what the session holds, cover included, so the
+        // mirror moves with it. The cover's own patch did not move it, and left
+        // there the next drain would deliver the cover a second time.
+        if (sessionMirrorRef.current?.id === id) sessionMirrorRef.current = { id, text: next };
       }
       await refreshOne(id);
     } catch {
@@ -2490,7 +2769,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const dest = normalizeFolderPath(moveInput.trim() || null);
     try {
       if (editing?.id === id && !editorUnchanged(id)) {
-        if (HAS_TAURI) await noteUpdate(id, editorText);
+        if (HAS_TAURI) await editorSave(id, editorText);
         else devStore().set(id, editorText);
         loadedTextRef.current = { id, text: editorText };
       }
@@ -3603,6 +3882,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     // would leave `editorUnchanged` comparing against the old
                     // bytes, so the very next save would write it back.
                     loadedTextRef.current = { id: open, text };
+                    sessionMirrorRef.current = { id: open, text };
                     setEditorText(text);
                   })
                   .catch(() => {
@@ -3708,7 +3988,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   // editor, so an unsaved buffer while browsing it is the
                   // ordinary state rather than an exotic one.
                   if (id === editing?.id && !editorUnchanged(id)) {
-                    if (HAS_TAURI) await noteUpdate(id, editorText);
+                    if (HAS_TAURI) await editorSave(id, editorText);
                     loadedTextRef.current = { id, text: editorText };
                   }
                   if (HAS_TAURI) await unmarkTemplate(id);
@@ -4050,6 +4330,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         onToggleList={isRegular ? () => setPanesRevealed((r) => !r) : undefined}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
+        peers={awarenessPeers.length}
+        onPresence={() => setPresenceOpen(true)}
         folder={readNoteFolder(editorText)}
         busy={editorBusy}
       />
@@ -4067,8 +4349,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       />
 
       {editorError && (
-        <div style={{ padding: "12px 16px 0" }}>
+        <div style={{ padding: "var(--space-3) var(--space-4) 0" }}>
           <Banner kind="danger">{editorError}</Banner>
+        </div>
+      )}
+      {editorNotice && (
+        <div style={{ padding: "var(--space-3) var(--space-4) 0" }}>
+          <Banner kind="info" testID="editor.live-notice">{editorNotice}</Banner>
         </div>
       )}
 
@@ -4132,7 +4419,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           <CMEditor
             value={editorText}
             onChange={setEditorText}
-            onReady={setEditorView}
+            onReady={(view) => {
+              editorViewRef.current = view;
+              setEditorView(view);
+            }}
+            // Live presence (`collab-presence-ui`, myne-md/myne#849 review): this
+            // device's caret/selection is reported so PEERS render its cursor. The
+            // desktop pane has had this from the start; without it the phone
+            // publishes its join frame and never moves, so a peer's roster row for
+            // it carries no position and jumping to the phone does nothing.
+            onCursorChange={handleCursorChange}
             // myne-md/myne#520: the note the cover banner's controls act on.
             // Mobile shows one note at a time, so this client cannot hit the
             // split defect that motivated the field, but the seam is shared
@@ -4148,6 +4444,16 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // not. Nothing would have found it: no mobile test asserts the
             // name and the roster's screen-reader item covers desktop only.
             noteTitle={editorTitle}
+            // Live-collaboration presence (myne-md/myne#849): the peers editing THIS
+            // note, drawn by the shared engine's awareness decoration field. A peer
+            // on another note is absent from the push rather than filtered by the
+            // engine. `undefined` (no note on screen) means this host is not driving
+            // awareness at this moment, which the engine reads as "push nothing".
+            awareness={awarenessPush}
+            // The roster's jump target (task 8). One-shot: the editor applies a
+            // reveal once per `nonce` and only for the note it holds, and nothing
+            // re-arms it, so no follow mode exists.
+            revealLine={revealLine}
             // MYND-559: the FormatBar (driven by the `onReady` view above) is
             // mobile's single formatting surface - suppress the engine's floating
             // selection toolbar so a word-select doesn't raise a second one.
@@ -4346,6 +4652,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             // The live note was overwritten on disk - re-read it into the editor.
             if (HAS_TAURI && editing?.id) void noteRead(editing.id).then(setEditorText).catch(() => {});
           }}
+        />
+      )}
+
+      {presenceOpen && editing?.id && (
+        <PresenceSheet
+          noteId={editing.id}
+          // Jump is one-shot: dispatch the peer's caret offset and let the editor's
+          // own listener reveal that line (task 8). No follow mode exists on either
+          // client.
+          onJump={(peer) => requestPresenceJump(editing.id, peer)}
+          onClose={() => setPresenceOpen(false)}
         />
       )}
       </>

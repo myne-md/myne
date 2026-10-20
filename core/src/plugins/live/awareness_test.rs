@@ -488,3 +488,98 @@ fn a_frame_sealed_under_a_different_epoch_is_refused() {
     assert!(route_awareness_frame(&reg, &key, &room, &NOTE, &acct, Some(2), &frame).is_err());
     assert!(route_awareness_frame(&reg, &key, &room, &NOTE, &acct, None, &frame).is_err());
 }
+
+/// `sync_lifecycle_resume` re-joins every open session (`SYNC-29`,
+/// myne-md/myne#849): after the open's own join has been announced, a resume makes
+/// the next drain a `FrameType::Join` again, so peers re-announce to a WebView
+/// that dropped its presence store while hidden. Absent states are a no-op.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[test]
+fn a_lifecycle_resume_makes_every_open_session_rejoin() {
+    use crate::plugins::sync::commands::sync_lifecycle_resume_from_host;
+    let reg = LiveSessionRegistry::new();
+    let uuid = *crate::plugins::notes::note_id::NoteId::new_v7()
+        .as_uuid()
+        .as_bytes();
+    open_session(&reg, uuid);
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+    let take = |reg: &LiveSessionRegistry| {
+        reg.with_note_mut(&note_id, |s| s.take_local_presence())
+            .flatten()
+    };
+    assert!(
+        take(&reg).is_some_and(|p| p.join),
+        "the open announces once"
+    );
+    assert!(take(&reg).is_none(), "and then owes nothing");
+
+    sync_lifecycle_resume_from_host(None, Some(&reg));
+    assert!(
+        take(&reg).is_some_and(|p| p.join),
+        "a resume must make the session announce a join again"
+    );
+    // Nothing managed at all is not a panic.
+    sync_lifecycle_resume_from_host(None, None);
+}
+
+/// Open `blob` as a session under `actor` in `reg`; one shared base blob means
+/// two devices start from the same document history.
+fn open_shared(reg: &LiveSessionRegistry, blob: &[u8], uuid: [u8; 16], actor: [u8; 16]) {
+    let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+    assert!(reg.insert(
+        LiveSession::open_from_blob(blob, "v".into(), note_id, uuid, Some(actor), &ik, &ikid)
+            .expect("open")
+    ));
+}
+
+/// myne-md/myne#849: a peer's frontmatter-only change (rename, retag, move,
+/// trash) has no BODY splice once clamped, and routing it as a no-op left the pane
+/// holding the old frontmatter, which its next whole-markdown save wrote back over
+/// the peer's change. It must route as `ChangeApplied`, with nothing queued.
+#[test]
+fn a_frontmatter_only_peer_change_is_applied_with_an_empty_queue() {
+    let host = TestHost::new("/base");
+    let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
+    let uuid = [0xAAu8; 16];
+    let note_id = uuid::Uuid::from_bytes(uuid).to_string();
+    let blob = encode_note_blob(
+        "---\ntitle: Old\n---\nbody\n",
+        &ik,
+        &ikid,
+        &uuid,
+        &[0xAAu8; 16],
+        &host,
+    )
+    .expect("seal");
+    let (peer, me) = (LiveSessionRegistry::new(), LiveSessionRegistry::new());
+    open_shared(&peer, &blob, uuid, [0xB0u8; 16]);
+    open_shared(&me, &blob, uuid, [0xC0u8; 16]);
+
+    // The peer renames the note: only the frontmatter moves.
+    peer.with_note_mut(&note_id, |s| {
+        s.apply_body_markdown("---\ntitle: New\n---\nbody\n", 1)
+    })
+    .expect("session")
+    .expect("rename");
+    let keys = owner_keys();
+    let acct = [0x55u8; 16];
+    let sealed = seal_local_changes(&peer, &keys, &acct, None);
+    assert_eq!(sealed.len(), 1);
+
+    assert_eq!(
+        route_incoming_frame(&me, &keys, &acct, None, &sealed[0].1).expect("route"),
+        AwarenessRoute::ChangeApplied(uuid),
+        "a frontmatter-only change must reach the pane"
+    );
+    assert!(
+        me.take_pending_splices(&note_id).is_empty(),
+        "no body splice survives the clamp, so nothing is queued"
+    );
+    assert_eq!(
+        me.with_note_mut(&note_id, |s| s.markdown())
+            .expect("session")
+            .expect("text"),
+        "---\ntitle: New\n---\nbody\n"
+    );
+}

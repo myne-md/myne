@@ -11,6 +11,8 @@ import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
 import { endAgentRun } from "../lib/agent-lifetime";
+import { clearAwareness } from "@myne/awareness-store";
+import { clearHandoffCaches } from "./vaultHandoff";
 import { HAS_TAURI } from "../lib/app-window";
 import { clearCustomTheme, paintSelectedCustomTheme } from "../lib/customTheme";
 import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
@@ -179,6 +181,46 @@ function StageSwitch() {
     void enterStage(null);
     void boot();
   }, [boot, enterStage]);
+
+  /**
+   * The editor's "create another vault" exit, one of the two vault-leaving paths
+   * that do NOT go through `lockVault`: the create -> auto-unlock chain locks the
+   * current vault at the IPC layer instead. A named function rather than an inline
+   * prop so `scripts/check-frontend-lock-teardown.mjs` can hold it (`mobile-create`)
+   * the way it holds `lockVault`; as an inline arrow it was a leaving path no guard
+   * could name (myne-md/myne#849 review, D9).
+   */
+  const leaveForCreateVault = () => {
+    // The agent run, as on the join path below and for the #529 reason: the store
+    // is module scope, so a proposal holding text copied out of THIS vault's notes
+    // would otherwise render in the new vault's AI tab. This exit had the presence
+    // clear and not this one, which is the one-path-short shape the guard exists for.
+    endAgentRun("lock", "");
+    // The presence store: module scope in `@myne/awareness-store`, so without this
+    // the previous vault's peers stay resident into the new vault's session.
+    clearAwareness();
+    // The editor caches that are re-derivable from the vault being left (see
+    // `vaultHandoff.ts`): the guard's blanket handoff exemption now covers only
+    // the staged conversation write, which the cancelled-join path must keep.
+    clearHandoffCaches();
+    dispatch({ type: "editor.create-vault" });
+  };
+
+  /**
+   * The editor's "join an account" exit, the other leaving path that skips
+   * `lockVault`: `sync_join_account` unlocks the vault it bootstraps, which evicts
+   * this one at the IPC layer (SYNC-1). Named for the guard (`mobile-join`), for
+   * the reason `leaveForCreateVault` gives.
+   */
+  const leaveForJoinAccount = () => {
+    endAgentRun("lock", "");
+    // The presence store too: this path ends the session at the IPC layer without
+    // going through `lockVault`, and a module-scope store outlives every unmount, so
+    // the previous vault's peers would otherwise stay resident into the joined one.
+    clearAwareness();
+    clearHandoffCaches();
+    setJoinFrom("editor");
+  };
 
   if (stage === null) {
     return (
@@ -355,17 +397,16 @@ function StageSwitch() {
             await lockVault(reason === "idle" ? "idle" : "manual").catch(() => {});
             dispatch({ type: "editor.lock" });
           }}
-          onCreateVault={() => dispatch({ type: "editor.create-vault" })}
+          // Not preceded by `lockVault()`: see `leaveForCreateVault`, which is what
+          // the teardown guard holds for this exit.
+          onCreateVault={leaveForCreateVault}
           // Not preceded by `lockVault()`, unlike `onSwitchVault`: the join
           // flow's own `sync_join_account` unlocks the vault it bootstraps,
           // which evicts this one at the IPC layer (SYNC-1) — the same posture
           // `onCreateVault` takes toward the create → auto-unlock chain.
           // Same reason as the delete path below: not preceded by `lockVault`,
           // and the vault it bootstraps is a different one.
-          onJoinAccount={() => {
-            endAgentRun("lock", "");
-            setJoinFrom("editor");
-          }}
+          onJoinAccount={leaveForJoinAccount}
           onSwitchVault={async (vaultId: VaultId) => {
             await lockVault("switch").catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
@@ -382,6 +423,14 @@ function StageSwitch() {
           // vault-leaving path.
           onDeleteVaultSuccess={() => {
             endAgentRun("lock", "");
+            // The third leaving path that skips `lockVault`, same reason as the two
+            // above (myne-md/myne#849 review). The guarded clear is in
+            // `mobile/src/lib/vault-delete.ts::deleteVault` (`mobile-delete`), which
+            // runs it BEFORE the delete IPC, and every delete surface on this client
+            // reaches this callback only after that function resolved. This second
+            // call is belt and braces: it costs nothing, and the screen's half of the
+            // moment then does not depend on how the settings sheet reached it.
+            clearAwareness();
             clearCustomTheme();
             reprobe(); // #45 — see the unlock surface above
           }}

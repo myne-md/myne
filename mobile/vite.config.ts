@@ -136,6 +136,29 @@ export default defineConfig(async () => ({
       // use it under its total ban on `@tauri-apps/*`. Exact specifier, no
       // wildcard (same reasoning as above).
       { find: /^@myne\/clipboard$/, replacement: sib("../src/lib/clipboard.ts") },
+      // The live-collaboration AWARENESS cluster (myne-md/myne#849). Shared rather
+      // than reimplemented, and the reason is the same one the task-* block below
+      // gives: these modules ARE the cross-client decision. The store keys peers per
+      // note and holds the drop grace window, so two clients disagreeing about it
+      // would mean every caret flickers away on one of them; the label rule names a
+      // device the same way the version history does; and the colour derive is what
+      // puts a peer's caret and their roster row on the same palette entry.
+      // Safe to alias out of Tauri-coupled `../src/notes/`: every module in
+      // `collab/` imports only types, React-free helpers and each other (the store's
+      // own header states the same, and `presenceLabels` takes its resolver as a
+      // parameter, which is how this client injects its own binding). Exact
+      // specifiers, no wildcard, so a host-coupled sibling added to that directory
+      // cannot resolve by accident (the reasoning the block above records).
+      { find: /^@myne\/awareness-store$/, replacement: sib("../src/notes/collab/awarenessStore.ts") },
+      { find: /^@myne\/participant$/, replacement: sib("../src/notes/collab/participant.ts") },
+      { find: /^@myne\/identity-label$/, replacement: sib("../src/notes/collab/identityLabel.ts") },
+      { find: /^@myne\/presence-labels$/, replacement: sib("../src/notes/collab/presenceLabels.ts") },
+      { find: /^@myne\/presence-jump$/, replacement: sib("../src/notes/collab/presenceJump.ts") },
+      // The identity WIRE MIRROR (myne-md/myne#849 task 7). A pure type file with
+      // no imports, shared rather than retyped because it mirrors one Rust enum:
+      // a hand copy is how a variant the backend adds lands in the catch-all on
+      // one client only. Exact specifier, no wildcard (same reasoning as above).
+      { find: /^@myne\/resolved-identity$/, replacement: sib("../src/types/resolved-identity.ts") },
       // The shared ORNAMENT LAYER (myne#394) - the stylesheet a theme's ornament
       // selections resolve against, plus the role helper components declare
       // through. Wildcard rather than exact, because the CSS is a second entry

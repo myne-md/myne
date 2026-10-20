@@ -13,8 +13,9 @@
 //! `myne-core`; biometric stays desktop-only. `search` (MYS1) runs
 //! Rust-side (frontend-fed BM25), not TS-side.
 //!
-//! `sync` (MYND-458) is the mobile shim over `myne_core::plugins::sync` —
-//! ONE plugin, all fourteen commands, a single deny-by-default
+//! `sync` (MYND-458) is the mobile shim over `myne_core::plugins::sync`:
+//! ONE plugin over the whole shared roster (read `plugins/sync/mod.rs` for the
+//! count rather than a number here), behind a single deny-by-default
 //! `sync:default` capability entry (SYNC-15).
 
 // Agentic note editing over a remote provider (myne-md/myne#456). Registered
@@ -33,6 +34,12 @@ pub mod export;
 // resolves + creates + backup-excludes the export directory and sanitizes the
 // filename, so the WebView composes no path of its own.
 pub mod export_dir;
+// Live co-editing sessions (epic live-collab, `collab-editor-bridge`): a thin
+// `pub use myne_core::plugins::live::{commands, state}` + a local `init()`
+// registering the six commands the desktop registers. Deny-by-default
+// `live:default` capability; see `live/mod.rs` for why reachability was the
+// missing half on this client and what the `Slot::Unlocked` gate buys.
+pub mod live;
 // Knowledge-graph layout cache (MYG1, §9.19): a thin re-export wrapper over
 // `myne_core::plugins::graph_layout` — read/write of the encrypted
 // `vault.graph` node-position cache (Class 3, never synced/backed up).
@@ -82,13 +89,14 @@ pub mod secret_export;
 pub mod share_import;
 // MYS1 full-text search — a NEW local plugin (not a `myne-core` re-export): the
 // index engine lives in `myne_core::search`, but the mobile plugin that drives
-// it is frontend-fed (the WebView pushes the corpus down), so its two commands
+// it is frontend-fed (the WebView pushes the corpus down), so its commands
 // are defined locally in `search/mod.rs`.
 pub mod search;
 pub mod snapshots;
 // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync` — a thin
-// `pub use myne_core::plugins::sync::*` + a local `init()` registering all 14
-// commands. Deny-by-default `sync:default` capability; see `sync/mod.rs` for the
+// `pub use myne_core::plugins::sync::*` + a local `init()` registering the whole
+// shared roster (read `plugins/sync/mod.rs` for the count rather than a number
+// here: this comment said 14 long after the list had passed forty). Deny-by-default `sync:default` capability; see `sync/mod.rs` for the
 // R3 transport review-debt banner.
 pub mod sync;
 // Custom themes (MYT1, §9.21): a thin re-export wrapper over

@@ -708,7 +708,7 @@ pub(crate) fn notes_write_mutex() -> &'static Mutex<()> {
 /// always said so, but the body accepted uppercase `A`–`F` through
 /// `is_ascii_hexdigit` and the idea that one hash had two spellings is exactly
 /// the divergence R1.2 removed.
-fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
+pub(crate) fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
     protocol::hex::decode_lower(s)
 }
 

@@ -47,7 +47,7 @@ export async function writeMeetingSectionsToNote(
   const stamped = decoder.decode(
     patchUpdatedField(encoder.encode(next), new Date().toISOString()),
   );
-  await noteUpdate(noteId, stamped);
+  await noteUpdate(noteId, stamped, undefined, current);
   // The note's text changed → re-index (live, decrypt-free). Best-effort.
   void reindexNoteFromBody(noteId, stamped);
   // The settle half of the handshake: the meeting note is OPEN in a pane when

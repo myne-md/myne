@@ -69,6 +69,15 @@ pub enum LiveSessionCommandError {
     /// is scoped to text/markdown notes.
     #[error("live sessions do not apply to drawing notes")]
     DrawingNotApplicable,
+    /// The session's current whole markdown no longer matches the caller-declared
+    /// base (`expected_base_hash_hex` on
+    /// [`live_session_patch_frontmatter_from_host`]): something landed in the
+    /// session after the caller read it. **Nothing was written.** Serializes as
+    /// `{"kind":"BaseMismatch"}`, the same shape as
+    /// `NoteUpdateError::BaseMismatch`, so a caller's keep-both handling reads one
+    /// discriminator on either write path (myne-md/myne#849).
+    #[error("expected base mismatch")]
+    BaseMismatch,
     /// Entropy unavailable re-sealing the `NC05` blob.
     #[error("csprng unavailable")]
     Csprng,
@@ -96,6 +105,7 @@ pub fn live_session_error_kind(e: &LiveSessionCommandError) -> &'static str {
         LiveSessionCommandError::NotOnCharBoundary => "not_on_char_boundary",
         LiveSessionCommandError::OutOfBounds => "out_of_bounds",
         LiveSessionCommandError::NotOpen => "not_open",
+        LiveSessionCommandError::BaseMismatch => "base_mismatch",
         LiveSessionCommandError::DrawingNotApplicable => "drawing_not_applicable",
         LiveSessionCommandError::Csprng => "csprng",
         LiveSessionCommandError::Io { .. } => "io",
@@ -227,6 +237,42 @@ pub(crate) fn live_session_applies(session: &LiveSession) -> Result<(), LiveSess
 /// (frontmatter patched + body) through the session. Semantically an apply; task 6
 /// adds the reserved-region clamp, task 7 funnels the rename/move/delete writers
 /// here so exactly one change graph writes the note.
+///
+/// Two optional guards, checked in this order before anything is applied
+/// (myne-md/myne#849):
+///
+/// 1. `expected_base_hash_hex`: the lowercase or uppercase hex SHA-256 of the
+///    whole markdown the caller read. When the session's CURRENT whole markdown
+///    hashes differently, nothing is written and the answer is
+///    [`LiveSessionCommandError::BaseMismatch`], the keep-both signal. A malformed
+///    value skips the guard with a canary trace, the `note_update` rule: a bad
+///    hash is a frontend bug, and manufacturing a conflict from it is worse.
+/// 2. `base`: the text the caller's buffer was derived from. When it differs from
+///    the session's current text, the caller's buffer is stale (a live peer change
+///    or a pulled merge landed since), and replacing the session text with it would
+///    delete that change. So the caller's edits are rebased over the session's
+///    ([`merge_stale_save`](crate::plugins::live::compose::merge_stale_save))
+///    and the merged text goes down the whole-markdown path instead, which
+///    records only the caller's edits.
+///
+/// A merge whose diff is too large to compute line by line answers
+/// [`LiveSessionCommandError::BaseMismatch`] rather than placing the caller's
+/// edits approximately.
+///
+/// Returns the session's whole markdown right after the patch, read under the
+/// same lock hold as the apply, so nothing routed in during the flush is in it.
+/// It is NOT a mirror for an editor: when a merge ran it holds a peer's change
+/// the caller's buffer does not, so an editor that adopted it as its record of
+/// the session would hide that change from its merge drain (the clients record
+/// the text they SENT instead).
+// Eight parameters is one over clippy's budget, and the eighth is the pair of
+// OPTIONAL guards a three-way save carries (`expected_base_hash_hex`, `base`).
+// Bundling them would still leave seven plus the bundle, so the honest fix is
+// the allow beside a function that is the command's own seam: every argument is
+// a distinct thing the caller owns (host, vault slot, registry, hooks, filesystem,
+// note, text, guards) and packing them into a context struct would move the same
+// eight values one indirection away. The neighbours record the same trade.
+#[allow(clippy::too_many_arguments)]
 pub async fn live_session_patch_frontmatter_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
@@ -235,25 +281,78 @@ pub async fn live_session_patch_frontmatter_from_host(
     io: &dyn VaultIo,
     note_id: String,
     markdown: String,
-) -> Result<(), LiveSessionCommandError> {
+    expected_base_hash_hex: Option<String>,
+    base: Option<String>,
+) -> Result<String, LiveSessionCommandError> {
     let note_id = NoteId::parse(&note_id).map_err(|_| LiveSessionCommandError::InvalidNoteId)?;
     let note_id_str = note_id.to_string();
     let now = host.now_unix_millis();
+    let after = patch_session(
+        registry,
+        &note_id_str,
+        markdown,
+        expected_base_hash_hex.as_deref(),
+        base.as_deref(),
+        now,
+    )?;
+    flush_session(host, state, registry, hooks, io, &note_id_str).await?;
+    Ok(after)
+}
+
+/// The in-RAM half of [`live_session_patch_frontmatter_from_host`]: the
+/// expected-base guard, the stale-buffer merge and the whole-markdown apply,
+/// under ONE hold of the session lock so nothing lands in the session between
+/// the hash check and the write. Writes nothing to disk; the command flushes
+/// after it. On [`LiveSessionCommandError::BaseMismatch`] the session is left
+/// untouched. Returns the session's text after the apply, read in the same hold.
+pub(crate) fn patch_session(
+    registry: &LiveSessionRegistry,
+    note_id_str: &str,
+    markdown: String,
+    expected_base_hash_hex: Option<&str>,
+    base: Option<&str>,
+    now_millis: u64,
+) -> Result<String, LiveSessionCommandError> {
+    let expected = match expected_base_hash_hex {
+        None => None,
+        Some(h) => match crate::plugins::notes::commands::parse_base_hash_hex(h) {
+            Some(v) => Some(v),
+            None => {
+                tracing::error!(
+                    stage = "base_guard",
+                    outcome = "malformed_hash",
+                    "live_session_patch_frontmatter expected_base_hash_hex failed strict parse, guard skipped"
+                );
+                None
+            }
+        },
+    };
     // A durable frontmatter patch replaces the whole note text (the caller has
     // already re-derived the managed region, task 6), so it goes through the
     // whole-text update rather than the body-splice path.
-    match registry.with_note_mut(&note_id_str, |s| s.apply_body_markdown(&markdown, now)) {
-        None => return Err(LiveSessionCommandError::NotOpen),
-        Some(Ok(())) => {}
-        Some(Err(e)) => return Err(e.into()),
+    let applied = registry.with_note_mut(note_id_str, |s| {
+        let current = s.markdown()?;
+        if let Some(expected) = expected {
+            use sha2::{Digest, Sha256};
+            let current_hash: [u8; 32] = Sha256::digest(current.as_bytes()).into();
+            if current_hash != expected {
+                return Err(LiveSessionCommandError::BaseMismatch);
+            }
+        }
+        let target = match base {
+            Some(b) if b != current => {
+                crate::plugins::live::compose::merge_stale_save(b, &markdown, &current)
+                    .ok_or(LiveSessionCommandError::BaseMismatch)?
+            }
+            _ => markdown,
+        };
+        s.apply_body_markdown(&target, now_millis)?;
+        Ok(s.markdown()?)
+    });
+    match applied {
+        None => Err(LiveSessionCommandError::NotOpen),
+        Some(r) => r,
     }
-    // The flush owns the indexing (myne-md/myne#867): a live-owned note's save
-    // owes the same live-index side effects a stateless `note_update` performs,
-    // and `flush_live_session_to_dir` fires them for EVERY caller, so the editor
-    // save, the close and the sync cycle's post-pull merge are one mechanism
-    // rather than three copies.
-    flush_session(host, state, registry, hooks, io, &note_id_str).await?;
-    Ok(())
 }
 
 /// Feed a live-owned note's saved body into the live indexes: the same side
@@ -430,6 +529,30 @@ pub(crate) struct LiveIndexCtx<'a> {
     pub hooks: &'a Hooks,
 }
 
+/// Read the open session's whole current markdown (myne-md/myne#849). A live
+/// peer change is applied to the session WITHOUT a durable flush
+/// (`awareness::route_awareness_frame`), so the blob on disk can be behind the
+/// session, and a client that read a live note from disk and wrote it back
+/// through the session would delete the peer's edit. This is the read that
+/// cannot. [`LiveSessionCommandError::NotOpen`] when no session is open for the
+/// note, so the caller falls back to its ordinary disk read.
+///
+/// Holds no vault authority and takes no slot, like
+/// [`live_session_take_remote_splices_from_host`]: it reads the in-RAM registry
+/// only, and the registry is emptied by every vault-leaving hook
+/// (`live_session_teardown_on_lock`), so on a locked vault there is no session
+/// to read and the answer is `NotOpen`.
+pub fn live_session_read_from_host(
+    registry: &LiveSessionRegistry,
+    note_id: String,
+) -> Result<String, LiveSessionCommandError> {
+    let note_id = NoteId::parse(&note_id).map_err(|_| LiveSessionCommandError::InvalidNoteId)?;
+    match registry.with_note_mut(&note_id.to_string(), |s| s.markdown()) {
+        None => Err(LiveSessionCommandError::NotOpen),
+        Some(r) => r.map_err(Into::into),
+    }
+}
+
 /// Seal a session's document under the registry lock, write it OUTSIDE the lock
 /// (serialized with the sync pull's note write under `notes_write_mutex`, the §11.3
 /// linearizability point), then mark the heads durable and feed the live indexes.
@@ -541,6 +664,7 @@ pub async fn live_session_open<R: tauri::Runtime>(
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn live_session_patch_frontmatter<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, VaultRuntimeState>,
@@ -548,7 +672,9 @@ pub async fn live_session_patch_frontmatter<R: tauri::Runtime>(
     hooks: tauri::State<'_, crate::hooks::Hooks>,
     note_id: String,
     markdown: String,
-) -> Result<(), LiveSessionCommandError> {
+    expected_base_hash_hex: Option<String>,
+    base: Option<String>,
+) -> Result<String, LiveSessionCommandError> {
     live_session_patch_frontmatter_from_host(
         &crate::host::tauri_host::TauriHost::new(app),
         state.inner(),
@@ -557,6 +683,8 @@ pub async fn live_session_patch_frontmatter<R: tauri::Runtime>(
         &crate::vault_io::StdVaultIo,
         note_id,
         markdown,
+        expected_base_hash_hex,
+        base,
     )
     .await
 }
@@ -588,6 +716,15 @@ pub fn live_session_take_remote_splices(
     note_id: String,
 ) -> Result<Vec<crate::plugins::live::apply_local::LocalSplice>, LiveSessionCommandError> {
     live_session_take_remote_splices_from_host(registry.inner(), note_id)
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub fn live_session_read(
+    registry: tauri::State<'_, LiveSessionRegistry>,
+    note_id: String,
+) -> Result<String, LiveSessionCommandError> {
+    live_session_read_from_host(registry.inner(), note_id)
 }
 
 /// Record this device's local caret/selection for an open note so peers render its

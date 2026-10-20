@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { ornamentRole } from "@myne/ornaments";
 import { useTranslation } from "react-i18next";
 import { Icon, LIST_TOP } from "../../../../components";
+import { tappable } from "../../../a11y/tappable";
 
 /** Status-bar clearance for a top action bar: the real OS safe-area inset on
  *  device (viewport-fit=cover), or a floor tall enough to clear the iPhone
@@ -33,6 +34,8 @@ export function EditorTopBar({
   onToggleList,
   onContext,
   onMore,
+  peers,
+  onPresence,
   folder,
   busy,
 }: {
@@ -44,10 +47,18 @@ export function EditorTopBar({
   onContext: () => void;
   /** Note-actions ⋯ menu. Omitted for a brand-new (unsaved) note. */
   onMore?: () => void;
+  /** How many OTHER people are editing this note right now (myne-md/myne#849).
+   *  Zero or absent means the affordance is OMITTED rather than shown disabled
+   *  (`decisions.md` 2026-07-26: an offer the platform cannot honour is not
+   *  rendered), so being alone is the normal state and costs no chrome. */
+  peers?: number;
+  /** Open the presence roster. Required for the chip to appear at all. */
+  onPresence?: () => void;
   folder: string | null;
   busy: boolean;
 }) {
   const { t } = useTranslation();
+  const presence = peers !== undefined && peers > 0 && onPresence !== undefined;
   return (
     <div
       data-testid="editor.top-bar"
@@ -84,6 +95,47 @@ export function EditorTopBar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }}>
+        {presence && (
+          // Who is here (myne-md/myne#849 task 6): the mobile entry point to the
+          // presence roster. A count chip rather than an icon, because the useful
+          // fact on a phone is "two other people are in this note", and the chip
+          // appears only while that is true. `tappable` rather than one more raw
+          // button: this file already carries the primitive-adoption ratchet's
+          // count and a new raw element would grow it.
+          <span
+            {...tappable({ onActivate: onPresence, label: t("editor.chrome.presence.showList", { count: peers }) })}
+            data-testid="editor.presence-chip"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-1)",
+              // The touch floor, from the sheet the canon says to use rather than
+              // a per-component literal. `check-token-adoption.mjs` cannot see a
+              // height literal (its counted families are colour and
+              // radius/padding/gap/margin/font-size/weight), so nothing else would
+              // have caught this.
+              // In BOTH axes: a one-digit count is about 33px wide, and a touch
+              // target is a square floor rather than a height (myne-md/myne#849
+              // review, D6).
+              minHeight: "var(--m-touch)",
+              minWidth: "var(--m-touch)",
+              justifyContent: "center",
+              padding: "0 var(--space-2)",
+              // The small radius: `DESIGN.md` reserves the pill for status pills
+              // and inline editor chips, and this is a chip outside the editor.
+              borderRadius: "var(--radius-1)",
+              background: "var(--bg-2)",
+              color: "var(--fg-2)",
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--weight-semibold)",
+              cursor: "pointer",
+              flex: "none",
+            }}
+          >
+            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "var(--radius-pill)", background: "var(--accent)" }} />
+            {peers}
+          </span>
+        )}
         <button onClick={onContext} aria-label={t("editor.topBar.noteDetails")} style={chromeBtn}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
             <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />

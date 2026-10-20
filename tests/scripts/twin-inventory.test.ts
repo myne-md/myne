@@ -211,16 +211,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    // Then 125 to 126 for myne-md/myne: `src/hooks/useMemberVault.ts` is a new
-    // byte-identical pair, deliberately two files rather than one shared module
-    // because the answer it carries gates a destructive control on both clients.
-    expect(full.out).toContain("126 twin(s) discovered");
+    expect(full.out).toContain("132 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("126 twin(s) discovered");
+    expect(full.out).toContain("132 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -230,7 +227,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("126 twin(s) discovered");
+    expect(full.out).toContain("132 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -285,7 +282,33 @@ describe("check-twin-inventory", () => {
     // written. Byte-different and semantically identical, since the two files
     // differ in one doc paragraph and in nothing the comparison counts, which is
     // why this number moves and the drift ratchet's does not.
-    expect(full.out).toContain("126 twin(s) discovered");
+    //
+    // Then 125 to 129: myne-md/myne#849 (the mobile presence surface) adds FOUR
+    // pairs, and the shape splits two and two. Two are the by-now familiar
+    // `pub use myne_core` shim plus TS bindings twin, both `delegated` at entry
+    // time: the live-session plugin shim
+    // (`src-tauri/src/plugins/live/mod.rs` against its mobile twin) and the five
+    // command wrappers (`src/lib/live.ts` against `mobile/src/lib/live.ts`). The
+    // shim pair is the one this list has now seen three times and is worth
+    // stating again: `mobile/src-tauri/src/lib.rs` already MANAGED the
+    // `LiveSessionRegistry` and spawned the awareness supervisor while the plugin
+    // was registered nowhere, so the whole subsystem was wired and inert.
+    //
+    // The other two are not that shape, and each is a different kind of entry.
+    // `src/lib/identity.ts` against `mobile/src/lib/identity.ts` is a bindings
+    // twin whose desktop side had existed since `collab-provenance` task 2 and
+    // whose mobile side did not exist at all: the shared label rule had nothing
+    // to call on the phone, so every presence row there rendered the degraded
+    // device form with every gate green. And
+    // `src/platform/capabilities.ts` against
+    // `mobile/src/platform/capabilities.ts` is the roster's first pair whose
+    // verdict is `decision` BECAUSE the two differ: a capability descriptor
+    // answers "does THIS client provide X", so converging them would be the
+    // defect. It is in this list only because the mobile side is new; what the
+    // same change moved is the VOCABULARY (`Capability` and the keyed
+    // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
+    // phone answer the closed list at all.
+    expect(full.out).toContain("132 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -459,7 +482,21 @@ describe("check-twin-inventory", () => {
     // false for one file.
     expect(full.code).toBe(0);
     expect(full.out).not.toContain("have no verdict");
-    expect(ROSTER.length).toBe(126);
+    // 125 to 132: SIX pairs myne-md/myne#849 adds (the count also carries develop's
+    // +1, `src/hooks/useMemberVault.ts`, which landed while this branch was open).
+    // Four of the six are same-path pairs the
+    // sweep finds (the live plugin shim, the live transport, the identity binding,
+    // the capability descriptor, explained at the count assertion above), and TWO are
+    // cross-path pairs the sweep CANNOT see, which is the review round's finding
+    // rather than the feature's original state: the desktop presence roster
+    // (`WhoIsHereTab.tsx`) against the mobile sheet (`PresenceSheet.tsx`), and the two
+    // policy shims (`src/notes/liveNote.ts` against `mobile/src/lib/liveNote.ts`).
+    // Task 11's own What-to-build named both, and the first pass classified only what
+    // the sweep could see. They are in `CURATED_TWINS` now, which is where a pair at
+    // two different paths belongs. Kept as a second number on purpose rather than
+    // derived, because this one is what fails when an entry is added to the TREE
+    // without one being added here.
+    expect(ROSTER.length).toBe(132);
   });
 
   it("keeps `screen` narrow", () => {
@@ -478,7 +515,7 @@ describe("check-twin-inventory", () => {
     // independent judgement calls. The enumeration below is what actually holds
     // the line; this number only notices growth nobody argued for.
     const screens = ROSTER.filter((e) => e.verdict === "screen");
-    expect(screens.length).toBeLessThanOrEqual(12);
+    expect(screens.length).toBeLessThanOrEqual(13);
   });
 
   it("holds `screen` to its definition, not to its count", () => {
@@ -492,7 +529,12 @@ describe("check-twin-inventory", () => {
     //
     // Enumerated rather than pattern-matched. A regex over paths would be a
     // second rule that can drift from the first; a list of four cannot, and
-    // adding a fifth entry should cost a reviewer's argument.
+    // adding a fifth entry should cost a reviewer's argument. The fifth is
+    // myne-md/myne#849's: the desktop live-presence roster, whose mobile side is a
+    // bottom sheet rather than a right-panel tab, so the container is the
+    // per-client half while the store and the label rule are shared. The
+    // reviewer's argument is in the roster entry itself and in
+    // `CURATED_TWINS`.
     const screens = ROSTER.filter((e) => e.verdict === "screen").map((e) => e.a);
     expect(screens.sort()).toEqual([
       "src-tauri/src/main.rs", // host: binary entry point
@@ -500,6 +542,7 @@ describe("check-twin-inventory", () => {
       "src/components/settings/MemorySection.tsx", // surface: the memory management panel
       "src/main.tsx", // host: boot side-effect composition
       "src/notes/components/MemoryPopover.tsx", // surface: the in-chat memory roster
+      "src/notes/components/WhoIsHereTab.tsx", // surface: the presence roster (#849)
       "src/platform/core.ts", // host: the IPC entry point
       "src/platform/deepLink.ts", // host: deep-link registration
       "src/platform/event.ts", // host: backend-to-UI push

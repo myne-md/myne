@@ -117,9 +117,10 @@ export async function moveNoteToFolderWithoutRegistering(
   folder: string | null,
 ): Promise<string | null> {
   const norm = normalizeFolderPath(folder);
-  const withFolder = patchFolderField(enc.encode(await noteRead(id)), norm);
+  const current = await noteRead(id);
+  const withFolder = patchFolderField(enc.encode(current), norm);
   const bumped = patchUpdatedField(withFolder, new Date().toISOString());
-  await noteUpdate(id, dec.decode(bumped));
+  await noteUpdate(id, dec.decode(bumped), undefined, current);
   return norm;
 }
 
@@ -174,23 +175,27 @@ export function readNoteFlags(text: string): NoteFlags {
 // to trash/archive is not a content edit) — matches desktop trashNote/archiveNote.
 
 export async function trashNote(id: string): Promise<void> {
-  const cleared = patchArchivedField(enc.encode(await noteRead(id)), null);
+  const current = await noteRead(id);
+  const cleared = patchArchivedField(enc.encode(current), null);
   const trashed = patchTrashedField(cleared, new Date().toISOString());
-  await noteUpdate(id, dec.decode(trashed));
+  await noteUpdate(id, dec.decode(trashed), undefined, current);
 }
 
 export async function restoreNote(id: string): Promise<void> {
-  const restored = patchTrashedField(enc.encode(await noteRead(id)), null);
-  await noteUpdate(id, dec.decode(restored));
+  const current = await noteRead(id);
+  const restored = patchTrashedField(enc.encode(current), null);
+  await noteUpdate(id, dec.decode(restored), undefined, current);
 }
 
 export async function archiveNote(id: string): Promise<void> {
-  const cleared = patchTrashedField(enc.encode(await noteRead(id)), null);
+  const current = await noteRead(id);
+  const cleared = patchTrashedField(enc.encode(current), null);
   const archived = patchArchivedField(cleared, new Date().toISOString());
-  await noteUpdate(id, dec.decode(archived));
+  await noteUpdate(id, dec.decode(archived), undefined, current);
 }
 
 export async function unarchiveNote(id: string): Promise<void> {
-  const unarchived = patchArchivedField(enc.encode(await noteRead(id)), null);
-  await noteUpdate(id, dec.decode(unarchived));
+  const current = await noteRead(id);
+  const unarchived = patchArchivedField(enc.encode(current), null);
+  await noteUpdate(id, dec.decode(unarchived), undefined, current);
 }

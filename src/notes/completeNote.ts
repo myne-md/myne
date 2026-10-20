@@ -32,7 +32,17 @@ import { patchNoteCompletion } from "./completeNoteCore";
 // nothing that imported from here has to move.
 export { NotATaskNoteError, isTaskNote, type NoteCompletionIo } from "./completeNoteCore";
 
-const io = { readNote: noteRead, writeNote: noteUpdate };
+// One io per call, so the write carries the text ITS read returned as the merge
+// base (myne-md/myne#849 review round 5). While a live session owns the note a
+// peer edit can land between the read and the write, and a write with no base
+// replaces the session's text and deletes it.
+function ioForOneCall() {
+  let read: string | undefined;
+  return {
+    readNote: async (noteId: string) => (read = await noteRead(noteId)),
+    writeNote: (noteId: string, body: string) => noteUpdate(noteId, body, undefined, read),
+  };
+}
 
 /**
  * Mark a note-task complete by writing `done: <now>` (RFC 3339 UTC).
@@ -41,7 +51,7 @@ const io = { readNote: noteRead, writeNote: noteUpdate };
  * the timestamp.
  */
 export async function completeNote(noteId: string): Promise<void> {
-  await patchNoteCompletion(io, noteId, new Date().toISOString());
+  await patchNoteCompletion(ioForOneCall(), noteId, new Date().toISOString());
 }
 
 /**
@@ -49,5 +59,5 @@ export async function completeNote(noteId: string): Promise<void> {
  * by writing a falsy value, so a note is never left carrying `done: false`.
  */
 export async function uncompleteNote(noteId: string): Promise<void> {
-  await patchNoteCompletion(io, noteId, null);
+  await patchNoteCompletion(ioForOneCall(), noteId, null);
 }
