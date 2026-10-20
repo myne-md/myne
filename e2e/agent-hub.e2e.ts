@@ -81,7 +81,10 @@ async function sendAndDismiss(s: Session, message: string): Promise<void> {
   });
   await send.click();
   await s.waitForElement(testIdSelector("agentReview.screen"), { timeoutMs: 30_000 });
-  await (await s.byTestId("agentReview.close")).click();
+  // The card's exit is Reject all (myne-md/myne#894): the × was the one
+  // control that only dismissed the proposal, and rejecting everything IS
+  // dismissing it.
+  await (await s.byTestId("agentReview.rejectAll")).click();
   await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
 }
 

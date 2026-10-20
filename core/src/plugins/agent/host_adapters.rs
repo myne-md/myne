@@ -151,7 +151,14 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
         plaintext.push_str(&note.body);
         note_create_from_host(&self.host, self.state, &self.hooks, plaintext, &StdVaultIo)
             .await
-            .map_err(|_| AgentError::WriteFailed)
+            .map_err(|err| {
+                tracing::warn!(
+                    target: "myne_core::agent",
+                    event = "agent_create_refused",
+                    error_kind = crate::plugins::notes::commands::note_create_error_kind(&err)
+                );
+                AgentError::WriteFailed
+            })
     }
 
     async fn write_batch(&self, notes: Vec<(String, String)>) -> Result<(), AgentError> {
@@ -207,7 +214,18 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
                 updates,
             )
             .await
-            .map_err(|_| AgentError::WriteFailed)?;
+            .map_err(|err| {
+                // **The cause, before it is flattened** (myne-md/myne#894). The
+                // partition above is develop's; this arm keeps the diagnostic that
+                // landed with the review card, so one refused batch still names its
+                // `NoteBatchError` instead of collapsing ten refusals into one value.
+                tracing::warn!(
+                    target: "myne_core::agent",
+                    event = "agent_write_batch_refused",
+                    error_kind = crate::plugins::notes::commands::note_batch_error_kind(&err)
+                );
+                AgentError::WriteFailed
+            })?;
         }
 
         for (note_id, plaintext) in live {
@@ -221,7 +239,18 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
                 plaintext,
             )
             .await
-            .map_err(|_| AgentError::WriteFailed)?;
+            .map_err(|err| {
+                // The arm the live partition exists for, and the one the report
+                // behind this change most likely came from: without this line a
+                // refusal on the note the user had open reached the log only as the
+                // outer `write_failed` (myne-md/myne#894 review).
+                tracing::warn!(
+                    target: "myne_core::agent",
+                    event = "agent_live_write_refused",
+                    error_kind = crate::plugins::live::commands::live_session_error_kind(&err)
+                );
+                AgentError::WriteFailed
+            })?;
         }
         Ok(())
     }

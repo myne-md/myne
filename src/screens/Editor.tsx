@@ -202,7 +202,6 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 // rather than a panel because approval is a separate, attention-requiring act
 // and half the feature's other decisions rest on it being one.
 import { clearAgentForLock } from "../notes/agent/agentStore";
-import { AgentReviewTakeover } from "../notes/agent/components/AgentReviewTakeover";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
@@ -2533,21 +2532,12 @@ function EditorChrome({
             />
           </SidebarPane>
         )}
-        {/* Full-screen, self-gating, and deliberately NOT inside the pane above:
-            see the computation before `return` for the measurement behind it. */}
-        <AgentReviewTakeover
-          titleOf={(noteId) =>
-            resolverNotes.find((n) => n.noteUuid === noteId)?.title ?? null
-          }
-          // The folder a move row shows as its starting point. Resolved from the
-          // same list `titleOf` reads, so the two can never describe different
-          // notes (and `null` when the list does not know the note, which makes a
-          // move row show the destination alone rather than inventing a source).
-          folderOf={(noteId) =>
-            resolverNotes.find((n) => n.noteUuid === noteId)?.folder ?? null
-          }
-          onNotesWritten={notesWritten}
-        />
+        {/* The agent review is a card inside the transcript turn that proposed it
+            (myne-md/myne#894), mounted by `ConversationSurface`, so there is no
+            mount here. This block is what the deleted takeover used to occupy, and
+            it was left behind once by a rebase: `tsc` named it and nothing else
+            did, because a missing component in dead-looking JSX is still a
+            compile error. */}
       </div>
       {/* Sidebar toggles, floated into the editor's top corners (the title-bar
           row), level with the macOS traffic lights. Faded in focus mode. */}
@@ -5112,6 +5102,15 @@ function RightSidebar({
           <WhoIsHereTab />
         ) : null}
       </div>
+
+      {/* No agent review mount here any more (myne-md/myne#894). The review is a
+          card inside the transcript turn that proposed it, so it is mounted by
+          `ConversationSurface`, which is what puts it under the message the user
+          is reading rather than over the whole window, and what makes the
+          right-panel AI chat and the agent tab show the same surface. The idea
+          this comment used to carry is kept and relocated: the review is still
+          not a panel beside the work, and it is still not dismissable. It is now
+          simply where the work is. */}
 
       {/* Right-click menus (clone of the bottom-bar two-menu pattern). */}
       {tabMenu &&

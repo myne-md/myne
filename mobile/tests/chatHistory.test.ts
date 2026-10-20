@@ -114,6 +114,42 @@ describe("serializeTranscript / parseTranscript", () => {
     expect(parsed![1]!.agentSummary).toMatchObject({ runId: "r1", summary: "done" });
   });
 
+  it("carries a decided run's outcome, so a phone cannot strip it (myne-md/myne#894)", () => {
+    // Conversation files are synced Class-1, so a client that re-persisted a
+    // conversation without this field would strip the decision for every other
+    // client: the desktop's counts line would revert to "Proposed N changes" on a
+    // run that was decided somewhere else.
+    const turns = [
+      turn({
+        id: "b",
+        kind: "agent",
+        role: "assistant",
+        text: "",
+        agentSummary: {
+          runId: "r1",
+          summary: "done",
+          edits: 1,
+          newNotes: 0,
+          notesRead: 0,
+          iterations: 1,
+          charsOffDevice: null,
+          end: "finished",
+          outcome: "applied",
+        },
+      }),
+    ];
+    const parsed = parseTranscript(serializeTranscript(turns, "hi"));
+    expect(parsed![0]!.agentSummary).toMatchObject({ outcome: "applied" });
+    // An outcome a newer desktop learns first is dropped rather than refused: a
+    // hydrate is not the place to reject a conversation over a field we do not
+    // render.
+    const raw = JSON.parse(serializeTranscript(turns, "hi"));
+    raw.turns[0].agentSummary.outcome = "shelved";
+    expect(
+      parseTranscript(JSON.stringify(raw))![0]!.agentSummary.outcome,
+    ).toBeUndefined();
+  });
+
   it("fails closed on anything malformed", () => {
     expect(parseTranscript("not json")).toBeNull();
     expect(parseTranscript("{}")).toBeNull();

@@ -1,20 +1,23 @@
 // @vitest-environment jsdom
 //
-// Refusals are lifted out of the diff and stated above the run's own summary,
-// with a count (myne-md/myne#848).
+// Refusals, and where they are read (myne-md/myne#848, re-homed by
+// myne-md/myne#894's review).
 //
-// **This is the test the review said did not exist, and the reason recorded for
-// its absence was wrong**: the store does expose the setter (`settleApply`), and
-// another suite already drives it. Both acceptance criteria here are claims about
-// POSITION and COUNT, and neither was checked anywhere, so deleting the block
-// failed nothing.
+// **The property never moved; the surface that can hold it did.** The rule is that
+// the host's fact must not be read after the model's claim in the order that
+// flatters the model. It was the review card's first body region, which worked
+// while the card rendered the summary too. The card is now a decision surface and
+// the model's prose lives on the transcript turn, so a block inside the card would
+// sit UNDER the prose: exactly the misreading the rule exists to prevent. So the
+// block renders in the turn, above the answer (`ConversationSurface`), and the
+// ordering assertion lives where both halves are siblings
+// (`tests/components/AgentPane.test.tsx`, which drives a real transcript).
 //
-// Asserted on DOM order rather than on the JSX source, because the source order
-// is what the criterion is about and a refactor that moved the block below the
-// summary would keep the source reading correctly.
+// What this file still owns, since the block is exported and used by the turn: how
+// it renders, and the negative that the card does NOT carry a second copy.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -23,8 +26,8 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-import type { ProposedEdit } from "../../src/lib/agent-run";
-import { AgentReview } from "../../src/screens/AgentReview";
+import type { AgentApplyResult, ProposedEdit } from "../../src/lib/agent-run";
+import { AgentReview, RefusalBlock } from "../../src/screens/AgentReview";
 import {
   beginRun,
   clearAgentForLock,
@@ -38,6 +41,16 @@ const MOVE: ProposedEdit = {
   kind: "move",
   anchor: "",
   replacement: "Private",
+};
+
+/** An apply that refused its one edit. */
+const REFUSED: AgentApplyResult = {
+  applied: 0,
+  refused: [{ noteId: "n1", index: 0, reason: "moveIntoExcludedFolder" }],
+  refusedNewNotes: [],
+  notesWritten: [],
+  notesCreated: [],
+  restorePoints: [],
 };
 
 function settleWith(edits: ProposedEdit[]) {
@@ -57,18 +70,14 @@ function settleWith(edits: ProposedEdit[]) {
   );
 }
 
-function applyWithRefusals() {
-  settleApply(
-    {
-      applied: 0,
-      refused: [{ noteId: "n1", index: 0, reason: "moveIntoExcludedFolder" }],
-      refusedNewNotes: [],
-      notesWritten: [],
-      notesCreated: [],
-      restorePoints: [],
-    },
-    [],
-    currentRunEpoch(),
+function mountCard() {
+  render(
+    <AgentReview
+      onClose={() => {}}
+      onNotesWritten={() => {}}
+      titleOf={() => "Note"}
+      folderOf={() => null}
+    />,
   );
 }
 
@@ -77,95 +86,9 @@ afterEach(() => {
   clearAgentForLock();
 });
 
-/** A run whose summary is long enough to clamp. */
-function settleWithLongSummary() {
-  beginRun(null);
-  settleStep(
-    {
-      view: {
-        runId: "run-1",
-        scopeTotal: 1,
-        userGrants: 1,
-        modelGrants: 0,
-        cancelled: false,
-      },
-      proposal: {
-        edits: [MOVE],
-        newNotes: [],
-        summary: "moved it ".repeat(40),
-      },
-      end: { kind: "finished" },
-      iterations: 1,
-      notesRead: 1,
-      charsOffDevice: null,
-      excludedCount: 0,
-      memoryUpdated: 0,
-    },
-    currentRunEpoch(),
-  );
-}
-
-describe("the summary is clamped, and can be opened", () => {
-  it("clamps a long one behind a disclosure", () => {
-    // myne-md/myne#848, on the user's read: "too much of a top text… this should
-    // be only something about the diff". A run that moved twenty-three notes
-    // answers with the whole itinerary, and a wall of prose above the diff makes
-    // the diff the small print.
-    settleWithLongSummary();
-    render(
-      <AgentReview
-        onClose={() => {}}
-        onNotesWritten={() => {}}
-        titleOf={() => "Note"}
-        folderOf={() => null}
-      />,
-    );
-    const summary = screen.getByTestId("agentReview.summary");
-    expect(summary.getAttribute("data-clamped")).toBe("true");
-    expect(summary.style.webkitLineClamp).toBe("3");
-    // The model's claim is still ON SCREEN, which is the half a hide would lose:
-    // the paragraph above argues a refusal has to be able to contradict it.
-    expect(summary.textContent).toContain("moved it");
-  });
-
-  it("reveals the whole thing on the disclosure", () => {
-    settleWithLongSummary();
-    render(
-      <AgentReview
-        onClose={() => {}}
-        onNotesWritten={() => {}}
-        titleOf={() => "Note"}
-        folderOf={() => null}
-      />,
-    );
-    fireEvent.click(screen.getByTestId("agentReview.summary-toggle"));
-    const summary = screen.getByTestId("agentReview.summary");
-    expect(summary.getAttribute("data-clamped")).toBeNull();
-    expect(summary.style.webkitLineClamp).toBe("");
-  });
-
-  it("offers no disclosure over a summary that fits", () => {
-    // A control that reveals what is already visible is a control that does
-    // nothing, and the short summary is the common case for a question.
-    settleWith([MOVE]);
-    render(
-      <AgentReview
-        onClose={() => {}}
-        onNotesWritten={() => {}}
-        titleOf={() => "Note"}
-        folderOf={() => null}
-      />,
-    );
-    expect(screen.getByTestId("agentReview.summary").getAttribute("data-clamped")).toBeNull();
-    expect(screen.queryByTestId("agentReview.summary-toggle")).toBeNull();
-  });
-});
-
 describe("the refusal block", () => {
   it("states the count and the reason", () => {
-    settleWith([MOVE]);
-    applyWithRefusals();
-    render(<AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} folderOf={() => null} />);
+    render(<RefusalBlock result={REFUSED} />);
     expect(screen.getByTestId("agentReview.refusedCount").textContent).toContain(
       "agent.review.refusedCount:1",
     );
@@ -174,41 +97,77 @@ describe("the refusal block", () => {
     );
   });
 
-  it("sits ABOVE the run's own summary, so the summary cannot describe work that was not done", () => {
-    settleWith([MOVE]);
-    applyWithRefusals();
-    render(<AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} folderOf={() => null} />);
-    const block = screen.getByTestId("agentReview.refusedBlock");
-    const summary = screen.getByTestId("agentReview.summary");
-    const blockIsAbove =
-      (block.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    expect(blockIsAbove, "the refusal block fell below the summary").toBe(true);
+  it("counts refused settings in the same sentence", () => {
+    // **All three kinds, counted together** (from an earlier review): a refused
+    // setting once rendered a block reading "0 changes could not be applied" above
+    // a list with an entry in it, and the row for that same change said "Applied".
+    render(
+      <RefusalBlock
+        result={{
+          ...REFUSED,
+          refusedSettings: [{ intentId: "editor.weekly-notes-folder", index: 0, reason: "writeFailed" }],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("agentReview.refusedCount").textContent).toContain(
+      "agent.review.refusedCount:2",
+    );
   });
 
-  it("keeps the summary on screen when every change was refused", () => {
-    // The point is to CONTRADICT the summary, not to hide it: a run whose moves
-    // were all refused still shows what the model said it did.
+  it("is NOT rendered by the card, so the prose above it stays first", () => {
     settleWith([MOVE]);
-    applyWithRefusals();
-    render(<AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} folderOf={() => null} />);
-    expect(screen.getByTestId("agentReview.summary")).toBeTruthy();
+    mountCard();
+    act(() => {
+      settleApply(REFUSED, [], currentRunEpoch());
+    });
+    expect(screen.queryByTestId("agentReview.refusedBlock")).toBeNull();
   });
 
-  it("renders no block when nothing was refused", () => {
+  it("leaves every refused row actionable", () => {
+    // A refused row is not in `appliedEdits`, so it stays in the proposal with its
+    // own Reject: the reader can resolve it rather than staring at a refusal they
+    // cannot act on.
     settleWith([MOVE]);
-    settleApply(
+    mountCard();
+    act(() => {
+      settleApply(REFUSED, [], currentRunEpoch());
+    });
+    expect(screen.getByTestId("agentReview.edit")).toBeTruthy();
+    expect(screen.getByTestId("agentReview.toggleEdit")).toBeTruthy();
+  });
+});
+
+describe("the model's summary is not in the card", () => {
+  it("does not render it, however long it is", () => {
+    // **The other half of the ordering rule.** The summary is the model's claim;
+    // the card is the host's account of what would be and was written. Keeping the
+    // claim out of the decision surface is what makes "the refusal cannot be read
+    // after the thing it contradicts" true by construction rather than by DOM
+    // order inside one component. It is NOT hidden from the user: the turn that
+    // owns the card renders it as `ai.agent-answer`, with its note mentions
+    // clickable.
+    beginRun(null);
+    settleStep(
       {
-        applied: 1,
-        refused: [],
-        refusedNewNotes: [],
-        notesWritten: ["n1"],
-        notesCreated: [],
-        restorePoints: [["n1", "s1"]],
+        view: {
+          runId: "run-1",
+          scopeTotal: 1,
+          userGrants: 1,
+          modelGrants: 0,
+          cancelled: false,
+        },
+        proposal: { edits: [MOVE], newNotes: [], summary: "moved it ".repeat(80) },
+        end: { kind: "finished" },
+        iterations: 1,
+        notesRead: 1,
+        charsOffDevice: null,
+        excludedCount: 0,
+        memoryUpdated: 0,
       },
-      [0],
       currentRunEpoch(),
     );
-    render(<AgentReview onClose={() => {}} onNotesWritten={() => {}} titleOf={() => null} folderOf={() => null} />);
-    expect(screen.queryByTestId("agentReview.refusedBlock")).toBeNull();
+    mountCard();
+    const card = screen.getByTestId("agentReview.screen");
+    expect(card.textContent).not.toContain("moved it");
   });
 });

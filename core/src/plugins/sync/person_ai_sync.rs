@@ -46,7 +46,7 @@ use crate::host::HostCtx;
 use crate::plugins::chats::commands::ChatsCatalogMap;
 use crate::plugins::memory::commands::{MemoryCatalogMap, PersonalityView};
 use crate::plugins::sync::conflict::{
-    merge_chats_catalog, merge_chats_turns, merge_memory_catalog,
+    merge_chats_catalog, merge_chats_turns, merge_memory_catalog, merge_turn_content,
 };
 use crate::plugins::sync::person_ai_store::{
     decode_person_ai_state, encode_person_ai_state, lock_write, person_ai_is_private,
@@ -444,38 +444,55 @@ fn merge_one_conversation(
 
     let (local_ids, local_turns, local_title) = turns_of(&local_plain)?;
     let (remote_ids, remote_turns, remote_title) = turns_of(&remote_plain)?;
-    if local_ids == remote_ids {
-        // Same turn ids: the local body is authoritative (settled turns are
-        // immutable); keep it verbatim.
-        return Ok(Some(local_hex.to_string()));
-    }
+    // **No early return on equal id lists any more** (myne-md/myne#894). It read
+    // "same turn ids, so the local body is authoritative (settled turns are
+    // immutable)", which is true for every field except the monotone decision
+    // marker: two devices can hold the same id with and without it, and the early
+    // return dropped the decision on the floor. The tail of this function already
+    // reuses an existing sealed body when the merge equals it, so nothing churns
+    // when the sides really do agree.
     let merged_ids = merge_chats_turns(&local_ids, &remote_ids);
-    let mut by_id: std::collections::HashMap<&str, &serde_json::Value> =
+    let mut local_by_id: std::collections::HashMap<&str, &serde_json::Value> =
         std::collections::HashMap::new();
     for (id, obj) in local_ids.iter().zip(local_turns.iter()) {
-        by_id.insert(id.as_str(), obj);
+        local_by_id.insert(id.as_str(), obj);
     }
+    let mut remote_by_id: std::collections::HashMap<&str, &serde_json::Value> =
+        std::collections::HashMap::new();
     for (id, obj) in remote_ids.iter().zip(remote_turns.iter()) {
-        by_id.entry(id.as_str()).or_insert(obj);
+        remote_by_id.insert(id.as_str(), obj);
     }
     let merged_turns: Vec<serde_json::Value> = merged_ids
         .iter()
         .map(|id| {
-            by_id
-                .remove(id.as_str())
-                .cloned()
-                .unwrap_or(serde_json::Value::Null)
+            match (
+                local_by_id.remove(id.as_str()),
+                remote_by_id.remove(id.as_str()),
+            ) {
+                (Some(l), Some(r)) => merge_turn_content(l, r),
+                (Some(l), None) => l.clone(),
+                (None, Some(r)) => r.clone(),
+                (None, None) => serde_json::Value::Null,
+            }
         })
         .collect();
     let merged_title = local_title.or(remote_title);
     let payload = payload_with_title(merged_turns, merged_title);
     let merged_plain = serde_json::to_vec(&payload).map_err(|_| ())?;
 
-    // Reuse an existing sealed body when it already IS the merged state.
-    if merged_plain.as_slice() == local_plain.as_slice() {
+    // Reuse an existing sealed body when it already IS the merged state, compared
+    // as PARSED values rather than as bytes (myne-md/myne#894 review). `serde_json`
+    // is default-featured, so its object map is a `BTreeMap` and `to_vec` emits
+    // sorted keys, while the body it is compared against is written by the
+    // frontend as `JSON.stringify` in insertion order. The two can never be
+    // byte-equal, so a byte comparison would re-seal and re-push on every merge
+    // that the deleted equal-id fast path used to answer verbatim, which is the
+    // nonce churn the §10.3 clause exists to stop. The orchestrator's twin already
+    // compares values for this reason.
+    if serde_json::from_slice::<serde_json::Value>(&local_plain).is_ok_and(|v| v == payload) {
         return Ok(Some(local_hex.to_string()));
     }
-    if merged_plain.as_slice() == remote_plain.as_slice() {
+    if serde_json::from_slice::<serde_json::Value>(&remote_plain).is_ok_and(|v| v == payload) {
         return Ok(Some(remote_hex.to_string()));
     }
     let blob =

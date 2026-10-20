@@ -37,6 +37,7 @@ import {
   hydrateChatTurns,
   setActiveConversationId,
   setChatPersister,
+  type AgentRunOutcome,
   type AgentTurnSummary,
   type ChatTurn,
 } from "./chatStore";
@@ -178,6 +179,15 @@ function parseAgentSummary(raw: unknown): { agentSummary: AgentTurnSummary } | n
   }
   if (typeof raw["durationMillis"] === "number" && Number.isFinite(raw["durationMillis"])) {
     out.durationMillis = raw["durationMillis"];
+  }
+  // **And now `outcome`, which is the failure this comment predicted**
+  // (myne-md/myne#894, from the review). The counts line reads it, so dropping it
+  // here sent a decided run back to "Proposed N changes" after any lock or
+  // reload, asserting an actionable state for a run that was dropped and has no
+  // re-apply affordance. Two arms only: anything else is not a decision this
+  // client can name, and the field is optional.
+  if (raw["outcome"] === "applied" || raw["outcome"] === "rejected") {
+    out.outcome = raw["outcome"];
   }
   if (isRecord(raw["proposal"])) {
     const proposal = raw["proposal"];
@@ -635,6 +645,39 @@ export async function settleTurnInConversation(
   } catch {
     // Unreachable in practice (a conversation created moments ago reads back),
     // and the fallback is doing nothing.
+  }
+}
+
+/**
+ * Write a run's decision into the conversation the RUN started in.
+ *
+ * The active-transcript path (`markAgentTurnOutcome`) only sees the conversation
+ * on screen, and the decision arrives after `await agentApply(...)`, so a reader
+ * who switched conversations during that round trip used to lose the decision
+ * while the notes were already on disk (myne-md/myne#894 review). This is the
+ * same routing `settleTurnInConversation` uses for a settle, applied to the one
+ * field a settled turn can gain.
+ */
+export async function markOutcomeInConversation(
+  id: string,
+  runId: string,
+  outcome: AgentRunOutcome,
+): Promise<void> {
+  try {
+    const payload = await chatsRead(id);
+    const turns = parseTranscript(payload);
+    if (turns === null) return;
+    const next = chatReducer(
+      { turns, streaming: false },
+      { type: "AGENT_OUTCOME", runId, outcome },
+    );
+    // The reducer returns the same array when nothing matched (the turn is not in
+    // this conversation), and an append of identical turns is a wasted write.
+    if (next.turns === turns) return;
+    await chatsAppendTurn(id, serializeTranscript(next.turns));
+  } catch {
+    // Best effort by design: the notes are written either way, and a failure here
+    // leaves the transcript reading "proposed" rather than corrupting it.
   }
 }
 

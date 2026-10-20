@@ -25,6 +25,39 @@ const SRC: string = readFileSync(
   "utf8",
 );
 
+describe("PaneView tells the sidebar an apply wrote something", () => {
+  // **The handler whose absence was a user report** (myne-md/myne#894: "I
+  // approved the move and the sidebar did not follow it"). It arrived as two
+  // props at a call site, which is the shape nothing asserts: the pane rendered
+  // correctly without them, the apply wrote through the backend, and a moved
+  // note sat under its OLD folder. Round 1 of the review found the fix pinned by
+  // nothing (emptying its body left every suite green), so the two props and the
+  // two calls they carry are asserted here, in the same source-check style as the
+  // `folders` case above and for the same reason.
+
+  it("passes onNotesWritten and onRunUndone to AgentPane", () => {
+    const at = SRC.indexOf("<AgentPane");
+    expect(at, "the agent pane is not mounted here any more").toBeGreaterThan(-1);
+    const el = SRC.slice(at, at + 1500);
+    expect(el, "AgentPane is mounted without onNotesWritten").toContain(
+      "onNotesWritten=",
+    );
+    expect(el, "AgentPane is mounted without onRunUndone").toContain(
+      "onRunUndone=",
+    );
+  });
+
+  it("reloads the open pane and re-reads every note the apply changed", () => {
+    const at = SRC.indexOf("const agentNotesWritten = useCallback(");
+    expect(at, "the handler is gone").toBeGreaterThan(-1);
+    const body = SRC.slice(at, at + 400);
+    expect(body, "the open pane is never reloaded").toContain(
+      "ctx.reloadOpenNote()",
+    );
+    expect(body, "no note's sidebar slice is re-read").toContain("ctx.refreshOne(");
+  });
+});
+
 describe("PaneView hands the agent pane a scope to offer", () => {
   it("passes folders to AgentPane", () => {
     const at = SRC.indexOf("<AgentPane");

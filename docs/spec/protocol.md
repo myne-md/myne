@@ -2938,16 +2938,18 @@ either order):
   `role` (`"user"` or `"assistant"`), `text` (as authored, possibly empty on
   a failed turn), `error` (bool), `errorCause`, `insertable` (bool),
   `answeredBy`, `scopeLabel` (string), and `agentSummary` (object with the
-  frozen counts, `charsOffDevice`, the closed `end` tag, and the frozen
-  `proposal` payload of anchors/replacements, persisted verbatim and
-  READ-ONLY in history; no historical re-apply exists anywhere in the client
-  surface). Field names are the writer's camelCase verbatim: a second
+  frozen counts, `charsOffDevice`, the closed `end` tag, the optional monotone
+  `outcome`, and the frozen `proposal` payload of anchors/replacements,
+  persisted verbatim and READ-ONLY in history; no historical re-apply exists
+  anywhere in the client surface). Field names are the writer's camelCase verbatim: a second
   implementation MUST NOT re-derive snake_case forms (`answered_by`,
   `scope_label`, `agent_summary`), which no shipped writer emits and no
   reader accepts as aliases.
 - `title_derived_from` (string): the derivation **input** snapshot (the first user turn's first 48 Unicode scalar values, newlines stripped). It records what the host (or a local model, when one is installed) derived a title from, so a manual rename stays detectable as a divergence from that input. It is deliberately **not** a re-derivation key: the host's truncation title is a pure function of it, but a title produced by a local model is not reproducible from the input alone (the model may be absent on the next device, and its output is not byte-stable), and this field MUST NOT be read as promising otherwise. Informational either way: readers that do not derive titles ignore it.
 
-Turns are **immutable once settled**: the write path is append-at-finalize (a turn is persisted the moment its stream closes, its run settles, or it fails, including the partial text of an interrupted stream), and no turn is ever rewritten in place. The `version` counter that sync races on lives in the catalog record (§9.23), not in this file: a conversation file is content-addressed by its id and pushed whenever its bytes change, while causal ordering is the catalog's job.
+Turns are **immutable once settled**, with **one monotone exception**: an agent turn's decision marker. The write path is append-at-finalize (a turn is persisted the moment its stream closes, its run settles, or it fails, including the partial text of an interrupted stream), and no turn is ever rewritten in place except the monotone decision marker described next.
+
+The exception is `agentSummary.outcome` (`"applied"` | `"rejected"`, optional), added by myne-md/myne#894. The reader decides AFTER the run's turn has settled and is on the transcript, so the decision cannot ride the settle that wrote the turn, and the transcript is its only home (the run itself is dropped once it is decided). The field is **monotone**: it goes from absent to one of the two values and is never unset or changed, and a reader that does not know the field drops it on its next write rather than preserving it, so a decision survives a mixed-version fleet only while an updated writer still holds a copy. That monotonicity is what makes the exception safe for sync: the merge prefers the DECIDED copy of a turn in whichever direction it arrived (`sync-protocol.md` §10.2.5). The DECIDED SET is closed: the two values above, and any other value counts as UNDECIDED, because that is exactly what every shipped reader does with it. Two copies that disagree are resolved by a fixed order on the value (`applied` before `rejected`), which is what makes decided-wins commutative, idempotent and associative for every input rather than only for the reachable one, so the append-ordered merge's convergence property is unchanged. Every other field of a settled turn remains immutable. The `version` counter that sync races on lives in the catalog record (§9.23), not in this file: a conversation file is content-addressed by its id and pushed whenever its bytes change, while causal ordering is the catalog's job.
 
 #### 9.24.3 AAD construction
 

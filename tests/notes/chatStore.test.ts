@@ -27,7 +27,7 @@ describe("chatReducer", () => {
     const out = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "hello",
       insertable: false,
     });
@@ -41,7 +41,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "hi",
       insertable: false,
     });
@@ -74,7 +74,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "q",
       insertable: false,
     });
@@ -90,7 +90,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "q",
       insertable: false,
     });
@@ -103,7 +103,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "q",
       insertable: false,
     });
@@ -118,7 +118,7 @@ describe("chatReducer", () => {
     const sent = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "q",
       insertable: false,
     });
@@ -221,7 +221,7 @@ describe("an ask terminal may not close an agent run's turn", () => {
     let s = chatReducer(CHAT_INITIAL, {
       type: "SEND",
       userId: "u1",
-      assistantId: "a1",
+      agentId: "a1",
       text: "what is this note about",
       insertable: false,
     });
@@ -470,5 +470,60 @@ describe("a settled turn freezes its proposal", () => {
       },
     });
     expect(s.turns[1]!.agentSummary!.proposal).toBeUndefined();
+  });
+});
+
+describe("a decision survives a later settle (myne-md/myne#894)", () => {
+  it("keeps the outcome when AGENT_SETTLE arrives after it", () => {
+    // **The second writer of the field, and the arm that was missing a guard.**
+    // `AGENT_SETTLE` replaces the summary wholesale, and `settleTurnInConversation`
+    // (the hydrate path in `chatPersist.ts`) applies one read from the conversation
+    // FILE, asynchronously, so a reader who decides a run while that read-to-write
+    // is in flight had the decision overwritten on disk. The spec says the marker
+    // is monotone and the merge rests on that; one arm short, it was not.
+    const summary = {
+      runId: "r1",
+      summary: "",
+      edits: 1,
+      newNotes: 0,
+      notesRead: 1,
+      iterations: 1,
+      charsOffDevice: null,
+      end: "finished" as const,
+    };
+    let state = chatReducer(CHAT_INITIAL, {
+      type: "AGENT_SEND",
+      userId: "u1",
+      agentId: "a1",
+      task: "tidy this",
+      scopeLabel: "This note",
+    });
+    state = chatReducer(state, { type: "AGENT_SETTLE", summary });
+    state = chatReducer(state, {
+      type: "AGENT_OUTCOME",
+      runId: "r1",
+      outcome: "rejected",
+    });
+    expect(state.turns[1]!.agentSummary!.outcome).toBe("rejected");
+
+    state = chatReducer(state, { type: "AGENT_SETTLE", summary });
+    expect(
+      state.turns[1]!.agentSummary!.outcome,
+      "a later settle must not unset a decision",
+    ).toBe("rejected");
+
+    // And a settle that DOES carry one still lands when the turn has none.
+    const fresh = chatReducer(CHAT_INITIAL, {
+      type: "AGENT_SEND",
+      userId: "u1",
+      agentId: "a1",
+      task: "tidy this",
+      scopeLabel: "This note",
+    });
+    const settled = chatReducer(fresh, {
+      type: "AGENT_SETTLE",
+      summary: { ...summary, outcome: "applied" },
+    });
+    expect(settled.turns[1]!.agentSummary!.outcome).toBe("applied");
   });
 });

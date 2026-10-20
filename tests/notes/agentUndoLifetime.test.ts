@@ -119,9 +119,8 @@ describe("a step that lands after the vault was left", () => {
     // The case with no host-side remedy: `beginRun(null)` nulls `view` and only a
     // settled step sets it, so for the whole first leg the run is working and
     // has no id to cancel with. Without the bump in `clearAgent` the reply
-    // landed afterwards, put the proposal's verbatim anchors back, and made
-    // `AgentReviewTakeover`'s derived `reviewable` true: a full-screen review
-    // of a conversation the user had just deleted.
+    // landed afterwards, put the proposal's verbatim anchors back, and opened a
+    // review card over a conversation the user had just deleted.
     beginRun(null);
     const epoch = currentRunEpoch();
     clearAgent();

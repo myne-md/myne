@@ -35,7 +35,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Icon } from "../../../components/primitives/Icon";
+import { StatusMark } from "../../../components/Spinner";
 import { IconButton } from "../../../components/primitives/IconButton";
 import { RunCostLine } from "./RunCostLine";
 
@@ -152,18 +152,30 @@ export function AgentFootprint({
   return (
     <div data-testid="agentFootprint" data-settled={settledLabel !== null}>
       <div style={LINE_STYLE}>
-        <span
-          aria-hidden="true"
-          style={{ display: "inline-flex" }}
-          // The wave rides the ICON and the status together, so the line reads
-          // as one breathing thing rather than a still label beside a moving
-          // glyph. `data-motion="essential"` is the repo's opt-in for motion
-          // that CARRIES STATE: under reduced motion it slows rather than
-          // freezing, because a frozen "Working" reads as hung.
-          className={working ? "myne-working-wave" : undefined}
-          data-motion={working ? "essential" : undefined}
-        >
-          <Icon name={working ? "bot" : failed ? "circle-alert" : "check"} size={12} />
+        <span style={{ display: "inline-flex" }}>
+          {/* **The status mark, and it SPINS while the run works**
+              (myne-md/myne#894, second pass: "the working thing does not turn").
+              `StatusMark` is the repo's own inline status mark, a named icon at
+              12px, wrapped in `.myne-spinner` when `spinning`, so the rotation
+              and its MYND-630 reduced-motion carve-out (half speed rather than
+              frozen, because a spinner stopped mid-turn reads as hung) come from
+              the primitive rather than from a private keyframe here.
+
+              The wave is on the LABEL only now: two motions on one 12px mark
+              fight each other, and of the two, the turn is the one that says
+              "work is happening". The glyph stays non-rotating once the run has
+              settled (`check` / `circle-alert`), which is the same state-not-shape
+              rule the primitive states.
+
+              `label={null}` because the sentence beside it already says the
+              state aloud. */}
+          <StatusMark
+            name={working ? "loader-circle" : failed ? "circle-alert" : "check"}
+            label={null}
+            spinning={working}
+            tone={working ? "accent" : "muted"}
+            testId="agentFootprint.mark"
+          />
         </span>
         <span
           data-testid="agentFootprint.status"

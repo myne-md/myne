@@ -29,8 +29,11 @@ import {
   getActiveConversationId,
   getChat,
   getPendingAnchorFolderId,
+  markAgentTurnOutcome,
   sendAgentTurn,
+  setChatPersister,
   sendChatMessage,
+  settleAgentTurn,
   setActiveConversationId,
   setPendingAnchorFolderId,
   setPendingAnchorNoteId,
@@ -179,6 +182,43 @@ describe("serializeTranscript", () => {
     });
   });
 
+  it("carries a decided run's outcome through the round trip", () => {
+    // **The field the counts line reads, dropped on every hydrate** (myne-md/myne#894,
+    // from review). `parseAgentSummary` rebuilds the summary from a known field
+    // list, so a field it does not name is silently lost, which is the failure the
+    // function's own comment records for `memoryUpdated`: a decided run went back
+    // to "Proposed N changes" after any lock, asserting an actionable state for a
+    // run that had been dropped.
+    const turns = [
+      turn({
+        id: "b",
+        kind: "agent",
+        role: "assistant",
+        agentSummary: {
+          runId: "r1",
+          summary: "done",
+          edits: 1,
+          newNotes: 0,
+          notesRead: 0,
+          iterations: 1,
+          charsOffDevice: null,
+          end: "finished",
+          outcome: "rejected",
+        },
+        scopeLabel: "This note",
+      }),
+    ];
+    const parsed = parseTranscript(serializeTranscript(turns));
+    expect(parsed![0]!.agentSummary!.outcome).toBe("rejected");
+    // And an unrecognised value is dropped rather than carried through as a third
+    // outcome no other client can name.
+    const raw = JSON.parse(serializeTranscript(turns));
+    raw.turns[0].agentSummary.outcome = "maybe";
+    expect(
+      parseTranscript(JSON.stringify(raw))![0]!.agentSummary!.outcome,
+    ).toBeUndefined();
+  });
+
   it("carries the title-derivation snapshot from the first turn", () => {
     const raw = serializeTranscript([
       turn({ id: "a", role: "user", text: "help me with taxes please" }),
@@ -294,6 +334,64 @@ describe("persist on settle", () => {
     expect(call[2]).toBe("note-1");
     // At most one anchor: a note-anchored conversation is not also folder-scoped.
     expect(call[3]).toBeNull();
+  });
+
+  it("persists a decision the moment it is made, not at the next settle", async () => {
+    // **The other half of the outcome's life** (myne-md/myne#894, from review).
+    // `markAgentTurnOutcome` writes the field onto a FROZEN turn, and the store's
+    // own copy of a run dies with the run, so the field's only home is the
+    // transcript. Without the settle the decision reached RAM and nothing else: on
+    // the reject path, which drops the run and ends the interaction, no later
+    // settle was coming.
+    //
+    // **A fake persister, because it is the only observer that can tell the two
+    // apart.** The installed one stages and dedups, so an explicit flush at the
+    // end of this test writes the current state whether or not the decision
+    // settled it: the first version of this test asserted exactly that and passed
+    // with the settle deleted.
+    let settled = 0;
+    setChatPersister(() => {
+      settled += 1;
+    });
+    try {
+      sendAgentTurn("tidy this", "This note");
+      settleAgentTurn({
+        runId: "r1",
+        summary: "",
+        edits: 1,
+        newNotes: 0,
+        notesRead: 1,
+        iterations: 1,
+        charsOffDevice: null,
+        end: "finished",
+      });
+      const afterSettle = settled;
+
+      markAgentTurnOutcome("r1", "rejected");
+      expect(
+        settled,
+        "the decision did not settle the transcript of its own accord",
+      ).toBe(afterSettle + 1);
+    } finally {
+      setChatPersister(null);
+    }
+
+    // And the field it wrote is the one the reader later reads, on the wire the
+    // conversation file actually uses: re-installed, then one more decision, since
+    // the persister stages on notify rather than on a flush.
+    installChatPersistence();
+    // The document that reaches the wire carries the FIRST decision, because a
+    // second one is a no-op: this call exists to make the installed persister
+    // stage the current state, not to change it.
+    markAgentTurnOutcome("r1", "applied");
+    await __flushChatPersistForTest();
+    const written = [...mockChatsCreate.mock.calls, ...mockChatsAppendTurn.mock.calls]
+      .map((call) => String(call[0]))
+      .join("\n");
+    expect(
+      written,
+      "the decision never reached the conversation store",
+    ).toContain('"outcome":"rejected"');
   });
 
   it("appends once bound, and skips an identical payload (stop-then-finalize)", async () => {

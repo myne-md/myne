@@ -56,7 +56,10 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
  *  `ag6` in `agent-run.e2e.ts` does the same thing for the same reason. */
 async function dismissRunProposal(s: Session): Promise<void> {
   await s.waitForElement(testIdSelector("agentReview.screen"), { timeoutMs: 30_000 });
-  await (await s.byTestId("agentReview.close")).click();
+  // The card's exit is Reject all (myne-md/myne#894): the × was the one
+  // control that only dismissed the proposal, and rejecting everything IS
+  // dismissing it.
+  await (await s.byTestId("agentReview.rejectAll")).click();
   await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 10_000 });
 }
 

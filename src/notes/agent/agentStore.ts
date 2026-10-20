@@ -572,6 +572,46 @@ export function keptSettings(s: AgentState = state): ProposedSetting[] {
   );
 }
 
+/** The run the user still has to review, or `null` (myne-md/myne#529,
+ *  myne-md/myne#894).
+ *
+ *  **Moved here verbatim from the review takeover this replaced rather than copied**,
+ *  because
+ *  there is now one thing that decides it and it is not a mount: the review moved
+ *  out of a full-screen dialog and into the conversation, so the surface that
+ *  shows it is an ordinary transcript turn and the rule has to be readable from
+ *  wherever the transcript renders. Two copies is how the turn and the card come
+ *  to disagree about whether a run is still open.
+ *
+ *  A run is reviewable once it has STOPPED, has not stopped to ASK, has something
+ *  to show and is not applying itself:
+ *
+ *  - `end !== null || error !== null`: a settled run leaves a proposal its user is
+ *    entitled to see, whatever the end kind (`finished`, `cancelled`,
+ *    `exhaustedIterations`, `stalled`), and a FAILED leg is the same shape, it
+ *    records `error` and leaves `end` alone (myne-md/myne#848).
+ *  - `awaitingScope` excluded: a run paused on a question is not a run to review,
+ *    and the scope dialog must not be buried under a review of a proposal the
+ *    model has not finished making.
+ *  - something proposed: a question is a run too, so "it stopped" is not the same
+ *    fact as "there is something to review" (myne-md/myne#568). One edit, one new
+ *    note or one setting change is enough; a settings-only run is a proposal
+ *    (myne-md/myne#850).
+ *  - `!autoApplying`: an automatic run would otherwise show the surface it exists
+ *    to skip for the frames between the step settling and the apply returning
+ *    (myne-md/myne#551). */
+export function reviewableRun(s: AgentState = state): { runId: string } | null {
+  if (s.view === null || s.running || s.autoApplying) return null;
+  if (s.end === null && s.error === null) return null;
+  if (s.end?.kind === "awaitingScope") return null;
+  const proposed =
+    s.proposal.edits.length > 0 ||
+    s.proposal.newNotes.length > 0 ||
+    (s.proposal.settings?.length ?? 0) > 0;
+  if (!proposed) return null;
+  return { runId: s.view.runId };
+}
+
 /** The indices of new notes the user has NOT rejected. This is what the apply
  *  sends; a note that is not in it is not created. */
 export function approvedNewNoteIndices(s: AgentState = state): number[] {
@@ -648,7 +688,7 @@ export function keptEdits(s: AgentState = state): ProposedEdit[] {
  *  one that misses the users with the most rows to work through.
  *
  *  A selector, not a writer. Its one caller is {@link settleApply}; the reason
- *  that is the caller, and not an effect in `AgentReviewTakeover`, is argued
+ *  that is the caller, and not an effect in the card, is argued
  *  there. It lives beside {@link landedEditIndices} for the reason that
  *  function states about its own subtraction: a call site is not testable, and
  *  each of the five checks below is worth failing by name.
@@ -665,11 +705,11 @@ export function applyWasCleanAndComplete(s: AgentState = state): boolean {
   const applied = s.applied;
   if (applied === null) return false;
   // Nothing to review means there is no review to close, so the rule does not
-  // fire and the run is not dropped. Mirrors `AgentReviewTakeover`'s own
-  // `reviewable`, which needs a proposal for the same reason (myne-md/myne#568).
-  // **A settings-only run counts** (myne-md/myne#850): it is a proposal, and the
-  // takeover opens for it, so leaving it out here would make the dialog stick
-  // open on a run that has nothing left to do.
+  // fire and the run is not dropped. Mirrors `reviewableRun` above, which needs
+  // a proposal for the same reason (myne-md/myne#568). **A settings-only run
+  // counts** (myne-md/myne#850): it is a proposal, and the card renders for it,
+  // so leaving it out here would make the card stick open on a run that has
+  // nothing left to do.
   if (
     s.proposal.edits.length === 0 &&
     s.proposal.newNotes.length === 0 &&
@@ -762,7 +802,7 @@ export function landedSettingIndices(
  *
  *  **An APPLY is the only thing that may close the review, and that is the
  *  whole reason this lives here.** The rule was written as a `useEffect` in
- *  `AgentReviewTakeover` first, deriving from state the way that file derives
+ *  the card first, deriving from state the way that surface derives
  *  OPEN, and it reached one state too many. `keptEdits` counts a REJECTED edit
  *  as resolved, so after any clean apply had left one row outstanding, a single
  *  click on that row's Reject button satisfied the rule and the effect dropped
@@ -913,7 +953,7 @@ export function clearAgent(): void {
   // to the first channel message, and the epoch bump is still what covers the
   // rest — without it the reply landed afterwards,
   // repopulated `proposal.edits` with its verbatim anchors, and made
-  // `AgentReviewTakeover`'s derived `reviewable` true, opening a full-screen
+  // `reviewableRun` true, opening the card
   // review of a conversation the user had just deleted.
   runEpoch += 1;
   // Reset with the counters it accompanies. A base that outlived a cleared

@@ -215,6 +215,14 @@ The user's standing voice directives for the AI (tone, length, language, formatt
 
 Used in: `protocol.md` §9.27; `decisions/ai/0590`; `sync-protocol.md` §10.2.7
 
+### **agent review** &nbsp; 📦 *Product*
+
+*(Aliases: review card. Myne-divergent: no.)*
+
+The surface where a user approves or refuses what an [agent run](#agent-run) proposed. It is a card rendered inside the assistant's own turn, in the conversation that started the run (see [agent turn](#agent-turn)), so it appears where the request was made rather than as a dialog over the window: nothing has to be clicked for it to arrive. A proposed change is one line (the note, and what the change does) with its own diff or destination folder behind that line's chevron, and the card's footer acts on the whole proposal. It is the only surface that can approve anything; a settled turn renders the FROZEN proposal read-only (see [proposed edit](#proposed-edit)), which is history rather than a decision. Refusals render ABOVE the model's own answer on the same turn, so the host's account of what it could not do is read before the claim it may contradict (myne-md/myne#848).
+
+Used in: `decisions/ai/0715`
+
 ### **agent run** &nbsp; 📦 *Product*
 
 One invocation of [agentic note editing](#agentic-note-editing): a task the user asked for, an [agent scope](#agent-scope) they approved, and the [proposed edits](#proposed-edit) it produced. Host-side state with an identity, a cancel flag shared with the vault-lock teardown, and a running scope total. **Nothing about a run's LIVE state survives a vault lock**: the run table and the live transcript store are dropped on the same leg as the AI vector store. What changed with persisted [conversations](#conversation) (myne-md/myne#675): the turn a run leaves behind is now written to its conversation at settle (append-at-finalize), and since `decisions/ai/0583` that settled turn KEEPS the frozen proposal (anchors and replacements, verbatim note-derived text) alongside the run id, the counts, the scope label and the end tag. The historical copy is **read-only**: no re-apply affordance exists anywhere, because a frozen proposal may quote a note that has since changed, been trashed, or moved folders. The RAM half of the old claim still holds: `agentStore`'s live copy is dropped on every vault-leaving path, enforced by the lock-teardown guards. A run writes exactly one thing without approval: a single memory entry through the [remember verb](#remember-verb) (myne-md/myne#697, `decisions/ai/0591`); everything else about a run never writes, and applying is a separate act behind the user's approval.
@@ -235,7 +243,7 @@ Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
 ### **agent turn** &nbsp; 📦 *Product*
 
-How an [agent run](#agent-run) appears in the [conversational AI chat](#conversational-ai-chat) transcript: the task the user sent, carrying the [agent scope](#agent-scope) label it was sent under, and beside it the turn the run itself renders into. Both belong to the agent flow rather than to the chat, which is what keeps the task out of the ask model's conversation history. The run's turn holds counts and a closed end tag, never the [proposed edits](#proposed-edit). The run's LIVE state is on the turn's own footprint line (myne-md/myne#848): its status, its running scope total and its cost figures, which are ON the line while the run works and behind a disclosure once it settles, so a control the threat model requires to be continuously visible is readable without a press. The scope-expansion approval is the exception and stays outside the scrolling transcript: it is a modal question, and mounting it inside the region a reader has scrolled put it below their view.
+How an [agent run](#agent-run) appears in the [conversational AI chat](#conversational-ai-chat) transcript: the task the user sent, carrying the [agent scope](#agent-scope) label it was sent under, and beside it the turn the run itself renders into. Both belong to the agent flow rather than to the chat, which is what keeps the task out of the ask model's conversation history. The run's turn holds counts, a closed end tag and, once the run settles, the frozen [proposed edits](#proposed-edit) in its persisted summary, which are read-only in history with no re-apply affordance. While a proposal is undecided the turn ALSO renders the [review card](#agent-review), and the copy it acts on is the LIVE one from the store, which dies with the run when the reader decides. The run's LIVE state is on the turn's own footprint line (myne-md/myne#848): its status, its running scope total and its cost figures, which are ON the line while the run works and behind a disclosure once it settles, so a control the threat model requires to be continuously visible is readable without a press. The scope-expansion approval is the exception and stays outside the scrolling transcript: it is a modal question, and mounting it inside the region a reader has scrolled put it below their view.
 
 Used in: `decisions.md` 2026-08-19
 
@@ -601,7 +609,7 @@ Used in: `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored
 
 ### **chat turn** &nbsp; 📦 *Product*
 
-One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled: the write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
 
 Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
 
@@ -2667,7 +2675,7 @@ Used in: `decisions/ai/0555`, `threat-model.md` TB13
 
 ### **proposed edit** &nbsp; 📦 *Product*
 
-One change an [agent run](#agent-run) suggests to a note. It comes in three kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). A MOVE carries no anchor either, and its `replacement` is the destination FOLDER rather than note text, which is what lets the review show where the note would land and the [folder lock](#folder-lock) read the destination before the write (see [move verb](#move-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over all three by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review screen, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
+One change an [agent run](#agent-run) suggests to a note. It comes in three kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). A MOVE carries no anchor either, and its `replacement` is the destination FOLDER rather than note text, which is what lets the review show where the note would land and the [folder lock](#folder-lock) read the destination before the write (see [move verb](#move-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over all three by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review card, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
@@ -2974,7 +2982,7 @@ Used in: `decisions/ui/0599`; `src/lib/regions.ts`, `src/commands/bindableCatalo
 
 ### **remember verb** &nbsp; 📦 *Product*
 
-The fourth verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#697): it writes one memory entry, not a note, carrying `entry_id` (absent mints, present overwrites) and `text`. The only model-initiated write that does not end in the review screen (`decisions/ai/0591`): the run loop caps it at one write per run, threads the writing run's id and the folders it read as provenance, and the memory plugin's write-time gate (schema, 2000-character cap, injection scan, authorship, exclusion) runs inside. Removal stays a user act in the memory UI; the model has no delete verb. Advertised to the model in the prompt's action list, or the feature is inert.
+The fourth verb of [agentic note editing](#agentic-note-editing) (myne-md/myne#697): it writes one memory entry, not a note, carrying `entry_id` (absent mints, present overwrites) and `text`. The only model-initiated write that does not end in the review card (`decisions/ai/0591`): the run loop caps it at one write per run, threads the writing run's id and the folders it read as provenance, and the memory plugin's write-time gate (schema, 2000-character cap, injection scan, authorship, exclusion) runs inside. Removal stays a user act in the memory UI; the model has no delete verb. Advertised to the model in the prompt's action list, or the feature is inert.
 
 Used in: `spec/protocol.md` §9.25, §9.26; `decisions/ai/0590`; `decisions/ai/0591`
 
@@ -3186,7 +3194,7 @@ shape of value it accepts, and, where the setting has one, the sub-step it carri
 resolved against a table in `myne-core` rather than trusted from the client, so a client catalogue
 claiming more than the table allows is an offer of less.
 
-A setting change rides the review dialog as its own kind of item, with the value in place shown beside
+A setting change rides the review card as its own kind of item, with the value in place shown beside
 the one asked for, and it is **carved out of Apply automatically**: a preference sits inside no note
 grant, so the bound that makes the automatic path safe has nothing to attach to. Clearing is a
 DISTINCT verb rather than an absent value: a clear removes the pref entry, and an empty string is

@@ -170,6 +170,136 @@ textarea,
   animation: myne-working-wave 1.6s ease-in-out infinite alternate;
 }
 
+/* -- The approval card's arrival, and the fact that it is waiting
+   (myne-md/myne#894) --------------------------------------------------------
+
+   The review used to be a dialog: it was either on screen or not, and nothing
+   about it moved. It is now a card in the conversation, under the turn that
+   proposed the change, and it has a state the reader has to notice, an
+   unapproved proposal of edits to their notes, sitting in the transcript they
+   are reading.
+
+   Two pieces of motion, and they are different in kind.
+
+   ARRIVAL is decoration and is the EmptyState argument verbatim: a review is a
+   destination, not a transient (it exists to be acted on, and it is rare, you
+   see one when a run proposes something), so it is worth landing rather than
+   appearing. It passes the same frequency gate `myne-empty-in` documents and
+   uses `--ease-emphasized` for the same reason: the shape leaves fast and
+   settles slow, which reads as weight instead of as a fade-up.
+
+   The global `prefers-reduced-motion` rule zeroes this, which is correct.
+
+   WAITING is carried by the STATUS ROW and not by a loop, which is a correction
+   rather than a preference: the first version of this breathed the dot beside
+   the sentence, and `motion-canon` refused it against PRODUCT.md principle 4,
+   which admits no pulsing state indicator in either motion tier. An allowlist
+   entry was the wrong answer, the allowlist exists for indeterminate PROGRESS,
+   and a card waiting on the reader reports no work in flight, so the aliveness
+   is the arrival below, and the state is the sentence plus the tone it carries,
+   which changes when the wait ends. An accent dot once sat beside that sentence
+   and is gone: it said nothing the sentence did not, and the wait it was marking
+   is the reader's rather than the app's. What the reader needs to notice is that
+   the card is asking something, and the sentence says so. */
+@keyframes myne-review-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.myne-review-card {
+  animation: myne-review-card-in var(--duration-base) var(--ease-emphasized);
+  /* The wash is absolutely positioned inside, so the card is its containing
+     block, and `overflow: hidden` (already on the card) is what keeps the blur
+     inside the rounded corners. */
+  position: relative;
+}
+
+/* **The zero state's wash, reused rather than re-derived** (myne-md/myne#894,
+   on the user's read: "it has none of that colour turning behind it, like the
+   zero state, let's add that too"). The recipe lives in
+   `client-core/src/components.css` as `.myne-empty__wash` and is shared by all
+   three clients; the only thing a caller supplies is the COLOUR, through the
+   `--myne-empty-wash` variable, so the card tints the same gradient with the
+   attention tone of whatever state its headline is in. A second copy of those
+   two blurred radial gradients here is a second place the look can drift, which
+   is why the class is worn as-is. */
+.myne-review-card[data-state="waiting"] {
+  --myne-empty-wash: var(--accent);
+}
+
+.myne-review-card[data-state="failed"] {
+  --myne-empty-wash: var(--danger);
+}
+
+.myne-review-card[data-state="review"] {
+  --myne-empty-wash: var(--accent);
+}
+
+/* The card's own children paint above the wash. `--z-ground` is 0, and a
+   positioned zero-index box paints above in-flow content, so every region owes
+   this one line rather than the wash owing a negative index (which would put it
+   under the card's own background and make it invisible). */
+.myne-review-region {
+  position: relative;
+  z-index: var(--z-local);
+}
+
+/* The card's HEADLINE, so it carries the weight of one: the zero state's title
+   row, not a caption beside a heading. Semibold and `--text-sm` (the card is the
+   compact object, and the row's own sentence is `--text-sm` too), with
+   `min-width: 0` so a long failure sentence wraps inside the card rather than
+   pushing the footer's controls off it. */
+.myne-review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-1);
+}
+
+/* `data-state` on the status element, so the colour and the motion are one
+   decision rather than two attributes a caller keeps in step. */
+.myne-review-status[data-state="failed"] {
+  color: var(--danger);
+  /* A sentence rather than a label: at semibold a provider's refusal reads as a
+     headline shouting the failure. The weight comes back down for this arm
+     only. */
+  font-weight: var(--weight-medium);
+  letter-spacing: normal;
+}
+
+/* The glyph tile, borrowed from the zero state's anatomy
+   (`client-core/src/components.css`, `.myne-empty__glyph`): a neutral surface
+   with a hairline, sized for a card rather than for a full-pane empty state, and
+   tinted by the same `data-state` the headline reads. */
+/* **A modifier of `.myne-empty__glyph`, not a copy of it** (myne-md/myne#894, from
+   review: the wash was deliberately borrowed and the tile re-derived the same
+   surface three lines further down). The card carries both classes, so the
+   surface, the hairline and the centring have one definition and this rule only
+   says what is different: the size, and that the glyph is full ink. */
+.myne-review-tile {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-2);
+  /* The glyph is full ink rather than a tint (myne-md/myne#894, on the user's
+     read: "make the icon white"). At 14px inside a 26px tile, a tinted glyph
+     reads as disabled next to the headline it belongs to, and the tile is
+     decoration here, so it is the one place the accent is not the answer. */
+  color: var(--fg-1);
+}
+
+.myne-review-tile[data-state="failed"] {
+  color: var(--danger);
+}
+
 /* -- Spinner ----------------------------------------------------------------
    Used by <Spinner /> primitive. Border-top accent + linear rotation.
    Under reduced motion it keeps turning at half speed (see the exemption

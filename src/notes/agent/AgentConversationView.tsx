@@ -24,12 +24,14 @@
 // Same `ConversationSurface` the light panel uses, so a run started here and a
 // run started in the panel are one implementation (story 23).
 
-import { useCallback, useEffect, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
 import { ConversationSurface } from "../ai/ConversationSurface";
+import { buildMentionTargets } from "../ai/noteMentions";
 import { openConversation } from "../ai/chatPersist";
+import { useResolverNotes } from "../resolverNotes";
 import { useWorkspace } from "../workspaceContext";
 
 const WRAP_STYLE: CSSProperties = {
@@ -86,6 +88,27 @@ export function AgentConversationView({
     if (noteId !== null && noteId !== "") ws.openInFocused(noteId);
   }, [ws, noteId]);
 
+  // **A note the answer names is a link, in THIS surface too** (myne-md/myne#867,
+  // the mention wiring this view never got). `ChatMarkdown` renders a mention as
+  // plain text unless its caller hands it candidates and somewhere to land, and
+  // the design allows that on purpose, but only the right panel's `AiChatTab`
+  // ever supplied them, so an agent answer that named a note ("Moved Notes on Q3
+  // into Projects") named something the reader could not open, in the surface whose whole
+  // output is names of notes and paths. Read here rather than handed down from
+  // the pane: this view is the transcript's host, the note set is the vault's own
+  // projection of itself, and the press lands where the decision says it does,
+  // a new tab, the same call `AiChatTab` makes, so a mention cannot mean one
+  // thing in the panel and another in the tab.
+  const resolverNotes = useResolverNotes();
+  const mentionTargets = useMemo(
+    () => buildMentionTargets(resolverNotes),
+    [resolverNotes],
+  );
+  const openMention = useCallback(
+    (noteUuid: string) => ws.openNewTabInFocused(noteUuid),
+    [ws],
+  );
+
   return (
     <div data-testid="agent.focus" style={WRAP_STYLE}>
       <div style={HEADER_STYLE}>
@@ -111,6 +134,8 @@ export function AgentConversationView({
         // this: there the note is whatever the editor has open beside the box,
         // and changing the scope for one message is the idiom.
         anchoredNoteId={noteId}
+        mentionTargets={mentionTargets}
+        onOpenNote={openMention}
         {...(folders === undefined ? {} : { folders })}
         {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
         {...(onRunUndone === undefined ? {} : { onRunUndone })}

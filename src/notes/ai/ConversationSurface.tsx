@@ -25,7 +25,7 @@
 // not invent a height of its own, because the panel and the tab give it different
 // ones.
 
-import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
@@ -39,13 +39,15 @@ import { ModalShell } from "../../components/primitives/ModalShell";
 import { ScrollArea } from "../../components/primitives/ScrollArea";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
-import { agentLastRun, agentUndo } from "../../lib/agent-run";
-import type { AgentUndoResult, Proposal } from "../../lib/agent-protocol";
+import { agentLastRun, agentUndo, hasRefusals } from "../../lib/agent-run";
+import type { AgentApplyResult, AgentUndoResult, Proposal } from "../../lib/agent-protocol";
 import { providerErrorKey } from "../../lib/engine-error";
 import {
   getActiveConversationId,
+  markAgentTurnOutcome,
   useChat,
   useConversationEpoch,
+  type AgentRunOutcome,
   type AgentTurnEnd,
   type ChatTurn,
 } from "./chatStore";
@@ -55,9 +57,12 @@ import {
   installChatPersistence,
   isChatHydrateFailed,
   isChatPersistLagging,
+  markOutcomeInConversation,
   subscribeChatPersistHealth,
 } from "./chatPersist";
-import { markConversationRead, useAgent } from "../agent/agentStore";
+import { markConversationRead, clearAgent, reviewableRun, useAgent } from "../agent/agentStore";
+import { useResolverNotes } from "../resolverNotes";
+import { reviewCardBelongsToTurn } from "./reviewOwnership";
 // This client's nonce, passed into the shared undo hook below.
 import { bumpPrefsNonce } from "../prefsNonce";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
@@ -68,6 +73,7 @@ import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { CAPTION_STYLE } from "../components/sharedStyles";
 import { ChatComposer } from "../components/ChatComposer";
 import { ProposalDiffModal } from "../components/ProposalDiffModal";
+import { AgentReview, RefusalBlock } from "../../screens/AgentReview";
 
 /** The translation function shape every helper here takes. */
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
@@ -99,6 +105,73 @@ const bubbleStyle = (isUser: boolean): CSSProperties => ({
   borderRadius: "var(--radius-1)",
   padding: "var(--space-1) var(--space-2)",
 });
+
+/**
+ * The verb for the counts line's edit half, by what the reader decided
+ * (myne-md/myne#894).
+ *
+ * **A helper with literal `t()` arms, not a computed key**, and that is the same
+ * rule `emptyRunLabel` below and `removalFlagLabel` in the agent protocol both
+ * follow: `scripts/check-i18n.mjs` scans STATIC quoted-key call sites by design
+ * (an expression-aware scanner is a scanner with a bypass), so a key assembled
+ * from a variable is a sentence outside every check in this repository. The first
+ * version of this was one `t(cond ? "b" : "c")` in the JSX, and the guard's own
+ * count went DOWN by two, it could see neither sentence.
+ *
+ * Which sentence is true changes exactly once, when the reader acts: a proposal
+ * awaits approval, so "proposed" is the honest word; after an apply or a
+ * rejection that number is a record of what happened. A run nobody decided (a
+ * lock, a reload, a conversation walked away from) keeps saying "proposed",
+ * because that is still what it is.
+ */
+function editCountVerb(
+  outcome: AgentRunOutcome | undefined,
+  count: number,
+  t: TFn,
+): string {
+  // **No number in the applied arm, and the reason is that the only number the
+  // turn carries is the PROPOSED one** (myne-md/myne#894 review). A partial apply
+  // is still `applied`, so "{{count}} changes applied" printed the proposal's size
+  // over a result that may be smaller, on a synced turn that outlives the card:
+  // the one permanent record of what the run did to the vault, claiming more than
+  // it did. The landed split is not persisted, so the honest sentence is the one
+  // that does not need it.
+  if (outcome === "applied") return t("agent.review.appliedSummary");
+  if (outcome === "rejected") return t("agent.review.rejectedCount", { count });
+  return t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", { count });
+}
+
+/** The new-note half of the same line, by the same rule. Only the rejection has
+ *  its own sentence: a created note that landed is a create the reader kept, and
+ *  "proposed" reads correctly for it in both of the other two states. */
+function newNoteCountVerb(
+  outcome: AgentRunOutcome | undefined,
+  count: number,
+  t: TFn,
+): string {
+  if (outcome === "rejected") return t("agent.review.rejectedNewNotes", { count });
+  return t("editor.chrome.rightPanel.aiChat.agentTurn.newNotes", { count });
+}
+
+/** The settings half of the counts line, by the same rule as the edits.
+ *
+ *  **It was the one clause that ignored the decision** (myne-md/myne#894, from
+ *  review): `settings` on the summary is the PROPOSED count, so a rejected
+ *  settings-only proposal printed "1 setting changed." with nothing corrected
+ *  beside it, which is the exact claim the fifth pass of this entry exists to
+ *  stop making. A landed setting and a proposed one read the same in the applied
+ *  case, so only the rejection has its own sentence. */
+function settingCountVerb(
+  outcome: AgentRunOutcome | undefined,
+  count: number,
+  t: TFn,
+): string {
+  if (outcome === "rejected") return t("agent.review.rejectedSettings", { count });
+  // Same rule as the edits arm: a settings apply can be partial, and `count` here
+  // is the proposed number.
+  if (outcome === "applied") return t("agent.review.settingsApplied");
+  return t("agent.review.settingsChanged", { count });
+}
 
 /** What a run that proposed nothing AND answered nothing says (myne-md/myne#574).
  *
@@ -232,6 +305,11 @@ function TurnCopyButton({
 function AgentTurnView({
   turn,
   live,
+  refusals,
+  reviewing,
+  onNotesWritten,
+  titleOf,
+  folderOf,
   t,
   canRevert,
   onOpenDiff,
@@ -247,6 +325,24 @@ function AgentTurnView({
    *  working footprint shows the run's running figures, and a boolean would
    *  make the caller the place those figures are looked up (myne-md/myne#848). */
   live: AgentState | null;
+  /** The apply's refusals for this turn's run, or `null`.
+   *
+   *  Carried rather than read here because the card is the only thing that knows
+   *  the run is the open one, and the ORDER is this component's business: the
+   *  host's fact is rendered above the model's answer. */
+  refusals: AgentApplyResult | null;
+  /** Whether the review card belongs to THIS turn (myne-md/myne#894).
+   *
+   *  A boolean rather than the store, because the rule that decides it is about
+   *  which turn owns the open run, the live one, or the frozen one whose
+   *  summary carries the same `runId`, and that is a question about the
+   *  TRANSCRIPT. `AgentReview` reads the run itself, as it always has. */
+  reviewing: boolean;
+  onNotesWritten?: (noteIds: readonly string[]) => void;
+  /** The review card's two note questions, resolved by the surface. Required,
+   *  because the card cannot render a row's note without them. */
+  titleOf: (noteId: string) => string | null;
+  folderOf: (noteId: string) => string | null;
   t: TFn;
   canRevert: boolean;
   onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
@@ -262,6 +358,16 @@ function AgentTurnView({
     s !== undefined &&
     s.proposal !== undefined &&
     (s.proposal.edits.length > 0 || s.proposal.newNotes.length > 0);
+  /** Whether this turn is holding an unapproved proposal, i.e. the counts line
+   *  below is describing an ACTION rather than a record (myne-md/myne#894).
+   *
+   *  `reviewing` and not the counts alone: a run whose proposal is gone (an older
+   *  transcript) or already applied is history, and the tone is reserved for the
+   *  state where the reader can still do something about it. */
+  const proposalPending =
+    reviewing &&
+    s !== undefined &&
+    (s.edits > 0 || s.newNotes > 0 || (s.settings ?? 0) > 0);
   return (
     <div
       data-testid="ai.turn"
@@ -376,6 +482,22 @@ function AgentTurnView({
           {turn.text}
         </p>
       ) : null}
+      {/* **The host's fact goes ABOVE the model's claim** (myne-md/myne#848,
+          and this is where it lives now: myne-md/myne#894 moved the card under
+          the answer, so a refusal block inside the card would be read after the
+          summary that a refused run tends to overstate. A manual pass found
+          exactly that: ten folder moves refused, the summary reporting them as
+          applied, and the user believing it until the refusal list at the bottom
+          of a long diff. So the refusals render here, first, with their count;
+          the prose stays visible below them rather than being hidden, because the
+          point is to contradict the claim in front of the reader. */}
+      {refusals !== null ? <RefusalBlock result={refusals} /> : null}
+      {/* **The model's own words stay here, card or no card** (myne-md/myne#894,
+          second pass). They were suppressed while the review card was up, because
+          the card rendered the same paragraph itself, which cost the mention
+          links their targets for exactly as long as the reader was deciding.
+          The card no longer carries the summary (it is a decision card, not a
+          document), so this is the one copy and it is always the real one. */}
       {s !== undefined && s.summary.trim().length > 0 ? (
         <ChatMarkdown
           testId="ai.agent-answer"
@@ -388,7 +510,35 @@ function AgentTurnView({
       {s !== undefined ? (
         <div
           data-testid="ai.agent-summary"
-          style={{ ...TURN_TEXT_STYLE, color: "var(--fg-1)", marginTop: "var(--space-1)" }}
+          // **An unapproved proposal is an ACTION, and it says so in the
+          // app's live-tone** (myne-md/myne#894: first "show it warning-toned",
+          // then the correction, "make it accent, not orange"). `--warning` is
+          // the colour a weak password and a lost session use; a proposal
+          // waiting on the reader is the surface's whole purpose, and the
+          // accent is what this app paints the live thing with. While the card
+          // is waiting, this line and the card's wash are one colour (the failed
+          // arm washes danger instead, and the applied arm keeps the accent on
+          // this line because the number is still live). The card's tile stays
+          // full ink by design (`src/styles/tokens.css`: at 14px inside a 26px
+          // tile a tinted glyph reads as disabled), and the dot beside the
+          // status sentence is gone. What matters here is the contrast: this
+          // line is the last thing above the card that asks for a decision, and
+          // it used to carry the model answer's own ink, so the one sentence on
+          // the turn that expects the reader to do something read like prose.
+          //
+          // Tied to `reviewing` rather than to the counts alone, and the
+          // difference matters in both directions: a proposal whose run is gone
+          // (an older transcript, or one dropped by a lock) is a record and not
+          // an action, and a proposal that has been applied is not one either,
+          // so the tone follows the CARD, which exists exactly while something
+          // is still decidable. `data-pending` carries the same fact for anything
+          // that should assert it without reading a colour.
+          data-pending={proposalPending ? "true" : undefined}
+          style={{
+            ...TURN_TEXT_STYLE,
+            color: proposalPending ? "var(--accent)" : "var(--fg-1)",
+            marginTop: "var(--space-1)",
+          }}
         >
           <div>
             {s.edits === 0 && s.newNotes === 0 && (s.settings ?? 0) === 0
@@ -396,25 +546,15 @@ function AgentTurnView({
                 ? null
                 : emptyRunLabel(s.end, t)
               : [
-                  s.edits > 0
-                    ? t("editor.chrome.rightPanel.aiChat.agentTurn.proposed", {
-                        count: s.edits,
-                      })
-                    : null,
-                  s.newNotes > 0
-                    ? t("editor.chrome.rightPanel.aiChat.agentTurn.newNotes", {
-                        count: s.newNotes,
-                      })
-                    : null,
+                  s.edits > 0 ? editCountVerb(s.outcome, s.edits, t) : null,
+                  s.newNotes > 0 ? newNoteCountVerb(s.outcome, s.newNotes, t) : null,
                   // **A setting change counts as output** (myne-md/myne#850,
                   // from the 2026-10-14 review): without this clause a run whose
                   // only proposal was a setting change rendered "The agent
                   // proposed no changes." directly above the review screen that
                   // showed one.
                   (s.settings ?? 0) > 0
-                    ? t("agent.review.settingsChanged", {
-                        count: s.settings,
-                      })
+                    ? settingCountVerb(s.outcome, s.settings ?? 0, t)
                     : null,
                 ]
                   .filter((line) => line !== null)
@@ -433,6 +573,60 @@ function AgentTurnView({
               {undoResultText(undoReport, t)}
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {/* **The decision, in the conversation** (myne-md/myne#894).
+          It used to be a full-screen dialog mounted by `Editor`, which meant the
+          proposal was rendered in a place the user did not come from and could
+          not read beside the message that produced it, and, in the report this
+          exists for, it was not seen at all until a click somewhere else
+          repainted the window. Here it is part of the turn: the card arrives the
+          moment the run settles, under the words that describe it, in the
+          transcript the user is already reading.
+
+          `onClose` drops the frontend's copy of the run, mirroring the host,
+          which drops its half on lock: the two going out of step is how a
+          surface ends up rendering a proposal whose run no longer exists. It is
+          also what makes the card go away, so there is no second flag to keep in
+          step with this one.
+
+          **`aria-live="off"` on the wrapper, and that is not decoration.** The
+          transcript is a polite live region, because a streaming answer has to be
+          announced as it arrives. Interactive content inside one is the classic
+          mistake: every row the user rejects, every refusal that lands and every
+          label that flips between "Reject" and "Keep" is a mutation in a live
+          region, so a screen reader reads the card's churn back at the person
+          operating it. The nearest ancestor's value is the one that applies to a
+          subtree, so this switches the card off inside the region it has to sit
+          in for layout. Stated rather than asserted: no machine on this project
+          runs a screen reader, so this is a reasoned attribute and a candidate
+          for the manual roster's desktop-AT item, not a verified one. */}
+      {reviewing ? (
+        <div aria-live="off">
+          <AgentReview
+            onClose={clearAgent}
+            // The run's own id: the outcome lands on the turn that names it,
+            // whether or not the reader is looking at that conversation.
+            // The run this card is about, from whichever side knows it: a live
+            // turn has it on the store, a settled one on the frozen summary.
+            onDecision={(outcome) => {
+              const runId = live?.view?.runId ?? s?.runId ?? null;
+              if (runId === null) return;
+              // The active transcript first, then the run's OWN conversation. The
+              // apply is awaited, so the reader may have navigated away by now; the
+              // first call reports whether the turn was on screen (myne-md/myne#894
+              // review), and a miss is routed the way a settle is.
+              if (!markAgentTurnOutcome(runId, outcome)) {
+                const conversationId = live?.runConversationId ?? null;
+                if (conversationId !== null) {
+                  void markOutcomeInConversation(conversationId, runId, outcome);
+                }
+              }
+            }}
+            {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
+            titleOf={titleOf}
+            folderOf={folderOf}
+          />
         </div>
       ) : null}
     </div>
@@ -733,15 +927,115 @@ export function ConversationSurface({
     undoRunId !== null &&
     chat.turns.some((turn) => turn.agentSummary?.runId === undoRunId);
 
-  // Follow the newest turn, but only when the reader is already at the bottom.
-  // The position is RECORDED on scroll rather than measured in the effect,
-  // because by the time the effect runs the DOM already carries the new turn.
-  // Coalesced into a frame, because the trigger is per token.
+  // **The run the review card belongs to, and the turn that shows it**
+  // (myne-md/myne#894). The rule that decides whether a run is reviewable at all
+  // lives in the store (`reviewableRun`), moved there from the old takeover so
+  // there is one copy of it. What is decided HERE is only WHICH turn renders it:
+  // the live one (no summary frozen onto it yet, the race between `settleStep`
+  // and `AGENT_SETTLE`), or the frozen turn whose summary carries the same
+  // `runId`. A card rendered by the wrong turn would hang under the wrong
+  // message the moment the user sends another one.
+  const review = reviewableRun(agent);
+  // **The two note questions the review card asks, resolved where the providers
+  // are** (myne-md/myne#894). It used to be `Editor.tsx` that answered them (it
+  // was the mount point of the takeover); the card now renders inside a
+  // transcript turn, and this surface is the nearest ancestor that already holds
+  // the resident note set, `AiChatTab` reads the same hook four lines up for
+  // note mentions. A map rather than two `find`s per row: a proposal can be forty
+  // edits across forty notes, and this is rebuilt once per index change rather
+  // than once per lookup.
+  const resolverNotes = useResolverNotes();
+  const noteById = useMemo(() => {
+    const map = new Map<string, { title: string | null; folder: string | null }>();
+    for (const note of resolverNotes) {
+      map.set(note.noteUuid, { title: note.title, folder: note.folder });
+    }
+    return map;
+  }, [resolverNotes]);
+  const titleOf = useCallback(
+    (noteId: string): string | null => noteById.get(noteId)?.title ?? null,
+    [noteById],
+  );
+  const folderOf = useCallback(
+    (noteId: string): string | null => noteById.get(noteId)?.folder ?? null,
+    [noteById],
+  );
+
+  // **Stick to the bottom by OBSERVING the content, not by listing causes**
+  // (myne-md/myne#894, on the user's report: "it does not scroll down when a new
+  // message arrives, neither while working nor when the message completes, it
+  // stays aligned with the message I sent").
+  //
+  // What was here listed two dependencies, `turns.length` and the last turn's
+  // text length, and both are blind to an AGENT turn: its text never streams into
+  // the bubble (the answer arrives as a settled summary), the footprint's figures
+  // tick in place, and the review card appears and grows inside the turn. Every
+  // one of those changes the transcript's HEIGHT without changing either
+  // dependency, so the reader sat at the bottom of a box that had grown
+  // underneath them.
+  //
+  // A `ResizeObserver` on the content is the version that cannot miss a cause: an
+  // attachment finishing its decode, a figure re-rendering, a card expanding, a
+  // refusal block arriving, all of them are a size change, and that is the fact
+  // being tracked. The `atBottom` latch is unchanged and still the only thing
+  // that decides: a reader who has scrolled up is never yanked back down.
+  //
+  // Feature-detected for the reason `useScrollEdges` states: an unguarded
+  // `new ResizeObserver(...)` throws in a host that ships without one, and a
+  // transcript that scrolls slightly wrong is not worth a blank screen.
   const atBottomRef = useRef(true);
-  const frameRef = useRef(0);
-  const lastTurn = chat.turns[chat.turns.length - 1];
-  const turnCount = chat.turns.length;
-  const tailLength = lastTurn?.text.length ?? 0;
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null) return;
+    const pin = (): void => {
+      if (!atBottomRef.current) return;
+      // Checked rather than assigned blindly: the observer fires on the size
+      // CHANGE, and assigning `scrollTop` can itself produce another (a scrollbar
+      // appearing), so this makes the second pass a no-op instead of a loop.
+      if (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 1) return;
+      scroller.scrollTop = scroller.scrollHeight;
+    };
+    // The first pin is not an observation: a hydrated conversation may already be
+    // taller than the box on mount, and nothing will resize for it.
+    pin();
+    if (typeof ResizeObserver !== "function") {
+      // The window fallback still catches the case that matters most on a host
+      // without one, and the scroll listener catches the rest.
+      window.addEventListener("resize", pin);
+      return () => window.removeEventListener("resize", pin);
+    }
+    const ro = new ResizeObserver(pin);
+    // **Re-observe on every childList change, and that is the half that made the
+    // first version of this do nothing** (the user's report, one round later:
+    // "the chat stays where it is"). The transcript is not the scroller's child
+    // at mount: the conversation hydrates asynchronously, so the element that
+    // exists when this effect runs is the loading shim, and it is REPLACED by the
+    // transcript a moment later. An observer bound to the child that was there at
+    // mount is bound to a node that has left the document, and the box it was
+    // supposed to watch grew with nobody looking. This is the same discipline
+    // `ScrollArea` uses for its own thumb, for the same reason, and it now names
+    // the failure it prevents.
+    const observeAll = (): void => {
+      ro.disconnect();
+      // The scroller itself is watched too: a viewport that shrinks has to
+      // re-pin as much as content that grows.
+      ro.observe(scroller);
+      for (const child of Array.from(scroller.children)) ro.observe(child);
+    };
+    observeAll();
+    const mo =
+      typeof MutationObserver === "function"
+        ? new MutationObserver(() => {
+            observeAll();
+            pin();
+          })
+        : null;
+    mo?.observe(scroller, { childList: true, subtree: true });
+    return () => {
+      ro.disconnect();
+      mo?.disconnect();
+    };
+  }, []);
 
   const [persistLagging, setPersistLagging] = useState(isChatPersistLagging());
   const [hydrateFailed, setHydrateFailedState] = useState(isChatHydrateFailed());
@@ -767,15 +1061,6 @@ export function ConversationSurface({
     installChatPersistence();
     void hydrateActiveConversation();
   }, []);
-  useEffect(() => {
-    if (!atBottomRef.current) return;
-    cancelAnimationFrame(frameRef.current);
-    frameRef.current = requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el !== null) el.scrollTop = el.scrollHeight;
-    });
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [turnCount, tailLength]);
 
   return (
     <div
@@ -843,6 +1128,7 @@ export function ConversationSurface({
                   turn={turn}
                   {...(mentionTargets === undefined ? {} : { mentionTargets })}
                   {...(onOpenNote === undefined ? {} : { onOpenNote })}
+                  {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
                   // The LIVE turn is the one the store's run belongs to and that
                   // has nothing frozen onto it yet: that is "running now" AND
                   // "paused on a question", which is why the condition is
@@ -854,6 +1140,34 @@ export function ConversationSurface({
                       ? agent
                       : null
                   }
+                  // The card is this turn's when the run it names is this turn's
+                  // (myne-md/myne#894). The rule is pure and lives in
+                  // `reviewOwnership.ts`, because getting it wrong puts a
+                  // proposal under the wrong message.
+                  refusals={
+                    review !== null &&
+                    agent.applied !== null &&
+                    hasRefusals(agent.applied) &&
+                    reviewCardBelongsToTurn(
+                      turn.id,
+                      turn.agentSummary?.runId,
+                      liveAgentTurnId,
+                      review.runId,
+                    )
+                      ? agent.applied
+                      : null
+                  }
+                  reviewing={
+                    review !== null &&
+                    reviewCardBelongsToTurn(
+                      turn.id,
+                      turn.agentSummary?.runId,
+                      liveAgentTurnId,
+                      review.runId,
+                    )
+                  }
+                  titleOf={titleOf}
+                  folderOf={folderOf}
                   t={t}
                   canRevert={
                     undo.run !== null &&

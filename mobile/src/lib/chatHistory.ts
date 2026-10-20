@@ -63,6 +63,12 @@ export interface AgentSummaryJson {
    *  `memoryUpdated` twin): absent on turns written before this client
    *  learned the field, which reads as zero rather than malformed. */
   memoryUpdated?: number;
+  /** What the reader decided about the proposal (`myne-md/myne#894`, the
+   *  desktop `AgentTurnSummary.outcome` twin): `"applied"` or `"rejected"`, or
+   *  absent when nobody decided. Conversation files are synced Class-1, so a
+   *  phone that re-persisted a conversation without carrying this would strip it
+   *  for every other client. */
+  outcome?: "applied" | "rejected";
   end: string;
   proposal?: {
     edits: { noteId: string; anchor: string; replacement: string }[];
@@ -196,6 +202,12 @@ function parseAgentSummary(raw: Record<string, unknown>): AgentSummaryJson | nul
   if (memoryUpdated !== undefined) {
     if (!isFiniteNumber(memoryUpdated)) return null;
     out.memoryUpdated = memoryUpdated;
+  }
+  // Two arms, and an unrecognised value is dropped rather than rejected: a
+  // desktop may learn a third outcome before this client does, and a hydrate is
+  // not the place to refuse a conversation over a field it does not render.
+  if (raw["outcome"] === "applied" || raw["outcome"] === "rejected") {
+    out.outcome = raw["outcome"];
   }
   if (isRecord(raw["proposal"])) {
     const proposal = raw["proposal"];

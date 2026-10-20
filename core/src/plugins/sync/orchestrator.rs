@@ -2996,7 +2996,9 @@ struct ChatsConversationPhase {
 ///   lists (§ 9.24.2 schema) → `merge_chats_turns` on the id lists (common
 ///   prefix kept, both suffixes kept in id order; an id on both sides is one
 ///   turn, with the LOCAL turn object winning a content mismatch. Settled
-///   turns are immutable, so a mismatch is unreachable and determinism beats
+///   turns are immutable except for the one monotone decision marker, which is
+///   why a mismatch is reconciled rather than unreachable
+///   (`conflict::merge_turn_content`), and determinism beats
 ///   argument-sensitivity) → adopt the server bytes verbatim when the merge
 ///   equals the remote list (no nonce churn), else write the merged file
 ///   freshly (pushed this cycle against the server's current version).
@@ -3124,26 +3126,36 @@ async fn sync_chats_conversation_phase(
         // an absent local file takes the remote's.
         let merged_title = local_title.or(remote_title.clone());
 
-        // Merge on the id lists; objects come from a by-id union with LOCAL
-        // winning a content mismatch (unreachable in practice: settled turns
-        // are immutable; determinism requires a rule, and local-wins is the
-        // argument-independent fixed point the tests pin).
+        // Merge on the id lists; objects come from a by-id union whose content
+        // rule is `merge_turn_content`: LOCAL wins a mismatch, except for the
+        // monotone decision marker, where the decided copy wins in either
+        // direction (myne-md/myne#894). A settled turn used to be immutable for
+        // every field, which is what made local-wins a fixed point; the marker is
+        // the one field a settled turn can gain, so the rule has to know about it
+        // or an undecided copy silently overwrites a decision on every pull.
         let merged_ids = crate::plugins::sync::conflict::merge_chats_turns(&local_ids, &remote_ids);
-        let mut by_id: std::collections::HashMap<&str, &serde_json::Value> =
+        let mut local_by_id: std::collections::HashMap<&str, &serde_json::Value> =
             std::collections::HashMap::new();
         for (id, obj) in local_ids.iter().zip(local_turns.iter()) {
-            by_id.insert(id.as_str(), obj);
+            local_by_id.insert(id.as_str(), obj);
         }
+        let mut remote_by_id: std::collections::HashMap<&str, &serde_json::Value> =
+            std::collections::HashMap::new();
         for (id, obj) in remote_ids.iter().zip(remote_turns.iter()) {
-            by_id.entry(id.as_str()).or_insert(obj);
+            remote_by_id.insert(id.as_str(), obj);
         }
         let merged_turns: Vec<serde_json::Value> = merged_ids
             .iter()
             .map(|id| {
-                by_id
-                    .remove(id.as_str())
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null)
+                match (
+                    local_by_id.remove(id.as_str()),
+                    remote_by_id.remove(id.as_str()),
+                ) {
+                    (Some(l), Some(r)) => crate::plugins::sync::conflict::merge_turn_content(l, r),
+                    (Some(l), None) => l.clone(),
+                    (None, Some(r)) => r.clone(),
+                    (None, None) => serde_json::Value::Null,
+                }
             })
             .collect();
         // The merged file keeps the § 9.24.2 shape: `turns` plus the

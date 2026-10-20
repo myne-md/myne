@@ -10,16 +10,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-const { mockSetAgentViewState, mockOpenInFocused, mockChatsList } = vi.hoisted(() => ({
-  mockSetAgentViewState: vi.fn(),
-  mockOpenInFocused: vi.fn(),
-  mockChatsList: vi.fn(),
-}));
+const { mockSetAgentViewState, mockOpenInFocused, mockOpenNewTabInFocused, mockChatsList } =
+  vi.hoisted(() => ({
+    mockSetAgentViewState: vi.fn(),
+    mockOpenInFocused: vi.fn(),
+    mockOpenNewTabInFocused: vi.fn(),
+    mockChatsList: vi.fn(),
+  }));
 
 vi.mock("../../src/notes/workspaceContext", () => ({
   useWorkspace: () => ({
     setAgentViewState: mockSetAgentViewState,
     openInFocused: mockOpenInFocused,
+    // Where a note MENTION lands (myne-md/myne#867). A separate call from
+    // `openInFocused` on purpose: the decision says a mention opens a new tab,
+    // and this is the assertion that the agent tab routes it through the same
+    // call the right panel does.
+    openNewTabInFocused: mockOpenNewTabInFocused,
   }),
 }));
 
@@ -29,6 +36,17 @@ vi.mock("../../src/notes/sidebarState", async (importOriginal) => ({
   // (myne-md/myne#848). The provider is not mounted here, and mounting the whole
   // sidebar to render a pane would be a different test.
   useSelectedNote: () => ({ cache: new Map() }),
+}));
+
+/** The vault's note set, as `useResolverNotes` reports it. Mutable, so a test
+ *  can put a note in it without mounting a vault. Two consumers: the review
+ *  card's title lookup and the mention matcher. */
+let resolverNoteSet: import("../../src/notes/resolveWikilink").ResolverNote[] = [];
+vi.mock("../../src/notes/resolverNotes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/notes/resolverNotes")>()),
+  // A surface INPUT, the same reason the sidebar-state mock above exists:
+  // mounting a vault to render a pane would be a different test.
+  useResolverNotes: () => resolverNoteSet,
 }));
 
 vi.mock("../../src/lib/chats", () => ({
@@ -63,16 +81,36 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { AgentPane } from "../../src/notes/agent/AgentPane";
-import { beginRun, clearAgent } from "../../src/notes/agent/agentStore";
-import { getChat, sendChatMessage } from "../../src/notes/ai/chatStore";
+import {
+  beginRun,
+  clearAgent,
+  currentRunEpoch,
+  settleApply,
+  settleStep,
+} from "../../src/notes/agent/agentStore";
+import {
+  appendChatToken,
+  clearChat,
+  finalizeChatTurn,
+  getChat,
+  markAgentTurnOutcome,
+  sendAgentTurn,
+  sendChatMessage,
+  settleAgentTurn,
+} from "../../src/notes/ai/chatStore";
 import { AGENT_TAB_ID } from "../../src/notes/workspaceState";
 
 beforeEach(() => {
   mockSetAgentViewState.mockReset();
   mockOpenInFocused.mockReset();
+  mockOpenNewTabInFocused.mockReset();
+  resolverNoteSet = [];
   mockChatsList.mockReset();
   mockChatsList.mockResolvedValue([]);
   clearAgent();
+  // The chat store is module-scope too, so a test that seeds a transcript leaves
+  // its turns for the next one: two `ai.agent-summary` nodes is how that reads.
+  clearChat();
 });
 
 afterEach(() => cleanup());
@@ -97,6 +135,272 @@ describe("AgentPane: one screen, both columns", () => {
       />,
     );
   }
+
+  it("follows the transcript to the bottom, and stops following once the reader scrolls up", () => {
+    // **The stick-to-bottom wiring, which the review found pinned by nothing**
+    // (myne-md/myne#894). The user reported the behaviour twice ("it does not
+    // scroll down when a new message arrives", then "the chat stays where it is"),
+    // and emptying the effect body left every test green. jsdom computes no layout,
+    // so the box has to be given a height for the question to exist at all; and the
+    // suite's own `ResizeObserver` stub is a no-op, so this installs a capturing one
+    // for the duration of the test.
+    const callbacks: Array<() => void> = [];
+    const original = globalThis.ResizeObserver;
+    class Capturing implements ResizeObserver {
+      constructor(cb: ResizeObserverCallback) {
+        callbacks.push(() => cb([], this));
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = Capturing;
+
+    try {
+      const turnToken = sendChatMessage("q");
+      appendChatToken(turnToken, "an answer");
+      finalizeChatTurn(turnToken);
+      paneAt({ conversationId: "c-1" });
+
+      const scroller = screen.getByTestId("ai.transcript").parentElement;
+      expect(scroller).not.toBeNull();
+      let scrollTop = 0;
+      Object.defineProperty(scroller, "scrollHeight", { value: 1_000, configurable: true });
+      Object.defineProperty(scroller, "clientHeight", { value: 300, configurable: true });
+      Object.defineProperty(scroller, "scrollTop", {
+        get: () => scrollTop,
+        set: (v: number) => {
+          scrollTop = v;
+        },
+        configurable: true,
+      });
+
+      // A reader at the bottom is pulled to it when the content grows: firing the
+      // observer's callback is what a real resize does. 200px short of the bottom
+      // rather than exactly at it, because `pin` deliberately no-ops when the box
+      // is already there (assigning `scrollTop` can itself fire another scroll).
+      scrollTop = 200;
+      act(() => {
+        for (const cb of callbacks) cb();
+      });
+      expect(scrollTop).toBe(1_000);
+
+      // And one who has scrolled up is left alone. The latch is recorded by the
+      // scroller's own scroll event, which is the only thing that decides.
+      scrollTop = 100;
+      fireEvent.scroll(scroller!);
+      act(() => {
+        for (const cb of callbacks) cb();
+      });
+      expect(scrollTop).toBe(100);
+    } finally {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
+    }
+  });
+
+  it("reads the host's refusals BEFORE the model's claim (myne-md/myne#848)", () => {
+    // **The ordering rule, asserted where both halves are siblings.** It used to
+    // be asserted inside the review card, which worked while the card rendered the
+    // summary too. The summary is now the turn's answer and the card mounts under
+    // it, so a block inside the card would be read after the prose it contradicts:
+    // the misreading `myne-md/myne#848` was fixed for (ten moves refused, the
+    // summary reporting them as applied, believed). The block therefore renders in
+    // the TURN, above `ai.agent-answer`, and this is the only place that ordering
+    // can be seen.
+    sendAgentTurn("selam", "All notes");
+    settleAgentTurn({
+      runId: "run-refused",
+      summary: "Hepsini taşıdım.",
+      edits: 1,
+      newNotes: 0,
+      iterations: 1,
+      notesRead: 1,
+      charsOffDevice: null,
+      end: "finished",
+      durationMillis: 500,
+    });
+    act(() => {
+      beginRun(null);
+      settleStep(
+        {
+          view: {
+            runId: "run-refused",
+            scopeTotal: 2,
+            userGrants: 1,
+            modelGrants: 0,
+            cancelled: false,
+          },
+          proposal: {
+            edits: [{ noteId: "n1", kind: "move", anchor: "", replacement: "Archive/" }],
+            newNotes: [],
+            summary: "Hepsini taşıdım.",
+          },
+          end: { kind: "finished" },
+          iterations: 1,
+          notesRead: 1,
+          charsOffDevice: null,
+          excludedCount: 0,
+          memoryUpdated: 0,
+        },
+        currentRunEpoch(),
+      );
+      settleApply(
+        {
+          applied: 0,
+          refused: [{ noteId: "n1", index: 0, reason: "moveIntoExcludedFolder" }],
+          refusedNewNotes: [],
+          notesWritten: [],
+          notesCreated: [],
+          restorePoints: [],
+        },
+        [],
+        currentRunEpoch(),
+      );
+    });
+    paneAt({ conversationId: "c-1" });
+
+    const refusals = screen.getByTestId("agentReview.refusedBlock");
+    const answer = screen.getByTestId("ai.agent-answer");
+    expect(
+      refusals.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // And the card is still there, under the prose it belongs to.
+    const card = screen.getByTestId("agentReview.screen");
+    expect(
+      answer.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("gives the settings and new-note clauses the same decision rule", () => {
+    // **The two clauses the first version of this fix left behind** (myne-md/myne#894,
+    // from review): `edits` learned the outcome verb and the settings and
+    // new-note counts did not, so a rejected settings-only proposal still read
+    // "1 setting changed." with nothing corrected beside it: a claim about a write
+    // that never happened, on the line whose whole purpose is to say what did.
+    // Injecting the pre-fix arm (`settingsChanged` unconditionally) left every
+    // suite green, which is why this case exists.
+    sendAgentTurn("selam", "All notes");
+    settleAgentTurn({
+      runId: "run-settings",
+      summary: "ayarladım",
+      edits: 0,
+      newNotes: 1,
+      settings: 1,
+      iterations: 1,
+      notesRead: 1,
+      charsOffDevice: null,
+      end: "finished",
+      durationMillis: 500,
+    });
+    paneAt({ conversationId: "c-1" });
+    const line = () => screen.getByTestId("ai.agent-summary").textContent ?? "";
+    expect(line()).toContain("aiChat.agentTurn.newNotes");
+    expect(line()).toContain("agent.review.settingsChanged");
+
+    act(() => {
+      markAgentTurnOutcome("run-settings", "rejected");
+    });
+    expect(line()).toContain("agent.review.rejectedNewNotes");
+    expect(
+      line(),
+      "a rejected run must not report a setting as changed",
+    ).toContain("agent.review.rejectedSettings");
+    expect(line()).not.toContain("agent.review.settingsChanged");
+  });
+
+  it("says what the reader decided, not just what was proposed (myne-md/myne#894)", () => {
+    // **The counts line's verb follows the decision.** "Proposed 3 changes." is
+    // the approval stage's sentence; once the reader has acted, the same number
+    // is a record of what happened, and the transcript has to say which, the
+    // user's report on a turn whose card was long gone.
+    //
+    // Driven through the store rather than by rendering a hand-built summary,
+    // because the WRITE is half the feature: the outcome lands on the turn that
+    // names the run, wherever that turn is, and that is the arm under test.
+    sendAgentTurn("selam", "All notes");
+    settleAgentTurn({
+      runId: "run-outcome",
+      summary: "taşıdım",
+      edits: 3,
+      newNotes: 0,
+      iterations: 1,
+      notesRead: 2,
+      charsOffDevice: null,
+      end: "finished",
+      durationMillis: 1_000,
+    });
+    paneAt({ conversationId: "c-1" });
+    expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+      "editor.chrome.rightPanel.aiChat.agentTurn.proposed",
+    );
+
+    act(() => {
+      markAgentTurnOutcome("run-outcome", "rejected");
+    });
+    expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+      "agent.review.rejectedCount",
+    );
+
+    // **A second decision is a no-op** (myne-md/myne#894, from review): the field
+    // is monotone, which is what the specs say and what the merge's decided-wins
+    // rule is commutative on. This asserted the opposite (last call wins) until a
+    // review traced a partial apply plus the card's own Reject all to two devices
+    // holding different decisions for one turn.
+    act(() => {
+      markAgentTurnOutcome("run-outcome", "applied");
+    });
+    expect(
+      screen.getByTestId("ai.agent-summary").textContent,
+      "the first decision stands",
+    ).toContain("agent.review.rejectedCount");
+
+    // A run the transcript does not know is left alone rather than crashing, and
+    // the turn it does not name keeps the sentence it had.
+    act(() => {
+      markAgentTurnOutcome("run-elsewhere", "applied");
+    });
+    expect(screen.getByTestId("ai.agent-summary").textContent).toContain(
+      "agent.review.rejectedCount",
+    );
+  });
+
+  it("opens a note the conversation names, in a new tab (myne-md/myne#867)", () => {
+    // **The wiring the agent tab never got.** `ChatMarkdown` renders a mention
+    // as plain text unless its caller hands it candidates and somewhere to land,
+    // and only the right panel's `AiChatTab` ever did: an answer naming a note
+    // was unreadable-in-place in the surface whose whole output is the names of
+    // notes. Read through the store, so this fails if the pane stops passing
+    // either half, a target list with no callback renders plain text, which is
+    // the exact state this test was written from.
+    resolverNoteSet = [
+      {
+        noteUuid: "n-pixel",
+        title: "Pixel 10 Graphene OS",
+        folder: "Personal/Things I have/",
+      },
+    ];
+    const token = sendChatMessage("where did I note that?");
+    appendChatToken(token, "Under Personal/Things I have/Pixel 10 Graphene OS.");
+    finalizeChatTurn(token);
+    paneAt({ conversationId: "c-1" });
+
+    const link = screen.getByTestId("ai.mention-link");
+    expect(link.textContent).toBe("Personal/Things I have/Pixel 10 Graphene OS");
+    fireEvent.click(link);
+    // The decision's own call (`decisions/ai/0690`): a new tab, and the same one
+    // the right panel makes, so a mention cannot mean two things.
+    expect(mockOpenNewTabInFocused).toHaveBeenCalledWith("n-pixel");
+  });
+
+  it("leaves a name the vault does not hold as plain text", () => {
+    // The other direction, so the assertion above cannot pass on any paragraph:
+    // with no note set there is nothing to link.
+    const token = sendChatMessage("q");
+    appendChatToken(token, "Under Personal/Things I have/Pixel 10 Graphene OS.");
+    finalizeChatTurn(token);
+    paneAt({ conversationId: "c-1" });
+    expect(screen.queryByTestId("ai.mention-link")).toBeNull();
+  });
 
   it("pins the composer's scope when the view is anchored to a note", () => {
     // **The wiring, not the composer's own rule** (myne-md/myne#848): the pane's

@@ -14,7 +14,7 @@
 // back to the diff, and nothing else in the tree compares the two.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -80,10 +80,22 @@ afterEach(() => {
   clearAgentForLock();
 });
 
+/** Open the row's own disclosure: the change itself is one press away
+ *  (myne-md/myne#894), and every body assertion below is behind that press. */
+function openRow() {
+  fireEvent.click(screen.getByTestId("agentReview.toggleDiff"));
+}
+
 describe("the move row", () => {
-  it("shows the folder the note is in and the folder it would land in", () => {
+  it("says where it moves to in one line, and shows both folders on request", () => {
     settleWith([MOVE]);
     mount(() => "Work");
+    // The line, which is all a reader needs to decide: what the change does,
+    // with the destination in it.
+    expect(screen.getByTestId("agentReview.edit").textContent).toContain(
+      "agent.review.rowMove",
+    );
+    openRow();
     expect(screen.getByTestId("agentReview.moveFrom").textContent).toBe("Work");
     expect(screen.getByTestId("agentReview.moveTo").textContent).toBe("Projects");
   });
@@ -91,10 +103,11 @@ describe("the move row", () => {
   it("is not rendered as a diff, which would describe nothing", () => {
     settleWith([MOVE]);
     mount(() => "Work");
+    openRow();
+    // A diff would draw an empty left column under "in the note now" and a
+    // folder on the right, and a folder is not note text.
     expect(screen.queryByTestId("diff.view")).toBeNull();
-    expect(screen.getByTestId("agentReview.moveFlag").textContent).toBe(
-      "agent.review.moveFlag",
-    );
+    expect(screen.getByTestId("agentReview.moveBody")).toBeTruthy();
   });
 
   it("names the vault root rather than showing an empty destination", () => {
@@ -102,6 +115,7 @@ describe("the move row", () => {
     // wire says it. An empty box beside "after this change" would read as a bug.
     settleWith([{ ...MOVE, replacement: "" }]);
     mount(() => "Work");
+    openRow();
     expect(screen.getByTestId("agentReview.moveTo").textContent).toBe(
       "agent.review.vaultRoot",
     );
@@ -113,6 +127,7 @@ describe("the move row", () => {
     // The honest answer is the vault root rather than an invented source.
     settleWith([MOVE]);
     mount(() => null);
+    openRow();
     expect(screen.getByTestId("agentReview.moveFrom").textContent).toBe(
       "agent.review.vaultRoot",
     );
@@ -124,8 +139,8 @@ describe("the move row", () => {
     // replace must keep rendering as a diff.
     settleWith([{ noteId: "n1", anchor: "a", replacement: "b" }]);
     mount(() => "Work");
+    openRow();
     expect(screen.getByTestId("diff.view")).toBeDefined();
     expect(screen.queryByTestId("agentReview.moveBody")).toBeNull();
-    expect(screen.queryByTestId("agentReview.moveFlag")).toBeNull();
   });
 });

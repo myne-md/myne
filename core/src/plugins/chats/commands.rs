@@ -578,7 +578,8 @@ async fn lock_write() -> tokio::sync::OwnedMutexGuard<()> {
 // ---------------------------------------------------------------------------
 
 /// Write a settled conversation state: the full current turn list (turns are
-/// immutable once settled, so the host sends the authoritative list), bump
+/// immutable once settled except for the one monotone decision marker on an agent
+/// turn, so the host sends the authoritative list), bump
 /// the catalog row's `version` + `updated_at`. Called when a turn settles
 /// (text finalize, agent settle, failure, interrupted-stream partial text).
 pub async fn chats_append_turn_with_dir(
