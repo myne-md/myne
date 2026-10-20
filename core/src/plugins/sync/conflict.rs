@@ -736,6 +736,29 @@ mod tests {
                         "[{id}] turns merge, swapped (commutativity)"
                     );
                 }
+                // **One turn's CONTENT, for the same id** (myne-md/myne#894). The
+                // id-list join above assumes two copies of one id are equal, and a
+                // settled turn's decision marker is the one field that can differ,
+                // so this case kind pins the rule that reconciles it: decided wins
+                // in either direction, the decided set is closed, two disagreeing
+                // decisions resolve by a fixed order on the value, and the marker
+                // is grafted onto the local turn rather than taking the remote
+                // object whole.
+                "turns_merge_content" => {
+                    let local = &case["input_local"];
+                    let remote = &case["input_remote"];
+                    let expected = &case["expected_merged"];
+                    assert_eq!(
+                        &merge_turn_content(local, remote),
+                        expected,
+                        "[{id}] turn content merge"
+                    );
+                    assert_eq!(
+                        &merge_turn_content(remote, local),
+                        expected,
+                        "[{id}] turn content merge, swapped (commutativity)"
+                    );
+                }
                 other => panic!("[{id}] unknown case_kind '{other}'"),
             }
         }
