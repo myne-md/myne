@@ -368,14 +368,6 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => setServerSelectionOpen(true)}
-            data-testid="identity-setup.change-server"
-          >
-            {t("identitySetup.changeServer")}
-          </Button>
           {heldIdentity ? (
             // A held identity cannot be opened by a freshly generated phrase, so
             // Create is replaced by the notice + Recover, with an explicit
@@ -437,6 +429,18 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
               />
             </ChoiceCard>
           ) : null}
+
+          {/* The server is a secondary choice, so it sits below the identity
+              fork rather than above it: a link first reads as the step the user
+              must take, and the step here is Create or Recover. */}
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => setServerSelectionOpen(true)}
+            data-testid="identity-setup.change-server"
+          >
+            {t("identitySetup.changeServer")}
+          </Button>
 
           {(heldIdentity || recoverOpen) && (
           <>
