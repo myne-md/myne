@@ -33,9 +33,28 @@ export function Chip({
   );
 }
 
+/**
+ * THE account-number specimen the whole board draws.
+ *
+ * One value, one home. A store listing is permanent and public, so a specimen
+ * that reached one could never be retracted, and two copies of it (this default
+ * and the members screen's own literal) are exactly the drift
+ * `scripts/check-store-frame-identifiers.mjs` exists to catch. Every board screen
+ * that shows an account number renders this constant rather than a literal, and
+ * the value is a VALID Crockford-base32 display form whose Damm-32 check
+ * character was verified once against `protocol/src/account_number.rs`, the same
+ * one-time check the guard's own header records rather than a claim that a test
+ * runs. `scripts/check-store-frame-identifiers.mjs` holds the FORMAT, and it says
+ * so in its header instead of overstating its reach.
+ *
+ * ASCII hyphens on purpose: the board's CSS may render U+2011 in some places,
+ * which is why the guard normalises the four Unicode dashes before matching.
+ */
+export const ACCOUNT_NUMBER_SPECIMEN = "MY-4H7Q-2M9T-8XKB-3R6W-P4N6";
+
 /** The account-number specimen chip (mark + monospace identifier). */
 export function AccountNumber({
-  value = "MY‑4F2A‑9C17‑8E2D‑1B5F‑K",
+  value = ACCOUNT_NUMBER_SPECIMEN,
   style,
 }: {
   value?: string;

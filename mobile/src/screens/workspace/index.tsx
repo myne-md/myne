@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Screen, ScreenScroll } from "../../components";
+import { Screen, ScreenScroll, ACCOUNT_NUMBER_SPECIMEN } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
 
 // ── Shared bits ──────────────────────────────────────────────────────────────
@@ -446,7 +446,7 @@ function Settings() {
             left={<span style={rowLabel}>Account no.</span>}
             right={
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, letterSpacing: "0.02em", color: "var(--fg-2)" }}>
-                MY‑4F2A‑9C17‑8E2D‑1B5F‑K
+                {ACCOUNT_NUMBER_SPECIMEN}
               </span>
             }
           />

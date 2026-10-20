@@ -1,0 +1,108 @@
+{
+  "$comment": "Store caption copy, English. Deliberately NOT in locales/: that tree is the APP's catalogs, held to a three-place language roster and a coverage projection by scripts/check-i18n-coverage.mjs, and this text is read by a store reviewer rather than rendered by any screen. Keyed by frame id from scripts/lib/store-shots/story.mjs, and asserted in both directions by the unit spec.",
+  "notes": {
+    "eyebrow": "END-TO-END ENCRYPTED",
+    "headline": "Notes that stay yours.",
+    "sub": "Plain markdown underneath, so the file outlives the app.",
+    "cards": [
+      {
+        "text": "MY-4H7Q-2M9T-8XKB-3R6W-P4N6",
+        "mono": true,
+        "label": "your account number",
+        "icon": "spark",
+        "accent": 0
+      }
+    ]
+  },
+  "markdown": {
+    "eyebrow": "PLAIN MARKDOWN",
+    "headline": "Write in plain markdown.",
+    "sub": "Wikilinks, backlinks and live preview, with no proprietary format.",
+    "cards": [
+      {
+        "text": "[[Reading list]]",
+        "mono": true,
+        "label": "wikilinks resolve as you type",
+        "icon": "link",
+        "accent": 0
+      }
+    ]
+  },
+  "find": {
+    "eyebrow": "ON THIS DEVICE",
+    "headline": "Find anything, offline.",
+    "sub": "Full-text search and the graph, computed on your own machine.",
+    "cards": [
+      {
+        "text": "48 notes  ·  58 links",
+        "mono": false,
+        "label": "nothing leaves to be indexed",
+        "icon": "spark",
+        "accent": 2
+      }
+    ]
+  },
+  "privacy": {
+    "eyebrow": "NO EMAIL  ·  NO TRACKING",
+    "headline": "No email. No tracking.",
+    "sub": "Your identity is a 20-character account number. Nothing to sign up for.",
+    "cards": [
+      {
+        "text": "MY-4H7Q-…-P4N6",
+        "mono": true,
+        "label": "no email, no phone number",
+        "icon": "file",
+        "accent": 3
+      },
+      {
+        "text": "no telemetry, ever",
+        "mono": false,
+        "label": "and no provider named",
+        "icon": "file",
+        "accent": 0
+      }
+    ]
+  },
+  "server": {
+    "eyebrow": "SELF-HOSTED SYNC",
+    "headline": "Sync through your own server.",
+    "sub": "Self-hosted, running the same open code as the app.",
+    "cards": [
+      {
+        "text": "your own server",
+        "mono": false,
+        "label": "the same open code you run",
+        "icon": "server",
+        "accent": 0
+      }
+    ]
+  },
+  "agent": {
+    "eyebrow": "AI AGENT  ·  OFF BY DEFAULT",
+    "headline": "Ask your notes anything.",
+    "sub": "Off until you turn it on. You name the provider, and nothing is sent anywhere until you do.",
+    "cards": [
+      {
+        "text": "none",
+        "mono": true,
+        "label": "no provider named, nothing sent",
+        "icon": "spark",
+        "accent": 2
+      }
+    ]
+  },
+  "collab": {
+    "eyebrow": "SHARED VAULT",
+    "headline": "One vault, shared.",
+    "sub": "Not your account, and not your other notes.",
+    "cards": [
+      {
+        "text": "shared with 3 people",
+        "mono": false,
+        "label": "every member's copy opens with the group key",
+        "icon": "people",
+        "accent": 0
+      }
+    ]
+  }
+}

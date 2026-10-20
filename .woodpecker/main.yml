@@ -721,6 +721,22 @@ steps:
       # until myne-md/myne#579 and would otherwise have become a per-release
       # check by accident; it needs neither a binary nor a display.
       - node scripts/check-icons.mjs
+      # Store-listing guards (myne#896), the same zero-dependency node-builtins
+      # class as the guards above. A published frame is permanent and public, so
+      # two things have to hold and no compiler sees either: a frame may only
+      # show a surface mobile can actually reach (check-store-publishable) and
+      # only the pinned account number (check-store-frame-identifiers). Both are
+      # backstops for the pre-commit hooks below, whose globs are what decide
+      # WHEN they run.
+      - node scripts/check-store-publishable.mjs
+      - node scripts/check-store-frame-identifiers.mjs
+      # Store-set freshness (myne#896). WARNING ONLY: the script always exits 0,
+      # because a byte-exact gate needs a pinned browser and reddens on a
+      # font-hinting or GPU-path difference (the `check-preview-freshness.mjs`
+      # precedent). The `--render` drift comparison launches a browser and stays
+      # a by-hand step; this compares the committed tree to the append-only
+      # `scripts/store-shots-record.json` with no flags.
+      - node scripts/check-store-set-freshness.mjs
       # The one contract the two workflow files duplicate by design: the
       # desktop build's `--features` list. `tauri-compile` below carries the
       # stub features purely so those arms cannot bit-rot while the suite that
