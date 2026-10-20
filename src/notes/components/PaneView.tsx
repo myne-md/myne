@@ -132,7 +132,7 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { Toast } from "../../components/Toast";
 import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import { paneScrimStyle } from "./sharedStyles";
+import { paneDimStyle } from "./sharedStyles";
 import { Button } from "../../components/primitives/Button";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -2469,14 +2469,11 @@ export function PaneView({
           focused && ws.leaves.length > 1
             ? "inset 0 2px 0 0 var(--accent-soft)"
             : "none",
+        // Brightness, not a wash: see `paneDimStyle`. The one treatment that
+        // reads as "not the active one" on light, dark and true-black alike.
+        ...(paneDimStyle(focused, ws.leaves.length) ?? {}),
       }}
     >
-      {(() => {
-        const scrim = paneScrimStyle(focused, ws.leaves.length);
-        return scrim === null ? null : (
-          <div aria-hidden="true" data-testid="editor.pane-scrim" style={scrim} />
-        );
-      })()}
       <TabStrip
         paneId={leaf.id}
         tabs={leaf.tabs.map(itemKey)}
