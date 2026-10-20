@@ -614,6 +614,7 @@ export function VaultPanel({
         }}
         inFlight={inFlight}
         partialFailContext={deletePartialFail}
+        variant={memberVault ? "member" : "owner"}
       />
     );
   }
@@ -825,16 +826,23 @@ export function VaultPanel({
       <SettingsSection
         tone="danger"
         title={
-          capabilities.has("localOnlyVault")
+          memberVault || capabilities.has("localOnlyVault")
             ? t("settings.vault.dangerZoneHeading")
             : t("settings.vault.localEraseHeading")
         }
       >
-        <p style={HELPER_TEXT_MUTED_STYLE}>
-          {capabilities.has("localOnlyVault")
-            ? t("settings.vault.dangerZoneHelper")
-            : t("settings.vault.localEraseHelper")}
-        </p>
+        {/* A member vault's copy is not the vault. The owner sentence below
+            ("permanently delete ... recovery phrase will not restore") is false
+            for a member in the dangerous direction, so it is ABSENT rather than
+            corrected: the confirm form carries the shared-vault disclosure
+            verbatim, and this section only has to name the action. */}
+        {!memberVault && (
+          <p style={HELPER_TEXT_MUTED_STYLE}>
+            {capabilities.has("localOnlyVault")
+              ? t("settings.vault.dangerZoneHelper")
+              : t("settings.vault.localEraseHelper")}
+          </p>
+        )}
         <div>
           <Button
             variant="danger"
@@ -844,9 +852,11 @@ export function VaultPanel({
               setView("delete-vault");
             }}
           >
-            {capabilities.has("localOnlyVault")
-              ? t("settings.vault.deleteVaultButton")
-              : t("settings.vault.localEraseButton")}
+            {memberVault
+              ? t("settings.deleteVault.memberSubmit")
+              : capabilities.has("localOnlyVault")
+                ? t("settings.vault.deleteVaultButton")
+                : t("settings.vault.localEraseButton")}
           </Button>
         </div>
       </SettingsSection>

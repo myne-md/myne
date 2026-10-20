@@ -958,10 +958,17 @@ export function Unlock({
           </button>
         </div>
       )}
-      {/* Below the rule: destroying the vault is not a third way to open it.
-          The `trash-2` glyph is the canon's own requirement rather than
-          decoration — `PRODUCT.md` says colour is never the sole channel. */}
-      {surface !== "pending" && !decrypting && (
+        </>
+      )}
+      {/* Below the rule: destroying the vault is not a third way to open it,
+          and neither is removing a shared vault from this device. This sits
+          OUTSIDE the member/owner branch because the way out when the
+          credential is gone is the same on both: the label and the confirm
+          screen already branch on `memberVault`, and only the entry point was
+          on the owner's side of the ternary. The `trash-2` glyph is the
+          canon's own requirement rather than decoration — `PRODUCT.md` says
+          colour is never the sole channel. */}
+      {(memberVault || surface !== "pending") && !decrypting && (
         <div style={DANGER_ZONE_STYLE}>
           <button
             type="button"
@@ -974,8 +981,6 @@ export function Unlock({
             {memberVault ? t("unlock.memberRemoveLink") : t("unlock.deleteLink")}
           </button>
         </div>
-      )}
-        </>
       )}
     </AuthShell>
   );
