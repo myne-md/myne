@@ -118,3 +118,7 @@ web/bench/pkg/
 
 # E2E run reports (json floor evidence + junit flake history) — regenerated per run.
 .e2e-report/
+
+# Agent scratch: local permission allow-lists and per-machine settings. The
+# website ignores the same directory; nothing in it is a repo artefact.
+/.claude/
