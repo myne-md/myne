@@ -28,7 +28,7 @@
 #![cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 
 use crate::host::tauri_host::TauriHost;
-use crate::plugins::agent::apply::{ApplyReader, BatchWriter, RestorePointTaker};
+use crate::plugins::agent::apply::{ApplyReader, BatchWrite, BatchWriter, RestorePointTaker};
 use crate::plugins::agent::error::AgentError;
 use crate::plugins::agent::memory::{MemoryStore, RememberAction, RememberOutcome};
 use crate::plugins::agent::prompt::ProposedNote;
@@ -161,7 +161,7 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
             })
     }
 
-    async fn write_batch(&self, notes: Vec<(String, String)>) -> Result<(), AgentError> {
+    async fn write_batch(&self, notes: Vec<BatchWrite>) -> Result<(), AgentError> {
         // The REAL live-session registry, not a throwaway: this is the write path
         // that authors an agent's edits (a batch, not the guarded `note_update`), so
         // a note a live session owns must be written THROUGH that session rather
@@ -188,9 +188,9 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
         // The session's own whole-markdown patch is the write the editor's save
         // funnel already uses (`src/notes/liveNote.ts`), so the agent's edit takes
         // the same door rather than a second one beside it.
-        let (live, plain): (Vec<(String, String)>, Vec<(String, String)>) = notes
+        let (live, plain): (Vec<BatchWrite>, Vec<BatchWrite>) = notes
             .into_iter()
-            .partition(|(note_id, _)| registry.is_note_open(note_id));
+            .partition(|write| registry.is_note_open(&write.note_id));
 
         // **The transactional half FIRST, and the order is the most this can
         // promise.** A failure there returns before anything is written, so every
@@ -203,7 +203,10 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
         if !plain.is_empty() {
             let updates: Vec<NoteBatchUpdate> = plain
                 .into_iter()
-                .map(|(note_id, plaintext)| NoteBatchUpdate { note_id, plaintext })
+                .map(|write| NoteBatchUpdate {
+                    note_id: write.note_id,
+                    plaintext: write.text,
+                })
                 .collect();
             note_write_batch_transactional_from_host(
                 &self.host,
@@ -228,17 +231,22 @@ impl<R: Runtime> BatchWriter for WriteAdapter<'_, R> {
             })?;
         }
 
-        for (note_id, plaintext) in live {
+        for write in live {
             crate::plugins::live::commands::live_session_patch_frontmatter_from_host(
                 &self.host,
                 self.state,
                 registry.inner(),
                 &self.hooks,
                 &StdVaultIo,
-                note_id,
-                plaintext,
+                write.note_id,
+                write.text,
                 None,
-                None,
+                // **The merge base goes WITH the write.** The body this text was
+                // derived from is what lets a session merge a peer edit that
+                // landed between the apply's read and this call; without it the
+                // patch is a whole-text replacement and the peer's text is gone
+                // (myne-md/myne#893 follow-up).
+                write.base,
             )
             .await
             .map_err(|err| {
