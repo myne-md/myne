@@ -129,6 +129,7 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { Toast } from "../../components/Toast";
 import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { paneScrimStyle } from "./sharedStyles";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { copyText } from "../../lib/clipboard";
@@ -2391,6 +2392,12 @@ export function PaneView({
             : "none",
       }}
     >
+      {(() => {
+        const scrim = paneScrimStyle(focused, ws.leaves.length);
+        return scrim === null ? null : (
+          <div aria-hidden="true" data-testid="editor.pane-scrim" style={scrim} />
+        );
+      })()}
       <TabStrip
         paneId={leaf.id}
         tabs={leaf.tabs.map(itemKey)}
