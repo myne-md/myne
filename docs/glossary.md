@@ -2749,6 +2749,12 @@ The real Myne interface, captured as data: the editor's own DOM plus every CSS r
 
 Used in: `decisions.md` 2026-08-08
 
+### **theme-demo stills** &nbsp; 📦 *Product*
+
+The eight JPEG frames behind the `/themes` hero carousel on the website, captured from the running desktop app by `e2e/capture/theme-demo.capture.ts` inside the E2E container and encoded on the host by `scripts/build-theme-demo-stills.mjs` (the image has no ffmpeg, and this machine's ffmpeg has no WebP encoder). The frames are gitignored; the only committed copies are the encoded stills in `myne-website/public/themes/demo/`, which is the pipeline's single consumer. Like the [preview snapshot](#preview-snapshot), they are an artefact rather than a drawing and carry a "do not hand-edit, re-run the capture" rule, and the capture writes no frame until the seeded fixture note is on screen and no account-number-shaped string appears in the page text, because these bytes are published on a public origin.
+
+Used in: `decisions.md` 2026-08-08 (the preview snapshot's capture-pipeline precedent); `myne-md/myne-website#92`
+
 
 ### **PrefsView** &nbsp; 🛠️ *Tooling*
 
