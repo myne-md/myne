@@ -55,6 +55,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "../../platform/dialog";
+import {
+  readAutoApplyTags,
+  subscribeAutoApplyTags,
+  writeAutoApplyTags,
+} from "../../lib/autoApplyTags";
 import { openUrl } from "../../platform/opener";
 
 import type {
@@ -671,6 +676,18 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
       ? { kind: "local-runtime", name: LOCAL_RUNTIME.name }
       : { kind: "in-process" };
   const autoTag = prefs.auto_tag_enabled;
+  // Device-local, not a pref (myne-md/myne#908): see `lib/autoApplyTags.ts` for
+  // why automatic WRITING is a per-device permission while suggestions are
+  // vault content.
+  const [autoApply, setAutoApplyState] = useState<boolean>(() => readAutoApplyTags());
+  const setAutoApplyTags = useCallback(
+    (next: boolean) => {
+      writeAutoApplyTags(next);
+      setAutoApplyState(next);
+    },
+    [],
+  );
+  useEffect(() => subscribeAutoApplyTags(setAutoApplyState), []);
 
   // Read every role's persisted path from the host. Shared by the mount effect
   // and the download rows' `onChanged`, so a completed download updates the
@@ -1600,6 +1617,27 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
           </p>
         )}
       </SettingRow>
+
+      {/* Automatic writing, subordinate to the switch above (myne-md/myne#908).
+          Two things this row says without prose: it is disabled until
+          suggestions are on (there is nothing to apply otherwise), and it is
+          DEVICE-LOCAL, so its helper names that instead of implying it follows
+          the vault. */}
+      <SettingRow
+        anchorId="ai.auto-apply-tags"
+        label={t("settings.ai.autoApplyLabel")}
+        helper={t("settings.ai.autoApplyHelper")}
+        control={(helperId) => (
+          <Switch
+            checked={autoApply}
+            disabled={!aiEnabled || !autoTag || tagModel === false}
+            onChange={setAutoApplyTags}
+            ariaLabel={t("settings.ai.autoApplyLabel")}
+            ariaDescribedBy={helperId}
+            testId="ai.auto-apply-tags-toggle"
+          />
+        )}
+      />
       </SettingsSection>
 
       {/* The catalogue is its own section (myne-md/myne#885): fetching a file

@@ -117,6 +117,9 @@ import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
 import { useTagSuggestions } from "../useTagSuggestions";
 import { acceptTagIntoView } from "../ai/acceptTagIntoView";
+import { computeTagRemoveEdit } from "../ai/acceptTag";
+import { shouldAutoApply } from "../ai/autoApply";
+import { readAutoApplyTags, subscribeAutoApplyTags } from "../../lib/autoApplyTags";
 import * as capabilities from "../../platform/capabilities";
 import { toggleTaskSwallowingRefusal } from "../toggleTask";
 import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-query-block";
@@ -130,6 +133,7 @@ import { Toast } from "../../components/Toast";
 import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { paneScrimStyle } from "./sharedStyles";
+import { Button } from "../../components/primitives/Button";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { copyText } from "../../lib/clipboard";
@@ -1296,14 +1300,15 @@ export function PaneView({
   // AI switches and on the host actually having local AI - the Rust side refuses
   // regardless (task 4), but an off feature should not be arming idle timers or
   // building prompts that carry note text.
+  const enabledForTagPass =
+    capabilities.has("localAi") &&
+    prefs.ai_enabled === true &&
+    prefs.auto_tag_enabled === true;
   const { suggestions: tagSuggestions, dismiss: dismissTagSuggestion } = useTagSuggestions({
     noteId: activeId,
     body: content,
     folder: activeNoteFolder,
-    enabled:
-      capabilities.has("localAi") &&
-      prefs.ai_enabled === true &&
-      prefs.auto_tag_enabled === true,
+    enabled: enabledForTagPass,
     excludedFolders: prefs.ai_excluded_folders,
   });
 
@@ -1324,6 +1329,80 @@ export function PaneView({
     (detail: { tag: string }) => dismissTagSuggestion(detail.tag),
     [dismissTagSuggestion],
   );
+
+  // --- Automatic tagging (myne-md/myne#908) -----------------------------------
+  //
+  // Writes happen at most ONCE per note per session, and only for a note the
+  // user actually edited here. The pass re-fires on every content change, so
+  // "write on every pass" is the shape that turns a note into tag confetti: a
+  // model that emits a variant each time ("myne", then "myne-app") would keep
+  // adding, and nothing would report it. The once-per-session rule costs one Set
+  // and needs no number to defend later.
+  const [autoApplyTags, setAutoApplyTags] = useState<boolean>(() => readAutoApplyTags());
+  useEffect(() => subscribeAutoApplyTags(setAutoApplyTags), []);
+  const [autoAppliedRow, setAutoAppliedRow] = useState<{
+    noteId: NoteId;
+    tags: string[];
+  } | null>(null);
+  const autoAppliedNotesRef = useRef<Set<NoteId>>(new Set());
+  const editedNotesRef = useRef<Set<NoteId>>(new Set());
+
+  // A user edit, and ONLY a user edit: this is the CMEditor `onChange` handler,
+  // not the buffer's authoritative writers, so a disk load or a save echo cannot
+  // mark a note as edited and make it eligible for an automatic write.
+  const handleUserChange = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      const id = activeIdRef.current;
+      if (id !== null) editedNotesRef.current.add(id);
+      setContent(next);
+    },
+    [setContent],
+  );
+
+  useEffect(() => {
+    if (activeId === null) return;
+    const view = editorView;
+    if (view === null) return;
+    const allowed = shouldAutoApply({
+      enabled: autoApplyTags,
+      passEnabled: enabledForTagPass,
+      hasSuggestions: tagSuggestions.length > 0,
+      editedThisSession: editedNotesRef.current.has(activeId),
+      alreadyApplied: autoAppliedNotesRef.current.has(activeId),
+      readOnly: view.state.readOnly,
+    });
+    if (!allowed) return;
+    const tags = tagSuggestions.map((chip) => chip.tag);
+    const landed: string[] = [];
+    for (const tag of tags) {
+      if (acceptTagIntoView(view, tag)) landed.push(tag);
+    }
+    autoAppliedNotesRef.current.add(activeId);
+    // Nothing landed: every tag was already present or the frontmatter is a
+    // shape the writer refuses. Leave the chips up, which is the reader's only
+    // way to see why.
+    if (landed.length > 0) setAutoAppliedRow({ noteId: activeId, tags: landed });
+  }, [autoApplyTags, enabledForTagPass, tagSuggestions, activeId, editorView]);
+
+  // Undo recomputes the removal against the CURRENT document, so it still works
+  // after further typing, and a tag the user already removed by hand resolves to
+  // null rather than sitting there as a dead button.
+  const handleUndoAutoApplied = useCallback(() => {
+    const row = autoAppliedRow;
+    const view = editorView;
+    if (row === null || view === null) return;
+    let removed = false;
+    for (const tag of row.tags) {
+      const edit = computeTagRemoveEdit(view.state.doc.toString(), tag);
+      if (edit === null) continue;
+      view.dispatch({
+        changes: { from: edit.from, to: edit.to, insert: edit.insert },
+        userEvent: "ai.undo-auto-tag",
+      });
+      removed = true;
+    }
+    if (removed) setAutoAppliedRow(null);
+  }, [autoAppliedRow, editorView]);
 
   // Load / restore the active note's body on change (MYND-534). Persistent-view
   // aware: capture the OUTGOING note's EditorState + scroll before swapping, then
@@ -2205,7 +2284,7 @@ export function PaneView({
             // Set only by the autosave `updated:` echo; undefined for every
             // authoritative writer, so those still apply unconditionally.
             valueBase={buffer.base}
-            onChange={setContent}
+            onChange={handleUserChange}
             onBlur={handleBlur}
             onSelectionChange={handleSelectionChange}
             // Live presence (`collab-presence-ui`): report this pane's local caret
@@ -2484,6 +2563,38 @@ export function PaneView({
         onDetachNote={ws.detachNote}
         panelId={panelDomId}
       />
+      {/* Automatic tagging reports what it wrote, and offers the inverse
+          (myne-md/myne#908). It sits above the note, in the band's own row of
+          the layout, because an automatic write must never be invisible: the
+          row names the tags and the undo removes exactly those. RAM-only and
+          note-scoped, so switching notes drops it, matching the suggestion
+          set's lifetime. */}
+      {autoAppliedRow !== null && autoAppliedRow.noteId === activeId ? (
+        <div
+          data-testid="editor.auto-tag-applied"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-1) var(--space-3)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-3)",
+            borderBottom: "1px solid var(--line-1)",
+          }}
+        >
+          <span>
+            {t("notes.autoTag.applied", { tags: autoAppliedRow.tags.join(", ") })}
+          </span>
+          <Button
+            variant="ghost"
+            onClick={handleUndoAutoApplied}
+            data-testid="editor.auto-tag-undo"
+          >
+            {t("notes.autoTag.undo")}
+          </Button>
+        </div>
+      ) : null}
       <div
         ref={outlineScrollerRef}
         // The pane body is the strip's `role="tabpanel"` (myne#728). Without
