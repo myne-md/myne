@@ -19,8 +19,8 @@
 // is unknowable while locked).
 
 import { setCustomTheme, type ThemeChoice } from "./prefs";
-import { deriveSyntaxTokensForTheme } from "./syntaxTheme";
 import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
+import { readAppearanceCanon } from "./themeCanon";
 import { clampPalette, readMeasureDefaults } from "./themeMeasure";
 import type { ThemePalette } from "./themes";
 
@@ -54,6 +54,32 @@ export function applyTheme(choice: ThemeChoice | null): void {
  * `--*` keys are written; the values were already value-shape-allowlist
  * validated host-side (the injection guard, MYND-111), and per-property
  * `setProperty` cannot inject a second declaration regardless.
+ *
+ * ── THE THEME IS A PARTIAL PALETTE, AND THAT IS WHY THE CANON IS SEEDED ─────
+ * A theme file carries the 21 required tokens plus whichever optional ones its
+ * author set. The shipped gallery themes carry a fraction of the sheet's colour
+ * tokens and omit whole families: the dark ones set no label colour and no
+ * highlight at all. Painting only the file's keys therefore left those families on
+ * the built-in LIGHT values of `:root`, because dropping `data-theme` is what this
+ * function does first: a dark theme came out with light-mode label chips, light
+ * highlight washes, light graph group dots and light shadow scrims.
+ * `deriveSyntaxTokensForTheme` (MYND-356/527) patched the syntax family of that
+ * bug only, which is how the rest stayed invisible.
+ *
+ * So the palette is applied as `{ ...canon, ...palette }`: every token the theme
+ * omits comes from the built-in canon FOR THE APPEARANCE THE THEME DECLARES, and
+ * every token the theme sets keeps the author's value. The canonical set and the
+ * reading rule live in `themeCanon.ts`.
+ *
+ * The website's theme builder is on the same rule (`myne-website#93`): its preview
+ * merges the canon for the declared appearance too, over a table held to the
+ * captured sheet name by name and value by value, and it retired its own port of
+ * `deriveSyntaxTokensForTheme` in the same change. One difference is deliberate
+ * and stays: the builder paints through its value allowlist, so the three
+ * `--shadow-*` canon entries do not land there (a shadow is a multi-part value the
+ * allowlist has no grammar for). Widening a security gate to close a shadow
+ * difference is not a trade worth making, and the builder's own test pins which
+ * tokens it skips.
  */
 export function applyCustomTheme(palette: Record<string, string>): void {
   const root = document.documentElement;
@@ -63,6 +89,10 @@ export function applyCustomTheme(palette: Record<string, string>): void {
   // value rather than the previous theme's, and reading beats a hardcoded table
   // because it cannot drift from `tokens.css` (deep-customization, myne#394).
   const measureDefaults = readMeasureDefaults(root);
+  // The appearance comes from the theme's OWN background, never from whichever
+  // built-in happened to be active: a dark theme applied while Light was on still
+  // needs the dark canon for the families it omits.
+  const canon = readAppearanceCanon(root, palette);
   root.removeAttribute("data-theme");
   // Colour and ornament keys pass through untouched; measure keys are bounded to
   // 0.5×–2× of their default, and one that cannot be bounded (unit mismatch, no
@@ -74,7 +104,8 @@ export function applyCustomTheme(palette: Record<string, string>): void {
   // under. The shared package owns both, so no client can reflect and forget.
   applyOrnamentAttributes(root, applied);
   const keys: string[] = [];
-  for (const [key, value] of Object.entries(applied)) {
+  // Canon FIRST, palette second: the author's value always wins.
+  for (const [key, value] of Object.entries({ ...canon, ...applied })) {
     // `--_o-*` is the ornament layer's private namespace — `--_o-ceiling` is the
     // bound the tint wash is clamped by. The key grammar allows `_`, so a palette
     // can carry one; the host filters it on read, and this is the second line of
@@ -83,19 +114,6 @@ export function applyCustomTheme(palette: Record<string, string>): void {
       root.style.setProperty(key, value);
       keys.push(key);
     }
-  }
-  // MYND-356: a DARK custom theme's syntax roles that lack an override would else
-  // inherit the built-in LIGHT syntax colors (unreadable on a dark surface).
-  // Alias those roles to the design-tuned dark ramp instead — reusing approved
-  // colors, deriving light-vs-dark from the theme's own background luminance.
-  // Applied AFTER the palette so it never clobbers a role the theme set itself;
-  // `deriveSyntaxTokensForTheme` fills only the roles the theme omits (MYND-527:
-  // per-role, since the gallery themes define just 5 of 12) and returns `{}` for
-  // a light theme. Tracked in `keys` so `clearCustomTheme` reverts them on
-  // switch/lock.
-  for (const [key, value] of Object.entries(deriveSyntaxTokensForTheme(palette))) {
-    root.style.setProperty(key, value);
-    keys.push(key);
   }
   appliedCustomKeys = keys;
 }

@@ -10,24 +10,41 @@
 //
 // Two properties carry the weight here:
 //
-//   1. The SYNTAX FILL is per-role. A dark palette that defines only some of the
-//      12 `--syntax-*` roles must get the rest aliased to the built-in dark ramp
-//      and keep the ones it chose. Desktop shipped the all-or-nothing version of
-//      this rule first and had to fix it again (MYND-356 → MYND-527); mobile
-//      consumes the same shared derivation precisely so it inherits the fix
-//      rather than the bug, and this asserts the shared module is actually wired
-//      in — a resolution failure or a stale copy fails here, loudly.
+//   1. The CANON SEED is per-token and appearance-correct. A theme is a partial
+//      palette: every optional token it omits (the syntax roles, the label
+//      colours, the highlights) must come from the built-in canon for the
+//      appearance the palette DECLARES, and a token it does set must keep the
+//      author's value. Mobile consumes the shared rule
+//      (`@myne/theme-canon`, the same module desktop paints through) precisely so
+//      the two clients cannot disagree, and this asserts it is actually wired in.
+//      A resolution failure or a stale copy fails here, loudly.
 //   2. The REVERT is exact. `clearCustomTheme` removes the keys the last apply
 //      wrote and nothing else. It runs on lock, where "nothing else" is not
 //      tidiness: over-removal breaks unrelated inline properties, and
 //      under-removal leaves a locked screen wearing the vault's palette.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { applyCustomTheme, clearCustomTheme, hasCustomTheme, resolveCustomPalette } from "../src/lib/customTheme";
 
 const root = () => document.documentElement;
 const prop = (key: string) => root().style.getPropertyValue(key);
+
+/** Stand in for the token sheet, which no test environment loads. */
+function installDefaults(css: string): HTMLStyleElement {
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.appendChild(style);
+  return style;
+}
+
+/** The built-in canon for one appearance, as the sheet would declare it. */
+function canonSheet(): HTMLStyleElement {
+  return installDefaults(`
+    :root { --highlight: #f3e7c4; --label-clay: #b0543f; --syntax-property: #6a5a8c; --syntax-invalid: #b03030; }
+    :root[data-theme="dark"] { --highlight: #4f4422; --label-clay: #d99683; --syntax-property: #9a8cc0; --syntax-invalid: #e06060; }
+  `);
+}
 
 /** The 5 roles the shipped gallery themes define; the other 7 are the fill set. */
 const DEFINED_ROLES = ["keyword", "string", "comment", "number", "variable"] as const;
@@ -54,24 +71,46 @@ afterEach(() => {
 });
 
 describe("applyCustomTheme", () => {
-  it("aliases only the syntax roles a dark palette omits, leaving its own alone", () => {
-    const palette = darkPartialPalette();
-    applyCustomTheme(palette);
+  it("seeds a DARK palette's omitted tokens from the dark canon, keeping its own", () => {
+    const sheet = canonSheet();
+    try {
+      const palette = darkPartialPalette();
+      applyCustomTheme(palette);
 
-    for (const role of OMITTED_ROLES) {
-      expect(prop(`--syntax-${role}`)).toBe(`var(--_syntax-${role}-dark)`);
-    }
-    for (const role of DEFINED_ROLES) {
-      expect(prop(`--syntax-${role}`)).toBe(palette[`--syntax-${role}`]);
+      // A token the theme omits takes the canon for ITS appearance: on a dark
+      // background that is the dark value, not the light one `:root` would
+      // otherwise expose once `data-theme` is dropped.
+      expect(prop("--syntax-property")).toBe("#9a8cc0");
+      expect(prop("--label-clay")).toBe("#d99683");
+      expect(prop("--highlight")).toBe("#4f4422");
+      // A token the theme defines keeps the author's value.
+      for (const role of DEFINED_ROLES) {
+        expect(prop(`--syntax-${role}`)).toBe(palette[`--syntax-${role}`]);
+      }
+    } finally {
+      sheet.remove();
     }
   });
 
-  it("derives no syntax tokens for a light palette", () => {
-    applyCustomTheme({ "--paper": "#fdfcf9", "--ink": "#1a1a1a" });
+  it("seeds a LIGHT palette's omitted tokens from the light canon", () => {
+    const sheet = canonSheet();
+    try {
+      applyCustomTheme({ "--paper": "#fdfcf9", "--ink": "#1a1a1a" });
 
-    for (const role of [...DEFINED_ROLES, ...OMITTED_ROLES]) {
-      expect(prop(`--syntax-${role}`)).toBe("");
+      expect(prop("--syntax-property")).toBe("#6a5a8c");
+      expect(prop("--label-clay")).toBe("#b0543f");
+      expect(prop("--paper")).toBe("#fdfcf9");
+    } finally {
+      sheet.remove();
     }
+  });
+
+  it("paints only the palette when no sheet declares a canon", () => {
+    // The seed must not invent values: with no token sheet there is nothing to
+    // read, and the behaviour is exactly what it was before the seed existed.
+    applyCustomTheme({ "--paper": "#fdfcf9" });
+
+    expect(prop("--syntax-property")).toBe("");
     expect(prop("--paper")).toBe("#fdfcf9");
   });
 
@@ -100,15 +139,22 @@ describe("applyCustomTheme", () => {
 });
 
 describe("clearCustomTheme", () => {
-  it("removes exactly the keys the last apply wrote, derived ones included", () => {
-    applyCustomTheme(darkPartialPalette());
-    clearCustomTheme();
+  it("removes exactly the keys the last apply wrote, seeded ones included", () => {
+    const sheet = canonSheet();
+    try {
+      applyCustomTheme(darkPartialPalette());
+      clearCustomTheme();
 
-    for (const role of [...DEFINED_ROLES, ...OMITTED_ROLES]) {
-      expect(prop(`--syntax-${role}`)).toBe("");
+      for (const role of [...DEFINED_ROLES, ...OMITTED_ROLES]) {
+        expect(prop(`--syntax-${role}`)).toBe("");
+      }
+      expect(prop("--label-clay")).toBe("");
+      expect(prop("--highlight")).toBe("");
+      expect(prop("--paper")).toBe("");
+      expect(prop("--ink")).toBe("");
+    } finally {
+      sheet.remove();
     }
-    expect(prop("--paper")).toBe("");
-    expect(prop("--ink")).toBe("");
   });
 
   it("leaves unrelated inline custom properties untouched", () => {
@@ -181,8 +227,22 @@ describe("hasCustomTheme", () => {
     expect(hasCustomTheme()).toBe(false);
   });
 
-  it("is false for a palette that carried no `--*` key at all", () => {
+  it("is true after an apply that painted only the canon, and false with no sheet", () => {
+    // Since the canon seed (myne-md/myne#900) an apply paints the canon for the
+    // declared appearance even when the palette names no token, so the predicate
+    // answers "did an apply run". This file installs no token sheet, which is the
+    // one case where nothing at all is painted and it stays false.
     applyCustomTheme({ name: "not a token" });
     expect(hasCustomTheme()).toBe(false);
+
+    const sheet = canonSheet();
+    try {
+      applyCustomTheme({ name: "not a token" });
+      expect(hasCustomTheme()).toBe(true);
+      expect(prop("--highlight")).toBe("#f3e7c4");
+    } finally {
+      sheet.remove();
+      clearCustomTheme();
+    }
   });
 });

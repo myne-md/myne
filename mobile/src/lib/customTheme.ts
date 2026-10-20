@@ -23,8 +23,8 @@
 // meet only here: a custom theme OVERRIDES the built-in choice, so applying one
 // drops `data-theme`.
 
-import { deriveSyntaxTokensForTheme } from "@myne/syntax-theme";
 import { applyOrnamentAttributes, clearOrnamentAttributes } from "@myne/ornaments";
+import { readAppearanceCanon } from "@myne/theme-canon";
 import { clampPalette, readMeasureDefaults } from "@myne/theme-measure";
 
 import { HAS_TAURI } from "./app-window";
@@ -66,6 +66,13 @@ export function applyCustomTheme(palette: ThemePalette): void {
   // clamp is a protective envelope: two clients disagreeing about the band would
   // mean one paints a value the other refused (myne#394).
   const measureDefaults = readMeasureDefaults(root);
+  // The built-in canon for the appearance THIS palette declares: a theme file is
+  // a partial palette, so every optional token it omits (the syntax roles, the
+  // label colours, the highlights) must come from the canon that matches its own
+  // background rather than from the light `:root` values the dropped attribute
+  // would otherwise expose. Read through the shared module so desktop and mobile
+  // cannot disagree about what a partial theme looks like.
+  const canon = readAppearanceCanon(root, palette);
   root.removeAttribute("data-theme");
 
   const { applied } = clampPalette(palette, measureDefaults);
@@ -74,7 +81,8 @@ export function applyCustomTheme(palette: ThemePalette): void {
   // under. The shared package owns both, so no client can reflect and forget.
   applyOrnamentAttributes(root, applied);
   const keys: string[] = [];
-  for (const [key, value] of Object.entries(applied)) {
+  // Canon FIRST, palette second: the author's value always wins.
+  for (const [key, value] of Object.entries({ ...canon, ...applied })) {
     // `--_o-*` is the ornament layer's private namespace — `--_o-ceiling` is the
     // bound the tint wash is clamped by. The key grammar allows `_`, so a palette
     // can carry one; the host filters it on read, and this is the second line of
@@ -83,22 +91,6 @@ export function applyCustomTheme(palette: ThemePalette): void {
       root.style.setProperty(key, value);
       keys.push(key);
     }
-  }
-
-  // A dark custom theme that defines no `--syntax-*` role of its own would
-  // inherit the built-in LIGHT syntax colors and render code blocks unreadable.
-  // The shared derivation (main repo `src/lib/syntaxTheme.ts`, aliased as
-  // `@myne/syntax-theme`) aliases each role the palette OMITS to the design-tuned
-  // `--_syntax-*-dark` ramp that `styles/tokens.css` defines unconditionally, and
-  // returns `{}` for a light theme. Per-role rather than all-or-nothing: the
-  // gallery themes define only 5 of the 12, and an all-or-nothing gate leaves the
-  // other 7 wrong (desktop's MYND-527).
-  //
-  // Applied AFTER the palette so it can never clobber a role the theme chose,
-  // and tracked in the same key list so the revert below covers it too.
-  for (const [key, value] of Object.entries(deriveSyntaxTokensForTheme(palette))) {
-    root.style.setProperty(key, value);
-    keys.push(key);
   }
 
   appliedCustomKeys = keys;
@@ -118,9 +110,15 @@ export function clearCustomTheme(): void {
  * Is a custom palette currently painted on the root?
  *
  * The built-in theme applier must not re-assert `data-theme` over a live custom
- * palette — a custom theme supersedes Light/Dark/System, and editor mount runs
+ * palette: a custom theme supersedes Light/Dark/System, and editor mount runs
  * AFTER the unlock-path paint. This is how that ordering is kept honest without
  * either side importing the other's state.
+ *
+ * The question it answers is "did an apply run", not "did the palette carry a
+ * token": since the canon seed (myne-md/myne#900) an apply paints the canon for
+ * the declared appearance even when the palette names no token at all, which is
+ * the honest answer for the consumer above (a theme IS in force). The `false`
+ * case is reachable only where no stylesheet declares a canon.
  */
 export function hasCustomTheme(): boolean {
   return appliedCustomKeys.length > 0;

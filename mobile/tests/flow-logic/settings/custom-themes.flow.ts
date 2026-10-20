@@ -113,9 +113,17 @@ test.describe("mobile custom-themes apply", () => {
     expect(props["--accent"]).toBe("#7aa2f7");
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBeNull();
     // Zinc is a dark palette that defines none of the 12 syntax roles, so the
-    // shared derivation filled them — the same defect desktop fixed twice, and
-    // proof the applier ran end-to-end rather than only writing literal keys.
-    expect(props["--syntax-keyword"]).toBe("var(--_syntax-keyword-dark)");
+    // canon seed filled them from the DARK ramp: the inline value is the
+    // resolved dark colour, not the light `:root` default the dropped
+    // `data-theme` would otherwise expose. Compared against the ramp the
+    // stylesheet declares rather than a literal, so a sheet value change does
+    // not redden this, and proof the applier ran end-to-end rather than only
+    // writing the keys the palette carried.
+    const darkSyntaxRamp = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--_syntax-keyword-dark").trim(),
+    );
+    expect(darkSyntaxRamp).not.toBe("");
+    expect(props["--syntax-keyword"]).toBe(darkSyntaxRamp);
 
     // ONE list call, and no read: the palette came from the entry the list
     // already handed over. (`themes_read` is mocked as the ACL rejection it is
