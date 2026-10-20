@@ -135,11 +135,28 @@ pub trait RestorePointTaker: Send + Sync {
     ) -> Result<Vec<(String, String)>, AgentError>;
 }
 
+/// One note's write in a batch: the text, and the text it was derived from.
+///
+/// **`base` is the merge base, and it exists because a note can be someone
+/// else's too** (myne-md/myne#849 review, myne-md/myne#893 follow-up). An apply
+/// reads each note from disk, places the edits against that read and writes the
+/// result. On a live-collaboration vault a peer's change may be merged into the
+/// session between the read and this write, and a write that does not say what
+/// it read REPLACES that change rather than merging over it. `None` means the
+/// write is deliberately a replacement (a snapshot restore), which is a
+/// decision the caller states rather than one the writer infers.
+pub struct BatchWrite {
+    pub note_id: String,
+    pub text: String,
+    /// The body `text` was derived from, or `None` for an intentional replace.
+    pub base: Option<String>,
+}
+
 /// Writing the changed notes, transactionally.
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait BatchWriter: Send + Sync {
-    async fn write_batch(&self, notes: Vec<(String, String)>) -> Result<(), AgentError>;
+    async fn write_batch(&self, notes: Vec<BatchWrite>) -> Result<(), AgentError>;
 
     /// Create one note and return its id.
     ///
@@ -315,6 +332,10 @@ pub async fn apply_approved(
     //    against a copy of every body taken beforehand: the copy answered the
     //    same question and cost a full duplicate of every in-scope note's text.
     let mut touched: BTreeSet<String> = BTreeSet::new();
+    // The pre-image per note, taken ONLY for notes an edit lands on (a whole
+    // duplicate of every in-scope body is the cost the comment above records
+    // being avoided). This becomes the merge base of the write.
+    let mut originals: BTreeMap<String, Zeroizing<String>> = BTreeMap::new();
     for (index, edit) in &in_scope {
         let Some(body) = bodies.get(&edit.note_id) else {
             continue; // already refused above as unreadable
@@ -370,6 +391,9 @@ pub async fn apply_approved(
                     });
                     continue;
                 }
+                originals
+                    .entry(edit.note_id.clone())
+                    .or_insert_with(|| Zeroizing::new(body.to_string()));
                 bodies.insert(edit.note_id.clone(), Zeroizing::new(next));
                 touched.insert(edit.note_id.clone());
                 outcome.applied += 1;
@@ -387,10 +411,14 @@ pub async fn apply_approved(
     // sync version and its mtime for no change.
     // The wrapper is unwrapped only here, at the boundary where the bytes are
     // handed to the writer that will encrypt them.
-    let changed: Vec<(String, String)> = bodies
+    let changed: Vec<BatchWrite> = bodies
         .into_iter()
         .filter(|(id, _)| touched.contains(id))
-        .map(|(id, body)| (id, body.to_string()))
+        .map(|(id, body)| BatchWrite {
+            base: originals.remove(&id).map(|b| b.to_string()),
+            note_id: id,
+            text: body.to_string(),
+        })
         .collect();
 
     // Nothing to rewrite is NOT nothing to do: a run may propose only new notes,
@@ -398,7 +426,7 @@ pub async fn apply_approved(
     // did, until the creation tests caught it.
     if !changed.is_empty() {
         // 4. Restore point BEFORE the write, and a failure here ends the apply.
-        let note_ids: Vec<String> = changed.iter().map(|(id, _)| id.clone()).collect();
+        let note_ids: Vec<String> = changed.iter().map(|w| w.note_id.clone()).collect();
         outcome.restore_points = restore.capture(run_id, &note_ids).await?;
 
         // 5. Write.
@@ -779,6 +807,9 @@ mod tests {
         notes: Mutex<BTreeMap<String, String>>,
         restore_ok: bool,
         captured: Mutex<Vec<(String, Vec<String>)>>,
+        /// The merge base each write carried, by note id. Empty for a write with
+        /// no base, which is the intentional-replace case.
+        bases: Mutex<BTreeMap<String, Option<String>>>,
         /// Make `create_note` fail. Off by default, so every existing test is
         /// unaffected and the one that sets it says why it does.
         create_fails: bool,
@@ -795,6 +826,7 @@ mod tests {
                 ),
                 restore_ok,
                 captured: Mutex::new(Vec::new()),
+                bases: Mutex::new(BTreeMap::new()),
                 create_fails: false,
             }
         }
@@ -846,10 +878,14 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
     #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
     impl BatchWriter for Disk {
-        async fn write_batch(&self, notes: Vec<(String, String)>) -> Result<(), AgentError> {
+        async fn write_batch(&self, notes: Vec<BatchWrite>) -> Result<(), AgentError> {
             let mut m = self.notes.lock().unwrap();
-            for (id, body) in notes {
-                m.insert(id, body);
+            for write in notes {
+                self.bases
+                    .lock()
+                    .unwrap()
+                    .insert(write.note_id.clone(), write.base.clone());
+                m.insert(write.note_id, write.text);
             }
             Ok(())
         }
@@ -890,6 +926,40 @@ mod tests {
         assert_eq!(cap.len(), 1);
         assert_eq!(cap[0].0, "r");
         assert_eq!(cap[0].1, vec!["a".to_string()]);
+    }
+
+    /// **The write carries the body the edit was applied to.**
+    ///
+    /// This is the merge base a live session needs: without it the patch is a
+    /// whole-text replacement, and a peer edit merged between this apply's read
+    /// and its write is deleted rather than merged (myne-md/myne#893 follow-up).
+    /// Asserted on the writer's own receipt, because the failure is invisible in
+    /// the returned note: the write succeeds either way, and only the base says
+    /// whether it merged or overwrote.
+    #[test]
+    fn a_batch_write_carries_the_body_the_edit_was_derived_from() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a", "b"]));
+        let disk = Disk::with(&[("a", "alpha world"), ("b", "untouched")], true);
+        block_on(apply_approved(
+            &runs,
+            "r",
+            &[edit("a", "world", "there")],
+            &[],
+            &[],
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        let bases = disk.bases.lock().unwrap().clone();
+        assert_eq!(
+            bases.get("a").cloned().flatten().as_deref(),
+            Some("alpha world")
+        );
+        // A note no edit landed on is not written at all, so it has no base.
+        assert!(!bases.contains_key("b"));
     }
 
     // The load-bearing one. Asserted by reading the notes back off the stand-in
