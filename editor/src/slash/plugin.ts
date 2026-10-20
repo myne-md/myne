@@ -109,6 +109,25 @@ class SlashMenuView implements PluginValue {
         }
       });
       if (this.state !== null && !openedFromInsert) {
+        // A slash query never spans whitespace. `findSlashTriggerLeftOfCaret`
+        // already relies on that invariant, but the live path did not enforce
+        // it: the filter string went straight to `filterCommands`, whose
+        // `fuzzyFilter` TRIMS the query, so `"/"` plus a space became the empty
+        // query, every command matched, and the `Prec.highest` Enter binding
+        // applied the first one instead of inserting the newline the user asked
+        // for. Closing BEFORE the filter is consulted is what makes the space
+        // reach the document.
+        const head = update.view.state.selection.main.head;
+        if (head > this.state.triggerFrom) {
+          const query = update.view.state.doc.sliceString(
+            this.state.triggerFrom + 1,
+            head,
+          );
+          if (/\s/.test(query)) {
+            this.close();
+            return;
+          }
+        }
         // Reset highlight to the first match whenever the filter changes, so
         // typing `/todo` + Enter accepts the top result without an arrow press.
         this.state = {

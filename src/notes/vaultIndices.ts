@@ -547,23 +547,51 @@ export type TagTreeNode = {
  * and a bump (every index mutation goes through the single chokepoint) makes
  * the next read re-fetch, so a tag accepted mid-session still appears.
  */
-let tagTreeCache: { nonce: number; promise: Promise<TagTreeNode[]> } | null = null;
+/** Hard bound on the memo (myne-md/myne#908 review): the key includes the index
+ *  nonce, which bumps on every autosave, so an unbounded map kept one whole
+ *  vault's tag tree per content change for the life of the process. */
+const TAG_TREE_CACHE_ENTRIES = 8;
+
+let tagTreeCache: Map<string, Promise<TagTreeNode[]>> = new Map();
 
 /** The full tag tree (nodes with direct + subtree counts + deterministic
  *  display), derived Rust-side from the stored exact folded tags (N2).
- *  Memoized on the index-changed nonce (see `tagTreeCache`). */
-export async function tagTree(): Promise<TagTreeNode[]> {
-  const nonce = getIndexNonce();
-  if (tagTreeCache !== null && tagTreeCache.nonce === nonce) {
-    return tagTreeCache.promise;
+ *  Memoized on the index-changed nonce AND the folder scope (see
+ *  `tagTreeCache`).
+ *
+ *  `folderPrefix` scopes the answer to notes under one folder (myne-md/myne#908
+ *  item 8). It exists for the auto-tag prompt, which must carry the note's own
+ *  project vocabulary rather than every tag in the vault. Omitting it is the
+ *  whole-vault answer, unchanged for every existing reader. The folder is part
+ *  of the memo key: serving one folder's tree to another would be a silent wrong
+ *  answer, and `__resetTagTreeForTest` still drops the lot. */
+export async function tagTree(folderPrefix?: string): Promise<TagTreeNode[]> {
+  // A tuple, JSON-encoded rather than joined with a sentinel: a folder really
+  // can be named `*`, and a string join would collide the no-argument answer
+  // with that folder's. Bounded below, because the key carries the index nonce
+  // and the nonce bumps on every autosave.
+  const key = JSON.stringify([getIndexNonce(), folderPrefix ?? null]);
+  const hit = tagTreeCache.get(key);
+  if (hit !== undefined) return hit;
+  const promise = invoke<TagTreeNode[]>(
+    "plugin:vault-indices|vault_indices_tag_tree",
+    folderPrefix === undefined ? {} : { folder: folderPrefix },
+  );
+  tagTreeCache.set(key, promise);
+  // The nonce half of the key makes every autosave a new entry, so the map must
+  // be bounded or a long session accumulates one whole-vault tree per keystroke
+  // burst that reached the model. Oldest-first, and the current entry is the
+  // last one inserted, so it is never the one evicted.
+  while (tagTreeCache.size > TAG_TREE_CACHE_ENTRIES) {
+    const oldest = tagTreeCache.keys().next();
+    if (oldest.done) break;
+    tagTreeCache.delete(oldest.value);
   }
-  const promise = invoke<TagTreeNode[]>("plugin:vault-indices|vault_indices_tag_tree");
-  tagTreeCache = { nonce, promise };
   // A rejected promise must not be cached for the rest of the nonce: a
   // transient slot/IO failure would otherwise be re-thrown on every reader
   // until the next index mutation. Clearing lets the next caller retry.
   promise.catch(() => {
-    if (tagTreeCache !== null && tagTreeCache.promise === promise) tagTreeCache = null;
+    if (tagTreeCache.get(key) === promise) tagTreeCache.delete(key);
   });
   return promise;
 }
@@ -571,7 +599,7 @@ export async function tagTree(): Promise<TagTreeNode[]> {
 /** Test-only: drop the memo so a spec starts from a clean cache. A nonce reset
  *  alone would leave a same-nonce entry behind (both start at 0). */
 export function __resetTagTreeForTest(): void {
-  tagTreeCache = null;
+  tagTreeCache = new Map();
 }
 
 /**

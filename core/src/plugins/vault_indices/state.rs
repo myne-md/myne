@@ -945,7 +945,16 @@ impl VaultIndicesState {
     /// folded tags. Each node carries direct + subtree counts (deduped by
     /// note) and a deterministic display. Sorted by folded key. Empty on a
     /// poisoned lock.
-    pub fn tag_tree(&self) -> Vec<TagTreeNode> {
+    ///
+    /// `folder_prefix` scopes the whole tree to notes under one folder
+    /// (myne-md/myne#908 item 8). It exists so the auto-tag prompt can carry the
+    /// vocabulary of the note's OWN project instead of every tag in the vault,
+    /// which is what let a note about one project be offered another project's
+    /// tag. `None` is the pre-existing whole-vault answer byte for byte, so every
+    /// caller that does not pass one keeps today's behaviour. An empty string
+    /// means the vault ROOT, not "everything": the root is a real folder a note
+    /// can live in.
+    pub fn tag_tree(&self, folder_prefix: Option<&str>) -> Vec<TagTreeNode> {
         use std::collections::{BTreeMap, BTreeSet};
         let Ok(idx) = self.inner.lock() else {
             return Vec::new();
@@ -957,6 +966,11 @@ impl VaultIndicesState {
         }
         let mut acc: BTreeMap<String, Acc> = BTreeMap::new();
         for (note_id, record) in idx.notes.iter() {
+            if let Some(prefix) = folder_prefix {
+                if !note_is_under_folder(record.folder.as_deref(), prefix) {
+                    continue;
+                }
+            }
             for tag in &record.tags {
                 let fsegs: Vec<&str> = tag.folded.split('/').filter(|s| !s.is_empty()).collect();
                 let dsegs: Vec<&str> = tag.display.split('/').collect();
@@ -995,6 +1009,24 @@ impl VaultIndicesState {
             })
             .collect()
     }
+}
+
+/// Is `note_folder` (a trailing-slash canonical folder, or `None` at the root)
+/// the same folder as `prefix`, or somewhere beneath it?
+///
+/// The comparison is on the SLASH-BOUNDARY, never on a raw `starts_with`: a
+/// prefix of `Projects` must not match `Projects-old`, which is the whole
+/// difference between a folder-scoped hint and a substring one.
+fn note_is_under_folder(note_folder: Option<&str>, prefix: &str) -> bool {
+    let p = prefix.trim_matches('/');
+    let f = note_folder.unwrap_or("").trim_matches('/');
+    if p.is_empty() {
+        return f.is_empty();
+    }
+    if f == p {
+        return true;
+    }
+    f.len() > p.len() && f.starts_with(p) && f.as_bytes()[p.len()] == b'/'
 }
 
 #[cfg(test)]
@@ -1202,7 +1234,7 @@ mod tests {
         state.apply("a", a);
         state.apply("b", b);
 
-        let tree = state.tag_tree();
+        let tree = state.tag_tree(None);
         let area = tree.iter().find(|n| n.key == "area").expect("area node");
         assert_eq!(area.direct_count, 1, "only A is tagged exactly #area");
         assert_eq!(area.subtree_count, 2, "A direct + B via descendant");
@@ -1225,7 +1257,7 @@ mod tests {
         state.apply("a", a);
         state.apply("b", b);
 
-        let tree = state.tag_tree();
+        let tree = state.tag_tree(None);
         let node = tree.iter().find(|n| n.key == "kitap").expect("kitap node");
         // lexicographically-min of {"Kitap","kitap"} → "Kitap" (ASCII upper < lower).
         assert_eq!(node.display, "Kitap");
@@ -1280,8 +1312,8 @@ mod tests {
             backwards.apply(&format!("n{i}"), r);
         }
 
-        let a = forwards.tag_tree();
-        let b = backwards.tag_tree();
+        let a = forwards.tag_tree(None);
+        let b = backwards.tag_tree(None);
         let keys = |t: &Vec<TagTreeNode>| t.iter().map(|n| n.key.clone()).collect::<Vec<_>>();
         assert_eq!(
             keys(&a),
@@ -1341,7 +1373,7 @@ mod tests {
             state.apply(&format!("n{i}"), r);
         }
         let keys = state
-            .tag_tree()
+            .tag_tree(None)
             .iter()
             .map(|n| n.key.clone())
             .collect::<Vec<_>>();
@@ -1737,5 +1769,74 @@ mod tests {
         let stored = state.note_record("note-a").expect("present");
         assert_eq!(stored.tasks.len(), 1, "replace semantics, not append");
         assert_eq!(stored.tasks[0].line_index, 9);
+    }
+
+    // myne-md/myne#908 item 8 — the tag tree can be read for ONE folder, which
+    // is what the auto-tag prompt uses instead of the whole vault's vocabulary.
+
+    #[test]
+    fn tag_tree_scopes_to_a_folder_and_its_descendants() {
+        let state = VaultIndicesState::default();
+        let mut myne = rec("M", Some("Projects/Myne/"));
+        myne.tags = vec![tag("rust", "rust")];
+        state.apply("m", myne);
+
+        let mut gathin = rec("G", Some("Projects/Gathin/"));
+        gathin.tags = vec![tag("sales", "sales")];
+        state.apply("g", gathin);
+
+        let mut deep = rec("D", Some("Projects/Myne/Design/"));
+        deep.tags = vec![tag("figma", "figma")];
+        state.apply("d", deep);
+
+        let mut root = rec("R", None);
+        root.tags = vec![tag("inbox", "inbox")];
+        state.apply("r", root);
+
+        let scoped = state.tag_tree(Some("Projects/Myne"));
+        let keys: Vec<String> = scoped.iter().map(|n| n.key.clone()).collect();
+        assert_eq!(
+            keys,
+            vec!["figma", "rust"],
+            "own folder plus descendants, sorted"
+        );
+
+        let all = state.tag_tree(None);
+        assert_eq!(all.len(), 4, "no prefix keeps the whole-vault answer");
+
+        let root_only = state.tag_tree(Some(""));
+        assert_eq!(
+            root_only.iter().map(|n| n.key.clone()).collect::<Vec<_>>(),
+            vec!["inbox"],
+            "an empty prefix is the ROOT folder, not everything"
+        );
+    }
+
+    #[test]
+    fn tag_tree_folder_match_is_boundary_aware() {
+        let state = VaultIndicesState::default();
+        let mut sibling = rec("S", Some("Projects-old/"));
+        sibling.tags = vec![tag("stale", "stale")];
+        state.apply("s", sibling);
+
+        assert!(
+            state.tag_tree(Some("Projects")).is_empty(),
+            "`Projects` must not match `Projects-old`; a raw starts_with would"
+        );
+    }
+
+    #[test]
+    fn tag_tree_folder_scope_keeps_counts_within_the_scope() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("A", Some("Work/"));
+        a.tags = vec![tag("plan", "plan")];
+        state.apply("a", a);
+        let mut b = rec("B", Some("Home/"));
+        b.tags = vec![tag("plan", "plan")];
+        state.apply("b", b);
+
+        let work = state.tag_tree(Some("Work"));
+        let plan = work.iter().find(|n| n.key == "plan").expect("plan");
+        assert_eq!(plan.subtree_count, 1, "one note in Work, not both");
     }
 }
