@@ -156,14 +156,58 @@ describe("AgentFootprint", () => {
     // rendering both put the same cost line on screen TWICE.
     expect(screen.queryByTestId("agentFootprint.detail")).toBeNull();
     expect(screen.queryByTestId("agentFootprint.disclosure")).toBeNull();
-    // The line breathes, and it breathes the robot: a still label beside a
-    // moving glyph reads as two things rather than one.
+    // The line breathes as one thing rather than a still label beside a moving
+    // glyph, and the glyph it breathes is NOT the speaker's: `bot` here sat
+    // directly under the assistant's own `bot` and the pair read as two speakers
+    // (myne-md/myne#894).
     expect(screen.getByTestId("agentFootprint.status").className).toContain(
       "myne-working-wave",
     );
     expect(screen.getByTestId("agentFootprint.status").getAttribute("data-motion")).toBe(
       "essential",
     );
+  });
+
+  it("turns while the run works, and stops turning when it settles", () => {
+    // **"The working thing does not turn."** The mark was a named glyph with an
+    // opacity wave on it, so the one thing on screen saying work was happening
+    // looked like a still picture of a spinner. `StatusMark` gives it the
+    // rotation from `tokens.css`, the MYND-630 carve-out that slows rather than
+    // freezes, and the settled arms keep their still glyphs.
+    show({ settledLabel: null, durationMillis: null, startedAtMillis: Date.now() - 1_000 });
+    const mark = screen.getByTestId("agentFootprint.mark");
+    expect(mark.className).toContain("myne-spinner");
+    // The wave is on the LABEL, not on the mark: two motions on one 12px glyph
+    // fight each other.
+    expect(mark.className).not.toContain("myne-working-wave");
+    expect(screen.getByTestId("agentFootprint.status").className).toContain(
+      "myne-working-wave",
+    );
+    cleanup();
+    show();
+    expect(screen.getByTestId("agentFootprint.mark").className).not.toContain(
+      "myne-spinner",
+    );
+  });
+
+  it("renders its status line and nothing else", () => {
+    // **The regression this file did not have** (myne-md/myne#894). The icon
+    // change was made with a long note written as `//` lines INSIDE the JSX, and
+    // a `//` line in JSX children is not a comment: React renders it as a text
+    // child, so the whole paragraph painted inside the run's status line, above
+    // the word "Finished". `tsc` was green, every unit test was green, and so was
+    // every guard in `scripts/`, the only thing that could have caught it was
+    // looking at the rendered catalogue, and this is the cheap half of that.
+    // Asserted as "no comment punctuation AND no double space", so it fails for
+    // a stray block rather than for one particular string.
+    show({ settledLabel: null, durationMillis: null, startedAtMillis: Date.now() - 2_000 });
+    const footprint = screen.getByTestId("agentFootprint");
+    expect(footprint.textContent).not.toContain("//");
+    expect(footprint.textContent).not.toContain("**");
+    expect(screen.getByTestId("agentFootprint.status").textContent).toBe(
+      "agent.progress.working",
+    );
+    expect(footprint.textContent).toContain("agent.progress.working");
   });
 
   it("drops the wave and shows a check once the run settles", () => {

@@ -3,9 +3,9 @@
 //
 // **The failure this file exists to catch is a silent one.** Before settings
 // existed, "the run proposed something" and "the run proposed a note edit"
-// were the same fact everywhere in this store and in `AgentReviewTakeover`. A
+// were the same fact everywhere in this store and on the review card. A
 // settings-only run is the case where they come apart, and a gate left on the
-// old fact does not error: the takeover simply does not open, the change the
+// old fact does not error: the review card simply does not render, the change the
 // model made is never shown, and the user has no way to tell. Every assertion
 // here is on the store's observable state rather than on a predicate's return
 // value, the convention `agentReviewAutoClose.test.ts` states at its own head.

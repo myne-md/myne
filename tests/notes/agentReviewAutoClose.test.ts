@@ -69,7 +69,7 @@ function settle(proposal: Proposal) {
   );
 }
 
-/** Whether the run survived. `view` is what `AgentReviewTakeover` renders on. */
+/** Whether the run survived. `view` is what the review card is derived from. */
 function runIsOpen(): boolean {
   return getAgent().view !== null;
 }

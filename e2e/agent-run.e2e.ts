@@ -200,6 +200,27 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
               `proposed: ${JSON.stringify(proposedDiffs)}`,
         ).toBeGreaterThan(1);
 
+        // **The card is a descendant of the turn that proposed it** (myne-md/myne#894).
+        // One CSS descendant selector, because "the proposal renders under the
+        // message that proposed it" is the whole point of the redesign, and nothing
+        // else in this scenario would notice it moving back out to a dialog over the
+        // window. The card's own testid is unchanged, so every other step here reads
+        // the same element it always did.
+        expect(
+          (
+            await s.findElements(
+              '[data-testid="ai.turn"] [data-testid="agentReview.screen"]',
+            )
+          ).length,
+          "the review card must render inside the assistant turn",
+        ).toBe(1);
+
+        // And a row's own detail is behind its chevron, which is what makes a
+        // forty-row proposal a list a reader scans: closed by default, revealed on
+        // request, and the mode it reveals is the card's own width decision.
+        await (await s.byTestId("agentReview.toggleDiff")).click();
+        await s.waitForElement(testIdSelector("diff.view"), { timeoutMs: 10_000 });
+
         // Reject exactly one, and assert the row says so rather than trusting
         // that the click landed.
         await (await s.byTestId("agentReview.toggleEdit")).click();
@@ -221,7 +242,7 @@ aiDescribe("ag1 agent run → review → reject one → approve rest", () => {
         // resolved (one rejected, the rest applied) and nothing was refused,
         // so there is no decision left in the screen and it dismisses. This
         // scenario used to wait on `agentReview.applyReport` and then click
-        // `agentReview.close`; both would now race a dialog that is on its way
+        // a close control; both would now race a surface that is on its way
         // out, so the disappearance IS the assertion.
         await s.waitForGone(testIdSelector("agentReview.screen"), {
           timeoutMs: 20_000,
@@ -351,7 +372,10 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
         // The bulk approve must not carry it. Approve everything, then assert the
         // note did NOT gain the marker: the state, not the label.
         await (await s.byTestId("agentReview.approveAll")).click();
-        await s.waitForElement(testIdSelector("agentReview.applyReport"), {
+        // **The outcome is the headline now** (myne-md/myne#894): the card is a
+        // decision surface, so what landed is one figure at the top and a flag on
+        // each row, rather than a report section at the bottom.
+        await s.waitForElement(testIdSelector("agentReview.appliedCount"), {
           timeoutMs: 20_000,
         });
 
@@ -369,7 +393,8 @@ aiDescribe("ag3 a removing edit is not carried by the bulk approve", () => {
           "an unapplied removal row is unresolved, so the review must not dismiss itself",
         ).toBe(1);
 
-        await clickByTestId(s, "agentReview.close");
+        // Reject all is the exit now (myne-md/myne#894).
+        await clickByTestId(s, "agentReview.rejectAll");
         await waitForSaved(s);
         expect(await editorText(s)).not.toContain("trashed:");
       },
@@ -608,7 +633,8 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         await s.waitForElement(testIdSelector("agentReview.screen"), {
           timeoutMs: 30_000,
         });
-        await clickByTestId(s, "agentReview.close");
+        // Reject all is the exit now (myne-md/myne#894).
+        await clickByTestId(s, "agentReview.rejectAll");
         await s.waitForGone(testIdSelector("agentReview.screen"), {
           timeoutMs: 10_000,
         });
@@ -628,7 +654,8 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         // that it works with no remount between the two sends IS half of what
         // this scenario claims.
         await startRun(s, "tidy this note");
-        await clickByTestId(s, "agentReview.close");
+        // Reject all is the exit now (myne-md/myne#894).
+        await clickByTestId(s, "agentReview.rejectAll");
 
         // Both flows landed in ONE transcript, in order, and the run's turn
         // still states its outcome after the review screen has been closed, which
@@ -703,7 +730,14 @@ aiDescribe("ag7 an append writes into a note with no body", () => {
         // `exists`, and the call that named one type-checked nowhere, because
         // `tsconfig.json` is include:["src"] and this tree is checked only by
         // `scripts/check-test-typecheck.mjs` (myne-md/myne#647).
-        expect((await s.byTestIdAll("agentReview.appendFlag")).length).toBeGreaterThan(0);
+        const appendRow = await s.waitForElement(
+          '[data-testid="agentReview.edit"][data-kind="append"]',
+          { timeoutMs: 20_000 },
+        );
+        // The row SAYS which verb it is in one sentence (`rowAppend`), which is
+        // what replaced the flag span: the same fact, said to the person
+        // approving rather than only to this scenario.
+        expect(await appendRow.textContent()).toContain("Add to the end");
 
         await (await s.byTestId("agentReview.approveAll")).click();
         await s.waitForGone(testIdSelector("agentReview.screen"), { timeoutMs: 20_000 });

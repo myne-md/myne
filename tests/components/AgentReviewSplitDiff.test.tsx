@@ -15,7 +15,7 @@
 // literal, and a unified diff of the same edit looks entirely plausible.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -75,6 +75,11 @@ function mount() {
       folderOf={() => null}
     />,
   );
+  // **The diff is one press away now** (myne-md/myne#894, second pass): the row
+  // says what the change does, and the text of the change is behind that row's
+  // own disclosure. This suite is about how a diff RENDERS once it is open, so
+  // it opens it the way a reader does.
+  fireEvent.click(screen.getByTestId("agentReview.toggleDiff"));
 }
 
 afterEach(() => {

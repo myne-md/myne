@@ -17,6 +17,7 @@ import { AgentReview } from "@app/screens/AgentReview";
 import {
   beginRun,
   clearAgentForLock,
+  failRun,
   currentRunEpoch,
   settleApply,
   settleStep,
@@ -271,7 +272,13 @@ function ToasterStackDemo() {
  * next, and the store is not something the fake host swaps. Clearing in the
  * effect's cleanup is what makes this story's state belong to this story.
  */
-function SeededReview({ refusals = false }: { refusals?: boolean }) {
+function SeededReview({
+  openRow = false,
+  failure = false,
+}: {
+  openRow?: boolean;
+  failure?: boolean;
+}) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     beginRun(null);
@@ -288,9 +295,15 @@ function SeededReview({ refusals = false }: { refusals?: boolean }) {
           edits: [
             {
               noteId: "n1",
-              kind: "move",
-              anchor: "",
-              replacement: "02 - AREAS/Self Improvement/",
+              // A diff rather than a move, because this row is the one the
+              // `row-opened` story discloses and a move's detail is a folder
+              // pair: a story describing a diff that renders a pair is the same
+              // defect as describing a dialog that is a card (myne-md/myne#894,
+              // from review). The text is plainly synthetic, which is also what
+              // this fixture is for.
+              kind: "replace",
+              anchor: "The draft lists three dates and no owners.",
+              replacement: "The draft lists three dates, each with an owner.",
             },
             {
               noteId: "n2",
@@ -300,11 +313,11 @@ function SeededReview({ refusals = false }: { refusals?: boolean }) {
             },
           ],
           newNotes: [],
-          // Long enough to be clamped: the modal shows three lines and a
-          // disclosure, so the diff below is what the screen is about.
+          // The model's own claim. The card does not render it (it is the
+          // turn's prose), so its length only matters to the turn stories.
           summary:
             "Analyzed all 23 notes in 00 - INBOX/ and rehomed each according to your PARA structure. ".repeat(
-              6,
+              3,
             ),
         },
         end: { kind: "finished" },
@@ -316,25 +329,26 @@ function SeededReview({ refusals = false }: { refusals?: boolean }) {
       },
       currentRunEpoch(),
     );
-    if (refusals) {
-      settleApply(
-        {
-          applied: 0,
-          refused: [
-            { noteId: "n2", index: 1, reason: "moveIntoExcludedFolder" },
-          ],
-          refusedNewNotes: [],
-          notesWritten: [],
-          notesCreated: [],
-          restorePoints: [],
-        },
-        [],
-        currentRunEpoch(),
-      );
+    if (failure) {
+      // The failed arm: the headline names the cause, and there is deliberately no
+      // second dismissing control beside it (myne-md/myne#894).
+      failRun("Writing the changes did not finish.");
     }
     setReady(true);
     return () => clearAgentForLock();
-  }, [refusals]);
+  }, [failure]);
+
+  // The opened-row state is an INTERACTION, so it is replayed rather than passed
+  // in: a row's own text (a diff, or a move's folder pair) is behind its chevron,
+  // and a story that asserted the closed shape only would depict a card whose
+  // detail nobody has looked at.
+  useEffect(() => {
+    if (!ready || !openRow) return;
+    const toggle = document.querySelector<HTMLElement>(
+      '[data-testid="agentReview.toggleDiff"]',
+    );
+    toggle?.click();
+  }, [ready, openRow]);
   if (!ready) return null;
   return (
     <AgentReview
@@ -1947,35 +1961,29 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "AgentReview",
     state: "default",
     description:
-      "The agent review screen with no run behind it: the empty state a user reaches before any agent run has produced a proposal. The seeded sibling stories show the settled run and the refusal case.",
-    tags: ["components", "ai", "agent", "review", "empty", "proposal"],
-    render: () => (
-      <AgentReview
-        onClose={action("onClose")}
-        titleOf={() => null}
-        folderOf={() => null}
-      />
-    ),
-  },
-  {
-    id: "components/agentreview/clamped-summary",
-    group: "components",
-    surface: "AgentReview",
-    state: "clamped-summary",
-    description:
-      "A settled run whose summary is long: three lines and a disclosure above the diff, so the diff is what the screen is about. The summary stays on screen rather than being hidden, because a refusal has to be able to contradict it (myne-md/myne#848).",
-    tags: ["components", "agentreview", "review", "summary", "clamp"],
+      "The review card as a decision surface: one line per proposed change (the note, and what the change does), a Reject on every row, and the footer's two bulk acts. The change's own text is behind its row's chevron, so forty proposals read as a list rather than a document.",
+    tags: ["components", "agentreview", "review", "card", "rows"],
     render: () => <SeededReview />,
   },
   {
-    id: "components/agentreview/refusals-above-the-claim",
+    id: "components/agentreview/row-opened",
     group: "components",
     surface: "AgentReview",
-    state: "refusals-above-the-claim",
+    state: "row-opened",
     description:
-      "An apply that refused one of the moves: the host's refusal is pinned ABOVE the model's summary, with a count, so the claim cannot be read in the order that flatters it (myne-md/myne#848).",
-    tags: ["components", "agentreview", "review", "refusal", "applied"],
-    render: () => <SeededReview refusals />,
+      "The same card with one row's detail disclosed: the anchor text and what replaces it, in the mode the card's width allows. This is the state a reader actually decides in, and the one the closed row is compact enough to hide.",
+    tags: ["components", "agentreview", "review", "diff", "opened-row"],
+    render: () => <SeededReview openRow />,
+  },
+  {
+    id: "components/agentreview/failed",
+    group: "components",
+    surface: "AgentReview",
+    state: "failed",
+    description:
+      "An apply that failed: the headline names the cause instead of one sentence for every refusal, and there is no second dismissing control beside it. The refusal block itself is NOT here, because it renders above the model's claim on the transcript turn (myne-md/myne#848).",
+    tags: ["components", "agentreview", "review", "failed", "cause"],
+    render: () => <SeededReview failure />,
   },
   {
     id: "components/editor/default",

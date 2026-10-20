@@ -388,6 +388,29 @@ export function PaneView({
       [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
     [notes],
   );
+  /** What an agent apply in THIS pane written to disk owes the rest of the app.
+   *
+   *  **The agent tab had no half of this at all** (myne-md/myne#894, on the
+   *  user's report: "I approved the move and the sidebar did not follow it").
+   *  `Editor.tsx` builds this handler for the right-panel AI chat and passes it
+   *  down its own tree; the centre pane's agent tab is mounted from HERE, and
+   *  this call site passed only `folders`, so an apply wrote through the backend
+   *  with nothing told the sidebar: its tree is derived from its own
+   *  title/folder cache, and a moved note therefore sat under its OLD folder
+   *  until something unrelated re-read it. It is the same two obligations the
+   *  panel's copy states, the open pane's buffer (an apply writes out of band of
+   *  every autosave loop) and the sidebar's slice of each note it changed, and it
+   *  differs from that copy in one deliberate way: the refreshes are caught here.
+   *  A pane is a leaf whose write path must not carry an unhandled rejection out
+   *  of a callback it does not own, and a sidebar re-index that failed is a stale
+   *  row rather than a failed apply. */
+  const agentNotesWritten = useCallback(
+    (ids: readonly string[]) => {
+      ctx.reloadOpenNote();
+      for (const id of ids) void ctx.refreshOne(id as NoteId).catch(() => {});
+    },
+    [ctx],
+  );
   const indexNonce = useIndexNonce();
   // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
   // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
@@ -1992,7 +2015,15 @@ export function PaneView({
         fill: true,
         gutters: false,
         el: (
-          <AgentPane paneId={leaf.id} item={leaf.activeTab} folders={agentFolders} />
+          <AgentPane
+            paneId={leaf.id}
+            item={leaf.activeTab}
+            folders={agentFolders}
+            onNotesWritten={agentNotesWritten}
+            // An undo rewrites notes out-of-band too, the same shape a sync pull
+            // has, so it takes the same blanket reload the panel's own copy uses.
+            onRunUndone={() => ctx.reloadOpenNote()}
+          />
         ),
       };
     }

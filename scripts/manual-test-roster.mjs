@@ -116,13 +116,16 @@
 export const ROSTER = Object.freeze([
   {
     id: "ai.agent-mode",
-    title: "Agent mode and its review screen",
+    title: "Agent mode and its review card",
     paths: [
       "src/screens/AgentReview.tsx",
       "src/notes/agent/agentStore.ts",
       "src/notes/agent/components/AgentProgress.tsx",
-      "src/notes/agent/components/AgentReviewTakeover.tsx",
       "src/notes/agent/components/ScopeExpansionDialog.tsx",
+      "src/notes/agent/reviewCardLayout.ts",
+      "src/notes/agent/applyFailure.ts",
+      "src/notes/ai/ConversationSurface.tsx",
+      "src/notes/ai/reviewOwnership.ts",
       "src/notes/components/ProposalDiffModal.tsx",
       "src/notes/agent/components/RunCostLine.tsx",
       "src/notes/ai/agentToChat.ts",
@@ -146,7 +149,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "With a real GGUF generation model loaded, run an agent edit across five notes. Time it: confirm the first proposed edit appears within about 30 seconds, the running-scope figure keeps moving, and the app stays responsive to typing. Read each proposed diff and confirm the anchor text really occurs in that note. Watch memory pressure and fan noise and confirm the machine does not swap or thermal-throttle. On Apple silicon, start an embedding pass while a chat turn is streaming and confirm the app survives. Then, with a run that proposed a SETTING change (\"change my weekly notes folder\"), read that row with the theme switched through all four palettes, including one imported custom theme: the label, the value it holds now and the value it would become must all stay legible on each, the focus ring must be visible on the row's two buttons as you Tab through them, and the row must not overflow at a narrow window width. The summary count is deliberately NOT walked here: `e2e/agent-setting-intent.e2e.ts` asserts it, and re-walking what a scenario covers is what naming the scenario prevents.",
+        see: "With a real GGUF generation model loaded, run an agent edit across five notes. Time it: confirm the first proposed edit appears within about 30 seconds, the running-scope figure keeps moving, and the app stays responsive to typing. Read each proposed change: each row is ONE line (the note and what the change does), and the diff itself is behind that row's chevron, open it and confirm the anchor text really occurs in that note, then close it and confirm forty rows still fit in a card you can read without scrolling the transcript. The review is no longer a dialog over the window (myne-md/myne#894): it is a card under the assistant's own message, in whatever conversation started the run, and it must arrive without anything else being clicked. Walk it in BOTH hosts: in the agent tab (a wide centre pane) each diff is two columns, and in the right panel's AI chat (~380px) it falls back to one column with gutter markers. Judge the narrow one honestly: with a wrapped paragraph and with a bulleted list, could you tell what the change does to the note? Confirm the card says it is waiting for your approval, that the sentence keeps that state while the run is undecided and drops it once an apply has failed or been refused, and that Escape and a click on the card change nothing. Then approve everything: the card must go away on its own, with no dialog left behind, and the message must be readable in the transcript afterwards. Watch memory pressure and fan noise and confirm the machine does not swap or thermal-throttle. On Apple silicon, start an embedding pass while a chat turn is streaming and confirm the app survives. Then, with a run that proposed a SETTING change (\"change my weekly notes folder\"), read that row with the theme switched through all four palettes, including one imported custom theme: the label, the value it holds now and the value it would become must all stay legible on each, the focus ring must be visible on the row's two buttons as you Tab through them, and the row must not overflow at a narrow window width. The summary count is deliberately NOT walked here: `e2e/agent-setting-intent.e2e.ts` asserts it, and re-walking what a scenario covers is what naming the scenario prevents.",
         whyNotAutomated: "Every AI scenario runs StubEngine behind --features local-inference-stub, so no Candle/GGUF model ever loads; output shape, first-token latency and the memory ceiling are unmeasured, and the Metal concurrency crash class only appears when two threads hold a real MetalDevice.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
@@ -167,7 +170,7 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "With an agent review screen open holding proposed replacements copied out of note bodies, close the laptop lid (or sleep the machine), wait a minute and wake it. Confirm the vault is locked and the review screen is gone rather than still showing note text. Repeat with the OS screen lock, and on macOS/Windows with fast user switching to a second account and back.",
+        see: "With the agent review card open holding proposed replacements copied out of note bodies, close the laptop lid (or sleep the machine), wait a minute and wake it. Confirm the vault is locked and the review card is gone rather than still showing note text. Repeat with the OS screen lock, and on macOS/Windows with fast user switching to a second account and back.",
         whyNotAutomated: "auto-lock.e2e.ts proves only the in-process idle timer; sleep/wake, OS screen lock and fast user switching are OS session events the container cannot raise, so whether keys and the proposal survive a suspend has never been observed.",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 12,
@@ -181,7 +184,7 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "On a DISPOSABLE vault, run an agent edit that touches four or five notes and reach the review screen on a real phone. Read one note's diff and answer one question honestly: could you tell what this change does to the note, or did you tap Apply because reading it was worse than trusting it? Check a diff of a long paragraph and one of a bulleted list. Then, on ANDROID, press the hardware back button at the top level and confirm the proposal is still there; press it inside an open diff and confirm it returns to the list rather than leaving. On IOS do the same with the edge-swipe from the left. Repeat the top-level back three times in a row. Finally apply and confirm every note listed actually changed.",
+        see: "On a DISPOSABLE vault, run an agent edit that touches four or five notes and reach the review card on a real phone. Read one note's diff and answer one question honestly: could you tell what this change does to the note, or did you tap Apply because reading it was worse than trusting it? Check a diff of a long paragraph and one of a bulleted list. Then, on ANDROID, press the hardware back button at the top level and confirm the proposal is still there; press it inside an open diff and confirm it returns to the list rather than leaving. On IOS do the same with the edge-swipe from the left. Repeat the top-level back three times in a row. Finally apply and confirm every note listed actually changed.",
         whyNotAutomated: "Two halves, and each is out of reach for its own reason. Whether a diff is READABLE at 390px is a judgement about a person's comprehension, and the honest pass condition is written above as a question to answer rather than an assertion. And the back gesture is a real OS gesture: the Android hardware button and the iOS edge-swipe are system events no lane raises, and the flow tier drives Chromium in a desktop browser with neither. That the screen CLAIMS a history entry, and claims a replacement after each pop, is asserted in mobile/tests/components/AiReviewFlow.test.tsx, which is the mechanism; whether the OS then behaves as expected on a real device is not something jsdom can speak for.",
         clients: ["ios", "android"],
         estimateMin: 14,

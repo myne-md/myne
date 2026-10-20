@@ -194,7 +194,10 @@ aiDescribe("ag8 setting change → review → approve one → the value is writt
         // the runner reported `monthly.folder` written, which was the test being
         // wrong rather than the app.
         await (await s.byTestIdAll("agentReview.settingApply"))[0].click();
-        await s.waitForElement(testIdSelector("agentReview.settingsChangedCount"), {
+        // A landed setting counts in the headline with the note edits
+        // (myne-md/myne#894): one figure for "what this run has written", and the
+        // per-row flag still says which row it was.
+        await s.waitForElement(testIdSelector("agentReview.appliedCount"), {
           timeoutMs: 15_000,
         });
         // Re-found rather than reused: the row above re-rendered, so a captured
@@ -207,7 +210,7 @@ aiDescribe("ag8 setting change → review → approve one → the value is writt
         // rather than on behaviour.
         await s.waitUntil(
           async () => {
-            const el = await s.byTestId("agentReview.settingsChangedCount");
+            const el = await s.byTestId("agentReview.appliedCount");
             const text = (await el.textContent()) ?? "";
             return text.includes("2") ? text : null;
           },

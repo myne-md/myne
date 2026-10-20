@@ -57,6 +57,16 @@ export type AgentTurnEnd =
   | "exhaustedIterations"
   | "stalled";
 
+/**
+ * How the reader resolved a run's proposal (`AgentTurnSummary.outcome`).
+ *
+ * Two arms, because the card has exactly two ways out (myne-md/myne#894): it was
+ * applied, or the reader rejected everything and the proposal was dropped. A
+ * partial apply is `applied`, the rows that landed are the ones the count
+ * reports, and the card stays open with its refusal block when some were refused.
+ */
+export type AgentRunOutcome = "applied" | "rejected";
+
 /** What an agent turn keeps once its run is no longer the open one.
  *
  *  **Counts, plus the model's own closing sentence, plus the frozen proposal.**
@@ -117,6 +127,24 @@ export interface AgentTurnSummary {
    *  "remote but nothing was sent" are different statements. */
   charsOffDevice: number | null;
   end: AgentTurnEnd;
+  /**
+   * What the reader decided about this run's proposal, once they have decided.
+   *
+   * **Absent means "not decided yet", and that is the honest reading of every
+   * turn on disk today**: a proposal the user never reached (a lock, a reload, a
+   * run they walked away from) leaves no outcome, and the line above the card
+   * therefore keeps saying what was PROPOSED. Optional for the same reason
+   * `settings` is: a turn persisted before this field existed reads as
+   * undecided rather than as `undefined` everywhere.
+   *
+   * The count line is what reads it (myne-md/myne#894, on the user's read:
+   * "after the decision it should say user rejected 3 changes / applied 3
+   * changes; 'proposed' is only for the approval stage"), and the reason it has
+   * to live HERE rather than in `agentStore` is that rejecting everything drops
+   * the run: by the time the transcript shows the outcome there is no run left to
+   * ask.
+   */
+  outcome?: AgentRunOutcome;
   /** Memory entries this run wrote (0 or 1, summed across resumes). Feeds the
    *  turn-end marker (myne-md/myne#697). */
   memoryUpdated?: number;
@@ -208,6 +236,7 @@ export type ChatAction =
       scopeLabel: string;
     }
   | { type: "AGENT_SETTLE"; summary: AgentTurnSummary }
+  | { type: "AGENT_OUTCOME"; runId: string; outcome: AgentRunOutcome }
   | { type: "AGENT_FAIL"; message: string }
   | { type: "CLEARED" }
   | { type: "HYDRATED"; turns: ChatTurn[] };
@@ -372,7 +401,53 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       // Frozen on the way in, not by the caller: every settle passes through
       // this arm, including `settleAgentTurn`, so no dispatch site can hand
       // the transcript a live reference into `agentStore` by forgetting.
-      next[i] = { ...turn, agentSummary: freezeSummary(action.summary) };
+      const frozen = freezeSummary(action.summary);
+      // **And a decision the turn already carries survives it** (myne-md/myne#894,
+      // from review). This arm replaces the summary WHOLESALE, which is what a
+      // settle means, and the decision marker is the one field on a settled turn
+      // that must not be dropped by a later writer: `settleTurnInConversation`
+      // (the hydrate path) applies a settle read from the conversation FILE,
+      // asynchronously, so a reader who decides a run while that read-to-write is
+      // in flight had it overwritten on disk. Same shape as `AGENT_OUTCOME`'s own
+      // guard, one arm over, and the spec's "never unset or changed" rests on both.
+      const priorOutcome = turn.agentSummary?.outcome;
+      next[i] = {
+        ...turn,
+        agentSummary:
+          priorOutcome === undefined ? frozen : { ...frozen, outcome: priorOutcome },
+      };
+      return { ...state, turns: next };
+    }
+    case "AGENT_OUTCOME": {
+      // Matched by RUN ID rather than by position, unlike the settle arm above.
+      // A settle happens once, from the run's own continuation, while the turn it
+      // belongs to is the newest; a decision happens when the READER acts, and
+      // they may have moved to another conversation in between, so the turn that
+      // names this run is the one to write, wherever it is.
+      const i = state.turns.findIndex(
+        (t) => t.agentSummary?.runId === action.runId,
+      );
+      if (i === -1) return state;
+      const turn = state.turns[i]!;
+      // **The FIRST decision wins, and this arm is where that is enforced**
+      // (myne-md/myne#894, from review). The field lands on a turn that has
+      // already settled, which `docs/spec/protocol.md` §9.24.2 permits only
+      // because it is MONOTONE, and the sync merge's decided-wins rule is
+      // commutative only while at most one side of a turn is decided
+      // (`conflict::merge_turn_content`). Both were false while this overwrote
+      // unconditionally: a PARTIAL apply keeps the card open, so its Reject all
+      // could write `rejected` over an `applied`, and two devices could then hold
+      // different decisions for one turn id with no rule to reconcile them, which
+      // is the CAS ping-pong the merge clause exists to close, reached by another
+      // door. A decision is not revisable in this surface either: the counts line
+      // reports what happened to the run, and the rows the reader turned down are
+      // the card's own record of that.
+      if (turn.agentSummary?.outcome !== undefined) return state;
+      const next = [...state.turns];
+      next[i] = {
+        ...turn,
+        agentSummary: { ...turn.agentSummary!, outcome: action.outcome },
+      };
       return { ...state, turns: next };
     }
     case "AGENT_FAIL": {
@@ -674,6 +749,35 @@ export function sendAgentTurn(task: string, scopeLabel: string): void {
 export function settleAgentTurn(summary: AgentTurnSummary): void {
   dispatchChat({ type: "AGENT_SETTLE", summary });
   notifySettled();
+}
+
+/**
+ * Record what the reader decided about a settled run's proposal.
+ *
+ * Called from the surface that owns both stores (`ConversationSurface`) when the
+ * card reports a decision, never from a render: the outcome is a fact about an
+ * act, and the turn it lands on is found by run id.
+ */
+export function markAgentTurnOutcome(runId: string, outcome: AgentRunOutcome): boolean {
+  // **Returns whether the ACTIVE transcript held the turn**, because the caller
+  // may have navigated away while the apply round trip was in flight
+  // (myne-md/myne#894 review). The reducer matches by run id inside the active
+  // conversation, so a miss used to be a silent `return state`: no dispatch, no
+  // persist, and the decision gone while the notes were already written. The
+  // caller routes a miss to the conversation the RUN started in, the same way
+  // `settleTurnInConversation` routes a settle.
+  const present = current.turns.some((t) => t.agentSummary?.runId === runId);
+  if (!present) return false;
+  dispatchChat({ type: "AGENT_OUTCOME", runId, outcome });
+  // **`notifySettled`, because this IS a settle** (myne-md/myne#894, from the
+  // review). It is the only path that persists the transcript, and every other
+  // terminal writer in this file calls it. Without it the decision reached RAM
+  // and nothing else: on the reject path, which drops the run and ends the
+  // interaction, no later settle was coming, so the field usually never landed at
+  // all, and the reason it lives on the turn rather than in the store was
+  // exactly that the store's copy goes with the run.
+  notifySettled();
+  return true;
 }
 
 /**

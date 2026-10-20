@@ -77,6 +77,31 @@ pub enum LiveSessionCommandError {
     Io { io_error_kind: IoFailureKind },
 }
 
+/// A bounded, content-free tag for a live-session refusal (myne-md/myne#894).
+///
+/// The agent's live-session write arm used to flatten its error to
+/// `AgentError::WriteFailed` with no trace, so the one flow the live partition
+/// exists for (approve an edit on the note you are reading) produced no line at
+/// all. A closed match rather than `Display`, for the same reason
+/// `note_batch_error_kind` is: the log may be sent to a maintainer, so it carries
+/// a label and never a path, an id or a message.
+pub fn live_session_error_kind(e: &LiveSessionCommandError) -> &'static str {
+    match e {
+        LiveSessionCommandError::VaultNotUnlocked => "vault_not_unlocked",
+        LiveSessionCommandError::InvalidNoteId => "invalid_note_id",
+        LiveSessionCommandError::NoteNotFound => "note_not_found",
+        LiveSessionCommandError::CannotDecrypt => "cannot_decrypt",
+        LiveSessionCommandError::Malformed => "malformed",
+        LiveSessionCommandError::PlaintextTooLarge => "plaintext_too_large",
+        LiveSessionCommandError::NotOnCharBoundary => "not_on_char_boundary",
+        LiveSessionCommandError::OutOfBounds => "out_of_bounds",
+        LiveSessionCommandError::NotOpen => "not_open",
+        LiveSessionCommandError::DrawingNotApplicable => "drawing_not_applicable",
+        LiveSessionCommandError::Csprng => "csprng",
+        LiveSessionCommandError::Io { .. } => "io",
+    }
+}
+
 impl From<crate::plugins::live::apply_remote::ApplyRemoteError> for LiveSessionCommandError {
     fn from(_: crate::plugins::live::apply_remote::ApplyRemoteError) -> Self {
         LiveSessionCommandError::Malformed

@@ -344,8 +344,9 @@ fn theme_tie_break(a: &ThemeEntry, b: &ThemeEntry) -> Ordering {
 //    user-facing guard).
 //
 // 2. `merge_chats_turns`: the `MYJ1` turn list, the one NEW shape: an
-//    append-ordered transcript where turns are immutable and ids are unique
-//    per client. The common prefix is kept verbatim; both divergent suffixes
+//    append-ordered transcript where turns are immutable (with the one monotone
+//    exception: the decision marker, reconciled by `merge_turn_content`) and ids
+//    are unique per client. The common prefix is kept verbatim; both divergent suffixes
 //    are kept, ordered by the turn-id total order (lexicographic on the id
 //    string: the id scheme embeds a client discriminator, so cross-client
 //    collisions cannot arise and the byte order is argument-independent).
@@ -407,6 +408,79 @@ fn chats_entry_tie_break(a: &ConversationEntry, b: &ConversationEntry) -> Orderi
             &b.folder,
         )),
     }
+}
+
+/// **One turn's content, when both sides hold the same turn id** (myne-md/myne#894).
+///
+/// The turn-list merge below is id-only for every field a settled turn carries,
+/// because a settled turn is immutable and two copies of one id are therefore
+/// expected to be equal (`protocol.md` §9.24.2). The decision marker is the ONE
+/// exception, and it is monotone: a turn's `agentSummary.outcome` goes from absent
+/// to `applied` or `rejected` after the reader decides, and it is never unset or
+/// changed. So when two copies of one id differ, the DECIDED one wins in whichever
+/// direction it arrived. Decided-wins is commutative, idempotent and associative,
+/// which is what leaves the merge's own convergence property (`sync-protocol.md`
+/// §10.2.5, the §10.3 ping-pong clause) intact: without it, the undecided copy
+/// overwrites a decision, both devices then disagree with their own merged output,
+/// and each re-pushes forever while the counts line reverts to "proposed".
+///
+/// A difference in any OTHER field is a writer bug rather than a reachable state,
+/// and falls back to `local`, the argument-independent fixed point the merge has
+/// always used. Two DECIDED copies that disagree are unreachable while a run is
+/// device-local, and the writer is what keeps them so: the store refuses to
+/// replace an outcome a turn already carries (`src/notes/ai/chatStore.ts`, the
+/// `AGENT_OUTCOME` arm). But the merge must not RELY on a caller for a property
+/// its own doc claims, because the host accepts the WebView's turn list and a
+/// second implementation or a future re-decide affordance reaches the same state.
+/// So two differing decisions resolve by a fixed order on the value itself
+/// (`applied` before `rejected`, lexicographic), which makes decided-wins
+/// commutative, idempotent and associative for EVERY input rather than for the
+/// reachable subset.
+///
+/// The DECIDED SET is closed (`applied`, `rejected`) and an unknown value counts
+/// as UNDECIDED, because both readers parse exactly those two and strip anything
+/// else. A non-null unknown value treated as decided would win a merge and then be
+/// dropped by every client on the next write, which is permanent churn rather than
+/// a decision.
+///
+/// **The marker is GRAFTED onto the local copy rather than taking the remote
+/// object whole.** A settled turn may carry `rest` fields an older writer does
+/// not know (`src/notes/ai/chatStore.ts`), and whole-object wins would drop them
+/// on a merge that is supposed to add one field.
+pub fn merge_turn_content(
+    local: &serde_json::Value,
+    remote: &serde_json::Value,
+) -> serde_json::Value {
+    const DECIDED: [&str; 2] = ["applied", "rejected"];
+    fn outcome(turn: &serde_json::Value) -> Option<&str> {
+        turn.pointer("/agentSummary/outcome")
+            .and_then(|v| v.as_str())
+            .filter(|v| DECIDED.contains(v))
+    }
+    let winner = match (outcome(local), outcome(remote)) {
+        (None, None) => None,
+        (Some(one), None) => Some(one),
+        (None, Some(other)) => Some(other),
+        (Some(one), Some(other)) => Some(if one <= other { one } else { other }),
+    };
+    let Some(winner) = winner else {
+        return local.clone();
+    };
+    let mut merged = local.clone();
+    if let Some(summary) = merged
+        .get_mut("agentSummary")
+        .and_then(|v| v.as_object_mut())
+    {
+        summary.insert(
+            "outcome".to_string(),
+            serde_json::Value::String(winner.to_string()),
+        );
+    } else if let Some(remote_summary) = remote.get("agentSummary") {
+        if let Some(object) = merged.as_object_mut() {
+            object.insert("agentSummary".to_string(), remote_summary.clone());
+        }
+    }
+    merged
 }
 
 /// Merge two versions of one conversation's turn list (the `MYJ1` payload's
@@ -2396,5 +2470,163 @@ fn memory_entry_tie_break(a: &MemoryEntryRow, b: &MemoryEntryRow) -> Ordering {
             b.created_at,
             b.quarantined,
         )),
+    }
+}
+
+#[cfg(test)]
+mod merge_turn_content_tests {
+    use super::merge_turn_content;
+
+    fn turn(outcome: Option<&str>) -> serde_json::Value {
+        match outcome {
+            Some(o) => serde_json::json!({
+                "id": "a",
+                "role": "assistant",
+                "agentSummary": { "runId": "r1", "outcome": o },
+            }),
+            None => serde_json::json!({
+                "id": "a",
+                "role": "assistant",
+                "agentSummary": { "runId": "r1" },
+            }),
+        }
+    }
+
+    #[test]
+    fn the_decided_copy_wins_in_either_direction() {
+        // The property the merge has to have (myne-md/myne#894): a decision
+        // written onto a settled turn after the other device synced must survive
+        // the merge, whichever side of it the decision is on. Local-wins would
+        // let the undecided copy overwrite it on every pull, and then both devices
+        // would disagree with their own merged output and re-push forever.
+        let undecided = turn(None);
+        let decided = turn(Some("rejected"));
+        assert_eq!(merge_turn_content(&undecided, &decided), decided);
+        assert_eq!(merge_turn_content(&decided, &undecided), decided);
+        // Commutative on the value that matters, so the two devices converge on
+        // ONE body. (A blanket local-wins is also commutative; this is the fixed
+        // point that preserves the decision.)
+        assert_eq!(
+            merge_turn_content(&undecided, &decided),
+            merge_turn_content(&decided, &undecided)
+        );
+        // Idempotent, and associative across the two decisions a turn can carry.
+        assert_eq!(merge_turn_content(&decided, &decided), decided);
+        let applied = turn(Some("applied"));
+        assert_eq!(
+            merge_turn_content(&merge_turn_content(&undecided, &decided), &applied),
+            merge_turn_content(&undecided, &merge_turn_content(&decided, &applied))
+        );
+    }
+
+    #[test]
+    fn a_null_or_unknown_outcome_is_undecided() {
+        // The two shapes the not-decided state can take on the wire. An UNKNOWN
+        // non-null value is undecided rather than decided: both readers parse
+        // exactly `applied` and `rejected` and strip anything else, so letting it
+        // win a merge would mean it is dropped by every client on the next write
+        // and the two sides flip that field on every settle.
+        let null_outcome = serde_json::json!({
+            "id": "a",
+            "agentSummary": { "runId": "r1", "outcome": null },
+        });
+        let decided = turn(Some("applied"));
+        assert_eq!(
+            merge_turn_content(&null_outcome, &decided)["agentSummary"]["outcome"],
+            "applied"
+        );
+
+        let unknown = serde_json::json!({
+            "id": "a",
+            "agentSummary": { "runId": "r1", "outcome": "deferred-by-a-future-client" },
+        });
+        assert_eq!(
+            merge_turn_content(&unknown, &decided)["agentSummary"]["outcome"],
+            "applied"
+        );
+        assert_eq!(merge_turn_content(&unknown, &turn(None)), unknown);
+    }
+
+    #[test]
+    fn two_disagreeing_decisions_resolve_by_a_fixed_order_in_both_directions() {
+        // Unreachable while a run is device-local, and the merge must not rest a
+        // normative convergence claim on that: a second writer is enough. The order
+        // is on the VALUE, so both devices pick the same one and neither re-pushes.
+        let applied = turn(Some("applied"));
+        let rejected = turn(Some("rejected"));
+        assert_eq!(merge_turn_content(&applied, &rejected), applied);
+        assert_eq!(merge_turn_content(&rejected, &applied), applied);
+    }
+
+    #[test]
+    fn the_marker_is_grafted_onto_the_local_turn_rather_than_taking_the_remote_object() {
+        // A settled turn may carry fields an older writer does not know (`rest` in
+        // the TS type). Whole-object wins on the decided remote would drop them, so
+        // the merge adds the marker and leaves the rest of the local turn alone.
+        let local = serde_json::json!({
+            "id": "a",
+            "role": "assistant",
+            "agentSummary": { "runId": "r1" },
+            "rest": { "futureField": 7 },
+        });
+        let remote = serde_json::json!({
+            "id": "a",
+            "role": "assistant",
+            "agentSummary": { "runId": "r1", "outcome": "applied" },
+        });
+        let merged = merge_turn_content(&local, &remote);
+        assert_eq!(merged["rest"]["futureField"], 7);
+        assert_eq!(merged["agentSummary"]["outcome"], "applied");
+    }
+}
+
+#[cfg(test)]
+mod merge_turn_content_callers {
+    // **A source assertion, and it says what it does not see.** The two sites that
+    // merge a conversation's turns are deep inside the sync cycle (crypto keys,
+    // blob codecs, a host context), so no unit test in this crate drives them: what
+    // a scan can hold is that BOTH of them ask this module for the content rule
+    // instead of keeping a private copy of "local wins", which is exactly the shape
+    // the rule was extracted to end (myne-md/myne#894). It cannot see whether the
+    // call is reached, and the pure rule it calls IS covered by
+    // `merge_turn_content_tests`.
+    /// Comments stripped, because the first version of this test was satisfied by
+    /// the explanatory comment the fix left beside the call: reverting the call to
+    /// `l.clone()` while keeping the comment left all three tests green, which a
+    /// reviewer found by injection. Line comments and `/* */` blocks both go, so
+    /// what is scanned is code.
+    fn code_only(source: &str) -> String {
+        let without_blocks = {
+            let mut out = String::with_capacity(source.len());
+            let mut rest = source;
+            while let Some(start) = rest.find("/*") {
+                out.push_str(&rest[..start]);
+                match rest[start..].find("*/") {
+                    Some(end) => rest = &rest[start + end + 2..],
+                    None => return out,
+                }
+            }
+            out.push_str(rest);
+            out
+        };
+        without_blocks
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn both_merge_sites_use_the_decided_wins_rule() {
+        let orchestrator = code_only(include_str!("orchestrator.rs"));
+        let person_sync = code_only(include_str!("person_ai_sync.rs"));
+        assert!(
+            orchestrator.contains("merge_turn_content("),
+            "the sparse-delta chat merge stopped CALLING the decided-wins rule"
+        );
+        assert!(
+            person_sync.contains("merge_turn_content("),
+            "the person-plane chat merge stopped CALLING the decided-wins rule"
+        );
     }
 }

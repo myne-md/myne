@@ -15,7 +15,7 @@ import { AgentPane } from "@app/notes/agent/AgentPane";
 import { AgentConversationView } from "@app/notes/agent/AgentConversationView";
 import { AgentFootprint } from "@app/notes/agent/components/AgentFootprint";
 import { AgentProgress } from "@app/notes/agent/components/AgentProgress";
-import { AgentReviewTakeover } from "@app/notes/agent/components/AgentReviewTakeover";
+import { AgentReview } from "@app/screens/AgentReview";
 import { RunCostLine } from "@app/notes/agent/components/RunCostLine";
 import { ScopeExpansionDialog } from "@app/notes/agent/components/ScopeExpansionDialog";
 import { SidebarStateProvider } from "@app/notes/sidebarState";
@@ -188,8 +188,22 @@ function SeededProgress() {
   );
 }
 
-/** The review screen as it mounts in the app: a portal over everything. */
-function SeededTakeover() {
+/**
+ * The review card as the app renders it: inside the assistant's own turn
+ * (myne-md/myne#894).
+ *
+ * **The width is the story, which is why there are two of them.** The card used
+ * to be a 1200px dialog, so its two-column diff always had room; in the
+ * conversation it renders in the agent tab (a wide centre pane) and in the right
+ * panel's AI chat (~380px), and the diff mode follows the card's own measured
+ * width. `narrow` and `wide` are those two, with the same proposal behind them,
+ * so the difference a reviewer sees is the decision and not the content.
+ *
+ * The bubble is reproduced here rather than left out, at the assistant's own
+ * `--paper-2` and padding: a card's job in this design is to sit INSIDE another
+ * surface, and mounting it on a bare stage would hide whether that reads.
+ */
+function SeededCard({ width }: { width: number }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     beginRun(null);
@@ -206,9 +220,24 @@ function SeededTakeover() {
           edits: [
             {
               noteId: "n1",
-              kind: "move",
+              // The row this story discloses, so the diff mode is what the pair
+              // shows rather than a claim about a card whose rows are closed
+              // (myne-md/myne#894, from review).
+              kind: "replace",
+              anchor: "The draft lists three dates and no owners.",
+              replacement: "The draft lists three dates, each with an owner.",
+            },
+            {
+              noteId: "n2",
+              kind: "replace",
+              anchor: "Two notes still need a source list.",
+              replacement: "Two notes still need a source list and a date.",
+            },
+            {
+              noteId: "n2",
+              kind: "append",
               anchor: "",
-              replacement: "02 - AREAS/Self Improvement/",
+              replacement: "\n\nFollow-ups are listed in the project note.",
             },
           ],
           newNotes: [],
@@ -227,13 +256,59 @@ function SeededTakeover() {
     setReady(true);
     return () => clearAgentForLock();
   }, []);
+
+  // **The disclosed row is what the pair exists to show.** Two cards whose rows
+  // are closed render the same DOM, which is what the review measured: the mode
+  // decision this change introduces was depicted by no story. Replaying the
+  // chevron on a replace-kind row makes `unified` and `split` visible.
+  useEffect(() => {
+    if (!ready) return;
+    document
+      .querySelector<HTMLElement>('[data-testid="agentReview.toggleDiff"]')
+      ?.click();
+  }, [ready]);
+
   if (!ready) return null;
   return (
-    <AgentReviewTakeover
-      titleOf={() => "00 - INBOX"}
-      folderOf={() => "00 - INBOX/"}
-      onNotesWritten={action("onNotesWritten")}
-    />
+    <div
+      style={{
+        width,
+        background: "var(--bg-1)",
+        padding: "var(--space-3)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* The assistant's turn, as `ConversationSurface` draws it. */}
+      <div
+        style={{
+          maxWidth: "92%",
+          background: "var(--paper-2)",
+          border: "1px solid var(--line-1)",
+          borderRadius: "var(--radius-1)",
+          padding: "var(--space-1) var(--space-2)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
+          Assistant
+        </span>
+        <p style={{ margin: "var(--space-1) 0", fontSize: "var(--text-sm)" }}>
+          Rehomed the meeting note into the archive folder, and tidied the two
+          body edits it needed first.
+        </p>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>
+          3 changes proposed
+        </span>
+        <AgentReview
+          titleOf={(id) => (id === "n1" ? "Quarterly planning" : "Onboarding checklist")}
+          folderOf={(id) => (id === "n1" ? null : "01 - PROJECTS/")}
+          onNotesWritten={action("onNotesWritten")}
+          onClose={action("onClose")}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -366,14 +441,24 @@ export const AI_STORIES: StoryDescriptor[] = [
     render: () => <SeededProgress />,
   },
   {
-    id: "ai-panel/agentreviewtakeover/over-everything",
+    id: "ai-panel/agentreview/narrow-column",
     group: "components",
-    surface: "AgentReviewTakeover",
-    state: "over-everything",
+    surface: "AgentReview",
+    state: "narrow-column",
     description:
-      "The review screen as the app mounts it: a portal into the body, so it paints over the whole window and nothing behind it can take a click or the wheel.",
-    tags: ["notes", "ai", "agent", "review", "takeover", "portal"],
-    render: () => <SeededTakeover />,
+      "The review card in the right panel's AI chat, under the assistant's own message: the diff falls back to one column with gutter markers, because two columns of note text do not fit in a chat column.",
+    tags: ["notes", "ai", "agent", "review", "card", "narrow", "unified-diff"],
+    render: () => <SeededCard width={420} />,
+  },
+  {
+    id: "ai-panel/agentreview/in-a-centre-pane",
+    group: "components",
+    surface: "AgentReview",
+    state: "in-a-centre-pane",
+    description:
+      "The same card in the agent tab, and the same proposal: two columns, because the card has the width for them. The pair is the point, one proposal, two hosts, and the diff mode is the only difference.",
+    tags: ["notes", "ai", "agent", "review", "card", "wide", "split-diff"],
+    render: () => <SeededCard width={980} />,
   },
   {
     id: "ai-panel/agentconversationview/focus",

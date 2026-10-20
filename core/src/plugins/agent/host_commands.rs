@@ -957,7 +957,7 @@ pub async fn step<R: Runtime>(
             // logging on produced zero output. `kind()` rather than the error,
             // because two variants carry a note id.
             tracing::debug!(
-                target: "myne::agent",
+                target: "myne_core::agent",
                 event = "step_failed",
                 error_kind = e.kind(),
             );
@@ -1290,8 +1290,59 @@ impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
 ///
 /// The caller keeps the `#[tauri::command]` and the `State` list; everything
 /// below the unwrapping is here.
+///
+/// **The failure is LOGGED here, and that is the fix for a real report**
+/// (myne-md/myne#894). A desktop user approved one move and got "The changes
+/// could not be applied."; there was nothing anywhere to say which of the dozen
+/// whole-call causes had fired, because this command emitted no trace at all and
+/// the frontend discarded the error. The UI now names the cause it is given, and
+/// this line is the other half: a report can be diagnosed from the log without a
+/// rebuild. `kind()` is the bounded, content-free tag, the variant id only,
+/// never the note id or any text (`src-tauri/AGENTS.md`'s DENY list).
 #[allow(clippy::too_many_arguments)]
 pub async fn apply_from_host<R: Runtime>(
+    app: AppHandle<R>,
+    run_id: String,
+    approved: Vec<ProposedEdit>,
+    approved_new_notes: Vec<usize>,
+    approved_settings: Vec<ProposedSetting>,
+    approval: Approval,
+    runs: &Arc<AgentRunState>,
+    sessions: &AgentSessionState,
+    indices: &VaultIndicesState,
+    vault: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+) -> Result<ApplyOutcome, AgentError> {
+    let outcome = apply_from_host_inner(
+        app,
+        run_id,
+        approved,
+        approved_new_notes,
+        approved_settings,
+        approval,
+        runs,
+        sessions,
+        indices,
+        vault,
+        hooks,
+    )
+    .await;
+    if let Err(error) = &outcome {
+        // **The one warn this whole change exists for, so it carries the
+        // subsystem's target and field like its siblings** (myne-md/myne#894, from
+        // review). A user told to reproduce with `RUST_LOG=myne_core::agent=debug`
+        // has to see it, and a reader grepping `error_kind` has to find it.
+        tracing::warn!(
+            target: "myne_core::agent",
+            event = "agent_apply_refused",
+            error_kind = error.kind()
+        );
+    }
+    outcome
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn apply_from_host_inner<R: Runtime>(
     app: AppHandle<R>,
     run_id: String,
     approved: Vec<ProposedEdit>,
@@ -1389,7 +1440,20 @@ pub async fn apply_from_host<R: Runtime>(
                 // the reason is chosen by meaning rather than by which arms happened
                 // to be listed first.
                 AgentError::Cancelled | AgentError::NoSuchRun => SettingRejection::RunStopped,
-                _ => SettingRejection::WriteFailed,
+                // **And the fallback logs its cause**, the way the note batch does
+                // (myne-md/myne#894, from review). This arm is reached by every
+                // remaining variant, and the row it produces says only "the write
+                // failed", so without this line a setting refusal is the one half
+                // of the apply path with no diagnosable trace. `kind()` is the
+                // bounded spelling, never the error's Display.
+                other => {
+                    tracing::warn!(
+                        target: "myne_core::agent",
+                        event = "agent_setting_refused",
+                        error_kind = other.kind()
+                    );
+                    SettingRejection::WriteFailed
+                }
             };
             outcome.refused_settings = indexed_settings
                 .iter()

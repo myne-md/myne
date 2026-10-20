@@ -133,6 +133,7 @@
     },
     "review": {
       "title": "Review changes",
+      "statusWaiting": "Waiting for your approval",
       "summaryShowAll": "Show the whole summary",
       "summaryShorten": "Shorten the summary",
       "close": "Close",
@@ -143,6 +144,12 @@
       "noteHeading_other": "{{count}} changes",
       "changedLines_one": "{{count}} line",
       "changedLines_other": "{{count}} lines",
+      "rowReplace_one": "Replace {{count}} line",
+      "rowReplace_other": "Replace {{count}} lines",
+      "rowAppend": "Add to the end of the note",
+      "rowMove": "Move to {{folder}}",
+      "showChange": "Show the change",
+      "hideChange": "Hide the change",
       "diffCurrent": "In the note now",
       "diffProposed": "After this change",
       "removalFlag": {
@@ -161,6 +168,12 @@
       "approveAll_other": "Approve {{count}} changes",
       "appliedCount_one": "{{count}} change applied.",
       "appliedCount_other": "{{count}} changes applied.",
+      "rejectedCount_one": "{{count}} change rejected.",
+      "rejectedCount_other": "{{count}} changes rejected.",
+      "rejectedNewNotes_one": "{{count}} new note rejected.",
+      "rejectedNewNotes_other": "{{count}} new notes rejected.",
+      "rejectedSettings_one": "{{count}} setting rejected.",
+      "rejectedSettings_other": "{{count}} settings rejected.",
       "refused": {
         "anchorNotFound": "Could not be applied: that text is no longer in the note.",
         "anchorAmbiguous": "Could not be applied: that text appears more than once.",
@@ -180,6 +193,15 @@
         "moveIntoExcludedFolder": "Not moved: that folder is excluded from AI."
       },
       "applyFailed": "The changes could not be applied.",
+      "applyFailedCause": {
+        "noSuchRun": "That run is no longer open, so nothing was written.",
+        "cancelled": "That run was stopped, so nothing was written.",
+        "locked": "The vault is locked, so nothing was written.",
+        "aiDisabled": "AI is switched off for this vault.",
+        "write": "Writing the changes did not finish.",
+        "read": "Something needed for this run could not be read, so nothing was written.",
+        "restorePoint": "The safety copy could not be taken, so nothing was written."
+      },
       "undo": "Undo this run",
       "undoFailed": "The run could not be undone.",
       "undoReport": "{{reverted}} notes restored. {{kept}} notes the run created were left in place.",
@@ -225,7 +247,9 @@
         "writeFailed": "Could not be applied: writing the setting failed. The other changes were still applied.",
         "runStopped": "Not applied: the run was stopped, so no change was attempted.",
         "notProposed": "Not applied: this run never proposed that change, so the host will not write it."
-      }
+      },
+      "appliedSummary": "Changes applied.",
+      "settingsApplied": "Settings applied."
     },
     "undo": {
       "action": "Undo the run",

@@ -1,12 +1,22 @@
-// The agent review screen (myne-md/myne#529, tasks 10, 11 and 13).
+// The agent review card (myne-md/myne#529, tasks 10, 11 and 13).
 //
-// A dialog of its own rather than a panel at the edge of the editor or a
-// dismissable modal (myne-md/myne#549), and that is not a layout preference.
-// Half the decisions this feature rests on assume approval is a
-// separate, attention-requiring act: the scope model, the no-cap answer and the
-// SYNC-17 restatement all lean on the user actually reading what they approve. A
-// panel at the edge of the editor makes it a thing beside the work; a modal
-// makes it something to dismiss.
+// **A card inside the conversation, under the turn that proposed it**
+// (myne-md/myne#894, superseding myne-md/myne#549's placement). #549 took the
+// review out of a full-window takeover and put it in a dialog of its own, on the
+// argument that approving is a separate, attention-requiring act. The argument
+// holds and the surface did not: the proposal belongs to the message that caused
+// it, and a dialog renders it somewhere the user did not come from, next to none
+// of the conversation. What #549 was protecting is kept, and it is what this
+// file is: the review is not dismissable by a stray Escape or a backdrop click,
+// it cannot be collapsed away while it holds an unapproved proposal, the running
+// scope total is always on screen, and every act that writes is per-row.
+//
+// The model's own prose is NOT here. It stays on the turn (`ChatMarkdown`), and
+// the refusals that contradict it are lifted ABOVE that prose by
+// `ConversationSurface` (myne-md/myne#848, restored by myne-md/myne#894's review:
+// they were briefly the card's first block, which put the claim back on top). This
+// file owns the decision surface: what is proposed, what it would write, and the
+// controls.
 //
 // Three things here are load-bearing rather than presentational.
 //
@@ -25,20 +35,27 @@
 //      place must never be mistaken for one that was not needed.
 //
 // The diff itself is the existing `<DiffView>` over `diffWithSegments`; nothing
-// about how a diff looks is invented here. It renders in `split` mode
-// (myne-md/myne#664): approving a change asks "what is this replacing?", and
-// `<DiffView>`'s own header already records that a gutter marker is the worse
-// answer to that question than a column is. The two columns are labelled from
-// here rather than by the component, because `<DiffView>` renders note text and
-// never copy of its own. There is no unified/split toggle: one mode is a
-// decision, a toggle is a surface to own.
+// about how a diff looks is invented here. Approving a change asks "what is this
+// replacing?", and a column is the better answer to that than a gutter marker is
+// (myne-md/myne#664), so the card renders `split` whenever it has the width for
+// it. It no longer always does: the same card sits in the agent tab's wide centre
+// pane and in the right panel's ~380px AI chat, and two columns of note text need
+// about 560px (`reviewCardLayout.ts`), so below that threshold the component's own
+// `unified` mode takes over. That clause supersedes the always-split half of
+// myne-md/myne#664 (see `decisions/ai/0715`). The labels come from here rather
+// than from the component, because `<DiffView>` renders note text and never copy
+// of its own. There is no user-facing mode toggle: the width decides, which is
+// what keeps one mode a decision rather than a surface to own.
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DiffView } from "../notes/components/DiffView";
-import { RunCostLine } from "../notes/agent/components/RunCostLine";
+import { applyFailureMessage } from "../notes/agent/applyFailure";
+import { useReviewCardNarrow } from "../notes/agent/reviewCardLayout";
 import { Button } from "../components/primitives/Button";
+import { Icon } from "../components/primitives/Icon";
+import { IconButton } from "../components/primitives/IconButton";
 import { changedLineCount, diffWithSegments } from "../dialect";
 import { flushBeforeFrontmatterWrite } from "../notes/flushBeforeFrontmatterWrite";
 import {
@@ -46,7 +63,6 @@ import {
   agentApply,
   agentUndo,
   editHidesNoteAs,
-  hasRefusals,
   isMove,
   netDeletion,
   splitForBulkApproval,
@@ -96,12 +112,6 @@ interface EditRow {
   largeDeletion: boolean;
 }
 
-/** Roughly what three lines of the modal's own width hold. Past it the summary
- *  is clamped behind a disclosure; below it the paragraph is shown whole,
- *  because a disclosure over something already visible is a control that does
- *  nothing. */
-const SUMMARY_CLAMP_CHARS = 320;
-
 /**
  * Whether the run wrote anything an undo could put back.
  *
@@ -123,10 +133,20 @@ function hasAnythingToUndo(applied: AgentApplyResult): boolean {
 export function AgentReview({
   onClose,
   onNotesWritten,
+  onDecision,
   titleOf,
   folderOf,
 }: {
   onClose: () => void;
+  /** What the reader decided, once they have decided (`"applied"` or
+   *  `"rejected"`).
+   *
+   * **Reported rather than written here** (myne-md/myne#894): the outcome is a
+   * fact about the TRANSCRIPT, and this component's two collaborators are its
+   * parent and the agent store. The parent (`ConversationSurface`) is the surface
+   * that already holds both the transcript and the run, so the write is one call
+   * there instead of a chat-store import in a screen. */
+  onDecision?: (outcome: "applied" | "rejected") => void;
   /** Called with the ids of notes an apply CHANGED on disk.
    *
    *  **Not cosmetic, and not optional in practice.** An apply writes through the
@@ -136,11 +156,19 @@ export function AgentReview({
    *  that stale buffer back, silently reverting the edit the user just approved
    *  and bumping the note's sync version while doing it. The task-write path
    *  (`TASK_WRITE_EVENT`) already solved exactly this; this is the same solution
-   *  reached through a prop rather than a global event, because this screen has
+   *  reached through a prop rather than a global event, because this surface has
    *  a parent to tell. */
   onNotesWritten?: (noteIds: readonly string[]) => void;
-  /** Resolve a note id to its title. Without it the review screen shows a diff
-   *  and never says which note receives it, which is not informed approval. */
+  /** Resolve a note id to its title. Without it the review shows a diff and
+   *  never says which note receives it, which is not informed approval.
+   *
+   *  **Still a prop rather than a store read here** (myne-md/myne#894). The card
+   *  moved out of `Editor.tsx`'s takeover and into a transcript turn, and the
+   *  tempting shortcut was to have this component read the resident note set
+   *  itself, but that store needs `SidebarStateProvider`, so it would have made
+   *  every mount of this component (including its unit tests) provider-bound to
+   *  answer a question about two strings. The resolution happens one level up,
+   *  where the providers are. */
   titleOf: (noteId: string) => string | null;
   /** The folder a note sits in, for a move row's starting point. */
   folderOf: (noteId: string) => string | null;
@@ -148,9 +176,11 @@ export function AgentReview({
   const { t } = useTranslation();
   const agent = useAgent();
   const [busy, setBusy] = useState(false);
-  /** Whether the model's summary is expanded. Session state, like every other
-   *  disclosure on this screen: a reader who opened it is reading it now. */
-  const [summaryOpen, setSummaryOpen] = useState(false);
+  // The card's own width, so a split diff only renders where two columns of note
+  // text fit (myne-md/myne#894). The conversation is 380px in the right sidebar
+  // and most of a centre pane in the agent tab, and one of those two cannot hold
+  // a split diff at all.
+  const { ref: cardRef, narrow } = useReviewCardNarrow<HTMLDivElement>();
   const [undoReport, setUndoReport] = useState<{
     reverted: number;
     failed: string[];
@@ -190,8 +220,13 @@ export function AgentReview({
   // here would re-run five marker regexes over every anchor and replacement on
   // every render, purely to render a count.
   const bulkApprovableCount = useMemo(
-    () => rows.filter((r) => r.removes === null && !agent.rejected.has(r.index)).length,
-    [rows, agent.rejected],
+    // Asked of the payload the bulk action actually builds, INCLUDING the rows
+    // that already landed. The filter this replaced read `!rejected` and
+    // `removes === null` but not `!appliedEdits`, so a second Approve-all after a
+    // partial apply left the button enabled over an EMPTY list and `apply()`
+    // returned early: no write, no report, no message (myne-md/myne#894 review).
+    () => splitForBulkApproval(kept).bulkApprovable.length,
+    [kept],
   );
   /** Whether Approve-all has anything to send.
    *
@@ -278,11 +313,18 @@ export function AgentReview({
       // apply time, so the notes that actually changed are the ones to reload.
       const changed = [...outcome.notesWritten, ...outcome.notesCreated];
       if (changed.length > 0) onNotesWritten?.(changed);
-    } catch {
-      // A whole-call failure is strictly worse than a per-edit refusal and was
-      // the one outcome with no report: `busy` cleared and the screen looked
-      // exactly as it did before the click.
-      failRun(t("agent.review.applyFailed"));
+      // The transcript's counts line stops saying "proposed" from here on. A
+      // partial apply is still `applied`: what landed is what the line reports,
+      // and the card stays open over its refusal block.
+      onDecision?.("applied");
+    } catch (err) {
+      // **Named by cause rather than "could not be applied"** (myne-md/myne#894).
+      // The error object used to be discarded here, so a dozen distinct
+      // whole-call causes, the run consumed, the vault locked, the write
+      // refused, the restore point failing, all read as one sentence, and the
+      // report could not be acted on or even diagnosed. `applyFailureMessage`
+      // reads the tag; the host logs the same tag on its side.
+      failRun(applyFailureMessage(err, t));
     } finally {
       setBusy(false);
     }
@@ -330,133 +372,221 @@ export function AgentReview({
     }
   }
 
-  const summaryClamped =
-    !summaryOpen && agent.proposal.summary.length > SUMMARY_CLAMP_CHARS;
+  /** Whether the proposal holds anything at all, across all three verbs. The
+   *  bulk approve counts edits and new notes because a setting is applied on its
+   *  own by construction; the EXIT cannot be gated that narrowly, or a run that
+   *  proposed only a setting has no way out. */
+  const anythingProposed =
+    rows.length > 0 ||
+    agent.proposal.newNotes.length > 0 ||
+    (agent.proposal.settings?.length ?? 0) > 0;
+
+  /** Everything the proposal holds, across all three verbs: what "Reject all"
+   *  discards and what the footer's own count is about. */
+  const proposedTotal =
+    // What is still DECIDABLE, not what was proposed: a row that already landed
+    // cannot be discarded, so counting it made "Reject all (3)" claim a discard of
+    // a row that is already on disk (review finding).
+    kept.length +
+    approvedNewNoteIndices(agent).length +
+    (agent.proposal.settings ?? []).filter(
+      (_, i) => !agent.appliedSettings.has(i) && !agent.rejectedSettings.has(i),
+    ).length;
+
+  /** Which arm of the headline is showing, as one value.
+   *
+   *  Read by the tile's tint as well as by the text, so the colour and the
+   *  sentence cannot come from two different conditions (the class of bug the
+   *  refusal block's count had, one surface over). */
+  const headlineState: "waiting" | "failed" | "review" =
+    agent.error !== null ? "failed" : agent.applied === null ? "waiting" : "review";
+
+  /** What an apply has landed so far, in one number.
+   *
+   *  The card used to print three separate report lines for this ("N changes
+   *  applied", "N settings changed", "N notes created"), which the compact shape
+   *  folds into the headline: the per-row "Applied" flags already say WHICH, and
+   *  the refusal block says what did not land. */
+  const appliedTotal = agent.applied === null
+    ? 0
+    : agent.applied.applied +
+      agent.applied.notesCreated.length +
+      (agent.applied.settingsChanged?.length ?? 0);
 
   return (
     <div
+      ref={cardRef}
       data-testid="agentReview.screen"
+      // **The card's arrival, and the fact that it is waiting on you**
+      // (myne-md/myne#894). The class carries the entrance animation, the wash
+      // and the status row's tone; all three are argued in
+      // `src/styles/tokens.css`.
+      className="myne-review-card"
+      data-state={headlineState}
+      // A named group rather than a bare div: the card is a decision with a
+      // beginning and an end, and a screen reader reaching it should say what it
+      // is before reading forty diff rows. `agent.review.title` is the name,
+      // which is also why the key survives a header that no longer prints it.
+      role="group"
+      aria-label={t("agent.review.title")}
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
         background: "var(--paper)",
+        // **Room above and below, inside the bubble** (myne-md/myne#894, on the
+        // user's read: "increase the proposal card's top and bottom margins").
+        // The card is the one object in the transcript that interrupts the
+        // reading flow, a message, then a decision, then the run's own line,
+        // and a card butted against the paragraph above it reads as part of it.
+        marginBlock: "var(--space-3)",
+        // A card, not a screen: it sits inside the assistant's bubble, so it
+        // reads as an object in the conversation rather than as a place the app
+        // navigated to. `overflow: hidden` is what keeps the body's scroll inside
+        // the rounded corners.
+        border: "1px solid var(--line-1)",
+        borderRadius: "var(--radius-2)",
+        overflow: "hidden",
         color: "var(--fg-1)",
       }}
     >
+      {/* **The header is the zero state's anatomy, not the old dialog's.**
+          (myne-md/myne#894, on the user's read: "this should be something built
+          from scratch that looks like a new zero state and sits there nicely
+          interactive"). It used to be a dialog heading: "Review changes" in
+          `--text-xl`, a Close button, then a status row and a scope line under
+          it, three rows of chrome that said what the dialog was called. A card
+          in a conversation owes the reader something different: what is being
+          asked of them, how big it is, and a way out. So it borrows the shape
+          the zero state settled on, a glyph tile, a headline, a body line,
+          and the headline IS the state rather than a name, which is what makes
+          one block do the work of three.
+
+          The acts deliberately stay in the FOOTER rather than moving up here,
+          and that is not symmetry: the body scrolls and the footer does not, so
+          the two buttons are on screen the whole time a reader works down forty
+          rows. Putting a copy at the top as well would be the same control twice
+          with two states to keep in step. */}
+      {/* The wash, from the zero state's own recipe. First child, decorative,
+          and written before anything it sits behind. */}
+      <span className="myne-empty__wash" aria-hidden="true" />
       <header
+        className="myne-review-region"
         style={{
           display: "flex",
-          alignItems: "baseline",
-          gap: "var(--space-4)",
-          padding: "var(--space-4) var(--space-5)",
+          // **Centred against the tile, not top-aligned to it** (myne-md/myne#894,
+          // on the user's read: "centre the two lines"). The header is a tile and
+          // two short lines beside it, so top-aligning the pair left the tile's
+          // optical centre sitting between them; centring is what makes the three
+          // pieces read as one row.
+          alignItems: "center",
+          gap: "var(--space-3)",
+          // **Even insets, and a little more of them.** The first compact pass
+          // used `space-3` on the top and bottom against `space-4` on the sides,
+          // which reads as a header that was squeezed rather than laid out; this
+          // is the same padding on all four sides, matching the rows and the
+          // footer so the card has one vertical rhythm instead of three.
+          padding: "var(--space-4)",
           borderBottom: "1px solid var(--line-1)",
         }}
       >
-        <h1
-          data-testid="agentReview.title"
-          style={{
-            margin: 0,
-            fontSize: "var(--text-xl)",
-            fontWeight: "var(--weight-semibold)",
-          }}
+        <span
+          aria-hidden="true"
+          className="myne-empty__glyph myne-review-tile"
+          data-state={headlineState}
         >
-          {t("agent.review.title")}
-        </h1>
-        {/* Always on screen, never behind a disclosure: with no cap on scope
-            growth this is the only thing bounding accumulation. */}
-        <span data-testid="agentReview.scopeTotal" style={{ color: "var(--fg-2)" }}>
-          {t("agent.review.scopeTotal", { count: agent.view?.scopeTotal ?? 0 })}
+          {/* `pencil`, because the card is about proposed CHANGES to notes: the
+              zero state's rule for picking a glyph is to name the thing rather
+              than a mood, and "a list", "a check" and "an eye" each name
+              something else. */}
+          <Icon name="pencil" size={14} />
         </span>
-        <span style={{ flex: 1 }} />
-        <Button variant="ghost" onClick={onClose} data-testid="agentReview.close">
-          {t("agent.review.close")}
-        </Button>
-      </header>
-
-      {/* **The host's fact goes above the model's claim** (myne-md/myne#848).
-          A run's summary is the model's own words, and "informed approval" is
-          this screen's whole premise, so the two must not be read in the order
-          that flatters the model. A manual pass found the opposite: ten folder
-          moves were refused and the summary still reported them as applied, and
-          the user believed it until they reached the refusal list at the BOTTOM
-          of the diff. So refusals are lifted out of the bottom, pinned here, and
-          counted. The summary stays visible BELOW them rather than being
-          hidden: the point is to contradict it in front of the user, not to
-          censor it. */}
-      {agent.applied && hasRefusals(agent.applied) ? (
-        <RefusalBlock result={agent.applied} />
-      ) : null}
-
-      {agent.proposal.summary ? (
         <div
           style={{
-            padding: "var(--space-3) var(--space-5)",
-            borderBottom: "1px solid var(--line-1)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-1)",
+            flex: 1,
+            minWidth: 0,
           }}
         >
-          {/* **Clamped, because a summary is not what this screen is for**
-              (myne-md/myne#848, on the user's read: "too much of a top text…
-              this should be only something about the diff"). A run that moved
-              twenty-three notes answers with the whole itinerary, and a wall of
-              prose above the diff makes the diff the small print.
-
-              Kept rather than hidden: the paragraph above argues that the
-              model's claim must stay in front of the user so a REFUSAL can
-              contradict it, and hiding it outright is a spec change rather than
-              a polish one. Three lines and a disclosure is the version that
-              serves both, the claim is on screen, the diff is what the screen
-              is about. */}
-          <p
-            data-testid="agentReview.summary"
-            data-clamped={summaryClamped ? "true" : undefined}
-            style={{
-              margin: 0,
-              color: "var(--fg-2)",
-              ...(summaryClamped
-                ? {
-                    display: "-webkit-box",
-                    WebkitBoxOrient: "vertical" as const,
-                    WebkitLineClamp: 3,
-                    overflow: "hidden",
-                  }
-                : {}),
-            }}
-          >
-            {agent.proposal.summary}
-          </p>
-          {/* Only when there is something to reveal: for a one-line summary a
-              disclosure is a control that does nothing. */}
-          {agent.proposal.summary.length > SUMMARY_CLAMP_CHARS ? (
-            <Button
-              variant="ghost"
-              data-testid="agentReview.summary-toggle"
-              aria-expanded={summaryOpen}
-              onClick={() => setSummaryOpen((open) => !open)}
-              style={{
-                marginTop: "var(--space-1)",
-                padding: 0,
-                fontSize: "var(--text-sm)",
-                color: "var(--fg-3)",
-              }}
+          {/* The headline. Three arms, and each is a different sentence because
+              each is a different situation: waiting on a decision, a failure the
+              reader has to understand, and an apply that landed with something
+              refused (where the refusal block on the turn ABOVE this card carries
+              the count, so the headline only has to be the card's name). */}
+          {agent.error !== null ? (
+            <span
+              className="myne-review-status"
+              data-state="failed"
+              data-testid="agentReview.status"
             >
-              {t(
-                summaryOpen
-                  ? "agent.review.summaryShorten"
-                  : "agent.review.summaryShowAll",
-              )}
-            </Button>
-          ) : null}
+              <span data-testid="agentReview.error">{agent.error}</span>
+            </span>
+          ) : agent.applied === null ? (
+            <span
+              className="myne-review-status"
+              data-state="waiting"
+              data-testid="agentReview.status"
+            >
+              {t("agent.review.statusWaiting")}
+            </span>
+          ) : (
+            <span
+              className="myne-review-status"
+              data-state="review"
+              data-testid="agentReview.status"
+            >
+              <span data-testid="agentReview.appliedCount">
+                {t("agent.review.appliedCount", { count: appliedTotal })}
+              </span>
+            </span>
+          )}
+          {/* The facts line, where the zero state puts its body: what the run
+              was allowed to touch. Always on screen, never behind a disclosure:
+              with no cap on scope growth this is the only thing bounding
+              accumulation. */}
+          <span
+            data-testid="agentReview.scopeTotal"
+            style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}
+          >
+            {t("agent.review.scopeTotal", { count: agent.view?.scopeTotal ?? 0 })}
+          </span>
         </div>
-      ) : null}
+      </header>
 
-      <div style={{ flex: 1, overflow: "auto" }}>
+      {/* **No refusal block here any more** (myne-md/myne#894, from the review).
+          It was the card's first body region, which put the model's claim above it:
+          the summary renders on the TURN (`ai.agent-answer`), and the card mounts
+          under that. `ConversationSurface` now lifts the refusals above the prose
+          it contradicts, which is what myne-md/myne#848 asked for in the first
+          place, and what this file's own header says happens. One copy, on the
+          surface that owns the reading order. */}
+
+      {/* The body scrolls, capped, so the card's own actions stay reachable.
+          A proposal can be forty edits; a card that grew to their full height
+          would push its own Approve button off screen and turn a decision into a
+          scroll to the bottom of the transcript. The cap is a fraction of the
+          viewport rather than a pixel count so it tracks the window, with a pixel
+          ceiling for a very tall one. */}
+      <div
+        className="myne-review-region"
+        style={{
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          maxHeight: "min(52vh, 420px)",
+        }}
+      >
         {byNote.length === 0 &&
         agent.proposal.newNotes.length === 0 &&
         (agent.proposal.settings?.length ?? 0) === 0 ? (
           <p
             data-testid="agentReview.empty"
-            style={{ padding: "var(--space-5)", color: "var(--fg-2)" }}
+            style={{
+              margin: 0,
+              padding: "var(--space-3)",
+              color: "var(--fg-2)",
+              fontSize: "var(--text-sm)",
+            }}
           >
             {t("agent.review.noChanges")}
           </p>
@@ -469,6 +599,7 @@ export function AgentReview({
             title={titleOf(noteId)}
             folderOf={folderOf}
             rows={noteRows}
+            narrow={narrow}
             rejected={agent.rejected}
             applied={agent.appliedEdits}
             busy={busy}
@@ -497,21 +628,15 @@ export function AgentReview({
           />
         ) : null}
 
-        {agent.applied ? <ApplyReport result={agent.applied} /> : null}
-
-        {agent.error ? (
-          <p
-            data-testid="agentReview.error"
-            style={{ padding: "var(--space-5)", color: "var(--danger)" }}
-          >
-            {agent.error}
-          </p>
-        ) : null}
-
         {undoReport ? (
           <p
             data-testid="agentReview.undoReport"
-            style={{ padding: "var(--space-5)", color: "var(--fg-2)" }}
+            style={{
+              margin: 0,
+              padding: "var(--space-2) var(--space-3)",
+              color: "var(--fg-2)",
+              fontSize: "var(--text-xs)",
+            }}
           >
             {t("agent.review.undoReport", {
               reverted: undoReport.reverted,
@@ -522,11 +647,6 @@ export function AgentReview({
                   count: undoReport.settingsReverted,
                 })}`
               : ""}
-            {/* **A restore that failed has to be said out loud.** `failed` carries
-                the notes and the settings together, and the review screen rendered
-                neither its count nor its members: an undo that put nothing back
-                read as "0 notes restored" and stopped, which is the one outcome the
-                user most needs told (2026-10-13 review round two). */}
             {undoReport.failed.length > 0
               ? ` ${t("agent.review.undoReportFailed", {
                   count: undoReport.failed.length,
@@ -534,31 +654,32 @@ export function AgentReview({
               : ""}
           </p>
         ) : null}
+
+        {/* No apply report here any more. Which rows landed
+            is on the rows themselves (`agentReview.appliedFlag`), the headline
+            states the total, and the undo report has rendered on the turn as
+            `ai.undo-result` since myne-md/myne#741, three surfaces for one fact
+            was most of what made this card look like a dialog. */}
+
       </div>
 
       <footer
+        className="myne-review-region"
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "var(--space-3)",
-          padding: "var(--space-4) var(--space-5)",
+          gap: "var(--space-2)",
+          padding: "var(--space-2) var(--space-3)",
           borderTop: "1px solid var(--line-1)",
         }}
       >
-        {/* The post-run summary. With no volume bound on the remote arm, this is
-            where an uncapped run becomes a visible one. Shared with the
-            transcript turn, which says the same thing about a run whose
-            proposal has since been dropped. */}
-        <RunCostLine
-          testId="agentReview.runSummary"
-          iterations={agent.iterations}
-          notesRead={agent.notesRead}
-          charsOffDevice={agent.charsOffDevice}
-          style={{ color: "var(--fg-2)" }}
-        />
-        <span style={{ flex: 1 }} />
-        {/* Undo the whole run as one action. Only offered once something has
-            been written, because there is nothing to revert before that. */}
+        {/* **The acts, and nothing else.** The run's cost line used to sit here
+            too, which is the third place the same figures appeared: the turn's
+            own footprint already reports the run (myne-md/myne#848 moved it
+            there for the settled and the running case alike), and a second copy
+            in the footer made a decision card carry the run's discharge as well.
+            A reader who wants the figures opens them on the line that owns
+            them. */}
         {agent.applied && hasAnythingToUndo(agent.applied) ? (
           <Button
             variant="ghost"
@@ -569,13 +690,55 @@ export function AgentReview({
             {t("agent.review.undo")}
           </Button>
         ) : null}
+        <span style={{ flex: 1 }} />
         <Button
           variant="ghost"
-          disabled={busy || rows.length === 0}
-          onClick={() => rejectAll(rows.map((r) => r.index))}
+          // **Gated on "the proposal holds anything", not on the edit rows**
+          // (myne-md/myne#894, from the review). `rows` is edits only, and the ×
+          // that used to be the always-enabled way out is gone, so a settings-only
+          // proposal (which this surface renders on purpose, myne-md/myne#850)
+          // painted Reject all disabled, "Approve 0 changes" disabled, and nothing
+          // else: a decision card whose every control was dead.
+          disabled={busy || !anythingProposed}
+          /* **Reject all IS the exit** (myne-md/myne#894, on the user's read:
+             "drop the ×, reject all will do that job"). The card has exactly two
+             ways out, approve, or reject, and a third control that only
+             dismissed the proposal was the one that needed the rule "closing
+             discards a proposal you have not applied" spelled out beside it. So
+             rejecting everything and closing are one act, and the rule is
+             unchanged: the run is dropped, nothing is written. */
+          onClick={() => {
+            // Every verb, not the edits alone: "reject all" that left a proposed
+            // new note or setting untouched would be a control whose name is
+            // false. The per-row toggles are current at render, so this only
+            // touches the ones still kept.
+            rejectAll(rows.map((r) => r.index));
+            agent.proposal.newNotes.forEach((_, i) => {
+              if (!agent.rejectedNewNotes.has(i)) toggleNewNote(i);
+            });
+            (agent.proposal.settings ?? []).forEach((_, i) => {
+              if (!agent.rejectedSettings.has(i)) toggleSetting(i);
+            });
+            // Before the close, because closing drops the run: the outcome has to
+            // be recorded while the card still knows which run it is about.
+            onDecision?.("rejected");
+            onClose();
+          }}
           data-testid="agentReview.rejectAll"
         >
+          {/* **The count, like the sibling control has** (myne-md/myne#894, from
+              review). This is the one act that drops the whole proposal, it is
+              now the only exit, and "Reject all" understated what one click
+              discards: the number is the reader's only notice of the size.
+              A digit beside the label rather than a plural inside the catalog
+              string, which is what a `{{count}}` here would cost 31 catalogs. */}
           {t("agent.review.rejectAll")}
+          <span
+            data-testid="agentReview.rejectAllCount"
+            style={{ color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {proposedTotal}
+          </span>
         </Button>
         <Button
           variant="primary"
@@ -594,6 +757,7 @@ function NoteGroup({
   noteId,
   title,
   rows,
+  narrow,
   rejected,
   applied,
   busy,
@@ -604,6 +768,8 @@ function NoteGroup({
   noteId: string;
   title: string | null;
   rows: EditRow[];
+  /** Too narrow for a two-column diff. `unified` is the mode that fits. */
+  narrow: boolean;
   rejected: ReadonlySet<number>;
   applied: ReadonlySet<number>;
   busy: boolean;
@@ -618,35 +784,47 @@ function NoteGroup({
       data-testid="agentReview.noteGroup"
       style={{
         borderBottom: "1px solid var(--line-1)",
-        padding: "var(--space-4) var(--space-5)",
+        padding: "var(--space-2) var(--space-3)",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-3)",
       }}
     >
-      <h2
+      {/* **The note's own name, and one line per change under it**
+          (myne-md/myne#894, second pass). The first version of this card was the
+          dialog's body: a bordered box per change, a two-column diff rendered
+          inline for every row, a flag beside each verb, a count, a heading per
+          group. Forty of those is a document, and the user's read was exact,
+          "it still looks like the big one, only smaller". What a reader needs
+          before deciding is WHICH note and WHAT KIND of change; the text of the
+          change is a question they ask about one row at a time, so it is behind
+          that row's own disclosure. */}
+      <h3
         data-testid="agentReview.noteTitle"
         style={{
           margin: 0,
-          fontSize: "var(--text-md)",
+          padding: "var(--space-1) 0",
+          fontSize: "var(--text-sm)",
           fontWeight: "var(--weight-semibold)",
+          display: "flex",
+          alignItems: "baseline",
+          gap: "var(--space-2)",
         }}
       >
-        {/* The note's own name, not just a count. Approving an anchored
-            replacement without knowing which note receives it is not informed
-            approval, which is the whole premise of this screen. */}
-        {title ?? t("agent.review.untitledNote")}{" "}
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {title ?? t("agent.review.untitledNote")}
+        </span>
         <span
           data-testid="agentReview.noteChangeCount"
-          style={{ color: "var(--fg-2)", fontWeight: "var(--weight-regular)" }}
+          style={{ color: "var(--fg-3)", fontWeight: "var(--weight-regular)", flex: "none" }}
         >
           {t("agent.review.noteHeading", { count: rows.length })}
         </span>
-      </h2>
+      </h3>
       {rows.map((row) => (
         <EditRowView
           key={row.index}
           row={row}
+          narrow={narrow}
           sourceFolder={folderOf(noteId)}
           rejected={rejected.has(row.index)}
           applied={applied.has(row.index)}
@@ -664,6 +842,7 @@ function NoteGroup({
 
 function EditRowView({
   row,
+  narrow,
   sourceFolder,
   rejected,
   applied,
@@ -672,6 +851,8 @@ function EditRowView({
   onApplyOne,
 }: {
   row: EditRow;
+  /** Too narrow for a two-column diff (myne-md/myne#894). */
+  narrow: boolean;
   /** The folder the note is in now, for a move row's left column. `null` when
    *  the note list does not know the note, in which case the destination is
    *  shown alone rather than a source being invented. */
@@ -683,147 +864,170 @@ function EditRowView({
   onApplyOne: () => void;
 }) {
   const { t } = useTranslation();
+  /** Whether this row's own change is showing. Session state, like every other
+   *  disclosure on this card: a reader who opened it is reading it now. */
+  const [open, setOpen] = useState(false);
   const { diff, changedLines } = useMemo(() => {
     const d = diffWithSegments(row.edit.anchor, row.edit.replacement);
     return { diff: d, changedLines: changedLineCount(d) };
   }, [row.edit.anchor, row.edit.replacement]);
+
+  // **One sentence per row, and it says what the change DOES** rather than which
+  // flag it carries. The verb was three separate labels before (moves to another
+  // folder / adds to the end / N lines), each its own span with its own testid,
+  // and the reader assembled the meaning from them.
+  const change = isMove(row.edit)
+    ? t("agent.review.rowMove", {
+        folder:
+          row.edit.replacement === ""
+            ? t("agent.review.vaultRoot")
+            : row.edit.replacement,
+      })
+    : row.edit.kind === "append"
+      ? t("agent.review.rowAppend")
+      : t("agent.review.rowReplace", { count: changedLines });
+
   return (
     <article
       data-testid="agentReview.edit"
-      /* Replace or append. The diff renders identically for both (an append
-         diffs an empty anchor against the new text, so every line reads as an
-         addition, which is exactly what it is), so this attribute is the only
-         thing that lets a scenario tell the two shapes apart. A literal, never
-         a runtime expression carrying content. */
+      /* Replace, append or move. The diff renders the first two similarly (an
+         append diffs an empty anchor against the new text, so every line reads
+         as an addition, which is exactly what it is), so this attribute is what
+         lets a scenario tell the shapes apart. A literal, never a runtime
+         expression carrying content. */
       data-kind={row.edit.kind ?? "replace"}
       data-rejected={rejected ? "true" : "false"}
       data-applied={applied ? "true" : "false"}
-      style={{
-        border: "1px solid var(--line-1)",
-        borderRadius: "var(--radius-2)",
-        opacity: rejected ? 0.5 : 1,
-        display: "flex",
-        flexDirection: "column",
-      }}
+      style={{ opacity: rejected ? 0.55 : 1 }}
     >
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "var(--space-3)",
-          padding: "var(--space-2) var(--space-3)",
-          borderBottom: "1px solid var(--line-1)",
+          gap: "var(--space-2)",
+          padding: "var(--space-1) 0",
         }}
       >
-        {/* A move has no changed lines to count: its `replacement` is a folder,
-            not text. Counting a diff of "" against a folder path would put a
-            meaningless number beside the row whose whole point is that it moves
-            something (myne-md/myne#848). */}
-        {isMove(row.edit) ? (
-          <span data-testid="agentReview.moveFlag" style={{ color: "var(--fg-2)" }}>
-            {t("agent.review.moveFlag")}
-          </span>
-        ) : (
-          <span style={{ color: "var(--fg-2)" }}>
-            {t("agent.review.changedLines", { count: changedLines })}
-          </span>
-        )}
-        {/* The structural carve-out, made visible. A removing edit is not part
-            of the bulk action at all, so it says so, says WHICH removal, and
-            carries its own act. */}
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-1)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {change}
+        </span>
+        {/* A removal is never part of the bulk action, so its row says so AND
+            carries its own act. The label names WHICH removal, because one
+            sentence cannot be true for all five markers. */}
         {row.removes !== null ? (
           <span
             data-testid="agentReview.removalFlag"
-            style={{ color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
+            style={{
+              flex: "none",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-1)",
+              fontWeight: "var(--weight-semibold)",
+            }}
           >
             {removalFlagLabel(row.removes, t)}
           </span>
         ) : null}
-        {/* Which VERB this row is, made visible. The diff renders an append
-            and a replacement identically (an append diffs an empty anchor
-            against the new text, so every line reads as an addition), and
-            "informed approval" is this screen's whole premise: an append is
-            unanchored and lands after the frontmatter block, which is a
-            different write from replacing text the reader can see in front of
-            them. `data-kind` above tells a SCENARIO the two apart; this tells
-            the person approving. */}
-        {row.edit.kind === "append" ? (
-          <span data-testid="agentReview.appendFlag" style={{ color: "var(--fg-2)" }}>
-            {t("agent.review.appendFlag")}
-          </span>
-        ) : null}
-        {/* The visual-only flag. Deliberately weaker than the one above. */}
+        {/* The visual-only flag for a very large cut, kept because it is the one
+            signal a reader cannot get from the line's verb. */}
         {row.largeDeletion && row.removes === null ? (
-          <span data-testid="agentReview.largeDeletion" style={{ color: "var(--fg-2)" }}>
+          <span
+            data-testid="agentReview.largeDeletion"
+            style={{ flex: "none", fontSize: "var(--text-xs)", color: "var(--fg-3)" }}
+          >
             {t("agent.review.largeDeletion")}
           </span>
         ) : null}
         {applied ? (
-          <span data-testid="agentReview.appliedFlag" style={{ color: "var(--fg-2)" }}>
+          <span
+            data-testid="agentReview.appliedFlag"
+            style={{ flex: "none", fontSize: "var(--text-xs)", color: "var(--fg-3)" }}
+          >
             {t("agent.review.alreadyApplied")}
           </span>
         ) : null}
-        <span style={{ flex: 1 }} />
-        {applied ? null : (
-          <Button variant="ghost" onClick={onToggle} data-testid="agentReview.toggleEdit">
-            {rejected ? t("agent.review.restoreEdit") : t("agent.review.rejectEdit")}
-          </Button>
-        )}
-        {row.removes !== null && !applied ? (
-          <Button
-            variant="danger"
-            disabled={busy || rejected}
-            onClick={onApplyOne}
-            data-testid="agentReview.applyRemoval"
-          >
-            {t("agent.review.applyRemoval")}
-          </Button>
-        ) : null}
+        <span style={{ flex: "none", display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+          {applied ? null : (
+            <Button variant="ghost" onClick={onToggle} data-testid="agentReview.toggleEdit">
+              {rejected ? t("agent.review.restoreEdit") : t("agent.review.rejectEdit")}
+            </Button>
+          )}
+          {row.removes !== null && !applied ? (
+            <Button
+              variant="danger"
+              disabled={busy || rejected}
+              onClick={onApplyOne}
+              data-testid="agentReview.applyRemoval"
+            >
+              {t("agent.review.applyRemoval")}
+            </Button>
+          ) : null}
+          <IconButton
+            icon={open ? "chevron-up" : "chevron-down"}
+            iconSize={12}
+            label={t(open ? "agent.review.hideChange" : "agent.review.showChange")}
+            tooltip
+            expanded={open}
+            testId="agentReview.toggleDiff"
+            onClick={() => setOpen((v) => !v)}
+          />
+        </span>
       </div>
-      {/* An append diffs an empty anchor against the new text, so its left
-          column is empty under a heading reading "in the note now". That is the
-          honest answer for an append rather than a layout defect: it replaces
-          nothing. */}
-      {/* **A move renders as its own row, not as a diff** (myne-md/myne#848).
-          A diff would draw an empty left column under "in the note now" and a
-          folder under "after this change", which describes nothing: a folder is
-          not note text. So the row shows the folder the note is in and the folder
-          it would land in, the pair a reader needs to judge the excluded-folder
-          clamp by eye. The source is resolved by the caller from the same note
-          list `titleOf` reads. */}
-      {isMove(row.edit) ? (
-        <div
-          data-testid="agentReview.moveBody"
-          style={{
-            display: "flex",
-            gap: "var(--space-5)",
-            padding: "var(--space-3)",
-            color: "var(--fg-2)",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            <span>{t("agent.review.diffCurrent")}</span>
-            <span data-testid="agentReview.moveFrom" style={{ color: "var(--fg-1)" }}>
-              {sourceFolder ?? t("agent.review.vaultRoot")}
-            </span>
+      {/* The change itself, on request. A move renders as its own pair of
+          folders rather than as a diff (a diff would draw an empty left column
+          under "in the note now" and a folder on the right, which describes
+          nothing: a folder is not note text). */}
+      {open ? (
+        isMove(row.edit) ? (
+          <div
+            data-testid="agentReview.moveBody"
+            style={{
+              display: "flex",
+              gap: "var(--space-5)",
+              padding: "var(--space-2) 0 var(--space-3)",
+              color: "var(--fg-2)",
+              fontSize: "var(--text-sm)",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+              <span>{t("agent.review.diffCurrent")}</span>
+              <span data-testid="agentReview.moveFrom" style={{ color: "var(--fg-1)" }}>
+                {sourceFolder ?? t("agent.review.vaultRoot")}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+              <span>{t("agent.review.diffProposed")}</span>
+              <span data-testid="agentReview.moveTo" style={{ color: "var(--fg-1)" }}>
+                {row.edit.replacement === ""
+                  ? t("agent.review.vaultRoot")
+                  : row.edit.replacement}
+              </span>
+            </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            <span>{t("agent.review.diffProposed")}</span>
-            <span data-testid="agentReview.moveTo" style={{ color: "var(--fg-1)" }}>
-              {row.edit.replacement === ""
-                ? t("agent.review.vaultRoot")
-                : row.edit.replacement}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <DiffView
-          diff={diff}
-          mode="split"
-          leftLabel={t("agent.review.diffCurrent")}
-          rightLabel={t("agent.review.diffProposed")}
-        />
-      )}
+        ) : (
+          <DiffView
+            diff={diff}
+            // **The mode follows the card's width** (myne-md/myne#894). The split
+            // is the better answer to "what is this replacing?" wherever it fits,
+            // and it was the only mode this component ever rendered because it
+            // always rendered in a 1200px dialog. In a 380px chat column two
+            // columns are 170px each, which is narrower than a sentence, so the
+            // unified mode, the component's own default, takes over there.
+            mode={narrow ? "unified" : "split"}
+            leftLabel={t("agent.review.diffCurrent")}
+            rightLabel={t("agent.review.diffProposed")}
+          />
+        )
+      ) : null}
     </article>
   );
 }
@@ -867,23 +1071,28 @@ function SettingsGroup({
   return (
     <section
       data-testid="agentReview.settingsGroup"
+      // **The card's own row anatomy, not the dialog's** (myne-md/myne#894, from
+      // review). This group kept the shape the rest of the card argues against: a
+      // bordered box per row, a heavier heading, and 0.5 where the other rows use
+      // 0.55. One card, one row shape, or the settings read as a different kind of
+      // object inside the same decision.
       style={{
         borderBottom: "1px solid var(--line-1)",
-        padding: "var(--space-4) var(--space-5)",
+        padding: "var(--space-2) var(--space-3)",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-3)",
       }}
     >
-      <h2
+      <h3
         style={{
           margin: 0,
-          fontSize: "var(--text-md)",
+          padding: "var(--space-1) 0",
+          fontSize: "var(--text-sm)",
           fontWeight: "var(--weight-semibold)",
         }}
       >
         {t("agent.review.settingsHeading", { count: settings.length })}
-      </h2>
+      </h3>
       {settings.map((setting, index) => {
         const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === setting.intentId);
         // The id is the fallback rather than the row being hidden: an entry the
@@ -928,10 +1137,8 @@ function SettingsGroup({
             data-rejected={isRejected ? "true" : "false"}
             data-applied={isApplied ? "true" : "false"}
             style={{
-              border: "1px solid var(--line-1)",
-              borderRadius: "var(--radius-2)",
-              padding: "var(--space-3)",
-              opacity: isRejected ? 0.5 : 1,
+              padding: "var(--space-1) 0",
+              opacity: isRejected ? 0.55 : 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -1031,55 +1238,64 @@ function NewNotesGroup({
   rejected,
   onToggle,
 }: {
-  notes: ProposedNote[];
+  notes: readonly ProposedNote[];
   rejected: ReadonlySet<number>;
   onToggle: (index: number) => void;
 }) {
   const { t } = useTranslation();
+  /* One row per note, in the same shape as an edit row: the title and where it
+     lands are what the decision turns on, and the body, which can be pages,
+     is behind that row's own disclosure. */
+  const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   return (
     <section
       data-testid="agentReview.newNotesGroup"
       style={{
         borderBottom: "1px solid var(--line-1)",
-        padding: "var(--space-4) var(--space-5)",
+        padding: "var(--space-2) var(--space-3)",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-3)",
       }}
     >
-      <h2
+      <h3
         style={{
           margin: 0,
-          fontSize: "var(--text-md)",
+          padding: "var(--space-1) 0",
+          fontSize: "var(--text-sm)",
           fontWeight: "var(--weight-semibold)",
         }}
       >
         {t("agent.review.newNotesHeading", { count: notes.length })}
-      </h2>
+      </h3>
       {notes.map((note, index) => (
         <article
           key={index}
           data-testid="agentReview.newNote"
           data-rejected={rejected.has(index) ? "true" : "false"}
-          style={{
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-2)",
-            opacity: rejected.has(index) ? 0.5 : 1,
-            display: "flex",
-            flexDirection: "column",
-          }}
+          style={{ opacity: rejected.has(index) ? 0.55 : 1 }}
         >
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "var(--space-3)",
-              padding: "var(--space-2) var(--space-3)",
-              borderBottom: "1px solid var(--line-1)",
+              gap: "var(--space-2)",
+              padding: "var(--space-1) 0",
             }}
           >
-            <strong data-testid="agentReview.newNoteTitle">{note.title}</strong>
-            <span style={{ color: "var(--fg-2)" }}>
+            <span
+              data-testid="agentReview.newNoteTitle"
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: "var(--text-sm)",
+                fontWeight: "var(--weight-medium)",
+              }}
+            >
+              {note.title}
+            </span>
+            <span style={{ flex: "none", fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
               {note.folder ?? t("agent.review.vaultRoot")}
             </span>
             <span style={{ flex: 1 }} />
@@ -1092,44 +1308,52 @@ function NewNotesGroup({
                 ? t("agent.review.restoreEdit")
                 : t("agent.review.rejectEdit")}
             </Button>
+            <IconButton
+              icon={open.has(index) ? "chevron-up" : "chevron-down"}
+              iconSize={12}
+              label={t(
+                open.has(index)
+                  ? "agent.review.hideChange"
+                  : "agent.review.showChange",
+              )}
+              tooltip
+              expanded={open.has(index)}
+              testId="agentReview.toggleNewNoteBody"
+              onClick={() =>
+                setOpen((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(index)) next.delete(index);
+                  else next.add(index);
+                  return next;
+                })
+              }
+            />
           </div>
-          {/* The whole body, not an excerpt: the user is approving a write, and
-              a create has no restore point to fall back on. */}
-          <pre
-            data-testid="agentReview.newNoteBody"
-            style={{
-              margin: 0,
-              padding: "var(--space-3) var(--space-5)",
-              fontFamily: "var(--font-mono)",
-              fontSize: "var(--text-sm)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              color: "var(--fg-2)",
-            }}
-          >
-            {note.body}
-          </pre>
+          {open.has(index) ? (
+            /* The whole body, not an excerpt: the user is approving a write, and
+               a create has no restore point to fall back on. */
+            <pre
+              data-testid="agentReview.newNoteBody"
+              style={{
+                margin: 0,
+                padding: "var(--space-2) 0 var(--space-3)",
+                fontFamily: "var(--font-mono)",
+                fontSize: "var(--text-sm)",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "var(--fg-2)",
+              }}
+            >
+              {note.body}
+            </pre>
+          ) : null}
         </article>
       ))}
     </section>
   );
 }
 
-/** The refusals, pinned ABOVE the model's summary.
- *
- *  **Why it is not inside `ApplyReport` any more** (myne-md/myne#848). A run on
- *  the first structured manual pass reported ten folder moves as applied while
- *  every one had been refused, and the user believed the summary until they
- *  reached the refusal list at the bottom of a 68-note diff. The host's fact now
- *  precedes the model's claim, and it carries a count because the reader's
- *  question is "did all of it land" rather than "which line failed".
- *
- *  All three kinds are counted together: a refused edit, a refused new note and
- *  a refused setting change index three different spaces, which is why they are
- *  three arrays on the wire, but to the person reading they are one experience.
- *  The count is what the host's own `hasRefusals` predicate decides on, so the
- *  two cannot disagree about whether this block exists. */
-function RefusalBlock({ result }: { result: AgentApplyResult }) {
+export function RefusalBlock({ result }: { result: AgentApplyResult }) {
   const { t } = useTranslation();
   // **All three kinds, and the settings were missing from both halves** (from
   // review). A refused setting change therefore rendered a block reading "0
@@ -1144,23 +1368,33 @@ function RefusalBlock({ result }: { result: AgentApplyResult }) {
     <section
       data-testid="agentReview.refusedBlock"
       style={{
-        padding: "var(--space-3) var(--space-5)",
+        padding: "var(--space-2) var(--space-3)",
         borderBottom: "1px solid var(--line-1)",
         background: "var(--paper-2)",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-2)",
+        gap: "var(--space-1)",
       }}
     >
       <p
         data-testid="agentReview.refusedCount"
-        style={{ margin: 0, color: "var(--fg-1)", fontWeight: "var(--weight-semibold)" }}
+        style={{
+          margin: 0,
+          fontSize: "var(--text-xs)",
+          color: "var(--danger)",
+          fontWeight: "var(--weight-semibold)",
+        }}
       >
         {t("agent.review.refusedCount", { count })}
       </p>
       <ul
         data-testid="agentReview.refusedList"
-        style={{ margin: 0, paddingInlineStart: "var(--space-5)", color: "var(--fg-2)" }}
+        style={{
+          margin: 0,
+          paddingInlineStart: "var(--space-3)",
+          color: "var(--fg-2)",
+          fontSize: "var(--text-xs)",
+        }}
       >
         {result.refused.map((r) => (
           <li key={`e-${r.noteId}-${r.index}`}>{t(`agent.review.refused.${r.reason}`)}</li>
@@ -1179,50 +1413,6 @@ function RefusalBlock({ result }: { result: AgentApplyResult }) {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-function ApplyReport({ result }: { result: AgentApplyResult }) {
-  const { t } = useTranslation();
-  return (
-    <section
-      data-testid="agentReview.applyReport"
-      style={{
-        padding: "var(--space-4) var(--space-5)",
-        borderTop: "1px solid var(--line-1)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-2)",
-      }}
-    >
-      {/* **Rendered only when something was applied** (myne-md/myne#850, from the
-          2026-10-14 review): a settings-only apply printed "0 changes applied."
-          directly above "1 setting changed.", so the report's first line denied
-          the change its second line announced. */}
-      {result.applied > 0 ? (
-        <p style={{ margin: 0 }} data-testid="agentReview.appliedCount">
-          {t("agent.review.appliedCount", { count: result.applied })}
-        </p>
-      ) : null}
-      {(result.settingsChanged?.length ?? 0) > 0 ? (
-        <p style={{ margin: 0 }} data-testid="agentReview.settingsChangedCount">
-          {t("agent.review.settingsChanged", {
-            count: result.settingsChanged?.length ?? 0,
-          })}
-        </p>
-      ) : null}
-      {result.notesCreated.length > 0 ? (
-        <p style={{ margin: 0 }} data-testid="agentReview.createdCount">
-          {t("agent.review.createdCount", { count: result.notesCreated.length })}
-        </p>
-      ) : null}
-      {/* Refusals are NOT here any more. They render in `RefusalBlock`, above the
-          model's own summary, because a summary that claimed refused work was
-          applied was read first and the refusal list last (myne-md/myne#848). The
-          `hasRefusals` predicate still decides whether this surface keeps the
-          dialog OPEN (`applyWasCleanAndComplete`, myne-md/myne#596), which is why
-          it stays one function rather than being inlined in either place. */}
     </section>
   );
 }

@@ -1372,7 +1372,13 @@ export function AgentHubList({
                       data-motion="essential"
                       style={RUN_STATE_STYLE}
                     >
-                      <Icon name="bot" size={12} />
+                      {/* **One state, one glyph** (myne-md/myne#894). This is the
+                          same "working" state the transcript's footprint line
+                          renders, and it now uses the same mark: `bot` here and
+                          `bot` there made the glyph mean "an assistant" in one
+                          place and "a run is in flight" in the other, and in the
+                          transcript the two landed on adjacent lines. */}
+                      <Icon name="loader-circle" size={12} />
                       <span>{t("agent.progress.working")}</span>
                       {runningSince !== null ? (
                         <>
