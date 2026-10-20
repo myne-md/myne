@@ -84,6 +84,22 @@ describe("IdentitySetupDialog", () => {
     );
   });
 
+  it("puts the server link below the create and recover choices", async () => {
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+
+    const create = await screen.findByTestId("identity-setup.create-cta");
+    const recover = screen.getByTestId("identity-setup.recover-open");
+    const changeServer = screen.getByTestId("identity-setup.change-server");
+
+    // `FOLLOWING` on the first operand means the second is later in the DOM.
+    expect(
+      create.compareDocumentPosition(changeServer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      recover.compareDocumentPosition(changeServer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("fronts the first-run server step when no endpoint is configured", async () => {
     invoke.mockReset().mockResolvedValue({ endpoint_url: null });
     render(<IdentitySetupDialog open onClose={() => {}} />);
