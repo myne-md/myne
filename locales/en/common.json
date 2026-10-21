@@ -256,6 +256,9 @@
       "appliedSummary": "Changes applied.",
       "settingsApplied": "Settings applied."
     },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
+    },
     "undo": {
       "action": "Undo the run",
       "reverted_one": "{{count}} note restored.",

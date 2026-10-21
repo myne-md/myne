@@ -40,7 +40,7 @@ import { ScrollArea } from "../../components/primitives/ScrollArea";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { agentLastRun, agentUndo, hasRefusals } from "../../lib/agent-run";
-import type { AgentApplyResult, AgentUndoResult, Proposal } from "../../lib/agent-protocol";
+import type { AgentApplyResult, AgentUndoResult } from "../../lib/agent-protocol";
 import { providerErrorKey } from "../../lib/engine-error";
 import {
   getActiveConversationId,
@@ -72,7 +72,7 @@ import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { CAPTION_STYLE } from "../components/sharedStyles";
 import { ChatComposer } from "../components/ChatComposer";
-import { ProposalDiffModal } from "../components/ProposalDiffModal";
+import { ProposalDiffBody } from "../components/ProposalDiffBody";
 import { AgentReview, RefusalBlock } from "../../screens/AgentReview";
 
 /** The translation function shape every helper here takes. */
@@ -312,7 +312,6 @@ function AgentTurnView({
   folderOf,
   t,
   canRevert,
-  onOpenDiff,
   onRequestRevert,
   revertBusy,
   undoReport,
@@ -345,7 +344,6 @@ function AgentTurnView({
   folderOf: (noteId: string) => string | null;
   t: TFn;
   canRevert: boolean;
-  onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
   onRequestRevert: (runId: string) => void;
   revertBusy: boolean;
   undoReport: AgentUndoResult | null;
@@ -368,6 +366,19 @@ function AgentTurnView({
     reviewing &&
     s !== undefined &&
     (s.edits > 0 || s.newNotes > 0 || (s.settings ?? 0) > 0);
+  /**
+   * **The frozen proposal's diff opens HERE, under its own turn**
+   * (myne-md/myne#913). The state used to live on the surface and the diff in a
+   * full-width modal, so pressing the turn's own diff control painted it
+   * somewhere the user had not come from, over the conversation that explains
+   * it. Local state is what makes "under this turn" true rather than a
+   * coincidence of there being one open conversation.
+   *
+   * Closed by default: the trigger is one line, and a settled proposal is a
+   * record the user consults rather than a decision waiting on them (the live
+   * one is the review card, which is not collapsible).
+   */
+  const [diffOpen, setDiffOpen] = useState(false);
   return (
     <div
       data-testid="ai.turn"
@@ -399,7 +410,12 @@ function AgentTurnView({
                 label={t("editor.chrome.rightPanel.aiChat.viewDiff")}
                 testId="ai.turn-diff"
                 iconSize={14}
-                onClick={() => onOpenDiff(s.proposal!)}
+                // A disclosure, so it says whether it is open. The modal it
+                // replaced had nothing to report: it covered the screen or it
+                // did not.
+                expanded={diffOpen}
+                active={diffOpen}
+                onClick={() => setDiffOpen((open) => !open)}
               />
             ) : null}
             {canRevert ? (
@@ -628,6 +644,15 @@ function AgentTurnView({
             folderOf={folderOf}
           />
         </div>
+      ) : null}
+      {/* **The frozen proposal, in place** (myne-md/myne#913). Below the card
+          rather than above it: the card is the live decision, and this is the
+          record of what was proposed, which is what the card is asking about. */}
+      {diffOpen && s?.proposal !== undefined ? (
+        <ProposalDiffBody
+          proposal={s.proposal}
+          titleOf={titleOf}
+        />
       ) : null}
     </div>
   );
@@ -891,10 +916,6 @@ export function ConversationSurface({
     bumpPrefsNonce,
     ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
   });
-  const [diffProposal, setDiffProposal] = useState<Pick<
-    Proposal,
-    "edits" | "newNotes"
-  > | null>(null);
   const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
   const runOpen = agent.view !== null;
 
@@ -1174,7 +1195,6 @@ export function ConversationSurface({
                     turn.agentSummary !== undefined &&
                     turn.agentSummary.runId === undo.run.runId
                   }
-                  onOpenDiff={setDiffProposal}
                   onRequestRevert={setRevertConfirmRunId}
                   revertBusy={undo.busy}
                   undoReport={
@@ -1251,13 +1271,6 @@ export function ConversationSurface({
         onNotesWritten={onNotesWritten}
       />
 
-      {diffProposal !== null ? (
-        <ProposalDiffModal
-          open
-          onClose={() => setDiffProposal(null)}
-          proposal={diffProposal}
-        />
-      ) : null}
       {/* Revert is a write, so it confirms first. The sentence states the one
           asymmetry the offer always carries: edits go back, creates stay. */}
       {revertConfirmRunId !== null ? (

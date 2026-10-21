@@ -126,7 +126,7 @@ export const ROSTER = Object.freeze([
       "src/notes/agent/applyFailure.ts",
       "src/notes/ai/ConversationSurface.tsx",
       "src/notes/ai/reviewOwnership.ts",
-      "src/notes/components/ProposalDiffModal.tsx",
+      "src/notes/components/ProposalDiffBody.tsx",
       "src/notes/agent/components/RunCostLine.tsx",
       "src/notes/ai/agentToChat.ts",
       "src/lib/agent-run.ts",
