@@ -34,6 +34,7 @@
 //      it is bought.
 
 import {
+  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -158,8 +159,28 @@ function ComposerDropdown(props: {
   label: string;
   icon: IconName;
   value: string;
-  options: { value: string; label: string; active: boolean }[];
+  options: {
+    value: string;
+    label: string;
+    active: boolean;
+    /** A small heading rendered above this option when it differs from the
+     *  previous one. Used to separate the scope kinds from the folder list. */
+    group?: string;
+  }[];
   onPick: (value: string) => void;
+  /**
+   * **What the menu is, above the list** (myne-md/myne#913).
+   *
+   * The scope menu was a bare list of names: "All notes", "This note", then
+   * every folder in the vault, with no statement of what the choice MEANS, what
+   * it leaves out, or that it only governs the next message. A user who does not
+   * already know the model reads four unrelated nouns and guesses. The heading,
+   * the resolved count and the exclusion sentence are the three answers a
+   * choice needs before it can be made, and they cost three lines.
+   */
+  heading?: string;
+  /** One line under the list: what the choice applies to. */
+  footer?: string;
 }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLSpanElement | null>(null);
@@ -189,27 +210,65 @@ function ComposerDropdown(props: {
         open={open}
         onClose={() => setOpen(false)}
         anchorRef={anchorRef}
-        minWidth={160}
+        // Wider than the old 160: the card carries a sentence, and a menu that
+        // wraps the exclusion sentence onto four lines is a menu nobody reads.
+        minWidth={props.heading === undefined ? 160 : 240}
         align="start"
         style={SCOPE_MENU_STYLE}
         testId={`${props.base}-menu`}
       >
-        {props.options.map((option) => (
-          <Button
-            key={option.value}
-            variant="ghost"
-            data-testid={`${props.base}-option`}
-            data-value={option.value}
-            data-active={option.active ? "true" : "false"}
-            onClick={() => {
-              props.onPick(option.value);
-              setOpen(false);
-            }}
-            style={SCOPE_MENU_ITEM_STYLE}
+        {props.heading === undefined ? null : (
+          <div
+            data-testid={`${props.base}-heading`}
+            style={SCOPE_MENU_HEADING_STYLE}
           >
-            {option.label}
-          </Button>
-        ))}
+            {props.heading}
+          </div>
+        )}
+        {props.options.map((option, index) => {
+          const previousGroup =
+            index === 0 ? undefined : props.options[index - 1]?.group;
+          return (
+            <Fragment key={option.value}>
+              {option.group !== undefined && option.group !== previousGroup ? (
+                <div
+                  data-testid={`${props.base}-group`}
+                  style={SCOPE_MENU_GROUP_STYLE}
+                >
+                  {option.group}
+                </div>
+              ) : null}
+              <Button
+                variant="ghost"
+                data-testid={`${props.base}-option`}
+                data-value={option.value}
+                data-active={option.active ? "true" : "false"}
+                onClick={() => {
+                  props.onPick(option.value);
+                  setOpen(false);
+                }}
+                style={{
+                  ...SCOPE_MENU_ITEM_STYLE,
+                  // The current one reads as the answer rather than as another
+                  // candidate: the menu states the scope AND offers the others,
+                  // and a list where all four look alike makes the user re-read
+                  // the trigger to know which one they are on.
+                  ...(option.active
+                    ? { color: "var(--accent)", background: "var(--bg-3)" }
+                    : {}),
+                }}
+              >
+                {option.active ? "\u2713 " : ""}
+                {option.label}
+              </Button>
+            </Fragment>
+          );
+        })}
+        {props.footer === undefined ? null : (
+          <div data-testid={`${props.base}-footer`} style={SCOPE_MENU_FOOTER_STYLE}>
+            {props.footer}
+          </div>
+        )}
       </AnchoredPanel>
     </>
   );
@@ -224,6 +283,33 @@ const SCOPE_MENU_STYLE: CSSProperties = {
   background: "var(--bg-2)",
   border: "1px solid var(--line-1)",
   borderRadius: "var(--radius-1)",
+};
+
+/** The card's question, above the list. */
+const SCOPE_MENU_HEADING_STYLE: CSSProperties = {
+  padding: "var(--space-1) var(--space-2)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-2)",
+  lineHeight: 1.4,
+};
+
+/** A kind break inside the list (the folder section). */
+const SCOPE_MENU_GROUP_STYLE: CSSProperties = {
+  padding: "var(--space-2) var(--space-2) var(--space-1)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  borderTop: "1px solid var(--line-1)",
+  marginTop: "var(--space-1)",
+};
+
+/** What the choice governs, under the list. */
+const SCOPE_MENU_FOOTER_STYLE: CSSProperties = {
+  padding: "var(--space-1) var(--space-2) var(--space-2)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  lineHeight: 1.4,
+  borderTop: "1px solid var(--line-1)",
+  marginTop: "var(--space-1)",
 };
 
 /** Only what the primitive does not already do. */
@@ -494,7 +580,11 @@ export function ChatComposer({
    * the user reads "This note" and concludes the app is broken rather than
    * that they have a choice to make.
    */
-  const scopeOptions = useMemo(
+  const scopeOptions = useMemo<{
+    value: string;
+    label: string;
+    group?: string;
+  }[]>(
     () => [
       // The whole vault first: it is what a new conversation opens on, so it is
       // the entry the trigger reads back most of the time (myne-md/myne#848).
@@ -502,7 +592,14 @@ export function ChatComposer({
       ...(openNoteId !== null && openNoteId !== ""
         ? [{ value: "", label: t("agent.composer.scopeOpenNote") }]
         : []),
-      ...folders.map((f) => ({ value: f, label: f })),
+      // The folders are a SECTION, not four more nouns in one list
+      // (myne-md/myne#913): the kinds above are fixed and about the vault, and
+      // these are the vault's own tree, which can be long.
+      ...folders.map((f) => ({
+        value: f,
+        label: f,
+        group: t("agent.composer.scopeFolders"),
+      })),
     ],
     [folders, openNoteId, t],
   );
@@ -807,9 +904,16 @@ export function ChatComposer({
           label={t("agent.composer.scopeLabel")}
           icon={scopeIcon}
           value={scopeLabel}
+          heading={t("agent.composer.scopeQuestion")}
+          // The two things the old menu never said (myne-md/myne#913): what the
+          // choice covers in time, and what it never covers at all. Both are
+          // enforced host-side, so this sentence describes the run rather than
+          // promising something the app does not do.
+          footer={t("agent.composer.scopeApplies")}
           options={scopeOptions.map((option) => ({
             value: option.value,
             label: option.label,
+            ...(option.group === undefined ? {} : { group: option.group }),
             // **Mirrors `grant`, not `attached`** (review finding): with a note
             // open and nothing attached the grant is THAT NOTE, so a menu keyed
             // on `attached` alone marked "All notes" as current while the trigger
