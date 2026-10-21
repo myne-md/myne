@@ -592,6 +592,12 @@ const GATE_REFUSALS: ReadonlySet<ProviderErrorCause> = new Set([
         // keeps the verb inert rather than half-wired. The day a setting row
         // lands in `AiReviewFlow`, this becomes `offeredSettingIds()`.
         [],
+        // **No documents, because this client has no picker** (myne-md/myne#913).
+        // The parameter exists on both clients so the shared binding's argument
+        // order is one thing; a phone that sent nothing here would be reading a
+        // file it was never handed. When the flow grows an attach control, this
+        // is the argument it fills.
+        [],
         // The run becomes addressable here, long before the promise resolves.
         // Without it Stop has no id for the whole first leg.
         (view) => void openRun(view, epoch),
