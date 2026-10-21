@@ -44,6 +44,45 @@ export interface EditorLayoutController extends EditorLayoutState {
   toggleLeftCollapsed: () => void;
   /** Collapse/expand the right sidebar (independent of the left). */
   toggleRightCollapsed: () => void;
+  /**
+   * Whether the persisted layout has been read yet (myne-md/myne#913).
+   *
+   * **A caller that changes the layout on its own must wait for this.** The
+   * initial read REPLACES the whole state when it lands, so anything set before
+   * it is silently undone: a collapse written during the first render came back
+   * expanded the moment `vault.prefs` answered, and the surface that asked for
+   * it had no way to tell. Exposed rather than assumed, because "it is
+   * hydrated by now" is exactly the assumption that failed.
+   */
+  hydrated: boolean;
+}
+
+/**
+ * Whether entering the agent tab should close the left sidebar (myne-md/myne#913).
+ *
+ * Pure so the four cases can be asserted without mounting the Editor, which is
+ * the largest component in the tree. The cases are the whole rule:
+ *
+ *  - the agent tab is showing and the workspace is a SINGLE pane: close it. The
+ *    agent has its own conversation rail, and two rails side by side ask the
+ *    user to pick something twice.
+ *  - a SPLIT workspace: leave it. There the note tree is the other pane's
+ *    context, and closing it hides the selection being worked from.
+ *  - the layout has not hydrated: do nothing. The persisted read REPLACES the
+ *    state, so a collapse written before it lands is undone silently.
+ *  - already collapsed, or already handled for this entry: do nothing, which is
+ *    what lets the user reopen the sidebar without being fought.
+ */
+export function shouldCollapseForAgentTab(input: {
+  agentTabFocused: boolean;
+  paneCount: number;
+  hydrated: boolean;
+  leftCollapsed: boolean;
+  handledForEntry: boolean;
+}): boolean {
+  if (!input.agentTabFocused || input.paneCount !== 1) return false;
+  if (!input.hydrated) return false;
+  return !input.leftCollapsed && !input.handledForEntry;
 }
 
 /** Debounce window for persisting layout changes to `vault.prefs`. Long
@@ -59,6 +98,9 @@ const DEFAULT_STATE: EditorLayoutState = {
 
 export function useEditorLayout(): EditorLayoutController {
   const [state, setState] = useState<EditorLayoutState>(DEFAULT_STATE);
+  // Mirror of `hydratedRef` as STATE, because the ref alone cannot wake a
+  // consumer's effect. See `EditorLayoutController.hydrated`.
+  const [hydrated, setHydrated] = useState(false);
 
   // `hydratedRef` flips true once the initial prefs read resolves (or
   // fails). `dirtyRef` flips true on the first real user change, gating
@@ -92,7 +134,10 @@ export function useEditorLayout(): EditorLayoutController {
           console.warn("[editorLayout] prefs load failed; using defaults:", err);
         }
       } finally {
-        if (!cancelled) hydratedRef.current = true;
+        if (!cancelled) {
+          hydratedRef.current = true;
+          setHydrated(true);
+        }
       }
     })();
     return () => {
@@ -162,6 +207,7 @@ export function useEditorLayout(): EditorLayoutController {
 
   return {
     ...state,
+    hydrated,
     setLeftWidth,
     setRightWidth,
     toggleLeftCollapsed,
