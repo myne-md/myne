@@ -1220,6 +1220,28 @@ function EditorChrome({
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive || detached;
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive || detached;
+  // **The agent tab carries its own rail** (myne-md/myne#913, on the report that
+  // the conversation list and the note tree sat side by side saying "pick
+  // something" twice). Entering the agent tab in a SINGLE-pane workspace closes
+  // the left sidebar once.
+  //
+  // Once, and not as a forced collapse: the user can reopen it and it stays
+  // open, because the effect only fires on the ENTRY (the previous value is the
+  // one it compares against) and never on `leftCollapsed` coming back to false.
+  // A split workspace is left alone: there the note tree is what the other pane
+  // is for, and closing it would hide the selection you are working from.
+  // A restored session that opens ON the agent tab does not collapse anything:
+  // the ref starts at the current value, so there is no entry to react to.
+  const agentTabFocused = ws.focusedLeaf.activeTab?.kind === "agent";
+  const wasAgentTabFocused = useRef(agentTabFocused);
+  useEffect(() => {
+    const wasFocused = wasAgentTabFocused.current;
+    wasAgentTabFocused.current = agentTabFocused;
+    if (!agentTabFocused || wasFocused) return;
+    if (ws.leaves.length !== 1) return;
+    if (layout.leftCollapsed) return;
+    layout.toggleLeftCollapsed();
+  }, [agentTabFocused, ws.leaves.length, layout]);
   // macOS floats the traffic lights over the top-left, so windowed builds inset
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).

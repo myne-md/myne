@@ -136,6 +136,22 @@ pub enum EditRejection {
     /// [`Self::ExcludedFolder`], which is about a proposed NEW note and has no
     /// current folder to compare against.
     MoveIntoExcludedFolder,
+    /// A move's destination is not a folder this vault has.
+    ///
+    /// **The model may not invent a folder** (myne-md/myne#913, on the report
+    /// that a run claimed to move a note to "Areas" and the sidebar grew a new
+    /// top-level folder beside the `02 - AREAS` the user already had). The
+    /// catalog of a vault is the user's own structure; a destination the model
+    /// made up is a silent second structure, and nothing in the app said so
+    /// because a `folder:` value IS the folder.
+    ///
+    /// The destination is compared canonically against the set the host builds
+    /// from the index and the deliberate (empty) folders, so case and trailing
+    /// slashes do not matter and an empty folder the user created is a real
+    /// destination. A destination the model was never shown is refused rather
+    /// than created: naming a folder is a user act, not a side effect of a
+    /// proposal.
+    UnknownFolder,
     /// An append into a note with neither a frontmatter block nor a body would
     /// have authored one.
     ///
