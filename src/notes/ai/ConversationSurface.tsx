@@ -798,6 +798,9 @@ export interface ConversationSurfaceProps {
   onInsert?: (text: string) => void;
   /** The open note: the agent's default scope in the composer. */
   openNoteId?: string | null;
+  /** That note's display name, when the caller knows it (myne-md/myne#913): the
+   *  run's `Working on:` line names the note instead of pointing at "this one". */
+  openNoteTitle?: string | null;
   /**
    * The note the SESSION is anchored to, when it was opened from one
    * (myne-md/myne#848): the composer pins its scope to it and renders no picker.
@@ -871,6 +874,7 @@ export function ConversationSurface({
   surface,
   onInsert,
   openNoteId = null,
+  openNoteTitle = null,
   anchoredNoteId = null,
   folders = NO_FOLDERS,
   onNotesWritten,
@@ -1266,6 +1270,7 @@ export function ConversationSurface({
       <ChatComposer
         surface={surface}
         openNoteId={openNoteId}
+        openNoteTitle={openNoteTitle}
         anchoredNoteId={anchoredNoteId}
         folders={folders}
         onNotesWritten={onNotesWritten}
