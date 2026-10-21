@@ -1745,3 +1745,69 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
     expect(screen.getByTestId("ai.honesty-note").textContent).toBe(AI_CHAT_HONESTY_NOTE);
   });
 });
+
+// ── The scope card and note-bound conversations (myne-md/myne#913) ──────────
+//
+// Two behaviours the issue names, each with the failure it prevents. Both are
+// asserted on what the surface SAYS or DOES rather than on an internal flag:
+// the card's failure was that a user could not read it, and the conversation
+// binding's failure was that the transcript beside a note was about a different
+// note.
+describe("AiChatTab: scope card and note binding", () => {
+  it("states the scope's question and what the choice never covers", async () => {
+    render(<AiChatTab folders={["Work", "Journal"]} />);
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    const menu = await screen.findByTestId("ai.composer-scope-menu");
+
+    // The three answers the old menu did not give: what the choice is about,
+    // that the folders are a section of their own, and what it applies to.
+    expect(
+      within(menu).getByTestId("ai.composer-scope-heading").textContent,
+    ).toBe("agent.composer.scopeQuestion");
+    expect(
+      within(menu).getByTestId("ai.composer-scope-footer").textContent,
+    ).toBe("agent.composer.scopeApplies");
+    expect(
+      within(menu).getAllByTestId("ai.composer-scope-group")[0]?.textContent,
+    ).toBe("agent.composer.scopeFolders");
+
+    // Exactly ONE option reads as the current one. A menu where every row looks
+    // alike makes the user re-read the trigger to find out where they are.
+    expect(
+      menu.querySelectorAll(
+        '[data-testid="ai.composer-scope-option"][data-active="true"]',
+      ).length,
+    ).toBe(1);
+  });
+
+  it("starts a fresh conversation when the open note changes", () => {
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    // The previous note's transcript is gone: the panel is about note-b now.
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("keeps the conversation when the user has pinned it, and says so", () => {
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+
+    fireEvent.click(screen.getByTestId("ai.keep-conversation"));
+    expect(screen.getByTestId("ai.keep-conversation-mark")).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("ai.keep-conversation")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    // Pinned: the escape hatch the issue asks for. The transcript survives the
+    // switch for the session, which is what driving one conversation across two
+    // notes requires.
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+  });
+});
