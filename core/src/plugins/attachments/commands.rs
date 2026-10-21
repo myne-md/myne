@@ -39,8 +39,8 @@ use base64::Engine as _;
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
     encode_attachments_catalog_versioned, meta_version_of, parse_vault_meta_any,
-    read_or_empty_versioned, AttachmentMeta, AttachmentsCatalog, MetaVersion, SubkeyRole,
-    ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
+    read_or_empty_versioned, AttachmentMeta, AttachmentScope, AttachmentsCatalog, MetaVersion,
+    SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
     VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
@@ -333,10 +333,13 @@ pub async fn attachment_import_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     source: ImportSource,
+    // Where the file lands (myne-md/myne#913). `Library` for every caller that
+    // is not pasting into a conversation.
+    scope: AttachmentScope,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
-    let result = attachment_import_with_dir(io, host, &dir, state, source).await;
+    let result = attachment_import_with_dir(io, host, &dir, state, source, scope).await;
     // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
     // blob + catalog must push on the next coalesced cycle.
     if matches!(&result, Ok(imported) if !imported.deduplicated) {
@@ -354,6 +357,12 @@ pub async fn attachment_import<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
     source: ImportSource,
+    // Where the file lands (myne-md/myne#913): `None` is the attachment library,
+    // `Some("chat")` a conversation's own file. A string rather than the enum so
+    // the wire shape is stable if a third placement ever appears; an unknown
+    // value is refused by mapping to the library, which is the placement that
+    // lists the file rather than one that hides it from the user who imported it.
+    scope: Option<String>,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     attachment_import_from_host(
         &TauriHost::new(app),
@@ -361,8 +370,19 @@ pub async fn attachment_import<R: Runtime>(
         state.inner(),
         hooks.inner(),
         source,
+        scope_for_wire(scope.as_deref()),
     )
     .await
+}
+
+/// Map the wire's scope string to the enum. Anything unrecognised is the
+/// library: a file the user imported must never become invisible because a
+/// client sent a word this build does not know.
+pub fn scope_for_wire(raw: Option<&str>) -> AttachmentScope {
+    match raw {
+        Some("chat") => AttachmentScope::Chat,
+        _ => AttachmentScope::Library,
+    }
 }
 
 /// Testable core of [`attachment_import`] — the **extraction-free** import
@@ -383,6 +403,7 @@ pub async fn attachment_import_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
+    scope: AttachmentScope,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     attachment_import_with_dir_ext(
         io,
@@ -390,7 +411,10 @@ pub async fn attachment_import_with_dir(
         vault_dir,
         state,
         source,
-        IngestPolicy::fresh(),
+        IngestPolicy {
+            scope,
+            ..IngestPolicy::fresh()
+        },
         no_op_extract,
     )
     .await
@@ -456,6 +480,15 @@ pub struct IngestPolicy {
     /// would be deleted again on the next sync.
     pub created_at_override: Option<u64>,
     pub compression: IngestCompression,
+    /// Which surface the new entry belongs to (myne-md/myne#913).
+    ///
+    /// `Library` for every ordinary import: file picker, drop, the attachment
+    /// library's own "add". `Chat` only for a file pasted into a conversation,
+    /// which stores it encrypted and keeps it out of the library listing. It
+    /// lives on the policy rather than in the function signature because an
+    /// import has exactly one placement and every caller already builds one of
+    /// these.
+    pub scope: AttachmentScope,
 }
 
 impl IngestPolicy {
@@ -465,6 +498,7 @@ impl IngestPolicy {
         Self {
             created_at_override: None,
             compression: IngestCompression::Apply,
+            scope: AttachmentScope::Library,
         }
     }
 }
@@ -969,6 +1003,13 @@ where
     let mut meta =
         AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size);
     meta.version = version;
+    // **The placement is the importer's, not the file's** (myne-md/myne#913).
+    // A dedup hit returned earlier, so this is a new id (or a revived tombstone),
+    // and the only question left is which surface asked for it. A file already in
+    // the library that gets pasted into a conversation dedups to that existing
+    // library entry: it was theirs before the paste, and quietly re-filing it
+    // would hide a file the user had curated.
+    meta.scope = policy.scope;
     catalog.entries.insert(id_hex.clone(), meta);
     let catalog_bytes = encode_attachments_catalog_versioned(
         meta_version,
@@ -1094,8 +1135,11 @@ pub(crate) async fn catalog_list_with_dir(
         .entries
         .into_iter()
         // A tombstoned entry is a sync deletion marker (MYND-468), not a
-        // library item — never listed.
-        .filter(|(_, meta)| !meta.is_tombstone())
+        // library item — never listed. And a chat attachment belongs to the
+        // conversation that owns it (myne-md/myne#913): it is stored, encrypted
+        // and synced like any other, and it is not one of the files the user
+        // curated into their library.
+        .filter(|(_, meta)| !meta.is_tombstone() && meta.scope == AttachmentScope::Library)
         .map(|(id, meta)| CatalogEntry {
             id,
             content_type: meta.content_type,
@@ -2748,7 +2792,15 @@ mod tests {
         state: &VaultRuntimeState,
         source: ImportSource,
     ) -> Result<ImportedAttachment, AttachmentImportError> {
-        super::attachment_import_with_dir(io(), &host(), vault_dir, state, source).await
+        super::attachment_import_with_dir(
+            io(),
+            &host(),
+            vault_dir,
+            state,
+            source,
+            super::IngestPolicy::fresh().scope,
+        )
+        .await
     }
 
     // Unused by this module's own tests (the desktop crate's `import_desktop`
@@ -2775,6 +2827,7 @@ mod tests {
             super::IngestPolicy {
                 created_at_override,
                 compression: super::IngestCompression::Apply,
+                scope: AttachmentScope::Library,
             },
             extract,
         )

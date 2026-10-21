@@ -108,6 +108,7 @@
       "attach": "Attach a document",
       "empty": "No attachments in this vault yet. Add a file to the attachment library first.",
       "failed": "The attachment library could not be read. Try again.",
+      "pasteFailed": "The pasted file could not be added to this conversation.",
       "cap": "You can attach up to {{count}} files.",
       "confirm_one": "Attach {{count}} file",
       "confirm_other": "Attach {{count}} files",

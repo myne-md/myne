@@ -66,9 +66,13 @@ import {
   useAgent,
 } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
-import { attachmentReadExtractedText, type CatalogEntry } from "../../lib/attachments";
+import {
+  attachmentImport,
+  attachmentReadExtractedText,
+  type CatalogEntry,
+} from "../../lib/attachments";
 import type { RunAttachment } from "../../lib/agent-run-core";
-import { AttachmentPickerDialog } from "./AttachmentPickerDialog";
+import { AttachmentPickerDialog, MAX_RUN_ATTACHMENTS } from "./AttachmentPickerDialog";
 import { useConversationEpoch } from "../ai/chatStore";
 import { useIndexNonce } from "../indexNonce";
 import { CAPTION_STYLE } from "./sharedStyles";
@@ -749,6 +753,59 @@ export function ChatComposer({
     }
   }
 
+  /**
+   * **A pasted file belongs to THIS conversation** (myne-md/myne#913).
+   *
+   * It is imported encrypted like any other attachment, with `scope: "chat"` so
+   * it does not appear in the library: a screenshot dropped into a question is
+   * about that question, and the library is the set of files the user curated.
+   * A file already in the library dedups to its existing entry and stays there,
+   * because it was theirs before the paste.
+   *
+   * The paste is intercepted rather than left to the textarea, which would
+   * otherwise insert the file NAME (or its `[image]` placeholder) into the
+   * message as text the user did not type.
+   */
+  async function handlePaste(
+    event: React.ClipboardEvent<HTMLTextAreaElement>,
+  ): Promise<void> {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (files.length === 0) return;
+    event.preventDefault();
+    setAttachmentError(null);
+    const room = MAX_RUN_ATTACHMENTS - attachedDocs.length;
+    if (room <= 0) {
+      setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
+      return;
+    }
+    try {
+      const imported: CatalogEntry[] = [];
+      for (const file of files.slice(0, room)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const att = await attachmentImport(
+          {
+            kind: "bytes",
+            bytes: Array.from(bytes),
+            filename: file.name || null,
+          },
+          "chat",
+        );
+        imported.push({
+          id: att.id,
+          content_type: att.content_type,
+          created_at: att.created_at,
+          filename: att.filename,
+          size: att.size,
+        });
+      }
+      setAttachedDocs((docs) =>
+        [...docs, ...imported].slice(0, MAX_RUN_ATTACHMENTS),
+      );
+    } catch {
+      setAttachmentError(t("agent.attachments.pasteFailed"));
+    }
+  }
+
   return (
     <div
       data-testid="ai.composer"
@@ -816,6 +873,9 @@ export function ChatComposer({
           rows={1}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onPaste={(e) => {
+            void handlePaste(e);
+          }}
           onKeyDown={(e) => {
             // Enter sends, Shift+Enter breaks the line. `isComposing` is the
             // load-bearing half: an IME commits its candidate with Enter, so
