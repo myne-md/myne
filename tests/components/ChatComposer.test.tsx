@@ -52,6 +52,7 @@ import {
   VAULT_SCOPE_SENTINEL,
 } from "../../src/notes/components/ChatComposer";
 import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
+import { startNewConversation } from "../../src/notes/ai/startNewConversation";
 import { bumpIndexNonce } from "../../src/notes/indexNonce";
 import {
   clearChat,
@@ -1285,5 +1286,25 @@ describe("ChatComposer: the scope names the note", () => {
     expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
       "agent.composer.scopeOpenNote",
     );
+  });
+});
+
+describe("ChatComposer: the draft belongs to its conversation (myne-md/myne#913)", () => {
+  it("drops a half-typed question when the conversation changes", () => {
+    // The report: a draft followed the user across every note they switched to,
+    // so a question about note A silently became the question sent about note B.
+    mount();
+    type("this was about note A");
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("this was about note A");
+
+    act(() => {
+      startNewConversation();
+    });
+
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("");
   });
 });

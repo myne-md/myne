@@ -615,14 +615,26 @@ export function ChatComposer({
    * then binds an id without any boundary having been crossed. The epoch is
    * bumped exactly at the three transcript boundaries and nowhere else.
    *
-   * It does NOT clear the typed message. A draft is what the user is holding
-   * in their hands; the scope is what the app would have done with it.
+   * **It clears the draft too, and that reverses this comment's earlier
+   * position** (myne-md/myne#913, on the report that a draft followed the user
+   * across every note they switched to). The old rule was "a draft is what the
+   * user is holding in their hands"; the cost of that rule is that the box stops
+   * being about anything, and a half-typed question about note A silently
+   * becomes the question you send about note B. The conversation is the unit the
+   * composer serves, so the draft goes with it.
+   *
+   * What the user LOSES is stated rather than hidden: an unsent draft is not
+   * restored when they come back, because the conversation it belonged to is not
+   * restored either. A per-conversation draft store is the shape that would keep
+   * both, and it is not this change.
    */
   const conversationEpoch = useConversationEpoch();
   useEffect(() => {
     setAttached(null);
     setAttachedDocs([]);
     setAttachmentError(null);
+    setPasting([]);
+    setMessage("");
   }, [conversationEpoch]);
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
