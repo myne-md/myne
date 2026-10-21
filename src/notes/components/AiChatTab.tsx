@@ -154,6 +154,12 @@ export function AiChatTab({
     (noteUuid: string) => ws.openNewTabInFocused(noteUuid),
     [ws],
   );
+  // The open note's name for the run's `Working on:` line (myne-md/myne#913),
+  // read from the resolver set the mentions already carry.
+  const openNoteTitle =
+    openNoteId === null || openNoteId === ""
+      ? null
+      : (resolverNotes.find((note) => note.noteUuid === openNoteId)?.title ?? null);
   // One host read, four states (#191 task 1) — replacing a private
   // `get_model_path` probe that could only say yes/no and defaulted to no.
   const backend = useAiSurfaceState(aiEnabled);
@@ -628,6 +634,7 @@ export function AiChatTab({
           surface="sidebar"
           {...(onInsert === undefined ? {} : { onInsert })}
           openNoteId={openNoteId}
+          openNoteTitle={openNoteTitle}
           {...(folders === undefined ? {} : { folders })}
           {...(onNotesWritten === undefined ? {} : { onNotesWritten })}
           {...(onRunUndone === undefined ? {} : { onRunUndone })}
