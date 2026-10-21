@@ -17,11 +17,34 @@
 //      the controls a full list makes you need.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const { mockMemoryList, mockMemoryRead } = vi.hoisted(() => ({
   mockMemoryList: vi.fn(),
   mockMemoryRead: vi.fn(() => Promise.resolve("the user's name is Ömer")),
+}));
+
+vi.mock("../../src/lib/seed-memory", () => ({
+  seedMemoryStatus: vi.fn(() =>
+    Promise.resolve({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      seedEntries: 2,
+      seededAt: 1_700_000_000_000,
+      provider: "in-process",
+      remote: false,
+    }),
+  ),
+  seedMemoryPayload: vi.fn(),
+  seedMemoryGenerate: vi.fn(),
+  seedMemoryCancel: vi.fn(),
+  memorySeedApply: vi.fn(),
+  isSeedStale: () => false,
+  SEED_STALE_COOLDOWN_DAYS: 14,
+  SEED_STALE_RATIO: 0.25,
+  SEED_SUGGEST_MIN_NOTES: 10,
+  SEED_SUGGEST_MIN_FOLDERS: 2,
 }));
 
 vi.mock("../../src/lib/memory", () => ({
@@ -34,6 +57,7 @@ vi.mock("../../src/lib/memory", () => ({
 }));
 
 import { MemorySection } from "../../src/components/settings/MemorySection";
+import * as memoryLib from "../../src/lib/memory";
 
 function rows(n: number) {
   return Array.from({ length: n }, (_, i) => ({
@@ -89,5 +113,60 @@ describe("MemorySection: the roster is bounded, counted, and honest at the cap",
     expect(list.style.overflowY).toBe("auto");
     expect(list.style.maxHeight).not.toBe("");
     expect(Number.parseInt(list.style.maxHeight, 10)).toBeGreaterThan(0);
+  });
+});
+
+describe("MemorySection: the seed group is separate and removable", () => {
+  it("groups seed rows apart from everything else", async () => {
+    const seed = (id: string) => ({
+      id,
+      created_at: 1_700_000_000_000,
+      updated_at: 2,
+      version: 1,
+      quarantined: false,
+      origin: "seed",
+    });
+    mockMemoryList.mockResolvedValue({
+      rows: [
+        seed("seed1"),
+        { id: "user1", created_at: 1, updated_at: 2, version: 1, quarantined: false },
+        seed("seed2"),
+      ],
+      cap: 100,
+    });
+    renderSection();
+    const group = await screen.findByTestId("settings.memory.seed-group");
+    expect(group.textContent).toContain("From your vault");
+    expect(screen.getAllByTestId("settings.memory.seed-entry")).toHaveLength(2);
+    // The ordinary list carries only the row that is not seed-marked.
+    const main = screen.getByTestId("settings.memory.list");
+    expect(main.querySelectorAll('[data-testid="settings.memory.row"]')).toHaveLength(1);
+  });
+
+  it("removes only the seed rows after a confirmation", async () => {
+    const seed = (id: string) => ({
+      id,
+      created_at: 1_700_000_000_000,
+      updated_at: 2,
+      version: 1,
+      quarantined: false,
+      origin: "seed",
+    });
+    mockMemoryList.mockResolvedValue({
+      rows: [
+        seed("seed1"),
+        { id: "user1", created_at: 1, updated_at: 2, version: 1, quarantined: false },
+        seed("seed2"),
+      ],
+      cap: 100,
+    });
+    renderSection();
+    fireEvent.click(await screen.findByTestId("settings.memory.seed.remove-all"));
+    fireEvent.click(screen.getByTestId("settings.memory.seed.remove-confirm"));
+    await waitFor(() => {
+      expect(memoryLib.memoryDelete).toHaveBeenCalledTimes(2);
+      expect(memoryLib.memoryDelete).toHaveBeenCalledWith("seed1");
+      expect(memoryLib.memoryDelete).toHaveBeenCalledWith("seed2");
+    });
   });
 });

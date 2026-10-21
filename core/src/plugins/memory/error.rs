@@ -139,6 +139,43 @@ pub enum MemoryMutateError {
     /// The OS CSPRNG was unavailable (entry id or nonce generation).
     #[error("os randomness unavailable")]
     RandomnessUnavailable,
+    /// A reviewed seed batch carried no entries (myne-md/myne#915). Refused
+    /// rather than treated as a successful no-op, because the wizard's Apply is
+    /// only enabled with at least one selected entry and a zero-entry apply is
+    /// always a caller bug.
+    #[error("the seed batch is empty")]
+    SeedEmpty,
+    /// One candidate in a reviewed seed batch failed the write-time gate
+    /// (myne-md/myne#915). The whole batch refuses before anything is written,
+    /// and the index names the row the review screen must highlight.
+    #[error("seed candidate {index} was refused")]
+    SeedCandidateRefused {
+        index: usize,
+        reason: SeedCandidateRefusal,
+    },
+    /// The reviewed batch would grow the roster past `MAX_MEMORY_ENTRIES`
+    /// (myne-md/myne#915). Unlike the single-write `EntryLimitReached`, this
+    /// carries the arithmetic the review screen needs: a rebuild replaces its
+    /// own rows, so the remaining slots may be larger than `cap - live`.
+    #[error("the memory roster is full")]
+    SeedCapExceeded {
+        cap: usize,
+        remaining: usize,
+        requested: usize,
+    },
+}
+
+/// Why one seed candidate was refused. A closed set, mirrored on the TS side,
+/// so the review screen can name the cause without parsing prose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SeedCandidateRefusal {
+    /// Empty or whitespace-only text.
+    Empty,
+    /// Over the 2000-USV cap.
+    TextTooLong,
+    /// Tripped the injection scan.
+    ScanRejected,
 }
 
 impl From<IoFailureKind> for MemoryMutateError {

@@ -31,6 +31,8 @@ import {
 } from "../../lib/memory";
 import { EmptyState } from "../primitives/EmptyState";
 import { SettingRow } from "./SettingRow";
+import { SeedMemoryRow } from "./SeedMemoryWizard";
+import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import {
   BLOCK_STYLE,
@@ -130,6 +132,9 @@ function MemoryRow(props: {
   onSaved: () => void;
   onDeleted: () => void;
   onShowToast: (message: string) => void;
+  /** The row's testid; the seed group uses its own so a scenario can count the
+   *  seed entries without also matching the Settings row that opens the wizard. */
+  testId?: string;
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -193,7 +198,7 @@ function MemoryRow(props: {
   }
 
   return (
-    <li style={ROW_STYLE} data-testid="settings.memory.row">
+    <li style={ROW_STYLE} data-testid={props.testId ?? "settings.memory.row"}>
       {props.row.quarantined ? (
         <p style={ROW_META_STYLE} data-testid="settings.memory.row-held">
           {t("settings.memory.heldForReview")}
@@ -262,6 +267,7 @@ export function MemorySection(props: {
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [personalityDraft, setPersonalityDraft] = useState("");
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [confirmingSeedClear, setConfirmingSeedClear] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [loadFailed, setLoadFailed] = useState(false);
@@ -322,6 +328,24 @@ export function MemorySection(props: {
 
 
 
+  const removeSeedRows = useCallback(async () => {
+    if (rows === null) return;
+    setBusy(true);
+    try {
+      for (const row of rows.filter((r) => r.origin === "seed")) {
+        await memoryDelete(row.id);
+      }
+      props.onShowToast(t("settings.memory.seed.removedToast"));
+      setConfirmingSeedClear(false);
+      void reload();
+    } catch {
+      props.onShowToast(t("settings.memory.deleteFailed"));
+    } finally {
+      setBusy(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, reload]);
+
   const savePersonality = useCallback(async () => {
     setBusy(true);
     const nextDirectives: PersonalityDirective[] = personalityDraft
@@ -357,6 +381,7 @@ export function MemorySection(props: {
         {t("settings.memory.heading")}
       </h3>
       <p style={HELPER_STYLE}>{t("settings.memory.helper")}</p>
+      <SeedMemoryRow onShowToast={props.onShowToast} />
 
       {loadFailed ? (
         <div style={HELPER_STYLE}>
@@ -396,19 +421,85 @@ export function MemorySection(props: {
             ) : null}
           </div>
           <ul style={LIST_STYLE} data-testid="settings.memory.list">
-          {rows.map((row) => (
-            <MemoryRow
-              key={row.id}
-              row={row}
-              text={texts[row.id] ?? null}
-              unreadable={failedIds.has(row.id)}
-              disabled={disabled}
-              onSaved={() => void reload()}
-              onDeleted={() => void reload()}
-              onShowToast={props.onShowToast}
-            />
-          ))}
+          {rows
+            .filter((row) => row.origin !== "seed")
+            .map((row) => (
+              <MemoryRow
+                key={row.id}
+                row={row}
+                text={texts[row.id] ?? null}
+                unreadable={failedIds.has(row.id)}
+                disabled={disabled}
+                onSaved={() => void reload()}
+                onDeleted={() => void reload()}
+                onShowToast={props.onShowToast}
+              />
+            ))}
           </ul>
+          {rows.some((row) => row.origin === "seed") ? (
+            <div data-testid="settings.memory.seed-group" style={{ ...BLOCK_STYLE, marginTop: "var(--space-3)" }}>
+              <h4 style={{ ...LABEL_STYLE, margin: 0 }}>
+                {t("settings.memory.seed.groupTitle")}
+              </h4>
+              <p style={HELPER_STYLE} data-testid="settings.memory.seed-group-meta">
+                {t("settings.memory.seed.groupMeta", {
+                  date: new Date(
+                    Math.max(
+                      ...rows
+                        .filter((row) => row.origin === "seed")
+                        .map((row) => row.created_at),
+                    ),
+                  ).toLocaleDateString(),
+                  count: rows.filter((row) => row.origin === "seed").length,
+                })}
+              </p>
+              <ul style={LIST_STYLE} data-testid="settings.memory.seed-list">
+                {rows
+                  .filter((row) => row.origin === "seed")
+                  .map((row) => (
+                    <MemoryRow
+                      key={row.id}
+                      row={row}
+                      text={texts[row.id] ?? null}
+                      unreadable={failedIds.has(row.id)}
+                      disabled={disabled}
+                      onSaved={() => void reload()}
+                      onDeleted={() => void reload()}
+                      onShowToast={props.onShowToast}
+                      testId="settings.memory.seed-entry"
+                    />
+                  ))}
+              </ul>
+              {confirmingSeedClear ? (
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <Button
+                    variant="ghost"
+                    data-testid="settings.memory.seed.remove-confirm"
+                    disabled={disabled}
+                    onClick={() => void removeSeedRows()}
+                  >
+                    {t("settings.memory.seed.removeConfirm")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    data-testid="settings.memory.seed.remove-cancel"
+                    onClick={() => setConfirmingSeedClear(false)}
+                  >
+                    {t("settings.memory.cancelLabel")}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  data-testid="settings.memory.seed.remove-all"
+                  disabled={disabled}
+                  onClick={() => setConfirmingSeedClear(true)}
+                >
+                  {t("settings.memory.seed.removeAll")}
+                </Button>
+              )}
+            </div>
+          ) : null}
         </>
       )}
 

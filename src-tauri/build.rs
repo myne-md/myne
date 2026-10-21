@@ -565,6 +565,7 @@ fn main() {
                 "memory_read",
                 "memory_write",
                 "memory_delete",
+                "memory_seed_apply",
                 "personality_read",
                 "personality_write",
             ]),
@@ -859,6 +860,10 @@ fn main() {
                 "download_model",
                 "cancel_model_download",
                 "remove_model",
+                "seed_memory_status",
+                "seed_memory_payload",
+                "seed_memory_generate",
+                "seed_memory_cancel",
             ]),
         );
     }
