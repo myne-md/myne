@@ -39,3 +39,56 @@ export function prefersReducedMotion(
 ): boolean {
   return media?.matches === true;
 }
+
+/** Constant speed, in CSS pixels per second, for the travelling half.
+ *
+ *  45 px/s is roughly six characters a second at the tab's type size: fast
+ *  enough to cross a long title in a couple of seconds, slow enough to read
+ *  while it moves. The previous version used `ease-in-out` and a duration
+ *  proportional to the distance, which made every title start slowly, race in
+ *  the middle and land softly: a spring, not a marquee, and the acceleration is
+ *  what a reader perceives as "jumpy" rather than as motion. */
+const REVEAL_SPEED_PX_PER_S = 45;
+
+/** The hold before the text starts moving. Long, because this is where the text
+ *  sits after coming back and where the eye needs to re-acquire the start of the
+ *  line. */
+const REVEAL_HOLD_START_MS = 1_600;
+
+/** The hold at the far end. Short: it exists so the last characters are read as
+ *  an ending rather than as the instant the word reverses. */
+const REVEAL_HOLD_END_MS = 600;
+
+/** One cycle of the reveal: hold, travel out, hold, travel back.
+ *
+ *  **Pure, and the numbers are the point.** The cycle is constant speed with
+ *  explicit holds rather than an easing curve: an easing function has no way to
+ *  express "wait, move, wait, move back", so the previous three-keyframe version
+ *  expressed the movement with `ease-in-out` and the pacing was whatever the
+ *  curve happened to do at that distance.
+ *
+ *  The return trip is animated rather than a jump. A marquee that snaps back
+ *  reads as a glitch in a tab strip, where the text is short and the eye is on
+ *  it; the hold after the return is what makes the snap unnecessary.
+ */
+export function marqueeTiming(
+  shift: number,
+): { frames: { transform: string; offset: number }[]; duration: number } {
+  const distance = Math.max(0, shift);
+  const travelMs = (distance / REVEAL_SPEED_PX_PER_S) * 1_000;
+  const duration = REVEAL_HOLD_START_MS + travelMs + REVEAL_HOLD_END_MS + travelMs;
+  const holdStart = REVEAL_HOLD_START_MS / duration;
+  const travel = travelMs / duration;
+  const holdEnd = REVEAL_HOLD_END_MS / duration;
+  const end = `translateX(-${distance}px)`;
+  return {
+    frames: [
+      { transform: "translateX(0)", offset: 0 },
+      { transform: "translateX(0)", offset: holdStart },
+      { transform: end, offset: holdStart + travel },
+      { transform: end, offset: holdStart + travel + holdEnd },
+      { transform: "translateX(0)", offset: 1 },
+    ],
+    duration,
+  };
+}
