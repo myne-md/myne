@@ -218,3 +218,19 @@ describe("tab title reveal (myne-md/myne#908 item 6)", () => {
     expect(label?.style.textOverflow).toBe("");
   });
 });
+
+describe("<TabStrip> tab widths", () => {
+  it("keeps every tab readable and lets the row scroll instead of shrinking", () => {
+    // myne-md/myne#913, second report: the strip shrank inactive tabs to an icon
+    // (56px) and the note titles became unreadable. Shrinking is what produced
+    // that, so the floor is a readable label and an overflowing row scrolls.
+    setup();
+    const [first, active] = screen.getAllByRole("tab");
+    // jsdom keeps the inline value verbatim, which is the point of asserting it.
+    expect(first!.style.minWidth).toBe("132px");
+    expect(first!.style.flexShrink).toBe("0");
+    // The active tab is sized by its own label, not by the floor.
+    expect(active!.style.minWidth).toBe("max-content");
+    expect(active!.style.flexShrink).toBe("0");
+  });
+});

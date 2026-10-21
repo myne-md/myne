@@ -1273,7 +1273,11 @@ function EditorChrome({
   const isFullscreen = useIsFullscreen();
   const leftToggleX =
     HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
-  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
+  // The strip's own `STRIP_BASE_PADDING_LEFT` already separates the first tab
+  // from whatever ends here, so the old `+ 8` was a SECOND gap on top of it: two
+  // insets that both said "leave room", visible as a dead strip of chrome with
+  // nothing in it (myne-md/myne#913). One gap, owned by the strip.
+  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + STRIP_GAP_AFTER_CONTROLS;
   // Is anything FLOATED in the top-right corner? Two things can be, the
   // note-actions "…" menu and the right-sidebar toggle, and they share one
   // condition, because both act on the OPEN NOTE: a non-note tab (the graph, the
@@ -3233,6 +3237,9 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 /** Right toggle's x offset from the right edge — shared with the tab strip's
  *  trailing inset, so the two end the row on one line. */
 const RIGHT_TOGGLE_X = TITLE_BAR_RIGHT_EDGE;
+/** The single gap between the floated controls and whatever the strip's inset
+ *  clears for them. Small on purpose: see `leftClearance`. */
+const STRIP_GAP_AFTER_CONTROLS = 4;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
