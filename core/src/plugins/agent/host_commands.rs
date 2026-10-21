@@ -166,6 +166,16 @@ struct Session {
     /// the seed halfway through would leave the model answering the second half
     /// of a conversation it can no longer see the first half of.
     history: Vec<Message>,
+    /// The documents the user attached to this run (myne-md/myne#913), already
+    /// budgeted and wrapped as untrusted messages.
+    ///
+    /// Held for the reason `language` is held: a run resumed after a scope
+    /// approval re-enters the loop, and a document that vanished on the second
+    /// leg would leave the model answering about a file it can no longer see.
+    /// NOT part of `history`, because `step` drops the seed when the egress
+    /// controls change and a withdrawn conversation is not a withdrawn
+    /// attachment: the user chose the file for this run.
+    documents: Vec<Message>,
     /// The egress controls the seed was built under, or `None` when the run
     /// was seeded with nothing.
     ///
@@ -437,6 +447,7 @@ impl AgentSessionState {
         live_ids: &BTreeSet<String>,
         language: Option<String>,
         history: Vec<Message>,
+        documents: Vec<Message>,
         seed_controls: Option<super::history::SeedControls>,
         offered_settings: Vec<String>,
     ) {
@@ -450,6 +461,7 @@ impl AgentSessionState {
                     task,
                     language,
                     history,
+                    documents,
                     seed_controls,
                     offered_settings,
                     ..Default::default()
@@ -578,6 +590,18 @@ fn wipe_session(session: &mut Session) {
         }
     }
     session.transcript.clear();
+    // The attached documents (myne-md/myne#913) hold the same class of bytes as
+    // a transcript: a document's text is somebody else's prose, and a run that
+    // read a PDF leaves it in RAM. Same loop, same arms, for the same reason the
+    // comment above gives about keying a teardown to today's answer.
+    for message in &mut session.documents {
+        for span in &mut message.content {
+            if let Content::Trusted(t) = span {
+                t.zeroize();
+            }
+        }
+    }
+    session.documents.clear();
     // **The whole proposal, destructured rather than enumerated.** This was
     // three hand-written lists until myne-md/myne#850, which is why it missed
     // `settings`: the `note.folder` arm below records that the same shape was
@@ -814,6 +838,7 @@ pub async fn step<R: Runtime>(
         task,
         language,
         mut history,
+        documents,
         mut read_ids,
         mut transcript,
         mut proposal,
@@ -833,6 +858,11 @@ pub async fn step<R: Runtime>(
             s.task.clone(),
             s.language.clone(),
             s.history.clone(),
+            // Cloned rather than taken: a document is read on every leg of the
+            // run, and a take would have to be written back on both exits from
+            // this function. The clone is the run's own text under `Zeroizing`,
+            // so it is wiped when the leg ends either way.
+            s.documents.clone(),
             std::mem::take(&mut s.read_ids),
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
@@ -908,6 +938,7 @@ pub async fn step<R: Runtime>(
         memory,
         language: language.as_deref(),
         history: &history,
+        documents: &documents,
         on_progress: &report,
     };
 
@@ -1770,6 +1801,7 @@ mod tests {
             &live,
             Some("tr".to_string()),
             seed,
+            Vec::new(),
             Some(controls.clone()),
             vec!["editor.weekly-notes-folder".to_string()],
         );

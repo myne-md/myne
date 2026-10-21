@@ -37,6 +37,7 @@
 
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { offeredSettingIds } from "../agent/settingCatalogue";
+import type { RunAttachment } from "../../lib/agent-run-core";
 import {
   agentApply,
   agentStart,
@@ -289,6 +290,9 @@ export async function startAgentRun(
    *  it must be set before the first persist; a vault-general run passes
    *  `null`. */
   anchorNoteId?: string | null,
+  /** The documents this run may read, already read from the vault
+   *  (myne-md/myne#913). Empty for an ordinary run. */
+  attachments: readonly RunAttachment[] = [],
 ): Promise<void> {
   // **Captured BEFORE the turn is appended**, which is the ordering that makes
   // this the conversation so far rather than the conversation including the
@@ -335,6 +339,7 @@ export async function startAgentRun(
       // is a read of a static registry, and a run that outlived a rebuild would
       // otherwise offer a setting the current tree no longer carries.
       offeredSettingIds(),
+      attachments,
       (view) => {
         // The run has an id now, minutes before this call resolves. Same epoch
         // as the settle below, so a run the user let go of mid-flight cannot

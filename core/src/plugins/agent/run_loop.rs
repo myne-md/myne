@@ -424,6 +424,17 @@ pub struct LoopDeps<'a> {
     /// the character budget is applied, which is host policy and belongs at the
     /// command boundary, not in the loop.
     pub history: &'a [Message],
+    /// The documents the user attached to this run, already budgeted and
+    /// wrapped as untrusted messages by `prompt::document_messages`
+    /// (myne-md/myne#913).
+    ///
+    /// Held on the session and read here rather than re-derived per iteration,
+    /// for the same reason `history` is: a run resumed after a scope approval
+    /// must still have the document it was asked about. Kept OUT of `history`
+    /// because `step` drops the seed when the egress controls change, and a
+    /// withdrawn conversation is not a withdrawn attachment: the user chose the
+    /// file for this run.
+    pub documents: &'a [Message],
     /// Whether the client offered a settings catalogue to this run
     /// (myne-md/myne#850).
     ///
@@ -699,6 +710,7 @@ async fn drive_inner(
             seed,
             &memory_block,
             &offered,
+            deps.documents,
         );
         // The class is the constant, passed here, in the loop's own code. It is
         // never read from a payload and never varies per iteration.
@@ -1862,6 +1874,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &no_progress,
+            documents: &[],
         }
     }
 
@@ -1933,6 +1946,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &no_progress,
+            documents: &[],
         }
     }
 
@@ -2065,6 +2079,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &no_progress,
+            documents: &[],
         };
         block_on(drive(
             &runs,
@@ -2116,6 +2131,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &no_progress,
+            documents: &[],
         };
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a"]));
@@ -3370,6 +3386,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &no_progress,
+            documents: &[],
         };
         let mut t = Vec::new();
         let out = block_on(drive(&runs, "r", "task", &mut t, &d, &mut BTreeSet::new())).unwrap();
@@ -3417,6 +3434,7 @@ mod tests {
             language: None,
             history: &[],
             on_progress: &record,
+            documents: &[],
         };
         let runs = AgentRunState::default();
         runs.start("r".into(), ids(&["a", "b"]));
@@ -3810,6 +3828,7 @@ mod tests {
             language: None,
             history: &seeded,
             on_progress: &no_progress,
+            documents: &[],
         };
         let mut t = Vec::new();
         let _ = block_on(drive(
