@@ -376,6 +376,9 @@ pub async fn drain_pending_shares<R: Runtime>(
             &dir,
             state.inner(),
             source,
+            // A shared file drains into the LIBRARY: the share queue has no
+            // conversation to belong to (myne-md/myne#913).
+            crate::plugins::attachments::commands::scope_for_wire(None),
         )
         .await
         {

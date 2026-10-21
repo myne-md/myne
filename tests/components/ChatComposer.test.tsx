@@ -33,10 +33,12 @@ const agentStart = vi.fn();
 const agentPreviewGrant = vi.fn();
 const catalogList = vi.fn();
 const attachmentReadExtractedText = vi.fn();
+const attachmentImport = vi.fn();
 vi.mock("../../src/lib/attachments", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/attachments")>()),
   catalogList: (...a: unknown[]) => catalogList(...a),
   attachmentReadExtractedText: (...a: unknown[]) => attachmentReadExtractedText(...a),
+  attachmentImport: (...a: unknown[]) => attachmentImport(...a),
 }));
 
 vi.mock("../../src/lib/agent-run", () => ({
@@ -119,6 +121,16 @@ beforeEach(() => {
   attachmentReadExtractedText
     .mockReset()
     .mockResolvedValue({ text: "the lecture, in words", source_format: "pdf", truncated: false });
+  attachmentImport.mockReset().mockResolvedValue({
+    id: "0184a2b3c4d5e6f708192a3b4c5d6e81",
+    content_type: "image/png",
+    filename: "image.png",
+    size: 512,
+    created_at: 2,
+    deduplicated: false,
+    original_size: 512,
+    container_changed: false,
+  });
 });
 afterEach(() => {
   cleanup();
@@ -1203,5 +1215,37 @@ describe("ChatComposer: attached documents", () => {
     ).toBe("summarise the lecture");
     // The chip stays, so the user can remove it rather than re-pick.
     expect(screen.getByTestId("ai.composer-attachment")).toBeTruthy();
+  });
+});
+
+// ---- pasting a file into a conversation (myne-md/myne#913) ----------------
+describe("ChatComposer: pasted files", () => {
+  it("imports a pasted file as a chat attachment, not a library one", async () => {
+    mount();
+    const file = new File(["hello"], "image.png", { type: "image/png" });
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [file] },
+    });
+
+    // The scope is the whole point: a pasted file is stored encrypted and kept
+    // out of the library, so it must be imported with `chat` and never with the
+    // default. Asserting the argument is what keeps a refactor from silently
+    // filing it in the library.
+    await waitFor(() => expect(attachmentImport).toHaveBeenCalledTimes(1));
+    expect(attachmentImport.mock.calls[0]![1]).toBe("chat");
+    const chip = await screen.findByTestId("ai.composer-attachment");
+    expect(chip.textContent).toContain("image.png");
+  });
+
+  it("does not swallow a paste that carries no file", () => {
+    // Ordinary text paste must reach the textarea untouched: intercepting it
+    // would mean typing a sentence into the box stops working.
+    mount();
+    const notPrevented = fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [] },
+    });
+    // `fireEvent.paste` returns false when a handler called preventDefault.
+    expect(notPrevented).toBe(true);
+    expect(attachmentImport).not.toHaveBeenCalled();
   });
 });

@@ -113,11 +113,50 @@ pub const CATALOG_BLOB_HEADER_LEN: usize = 34;
 /// parallel to `prefs.rs`).
 pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
+/// Where an attachment belongs (myne-md/myne#913).
+///
+/// **One field, two places a file can live.** The vault has one attachment
+/// store and one catalog; this says which SURFACE a row belongs to, not where
+/// its bytes are. A library attachment is the ordinary case: it is listed, it
+/// can be embedded in any note, and the cleanup dialog can offer it. A chat
+/// attachment was pasted into one conversation and is reachable only from
+/// there: still encrypted, still in `vault.attachments`, still synced and
+/// backed up, and deliberately absent from the library listing so a file the
+/// user dropped into a question does not turn up beside the ones they curated.
+///
+/// **`Library` is the default and is never written.** The field is emitted only
+/// for `Chat`, so every existing catalog — and every ordinary import — encodes
+/// byte-identically to the pre-#913 shape. An older reader drops the unknown key
+/// (§9.10.2's additive-field rule) and lists the file in its library, which is
+/// the safe direction: the file is still theirs, still encrypted, and still
+/// deletable, and a reader that cannot see the marker is a reader that never
+/// created one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AttachmentScope {
+    /// The vault's attachment library: listed, and embeddable from any note.
+    #[default]
+    Library,
+    /// Owned by one chat conversation. Stored and synced like any other
+    /// attachment; not listed in the library.
+    Chat,
+}
+
+impl AttachmentScope {
+    /// The canonical JSON token. `Library` has none on purpose: it is the
+    /// absent value.
+    pub const fn wire_token(self) -> Option<&'static str> {
+        match self {
+            Self::Library => None,
+            Self::Chat => Some("chat"),
+        }
+    }
+}
+
 /// One attachment's authoritative metadata (spec § 9.10.2). Fields are
 /// emitted in fixed canonical (lexicographic) order: `content_type` <
 /// `created_at` < `deleted_at` (when present) < `filename` < `size` <
-/// `updated_at` (when present) < `version` (when non-zero). The two
-/// `Option` fields plus `version` are the additive Phase-2-sync fields
+/// `updated_at` (when present) < `version` (when non-zero) < `scope` (when
+/// `chat`). The two `Option` fields plus `version` are the additive Phase-2-sync fields
 /// (MYND-468 + myne-md/myne#405); all absent/zero = pre-sync shape,
 /// byte-identical to the original four-field encode.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +190,10 @@ pub struct AttachmentMeta {
     /// field emitted only when non-zero, so a pre-#405 entry stays
     /// byte-identical. Declared last to keep canonical key order.
     pub version: u64,
+    /// Where this attachment belongs (myne-md/myne#913). Declared last for the
+    /// same reason `version` is, and emitted only for `Chat`, so a library entry
+    /// stays byte-identical to the pre-#913 encode.
+    pub scope: AttachmentScope,
 }
 
 impl AttachmentMeta {
@@ -166,7 +209,15 @@ impl AttachmentMeta {
             size,
             updated_at: None,
             version: 0,
+            scope: AttachmentScope::Library,
         }
+    }
+
+    /// The same entry, placed in a chat conversation instead of the library
+    /// (myne-md/myne#913).
+    pub fn in_chat(mut self) -> Self {
+        self.scope = AttachmentScope::Chat;
+        self
     }
 
     /// Whether this entry is an attachment catalog tombstone
@@ -192,6 +243,10 @@ impl AttachmentMeta {
             size: 0,
             updated_at: None,
             version: self.version + 1,
+            // Scrubbed with the rest: a tombstone describes nothing, and a
+            // surviving `chat` marker would say a conversation still owns a file
+            // that has been erased.
+            scope: AttachmentScope::Library,
         }
     }
 }
@@ -341,6 +396,12 @@ fn canonical_json_encode(catalog: &AttachmentsCatalog) -> Vec<u8> {
         }
         out.extend_from_slice(b",\"filename\":");
         push_json_string(&mut out, &meta.filename.nfc().collect::<String>());
+        // Between `filename` and `size`, which is where the canonical order puts
+        // "scope"; emitted only for `chat`, so the library shape is unchanged.
+        if let Some(token) = meta.scope.wire_token() {
+            out.extend_from_slice(b",\"scope\":");
+            push_json_string(&mut out, token);
+        }
         out.extend_from_slice(b",\"size\":");
         push_json_uint(&mut out, meta.size);
         if let Some(updated_at) = meta.updated_at {
@@ -511,6 +572,7 @@ impl Parser<'_> {
         let mut size: Option<u64> = None;
         let mut updated_at: Option<u64> = None;
         let mut version: u64 = 0;
+        let mut scope = AttachmentScope::Library;
 
         if self.peek() == Some(b'}') {
             self.pos += 1;
@@ -528,6 +590,20 @@ impl Parser<'_> {
                 "size" => size = Some(self.parse_uint()?),
                 "updated_at" => updated_at = Some(self.parse_uint()?),
                 "version" => version = self.parse_uint()?,
+                // An unknown scope value is TOLERATED as `Library` rather than
+                // failing the file: an additive field a later version invents
+                // must not cost this reader the whole catalog. The cost is that
+                // a future scope would list its rows in the library here, which
+                // is the same trade §9.10.2's additive-field rule makes
+                // everywhere else and the safe direction for a file the user
+                // still owns.
+                "scope" => {
+                    scope = if self.parse_string()? == "chat" {
+                        AttachmentScope::Chat
+                    } else {
+                        AttachmentScope::Library
+                    };
+                }
                 // Unknown (future additive) field — skip its value.
                 _ => self.skip_value()?,
             }
@@ -551,6 +627,7 @@ impl Parser<'_> {
             size: size?,
             updated_at,
             version,
+            scope,
         })
     }
 
@@ -2221,5 +2298,74 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write attachments-catalog tombstone vectors dump");
+    }
+    // ---- scope: chat vs library (myne-md/myne#913) ------------------------
+
+    /// A library entry is byte-identical to the pre-#913 four-field encode.
+    ///
+    /// This is the property the additive-field rule exists for, and it is worth
+    /// a test rather than a comment: the field is written only for `chat`, so a
+    /// vault that never pastes a file into a conversation keeps emitting exactly
+    /// the bytes it emitted before, and a reader from either side reads them.
+    #[test]
+    fn a_library_entry_emits_no_scope_key() {
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert(
+            "aa11".to_string(),
+            AttachmentMeta::live("text/plain".to_string(), 100, "a.txt".to_string(), 7),
+        );
+        let plaintext = canonical_json_encode(&catalog);
+        let text = String::from_utf8(plaintext).expect("utf8");
+        assert_eq!(
+            text,
+            r#"{"aa11":{"content_type":"text/plain","created_at":100,"filename":"a.txt","size":7}}"#
+        );
+        assert!(!text.contains("scope"));
+    }
+
+    /// A chat attachment carries the marker, at its canonical position.
+    #[test]
+    fn a_chat_entry_carries_its_scope_between_filename_and_size() {
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert(
+            "bb22".to_string(),
+            AttachmentMeta::live("text/plain".to_string(), 100, "a.txt".to_string(), 7).in_chat(),
+        );
+        let text = String::from_utf8(canonical_json_encode(&catalog)).expect("utf8");
+        assert_eq!(
+            text,
+            r#"{"bb22":{"content_type":"text/plain","created_at":100,"filename":"a.txt","scope":"chat","size":7}}"#
+        );
+    }
+
+    /// The parser reads the marker back, and tolerates one it does not know.
+    #[test]
+    fn the_parser_reads_a_known_scope_and_tolerates_an_unknown_one() {
+        let parsed = canonical_json_decode(
+            br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","scope":"chat","size":2}}"#,
+        )
+        .expect("parses");
+        assert_eq!(parsed.entries["aa"].scope, AttachmentScope::Chat);
+
+        // A scope from a later version is Library here, not a failed file: an
+        // additive field must never cost the reader the whole catalog.
+        let future = canonical_json_decode(
+            br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","scope":"note","size":2}}"#,
+        )
+        .expect("parses");
+        assert_eq!(future.entries["aa"].scope, AttachmentScope::Library);
+    }
+
+    /// Scrubbing a live entry into a tombstone drops the marker with the rest of
+    /// the descriptive metadata.
+    #[test]
+    fn a_tombstone_carries_no_scope() {
+        let live = AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2).in_chat();
+        let tomb = live.into_tombstone(9);
+        assert_eq!(tomb.scope, AttachmentScope::Library);
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert("aa".to_string(), tomb);
+        let text = String::from_utf8(canonical_json_encode(&catalog)).expect("utf8");
+        assert!(!text.contains("scope"));
     }
 }
