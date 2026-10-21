@@ -246,7 +246,7 @@ import { useBackupScheduler } from "../hooks/useBackupScheduler";
 import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
-import { shouldCollapseForAgentTab, useEditorLayout } from "./editorLayout";
+import { agentTabCollapse, useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
 import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
@@ -1246,27 +1246,36 @@ function EditorChrome({
   // a restored session, as never closing at all.
   const collapsedForEntry = useRef(false);
   useEffect(() => {
-    const collapse = shouldCollapseForAgentTab({
-      agentTabFocused,
-      paneCount: ws.leaves.length,
-      hydrated: layout.hydrated,
-      leftCollapsed: layout.leftCollapsed,
-      handledForEntry: collapsedForEntry.current,
-    });
-    // Leaving the tab (or splitting the pane) starts a new entry, so coming
-    // back collapses again. A split is not an entry: the note tree is in use.
+    // Leaving the tab (or splitting the pane) starts a new entry, so coming back
+    // collapses again. A split is not an entry: the note tree is in use there.
     if (!agentTabFocused || ws.leaves.length !== 1) {
       collapsedForEntry.current = false;
       return;
     }
-    if (layout.leftCollapsed) {
-      collapsedForEntry.current = true;
+    const collapse = agentTabCollapse({
+      agentTabFocused,
+      paneCount: ws.leaves.length,
+      hydrated: layout.hydrated,
+      leftCollapsed: layout.leftCollapsed,
+      rightCollapsed: layout.rightCollapsed,
+      handledForEntry: collapsedForEntry.current,
+    });
+    if (!collapse.left && !collapse.right) {
+      // Both already shut, or the layout is not hydrated yet.
+      if (layout.hydrated) collapsedForEntry.current = true;
       return;
     }
-    if (!collapse) return;
     collapsedForEntry.current = true;
-    layout.toggleLeftCollapsed();
-  }, [agentTabFocused, ws.leaves.length, layout.hydrated, layout.leftCollapsed, layout]);
+    if (collapse.left) layout.toggleLeftCollapsed();
+    if (collapse.right) layout.toggleRightCollapsed();
+  }, [
+    agentTabFocused,
+    ws.leaves.length,
+    layout.hydrated,
+    layout.leftCollapsed,
+    layout.rightCollapsed,
+    layout,
+  ]);
   // macOS floats the traffic lights over the top-left, so windowed builds inset
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
@@ -2569,7 +2578,12 @@ function EditorChrome({
           node={ws.root}
           focusedPaneId={ws.focusedPaneId}
           onReadout={onReadout}
-          leftInset={leftCollapsed ? leftClearance : 0}
+          // **No clearance for chrome that is not drawn** (myne-md/myne#913,
+          // on the report that a dead gap sat left of the first tab). Focus mode
+          // fades the floated controls to zero opacity, and the inset stayed:
+          // the strip reserved room for a toggle and two arrows nobody could see.
+          // The same rule the right inset already states for its own controls.
+          leftInset={leftCollapsed && !focusActive ? leftClearance : 0}
           // The clearance is reserved for the two controls that FLOAT in the
           // top-right corner, so it is only owed when they are there. On a
           // non-note tab (the graph, the task list, a saved view) neither is
@@ -2579,7 +2593,11 @@ function EditorChrome({
           // (myne-md/myne#727). The strip's padding already transitions on the
           // sidebar's own curve, so the caret slides rather than jumping when
           // the focused tab changes kind.
-          rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
+          rightInset={
+            rightCollapsed && topRightFloatsShown && !focusActive
+              ? RIGHT_CLEARANCE
+              : 0
+          }
         />
         </div>
         {/* A non-note tab has no note for the NOTE-SCOPED tabs to describe, so the

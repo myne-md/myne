@@ -250,6 +250,18 @@ export function AgentReview({
     () => bulkApprovableCount > 0 || approvedNewNoteIndices(agent).length > 0,
     [bulkApprovableCount, agent],
   );
+  /**
+   * What Approve-all will actually send, across BOTH verbs (myne-md/myne#913).
+   *
+   * The label counted edits only, so a run that proposed one new note and no
+   * edits offered a live primary button reading "Approve 0 changes" (reported
+   * from a real run: the agent created a note, asked two questions, and the card
+   * arrived with a zero). A decision surface may not understate its own payload:
+   * the count is the payload, which is `bulkApprovable` plus the approved new
+   * notes, the same two lists `approveAll` hands `apply`.
+   */
+  const approveAllCount =
+    bulkApprovableCount + approvedNewNoteIndices(agent).length;
 
   async function apply(
     edits: ProposedEdit[],
@@ -746,7 +758,7 @@ export function AgentReview({
           onClick={() => void approveAll()}
           data-testid="agentReview.approveAll"
         >
-          {t("agent.review.approveAll", { count: bulkApprovableCount })}
+          {t("agent.review.approveAll", { count: approveAllCount })}
         </Button>
       </footer>
     </div>
