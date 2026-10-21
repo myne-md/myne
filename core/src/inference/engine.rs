@@ -494,6 +494,56 @@ fn last_user_of(messages: &[ChatMessage]) -> &str {
         .unwrap_or("")
 }
 
+/// The reviewed-vault-seed script (myne-md/myne#915), or `None` when this is
+/// not a seed prompt.
+///
+/// Phase one answers with three entries plus one read request naming a folder
+/// it found IN the prompt, rather than a memorised name: a fixture folder that
+/// changed would otherwise leave the read request pointing at nothing and the
+/// phase-two path silently unexercised. Phase two answers from the excerpts it
+/// was handed, and the repair prompt answers valid JSON so a malformed reply
+/// cannot loop.
+#[cfg(feature = "local-inference-stub")]
+fn seed_script(prompt: &str) -> Option<String> {
+    if prompt.contains("PREVIOUS REPLY") {
+        return Some("{\"entries\":[]}".to_string());
+    }
+    if prompt.contains("NOTE EXCERPTS") {
+        return Some(
+            "{\"entries\":[\
+             {\"text\":\"Projects: Myne, including the roadmap and the release checklist.\"},\
+             {\"text\":\"Prefers short, decision-first answers.\"},\
+             {\"text\":\"Folders are organised by area, one folder per active project.\"}]}"
+                .to_string(),
+        );
+    }
+    if !prompt.contains("VAULT OUTLINE") {
+        return None;
+    }
+    let folder = prompt.lines().find_map(|line| {
+        let rest = line.strip_prefix("- ")?;
+        if rest.starts_with("(vault root)") {
+            return None;
+        }
+        let name = rest.split(" (").next()?.trim().trim_end_matches('/');
+        (!name.is_empty()).then(|| name.to_string())
+    });
+    let read = match folder {
+        Some(folder) => format!(
+            "[{{\"folder\":\"{}\",\"reason\":\"project context\"}}]",
+            folder.replace('"', "")
+        ),
+        None => "[]".to_string(),
+    };
+    Some(format!(
+        "{{\"entries\":[\
+         {{\"text\":\"Projects: Myne, including the roadmap and the release checklist.\"}},\
+         {{\"text\":\"Prefers short, decision-first answers.\"}},\
+         {{\"text\":\"Folders are organised by area, one folder per active project.\"}}],\
+         \"read\":{read}}}"
+    ))
+}
+
 /// The answer to `probe::probe_request`, or `None` when this is not the probe.
 ///
 /// The probe names the note, quotes the line to change and quotes what it
@@ -1015,6 +1065,14 @@ impl Engine for StubEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         if let Some(e) = self.fault() {
             return Err(e);
+        }
+        // The reviewed-vault-seed script (myne-md/myne#915). Gated on the E2E
+        // feature because the audited production build must not carry it; the
+        // seed job reaches `infer` (not the agent's role-structured surface),
+        // so this is the one place the script can live.
+        #[cfg(feature = "local-inference-stub")]
+        if let Some(script) = seed_script(prompt) {
+            return Ok(script);
         }
         // Echo, not a model. The marker lets a test assert the value came
         // through the trait against the stub (not a real completion).
@@ -2281,5 +2339,36 @@ mod agent_script_tests {
                 "{id} is emitted by the stub but the intent table refuses it"
             );
         }
+    }
+}
+
+#[cfg(all(test, feature = "local-inference-stub"))]
+mod seed_script_tests {
+    use super::seed_script;
+
+    #[test]
+    fn phase_one_names_a_folder_it_found_in_the_outline() {
+        let prompt = "Reply with JSON only.\n\nVAULT OUTLINE\nLive notes: 2\nFolders: 1\n\n- Projects/ (2 notes)\n  - Roadmap\n";
+        let reply = seed_script(prompt).expect("a seed prompt answers");
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("valid JSON");
+        assert_eq!(v["entries"].as_array().unwrap().len(), 3);
+        assert_eq!(v["read"][0]["folder"], "Projects");
+    }
+
+    #[test]
+    fn phase_two_answers_from_the_excerpts_and_repair_stays_valid_json() {
+        let reply = seed_script("DRAFT ENTRIES\n\nNOTE EXCERPTS\n### Projects/Roadmap\nbody")
+            .expect("phase two answers");
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("valid JSON");
+        assert_eq!(v["entries"].as_array().unwrap().len(), 3);
+
+        let repair = seed_script("PREVIOUS REPLY\n{bad").expect("repair answers");
+        let v: serde_json::Value = serde_json::from_str(&repair).expect("valid JSON");
+        assert!(v["entries"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_non_seed_prompt_is_not_intercepted() {
+        assert!(seed_script("summarize this note").is_none());
     }
 }

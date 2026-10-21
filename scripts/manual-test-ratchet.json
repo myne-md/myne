@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11812,
+  "totalMinutesCeiling": 11842,
   "$comment22": [
     "CEILING RAISED 11788 -> 11812 by myne-md/myne#837 (on top of myne-md/myne#761's",
     "11788: this entry was written as 11780 -> 11804 before that base landed, and",
@@ -1245,5 +1245,20 @@
     "The TOR item above it changed the same change and is a rewrite with no client",
     "added: it no longer asks an operator for a fingerprint before enrolling over",
     "Tor, which is why its text changed and its minutes did not."
+  ],
+  "$comment23": [
+    "CEILING RAISED 11812 -> 11842 by myne-md/myne#915. What added the minutes,",
+    "named so the raise is an argument rather than a number:",
+    "",
+    "  + one standard item on ai.chat, 10 minutes on each of desktop-macos,",
+    "    desktop-linux and desktop-windows = 30, the whole of 11812 -> 11842. It",
+    "    walks the reviewed vault seed on a real model: whether the distilled",
+    "    entries are fair summaries rather than copied titles, whether an edited",
+    "    one reads as the user meant, and the remote-provider consent refusal.",
+    "",
+    "WHY IT IS NOT A SCENARIO. The flow is covered (e2e/seed-memory.e2e.ts), but",
+    "model quality is a judgement and the remote arm needs a real provider and",
+    "key; the stub returns three fixed strings, so every assertion around it is",
+    "about the flow rather than about whether the memory is any good."
   ]
 }

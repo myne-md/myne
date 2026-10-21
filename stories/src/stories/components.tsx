@@ -19,7 +19,6 @@ import {
   clearAgentForLock,
   failRun,
   currentRunEpoch,
-  settleApply,
   settleStep,
 } from "@app/notes/agent/agentStore";
 import { AnsweredByIndicator } from "@app/components/AnsweredByIndicator";

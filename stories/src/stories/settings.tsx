@@ -48,6 +48,8 @@ import { HotkeysPanel } from "@app/components/settings/HotkeysPanel";
 import { LanguageSelect } from "@app/components/settings/LanguageSelect";
 import { LineNumbersSettings } from "@app/components/settings/LineNumbersSettings";
 import { MemorySection } from "@app/components/settings/MemorySection";
+import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
+import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
 import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
 import { NewNoteLocationSettings } from "@app/components/settings/NewNoteLocationSettings";
@@ -119,6 +121,37 @@ const PREFS_FIXTURE: Fixture = {
   },
 };
 
+
+/** The reviewed vault seed (myne-md/myne#915): AI on, an empty memory and a
+ *  small vault outline, so the scope step has real counts to state. */
+const SEED_FIXTURE: Fixture = {
+  description: "AI on, empty memory, a small vault outline",
+  handlers: {
+    ...PREFS_FIXTURE.handlers,
+    "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, ai_enabled: true }),
+    "plugin:memory|memory_list": () => ({ rows: [], cap: 100 }),
+    "plugin:memory|personality_read": () => ({ directives: [] }),
+    "plugin:local_inference|seed_memory_status": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      seedEntries: 0,
+      seededAt: null,
+      provider: "in-process",
+      remote: false,
+    }),
+    "plugin:local_inference|seed_memory_payload": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      excludedNotes: 1,
+      titlesOmitted: 0,
+      chars: 412,
+      payload:
+        "VAULT OUTLINE\nLive notes: 24\nFolders: 4\nNotes omitted because their folder is excluded from AI: 1\nTags: work, health\n\n- Projects/ (6 notes)\n  - Roadmap\n  - Release checklist\n- Notes/ (18 notes)\n  - Weekly review\n",
+    }),
+  },
+};
 
 /** The catalogue with one artefact installed and one not, which is the state it
  *  exists for: a list that answers "is this installed" and "what else can I get"
@@ -697,6 +730,47 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
         <LineNumbersSettings />
       </Frame>
     ),
+  },
+  {
+    id: "settings/seedmemorywizard/scope",
+    group: "settings",
+    surface: "SeedMemoryWizard",
+    state: "scope",
+    description:
+      "The first step of Teach Myne your vault: provider, note/folder/tag counts, the estimated payload size, the excluded-folder count and the real payload behind a toggle. A local provider needs no consent; a remote one cannot continue until the box is ticked.",
+    tags: ["settings", "ai", "memory", "seed", "review", "consent", "wizard"],
+    fixture: SEED_FIXTURE,
+    render: () => (
+      <Frame>
+        <SeedMemoryWizard open onClose={action("onClose")} />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/seedmemorycard/default",
+    group: "settings",
+    surface: "SeedMemoryCard",
+    state: "default",
+    description:
+      "The once-only offer in the chat zero state: AI is on, memory is empty and the vault has enough notes to distil. Two actions, one of which dismisses the offer permanently on this device.",
+    tags: ["settings", "ai", "memory", "seed", "card", "zero-state", "offer"],
+    fixture: SEED_FIXTURE,
+    render: () => {
+      // The card's own device-local gate, set before it mounts. A story that
+      // skipped this would render nothing and assert nothing.
+      try {
+        localStorage.setItem("myne.aiOnboardingSeen", "1");
+        localStorage.removeItem("myne.seedMemorySeen");
+      } catch {
+        // Storage unavailable: the story still renders the zero state without
+        // the offer, which is the honest degraded shape.
+      }
+      return (
+        <Frame>
+          <SeedMemoryCard />
+        </Frame>
+      );
+    },
   },
   {
     id: "settings/memorysection/default",

@@ -34,6 +34,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::memory_read,
             commands::memory_write,
             commands::memory_delete,
+            commands::memory_seed_apply,
             commands::personality_read,
             commands::personality_write,
         ])

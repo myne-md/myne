@@ -2526,18 +2526,34 @@ fn memory_entry_tie_break(a: &MemoryEntryRow, b: &MemoryEntryRow) -> Ordering {
     match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
         (true, false) => Ordering::Greater, // remove-wins
         (false, true) => Ordering::Less,
-        (true, true) => (a.deleted_at, a.created_at, a.updated_at, a.quarantined).cmp(&(
-            b.deleted_at,
-            b.created_at,
-            b.updated_at,
-            b.quarantined,
-        )),
-        (false, false) => (a.updated_at, a.version, a.created_at, a.quarantined).cmp(&(
-            b.updated_at,
-            b.version,
-            b.created_at,
-            b.quarantined,
-        )),
+        (true, true) => (
+            a.deleted_at,
+            a.created_at,
+            a.updated_at,
+            a.quarantined,
+            &a.origin,
+        )
+            .cmp(&(
+                b.deleted_at,
+                b.created_at,
+                b.updated_at,
+                b.quarantined,
+                &b.origin,
+            )),
+        (false, false) => (
+            a.updated_at,
+            a.version,
+            a.created_at,
+            a.quarantined,
+            &a.origin,
+        )
+            .cmp(&(
+                b.updated_at,
+                b.version,
+                b.created_at,
+                b.quarantined,
+                &b.origin,
+            )),
     }
 }
 
