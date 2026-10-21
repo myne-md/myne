@@ -289,7 +289,35 @@ export function TabStrip({
   // it is a convention is that it is the only affordance a scrollbar-less row
   // has.
   const stripOverflow = useStripOverflow<HTMLDivElement>();
+  // The same node, for the centring below. `stripOverflow` measures edges; this
+  // one scrolls, and keeping them separate means neither hook grows a second job.
+  const scrollRowRef = useRef<HTMLDivElement | null>(null);
   const [dropLeft, setDropLeft] = useState<number | null>(null);
+  /**
+   * **The active tab is centred whenever it changes** (myne-md/myne#913, on the
+   * report that the strip left the open note half off-screen after a switch).
+   *
+   * Every navigation lands here: opening a note, a pane switch, a restored
+   * session, the agent tab. Centring rather than `scrollIntoView({inline:
+   * "nearest"})` because "nearest" is satisfied by a tab already visible at the
+   * very edge, which is exactly the case that reads as "where did my note go".
+   * Clamped by the browser at both ends, so the first and last tabs do not
+   * scroll past their own edge into blank space.
+   */
+  useEffect(() => {
+    const row = scrollRowRef.current;
+    if (row === null || activeTab === null) return;
+    const tab = Array.from(
+      row.querySelectorAll<HTMLElement>('[role="tab"][data-tab-id]'),
+    ).find((el) => el.getAttribute("data-tab-id") === activeTab);
+    if (tab === undefined) return;
+    // jsdom has no layout and no `scrollTo`; a real host has both.
+    if (typeof row.scrollTo !== "function") return;
+    row.scrollTo({
+      left: centreScrollLeft(tab.offsetLeft, tab.offsetWidth, row.clientWidth),
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
+  }, [activeTab, tabs.join("\u0000")]);
   // Pre-drag rects for the FLIP pass. Captured on dragstart because by the time
   // the drop lands, the old layout is gone.
   const flipRectsRef = useRef<Map<string, DOMRect> | null>(null);
@@ -476,10 +504,11 @@ export function TabStrip({
         role="tablist"
         aria-label={t("notes.tabStrip.openNotes")}
         ref={(node) => {
-          // Two refs on one node: the roving-focus hook owns the tablist, and
-          // the overflow measurement needs the same element.
+          // Three refs on one node: the roving-focus hook owns the tablist, the
+          // overflow measurement reads its edges, and the centring scrolls it.
           (roving.containerRef as { current: HTMLDivElement | null }).current = node;
           stripOverflow.ref(node);
+          scrollRowRef.current = node;
         }}
         onKeyDown={roving.onKeyDown}
         // The fade is a MASK, not a gradient overlay, for the reason

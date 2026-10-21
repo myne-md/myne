@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { computeResponsiveCollapse } from "../../src/screens/layoutClamp";
-import { shouldCollapseForAgentTab } from "../../src/screens/editorLayout";
+import { agentTabCollapse } from "../../src/screens/editorLayout";
 
 // Default sidebar widths. need-both = 260+280+16+360 = 916;
 // need-left = 260+8+360 = 628.
@@ -79,33 +79,48 @@ describe("computeResponsiveCollapse (MYND-192)", () => {
   });
 });
 
-describe("shouldCollapseForAgentTab", () => {
+describe("agentTabCollapse", () => {
   const base = {
     agentTabFocused: true,
     paneCount: 1,
     hydrated: true,
     leftCollapsed: false,
+    rightCollapsed: false,
     handledForEntry: false,
   };
 
-  it("closes the sidebar on a single-pane agent tab", () => {
-    expect(shouldCollapseForAgentTab(base)).toBe(true);
+  it("closes BOTH sidebars on a single-pane agent tab", () => {
+    // The report was about the right one (the AI chat), which duplicated the
+    // agent pane's own transcript; the left duplicates its conversation rail.
+    expect(agentTabCollapse(base)).toEqual({ left: true, right: true });
   });
 
   it("does nothing while the persisted layout is still loading", () => {
-    // The read REPLACES the state, so a collapse written before it lands is
-    // undone silently. This is the case that shipped as "it stays open".
-    expect(shouldCollapseForAgentTab({ ...base, hydrated: false })).toBe(false);
+    expect(agentTabCollapse({ ...base, hydrated: false })).toEqual({
+      left: false,
+      right: false,
+    });
   });
 
   it("leaves a split workspace alone", () => {
-    // There the note tree is the other pane's context.
-    expect(shouldCollapseForAgentTab({ ...base, paneCount: 2 })).toBe(false);
+    expect(agentTabCollapse({ ...base, paneCount: 2 })).toEqual({
+      left: false,
+      right: false,
+    });
   });
 
-  it("does not fight a sidebar the user reopened, or a note tab", () => {
-    expect(shouldCollapseForAgentTab({ ...base, handledForEntry: true })).toBe(false);
-    expect(shouldCollapseForAgentTab({ ...base, leftCollapsed: true })).toBe(false);
-    expect(shouldCollapseForAgentTab({ ...base, agentTabFocused: false })).toBe(false);
+  it("does not fight sides the user reopened, and asks only for the open ones", () => {
+    expect(agentTabCollapse({ ...base, handledForEntry: true })).toEqual({
+      left: false,
+      right: false,
+    });
+    expect(agentTabCollapse({ ...base, leftCollapsed: true })).toEqual({
+      left: false,
+      right: true,
+    });
+    expect(agentTabCollapse({ ...base, agentTabFocused: false })).toEqual({
+      left: false,
+      right: false,
+    });
   });
 });

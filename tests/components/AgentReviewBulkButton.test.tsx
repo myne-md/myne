@@ -118,5 +118,20 @@ describe("Approve all", () => {
     mount();
     const button = screen.getByTestId("agentReview.approveAll");
     expect(button.hasAttribute("disabled")).toBe(false);
+    // **And it says one, not zero** (myne-md/myne#913). A live primary button
+    // reading "Approve 0 changes" is a decision surface understating its own
+    // payload; the count is what the action sends, across both verbs.
+    expect(button.textContent).toBe("agent.review.approveAll:1");
+  });
+
+  it("counts edits and new notes together", () => {
+    settleWith([ORDINARY], [
+      { title: "A", body: "a", folder: null },
+      { title: "B", body: "b", folder: null },
+    ]);
+    mount();
+    expect(screen.getByTestId("agentReview.approveAll").textContent).toBe(
+      "agent.review.approveAll:3",
+    );
   });
 });
