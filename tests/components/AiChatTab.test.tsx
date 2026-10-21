@@ -864,7 +864,7 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   // carries a diff icon that opens one read-only modal. Read-only still: a
   // frozen proposal may quote a note that has since changed, so NOTHING in the
   // modal may write: no insert control, no apply button.
-  it("opens a settled run's frozen proposal in a read-only diff modal", () => {
+  it("opens a settled run's frozen proposal inline, under its own turn", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       ...SUMMARY,
@@ -875,25 +875,30 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     });
     render(<AiChatTab />);
 
-    expect(screen.queryByTestId("ai.proposal-diff")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.turn-diff"));
+    // Collapsed at rest: a settled proposal is a record, not a decision.
+    expect(screen.queryByTestId("ai.proposal-diff-body")).toBeNull();
+    const trigger = screen.getByTestId("ai.turn-diff");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
 
-    const modal = screen.getByTestId("ai.proposal-diff-body");
-    expect(modal.textContent).toContain("old words");
-    expect(modal.textContent).toContain("new words");
-    expect(modal.textContent).toContain("Scratch");
-    expect(modal.textContent).toContain("fresh text");
+    const body = screen.getByTestId("ai.proposal-diff-body");
+    expect(body.textContent).toContain("old words");
+    expect(body.textContent).toContain("new words");
+    expect(body.textContent).toContain("Scratch");
+    expect(body.textContent).toContain("fresh text");
     expect(
       screen
         .getAllByTestId("ai.proposal-edit")[0]!
         .getAttribute("data-note-id"),
     ).toBe("n1");
-    // Read-only in the strong sense: the ONLY button in the modal is its close.
-    // `ai.insert-turn` alone would pass even if a write control were added.
-    expect(
-      screen.getByTestId("ai.proposal-diff").querySelectorAll("button").length,
-    ).toBe(1);
-    expect(screen.getByTestId("ai.proposal-diff-close")).toBeTruthy();
+    // **Inline, under the turn that proposed it** (myne-md/myne#913): the whole
+    // point of the change is that it is not painted somewhere else.
+    expect(body.closest('[data-testid="ai.turn"]')).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Read-only in the strong sense: nothing in the body writes. `ai.insert-turn`
+    // alone would pass even if a write control were added.
+    expect(body.querySelectorAll("button").length).toBe(0);
     expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
   });
 
