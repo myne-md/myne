@@ -1816,3 +1816,18 @@ describe("AiChatTab: scope card and note binding", () => {
     expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
   });
 });
+
+describe("AiChatTab: a sent message carries its files (myne-md/myne#913)", () => {
+  it("draws the files the message sent, and names them", () => {
+    // The composer's chips used to be the only record of what was attached, and
+    // they were cleared on send. The turn keeps them, so a question read back
+    // later still says what it was about and the file is one click away.
+    sendAgentTurn("what is in this picture", "This note", [
+      { id: "aa11bb22", name: "screenshot.png", contentType: "image/png" },
+    ]);
+    render(<AiChatTab />);
+    const chip = screen.getByTestId("ai.turn-attachment");
+    expect(chip.getAttribute("data-attachment-id")).toBe("aa11bb22");
+    expect(chip.textContent).toContain("screenshot.png");
+  });
+});
