@@ -1560,6 +1560,9 @@ pub async fn reseal_attachment(
         IngestPolicy {
             created_at_override: Some(created_at),
             compression: IngestCompression::SkipAlreadyCanonical,
+            // A restored / imported file is a library attachment: the import
+            // path has no conversation to belong to (myne-md/myne#913).
+            scope: protocol::AttachmentScope::Library,
         },
         |_ct: &str, _fn_: &str, _b: &[u8]| {
             crate::plugins::attachments::extract_types::ExtractedText::negative(
