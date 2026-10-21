@@ -61,6 +61,9 @@ import {
   subscribeChatPersistHealth,
 } from "./chatPersist";
 import { markConversationRead, clearAgent, reviewableRun, useAgent } from "../agent/agentStore";
+import { AttachmentThumbnail } from "../../components/attachments/AttachmentThumbnail";
+import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
+import { attachmentUrl } from "../attachmentRef";
 import { useResolverNotes } from "../resolverNotes";
 import { reviewCardBelongsToTurn } from "./reviewOwnership";
 // This client's nonce, passed into the shared undo hook below.
@@ -706,6 +709,86 @@ const ChatTurnView = memo(function ChatTurnView({
       {turn.scopeLabel !== undefined ? (
         <div data-testid="ai.turn-scope" style={CAPTION_STYLE}>
           {t("agent.composer.scopeLabel")}: {turn.scopeLabel}
+        </div>
+      ) : null}
+      {/* **What the message carried** (myne-md/myne#913). The chips used to live
+          only above the composer and were cleared on send, so a transcript read
+          back later showed a question about a document with no sign of which
+          document and no way to open it. The file belongs to the message: it is
+          drawn here, and a click opens it.
+
+          `attachment://` serves the bytes on demand, so this is a reference and
+          not a second copy. The thumbnail primitive is the library's own, so a
+          PDF shows its first page rather than an invented icon. */}
+      {isUser && turn.attachments !== undefined && turn.attachments.length > 0 ? (
+        <div
+          data-testid="ai.turn-attachments"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--space-1)",
+            marginTop: "var(--space-1)",
+          }}
+        >
+          {turn.attachments.map((file) => (
+            <Button
+              key={file.id}
+              variant="ghost"
+              type="button"
+              data-testid="ai.turn-attachment"
+              data-attachment-id={file.id}
+              title={file.name}
+              onClick={() =>
+                showAttachmentLightbox({
+                  url: attachmentUrl(file.id),
+                  alt: file.name,
+                  kind: file.contentType.startsWith("application/pdf")
+                    ? "pdf"
+                    : "image",
+                  id: file.id,
+                })
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-1)",
+                padding: "2px var(--space-2) 2px 2px",
+                background: "var(--bg-2)",
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-1)",
+                color: "var(--fg-2)",
+                fontSize: "var(--text-xs)",
+                maxWidth: "100%",
+                cursor: "zoom-in",
+              }}
+            >
+              <span
+                style={{
+                  flexShrink: 0,
+                  width: 24,
+                  height: 24,
+                  borderRadius: "var(--radius-1)",
+                  overflow: "hidden",
+                }}
+              >
+                <AttachmentThumbnail
+                  id={file.id}
+                  contentType={file.contentType}
+                  filename={file.name}
+                  size={24}
+                />
+              </span>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {file.name}
+              </span>
+            </Button>
+          ))}
         </div>
       ) : null}
       {/* **A model's answer is markdown, always** (myne-md/myne#771). It was

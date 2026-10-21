@@ -309,7 +309,19 @@ export async function startAgentRun(
   // two are read by the create path and travel onto the catalog row, which is
   // what lets the Hub say what a conversation is about without opening it.
   setPendingAnchorFolderId(grant.kind === "folder" ? grant.value : null);
-  sendAgentTurn(task, copy.scopeLabel);
+  // The turn carries the files it sent (myne-md/myne#913), so a transcript read
+  // back later shows WHAT the question was about instead of only the question.
+  sendAgentTurn(
+    task,
+    copy.scopeLabel,
+    attachments
+      .filter((doc) => doc.id !== undefined)
+      .map((doc) => ({
+        id: doc.id!,
+        name: doc.name,
+        contentType: doc.contentType ?? "",
+      })),
+  );
   // **The conversation exists from the first user message** (myne-md/myne#848),
   // and the run is bound to it before the first step is driven. The id is
   // awaited rather than read later: `beginRun` records ownership, and ownership
