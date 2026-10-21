@@ -48,7 +48,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Emitter, Runtime};
 use zeroize::Zeroize;
 
 use crate::plugins::agent::apply::{
@@ -1300,6 +1300,21 @@ impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
 /// rebuild. `kind()` is the bounded, content-free tag, the variant id only,
 /// never the note id or any text (`src-tauri/AGENTS.md`'s DENY list).
 #[allow(clippy::too_many_arguments)]
+/// Fired once per successful apply, so the WebView can refresh what it renders
+/// from the vault rather than from the run (myne-md/myne#913).
+///
+/// The sidebar had no way to learn that an agent run created, deleted or moved a
+/// note: the only "notes changed" event in the tree is the CLI bridge's, and the
+/// agent never emitted anything. So an agent-created note existed on disk and was
+/// absent from the left panel until something else forced a reload, which read as
+/// "the creation failed".
+///
+/// One event per RUN, not per note: the listener reloads the note list, so ten
+/// emits would be ten identical reloads. The name is the agent's own rather than
+/// the CLI's, because a shared name would tell a future reader that the CLI wrote
+/// the note.
+pub const AGENT_NOTES_CHANGED_EVENT: &str = "myne://agent-notes-changed";
+
 pub async fn apply_from_host<R: Runtime>(
     app: AppHandle<R>,
     run_id: String,
@@ -1313,6 +1328,7 @@ pub async fn apply_from_host<R: Runtime>(
     vault: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
 ) -> Result<ApplyOutcome, AgentError> {
+    let notify = app.clone();
     let outcome = apply_from_host_inner(
         app,
         run_id,
@@ -1337,6 +1353,12 @@ pub async fn apply_from_host<R: Runtime>(
             event = "agent_apply_refused",
             error_kind = error.kind()
         );
+    }
+    if outcome.is_ok() {
+        // Emitted from HERE rather than inside the inner function: this is the
+        // single point where the whole apply has settled, so the WebView hears one
+        // event per run whatever the run did, and hears nothing when it failed.
+        let _ = notify.emit(AGENT_NOTES_CHANGED_EVENT, ());
     }
     outcome
 }

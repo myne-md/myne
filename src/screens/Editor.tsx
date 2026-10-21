@@ -206,6 +206,7 @@ import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
+import { AGENT_NOTES_CHANGED_EVENT } from "../lib/agent-events";
 import { clearChat } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
@@ -1396,6 +1397,19 @@ function EditorChrome({
   // loss - the overwriting save coalesces with the pane's earlier ones, so the
   // CLI's line never gets a revision of its own to restore from.
   //
+  // "A writer outside this WebView changed the vault" is ONE condition with one
+  // recovery, whatever the writer was (the CLI, the agent, a sync pull). The chain
+  // is here rather than inlined at each listener so two of them cannot drift into
+  // refreshing different things.
+  const refreshAfterExternalWrite = useCallback(() => {
+    void noteList()
+      .then((ids) => syncCtxRef.current.refreshAll(ids))
+      .then(() => syncCtxRef.current.reloadOpenNote())
+      .catch(() => {
+        /* a manual refresh catches up */
+      });
+  }, []);
+
   // Same listener shape and same handler as the sync pull above, deliberately:
   // "someone else wrote to this vault" is one condition, and the CLI is just
   // another writer. The pane applies its own dirty guard on reload, so this
@@ -1407,15 +1421,23 @@ function EditorChrome({
       try {
         const handle = await listen(CLI_NOTES_CHANGED_EVENT, () => {
           if (cancelled) return;
-          void noteList()
-            .then((ids) => syncCtxRef.current.refreshAll(ids))
-            .then(() => syncCtxRef.current.reloadOpenNote())
-            .catch(() => {
-              /* a manual refresh catches up */
-            });
+          refreshAfterExternalWrite();
         });
-        if (cancelled) handle();
-        else unlisten = handle;
+        // The agent is the second writer outside this WebView (myne-md/myne#913):
+        // same condition, same refresh, its own event name.
+        const agentHandle = await listen(AGENT_NOTES_CHANGED_EVENT, () => {
+          if (cancelled) return;
+          refreshAfterExternalWrite();
+        });
+        if (cancelled) {
+          handle();
+          agentHandle();
+        } else {
+          unlisten = () => {
+            handle();
+            agentHandle();
+          };
+        }
       } catch {
         // Not inside Tauri (browser dev shim) → there is no CLI either.
       }
