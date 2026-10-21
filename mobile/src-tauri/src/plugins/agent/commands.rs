@@ -45,6 +45,7 @@ use myne_core::plugins::agent::host_commands::{
 };
 use myne_core::plugins::agent::probe::{run_probe, ProbeProgress, ProbeVerdict};
 use myne_core::plugins::agent::prompt::ProposedSetting;
+use myne_core::plugins::agent::prompt::{documents_from, Document};
 use myne_core::plugins::agent::run::{
     new_run_id, AgentRunState, AgentRunView, AppliedRun, GrantOrigin,
 };
@@ -80,6 +81,13 @@ pub async fn agent_start<R: Runtime>(
     // SILENTLY, so a phone that did not declare this would offer no settings and
     // refuse every `set_setting` with nothing saying why (myne-md/myne#850).
     settings: Vec<String>,
+    // The documents the user attached to this run (myne-md/myne#913): their
+    // extracted text, which the composer read from the vault. Declared on BOTH
+    // clients even where no picker exists yet, because the shared binding sends
+    // it on every call and Tauri drops an unknown argument silently: a client
+    // that did not declare it would ignore an attachment it was handed and
+    // answer about a file it cannot see, with nothing complaining.
+    attachments: Vec<Document>,
     on_open: Channel<AgentRunView>,
     on_progress: Channel<RunProgress>,
     runs: State<'_, Arc<AgentRunState>>,
@@ -118,12 +126,19 @@ pub async fn agent_start<R: Runtime>(
     } else {
         Some(SeedControls::from_view(&prefs))
     };
+    // Budgeted and wrapped HERE, at the command boundary, because the cap and
+    // the untrusted tagging are host policy: `documents_from` truncates each
+    // document and marks the truncation, and every span that carries text is a
+    // `Content::UntrustedNote`, so it is sanitized and counted in the off-device
+    // figure by the same code that handles note bodies.
+    let documents = documents_from(attachments);
     sessions.open(
         &run_id,
         task,
         &runs.live_ids(),
         language,
         seed,
+        documents,
         seed_controls,
         settings,
     );

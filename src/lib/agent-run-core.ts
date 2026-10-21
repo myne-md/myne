@@ -56,6 +56,23 @@ export interface AgentHost {
   Channel: new <T>() => HostChannel<T>;
 }
 
+/**
+ * One document the user attached to a run (myne-md/myne#913).
+ *
+ * **Context, not scope.** The agent may read it; it can never write it, and it
+ * carries no note id, so "the agent can see this file" cannot be mistaken for
+ * "the agent can change this file". The host wraps the text as an untrusted
+ * span: a document is somebody else's prose and can contain a paragraph
+ * addressed to the model.
+ */
+export interface RunAttachment {
+  /** The display name the user picked, shown in the composer and in the
+   *  transcript's own scope line. */
+  name: string;
+  /** The extracted text, already read from the vault by the caller. */
+  text: string;
+}
+
 /** Bind the agent commands to one client's seam. */
 export function makeAgentRun({ invoke, Channel }: AgentHost) {
   /** Start a run. The grant is the scope the user set; the host resolves and
@@ -93,6 +110,14 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
      *  the host then refuses every setting change rather than accepting one into
      *  a proposal no surface could render. */
     settings: readonly string[],
+    /** The documents the user attached to this run, or an empty list.
+     *
+     *  Sent as text rather than as attachment ids so the host never has to
+     *  reach back into the vault mid-run: the read happens once, under the
+     *  unlock the user already granted, and a vault that locks afterwards ends
+     *  the run rather than half-reading a file. The host caps each document and
+     *  the count, and tags every character of it untrusted (myne-md/myne#913). */
+    attachments: readonly RunAttachment[],
     /** Called with the run's view as soon as the host has created it, which is
      *  long before this promise resolves.
      *
@@ -128,6 +153,7 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
       language,
       history,
       settings,
+      attachments,
       onOpen: channel,
       onProgress: progress,
     });
