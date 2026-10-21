@@ -73,6 +73,7 @@ import {
 } from "../../lib/attachments";
 import type { RunAttachment } from "../../lib/agent-run-core";
 import { AttachmentPickerDialog, MAX_RUN_ATTACHMENTS } from "./AttachmentPickerDialog";
+import { AttachmentThumbnail } from "../../components/attachments/AttachmentThumbnail";
 import { useConversationEpoch } from "../ai/chatStore";
 import { useIndexNonce } from "../indexNonce";
 import { CAPTION_STYLE } from "./sharedStyles";
@@ -385,6 +386,17 @@ export function ChatComposer({
    *  goes out without it. */
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [readingDocs, setReadingDocs] = useState(false);
+  /**
+   * The files being imported right now (myne-md/myne#913).
+   *
+   * **A placeholder from the first frame, not only when the work finishes.** An
+   * image import decrypts, sniffs, encrypts and caches before it returns, which
+   * at 4 MB is long enough that a paste with no feedback reads as ignored: the
+   * user pastes again, and the second copy is a second file. The label is the
+   * file's name, so the placeholder says WHAT is arriving, not merely that
+   * something is.
+   */
+  const [pasting, setPasting] = useState<readonly string[]>([]);
   /** Whether the configured backend can hold the anchored edit format.
    *
    *  Three states in one field rather than a verdict plus a boolean: unasked,
@@ -642,7 +654,8 @@ export function ChatComposer({
    * yet", and treating it as empty would disable the box on every mount.
    */
   const scopeEmpty = preview !== null && preview !== "failed" && preview.noteCount === 0;
-  const blocked = empty || busy || probing || refused || scopeEmpty || readingDocs;
+  const blocked =
+    empty || busy || probing || refused || scopeEmpty || readingDocs || pasting.length > 0;
 
   // **Except while the field is BLOCKED, where the copy IS the message.**
   // (myne-md/myne#848.) The rule above exists so an empty composer does not grow
@@ -778,9 +791,14 @@ export function ChatComposer({
       setAttachmentError(t("agent.attachments.cap", { count: MAX_RUN_ATTACHMENTS }));
       return;
     }
+    const batch = files.slice(0, room);
+    // Claimed BEFORE the first await: the placeholder has to be on screen while
+    // the import is still asking the vault for keys, or there is no feedback at
+    // all during the part the user notices.
+    setPasting(batch.map((file, i) => `${i}:${file.name || t("agent.attachments.pastedFile")}`));
     try {
       const imported: CatalogEntry[] = [];
-      for (const file of files.slice(0, room)) {
+      for (const file of batch) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const att = await attachmentImport(
           {
@@ -803,6 +821,8 @@ export function ChatComposer({
       );
     } catch {
       setAttachmentError(t("agent.attachments.pasteFailed"));
+    } finally {
+      setPasting([]);
     }
   }
 
@@ -992,7 +1012,7 @@ export function ChatComposer({
           composer already shows one row of controls and a file is content
           rather than a setting. Each chip is removable on its own; the error
           line sits here too, since this is the row a file is added to. */}
-      {attachedDocs.length > 0 || attachmentError !== null ? (
+      {attachedDocs.length > 0 || pasting.length > 0 || attachmentError !== null ? (
         <div
           data-testid="ai.composer-attachments"
           style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-1)" }}
@@ -1005,8 +1025,9 @@ export function ChatComposer({
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "var(--space-1)",
-                padding: "2px var(--space-2)",
+                gap: "var(--space-2)",
+                padding: "var(--space-1)",
+                paddingRight: "var(--space-2)",
                 borderRadius: "var(--radius-1)",
                 background: "var(--bg-2)",
                 border: "1px solid var(--line-1)",
@@ -1015,10 +1036,43 @@ export function ChatComposer({
                 maxWidth: "100%",
               }}
             >
+              {/* **The file, shown as the file** (myne-md/myne#913). A name in a
+                  pill read as another scope value sitting beside "All notes";
+                  the thing the user pasted is content, so it gets a preview and
+                  its own row above the composer's controls, never inside them. */}
               <span
-                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                style={{
+                  flexShrink: 0,
+                  width: 32,
+                  height: 32,
+                  borderRadius: "var(--radius-1)",
+                  overflow: "hidden",
+                }}
               >
-                {doc.filename}
+                <AttachmentThumbnail
+                  id={doc.id}
+                  contentType={doc.content_type}
+                  filename={doc.filename}
+                  size={32}
+                />
+              </span>
+              <span
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1px",
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <span
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {doc.filename}
+                </span>
+                <span style={{ ...CAPTION_STYLE, color: "var(--fg-3)" }}>
+                  {Math.max(1, Math.round(doc.size / 1024))} KB
+                </span>
               </span>
               <IconButton
                 icon="x"
@@ -1029,6 +1083,32 @@ export function ChatComposer({
                   setAttachedDocs((docs) => docs.filter((row) => row.id !== doc.id))
                 }
               />
+            </span>
+          ))}
+          {pasting.map((entry) => (
+            <span
+              key={entry}
+              data-testid="ai.composer-attachment-pending"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                padding: "var(--space-1) var(--space-2)",
+                borderRadius: "var(--radius-1)",
+                background: "var(--bg-2)",
+                border: "1px dashed var(--line-2)",
+                fontSize: "var(--text-xs)",
+                color: "var(--fg-3)",
+                maxWidth: "100%",
+              }}
+            >
+              <Spinner size={14} />
+              <span
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {entry.slice(entry.indexOf(":") + 1)}
+              </span>
+              <span>{t("agent.attachments.pasting")}</span>
             </span>
           ))}
           {attachmentError !== null ? (

@@ -392,10 +392,16 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "To move a note to a different folder, use move_note. It takes the ",
         "note's id and the folder you want it in, and it is the only way to ",
         "change which folder a note lives in: an edit whose anchor spans the ",
-        "folder line is refused. The folder does not have to exist yet, so do ",
-        "not invent a reason to avoid naming a new one; prefer a folder you ",
-        "have already seen in a listing, and keep the user's own spelling of ",
-        "it.\n\n",
+        "folder line is refused. **The destination MUST be a folder this vault ",
+        "already has.** Take the path verbatim from a listing (list_scope ",
+        "reports each note's folder); never retype it from memory and never ",
+        "invent one. A move to any other name is refused and the note does not ",
+        "move, so a made-up folder cannot appear in the user's sidebar. If the ",
+        "user asks for a folder that does not exist, say so and ask them to ",
+        "create it: naming a folder in their vault is their act, not yours. ",
+        "Two folders that differ only in case or by a numeric prefix (`02 - AREAS` ",
+        "and `Areas`) are DIFFERENT folders, which is exactly the mistake this ",
+        "rule exists to prevent.\n\n",
         // **The one verb whose permission is a closed list rather than a scope**
         // (myne-md/myne#850). The paragraph names both halves for the reason
         // `move_note`'s does: a model told only that it may change settings

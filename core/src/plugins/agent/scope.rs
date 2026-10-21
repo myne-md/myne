@@ -243,6 +243,31 @@ pub trait ExclusionSource: Send + Sync {
     async fn excluded_now(&self) -> Result<Vec<String>, crate::plugins::agent::error::AgentError>;
 }
 
+/// The folders this vault HAS, canonically, as the write side compares them.
+///
+/// **The set exists because a folder in Myne is not a directory.** It is the
+/// `folder:` value of at least one note, or a deliberate (empty) folder the user
+/// created; there is nothing on disk to ask. So "does this folder exist" is a
+/// question only the host can answer, from the same two sources the sidebar
+/// renders: the index's records and `deliberate_folders`.
+///
+/// The root is always a member: moving a note OUT of every folder is a real
+/// destination, and the composer's move-to-root has no other spelling.
+pub fn known_folders<'a>(
+    record_folders: impl Iterator<Item = Option<&'a str>>,
+    deliberate: &[String],
+) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    out.insert(String::new());
+    for folder in record_folders.flatten() {
+        out.insert(canonical_folder(folder));
+    }
+    for folder in deliberate {
+        out.insert(canonical_folder(folder));
+    }
+    out
+}
+
 /// Start a run from a grant, resolving and clamping it here.
 ///
 /// The one entry point for beginning a run. `AgentRunState::start` takes an

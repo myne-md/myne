@@ -109,6 +109,8 @@
       "empty": "No attachments in this vault yet. Add a file to the attachment library first.",
       "failed": "The attachment library could not be read. Try again.",
       "pasteFailed": "The pasted file could not be added to this conversation.",
+      "pasting": "Pasting…",
+      "pastedFile": "Pasted file",
       "cap": "You can attach up to {{count}} files.",
       "confirm_one": "Attach {{count}} file",
       "confirm_other": "Attach {{count}} files",
@@ -207,6 +209,7 @@
         "appendEmpty": "Could not be applied: there was nothing to add.",
         "appendWouldWriteFrontmatter": "Could not be applied: that text would have become the note's properties block.",
         "moveToSameFolder": "Not moved: the note is already in that folder.",
+        "unknownFolder": "Not moved: this vault has no folder by that name, so nothing was written.",
         "moveIntoExcludedFolder": "Not moved: that folder is excluded from AI."
       },
       "applyFailed": "The changes could not be applied.",
