@@ -158,7 +158,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "PhraseTypeBack": { file: "src/components/PhraseTypeBack.tsx", line: 66 },
   "PlainFileSettings": { file: "src/components/settings/PlainFileSettings.tsx", line: 20 },
   "PrivacyPanel": { file: "src/components/settings/PrivacyPanel.tsx", line: 312 },
-  "ProposalDiffModal": { file: "src/notes/components/ProposalDiffModal.tsx", line: 52 },
+  "ProposalDiffBody": { file: "src/notes/components/ProposalDiffBody.tsx", line: 97 },
   "ProvisioningStep": { file: "src/screens/vault-creation/ProvisioningStep.tsx", line: 30 },
   "QuickPicker": { file: "src/components/QuickPicker.tsx", line: 124 },
   "QuickUnlockEntry": { file: "src/components/QuickUnlockEntry.tsx", line: 77 },

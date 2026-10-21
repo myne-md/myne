@@ -67,7 +67,7 @@ import { NoteList } from "@app/notes/components/NoteList";
 import { OutlineTab } from "@app/notes/components/OutlineTab";
 import { PaneTree } from "@app/notes/components/PaneTree";
 import { PaneView } from "@app/notes/components/PaneView";
-import { ProposalDiffModal } from "@app/notes/components/ProposalDiffModal";
+import { ProposalDiffBody } from "@app/notes/components/ProposalDiffBody";
 import { SidebarSearchRow } from "@app/notes/components/SidebarSearchRow";
 import { SnapshotFailedIndicator } from "@app/notes/components/SnapshotFailedIndicator";
 import { SnapshotsPanel } from "@app/notes/components/SnapshotsPanel";
@@ -1281,16 +1281,14 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     },
   },
   {
-    id: "notes/proposaldiffmodal/default",
+    id: "notes/proposaldiffbody/default",
     group: "components",
-    surface: "ProposalDiffModal",
+    surface: "ProposalDiffBody",
     state: "default",
-    description: "A frozen agent proposal: one edit diffed and one new note.",
-    tags: ["notes", "agent", "proposal", "diff", "modal"],
+    description: "A frozen agent proposal inline under its turn: one edit diffed and one new note.",
+    tags: ["notes", "agent", "proposal", "diff", "inline"],
     render: () => (
-      <ProposalDiffModal
-        open
-        onClose={action("onClose")}
+      <ProposalDiffBody
         proposal={{
           edits: [
             {
