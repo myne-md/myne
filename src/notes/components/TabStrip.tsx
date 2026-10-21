@@ -167,6 +167,11 @@ const scrollAreaStyle: CSSProperties = {
 const STRIP_BUTTON_HEIGHT = TITLE_BAR_CONTROL_HEIGHT;
 
 const TITLE_MAX = 160;
+/** The narrowest a tab may get before the row scrolls instead (myne-md/myne#913).
+ *  Sized from the label: a 16px icon, the 6px gap, the close control's hit area,
+ *  and roughly a dozen characters of the title. Below this a tab stops naming
+ *  anything, which is what the strip looked like before the row could scroll. */
+const TAB_MIN_WIDTH = 132;
 
 /**
  * Stable DOM id for a tab element (myne#728). The pane body carries
@@ -845,17 +850,20 @@ function Tab({
     height: "100%",
     padding: "0 6px 0 10px",
     maxWidth: TITLE_MAX + 56,
-    // **The active tab shows its name** (myne-md/myne#913, on the report that a
-    // narrow pane left the active tab reading "Ag"). A tab strip whose only
-    // legible tab is the one you are not on has the hierarchy backwards: the
-    // active tab is the one that has to be identifiable at a glance, so it takes
-    // its content width and pushes the others to shrink and the row to scroll.
-    // `max-content` rather than a measured width, because the browser already
-    // knows the label's width and a measurement here would have to be redone on
-    // every rename. The cap below still truncates a genuinely long title, which
-    // is what the reveal marquee is for.
-    minWidth: active ? "max-content" : 56,
-    flexShrink: active || stacked ? 0 : 1,
+    // **Every tab stays readable, and the row scrolls instead** (myne-md/myne#913,
+    // two reports in a row: first the active tab squeezed to "Ag", then the
+    // inactive ones squeezing to an icon). Shrinking is what produced both: a
+    // strip that ellipsizes to fit can always be made to fit, and the titles are
+    // the only thing that pays. The floor is a readable label (icon + a dozen
+    // characters + the close control) and the ceiling is the title cap, so a tab
+    // is sized by its own name and an overflowing strip scrolls with the fade at
+    // the edge saying so.
+    //
+    // `max-content` for the active tab rather than a measured width: the browser
+    // already knows the label's width and a measurement here would have to be
+    // redone on every rename.
+    minWidth: active ? "max-content" : TAB_MIN_WIDTH,
+    flexShrink: stacked ? 0 : 0,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     // In a stacked deck every card carries a full hairline (the cards overlap,
