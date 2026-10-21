@@ -31,6 +31,14 @@ vi.mock("react-i18next", () => ({
 const agentCapability = vi.fn();
 const agentStart = vi.fn();
 const agentPreviewGrant = vi.fn();
+const catalogList = vi.fn();
+const attachmentReadExtractedText = vi.fn();
+vi.mock("../../src/lib/attachments", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/attachments")>()),
+  catalogList: (...a: unknown[]) => catalogList(...a),
+  attachmentReadExtractedText: (...a: unknown[]) => attachmentReadExtractedText(...a),
+}));
+
 vi.mock("../../src/lib/agent-run", () => ({
   agentCapability: (...a: unknown[]) => agentCapability(...a),
   agentStart: (...a: unknown[]) => agentStart(...a),
@@ -99,6 +107,18 @@ beforeEach(() => {
     unknownCount: 0,
     newTotal: 12,
   });
+  catalogList.mockReset().mockResolvedValue([
+    {
+      id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+      content_type: "application/pdf",
+      created_at: 1,
+      filename: "lecture.pdf",
+      size: 2048,
+    },
+  ]);
+  attachmentReadExtractedText
+    .mockReset()
+    .mockResolvedValue({ text: "the lecture, in words", source_format: "pdf", truncated: false });
 });
 afterEach(() => {
   cleanup();
@@ -271,6 +291,11 @@ describe("ChatComposer", () => {
       // Asserted in the whole-call shape below so a new argument cannot be
       // added without a decision, which is what this expectation is for.
       expect.arrayContaining(["editor.weekly-notes-folder"]),
+      // The documents this message carries (myne-md/myne#913). An ordinary
+      // message carries none, and the empty list is asserted rather than
+      // skipped: a run that silently attached something would change what
+      // leaves the device without the user picking a file.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -305,6 +330,11 @@ describe("ChatComposer", () => {
       // Asserted in the whole-call shape below so a new argument cannot be
       // added without a decision, which is what this expectation is for.
       expect.arrayContaining(["editor.weekly-notes-folder"]),
+      // The documents this message carries (myne-md/myne#913). An ordinary
+      // message carries none, and the empty list is asserted rather than
+      // skipped: a run that silently attached something would change what
+      // leaves the device without the user picking a file.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -825,6 +855,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
         "en",
         expect.any(Array),
         expect.arrayContaining(["editor.weekly-notes-folder"]),
+        [],
         expect.any(Function),
         expect.any(Function),
       );
@@ -1109,5 +1140,68 @@ describe("ChatComposer, the blocked zero state", () => {
     const lines = parseFloat(input.style.maxHeight) / parseFloat(input.style.lineHeight);
     expect(lines).toBe(5);
     expect(input.style.overflowY).toBe("auto");
+  });
+});
+
+// ---- attached documents (myne-md/myne#913) --------------------------------
+//
+// The two properties that must not break: a document reaches the run as TEXT
+// under the user's own pick (not as an id the host re-reads later, and not as
+// part of the task string, which would stop it being counted off-device), and a
+// file with no extractable text is a sentence rather than a message that goes
+// out without it.
+describe("ChatComposer: attached documents", () => {
+  it("sends the chosen document's text with the run", async () => {
+    mount();
+    type("summarise the lecture");
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+
+    const option = await screen.findByTestId("ai.attachment-option");
+    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    // The chip names what the message carries, and can be taken off again.
+    const chip = await screen.findByTestId("ai.composer-attachment");
+    expect(chip.textContent).toContain("lecture.pdf");
+    expect(chip.getAttribute("data-attachment-id")).toBe(
+      "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+    );
+
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalledTimes(1));
+
+    // Argument five is the attachments list (task, grant, language, history,
+    // settings, attachments, ...). Asserting the POSITION is deliberate: a
+    // shift here is what would silently send documents as the settings list.
+    const call = agentStart.mock.calls[0]!;
+    expect(call[5]).toEqual([
+      { name: "lecture.pdf", text: "the lecture, in words" },
+    ]);
+    // And the task stays the user's words: the document is not spliced into it.
+    expect(call[0]).toBe("summarise the lecture");
+    expect(call[0]).not.toContain("the lecture, in words");
+    // The chips are gone once the run has started.
+    await waitFor(() => expect(screen.queryByTestId("ai.composer-attachment")).toBeNull());
+  });
+
+  it("keeps the message in the box when the file has no readable text", async () => {
+    attachmentReadExtractedText.mockReset().mockResolvedValue(null);
+    mount();
+    type("summarise the lecture");
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+    fireEvent.click(await screen.findByTestId("ai.attachment-option"));
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    const error = await screen.findByTestId("ai.composer-attachment-error");
+    expect(error.textContent).toContain("agent.attachments.noText");
+    // Nothing was sent, and the typed message is still there to send again.
+    expect(agentStart).not.toHaveBeenCalled();
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("summarise the lecture");
+    // The chip stays, so the user can remove it rather than re-pick.
+    expect(screen.getByTestId("ai.composer-attachment")).toBeTruthy();
   });
 });

@@ -68,6 +68,7 @@ import { OutlineTab } from "@app/notes/components/OutlineTab";
 import { PaneTree } from "@app/notes/components/PaneTree";
 import { PaneView } from "@app/notes/components/PaneView";
 import { ProposalDiffBody } from "@app/notes/components/ProposalDiffBody";
+import { AttachmentPickerDialog } from "@app/notes/components/AttachmentPickerDialog";
 import { SidebarSearchRow } from "@app/notes/components/SidebarSearchRow";
 import { SnapshotFailedIndicator } from "@app/notes/components/SnapshotFailedIndicator";
 import { SnapshotsPanel } from "@app/notes/components/SnapshotsPanel";
@@ -1306,6 +1307,39 @@ export const NOTES_STORIES: StoryDescriptor[] = [
             },
           ],
         }}
+      />
+    ),
+  },
+  {
+    id: "notes/attachmentpickerdialog/open",
+    group: "components",
+    surface: "AttachmentPickerDialog",
+    state: "open",
+    description:
+      "The document picker for an agent run: one file already chosen, one more available, and the cap stated.",
+    tags: ["notes", "agent", "attachments", "picker", "modal"],
+    render: () => (
+      <AttachmentPickerDialog
+        open
+        onClose={action("onClose")}
+        onPick={action("onPick")}
+        selectedIds={["0184a2b3c4d5e6f708192a3b4c5d6e7f"]}
+        load={async () => [
+          {
+            id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+            content_type: "application/pdf",
+            created_at: 1700000000,
+            filename: "lecture-04.pdf",
+            size: 482_304,
+          },
+          {
+            id: "0184a2b3c4d5e6f708192a3b4c5d6e80",
+            content_type: "text/markdown",
+            created_at: 1700000100,
+            filename: "reading-list.md",
+            size: 3_200,
+          },
+        ]}
       />
     ),
   },

@@ -103,6 +103,17 @@
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
     },
+    "attachments": {
+      "title": "Attach a document",
+      "attach": "Attach a document",
+      "empty": "No attachments in this vault yet. Add a file to the attachment library first.",
+      "failed": "The attachment library could not be read. Try again.",
+      "cap": "You can attach up to {{count}} files.",
+      "confirm_one": "Attach {{count}} file",
+      "confirm_other": "Attach {{count}} files",
+      "remove": "Remove {{name}}",
+      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached."
+    },
     "progress": {
       "working": "Working",
       "awaitingScope": "Waiting for you",

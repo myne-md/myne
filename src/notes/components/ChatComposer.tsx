@@ -45,6 +45,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import { IconButton } from "../../components/primitives/IconButton";
 import { AnchoredPanel } from "../../components/primitives/AnchoredPanel";
 import type { IconName } from "../../lib/icons";
 import { Spinner } from "../../components/Spinner";
@@ -65,6 +66,9 @@ import {
   useAgent,
 } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
+import { attachmentReadExtractedText, type CatalogEntry } from "../../lib/attachments";
+import type { RunAttachment } from "../../lib/agent-run-core";
+import { AttachmentPickerDialog } from "./AttachmentPickerDialog";
 import { useConversationEpoch } from "../ai/chatStore";
 import { useIndexNonce } from "../indexNonce";
 import { CAPTION_STYLE } from "./sharedStyles";
@@ -362,6 +366,21 @@ export function ChatComposer({
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * The documents this message will carry (myne-md/myne#913).
+   *
+   * **Per message, like the scope**, and cleared by the same conversation
+   * boundary: a file handed to one question is not a file handed to the next
+   * one, and an attachment that silently followed the conversation would be
+   * exactly the kind of inherited permission `decisions/ai/0518` refuses.
+   */
+  const [attachedDocs, setAttachedDocs] = useState<CatalogEntry[]>([]);
+  const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
+  /** Why the picked documents could not be sent. Rendered under the row, so a
+   *  file that has no extractable text is a sentence rather than a message that
+   *  goes out without it. */
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [readingDocs, setReadingDocs] = useState(false);
   /** Whether the configured backend can hold the anchored edit format.
    *
    *  Three states in one field rather than a verdict plus a boolean: unasked,
@@ -555,6 +574,8 @@ export function ChatComposer({
   const conversationEpoch = useConversationEpoch();
   useEffect(() => {
     setAttached(null);
+    setAttachedDocs([]);
+    setAttachmentError(null);
   }, [conversationEpoch]);
 
   // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
@@ -617,7 +638,7 @@ export function ChatComposer({
    * yet", and treating it as empty would disable the box on every mount.
    */
   const scopeEmpty = preview !== null && preview !== "failed" && preview.noteCount === 0;
-  const blocked = empty || busy || probing || refused || scopeEmpty;
+  const blocked = empty || busy || probing || refused || scopeEmpty || readingDocs;
 
   // **Except while the field is BLOCKED, where the copy IS the message.**
   // (myne-md/myne#848.) The rule above exists so an empty composer does not grow
@@ -650,6 +671,42 @@ export function ChatComposer({
     // The refusal is rendered by the notice below; keep what the user typed so
     // switching backend and sending again does not cost them the message.
     if (verdict === null || !verdict.passed) return;
+    // **Read the documents BEFORE the message is cleared** (myne-md/myne#913).
+    // The host takes text, not attachment ids, so this is the one moment the
+    // vault read happens; a read that fails has to leave the message in the box
+    // and say why, rather than sending a run that answers about a file it never
+    // received.
+    let attachments: RunAttachment[] = [];
+    if (attachedDocs.length > 0) {
+      setReadingDocs(true);
+      setAttachmentError(null);
+      try {
+        const read = await Promise.all(
+          attachedDocs.map(async (doc) => ({
+            name: doc.filename,
+            extracted: await attachmentReadExtractedText(doc.id),
+          })),
+        );
+        const missing = read.find((entry) => entry.extracted === null);
+        if (missing !== undefined) {
+          // The sentence names the file: "a document has no text" is not
+          // actionable when the user attached three.
+          setAttachmentError(
+            t("agent.attachments.noText", { name: missing.name }),
+          );
+          return;
+        }
+        attachments = read.map((entry) => ({
+          name: entry.name,
+          text: entry.extracted!.text,
+        }));
+      } catch {
+        setAttachmentError(t("agent.attachments.failed"));
+        return;
+      } finally {
+        setReadingDocs(false);
+      }
+    }
     setMessage("");
     setBusy(true);
     try {
@@ -679,7 +736,14 @@ export function ChatComposer({
         // (myne-md/myne#771). A folder or multi-note run is vault-general and
         // gets no anchor, which is what the Hub renders as "not anchored".
         grant.kind === "notes" && grant.value.length === 1 ? grant.value[0]! : null,
+        // The documents this run may read (myne-md/myne#913). Empty for an
+        // ordinary message, which is what keeps the request byte-identical for
+        // every run that attaches nothing.
+        attachments,
       );
+      // Only after the run actually started: a start that threw keeps the chips
+      // so the user can press Send again without re-picking.
+      setAttachedDocs([]);
     } finally {
       setBusy(false);
     }
@@ -863,7 +927,74 @@ export function ChatComposer({
           that replaces the picker here. The disclosure is unaffected: the count
           and the excluded figure stay, and they are what 0515 names as the
           mitigation. */}
+      {/* **What this message carries** (myne-md/myne#913), above the control row
+          and below the input: chips rather than a second list, because the
+          composer already shows one row of controls and a file is content
+          rather than a setting. Each chip is removable on its own; the error
+          line sits here too, since this is the row a file is added to. */}
+      {attachedDocs.length > 0 || attachmentError !== null ? (
+        <div
+          data-testid="ai.composer-attachments"
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-1)" }}
+        >
+          {attachedDocs.map((doc) => (
+            <span
+              key={doc.id}
+              data-testid="ai.composer-attachment"
+              data-attachment-id={doc.id}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-1)",
+                padding: "2px var(--space-2)",
+                borderRadius: "var(--radius-1)",
+                background: "var(--bg-2)",
+                border: "1px solid var(--line-1)",
+                fontSize: "var(--text-xs)",
+                color: "var(--fg-2)",
+                maxWidth: "100%",
+              }}
+            >
+              <span
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {doc.filename}
+              </span>
+              <IconButton
+                icon="x"
+                label={t("agent.attachments.remove", { name: doc.filename })}
+                iconSize={12}
+                testId="ai.composer-attachment-remove"
+                onClick={() =>
+                  setAttachedDocs((docs) => docs.filter((row) => row.id !== doc.id))
+                }
+              />
+            </span>
+          ))}
+          {attachmentError !== null ? (
+            <span
+              data-testid="ai.composer-attachment-error"
+              style={{ ...CAPTION_STYLE, color: "var(--danger)" }}
+            >
+              {attachmentError}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={ROW_STYLE}>
+        {/* The attach control: a `+` that opens the library picker. Its own
+            control rather than an entry in the scope menu, because scope is a
+            PERMISSION and a document is CONTEXT: the agent reads this file and
+            can never write it (myne-md/myne#913). */}
+        <IconButton
+          icon="plus"
+          label={t("agent.attachments.attach")}
+          tooltip
+          expanded={attachmentPickerOpen}
+          testId="ai.composer-attach"
+          onClick={() => setAttachmentPickerOpen(true)}
+        />
         {/* **The picker is the control, not a disclosure over one.** It used to
             render a caption plus a Change button, and pressing Change REPLACED
             them with this same `SearchableSelect` — whose trigger you then
@@ -1013,6 +1144,15 @@ export function ChatComposer({
         ) : null}
 
       </div>
+      <AttachmentPickerDialog
+        open={attachmentPickerOpen}
+        onClose={() => setAttachmentPickerOpen(false)}
+        selectedIds={attachedDocs.map((doc) => doc.id)}
+        onPick={(entries) => {
+          setAttachedDocs([...entries]);
+          setAttachmentError(null);
+        }}
+      />
     </div>
   );
 }
