@@ -92,3 +92,20 @@ export function marqueeTiming(
     duration,
   };
 }
+
+/** Where the strip must scroll to centre `tabLeft` in `viewport`.
+ *
+ *  Pure, because jsdom has no layout: the component's effect can only be proven
+ *  to FIRE in a unit test, not to land on the right pixel. Clamped at zero so the
+ *  first tab does not scroll into blank space; the browser clamps the other end.
+ */
+export function centreScrollLeft(
+  tabLeft: number,
+  tabWidth: number,
+  viewport: number,
+): number {
+  if (!Number.isFinite(tabLeft) || !Number.isFinite(tabWidth) || !Number.isFinite(viewport)) {
+    return 0;
+  }
+  return Math.max(0, tabLeft - (viewport - tabWidth) / 2);
+}

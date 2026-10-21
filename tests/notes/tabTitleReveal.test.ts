@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  centreScrollLeft,
   marqueeShift,
   marqueeTiming,
   prefersReducedMotion,
@@ -88,5 +89,22 @@ describe("marqueeTiming", () => {
     expect(startHold).toBeGreaterThan(endHold);
     const zero = marqueeTiming(0);
     expect(zero.frames[2]!.transform).toBe("translateX(-0px)");
+  });
+});
+
+describe("centreScrollLeft", () => {
+  it("puts the tab's middle on the viewport's middle", () => {
+    // tab 500px in, 120px wide, 800px viewport → its centre (560) sits at 400.
+    expect(centreScrollLeft(500, 120, 800)).toBe(500 - (800 - 120) / 2);
+  });
+
+  it("never scrolls before the first tab", () => {
+    // The strip's own left edge is 0; a negative offset would show blank space to
+    // the left of the first tab, which reads as a broken strip.
+    expect(centreScrollLeft(6, 132, 800)).toBe(0);
+  });
+
+  it("survives a measurement pass with no layout", () => {
+    expect(centreScrollLeft(Number.NaN, 132, 800)).toBe(0);
   });
 });

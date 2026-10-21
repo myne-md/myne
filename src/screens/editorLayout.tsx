@@ -58,31 +58,39 @@ export interface EditorLayoutController extends EditorLayoutState {
 }
 
 /**
- * Whether entering the agent tab should close the left sidebar (myne-md/myne#913).
+ * Which sidebars to close for the agent tab (myne-md/myne#913).
  *
- * Pure so the four cases can be asserted without mounting the Editor, which is
- * the largest component in the tree. The cases are the whole rule:
+ * Pure so the cases can be asserted without mounting the Editor, the largest
+ * component in the tree. **Both sides, not just the left**: the report was about
+ * the RIGHT one, which is the AI chat's home, and an agent pane beside an AI chat
+ * is the same surface twice with different transcripts. The left goes with it
+ * because the agent has its own conversation rail, so two rails were asking the
+ * user to pick something twice.
  *
- *  - the agent tab is showing and the workspace is a SINGLE pane: close it. The
- *    agent has its own conversation rail, and two rails side by side ask the
- *    user to pick something twice.
- *  - a SPLIT workspace: leave it. There the note tree is the other pane's
- *    context, and closing it hides the selection being worked from.
+ * The cases are the whole rule:
+ *
+ *  - the agent tab is showing and the workspace is a SINGLE pane: close whatever
+ *    is open. A SPLIT workspace is left alone: there the note tree and the
+ *    backlinks pane are the other pane's context, and closing them hides the
+ *    selection being worked from.
  *  - the layout has not hydrated: do nothing. The persisted read REPLACES the
  *    state, so a collapse written before it lands is undone silently.
- *  - already collapsed, or already handled for this entry: do nothing, which is
- *    what lets the user reopen the sidebar without being fought.
+ *  - `handledForEntry` already true: do nothing, which is what lets the user
+ *    reopen either side without being fought for the rest of the visit.
  */
-export function shouldCollapseForAgentTab(input: {
+export function agentTabCollapse(input: {
   agentTabFocused: boolean;
   paneCount: number;
   hydrated: boolean;
   leftCollapsed: boolean;
+  rightCollapsed: boolean;
   handledForEntry: boolean;
-}): boolean {
-  if (!input.agentTabFocused || input.paneCount !== 1) return false;
-  if (!input.hydrated) return false;
-  return !input.leftCollapsed && !input.handledForEntry;
+}): { left: boolean; right: boolean } {
+  const none = { left: false, right: false };
+  if (!input.agentTabFocused || input.paneCount !== 1) return none;
+  if (!input.hydrated) return none;
+  if (input.handledForEntry) return none;
+  return { left: !input.leftCollapsed, right: !input.rightCollapsed };
 }
 
 /** Debounce window for persisting layout changes to `vault.prefs`. Long
