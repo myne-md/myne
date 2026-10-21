@@ -378,6 +378,23 @@ export function ChatComposer({
   // session-scoped and has to be dropped by the same lock teardown that drops
   // the run, which a component's own state cannot be.
   const agent = useAgent();
+  /**
+   * **A sent attachment leaves the composer** (myne-md/myne#913, on the report
+   * that the chip stayed under the input after sending).
+   *
+   * Keyed on the run OPENING, not on `startAgentRun` resolving: that promise
+   * settles when the loop STOPS, so the chips outlived the send by the whole run
+   * and read as "still waiting to be sent". `agent.running` flips as soon as the
+   * host reports the run, which is the moment the message became the transcript's.
+   *
+   * A start that fails before opening a run never matches, so the chips stay and
+   * the user can press Send again without re-picking.
+   */
+  useEffect(() => {
+    if (!agent.running) return;
+    setAttachedDocs([]);
+    setAttachmentError(null);
+  }, [agent.running]);
   const [message, setMessage] = useState("");
   const [attached, setAttached] = useState<string | null>(null);
   const [preview, setPreview] = useState<GrantPreview | "failed" | null>(null);
@@ -781,9 +798,10 @@ export function ChatComposer({
         // every run that attaches nothing.
         attachments,
       );
-      // Only after the run actually started: a start that threw keeps the chips
-      // so the user can press Send again without re-picking.
-      setAttachedDocs([]);
+      // The chips are cleared by the `agent.running` effect above, which fires
+      // when the run OPENS rather than when it ends: `startAgentRun` resolves
+      // only after the loop stops, and a chip that hung around for the whole run
+      // said "this is still waiting to be sent" about a message already sent.
     } finally {
       setBusy(false);
     }
