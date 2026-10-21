@@ -23,6 +23,7 @@ import {
   TITLE_BAR_RIGHT_EDGE,
 } from "../../screens/titlebar";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -32,7 +33,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
@@ -92,6 +92,55 @@ const stripStyle: CSSProperties = {
   borderBottom: "1px solid var(--line-1)",
   position: "relative",
 };
+
+/**
+ * Whether a horizontally scrolling row has content off either edge.
+ *
+ * **A local hook rather than `useScrollEdges`** (myne-md/myne#913): that one is
+ * vertical by contract (`top`/`bottom`, and a mask whose gradient runs down the
+ * block axis), and the strip needs the inline axis. Generalising it would touch
+ * five adopters whose measurement is not the same question. The measurement
+ * here is three integers read on scroll, the same shape the vertical one uses.
+ */
+function useStripOverflow<T extends HTMLElement>(): {
+  ref: (node: T | null) => void;
+  left: boolean;
+  right: boolean;
+} {
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const nodeRef = useRef<T | null>(null);
+  const measure = useCallback(() => {
+    const el = nodeRef.current;
+    if (el === null) return;
+    const next = {
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    };
+    setEdges((prev) =>
+      prev.left === next.left && prev.right === next.right ? prev : next,
+    );
+  }, []);
+  const ref = useCallback(
+    (node: T | null) => {
+      nodeRef.current = node;
+      if (node === null) return;
+      node.addEventListener("scroll", measure, { passive: true });
+      // Feature-detected, the `useScrollEdges` discipline: jsdom has no
+      // `ResizeObserver`, and an unguarded construction there takes the screen
+      // down during render. The fade is a nicety; the strip is not.
+      const ro =
+        typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+      ro?.observe(node);
+      measure();
+      return () => {
+        node.removeEventListener("scroll", measure);
+        ro?.disconnect();
+      };
+    },
+    [measure],
+  );
+  return { ref, ...edges };
+}
 
 const scrollAreaStyle: CSSProperties = {
   display: "flex",
@@ -228,6 +277,13 @@ export function TabStrip({
   // its result. `dropLeft` is the seam, measured against the strip so it can be
   // drawn absolutely; `null` means "not dragging over this strip".
   const stripRef = useRef<HTMLDivElement | null>(null);
+  // **The row scrolls, and says so** (myne-md/myne#913). The tabs used to shrink
+  // until the titles were unreadable and then scroll with no signal that anything
+  // was off-screen; the mask fades whichever edge still has content beyond it,
+  // and nothing when the row fits. That is the browser convention, and the reason
+  // it is a convention is that it is the only affordance a scrollbar-less row
+  // has.
+  const stripOverflow = useStripOverflow<HTMLDivElement>();
   const [dropLeft, setDropLeft] = useState<number | null>(null);
   // Pre-drag rects for the FLIP pass. Captured on dragstart because by the time
   // the drop lands, the old layout is gone.
@@ -414,8 +470,21 @@ export function TabStrip({
         // (myne#728).
         role="tablist"
         aria-label={t("notes.tabStrip.openNotes")}
-        ref={roving.containerRef as RefObject<HTMLDivElement>}
+        ref={(node) => {
+          // Two refs on one node: the roving-focus hook owns the tablist, and
+          // the overflow measurement needs the same element.
+          (roving.containerRef as { current: HTMLDivElement | null }).current = node;
+          stripOverflow.ref(node);
+        }}
         onKeyDown={roving.onKeyDown}
+        // The fade is a MASK, not a gradient overlay, for the reason
+        // `useScrollEdges` gives: an overlay has to be painted in the strip's own
+        // colour, which is wrong the moment a theme changes it and wrong over a
+        // hovered tab. The gradient lives in `src/styles/tokens.css` with the
+        // vertical one, so its stops stay unreachable to a theme.
+        className="myne-tabstrip-fade"
+        data-fade-left={stripOverflow.left ? "true" : "false"}
+        data-fade-right={stripOverflow.right ? "true" : "false"}
         style={
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
@@ -758,8 +827,17 @@ function Tab({
     height: "100%",
     padding: "0 6px 0 10px",
     maxWidth: TITLE_MAX + 56,
-    minWidth: 0,
-    flexShrink: stacked ? 0 : 1,
+    // **The active tab shows its name** (myne-md/myne#913, on the report that a
+    // narrow pane left the active tab reading "Ag"). A tab strip whose only
+    // legible tab is the one you are not on has the hierarchy backwards: the
+    // active tab is the one that has to be identifiable at a glance, so it takes
+    // its content width and pushes the others to shrink and the row to scroll.
+    // `max-content` rather than a measured width, because the browser already
+    // knows the label's width and a measurement here would have to be redone on
+    // every rename. The cap below still truncates a genuinely long title, which
+    // is what the reveal marquee is for.
+    minWidth: active ? "max-content" : 56,
+    flexShrink: active || stacked ? 0 : 1,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     // In a stacked deck every card carries a full hairline (the cards overlap,

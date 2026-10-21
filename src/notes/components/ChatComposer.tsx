@@ -95,6 +95,16 @@ export interface ChatComposerProps {
   /** The open note: the default scope when no folder is attached. */
   openNoteId: string | null;
   /**
+   * The open note's display name, when the caller knows it (myne-md/myne#913).
+   *
+   * The run's own `Working on:` line said "This note", which is a pointer and not
+   * a name: in a pane running two notes side by side it did not say WHICH note the
+   * run was about, and in a transcript read back later it says nothing at all.
+   * Optional rather than required because a caller with no note set (a test, the
+   * isolated surface) has no name to give and must still render.
+   */
+  openNoteTitle?: string | null;
+  /**
    * The note this SESSION is anchored to, when the session was opened from one
    * (myne-md/myne#848, on the user's ask).
    *
@@ -353,6 +363,7 @@ export const VAULT_SCOPE_SENTINEL = "\u0000vault";
 export function ChatComposer({
   surface,
   openNoteId,
+  openNoteTitle = null,
   anchoredNoteId = null,
   folders,
   onNotesWritten,
@@ -511,7 +522,10 @@ export function ChatComposer({
       : attached !== null
         ? attached
         : openNoteId !== null && openNoteId !== ""
-          ? t("agent.composer.scopeOpenNote")
+          ? // The name when the caller has it; the pointer only as a fallback.
+            (openNoteTitle !== null && openNoteTitle !== ""
+              ? openNoteTitle
+              : t("agent.composer.scopeOpenNote"))
           : t("agent.composer.scopeAllVault");
 
   // The count comes from the HOST, resolved by the same code the commit runs.

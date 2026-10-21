@@ -1249,3 +1249,24 @@ describe("ChatComposer: pasted files", () => {
     expect(attachmentImport).not.toHaveBeenCalled();
   });
 });
+
+describe("ChatComposer: the scope names the note", () => {
+  it("shows the note's name rather than the pointer", () => {
+    // myne-md/myne#913: `Working on: This note` is a pointer, not a name. In a
+    // pane running two notes side by side it does not say WHICH note the run is
+    // about, and in a transcript read back later it says nothing at all.
+    mount({ openNoteId: "n1", openNoteTitle: "Software Testing HW" });
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
+      "Software Testing HW",
+    );
+  });
+
+  it("falls back to the generic label when the caller has no name", () => {
+    // A caller with no note set still has to render, so the fallback is not
+    // dead code: it is the arm a test or an isolated surface takes.
+    mount({ openNoteId: "n1", openNoteTitle: null });
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
+      "agent.composer.scopeOpenNote",
+    );
+  });
+});
