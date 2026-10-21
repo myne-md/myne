@@ -313,6 +313,14 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "{\"action\":\"set_setting\",\"intent_id\":\"...\",\"value\":\"...\"}\n",
         "{\"action\":\"clear_setting\",\"intent_id\":\"...\"}\n",
         "{\"action\":\"propose_note\",\"title\":\"...\",\"body\":\"...\"}\n",
+        // **Omitting `folder` means the user's default new-note location**, not
+        // the vault root (myne-md/myne#913). A run told the user its note would
+        // land in Inbox, omitted the field, and watched it appear at the root;
+        // the host now resolves the absence to the configured default, and the
+        // model has to know so it stops claiming a destination it did not name.
+        "A proposed note without `folder` lands wherever the user's new notes go ",
+        "(their default location), and one with `folder` uses that path, which ",
+        "must be a folder the vault already has. Say which one you used.\n",
         "{\"action\":\"remember\",\"entry_id\":\"...\",\"text\":\"...\"}\n",
         "{\"action\":\"request_scope\",\"folder\":\"...\",\"reason\":\"...\"}\n",
         "{\"action\":\"finish\",\"summary\":\"...\"}\n\n",
