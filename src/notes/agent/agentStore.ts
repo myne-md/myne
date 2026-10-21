@@ -94,6 +94,18 @@ export interface AgentState {
   rejected: ReadonlySet<number>;
   /** Indices into `proposal.newNotes` the user has rejected. Same convention. */
   rejectedNewNotes: ReadonlySet<number>;
+  /**
+   * Indices into `proposal.newNotes` whose create LANDED (myne-md/myne#913).
+   *
+   * The per-row answer this store was missing: the type's own comment on
+   * `applyWasCleanAndComplete` called it "the honest per-row fix", because
+   * without it the only question available was the approved COUNT versus
+   * `notesCreated.length`, and counts stay equal while membership diverges. The
+   * reported defect was the visible half of that: after a successful apply the
+   * card still offered "Approve 1 change" beside "2 changes applied", and
+   * pressing it re-sent an index the host had already consumed.
+   */
+  appliedNewNotes: ReadonlySet<number>;
   /** Indices into `proposal.settings` the user has rejected
    *  (myne-md/myne#850). Same convention as the two above, and it is the reason
    *  a settings-only run can be reviewed at all: without it the dialog has no
@@ -223,6 +235,7 @@ const INITIAL: AgentState = {
   memoryUpdated: 0,
   rejected: new Set(),
   rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
   rejectedSettings: new Set(),
   appliedEdits: new Set(),
   appliedSettings: new Set(),
@@ -336,6 +349,7 @@ export function beginRun(conversationId: string | null): void {
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
     rejectedSettings: new Set(),
     appliedEdits: new Set(),
     appliedSettings: new Set(),
@@ -612,12 +626,13 @@ export function reviewableRun(s: AgentState = state): { runId: string } | null {
   return { runId: s.view.runId };
 }
 
-/** The indices of new notes the user has NOT rejected. This is what the apply
- *  sends; a note that is not in it is not created. */
+/** The indices of new notes the user has NOT rejected and that have not already
+ *  been created. This is what the apply sends; a note that is not in it is not
+ *  created. */
 export function approvedNewNoteIndices(s: AgentState = state): number[] {
   return s.proposal.newNotes
     .map((_, i) => i)
-    .filter((i) => !s.rejectedNewNotes.has(i));
+    .filter((i) => !s.rejectedNewNotes.has(i) && !s.appliedNewNotes.has(i));
 }
 
 /** Reject every edit in a set of indices. */
@@ -835,6 +850,16 @@ export function settleApply(
   appliedIndices: number[],
   epoch: number,
   appliedSettingIndices: number[] = [],
+  /**
+   * The new-note indices the caller SENT (myne-md/myne#913). A landed create is
+   * RESOLVED, not pending: excluding it is what stops the card offering an
+   * approval for a note the host has already written.
+   *
+   * A default rather than a required argument because the automatic-apply path
+   * never creates one (`autoApplyRun` sends no new notes), and a required
+   * parameter there would be a second copy of that fact to keep true.
+   */
+  appliedNewNoteIndices: number[] = [],
 ): boolean {
   // **The same guard `setUndoable` takes, and for the same data.**
   // `AgentApplyResult` carries `notesWritten`, `notesCreated` and
@@ -876,7 +901,10 @@ export function settleApply(
   for (const i of appliedIndices) nextApplied.add(i);
   const nextAppliedSettings = new Set(state.appliedSettings);
   for (const i of appliedSettingIndices) nextAppliedSettings.add(i);
+  const nextAppliedNewNotes = new Set(state.appliedNewNotes);
+  for (const i of appliedNewNoteIndices) nextAppliedNewNotes.add(i);
   set({
+    appliedNewNotes: nextAppliedNewNotes,
     applied: merged,
     appliedEdits: nextApplied,
     appliedSettings: nextAppliedSettings,
@@ -992,6 +1020,7 @@ export function clearAgent(): void {
     unreadConversations: state.unreadConversations,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
     rejectedSettings: new Set(),
     appliedEdits: new Set(),
     appliedSettings: new Set(),

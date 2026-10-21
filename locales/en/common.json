@@ -180,6 +180,7 @@
       },
       "largeDeletion": "Removes a lot of text",
       "rejectEdit": "Reject",
+      "createdBadge": "Created",
       "restoreEdit": "Keep",
       "applyRemoval": "Apply on its own",
       "rejectAll": "Reject all",
