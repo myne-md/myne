@@ -30,6 +30,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -42,6 +43,7 @@ import {
   useAiBackendClass,
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
+import { useAgent } from "../agent/agentStore";
 import { useChat } from "../ai/chatStore";
 import { buildMentionTargets } from "../ai/noteMentions";
 import { useResolverNotes } from "../resolverNotes";
@@ -182,6 +184,55 @@ export function AiChatTab({
   const ready = aiEnabled && !degraded;
 
   const chat = useChat();
+  const agent = useAgent();
+  /**
+   * **A conversation belongs to the note it was started on** (myne-md/myne#913).
+   *
+   * The panel held ONE transcript whatever the editor had open, so moving to
+   * the next note left the previous note's conversation sitting beside it: the
+   * turns named a note the user was no longer looking at, and the next message
+   * was a continuation of a thread about something else. Switching notes now
+   * starts a fresh conversation, which is what makes the panel feel attached to
+   * the note rather than to the app.
+   *
+   * The escape hatch is `keepConversation`: an EXPLICIT pin, because the case it
+   * serves (driving one conversation across two notes in a split pane) is a
+   * deliberate act, and a default that kept the conversation is the behaviour
+   * this change removes.
+   *
+   * Session state, not a preference: it is about this working session, and a
+   * user who pinned a conversation yesterday did not ask for yesterday's
+   * conversation to survive a restart.
+   */
+  const [keepConversation, setKeepConversation] = useState(false);
+  /**
+   * The note the panel last saw, and the transcript's size, both read through
+   * refs so the effect that compares notes does not re-run when the transcript
+   * grows (each streamed turn would otherwise look like a note switch).
+   */
+  const lastNoteRef = useRef<string | null>(openNoteId);
+  const turnsRef = useRef(0);
+  turnsRef.current = chat.turns.length;
+  const runningRef = useRef(false);
+  runningRef.current = agent.running;
+  useEffect(() => {
+    const previous = lastNoteRef.current;
+    if (previous === openNoteId) return;
+    lastNoteRef.current = openNoteId;
+    // Only a move BETWEEN two notes is a switch. Opening a note where there was
+    // none (or closing the last one) has no previous conversation to leave, and
+    // treating it as a switch would start a new conversation on the first
+    // mount of every session.
+    if (previous === null || previous === "" || openNoteId === null || openNoteId === "") {
+      return;
+    }
+    if (keepConversation) return;
+    // Nothing to abandon yet, and a run in flight belongs to the note the user
+    // started it on: cancelling it here would throw away work they asked for.
+    // The next switch starts fresh, which is the same rule applied later.
+    if (turnsRef.current === 0 || runningRef.current) return;
+    startNewConversation();
+  }, [keepConversation, openNoteId]);
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
   // only while open so every opening re-fetches the roster.
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -325,6 +376,39 @@ export function AiChatTab({
               // load-bearing. Two copies is how one of them loses the cancel.
               onClick={startNewConversation}
             />
+          ) : null}
+          {/* **Keep this conversation** (myne-md/myne#913). A pin rather than
+              a menu entry: it is a state the panel is IN, and the state has to
+              be visible after the press, because the whole point is that the
+              next note switch will not throw the transcript away. `active` is
+              what carries that, into `aria-pressed` and into the glyph's
+              painted state, so it is not a colour a sighted user alone can see.
+              Shown only beside a conversation: pinning an empty one would say
+              the panel had something to keep. */}
+          {chat.turns.length > 0 ? (
+            <>
+              <IconButton
+                icon="pin"
+                label={
+                  keepConversation
+                    ? t("agent.composer.keepConversationPinned")
+                    : t("agent.composer.keepConversation")
+                }
+                tooltip
+                active={keepConversation}
+                testId="ai.keep-conversation"
+                onClick={() => setKeepConversation((keep) => !keep)}
+              />
+              {keepConversation ? (
+                <span
+                  data-testid="ai.keep-conversation-mark"
+                  className="myne-pill"
+                  style={{ fontSize: "var(--text-xs)" }}
+                >
+                  {t("agent.composer.keepConversationPinned")}
+                </span>
+              ) : null}
+            </>
           ) : null}
           {/* The fallback revert offer (myne-md/myne#741). Shown only when the
               host holds an undoable record that no turn in the open transcript
