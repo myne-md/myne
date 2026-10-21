@@ -246,7 +246,7 @@ import { useBackupScheduler } from "../hooks/useBackupScheduler";
 import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
-import { useEditorLayout } from "./editorLayout";
+import { shouldCollapseForAgentTab, useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
 import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
@@ -1233,15 +1233,40 @@ function EditorChrome({
   // A restored session that opens ON the agent tab does not collapse anything:
   // the ref starts at the current value, so there is no entry to react to.
   const agentTabFocused = ws.focusedLeaf.activeTab?.kind === "agent";
-  const wasAgentTabFocused = useRef(agentTabFocused);
+  // **Once per ENTRY, not once per transition** (myne-md/myne#913, second
+  // report). The transition-only version missed the case that matters most: a
+  // session restored ON the agent tab never transitions into it, so the sidebar
+  // stayed open for as long as the tab did. `collapsedForEntry` is reset by
+  // leaving the tab, which is what keeps a manual reopen working: the user can
+  // open the sidebar again while the tab is active and this will not fight them.
+  //
+  // **And it waits for the layout to hydrate.** The persisted layout REPLACES
+  // the state when its read lands, so a collapse written before it came back
+  // was undone silently: visible as "it collapses and then opens again", or, on
+  // a restored session, as never closing at all.
+  const collapsedForEntry = useRef(false);
   useEffect(() => {
-    const wasFocused = wasAgentTabFocused.current;
-    wasAgentTabFocused.current = agentTabFocused;
-    if (!agentTabFocused || wasFocused) return;
-    if (ws.leaves.length !== 1) return;
-    if (layout.leftCollapsed) return;
+    const collapse = shouldCollapseForAgentTab({
+      agentTabFocused,
+      paneCount: ws.leaves.length,
+      hydrated: layout.hydrated,
+      leftCollapsed: layout.leftCollapsed,
+      handledForEntry: collapsedForEntry.current,
+    });
+    // Leaving the tab (or splitting the pane) starts a new entry, so coming
+    // back collapses again. A split is not an entry: the note tree is in use.
+    if (!agentTabFocused || ws.leaves.length !== 1) {
+      collapsedForEntry.current = false;
+      return;
+    }
+    if (layout.leftCollapsed) {
+      collapsedForEntry.current = true;
+      return;
+    }
+    if (!collapse) return;
+    collapsedForEntry.current = true;
     layout.toggleLeftCollapsed();
-  }, [agentTabFocused, ws.leaves.length, layout]);
+  }, [agentTabFocused, ws.leaves.length, layout.hydrated, layout.leftCollapsed, layout]);
   // macOS floats the traffic lights over the top-left, so windowed builds inset
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
