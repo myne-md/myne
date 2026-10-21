@@ -21,6 +21,7 @@ import { ModalShell } from "../../components/primitives/ModalShell";
 import { Button } from "../../components/primitives/Button";
 import { Spinner } from "../../components/Spinner";
 import { catalogList, type CatalogEntry } from "../../lib/attachments";
+import { AttachmentThumbnail } from "../../components/attachments/AttachmentThumbnail";
 import { CAPTION_STYLE } from "./sharedStyles";
 
 /** The most documents one run may carry. Mirrors `MAX_DOCUMENTS` in
@@ -159,18 +160,42 @@ export function AttachmentPickerDialog({
                   opacity: !on && atCap ? 0.5 : 1,
                 }}
               >
+                {/* **A thumbnail, because a name is not an identity**
+                    (myne-md/myne#913). The library routinely holds seven files
+                    called `image.webp`, and a list of names asks the user to
+                    guess which is which. The primitive is the library's own, so
+                    a PDF shows its first page and audio its play tile rather
+                    than a second, different notion of "preview". */}
+                <span style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "var(--radius-1)", overflow: "hidden" }}>
+                  <AttachmentThumbnail
+                    id={row.id}
+                    contentType={row.content_type}
+                    filename={row.filename}
+                    size={40}
+                  />
+                </span>
                 <span
                   style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
                     overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
                     minWidth: 0,
+                    flex: 1,
                   }}
                 >
-                  {row.filename}
-                </span>
-                <span style={{ ...CAPTION_STYLE, flexShrink: 0 }}>
-                  {Math.max(1, Math.round(row.size / 1024))} KB
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.filename}
+                  </span>
+                  <span style={{ ...CAPTION_STYLE, color: "var(--fg-3)" }}>
+                    {Math.max(1, Math.round(row.size / 1024))} KB
+                  </span>
                 </span>
               </Button>
             );
@@ -204,7 +229,12 @@ export function AttachmentPickerDialog({
             onClose();
           }}
         >
-          {t("agent.attachments.confirm", { count: picked.size })}
+          {/* "Attach 0 files" on an empty selection read as a broken control
+              (myne-md/myne#913). With nothing picked the button is disabled and
+              says what the dialog does, not how many of nothing. */}
+          {picked.size === 0
+            ? t("agent.attachments.attach")
+            : t("agent.attachments.confirm", { count: picked.size })}
         </Button>
       </div>
     </ModalShell>

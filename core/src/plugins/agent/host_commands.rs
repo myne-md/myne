@@ -1441,8 +1441,24 @@ async fn apply_from_host_inner<R: Runtime>(
         state: vault,
         hooks: hooks.clone(),
     };
+    // **The folders this vault actually has** (myne-md/myne#913). Read here, at
+    // the write, for the same reason the exclusions are: the set can move while
+    // a proposal sits on the review screen (a folder emptied, a note added to
+    // one), and the answer that decides is the newest. A failure to read the
+    // prefs leaves the index's folders, which is still a real set: refusing a
+    // move is recoverable, creating a phantom folder is what this exists to stop.
+    let deliberate = prefs_read_from_host(&TauriHost::new(app.clone()), vault, &StdVaultIo)
+        .await
+        .map(|prefs| prefs.deliberate_folders)
+        .unwrap_or_default();
+    let records = indices.snapshot();
+    let known = super::scope::known_folders(
+        records.values().map(|record| record.folder.as_deref()),
+        &deliberate,
+    );
     let mut outcome = apply_approved(
-        runs, &run_id, &approved, &new_notes, &excluded, approval, &reader, &restore, &writer,
+        runs, &run_id, &approved, &new_notes, &excluded, &known, approval, &reader, &restore,
+        &writer,
     )
     .await?;
     // Edits the host never recorded the model proposing are REPORTED rather than
