@@ -727,9 +727,18 @@ export function ChatComposer({
           );
           return;
         }
-        attachments = read.map((entry) => ({
+        attachments = read.map((entry, i) => ({
           name: entry.name,
           text: entry.extracted!.text,
+          // The transcript's chip needs the id and the MIME hint; `read` was
+          // built from `attachedDocs` in order, so the index pairs them
+          // (myne-md/myne#913).
+          ...(attachedDocs[i] === undefined
+            ? {}
+            : {
+                id: attachedDocs[i]!.id,
+                contentType: attachedDocs[i]!.content_type,
+              }),
         }));
       } catch {
         setAttachmentError(t("agent.attachments.failed"));

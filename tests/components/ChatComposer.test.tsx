@@ -1186,14 +1186,31 @@ describe("ChatComposer: attached documents", () => {
     // settings, attachments, ...). Asserting the POSITION is deliberate: a
     // shift here is what would silently send documents as the settings list.
     const call = agentStart.mock.calls[0]!;
+    // `id` and `contentType` ride along here because this layer keeps them for
+    // the transcript's chip; the IPC boundary strips them (asserted in
+    // `tests/lib/agentRunAttachments.test.ts`). What matters at this position is
+    // that the TEXT is what arrives.
     expect(call[5]).toEqual([
-      { name: "lecture.pdf", text: "the lecture, in words" },
+      expect.objectContaining({
+        name: "lecture.pdf",
+        text: "the lecture, in words",
+      }),
     ]);
     // And the task stays the user's words: the document is not spliced into it.
     expect(call[0]).toBe("summarise the lecture");
     expect(call[0]).not.toContain("the lecture, in words");
     // The chips are gone once the run has started.
     await waitFor(() => expect(screen.queryByTestId("ai.composer-attachment")).toBeNull());
+    // And the message KEEPS the file it sent (myne-md/myne#913): the chip moving
+    // from the composer to the turn is the point, not the chip disappearing.
+    const sent = getChat().turns.find((t) => t.role === "user");
+    expect(sent?.attachments).toEqual([
+      {
+        id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+        name: "lecture.pdf",
+        contentType: "application/pdf",
+      },
+    ]);
   });
 
   it("keeps the message in the box when the file has no readable text", async () => {

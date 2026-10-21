@@ -71,6 +71,13 @@ export interface RunAttachment {
   name: string;
   /** The extracted text, already read from the vault by the caller. */
   text: string;
+  /** The attachment id, for the TRANSCRIPT's chip (myne-md/myne#913). Not sent
+   *  to the host: it is stripped before the IPC call, because the host receives
+   *  text and a name and has no use for an id it did not ask for. Optional so a
+   *  caller that only has text (a test, a future non-vault source) still fits. */
+  id?: string;
+  /** MIME hint for the chip's thumbnail kind. Stripped with `id`. */
+  contentType?: string;
 }
 
 /** Bind the agent commands to one client's seam. */
@@ -153,7 +160,11 @@ export function makeAgentRun({ invoke, Channel }: AgentHost) {
       language,
       history,
       settings,
-      attachments,
+      // The host gets the CONTRACT, not the UI's own metadata: `id` and
+      // `contentType` exist so the transcript can draw the file the message
+      // carried, and a payload that grew a field the Rust side ignores is a
+      // contract nobody can read.
+      attachments: attachments.map(({ name, text }) => ({ name, text })),
       onOpen: channel,
       onProgress: progress,
     });
