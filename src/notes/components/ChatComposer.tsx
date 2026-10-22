@@ -852,6 +852,13 @@ export function ChatComposer({
     setPasting(batch.map((file, i) => `${i}:${file.name || t("agent.attachments.pastedFile")}`));
     // Declared OUTSIDE the `try` so the catch can erase what already landed.
     const imported: CatalogEntry[] = [];
+    // **Only what this batch CREATED, by id** (review round four, data loss). A
+    // dedup hit returns an attachment that already existed, and the documented
+    // case is a file the user curated in the library and then pasted into a
+    // conversation: erasing it on a later file's failure would delete the user's
+    // library file, blob and catalog row, with no confirmation and nothing naming
+    // it. `deduplicated` is the host's answer and the only safe source for it.
+    const createdIds: string[] = [];
     try {
       for (const file of batch) {
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -863,6 +870,7 @@ export function ChatComposer({
           },
           "chat",
         );
+        if (!att.deduplicated) createdIds.push(att.id);
         imported.push({
           id: att.id,
           content_type: att.content_type,
@@ -881,8 +889,8 @@ export function ChatComposer({
       // They are crypto-erased here rather than left for a cleanup sweep the user
       // has no reason to run. Best effort: a failed delete leaves an
       // unreferenced row, which the unused-attachment sweep now offers.
-      for (const doc of imported) {
-        void attachmentDelete(doc.id).catch(() => {});
+      for (const id of createdIds) {
+        void attachmentDelete(id).catch(() => {});
       }
       setAttachmentError(t("agent.attachments.pasteFailed"));
     } finally {

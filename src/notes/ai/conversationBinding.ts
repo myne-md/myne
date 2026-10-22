@@ -36,7 +36,7 @@ export function setKeepConversationPinned(next: boolean): void {
  *
  *  **Held here for the same reason as the pin** (myne-md/myne#913, review round
  *  three): the panel unmounts on a tab switch, and a component-local ref meant a
- *  remount at note B adopted B as the conversation's note — so a conversation
+ *  remount at note B adopted B as the conversation's note, so a conversation
  *  started on A continued under B, which is the defect the binding exists to
  *  remove. Module state survives the unmount; the lock drops it. */
 export function conversationNoteId(): string | null {

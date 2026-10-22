@@ -2592,7 +2592,7 @@ mod tests {
     /// stated for a value this version does not know, and only a string can name
     /// a scope; the first implementation used `parse_string()?`, so a future
     /// `"scope":2` would have failed the parse and `read_or_empty` would have
-    /// collapsed the WHOLE catalog to `{}` — every attachment gone from every
+    /// collapsed the WHOLE catalog to `{}`: every attachment gone from every
     /// listing over one word a later version invented.
     #[test]
     fn a_non_string_scope_decodes_as_the_library() {

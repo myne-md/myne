@@ -82,7 +82,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DeviceManagementPanel": { file: "src/components/sync/DeviceManagementPanel.tsx", line: 266 },
   "DeviceRevoked": { file: "src/screens/DeviceRevoked.tsx", line: 67 },
   "DiffView": { file: "src/notes/components/DiffView.tsx", line: 91 },
-  "Editor": { file: "src/screens/Editor.tsx", line: 525 },
+  "Editor": { file: "src/screens/Editor.tsx", line: 526 },
   "EditorPanel": { file: "src/components/settings/EditorPanel.tsx", line: 686 },
   "EmptyState": { file: "src/components/primitives/EmptyState.tsx", line: 49 },
   "EncryptingStep": { file: "src/screens/vault-creation/EncryptingStep.tsx", line: 21 },
