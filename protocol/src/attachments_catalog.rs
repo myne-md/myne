@@ -131,13 +131,20 @@ pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 /// the safe direction: the file is still theirs, still encrypted, and still
 /// deletable, and a reader that cannot see the marker is a reader that never
 /// created one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum AttachmentScope {
     /// The vault's attachment library: listed, and embeddable from any note.
     #[default]
     Library,
     /// Owned by one chat conversation. Stored and synced like any other
     /// attachment; not listed in the library.
+    ///
+    /// `Ord` is load-bearing rather than incidental: the catalog merge breaks an
+    /// equal-`version` tie with a total order over retained fields, and a field
+    /// left out of that order turns arrival order into the tie-breaker. `Chat`
+    /// sorts ABOVE `Library` so two peers that disagree converge on the
+    /// conversation's claim rather than losing a file's placement to whichever
+    /// argument came first.
     Chat,
 }
 

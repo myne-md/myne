@@ -311,9 +311,19 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
  *  **Memory rides along and is named for the same reason.** Every agent run
  *  also carries what it remembers about you: distilled facts from earlier
  *  runs (at most 100 entries) and your voice preferences, each entry with a
- *  stable identifier (myne-md/myne#697). */
+ *  stable identifier (myne-md/myne#697).
+ *
+ *  **The attached document is the seventh payload and the one that is not
+ *  necessarily yours** (myne-md/myne#913). A message may carry up to four
+ *  attached files, and the run receives the text extracted from each, cut at
+ *  20,000 characters. A PDF someone sent you is a third party's words, which is
+ *  the same reason the meeting transcript earned a clause; and the bytes
+ *  themselves never leave, only the extracted text. Named here because
+ *  `threat-model.md` TB12/TB13 now carries it and this screen is the surface
+ *  that amendment is meant to reach: a consent screen that enumerates six of
+ *  seven payloads is not one. */
 export const CONSENT_WHAT_LEAVES =
-  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles, identifiers and folder paths of the notes it may read, before it has read any of them. That set is the whole working set, minus the folders you excluded from AI, unless you narrow it. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier. A meeting-notes run sends the transcript of the recording, which is other people's speech as well as your own.";
+  "The text of the notes involved in each request leaves your device: the note you are working in, and any note used to answer you. An agent run also sends the titles, identifiers and folder paths of the notes it may read, before it has read any of them. That set is the whole working set, minus the folders you excluded from AI, unless you narrow it. It also carries what it remembers about you: distilled facts from earlier runs (at most 100 entries) and your voice preferences, each entry with a stable identifier. A message that carries attached files sends the text Myne extracted from each one, up to four files of at most 20,000 characters each, and a file may be someone else's document rather than yours; the file itself never leaves, only that text. A meeting-notes run sends the transcript of the recording, which is other people's speech as well as your own.";
 
 /** WHEN it leaves. Bounded by the SYNC-14 bar: only work the user asks for.
  *

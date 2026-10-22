@@ -855,9 +855,11 @@ export function settleApply(
    * RESOLVED, not pending: excluding it is what stops the card offering an
    * approval for a note the host has already written.
    *
-   * A default rather than a required argument because the automatic-apply path
-   * never creates one (`autoApplyRun` sends no new notes), and a required
-   * parameter there would be a second copy of that fact to keep true.
+   * Required in practice at BOTH call sites. It carries a default because the
+   * signature predates the automatic path's creates, and the first version of
+   * this comment claimed that path "sends no new notes" while
+   * `autoApplyRun` sends `approvedNewNoteIndices(agent)` — a comment that made a
+   * forgotten call site look wired. Both sites pass it now.
    */
   appliedNewNoteIndices: number[] = [],
 ): boolean {

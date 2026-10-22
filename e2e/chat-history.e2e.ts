@@ -128,14 +128,20 @@ aiDescribe("ch1 AI chat history persists across lock, then deletes everywhere", 
           "the frozen proposal shows the anchor text it was settled with",
         ).toContain("alpha beta gamma delta");
         expect(await s.byTestIdAll("ai.insert-turn")).toHaveLength(0);
+        // The proposal is an INLINE region under its own turn now, not a modal
+        // with a close control (myne-md/myne#894, myne-md/myne#913): the body
+        // renders under the message that proposed the change and the diff icon
+        // that revealed it is what hides it again. Zero buttons is the
+        // read-only assertion, and it is stronger than the old
+        // "except the close button" count because there is no exception left.
         const buttonsInProposal = await s.execute<number>(
-          "return document.querySelectorAll('[data-testid=\"ai.proposal-diff-body\"] button:not([data-testid=\"ai.proposal-diff-close\"])').length;",
+          "return document.querySelectorAll('[data-testid=\"ai.proposal-diff-body\"] button').length;",
         );
         expect(
           buttonsInProposal,
-          "no write button inside the frozen proposal modal (read-only means read-only)",
+          "no write button inside the frozen proposal body (read-only means read-only)",
         ).toBe(0);
-        await (await s.byTestId("ai.proposal-diff-close")).click();
+        await (await s.byTestId("ai.turn-diff")).click();
         await s.waitForGone(testIdSelector("ai.proposal-diff-body"), { timeoutMs: 10_000 });
 
         // Delete with confirm: the row goes away and the list empties.

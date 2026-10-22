@@ -1281,7 +1281,11 @@ pub(crate) async fn attachment_unused_list_with_dir(
         .entries
         .into_iter()
         // A tombstone is already deleted — never offered for cleanup (MYND-468).
-        .filter(|(_, meta)| !meta.is_tombstone())
+        // **A chat-scoped row is never offered either** (myne-md/myne#913): its
+        // reference is a conversation turn, and this scan reads NOTES, so every
+        // pasted file would look unreferenced seven days later and the sweep
+        // would crypto-erase a file a transcript chip still names.
+        .filter(|(_, meta)| !meta.is_tombstone() && meta.scope == AttachmentScope::Library)
         .filter(|(id, _meta)| !referenced.contains(id))
         // SYNC-10 grace: withhold a freshly-added, never-referenced attachment
         // (e.g. a just-shared, not-yet-filed file) from the erase review for
@@ -1363,10 +1367,17 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
         match catalog.entries.get(id) {
             // Present, live, still zero-reference → erase. (Capture size
             // before the scrub so the summary can report bytes freed.)
-            Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
+            Some(meta)
+                if !meta.is_tombstone()
+                    && meta.scope == AttachmentScope::Library
+                    && !referenced.contains(id) =>
+            {
                 survivors.push((id.clone(), meta.size))
             }
-            // Absent / already tombstoned (gone) OR now referenced (TOCTOU) → skip.
+            // Absent / already tombstoned (gone) / now referenced (TOCTOU) /
+            // chat-scoped (myne-md/myne#913) → skip. The scope test is repeated
+            // HERE rather than trusted from the list because the ids arrive from
+            // the caller: the list is a review surface, not the guard.
             _ => skipped += 1,
         }
     }
@@ -4299,6 +4310,30 @@ mod tests {
         .id
     }
 
+    /// Import with an explicit scope: the `Chat` arm is the paste path, whose
+    /// row no note refers to (myne-md/myne#913).
+    async fn import_tagged_scoped(
+        tmp: &ScopedTempDir,
+        state: &VaultRuntimeState,
+        tag: u8,
+        scope: AttachmentScope,
+    ) -> String {
+        super::attachment_import_with_dir(
+            io(),
+            &host(),
+            tmp.path(),
+            state,
+            ImportSource::Bytes {
+                bytes: png_with_tag(tag),
+                filename: Some(format!("a{tag}.png")),
+            },
+            scope,
+        )
+        .await
+        .expect("import")
+        .id
+    }
+
     async fn create_note(notes_dir: &Path, state: &VaultRuntimeState, body: &str) -> String {
         std::fs::create_dir_all(notes_dir).unwrap();
         crate::plugins::notes::commands::note_create_with_dir(
@@ -4631,6 +4666,74 @@ mod tests {
             // Nothing erased — the corrupt note aborted the whole sweep.
             assert!(catalog_ids(&tmp, &state).await.contains(&a));
             assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    /// **A chat-scoped attachment is never offered for cleanup**
+    /// (myne-md/myne#913).
+    ///
+    /// Its only reference is a conversation turn, and the unused scan reads
+    /// NOTES, so without this filter every file pasted into a chat would look
+    /// unreferenced once the SYNC-10 grace window passed and the erase dialog
+    /// would offer to crypto-erase a file a transcript chip still names.
+    #[test]
+    fn unused_list_never_offers_a_chat_scoped_attachment() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 21, AttachmentScope::Chat).await;
+            let library = import_tagged(&tmp, &state, 22).await;
+
+            // Past the grace window, so the ONLY thing keeping the pasted row
+            // out of the list is the scope filter.
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + UNUSED_CLEANUP_GRACE_SECS
+                + 1;
+            let listed = attachment_unused_list_with_dir(tmp.path(), &state, now)
+                .await
+                .expect("list");
+            let ids: Vec<&str> = listed.iter().map(|entry| entry.id.as_str()).collect();
+
+            assert!(
+                ids.contains(&library.as_str()),
+                "control: an unreferenced LIBRARY row is still offered: {ids:?}"
+            );
+            assert!(
+                !ids.contains(&pasted.as_str()),
+                "a chat-scoped row must never be offered: {ids:?}"
+            );
+        });
+    }
+
+    /// And the sweep itself refuses one, because the list is a review surface
+    /// and the ids it returns come back as a caller-supplied argument.
+    #[test]
+    fn clean_unused_refuses_a_chat_scoped_id() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 23, AttachmentScope::Chat).await;
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![pasted.clone()])
+                .await
+                .expect("clean");
+
+            assert_eq!(result.deleted, 0, "a chat-scoped attachment is not erased");
+            assert_eq!(result.skipped, 1);
+            // The RAW catalog, not `catalog_list`: that command filters to the
+            // library, so it cannot see the row this test is about. Asserting
+            // through it would have passed with the row erased.
+            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
+            let catalog = read_catalog(
+                &tmp.path().join("vault.attachments"),
+                &catalog_key,
+                &[SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+            )
+            .await
+            .expect("catalog");
+            assert!(catalog.entries.contains_key(&pasted));
+            assert!(blob_exists(&tmp, &pasted));
         });
     }
 
