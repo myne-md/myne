@@ -183,9 +183,9 @@ Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; 
 
 *(Alias: `seed_memory`, "Teach Myne your vault"; the reviewed one-shot pass from a vault into [agent memory](#agent-memory).)*
 
-A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0719`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
+A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0720`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
 
-Used in: `decisions/ai/0719`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
+Used in: `decisions/ai/0720`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
 
 ### **agent-writability verdict** &nbsp; 🛠️ *Tooling*
 
@@ -653,7 +653,7 @@ One persisted AI chat history unit: an ordered, immutable list of settled [chat 
 
 **A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0719`
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0720`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 
