@@ -1228,6 +1228,16 @@ pub(crate) async fn vault_conversations_may_be_person_scoped(
     let Ok(bytes) = io.read(&vault_dir.join("vault.meta")).await else {
         return true;
     };
+    // **`NTV6` FIRST, and this is the half that was missing** (review round
+    // eight): the B2B frame is the one generation whose conversations are
+    // person-private, and its base prefix carries `membership: None` by
+    // construction (`serialize_vault_meta_ntv6` REJECTS a base with one), so
+    // asking `membership.is_some()` answered `false` on exactly the vaults this
+    // predicate exists for. A test seeded with an `NTV5` meta could never have
+    // caught it.
+    if bytes.get(0..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return true;
+    }
     match protocol::parse_vault_meta_any(&bytes) {
         Ok(meta) => meta.membership.is_some(),
         Err(_) => true,
@@ -2885,9 +2895,55 @@ mod tests {
         .expect("seed NTV5 vault.meta");
     }
 
-    /// The same vault, carrying a MEMBERSHIP: the shape of every B2B vault, where
-    /// conversations are person-scoped and a sweep can only prove one person's
-    /// references (review round seven).
+    /// **The predicate must answer TRUE for `NTV6`, and that is the half the
+    /// round-seven version got wrong** (review round eight): the B2B frame is the
+    /// one generation whose conversations are person-private, and its base prefix
+    /// carries `membership: None` BY CONSTRUCTION
+    /// (`serialize_vault_meta_ntv6` refuses a base with one), so a predicate that
+    /// only asked about membership answered `false` on exactly the vaults it
+    /// exists for. A fixture seeded with an `NTV5` meta could never have caught it.
+    #[test]
+    fn an_ntv6_vault_is_treated_as_person_scoped() {
+        let tmp = ScopedTempDir::new("attach-ntv6-scope").expect("scoped tempdir");
+        let base = protocol::VaultMeta {
+            account_number_hash: [SEED_ACCOUNT_HASH; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            // `NTV6` cannot carry one, which is the whole point.
+            membership: None,
+            person_binding: None,
+        };
+        let ntv6 = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base,
+            group_key_nonce: [0x0C; 24],
+            enc_group_key: [0x0D; 64],
+            group_key_epoch: 1,
+            signed_roster_envelope: vec![0x0E; 200],
+        })
+        .expect("serialize NTV6");
+        std::fs::write(tmp.path().join("vault.meta"), ntv6).unwrap();
+
+        assert!(
+            rt().block_on(vault_conversations_may_be_person_scoped(io(), tmp.path())),
+            "an NTV6 vault keeps conversations per person, so the sweep cannot prove completeness"
+        );
+
+        // Control: the same fixture without the B2B frame is not withheld, or the
+        // assertion above would pass for every vault.
+        seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
+        assert!(!rt().block_on(vault_conversations_may_be_person_scoped(io(), tmp.path())));
+    }
+
+    /// The same vault, carrying a MEMBERSHIP: the shape of a B2B vault whose base
+    /// carries the single-account field (review round seven).
     fn seed_vault_meta_with_membership(dir: &Path, seed: u8) {
         let meta = protocol::VaultMeta {
             account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
