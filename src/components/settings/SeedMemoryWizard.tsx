@@ -239,7 +239,9 @@ export function SeedMemoryWizard(props: {
     setStep("candidates");
     setGenerating(true);
     setProgress(null);
-    const jobId = crypto.randomUUID();
+    // A cancellation key, not a secret: uniqueness within this view is all it
+    // needs, and `crypto.randomUUID` is not available in every WebView build.
+    const jobId = `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     jobIdRef.current = jobId;
     try {
       const result = await seedMemoryGenerate(jobId, consent, setProgress);
