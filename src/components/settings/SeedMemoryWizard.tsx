@@ -46,6 +46,15 @@ const BLOCK: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
+  // The modal body is a bare flex child (`ModalShell` supplies chrome and no
+  // padding), so every ModalShell caller owns its inset. Horizontally this is
+  // the same `--space-5` the header's title uses, which is what makes the title
+  // and the body read as one column; the body scrolls rather than clipping when
+  // a candidate list is long.
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  padding: "var(--space-4) var(--space-5) var(--space-5)",
   fontSize: "var(--text-sm)",
   color: "var(--fg-1)",
 };
