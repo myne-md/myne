@@ -1203,6 +1203,37 @@ pub async fn attachment_unused_list<R: Runtime>(
     .await
 }
 
+/// Whether this vault's conversations may live in a store the running session
+/// cannot read (myne-md/myne#913, review round seven).
+///
+/// **A chat-scoped attachment's only reference is a conversation turn, and on a
+/// B2B vault the conversations are person-scoped**: a member's live in their
+/// private container, and an owner cannot read any member's. So the reference
+/// scan proves completeness for ONE person, while the catalog row and the blob
+/// it protects are shared (the catalog decodes under the group key both tiers
+/// derive). A sweep that treats a successful partial scan as authoritative would
+/// offer, and then crypto-erase, a file another person's conversation still
+/// names, with no confirmation that person ever sees.
+///
+/// Any `vault.meta` that carries a membership is therefore treated as
+/// possibly-shared, and every chat-scoped row is withheld from the sweep. The
+/// cost is stated rather than hidden: on a B2B vault a chat-scoped attachment is
+/// not offered for cleanup until the sweep can enumerate every participant's
+/// conversations. An unreadable or unparseable meta answers `true`, which is the
+/// same conservative side.
+pub(crate) async fn vault_conversations_may_be_person_scoped(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+) -> bool {
+    let Ok(bytes) = io.read(&vault_dir.join("vault.meta")).await else {
+        return true;
+    };
+    match protocol::parse_vault_meta_any(&bytes) {
+        Ok(meta) => meta.membership.is_some(),
+        Err(_) => true,
+    }
+}
+
 /// Testable core of [`attachment_unused_list`]. `now` is the current UNIX time
 /// (the wrapper passes [`now_unix_secs`]); entries added within
 /// [`UNUSED_CLEANUP_GRACE_SECS`] of it are withheld (SYNC-10). Pass
@@ -1246,6 +1277,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
     let chat_refs =
         crate::plugins::chats::commands::referenced_attachment_ids_with_dir(io, vault_dir, state)
             .await;
+    let chat_scope_is_provable = !vault_conversations_may_be_person_scoped(io, vault_dir).await;
 
     // Hold the slot guard across the whole compute (catalog read + note
     // scan) — the import/delete writer-guard pattern. Clone the material
@@ -1302,6 +1334,19 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // failure falls back to the conservative side (offer none).
     let mut referenced = referenced;
     match chat_refs {
+        // **A partial plane is not an answer** (review round seven): the scan
+        // read ONE person's conversations, and the rows it protects are shared.
+        // Treat every chat row as referenced rather than offering one whose
+        // author may still be reading it.
+        Ok(_) if !chat_scope_is_provable => {
+            referenced.extend(
+                catalog
+                    .entries
+                    .iter()
+                    .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
+                    .map(|(id, _)| id.clone()),
+            );
+        }
         Ok(chat_ids) => referenced.extend(chat_ids),
         Err(error) => {
             // Fail SAFE rather than open: an unreadable conversation proves
@@ -1581,6 +1626,29 @@ pub async fn attachment_clean_unused_with_dir(
     .await?;
     // The conversation half, read before the guard above.
     referenced.extend(chat_refs);
+    // **And a shared vault withholds every chat row** (review round seven): the
+    // scan proves completeness for ONE person, while the row and the blob are
+    // shared, so a row another person's conversation names would otherwise be
+    // erased on this person's confirmation. Withheld rather than refused, because
+    // the library half of the sweep is still correct and still useful.
+    if vault_conversations_may_be_person_scoped(io, vault_dir).await {
+        let catalog = read_catalog(
+            io,
+            &vault_dir.join("vault.attachments"),
+            &catalog_key,
+            &account_number_hash,
+            meta_version,
+        )
+        .await
+        .map_err(|_| AttachmentCleanUnusedError::CatalogUndecodable)?;
+        referenced.extend(
+            catalog
+                .entries
+                .into_iter()
+                .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
+                .map(|(id, _)| id),
+        );
+    }
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -2726,7 +2794,7 @@ pub async fn hydrate_attachment_refs_core(
 mod tests {
     use super::*;
     use crate::plugins::vault_unlock::state::{
-        fixture_unlocked_with_keys, test_vault_id, UnlockedVault, VaultRuntimeState,
+        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
     use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
@@ -2815,6 +2883,36 @@ mod tests {
             protocol::serialize_vault_meta_v0_2(&meta),
         )
         .expect("seed NTV5 vault.meta");
+    }
+
+    /// The same vault, carrying a MEMBERSHIP: the shape of every B2B vault, where
+    /// conversations are person-scoped and a sweep can only prove one person's
+    /// references (review round seven).
+    fn seed_vault_meta_with_membership(dir: &Path, seed: u8) {
+        let meta = protocol::VaultMeta {
+            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            membership: Some(protocol::Membership {
+                nonce: [0x0A; 24],
+                enc: [0x0B; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+                roster: None,
+            }),
+            person_binding: None,
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta_v0_2(&meta),
+        )
+        .expect("seed membership-bearing vault.meta");
     }
 
     async fn temp_vault_v0_2() -> (ScopedTempDir, VaultRuntimeState) {
@@ -4884,50 +4982,46 @@ mod tests {
         });
     }
 
-    /// **A member vault does not read the shared conversations** (myne-md/myne#913,
-    /// review round seven).
+    /// **On a shared vault, a chat row is withheld from the sweep**
+    /// (myne-md/myne#913, review rounds seven and eight).
     ///
-    /// A member's conversations live person-privately, and the scan read the
-    /// SHARED family: on a member vault that read does not fail, it answers "no
-    /// conversations", which the sweep reads as "nothing references these rows".
-    /// The first version therefore erased a referenced file on a member vault, and
-    /// no test could see it because every fixture was an owner.
+    /// A chat attachment's only reference is a conversation turn, and on a B2B
+    /// vault the conversations are person-scoped: a member's live in their private
+    /// container and an owner cannot read any member's. So a successful scan
+    /// proves ONE person's references while the catalog row and the blob are
+    /// shared, and treating it as authoritative would erase another person's file
+    /// on this person's confirmation. Any membership-bearing `vault.meta` therefore
+    /// withholds every chat row, and the blob survives.
     ///
-    /// The assertion is that the sweep REFUSES rather than answering: with no
-    /// person session the private store cannot be opened, which is the fail-closed
-    /// arm, and the blob is still there either way. **What this pins is the
-    /// refusal and its cause**: on this fixture the old code also refused, but by
-    /// accident (the shared catalog would not decode under the member's singleton
-    /// key), so a regression that made the sweep run on a member vault would have
-    /// shown up as a successful erase here and now shows up as this assertion
-    /// going red.
+    /// This reddens against the previous behaviour, where a chat row no
+    /// conversation named was offered and erased.
     #[test]
-    fn a_member_vault_refuses_rather_than_reading_the_shared_conversations() {
+    fn a_shared_vault_withholds_chat_rows_from_the_sweep() {
         rt().block_on(async {
-            let (tmp, owner) = temp_vault().await;
-            let pasted = import_tagged_scoped(&tmp, &owner, 37, AttachmentScope::Chat).await;
+            let tmp = ScopedTempDir::new("attach-shared").expect("scoped tempdir");
+            seed_vault_meta_with_membership(tmp.path(), SEED_ACCOUNT_HASH);
+            let state = unlocked_state().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 41, AttachmentScope::Chat).await;
 
-            let member = VaultRuntimeState::default();
-            member
-                .set_unlocked(
-                    test_vault_id(),
-                    UnlockedVault::member(
-                        zeroize::Zeroizing::new([0x11; 32]),
-                        zeroize::Zeroizing::new([SEED_ITEMS; 32]),
-                        [SEED_ITEMS_ID; 16],
-                        0,
-                        [0xFF; 32],
-                    ),
-                )
-                .await;
-
-            let result =
-                attachment_clean_unused_with_dir(tmp.path(), &member, vec![pasted.clone()]).await;
-
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + UNUSED_CLEANUP_GRACE_SECS
+                + 1;
+            let listed = attachment_unused_list_with_dir(tmp.path(), &state, now)
+                .await
+                .expect("list");
             assert!(
-                result.is_err(),
-                "a member vault must refuse, not answer from the shared family: {result:?}"
+                !listed.iter().any(|entry| entry.id == pasted),
+                "a shared vault must not offer a chat row it cannot prove unreferenced"
             );
+
+            let cleaned =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec![pasted.clone()])
+                    .await
+                    .expect("clean");
+            assert_eq!(cleaned.deleted, 0);
             assert!(blob_exists(&tmp, &pasted));
         });
     }
