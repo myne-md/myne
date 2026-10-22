@@ -81,12 +81,12 @@ export interface SeedApplyOutcome {
 
 /** The status the Memory row and the card gate on. */
 export async function seedMemoryStatus(): Promise<SeedStatus> {
-  return await invoke<SeedStatus>("plugin:local_inference|seed_memory_status");
+  return await invoke<SeedStatus>("plugin:local-inference|seed_memory_status");
 }
 
 /** The exact tree payload phase one sends, for the scope screen. */
 export async function seedMemoryPayload(): Promise<SeedPayload> {
-  return await invoke<SeedPayload>("plugin:local_inference|seed_memory_payload");
+  return await invoke<SeedPayload>("plugin:local-inference|seed_memory_payload");
 }
 
 /**
@@ -101,7 +101,7 @@ export async function seedMemoryGenerate(
 ): Promise<SeedResult> {
   const channel = new Channel<SeedProgress>();
   if (onProgress !== undefined) channel.onmessage = onProgress;
-  return await invoke<SeedResult>("plugin:local_inference|seed_memory_generate", {
+  return await invoke<SeedResult>("plugin:local-inference|seed_memory_generate", {
     jobId,
     remoteConsent,
     onProgress: channel,
@@ -110,7 +110,7 @@ export async function seedMemoryGenerate(
 
 /** Ask the running job to stop. The host discards anything it has not returned. */
 export async function seedMemoryCancel(jobId: string): Promise<void> {
-  await invoke("plugin:local_inference|seed_memory_cancel", { jobId });
+  await invoke("plugin:local-inference|seed_memory_cancel", { jobId });
 }
 
 /**
@@ -132,7 +132,6 @@ export const SEED_STALE_COOLDOWN_DAYS = 14;
 export const SEED_STALE_RATIO = 0.25;
 /** A floor, not a rate: a three-note vault has nothing to distil. */
 export const SEED_SUGGEST_MIN_NOTES = 10;
-export const SEED_SUGGEST_MIN_FOLDERS = 2;
 
 /**
  * Whether a seed is old enough and the vault has moved enough to mention it.

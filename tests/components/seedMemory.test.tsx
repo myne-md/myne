@@ -147,7 +147,8 @@ describe("SeedMemoryWizard", () => {
   });
 
   it("applies the checked entries and reports the count", async () => {
-    render(<SeedMemoryWizard open onClose={() => {}} />);
+    const onApplied = vi.fn();
+    render(<SeedMemoryWizard open onClose={() => {}} onApplied={onApplied} />);
     fireEvent.click(await screen.findByTestId("settings.memory.seed.continue"));
     expect(await screen.findByTestId("settings.memory.seed.candidate-list")).toBeTruthy();
     expect(screen.getAllByTestId("settings.memory.seed.candidate")).toHaveLength(3);
@@ -157,6 +158,9 @@ describe("SeedMemoryWizard", () => {
       ["Projects: Myne.", "Prefers short answers.", "Folders follow areas."],
       false,
     );
+    // The enclosing Memory panel re-reads its roster from this callback; the
+    // E2E rebuild scenario is what caught its absence.
+    expect(onApplied).toHaveBeenCalledTimes(1);
   });
 
   it("marks the refused candidate and keeps the rest selectable", async () => {

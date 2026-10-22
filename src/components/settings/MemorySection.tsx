@@ -381,7 +381,7 @@ export function MemorySection(props: {
         {t("settings.memory.heading")}
       </h3>
       <p style={HELPER_STYLE}>{t("settings.memory.helper")}</p>
-      <SeedMemoryRow onShowToast={props.onShowToast} />
+      <SeedMemoryRow onShowToast={props.onShowToast} onApplied={() => void reload()} />
 
       {loadFailed ? (
         <div style={HELPER_STYLE}>

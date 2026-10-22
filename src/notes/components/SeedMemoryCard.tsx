@@ -22,11 +22,7 @@ import { Button } from "../../components/primitives/Button";
 import { usePrefs } from "../../hooks/usePrefs";
 import { readAiOnboardingSeen } from "../../lib/aiOnboardingSeen";
 import { memoryList } from "../../lib/memory";
-import {
-  SEED_SUGGEST_MIN_FOLDERS,
-  SEED_SUGGEST_MIN_NOTES,
-  seedMemoryStatus,
-} from "../../lib/seed-memory";
+import { SEED_SUGGEST_MIN_NOTES, seedMemoryStatus } from "../../lib/seed-memory";
 import { SeedMemoryWizard } from "../../components/settings/SeedMemoryWizard";
 
 const DISMISSED_KEY = "myne.seedMemorySeen";
@@ -89,10 +85,10 @@ export function SeedMemoryCard() {
         return;
       }
       const status = await seedMemoryStatus();
-      setEligible(
-        status.notes >= SEED_SUGGEST_MIN_NOTES &&
-          status.folders >= SEED_SUGGEST_MIN_FOLDERS,
-      );
+      // A floor on notes only. A vault with ten notes in one folder still has
+      // plenty to distil, and requiring a second folder would hide the offer
+      // from exactly the people who keep a flat vault.
+      setEligible(status.notes >= SEED_SUGGEST_MIN_NOTES);
     } catch {
       // AI off or the store unreadable: no offer. The Settings row states the
       // cause if the user goes looking.

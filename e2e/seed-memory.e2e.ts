@@ -45,12 +45,36 @@ async function openMemorySection(s: Session): Promise<void> {
 }
 
 async function runWizardToApplied(s: Session): Promise<void> {
+  // The scope container renders before its two IPC reads answer, and Continue is
+  // disabled until they do. A click at "the step is on screen" is a click on a
+  // disabled button, which then reads as a generation that never started.
+  await s.waitUntil(
+    async () => {
+      const loadError = await s.byTestIdAll("settings.memory.seed.load-error");
+      if (loadError.length > 0) {
+        throw new Error(`seed scope failed to load: ${await loadError[0]!.textContent()}`);
+      }
+      const button = await s.byTestId("settings.memory.seed.continue");
+      return (await button.attribute("disabled")) === null ? true : null;
+    },
+    { label: "the seed scope is loaded", timeoutMs: 20_000 },
+  );
   await (await s.byTestId("settings.memory.seed.continue")).click();
   // The stub answers phase one immediately; the candidate list is the proof the
-  // whole two-phase contract (prompt, parse, review) ran.
-  await s.waitForElement(testIdSelector("settings.memory.seed.candidate-list"), {
-    timeoutMs: 30_000,
-  });
+  // whole two-phase contract (prompt, parse, review) ran. A run error returns the
+  // wizard to the scope step, so wait for EITHER and report the cause rather
+  // than a bare timeout.
+  await s.waitUntil(
+    async () => {
+      const errors = await s.byTestIdAll("settings.memory.seed.run-error");
+      if (errors.length > 0) {
+        throw new Error(`seed run failed: ${await errors[0]!.textContent()}`);
+      }
+      const lists = await s.byTestIdAll("settings.memory.seed.candidate-list");
+      return lists.length > 0 ? true : null;
+    },
+    { label: "the seed candidates appear", timeoutMs: 30_000 },
+  );
   expect(await s.byTestIdAll("settings.memory.seed.candidate")).toHaveLength(3);
   await (await s.byTestId("settings.memory.seed.apply")).click();
   await s.waitForElement(testIdSelector("settings.memory.seed.done"), { timeoutMs: 30_000 });
@@ -124,8 +148,14 @@ aiDescribe("seed2 rebuild replaces its own rows instead of doubling them", () =>
         await runWizardToApplied(s);
 
         // Rebuild: the row now reads seeded, so its action asks for confirmation
-        // first and names the previous date and count.
+        // first and names the previous date and count. Wait for the row's own
+        // reload, not only the list's: the two reads race, and a click on the
+        // pre-reload row opens a first-seed wizard instead of the confirmation.
         await s.waitForElement(testIdSelector("settings.memory.seed-group"), { timeoutMs: 15_000 });
+        await s.waitForElement(
+          testIdSelector("settings.memory.seed-row", { "data-seeded": "true" }),
+          { timeoutMs: 15_000 },
+        );
         await (await s.byTestId("settings.memory.seed.open")).click();
         await (await s.byTestId("settings.memory.seed.rebuild-confirm")).click();
         await s.waitForElement(testIdSelector("settings.memory.seed.scope"), {
