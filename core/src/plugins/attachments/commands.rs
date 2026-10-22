@@ -1233,6 +1233,20 @@ pub(crate) async fn attachment_unused_list_with_dir(
         return Err(AttachmentUnusedListError::CorpusIncomplete);
     }
 
+    // **The conversation scan runs BEFORE the slot guard is taken** (myne-md/myne#913,
+    // review round seven). The chats read takes its own `slots.read()`, and
+    // re-entering this `RwLock`'s read side while `hold_unlocked_attachment_material`
+    // holds a guard is the reentrant-lock hazard this file already documents on the
+    // import path: with a writer queued between the two, the second read waits
+    // behind it and the writer waits for the first guard, which cannot drop. A hang,
+    // not an error. Nothing here needs the attachment material, so it moves up.
+    //
+    // The result is a superset of ids (every 64-hex run in a live
+    // conversation), which is fine: its only use is "do not offer this id".
+    let chat_refs =
+        crate::plugins::chats::commands::referenced_attachment_ids_with_dir(io, vault_dir, state)
+            .await;
+
     // Hold the slot guard across the whole compute (catalog read + note
     // scan) — the import/delete writer-guard pattern. Clone the material
     // once: root_key derives the catalog KEK; items_key + items_key_id
@@ -1286,16 +1300,8 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // conversation was deleted, stayed on disk, in the backup and on the sync
     // server forever. Counting the reference is the honest middle, and a read
     // failure falls back to the conservative side (offer none).
-    let catalog_ids: std::collections::BTreeSet<String> = catalog.entries.keys().cloned().collect();
     let mut referenced = referenced;
-    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
-        io,
-        vault_dir,
-        state,
-        &catalog_ids,
-    )
-    .await
-    {
+    match chat_refs {
         Ok(chat_ids) => referenced.extend(chat_ids),
         Err(error) => {
             // Fail SAFE rather than open: an unreadable conversation proves
@@ -1526,6 +1532,27 @@ pub async fn attachment_clean_unused_with_dir(
         return Err(AttachmentCleanUnusedError::CorpusIncomplete);
     }
 
+    // **The conversation scan runs BEFORE the slot guard is taken**
+    // (myne-md/myne#913, review round seven): the chats read takes its own
+    // `slots.read()`, and re-entering that `RwLock` under a held guard deadlocks
+    // against a queued writer. A conversation that cannot be read aborts the whole
+    // sweep, before anything is held or written.
+    let chat_refs = match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+        io, vault_dir, state,
+    )
+    .await
+    {
+        Ok(ids) => ids,
+        Err(error) => {
+            tracing::debug!(
+                target: "myne_core::attachments",
+                event = "clean_unused_chat_scan_failed",
+                error_kind = ?error
+            );
+            return Err(AttachmentCleanUnusedError::ConversationScanFailed);
+        }
+    };
+
     let (_slots_guard, items_key, items_key_id, shared) = state
         .hold_unlocked_attachment_material()
         .await
@@ -1552,51 +1579,8 @@ pub async fn attachment_clean_unused_with_dir(
         &items_key_id,
     )
     .await?;
-    // The conversation half, for the reason the list states (myne-md/myne#913).
-    // This is the re-verify that closes the review-to-confirm window, so it reads
-    // the CURRENT conversations rather than the ones the list saw.
-    //
-    // **A failed read must not look like "no conversations"** (review round
-    // three). The first version swallowed both failures with
-    // `unwrap_or_default()`, so an unreadable catalog produced an empty candidate
-    // set, the scan answered "nothing referenced", and the sweep proceeded to
-    // crypto-erase chat rows. `chat_scan_ok` is carried into the guard instead:
-    // when the conversation references could not be established, NO chat-scoped
-    // row is erasable, the same posture the note scan takes by aborting.
-    // **The candidate set is the requested ids**, not the catalog's keys
-    // (review round four, and this one was a real hole in the round-three fix).
-    // Reading the catalog to build candidates meant a failed read became an
-    // EMPTY set, `referenced_attachment_ids_with_dir` short-circuits on empty and
-    // answers "nothing referenced", and the scan came back `Ok`, so
-    // `chat_scan_ok` was true and the guard licensed erasing exactly the rows it
-    // exists to protect. The requested ids are all this needs: they are the only
-    // ids that could be erased, so they are a superset of the candidates, and no
-    // extra read can fail.
-    let chat_candidates: std::collections::BTreeSet<String> = requested.iter().cloned().collect();
-    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
-        io,
-        vault_dir,
-        state,
-        &chat_candidates,
-    )
-    .await
-    {
-        Ok(chat_ids) => referenced.extend(chat_ids),
-        Err(error) => {
-            // **Abort the whole sweep** (myne-md/myne#913, review round five). A
-            // library attachment can be referenced ONLY by a conversation turn
-            // (a file picked with `+` and never embedded in a note), so a
-            // refusal narrowed to `scope: "chat"` would still erase a library
-            // file whose only reference could not be read. This is the same
-            // posture the note scan takes one screen up.
-            tracing::debug!(
-                target: "myne_core::attachments",
-                event = "clean_unused_chat_scan_failed",
-                error_kind = ?error
-            );
-            return Err(AttachmentCleanUnusedError::ConversationScanFailed);
-        }
-    }
+    // The conversation half, read before the guard above.
+    referenced.extend(chat_refs);
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -2742,7 +2726,7 @@ pub async fn hydrate_attachment_refs_core(
 mod tests {
     use super::*;
     use crate::plugins::vault_unlock::state::{
-        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
+        fixture_unlocked_with_keys, test_vault_id, UnlockedVault, VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
     use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
@@ -4897,6 +4881,54 @@ mod tests {
             );
             assert!(blob_exists(&tmp, &pasted));
             assert!(blob_exists(&tmp, &library));
+        });
+    }
+
+    /// **A member vault does not read the shared conversations** (myne-md/myne#913,
+    /// review round seven).
+    ///
+    /// A member's conversations live person-privately, and the scan read the
+    /// SHARED family: on a member vault that read does not fail, it answers "no
+    /// conversations", which the sweep reads as "nothing references these rows".
+    /// The first version therefore erased a referenced file on a member vault, and
+    /// no test could see it because every fixture was an owner.
+    ///
+    /// The assertion is that the sweep REFUSES rather than answering: with no
+    /// person session the private store cannot be opened, which is the fail-closed
+    /// arm, and the blob is still there either way. **What this pins is the
+    /// refusal and its cause**: on this fixture the old code also refused, but by
+    /// accident (the shared catalog would not decode under the member's singleton
+    /// key), so a regression that made the sweep run on a member vault would have
+    /// shown up as a successful erase here and now shows up as this assertion
+    /// going red.
+    #[test]
+    fn a_member_vault_refuses_rather_than_reading_the_shared_conversations() {
+        rt().block_on(async {
+            let (tmp, owner) = temp_vault().await;
+            let pasted = import_tagged_scoped(&tmp, &owner, 37, AttachmentScope::Chat).await;
+
+            let member = VaultRuntimeState::default();
+            member
+                .set_unlocked(
+                    test_vault_id(),
+                    UnlockedVault::member(
+                        zeroize::Zeroizing::new([0x11; 32]),
+                        zeroize::Zeroizing::new([SEED_ITEMS; 32]),
+                        [SEED_ITEMS_ID; 16],
+                        0,
+                        [0xFF; 32],
+                    ),
+                )
+                .await;
+
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &member, vec![pasted.clone()]).await;
+
+            assert!(
+                result.is_err(),
+                "a member vault must refuse, not answer from the shared family: {result:?}"
+            );
+            assert!(blob_exists(&tmp, &pasted));
         });
     }
 

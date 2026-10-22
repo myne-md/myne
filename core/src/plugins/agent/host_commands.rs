@@ -1449,20 +1449,45 @@ async fn apply_from_host_inner<R: Runtime>(
     // **The folders this vault actually has** (myne-md/myne#913). Read here, at
     // the write, for the same reason the exclusions are: the set can move while
     // a proposal sits on the review screen (a folder emptied, a note added to
-    // one), and the answer that decides is the newest. A failure to read the
-    // prefs leaves the index's folders, which is still a real set: refusing a
-    // move is recoverable, creating a phantom folder is what this exists to stop.
-    let prefs = prefs_read_from_host(&TauriHost::new(app.clone()), vault, &StdVaultIo)
-        .await
-        .ok();
+    // one), and the answer that decides is the newest.
+    //
+    // **Read through the ORIGIN-reporting seam, and a read we cannot trust
+    // refuses the batch's creates** (review round seven). The first version used
+    // `prefs_read_from_host(..).ok()`, so a degraded or failed read became
+    // "the default is unset" and the approved note was written at the vault ROOT
+    // with nothing said: a silent mis-file, and the same class as the bug this
+    // rule was added for. The settings half of this same apply already answers it
+    // this way thirty lines up ("here the difference is a WRITE").
+    let prefs_read = crate::plugins::prefs::commands::prefs_read_from_host_reporting_origin(
+        &TauriHost::new(app.clone()),
+        vault,
+        &StdVaultIo,
+    )
+    .await;
+    let prefs_trustworthy = matches!(
+        &prefs_read,
+        Ok((_, crate::plugins::prefs::commands::PrefsOrigin::Stored))
+            | Ok((_, crate::plugins::prefs::commands::PrefsOrigin::Absent))
+    );
+    if !prefs_trustworthy && !approved_new_notes.is_empty() {
+        // Nothing has been written yet. A create whose destination is unknown is
+        // not placed anywhere: the user retries, and the card says the apply
+        // failed rather than the note appearing in the wrong folder.
+        tracing::warn!(
+            target: "myne_core::agent",
+            event = "agent_apply_refused",
+            error_kind = "prefs_unreadable"
+        );
+        return Err(AgentError::WriteFailed);
+    }
+    let prefs = prefs_read.ok().map(|(view, _)| view);
     let deliberate = prefs
         .as_ref()
         .map(|p| p.deliberate_folders.clone())
         .unwrap_or_default();
     // The user's configured new-note location, as a proposed note with no folder
-    // should treat it (myne-md/myne#913). Read here because this is where the
-    // write happens; a prefs failure leaves `None`, which is the vault root and
-    // the behaviour before this rule existed.
+    // should treat it (myne-md/myne#913). Only reached when the read is
+    // trustworthy or there is no create to place.
     let default_new_note_folder = prefs.as_ref().and_then(|p| {
         if p.new_note_location.as_deref() == Some("specific") {
             p.new_note_location_folder.clone()
