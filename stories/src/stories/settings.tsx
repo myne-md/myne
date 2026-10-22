@@ -140,6 +140,16 @@ const SEED_FIXTURE: Fixture = {
       provider: "in-process",
       remote: false,
     }),
+    "plugin:local_inference|seed_memory_generate": () => ({
+      candidates: [
+        { text: "Projects: Myne, including the roadmap and the release checklist." },
+        { text: "Prefers short, decision-first answers." },
+        { text: "Folders are organised by area, one folder per active project." },
+      ],
+      notesRead: 0,
+      foldersRead: [],
+    }),
+    "plugin:memory|memory_seed_apply": () => ({ ids: ["a", "b", "c"], replaced: 0, liveCount: 3 }),
     "plugin:local_inference|seed_memory_payload": () => ({
       notes: 24,
       folders: 4,
@@ -149,6 +159,38 @@ const SEED_FIXTURE: Fixture = {
       chars: 412,
       payload:
         "VAULT OUTLINE\nLive notes: 24\nFolders: 4\nNotes omitted because their folder is excluded from AI: 1\nTags: work, health\n\n- Projects/ (6 notes)\n  - Roadmap\n  - Release checklist\n- Notes/ (18 notes)\n  - Weekly review\n",
+    }),
+  },
+};
+
+/** The same vault after a reviewed seed: three seed rows and one user row, so
+ *  the `From your vault` group and its Remove all are visible. */
+const SEEDED_FIXTURE: Fixture = {
+  description: "AI on, a seeded memory group and one user row",
+  handlers: {
+    ...SEED_FIXTURE.handlers,
+    "plugin:memory|memory_list": () => ({
+      cap: 100,
+      rows: [
+        { id: "seed1", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_000, version: 1, quarantined: false, origin: "seed" },
+        { id: "seed2", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_001, version: 1, quarantined: false, origin: "seed" },
+        { id: "seed3", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_002, version: 1, quarantined: false, origin: "seed" },
+        { id: "user1", created_at: 1_700_000_200_000, updated_at: 1_700_000_200_000, version: 1, quarantined: false },
+      ],
+    }),
+    "plugin:memory|memory_read": (args: Record<string, unknown>) => {
+      const id = String(args.memoryIdHex ?? "");
+      if (id === "user1") return "A fact the user wrote herself.";
+      return "An entry distilled from the vault.";
+    },
+    "plugin:local_inference|seed_memory_status": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      seedEntries: 3,
+      seededAt: 1_700_000_000_000,
+      provider: "in-process",
+      remote: false,
     }),
   },
 };
@@ -780,10 +822,25 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     description:
       "The agent-memory and personality management surface: the complete list, edit, delete, clear-all-with-confirm and the personality editor, sharing one store and one set of commands with the chat header's discoverable popover. Rendered here with `aiEnabled={false}`, so look for the disabled or empty treatment.",
     tags: ["settings", "ai", "agent", "memory", "personality", "management"],
-    fixture: PREFS_FIXTURE,
+    fixture: SEED_FIXTURE,
     render: () => (
       <Frame>
         <MemorySection onShowToast={action("onShowToast")} aiEnabled={false} />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/memorysection/seeded",
+    group: "settings",
+    surface: "MemorySection",
+    state: "seeded",
+    description:
+      "The same panel after a reviewed seed: the seed entries in their own From your vault group with the seed date and Remove all, the ordinary rows above them, and the user row untouched.",
+    tags: ["settings", "ai", "memory", "seed", "group", "remove-all"],
+    fixture: SEEDED_FIXTURE,
+    render: () => (
+      <Frame>
+        <MemorySection onShowToast={action("onShowToast")} aiEnabled />
       </Frame>
     ),
   },
