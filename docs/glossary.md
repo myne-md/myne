@@ -643,7 +643,9 @@ Used in: `spec/protocol.md` §9.5.2
 
 One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0581`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0583`).
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`
+**A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
+
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0719`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 

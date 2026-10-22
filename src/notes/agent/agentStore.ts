@@ -22,6 +22,7 @@ import type {
   ProposedSetting,
 } from "../../lib/agent-protocol";
 import { hasRefusals } from "../../lib/agent-protocol";
+import { resetConversationBinding } from "../ai/conversationBinding";
 
 /** The client's prefs-changed nonce bump (myne-md/myne#850).
  *
@@ -766,6 +767,30 @@ export function landedEditIndices(
 }
 
 /**
+ * Which of the SENT new-note indices actually landed.
+ *
+ * **The new-note twin of `landedEditIndices`, and it was missing for the same
+ * reason that one exists.** `settleApply` was handed the SENT list, so a create
+ * the host refused at apply time (an unsafe title, an excluded folder, a write
+ * failure) was recorded as `applied`: the row rendered "Created" and
+ * `approvedNewNoteIndices` filtered it out, so that note could never be
+ * re-approved for the life of the run. Found in the review of myne-md/myne#913,
+ * one round after the fix that introduced it.
+ *
+ * `apply.rs` defines `RefusedNewNote::index` as the position in the run's
+ * PROPOSAL new-note list, which is the same space `sent` is expressed in, so the
+ * subtraction is direct rather than positional (unlike `landedEditIndices`,
+ * whose refusals are indexed against the approved list).
+ */
+export function landedNewNoteIndices(
+  sent: number[],
+  outcome: Pick<AgentApplyResult, "refusedNewNotes">,
+): number[] {
+  const refused = new Set(outcome.refusedNewNotes.map((r) => r.index));
+  return sent.filter((i) => !refused.has(i));
+}
+
+/**
  * The setting rows that actually LANDED, as indices into the PROPOSAL.
  *
  * **The twin of `landedEditIndices`, added because the settings half shipped
@@ -858,7 +883,7 @@ export function settleApply(
    * Required in practice at BOTH call sites. It carries a default because the
    * signature predates the automatic path's creates, and the first version of
    * this comment claimed that path "sends no new notes" while
-   * `autoApplyRun` sends `approvedNewNoteIndices(agent)` — a comment that made a
+   * `autoApplyRun` sends `approvedNewNoteIndices(agent)`, a comment that made a
    * forgotten call site look wired. Both sites pass it now.
    */
   appliedNewNoteIndices: number[] = [],
@@ -1042,6 +1067,11 @@ export function clearAgentForLock(): void {
   // The epoch bump comes from `clearAgent`, which every leaving path goes
   // through: a reply that lands after the teardown cannot repopulate the store.
   clearAgent();
+  // **And the conversation binding** (myne-md/myne#913): the pin and the
+  // deferred switch are session state, and a lock ends the session. Dropped here
+  // rather than in the panel because the panel is unmounted on most tabs and a
+  // lock is the one event that must not depend on it being mounted.
+  resetConversationBinding();
   // **And the automatic-apply mode**, which `clearAgent` deliberately keeps.
   // The mode says a finished run may write without a second act, and the act
   // that granted it was the user choosing it while this vault was open. A lock
