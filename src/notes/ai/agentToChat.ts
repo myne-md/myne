@@ -464,7 +464,13 @@ async function autoApplyRun(
       [],
       "bulk",
     );
-    if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
+    // The creates are passed for the same reason the edits are: this path DOES
+    // send them (`agentApply` above), so a defaulted-empty argument here left a
+    // created note in the actionable set on the automatic route — the defect the
+    // review screen's own call site fixed, surviving on its twin.
+    if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch, [], newNotes)) {
+      return;
+    }
     const changed = [...outcome.notesWritten, ...outcome.notesCreated];
     if (changed.length > 0) onNotesWritten?.(changed);
   } catch {

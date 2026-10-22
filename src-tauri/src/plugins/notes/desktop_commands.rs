@@ -5386,6 +5386,7 @@ mod tests {
                 bytes: bytes.to_vec(),
                 filename: Some(filename.to_string()),
             },
+            myne_core::plugins::attachments::commands::scope_for_wire(None),
         )
         .await
         .expect("fixture attachment import must succeed")
