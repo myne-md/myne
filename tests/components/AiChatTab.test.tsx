@@ -115,6 +115,7 @@ vi.mock("react-i18next", () => ({
 import { AI_CHAT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
 import type { ResolverNote } from "../../src/notes/resolveWikilink";
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
+import { resetConversationBinding } from "../../src/notes/ai/conversationBinding";
 import { CHIP_KEY } from "../../src/notes/ai/restingCause";
 import type { ProviderErrorCause } from "../../src/lib/engine-error";
 
@@ -153,6 +154,9 @@ beforeEach(() => {
   resolverNoteSet = [];
   openNewTabInFocused.mockClear();
   clearAgent();
+  // The conversation binding is MODULE state now (it has to outlive the tab), so
+  // a test that pins would otherwise hand the pin to the next one.
+  resetConversationBinding();
   agentLastRun.mockReset().mockResolvedValue(null);
   agentUndo.mockReset().mockResolvedValue({ reverted: 0, failed: [], notesCreatedNotReverted: 0 });
   agentCapability.mockReset();
@@ -1813,6 +1817,39 @@ describe("AiChatTab: scope card and note binding", () => {
     // Pinned: the escape hatch the issue asks for. The transcript survives the
     // switch for the session, which is what driving one conversation across two
     // notes requires.
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+  });
+
+  it("starts fresh when a note is CLOSED and another opened", () => {
+    // Closing A and opening B is a switch between two notes, and the first
+    // version read it as a first mount because it compared against the last note
+    // the panel SAW, which the close had already set to nothing. The transcript
+    // for A then sat beside B.
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+
+    rerender(<AiChatTab openNoteId={null} />);
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("keeps the pin across a tab switch, because the tab unmounts", () => {
+    // The pin was `useState`, and the right panel mounts this component only
+    // while its tab is the AI one: switching tabs reset the pin silently, so the
+    // very next note switch cleared a conversation the user had pinned.
+    sendAgentTurn("what is in this note", "This note");
+    const first = render(<AiChatTab openNoteId="note-a" />);
+    fireEvent.click(screen.getByTestId("ai.keep-conversation"));
+    first.unmount();
+
+    const second = render(<AiChatTab openNoteId="note-a" />);
+    expect(
+      screen.getByTestId("ai.keep-conversation").getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    second.rerender(<AiChatTab openNoteId="note-b" />);
     expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
   });
 });
