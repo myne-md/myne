@@ -1293,6 +1293,44 @@ describe("ChatComposer: pasted files", () => {
     );
   });
 
+  it("never erases a file the batch did not create (a dedup hit)", async () => {
+    // **The library file a user curated, pasted by mistake** (review round four,
+    // data loss): a dedup hit returns an attachment that already existed, so
+    // deleting it on a later file's failure removes the user's library file, its
+    // blob and its catalog row, with no confirmation. `deduplicated` is the
+    // host's answer and the only safe source for "did this batch create it".
+    mount();
+    attachmentImport
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: "lib11",
+        content_type: "image/png",
+        filename: "already-here.png",
+        size: 3,
+        created_at: 2,
+        deduplicated: true,
+        original_size: 3,
+        container_changed: false,
+      })
+      .mockRejectedValueOnce(new Error("no keys"));
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [
+          new File(["one"], "already-here.png", { type: "image/png" }),
+          new File(["two"], "second.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-attachment-error") as HTMLElement).textContent,
+      ).toContain("agent.attachments.pasteFailed"),
+    );
+    expect(attachmentDelete).not.toHaveBeenCalled();
+  });
+
   it("erases the files a failed batch had already stored", async () => {
     // A batch that fails on its second file used to leave the first as an
     // encrypted chat-scoped blob with no chip, no turn and no library row

@@ -1570,21 +1570,21 @@ pub async fn attachment_clean_unused_with_dir(
     // crypto-erase chat rows. `chat_scan_ok` is carried into the guard instead:
     // when the conversation references could not be established, NO chat-scoped
     // row is erasable, the same posture the note scan takes by aborting.
-    let catalog_ids: std::collections::BTreeSet<String> = read_catalog(
-        io,
-        &vault_dir.join("vault.attachments"),
-        &catalog_key,
-        &account_number_hash,
-        meta_version,
-    )
-    .await
-    .map(|catalog| catalog.entries.into_keys().collect())
-    .unwrap_or_default();
+    // **The candidate set is the requested ids**, not the catalog's keys
+    // (review round four, and this one was a real hole in the round-three fix).
+    // Reading the catalog to build candidates meant a failed read became an
+    // EMPTY set, `referenced_attachment_ids_with_dir` short-circuits on empty and
+    // answers "nothing referenced", and the scan came back `Ok`, so
+    // `chat_scan_ok` was true and the guard licensed erasing exactly the rows it
+    // exists to protect. The requested ids are all this needs: they are the only
+    // ids that could be erased, so they are a superset of the candidates, and no
+    // extra read can fail.
+    let chat_candidates: std::collections::BTreeSet<String> = requested.iter().cloned().collect();
     let chat_scan_ok = match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
         io,
         vault_dir,
         state,
-        &catalog_ids,
+        &chat_candidates,
     )
     .await
     {
@@ -4847,6 +4847,55 @@ mod tests {
             assert_eq!(result.skipped, 1);
             assert!(blob_exists(&tmp, &named), "the named file survives");
             assert!(!blob_exists(&tmp, &orphan), "the orphan is erased");
+        });
+    }
+
+    /// **A conversation that cannot be read withholds every chat row**
+    /// (myne-md/myne#913, review round four).
+    ///
+    /// The round-three fix added a fail-safe flag, and the round-three code still
+    /// defeated it: the candidate set came from a catalog read whose failure was
+    /// swallowed into an empty set, the scan answered "nothing referenced", and
+    /// the flag stayed true. The candidates are the REQUESTED ids now, so the
+    /// only way to reach "could not establish references" is an unreadable
+    /// conversation, which this test constructs. The erase is irreversible, so
+    /// the assertion is that it does not happen.
+    #[test]
+    fn clean_unused_refuses_chat_rows_when_conversations_cannot_be_read() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 35, AttachmentScope::Chat).await;
+            let conversation = crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: "{\"turns\":[]}",
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
+            )
+            .await
+            .expect("create conversation");
+            std::fs::write(
+                tmp.path().join("chats").join(&conversation),
+                b"not a MYJ1 blob",
+            )
+            .unwrap();
+
+            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![pasted.clone()])
+                .await
+                .expect("clean");
+
+            assert_eq!(
+                result.deleted, 0,
+                "a chat row is not erasable while its conversations cannot be read"
+            );
+            assert_eq!(result.skipped, 1);
+            assert!(blob_exists(&tmp, &pasted));
         });
     }
 

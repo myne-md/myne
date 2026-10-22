@@ -58,6 +58,7 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { listFolderPaths } from "../notes/listFolderPaths";
 import { topRightFloatsShown as topRightFloats } from "../notes/topRightFloats";
 import { requestGraphViewFilter } from "../notes/graphViewFilter";
 import {
@@ -4975,20 +4976,39 @@ function RightSidebar({
     manualActivation: true,
   });
 
-  // Folders the composer can attach as a scope. Derived from the notes the
-  // resolver already holds, so it needs no second load; the authoritative
-  // resolution and the excluded-folder clamp are host-side either way.
+  // **Folders the composer can attach as a scope, from the ONE derivation the
+  // sidebar and every other folder picker use** (myne-md/myne#913, review round
+  // four). Walking `notes` alone offered only folders a live note sat directly
+  // in: a deliberately created empty folder was missing (`deliberate_folders`),
+  // a parent was missing unless a note sat in it, and a folder that survived only
+  // on a trashed note was OFFERED while the sidebar hides it. The first two deny
+  // the user a scope the tree shows; the third offers one that resolves to zero
+  // notes, so the composer then says "nothing in scope" about a folder it just
+  // suggested. `listFolderPaths` unions the live note set with the deliberate
+  // folders, synthesizes ancestors and filters archived ones.
   //
-  // Gated on the AI tab being open. `notes` changes identity on every note save,
-  // so without the gate this sort ran for every user on every save, including
-  // everyone who never opens the tab it feeds.
-  const agentFolders = useMemo(
+  // Gated on the AI tab being open, and keyed on the SET rather than on `notes`
+  // (which changes identity on every save), so a user who never opens the tab
+  // pays nothing and a save in an unchanged folder set does not re-read.
+  const [agentFolders, setAgentFolders] = useState<readonly string[]>(EMPTY_FOLDERS);
+  const folderSignature = useMemo(
     () =>
-      active === "ai-chat"
-        ? [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort()
-        : EMPTY_FOLDERS,
-    [notes, active],
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))]
+        .sort()
+        .join("\u0000"),
+    [notes],
   );
+  useEffect(() => {
+    if (active !== "ai-chat") return;
+    let cancelled = false;
+    void listFolderPaths().then((options) => {
+      if (cancelled) return;
+      setAgentFolders([...new Set(options.map((option) => option.path))].sort());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, folderSignature]);
 
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
