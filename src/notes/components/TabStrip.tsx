@@ -52,7 +52,7 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
 import { MIN_TARGET } from "../../components/primitives/targetSize";
 import { useTitleReveal } from "./useTitleReveal";
-import { prefersReducedMotion } from "./tabTitleReveal";
+import { centreScrollLeft, prefersReducedMotion } from "./tabTitleReveal";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */

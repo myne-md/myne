@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
 import {
   centreScrollLeft,
   marqueeShift,
-  marqueeTiming,
   prefersReducedMotion,
 } from "../../src/notes/components/tabTitleReveal";
 
@@ -43,54 +42,12 @@ describe("prefersReducedMotion", () => {
   });
 });
 
-describe("marqueeTiming", () => {
-  it("holds, travels, holds and travels back in that order", () => {
-    const { frames, duration } = marqueeTiming(90);
-    expect(frames).toHaveLength(5);
-    // Monotonic offsets, or the browser refuses the keyframe list.
-    const offsets = frames.map((f) => f.offset);
-    expect(offsets).toEqual([...offsets].sort((a, b) => a - b));
-    expect(offsets[0]).toBe(0);
-    expect(offsets[4]).toBe(1);
-    // The two holds are the still frames: unchanged transform between 0 -> 1
-    // and between 2 -> 3.
-    expect(frames[0]!.transform).toBe(frames[1]!.transform);
-    expect(frames[2]!.transform).toBe(frames[3]!.transform);
-    // And the two moves are the opposite ones.
-    expect(frames[1]!.transform).not.toBe(frames[2]!.transform);
-    expect(frames[3]!.transform).not.toBe(frames[4]!.transform);
-    expect(frames[2]!.transform).toBe("translateX(-90px)");
-    expect(duration).toBeGreaterThan(0);
-  });
-
-  it("travels at a CONSTANT speed, so a longer title takes proportionally longer", () => {
-    // The defect this replaces: a distance-proportional duration with an
-    // `ease-in-out` curve, which made every title accelerate through the middle
-    // and changed the pace with its length. Here the travel fraction of the
-    // cycle is exactly `pause + distance/speed`, so doubling the distance
-    // doubles the moving time and leaves the holds untouched.
-    const short = marqueeTiming(45);
-    const long = marqueeTiming(90);
-    const travelOf = (t: ReturnType<typeof marqueeTiming>) =>
-      (t.frames[2]!.offset - t.frames[1]!.offset) * t.duration;
-    expect(travelOf(long)).toBeCloseTo(travelOf(short) * 2, 0);
-    // The start hold is the same wall-clock in both, which is what "constant
-    // speed, fixed pauses" means.
-    expect(short.frames[1]!.offset * short.duration).toBeCloseTo(
-      long.frames[1]!.offset * long.duration,
-      0,
-    );
-  });
-
-  it("waits longer at the start than at the end, and never negatively", () => {
-    const { frames, duration } = marqueeTiming(60);
-    const startHold = frames[1]!.offset * duration;
-    const endHold = (frames[3]!.offset - frames[2]!.offset) * duration;
-    expect(startHold).toBeGreaterThan(endHold);
-    const zero = marqueeTiming(0);
-    expect(zero.frames[2]!.transform).toBe("translateX(-0px)");
-  });
-});
+// `marqueeTiming` no longer exists: the base branch replaced it with the shared
+// `useTitleReveal` hook, which builds the same four phases inline from
+// `MARQUEE_PX_PER_MS` and `MARQUEE_HOLD_MS` (constant speed, a long hold at the
+// start, a short one at the end, and a return trip). The constants it reads are
+// asserted above, and the strip's own behaviour is asserted in
+// `TabStrip.test.tsx`.
 
 describe("centreScrollLeft", () => {
   it("puts the tab's middle on the viewport's middle", () => {
