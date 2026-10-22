@@ -444,6 +444,25 @@ export function TabStrip({
     onMoveTab(parsed.fromPaneId, parsed.tabId, toIndex);
   };
 
+  // **The cleanup the overflow hook returns must survive the wrapper** (review
+  // round seven). An inline arrow ref changed identity on every render, so React
+  // called it with `null` and then with the node each time; the hook returns
+  // early on `null` before any teardown, and a NEW `ResizeObserver` was built for
+  // the live node while the previous one stayed attached: an unbounded leak of
+  // observers and listeners for the life of the session, on a component rendered
+  // per pane and re-rendered on every save-status and cursor change. A stable
+  // callback that RETURNS the cleanup is what lets React call it.
+  const attachRow = useCallback(
+    (node: HTMLDivElement | null) => {
+      // Three refs on one node: the roving-focus hook owns the tablist, the
+      // overflow measurement reads its edges, and the centring scrolls it.
+      (roving.containerRef as { current: HTMLDivElement | null }).current = node;
+      scrollRowRef.current = node;
+      return stripOverflow.ref(node);
+    },
+    [roving.containerRef, stripOverflow.ref],
+  );
+
   return (
     <div
       // The tab strip is CHROME for ornament purposes (myne#394). Ornament here
@@ -503,13 +522,7 @@ export function TabStrip({
         // (myne#728).
         role="tablist"
         aria-label={t("notes.tabStrip.openNotes")}
-        ref={(node) => {
-          // Three refs on one node: the roving-focus hook owns the tablist, the
-          // overflow measurement reads its edges, and the centring scrolls it.
-          (roving.containerRef as { current: HTMLDivElement | null }).current = node;
-          stripOverflow.ref(node);
-          scrollRowRef.current = node;
-        }}
+        ref={attachRow}
         onKeyDown={roving.onKeyDown}
         // The fade is a MASK, not a gradient overlay, for the reason
         // `useScrollEdges` gives: an overlay has to be painted in the strip's own

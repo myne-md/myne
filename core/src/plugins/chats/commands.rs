@@ -721,12 +721,36 @@ pub async fn referenced_attachment_ids_with_dir(
     io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
-    candidates: &std::collections::BTreeSet<String>,
+) -> Result<std::collections::BTreeSet<String>, ChatsReadError> {
+    // **A member's conversations live person-privately** (design A), and the
+    // redirect is the same one every other chats entry point makes. Reading the
+    // SHARED family on a member vault would not fail here: it would answer "no
+    // conversations", which the attachment sweep reads as "nothing references
+    // these rows" and acts on irreversibly (myne-md/myne#913, review round seven).
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, vault_dir, state)
+            .await
+            .map_err(|_| ChatsReadError::CatalogUnreadable)?;
+        return referenced_attachment_ids_in_dir(&fs, vault_dir, state).await;
+    }
+    referenced_attachment_ids_in_dir(io, vault_dir, state).await
+}
+
+/// The scan itself, over one Io implementation. Split from the entry point so
+/// the member redirect cannot recurse into itself.
+async fn referenced_attachment_ids_in_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
 ) -> Result<std::collections::BTreeSet<String>, ChatsReadError> {
     use std::collections::BTreeSet;
-    if candidates.is_empty() {
-        return Ok(BTreeSet::new());
-    }
+    // **No candidate filter, and that is what lets the caller run this BEFORE it
+    // takes the attachment slot guard** (myne-md/myne#913, review round seven).
+    // A filter would have to come from the catalog, which is read under that
+    // guard, and re-entering the slots `RwLock`'s read side under a held guard is
+    // the reentrancy hazard this crate documents elsewhere. The result is a
+    // superset (every 64-hex run in a conversation), which is harmless: the only
+    // use is "do not erase this id".
     let (_, seal) = seal_from_slot_for_read(io, vault_dir, state).await?;
     let map = read_catalog_in_dir(io, vault_dir, &seal).await?;
     let mut found = BTreeSet::new();
@@ -737,21 +761,18 @@ pub async fn referenced_attachment_ids_with_dir(
         let plaintext = read_conversation_in_dir(io, vault_dir, &id, &seal).await?;
         let text = String::from_utf8_lossy(&plaintext);
         for run in hex_runs(&text) {
-            if candidates.contains(run) {
-                found.insert(run.to_string());
-            }
+            found.insert(run.to_string());
         }
     }
     Ok(found)
 }
 
-/// Every maximal run of lowercase hex at least 64 characters long, yielded as
-/// the run's own slice. Only a candidate match matters, and every candidate is
-/// exactly 64, so a longer run is truncated to 64 by the caller's set lookup
-/// failing: a 65-character run is not an id.
+/// Every maximal run of lowercase hex EXACTLY 64 characters long, yielded as the
+/// run's own slice. An attachment id is exactly 64, so a longer run is not one:
+/// truncating it would invent an id that no line ever carried.
 fn hex_runs(text: &str) -> impl Iterator<Item = &str> {
     text.split(|c: char| !c.is_ascii_hexdigit() || c.is_ascii_uppercase())
-        .filter(|run| run.len() >= 64)
+        .filter(|run| run.len() == 64)
 }
 
 // ---------------------------------------------------------------------------

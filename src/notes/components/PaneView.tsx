@@ -423,15 +423,33 @@ export function PaneView({
   const deliberateKey = (prefs.deliberate_folders ?? []).join("\u0000");
   const archivedKey = (prefs.archived_folders ?? []).join("\u0000");
   useEffect(() => {
+    // **Gated on the pane kind and given a failure path** (review round seven).
+    // Without the gate every plain note pane paid a full folder read per
+    // signature change for a prop only `AgentPane` reads; without the catch a
+    // rejected read left `[]`, which the picker renders as a vault with no
+    // folders, indistinguishable from an empty vault. On failure the note-only
+    // list this pane already holds is the honest fallback.
+    if (!isAgent) return;
     let cancelled = false;
-    void listFolderPaths().then((options) => {
-      if (cancelled) return;
-      setAgentFolders([...new Set(options.map((option) => option.path))].sort());
-    });
+    void listFolderPaths()
+      .then((options) => {
+        if (cancelled) return;
+        setAgentFolders([...new Set(options.map((option) => option.path))].sort());
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAgentFolders(
+          [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+        );
+      });
     return () => {
       cancelled = true;
     };
-  }, [folderSignature, deliberateKey, archivedKey]);
+    // `notes` is deliberately absent: it changes identity on every save, and the
+    // signature above already tracks the only part of it this cares about. The
+    // catch reads the render's own , which is correct at the moment the
+    // effect fires.
+  }, [isAgent, folderSignature, deliberateKey, archivedKey]);
   /** What an agent apply in THIS pane written to disk owes the rest of the app.
    *
    *  **The agent tab had no half of this at all** (myne-md/myne#894, on the
