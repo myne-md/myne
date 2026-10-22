@@ -374,6 +374,7 @@
       "colType": "Type",
       "colUsedIn": "Used in",
       "corpusIncompleteNotice": "Finish syncing first. This device doesn't have all your notes yet, so it can't tell which attachments are unused.",
+      "sharedVaultNotice": "This is a shared vault, so conversations are kept per person. Myne cannot tell which files another member is still using, so it will not offer any for cleanup.",
       "decrypting": "Decrypting attachments…",
       "emptyClearSearch": "Clear search",
       "emptyFilteredBody": "Nothing here matches the current type filter. Clear it to see the whole library again.",

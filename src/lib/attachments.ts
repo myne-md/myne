@@ -151,6 +151,11 @@ export type AttachmentUnusedListError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** The vault is a shared (`NTV6`) one, so every conversation lives in a
+   *  person-scoped store this session cannot fully read: no attachment can be
+   *  proven unused, and the list is refused rather than returned empty
+   *  (myne-md/myne#913). */
+  | { kind: "ConversationsNotProvable" }
   /** This device has not finished syncing, so the unused set would be computed
    *  over a fraction of the corpus (phase3-web-client task 89). */
   | { kind: "CorpusIncomplete" }
