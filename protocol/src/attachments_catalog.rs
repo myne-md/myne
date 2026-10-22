@@ -609,11 +609,22 @@ impl Parser<'_> {
                 // everywhere else and the safe direction for a file the user
                 // still owns.
                 "scope" => {
-                    scope = if self.parse_string()? == "chat" {
-                        AttachmentScope::Chat
+                    // **Tolerance covers the VALUE, not only the strings this
+                    // version knows** (myne-md/myne#913, review round three): a
+                    // later version may spell the field as a number or an
+                    // object, and §9.10.2 says a value this implementation does
+                    // not know reads as the library rather than failing the
+                    // catalog. Only a string can name a scope here, so anything
+                    // else is skipped and the row stays in the library.
+                    if self.peek() == Some(b'"') {
+                        scope = if self.parse_string()? == "chat" {
+                            AttachmentScope::Chat
+                        } else {
+                            AttachmentScope::Library
+                        };
                     } else {
-                        AttachmentScope::Library
-                    };
+                        self.skip_value()?;
+                    }
                 }
                 // Unknown (future additive) field — skip its value.
                 _ => self.skip_value()?,
@@ -2135,6 +2146,61 @@ mod tests {
             "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
             hex_lower(&pt_future_expected)
         ));
+        d.push_str("    },\n");
+
+        // (3) A non-string value decodes as the library too. §9.10.2's tolerance
+        // is about a value this version does not know, and a later version could
+        // spell the field as a number; `parse_string()?` would have failed the
+        // whole catalog over it.
+        let nonce_non_string: [u8; AEAD_NONCE_LEN] = [0xCE; AEAD_NONCE_LEN];
+        let pt_non_string: &[u8] = br#"{"ee55":{"content_type":"text/plain","created_at":1700000000,"filename":"note.txt","scope":2,"size":42}}"#;
+        let sealed_non_string = aead_seal_ctx(&catalog_key, &nonce_non_string, pt_non_string, &aad)
+            .expect("seal non-string scope");
+        let mut blob_non_string =
+            Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed_non_string.len());
+        blob_non_string.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob_non_string.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob_non_string.push(CATALOG_BLOB_RESERVED);
+        blob_non_string.extend_from_slice(&nonce_non_string);
+        blob_non_string.extend_from_slice(&(sealed_non_string.len() as u32).to_be_bytes());
+        blob_non_string.extend_from_slice(&sealed_non_string);
+        let decoded_non_string =
+            decode_attachments_catalog(&catalog_key, &account_hash, &blob_non_string)
+                .expect("a non-string scope must not fail the catalog");
+        assert_eq!(
+            decoded_non_string.entries["ee55"].scope,
+            AttachmentScope::Library
+        );
+        let pt_non_string_expected = canonical_json_encode(&decoded_non_string);
+
+        d.push_str("    {\n");
+        d.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-non-string-scope-tolerated\",\n",
+        );
+        d.push_str(
+            "      \"description\": \"Forward-compat (§9.10.2): the tolerance is stated for a scope VALUE this version does not know, not only for a string it does not know. A sealed non-string value MUST decode as `library` rather than fail the catalog (the first implementation used `parse_string()?`, which would have collapsed the WHOLE catalog to {}). expected_plaintext_canonical_utf8_hex is the re-encode without the key; informational_sealed_plaintext_utf8_hex carries the sealed bytes.\",\n",
+        );
+        d.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_non_string)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_sealed_plaintext_utf8_hex\": \"{}\",\n",
+            hex_lower(pt_non_string)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt_non_string_expected)
+        ));
         d.push_str("    }\n");
 
         std::fs::write(
@@ -2521,6 +2587,38 @@ mod tests {
 
     /// Scrubbing a live entry into a tombstone drops the marker with the rest of
     /// the descriptive metadata.
+    /// **A non-string scope decodes as the library instead of killing the
+    /// catalog** (myne-md/myne#913, review round three). §9.10.2's tolerance is
+    /// stated for a value this version does not know, and only a string can name
+    /// a scope; the first implementation used `parse_string()?`, so a future
+    /// `"scope":2` would have failed the parse and `read_or_empty` would have
+    /// collapsed the WHOLE catalog to `{}` — every attachment gone from every
+    /// listing over one word a later version invented.
+    #[test]
+    fn a_non_string_scope_decodes_as_the_library() {
+        let root_key = fixed_root_key();
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash = [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        // Not a canonical value for the field on purpose: the point is a shape
+        // this version has no rule for.
+        let plaintext: &[u8] =
+            br#"{"aa11":{"content_type":"t","created_at":1,"filename":"f","scope":2,"size":2}}"#;
+        let aad = aad_attachments_catalog(&account_hash);
+        let sealed = aead_seal_ctx(&catalog_key, &nonce, plaintext, &aad).expect("seal");
+        let mut blob = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed.len());
+        blob.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob.push(CATALOG_BLOB_RESERVED);
+        blob.extend_from_slice(&nonce);
+        blob.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob.extend_from_slice(&sealed);
+
+        let decoded = decode_attachments_catalog(&catalog_key, &account_hash, &blob)
+            .expect("a non-string scope must not fail the catalog");
+        assert_eq!(decoded.entries["aa11"].scope, AttachmentScope::Library);
+    }
+
     #[test]
     fn a_tombstone_carries_no_scope() {
         let live = AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2).in_chat();

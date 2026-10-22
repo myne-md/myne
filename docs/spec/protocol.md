@@ -2938,7 +2938,10 @@ either order):
   shipped writer emits, where applicable: `kind` (`"text"` or `"agent"`),
   `role` (`"user"` or `"assistant"`), `text` (as authored, possibly empty on
   a failed turn), `error` (bool), `errorCause`, `insertable` (bool),
-  `answeredBy`, `scopeLabel` (string), and `agentSummary` (object with the
+  `answeredBy`, `scopeLabel` (string), `attachments` (a user turn's own filed
+  uploads: an array of `{id, name, contentType}` for the files the message
+  carried, absent when it carried none, additive so a pre-#913 turn re-hydrates
+  without it; `id` is the `vault.attachments` id), and `agentSummary` (object with the
   frozen counts, `charsOffDevice`, the closed `end` tag, the optional monotone
   `outcome`, and the frozen `proposal` payload of anchors/replacements,
   persisted verbatim and READ-ONLY in history; no historical re-apply exists

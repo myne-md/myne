@@ -1370,7 +1370,7 @@
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
-          "noticeLeaves": "The words you type, the notes a turn reads, the titles, identifiers and folder paths of every note the run may read (the whole vault minus your excluded folders, unless you narrow it), and what the AI remembers about you are sent to whatever is answering. Nothing else on this device is sent.",
+          "noticeLeaves": "The words you type, the notes a turn reads, the titles, identifiers and folder paths of every note the run may read (the whole vault minus your excluded folders, unless you narrow it), the text Myne extracted from any files you attach to a message (up to four, each cut at 20,000 characters; the file itself stays here), and what the AI remembers about you are sent to whatever is answering. Nothing else on this device is sent.",
           "noticeReceiver": "It is answering: {{provider}}, which Myne does not run.",
           "noticeReceiverLocal": "It is answering: a program running on this device. Nothing leaves the machine, but that program is not part of Myne and Myne cannot see what it does with them.",
           "noticeRevoke": "To stop it, switch AI off in Settings, or change what is answering there. Revoking a provider key stops that provider immediately.",
