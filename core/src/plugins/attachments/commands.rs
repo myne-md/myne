@@ -1384,6 +1384,9 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
     version: MetaVersion,
     requested: &[String],
     referenced: &std::collections::HashSet<String>,
+    // Whether `referenced` includes the conversation references. When it does
+    // not, a chat-scoped row cannot be shown to be unreferenced and is refused.
+    chat_scan_ok: bool,
 ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
@@ -1402,7 +1405,11 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
         match catalog.entries.get(id) {
             // Present, live, still zero-reference → erase. (Capture size
             // before the scrub so the summary can report bytes freed.)
-            Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
+            Some(meta)
+                if !meta.is_tombstone()
+                    && (chat_scan_ok || meta.scope == AttachmentScope::Library)
+                    && !referenced.contains(id) =>
+            {
                 survivors.push((id.clone(), meta.size))
             }
             // Absent / already tombstoned (gone) / now referenced (TOCTOU) →
@@ -1555,6 +1562,14 @@ pub async fn attachment_clean_unused_with_dir(
     // The conversation half, for the reason the list states (myne-md/myne#913).
     // This is the re-verify that closes the review-to-confirm window, so it reads
     // the CURRENT conversations rather than the ones the list saw.
+    //
+    // **A failed read must not look like "no conversations"** (review round
+    // three). The first version swallowed both failures with
+    // `unwrap_or_default()`, so an unreadable catalog produced an empty candidate
+    // set, the scan answered "nothing referenced", and the sweep proceeded to
+    // crypto-erase chat rows. `chat_scan_ok` is carried into the guard instead:
+    // when the conversation references could not be established, NO chat-scoped
+    // row is erasable, the same posture the note scan takes by aborting.
     let catalog_ids: std::collections::BTreeSet<String> = read_catalog(
         io,
         &vault_dir.join("vault.attachments"),
@@ -1563,9 +1578,9 @@ pub async fn attachment_clean_unused_with_dir(
         meta_version,
     )
     .await
-    .map(|c| c.entries.into_keys().collect())
+    .map(|catalog| catalog.entries.into_keys().collect())
     .unwrap_or_default();
-    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+    let chat_scan_ok = match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
         io,
         vault_dir,
         state,
@@ -1573,29 +1588,19 @@ pub async fn attachment_clean_unused_with_dir(
     )
     .await
     {
-        Ok(chat_ids) => referenced.extend(chat_ids),
-        Err(_) => {
-            // Fail SAFE: without a conversation scan, no chat-scoped id can be
-            // shown to be unreferenced, so all of them are withheld.
-            let chat_ids: Vec<String> = read_catalog(
-                io,
-                &vault_dir.join("vault.attachments"),
-                &catalog_key,
-                &account_number_hash,
-                meta_version,
-            )
-            .await
-            .map(|c| {
-                c.entries
-                    .into_iter()
-                    .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
-                    .map(|(id, _)| id)
-                    .collect()
-            })
-            .unwrap_or_default();
+        Ok(chat_ids) => {
             referenced.extend(chat_ids);
+            true
         }
-    }
+        Err(error) => {
+            tracing::debug!(
+                target: "myne_core::attachments",
+                event = "clean_unused_chat_scan_failed",
+                error_kind = ?error
+            );
+            false
+        }
+    };
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -1611,6 +1616,7 @@ pub async fn attachment_clean_unused_with_dir(
         meta_version,
         &requested,
         &referenced,
+        chat_scan_ok,
     )
     .await?;
 
@@ -3000,6 +3006,10 @@ mod tests {
             MetaVersion::V0_1,
             requested,
             referenced,
+            // The shim's callers are tests that hand a reference set of their
+            // own; no conversation scan backs it, so no chat row is erasable
+            // through them (the conservative answer).
+            false,
         )
         .await
     }

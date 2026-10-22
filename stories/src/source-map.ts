@@ -22,7 +22,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "AgentPane": { file: "src/notes/agent/AgentPane.tsx", line: 68 },
   "AgentProgress": { file: "src/notes/agent/components/AgentProgress.tsx", line: 89 },
   "AgentReview": { file: "src/screens/AgentReview.tsx", line: 134 },
-  "AiChatTab": { file: "src/notes/components/AiChatTab.tsx", line: 133 },
+  "AiChatTab": { file: "src/notes/components/AiChatTab.tsx", line: 135 },
   "AiModelCatalogue": { file: "src/components/settings/AiModelCatalogue.tsx", line: 512 },
   "AiOnboardingSurface": { file: "src/components/settings/AiOnboardingSurface.tsx", line: 164 },
   "AiPanel": { file: "src/components/settings/AiPanel.tsx", line: 472 },

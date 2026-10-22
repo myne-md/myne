@@ -20,6 +20,7 @@
 
 let pinned = false;
 let pendingSwitch = false;
+let conversationNote: string | null = null;
 
 /** Whether the user has pinned this conversation across note switches. */
 export function keepConversationPinned(): boolean {
@@ -29,6 +30,22 @@ export function keepConversationPinned(): boolean {
 /** Pin or unpin, for the rest of the session. */
 export function setKeepConversationPinned(next: boolean): void {
   pinned = next;
+}
+
+/** The note the open conversation belongs to.
+ *
+ *  **Held here for the same reason as the pin** (myne-md/myne#913, review round
+ *  three): the panel unmounts on a tab switch, and a component-local ref meant a
+ *  remount at note B adopted B as the conversation's note — so a conversation
+ *  started on A continued under B, which is the defect the binding exists to
+ *  remove. Module state survives the unmount; the lock drops it. */
+export function conversationNoteId(): string | null {
+  return conversationNote;
+}
+
+/** Bind the open conversation to a note (or to none). */
+export function setConversationNote(noteId: string | null): void {
+  conversationNote = noteId;
 }
 
 /** Record that a note change asked for a fresh conversation while a run was in
@@ -50,4 +67,5 @@ export function takeNoteSwitch(): boolean {
 export function resetConversationBinding(): void {
   pinned = false;
   pendingSwitch = false;
+  conversationNote = null;
 }
