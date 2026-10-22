@@ -1384,9 +1384,6 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
     version: MetaVersion,
     requested: &[String],
     referenced: &std::collections::HashSet<String>,
-    // Whether `referenced` includes the conversation references. When it does
-    // not, a chat-scoped row cannot be shown to be unreferenced and is refused.
-    chat_scan_ok: bool,
 ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
     let catalog_path = vault_dir.join("vault.attachments");
     // `_for_write`, not `read_catalog` (myne#308) — see its doc.
@@ -1405,11 +1402,7 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
         match catalog.entries.get(id) {
             // Present, live, still zero-reference → erase. (Capture size
             // before the scrub so the summary can report bytes freed.)
-            Some(meta)
-                if !meta.is_tombstone()
-                    && (chat_scan_ok || meta.scope == AttachmentScope::Library)
-                    && !referenced.contains(id) =>
-            {
+            Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
                 survivors.push((id.clone(), meta.size))
             }
             // Absent / already tombstoned (gone) / now referenced (TOCTOU) →
@@ -1580,7 +1573,7 @@ pub async fn attachment_clean_unused_with_dir(
     // ids that could be erased, so they are a superset of the candidates, and no
     // extra read can fail.
     let chat_candidates: std::collections::BTreeSet<String> = requested.iter().cloned().collect();
-    let chat_scan_ok = match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
         io,
         vault_dir,
         state,
@@ -1588,19 +1581,22 @@ pub async fn attachment_clean_unused_with_dir(
     )
     .await
     {
-        Ok(chat_ids) => {
-            referenced.extend(chat_ids);
-            true
-        }
+        Ok(chat_ids) => referenced.extend(chat_ids),
         Err(error) => {
+            // **Abort the whole sweep** (myne-md/myne#913, review round five). A
+            // library attachment can be referenced ONLY by a conversation turn
+            // (a file picked with `+` and never embedded in a note), so a
+            // refusal narrowed to `scope: "chat"` would still erase a library
+            // file whose only reference could not be read. This is the same
+            // posture the note scan takes one screen up.
             tracing::debug!(
                 target: "myne_core::attachments",
                 event = "clean_unused_chat_scan_failed",
                 error_kind = ?error
             );
-            false
+            return Err(AttachmentCleanUnusedError::ConversationScanFailed);
         }
-    };
+    }
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -1616,7 +1612,6 @@ pub async fn attachment_clean_unused_with_dir(
         meta_version,
         &requested,
         &referenced,
-        chat_scan_ok,
     )
     .await?;
 
@@ -3006,10 +3001,6 @@ mod tests {
             MetaVersion::V0_1,
             requested,
             referenced,
-            // The shim's callers are tests that hand a reference set of their
-            // own; no conversation scan backs it, so no chat row is erasable
-            // through them (the conservative answer).
-            false,
         )
         .await
     }
@@ -4886,16 +4877,26 @@ mod tests {
             )
             .unwrap();
 
-            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![pasted.clone()])
-                .await
-                .expect("clean");
+            // **A library row too**, named only by the (unreadable) conversation:
+            // a file picked with `+` and never embedded in a note. Narrowing the
+            // refusal to chat-scoped rows is what round five fixed.
+            let library = import_tagged(&tmp, &state, 36).await;
+            let result = attachment_clean_unused_with_dir(
+                tmp.path(),
+                &state,
+                vec![pasted.clone(), library.clone()],
+            )
+            .await;
 
-            assert_eq!(
-                result.deleted, 0,
-                "a chat row is not erasable while its conversations cannot be read"
+            assert!(
+                matches!(
+                    result,
+                    Err(AttachmentCleanUnusedError::ConversationScanFailed)
+                ),
+                "the sweep refuses rather than erasing against a corpus it could not read"
             );
-            assert_eq!(result.skipped, 1);
             assert!(blob_exists(&tmp, &pasted));
+            assert!(blob_exists(&tmp, &library));
         });
     }
 

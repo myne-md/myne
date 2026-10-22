@@ -66,15 +66,20 @@ describe("PaneView hands the agent pane a scope to offer", () => {
     expect(el, "AgentPane is mounted without folders").toContain("folders=");
   });
 
-  it("derives them from the notes the pane already has", () => {
-    // Not a second IPC read: `useLiveResolverNotes` is already in this
-    // component for wikilink resolution, and every folder that holds a note is
-    // what the picker needs.
-    expect(SRC).toContain("const agentFolders = useMemo(");
-    const at = SRC.indexOf("const agentFolders = useMemo(");
-    const body = SRC.slice(at, at + 400);
-    expect(body).toContain("notes.map");
-    // Memoized, because `notes` changes identity on every save and this sorts.
-    expect(body).toContain("[notes]");
+  it("derives them from the shared folder derivation, not notes alone", () => {
+    // **The notes-only derivation was the defect** (myne-md/myne#913, review
+    // round five): it offered no deliberately created empty folder, no parent
+    // that holds no note directly, and a folder that survives only on an archived
+    // note, while the right panel offered all three from `listFolderPaths`. The
+    // same control then answered differently in the two mounts.
+    const at = SRC.indexOf("const [agentFolders, setAgentFolders]");
+    expect(at, "the scope folders are gone").toBeGreaterThan(-1);
+    const body = SRC.slice(at, at + 1600);
+    expect(body, "the shared derivation is not used").toContain("listFolderPaths()");
+    // Keyed on the folder SET rather than on `notes` (which changes identity on
+    // every save) and on the prefs that change with no note write at all.
+    expect(body).toContain("folderSignature");
+    expect(body).toContain("deliberateKey");
+    expect(body).toContain("archivedKey");
   });
 });

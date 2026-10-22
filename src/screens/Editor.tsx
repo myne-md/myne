@@ -4998,6 +4998,13 @@ function RightSidebar({
         .join("\u0000"),
     [notes],
   );
+  // **The prefs half of the key** (review round five): `listFolderPaths` also
+  // unions `deliberate_folders` and filters `archived_folders`, and both change
+  // with no note write at all. Keyed on the note signature alone, the session in
+  // which the user creates an empty folder or archives one kept the old list
+  // until an unrelated save.
+  const deliberateKey = (prefs.deliberate_folders ?? []).join("\u0000");
+  const archivedKey = (prefs.archived_folders ?? []).join("\u0000");
   useEffect(() => {
     if (active !== "ai-chat") return;
     let cancelled = false;
@@ -5008,7 +5015,7 @@ function RightSidebar({
     return () => {
       cancelled = true;
     };
-  }, [active, folderSignature]);
+  }, [active, folderSignature, deliberateKey, archivedKey]);
 
 
   const [draggedId, setDraggedId] = useState<string | null>(null);

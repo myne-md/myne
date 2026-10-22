@@ -80,7 +80,17 @@ export function AttachmentPickerDialog({
     () => (rows === null ? [] : [...rows].sort((a, b) => b.created_at - a.created_at)),
     [rows],
   );
-  const atCap = picked.size >= MAX_RUN_ATTACHMENTS;
+  // **The selection as ROWS, which is what this dialog can actually return**
+  // (review round five). `picked` is seeded from the run's current ids, and that
+  // set can hold a chat-scoped file the library list does not contain; counting
+  // `picked.size` made the button promise a file it would not return ("Attach 2
+  // files" handing back one) and, because the composer replaced its list with
+  // the result, silently dropped the pasted chip.
+  const chosen = useMemo(
+    () => (rows === null ? [] : rows.filter((row) => picked.has(row.id))),
+    [rows, picked],
+  );
+  const atCap = chosen.length >= MAX_RUN_ATTACHMENTS;
 
   function toggle(id: string): void {
     setPicked((current) => {
@@ -223,18 +233,18 @@ export function AttachmentPickerDialog({
         <Button
           variant="primary"
           data-testid="ai.attachment-picker-confirm"
-          disabled={picked.size === 0}
+          disabled={chosen.length === 0}
           onClick={() => {
-            onPick(sorted.filter((row) => picked.has(row.id)));
+            onPick(chosen);
             onClose();
           }}
         >
           {/* "Attach 0 files" on an empty selection read as a broken control
               (myne-md/myne#913). With nothing picked the button is disabled and
               says what the dialog does, not how many of nothing. */}
-          {picked.size === 0
+          {chosen.length === 0
             ? t("agent.attachments.attach")
-            : t("agent.attachments.confirm", { count: picked.size })}
+            : t("agent.attachments.confirm", { count: chosen.length })}
         </Button>
       </div>
     </ModalShell>
