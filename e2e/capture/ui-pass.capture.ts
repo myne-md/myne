@@ -254,8 +254,10 @@ runner(
       // runs of this spec waited out the pane's whole budget with the row
       // right there on screen: the capture was reading "the row exists" as
       // "the row works".
+      let aiReady = false;
       await safe("ai opt-in", async () => {
         await enableAi(s);
+        aiReady = true;
         await sleep(400);
         await closeSettings(s);
         await sleep(600);
@@ -348,18 +350,14 @@ runner(
 
       // ── The reviewed vault seed (myne-md/myne#915) ────────────────────
       // The card needs the floor of ten live notes, so the frames come last.
+      // They are gated on the earlier AI opt-in because the card's own gate
+      // reads it: a pass where that step did not land would otherwise report
+      // four timeouts for a surface that is correctly absent.
       // The generation frames are best-effort: this capture build does not
       // define `local-inference-stub`, so a run without a real model stops at
       // the scope screen and the candidate frame is skipped rather than
       // failing the pass. The E2E suite runs the same path against the stub.
-      await safe("developer mode for the AI panel", async () => {
-        await openSettings(s);
-        await enableDeveloperModeInSettings(s);
-        await closeSettings(s);
-      });
-      await safe("AI on", async () => {
-        await enableAi(s);
-      });
+      if (aiReady) {
       await safe("ten notes for the card's floor", async () => {
         for (let i = 0; i < 10; i += 1) {
           await runPaletteAction(s, "note.new", "new note");
@@ -420,6 +418,7 @@ runner(
           await sleep(600);
         },
       );
+      }
 
     } finally {
       // eslint-disable-next-line no-console
