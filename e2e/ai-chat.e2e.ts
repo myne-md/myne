@@ -155,6 +155,14 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         const mentions = await s.findElements(testIdSelector("ai.mention-link"));
         expect(mentions.length).toBeGreaterThan(0);
         expect((await mentions[0]!.textContent()).trim()).toBe("stub run");
+        // **Pin the conversation before the mention moves the editor**
+        // (myne-md/myne#913). Pressing a mention opens its note, and opening a
+        // different note starts a FRESH conversation, which is the shipped
+        // binding (`ac3` asserts it). This scenario is about the transcript and
+        // the lock, not about the binding, so it uses the explicit pin the user
+        // has for exactly this case; without it the follow-up below would be the
+        // first turn of a new conversation and the count would never reach four.
+        await (await s.byTestId("ai.keep-conversation")).click();
         await mentions[0]!.click();
         // `openMention` is `ws.openNewTabInFocused`, so the note becomes the
         // ACTIVE tab, the one signal that says the press reached the
