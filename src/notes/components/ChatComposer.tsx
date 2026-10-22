@@ -1361,7 +1361,16 @@ export function ChatComposer({
         onClose={() => setAttachmentPickerOpen(false)}
         selectedIds={attachedDocs.map((doc) => doc.id)}
         onPick={(entries) => {
-          setAttachedDocs([...entries]);
+          // **Merge, not replace** (review round five). The picker lists the
+          // LIBRARY, so a file already attached from a paste is not among its
+          // rows; replacing the list dropped that chip and left the file with
+          // nothing naming it, which the sweep would then erase. Order is the
+          // run's order: what was already attached, then the new picks.
+          setAttachedDocs((docs) => {
+            const byId = new Map(docs.map((doc) => [doc.id, doc]));
+            for (const entry of entries) byId.set(entry.id, entry);
+            return [...byId.values()].slice(0, MAX_RUN_ATTACHMENTS);
+          });
           setAttachmentError(null);
         }}
       />

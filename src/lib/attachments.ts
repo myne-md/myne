@@ -163,6 +163,10 @@ export type AttachmentCleanUnusedError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** A conversation could not be read while re-verifying references, so the
+   *  sweep refused and erased nothing. Fail-closed for EVERY row, because a
+   *  library attachment can be referenced only by a conversation turn. */
+  | { kind: "ConversationScanFailed" }
   /** See {@link AttachmentUnusedListError}. Re-checked at the destructive step,
    *  because the list is advisory and storage can shrink between the two. */
   | { kind: "CorpusIncomplete" }

@@ -464,6 +464,7 @@ pub async fn apply_approved(
         approved_new_notes,
         excluded_folders,
         default_new_note_folder,
+        known_folders,
         writer,
         &mut outcome,
     )
@@ -491,6 +492,12 @@ async fn create_notes(
     new_notes: &[(usize, ProposedNote)],
     excluded_folders: &[String],
     default_folder: Option<&str>,
+    // **The same canonical set the MOVE verb is checked against** (myne-md/myne#913,
+    // review round five). The prompt says a new note's folder must be one the vault
+    // has, and `decisions/ai/0720` states that the apply half is what makes a wrong
+    // one impossible; without this the sibling verb could still create `Areas`
+    // beside the user's `02 - AREAS`, which is the exact report that rule exists for.
+    known_folders: &BTreeSet<String>,
     writer: &dyn BatchWriter,
     outcome: &mut ApplyOutcome,
 ) -> Result<(), AgentError> {
@@ -516,6 +523,20 @@ async fn create_notes(
                 reason: EditRejection::UnsafeFrontmatter,
             });
             continue;
+        }
+        // **A folder the vault does not have is refused, exactly as a move's
+        // destination is** (myne-md/myne#913, review round five). Scoped to a
+        // folder the MODEL named: the default location is the user's own setting,
+        // and a note that lands there must not be refused because the setting
+        // points at a folder this batch cannot see.
+        if let Some(named) = note.folder.as_deref() {
+            if !named.is_empty() && !known_folders.contains(&canonical_folder(named)) {
+                outcome.refused_new_notes.push(RefusedNewNote {
+                    index: *index,
+                    reason: EditRejection::UnknownFolder,
+                });
+                continue;
+            }
         }
         // **No folder means the user's default location, not the root**
         // (myne-md/myne#913). This is the same question a manual "New note"
@@ -2059,7 +2080,9 @@ mod tests {
             &[],
             &[(0, new_note("Fresh", Some("Projects")))],
             &[],
-            &BTreeSet::from([String::new()]),
+            // The folder the proposal names, because a create is checked against
+            // the vault's folders as a move is (review round five).
+            &BTreeSet::from([String::new(), "projects/".to_string()]),
             None,
             Approval::Bulk,
             &disk,
@@ -2097,7 +2120,7 @@ mod tests {
             &[],
             &[(0, new_note("Fresh", None))],
             &[],
-            &BTreeSet::from([String::new()]),
+            &BTreeSet::from([String::new(), "00 - inbox/".to_string()]),
             Some("00 - INBOX"),
             Approval::Bulk,
             &disk,
@@ -2111,6 +2134,38 @@ mod tests {
             disk.read_back("new-Fresh").contains("folder: 00 - INBOX"),
             "{}",
             disk.read_back("new-Fresh")
+        );
+    }
+
+    /// **A created note cannot invent a folder** (myne-md/myne#913, review round
+    /// five). The move verb refused one and the create verb accepted any name,
+    /// so `propose_note {folder: "Areas"}` still produced a top-level `Areas`
+    /// beside the user's `02 - AREAS`, which is the report
+    /// `decisions/ai/0720` exists for. Refused, and nothing written.
+    #[test]
+    fn a_new_note_in_a_folder_the_vault_lacks_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[],
+            &[(0, new_note("Stray", Some("Areas")))],
+            &[],
+            &BTreeSet::from([String::new(), "02 - areas/".to_string()]),
+            None,
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert!(out.notes_created.is_empty(), "nothing is written");
+        assert_eq!(out.refused_new_notes.len(), 1);
+        assert_eq!(
+            out.refused_new_notes[0].reason,
+            EditRejection::UnknownFolder
         );
     }
 
@@ -2156,7 +2211,11 @@ mod tests {
             &[],
             &[(0, new_note("Secret", Some("Private/Deep")))],
             &["Private".into()],
-            &BTreeSet::from([String::new()]),
+            // The folder EXISTS and is excluded, which is the realistic pair: an
+            // exclusion names a folder the user has. Without it the create would
+            // be refused as unknown first and this test would be asserting the
+            // wrong arm (review round five).
+            &BTreeSet::from([String::new(), "private/deep/".to_string()]),
             None,
             Approval::Bulk,
             &disk,
@@ -2187,7 +2246,11 @@ mod tests {
                 (1, new_note("Fine", Some("Projects"))),
             ],
             &["Private".into()],
-            &BTreeSet::from([String::new()]),
+            &BTreeSet::from([
+                String::new(),
+                "private/".to_string(),
+                "projects/".to_string(),
+            ]),
             None,
             Approval::Bulk,
             &disk,

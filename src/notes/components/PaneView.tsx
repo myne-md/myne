@@ -90,6 +90,7 @@ import { useVaultHeadings } from "../useVaultHeadings";
 import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
+import { listFolderPaths } from "../listFolderPaths";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type FlushOptions, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import type { LiveSaveContext } from "../saveNote";
@@ -399,15 +400,38 @@ export function PaneView({
   // reference only when the set actually changed, so an unrelated bump no longer
   // reconfigures this pane's editor (myne#217).
   const notes = useLiveResolverNotes();
-  // Every folder that holds a note, for the agent tab's scope picker. Memoized
-  // because `notes` changes identity on every save and this sorts; the right
-  // panel's own copy gates on its tab being open for the same reason, and the
-  // gate here is the pane's kind, checked where it is used.
-  const agentFolders = useMemo(
+  // **The same folder derivation the sidebar and every other picker use**
+  // (myne-md/myne#913, review round five). This pane and the right panel show the
+  // same agent surface, and deriving from notes here while the panel used the
+  // shared derivation meant the two offered DIFFERENT folders for the same
+  // control: no deliberately created empty folder, no parent that holds no note
+  // directly, and a folder that survives only on an archived note still on the
+  // list. `listFolderPaths` unions the live note set with `deliberate_folders`,
+  // synthesizes ancestors and filters archived ones.
+  //
+  // Keyed on the note set's FOLDER SIGNATURE rather than on `notes`, which
+  // changes identity on every save, plus the prefs that change with no note write
+  // at all.
+  const [agentFolders, setAgentFolders] = useState<readonly string[]>([]);
+  const folderSignature = useMemo(
     () =>
-      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))]
+        .sort()
+        .join("\u0000"),
     [notes],
   );
+  const deliberateKey = (prefs.deliberate_folders ?? []).join("\u0000");
+  const archivedKey = (prefs.archived_folders ?? []).join("\u0000");
+  useEffect(() => {
+    let cancelled = false;
+    void listFolderPaths().then((options) => {
+      if (cancelled) return;
+      setAgentFolders([...new Set(options.map((option) => option.path))].sort());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [folderSignature, deliberateKey, archivedKey]);
   /** What an agent apply in THIS pane written to disk owes the rest of the app.
    *
    *  **The agent tab had no half of this at all** (myne-md/myne#894, on the

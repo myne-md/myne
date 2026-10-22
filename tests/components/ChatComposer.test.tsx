@@ -1167,6 +1167,41 @@ describe("ChatComposer, the blocked zero state", () => {
 // file with no extractable text is a sentence rather than a message that goes
 // out without it.
 describe("ChatComposer: attached documents", () => {
+  it("keeps a pasted document when a library file is picked afterwards", async () => {
+    // **The picker cannot return a chat-scoped file** (review round five): it
+    // lists the library, so a file already attached from a paste is not among
+    // its rows. The composer used to REPLACE its list with the picker's answer,
+    // so picking a library PDF silently dropped the pasted screenshot's chip and
+    // left that file with nothing naming it, which the sweep would later erase.
+    mount();
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [new File(["png"], "pasted.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(1),
+    );
+
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+    const option = await screen.findByTestId("ai.attachment-option");
+    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(2),
+    );
+    const names = screen
+      .getAllByTestId("ai.composer-attachment")
+      .map((chip) => chip.textContent ?? "")
+      .join(" ");
+    // The mock's import returns  whatever the File was called; what
+    // matters is that the pasted chip survived alongside the picked one.
+    expect(names).toContain("image.png");
+    expect(names).toContain("lecture.pdf");
+  });
+
   it("sends the chosen document's text with the run", async () => {
     mount();
     type("summarise the lecture");

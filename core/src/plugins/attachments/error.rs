@@ -697,6 +697,16 @@ pub enum AttachmentCleanUnusedError {
     #[error("a note could not be scanned for attachment references")]
     NoteScanFailed,
 
+    /// A CONVERSATION could not be decrypted / decoded during the reference
+    /// re-verify. **Fail-closed for the whole sweep, not only for chat-scoped
+    /// rows** (myne-md/myne#913, review round five): a library attachment can be
+    /// referenced only by a conversation turn (a file picked with `+` and never
+    /// embedded in a note), so narrowing the refusal to `scope: "chat"` would
+    /// still crypto-erase a library file whose only reference could not be read.
+    /// Nothing is erased.
+    #[error("a conversation could not be scanned for attachment references")]
+    ConversationScanFailed,
+
     /// This device cannot prove it holds the whole vault (phase3-web-client
     /// task 89).
     ///
