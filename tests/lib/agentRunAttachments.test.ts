@@ -8,20 +8,29 @@
 // that is the only layer where the distinction between "what the app knows" and
 // "what crosses the wire" exists.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { makeAgentRun } from "../../src/lib/agent-run-core";
 
 describe("makeAgentRun.agentStart", () => {
   it("sends only the name and the text of each attachment", async () => {
-    const invoke = vi.fn(async () => ({
-      view: { runId: "r", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
-      proposal: { edits: [], newNotes: [], summary: "" },
-      end: { kind: "finished" },
-      iterations: 0,
-      notesRead: 0,
-      charsOffDevice: null,
-      excludedCount: 0,
-    }));
+    // The calls are captured rather than read back off `vi.fn().mock`, because
+    // the binding's own signature is generic (`<T>(cmd) => Promise<T>`) and a
+    // mock that infers a concrete payload type is not assignable to it. The
+    // alternative, a cast on `mock.calls`, moves the untyped edge into the
+    // assertion and reports the wrong thing when the payload shape changes.
+    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+    const invoke = (async (cmd: string, args?: Record<string, unknown>) => {
+      calls.push([cmd, args]);
+      return {
+        view: { runId: "r", scopeTotal: 1, userGrants: 1, modelGrants: 0, cancelled: false },
+        proposal: { edits: [], newNotes: [], summary: "" },
+        end: { kind: "finished" },
+        iterations: 0,
+        notesRead: 0,
+        charsOffDevice: null,
+        excludedCount: 0,
+      };
+    }) as <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
     class Channel<T> {
       onmessage: ((v: T) => void) | null = null;
     }
@@ -41,7 +50,7 @@ describe("makeAgentRun.agentStart", () => {
         },
       ],
     );
-    const payload = invoke.mock.calls[0]![1] as {
+    const payload = calls[0]![1] as {
       attachments: Record<string, unknown>[];
     };
     expect(payload.attachments).toEqual([

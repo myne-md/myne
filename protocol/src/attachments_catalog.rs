@@ -154,11 +154,15 @@ impl AttachmentScope {
 
 /// One attachment's authoritative metadata (spec § 9.10.2). Fields are
 /// emitted in fixed canonical (lexicographic) order: `content_type` <
-/// `created_at` < `deleted_at` (when present) < `filename` < `size` <
-/// `updated_at` (when present) < `version` (when non-zero) < `scope` (when
-/// `chat`). The two `Option` fields plus `version` are the additive Phase-2-sync fields
-/// (MYND-468 + myne-md/myne#405); all absent/zero = pre-sync shape,
-/// byte-identical to the original four-field encode.
+/// `created_at` < `deleted_at` (when present) < `filename` < `scope` (when
+/// `chat`) < `size` < `updated_at` (when present) < `version` (when non-zero).
+/// This comment listed `scope` LAST while the encoder emitted it between
+/// `filename` and `size`, which is the slot §9.10.2 pins and the one a port
+/// reads; the comment was a second, wrong answer to the only question the
+/// ordering exists to settle. The `Option` fields plus `version` are the
+/// additive Phase-2-sync fields (MYND-468 + myne-md/myne#405); all
+/// absent/zero = pre-sync shape, byte-identical to the original four-field
+/// encode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentMeta {
     /// Import-time MIME of the file (a hint; the `attachment://` handler
@@ -1979,6 +1983,158 @@ mod tests {
 
         std::fs::write("/tmp/myne_attachments_catalog_vectors.json", d.as_bytes())
             .expect("write attachments-catalog vectors dump");
+    }
+
+    // ---- KAT vector APPEND generator: attachment scope -----------------
+
+    /// Emits a JSON **array fragment** of 2 `scope` cases for
+    /// `myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json` at
+    /// `/tmp/myne_attachments_catalog_scope_vectors.json` (myne-md/myne#913),
+    /// spliced by hand into the existing `cases` array like the parse-fail
+    /// fragment beside it. The whole-file emitter above is NOT re-run: it is
+    /// byte-stable for `vector_id` immutability, and it predates the tombstone
+    /// cases too.
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_catalog_scope_vectors -- --ignored`
+    ///
+    /// The two directions the field has, and neither is covered before #913: a
+    /// `chat` row ENCODES `"scope":"chat"` in its canonical slot (between
+    /// `filename` and `size`), and a value from a later version DECODES as
+    /// `library` rather than failing the catalog (§9.10.2).
+    #[test]
+    #[ignore]
+    fn emit_catalog_scope_vectors() {
+        extern crate std;
+
+        let root_key: [u8; 32] = [0x42; 32];
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash: [u8; CATALOG_BLOB_ACCOUNT_HASH_LEN] =
+            [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        // 0x77 / 0x88 / 0x99 / 0xAA are taken in this family's nonce registry.
+        let nonce_chat: [u8; AEAD_NONCE_LEN] = [0xBB; AEAD_NONCE_LEN];
+        let nonce_future: [u8; AEAD_NONCE_LEN] = [0xCC; AEAD_NONCE_LEN];
+
+        // (1) A chat-scoped entry: the slot, and the whole MYC1 output.
+        let mut chat = AttachmentsCatalog::empty();
+        chat.entries.insert(
+            "cc33".to_string(),
+            AttachmentMeta::live(
+                "image/png".to_string(),
+                1_700_000_000,
+                "pasted.png".to_string(),
+                12345,
+            )
+            .in_chat(),
+        );
+        let pt_chat = canonical_json_encode(&chat);
+        let text = core::str::from_utf8(&pt_chat).expect("canonical JSON is UTF-8");
+        // The SLOT is the contract, so it is asserted here rather than left to
+        // the pinned bytes alone: a canonical order that moved it would still
+        // round-trip through this implementation, and only a port reading the
+        // vector would ever see the difference.
+        assert!(
+            text.contains(r#""filename":"pasted.png","scope":"chat","size":12345"#),
+            "scope must sit between filename and size: {text}"
+        );
+        let blob_chat =
+            encode_attachments_catalog_raw(&catalog_key, &account_hash, &chat, &nonce_chat)
+                .expect("encode chat scope");
+
+        // (2) A scope from a later version decodes as `library`, never as a
+        // failed catalog. The typed encoder cannot emit one, so the envelope is
+        // assembled by hand (assembly mirrors `encode_attachments_catalog_raw`).
+        let pt_future: &[u8] = br#"{"dd44":{"content_type":"text/plain","created_at":1700000000,"filename":"note.txt","scope":"note","size":42}}"#;
+        let aad = aad_attachments_catalog(&account_hash);
+        let sealed =
+            aead_seal_ctx(&catalog_key, &nonce_future, pt_future, &aad).expect("seal future");
+        let mut blob_future = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed.len());
+        blob_future.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob_future.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob_future.push(CATALOG_BLOB_RESERVED);
+        blob_future.extend_from_slice(&nonce_future);
+        blob_future.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob_future.extend_from_slice(&sealed);
+
+        let decoded = decode_attachments_catalog(&catalog_key, &account_hash, &blob_future)
+            .expect("an unknown scope must not fail the catalog");
+        assert_eq!(
+            decoded.entries["dd44"].scope,
+            AttachmentScope::Library,
+            "an unknown scope value decodes as library"
+        );
+        let pt_future_expected = canonical_json_encode(&decoded);
+        assert!(
+            !core::str::from_utf8(&pt_future_expected)
+                .expect("utf8")
+                .contains("scope"),
+            "the canonical re-encode of a library row carries no scope key"
+        );
+
+        let mut d = String::new();
+        d.push_str("    {\n");
+        d.push_str("      \"vector_id\": \"attachments-catalog/v0.1/encrypt-chat-scope\",\n");
+        d.push_str("      \"description\": \"A chat-scoped entry pins the canonical slot of the optional `scope` field: \\\"scope\\\":\\\"chat\\\" between `filename` and `size` (myne-md/myne#913, §9.10.2). The file's bytes, KEK and envelope are a library attachment's; the field only says which surface lists the row. `library` is never emitted, so a library row is byte-identical to the pre-#913 shape (`encrypt-populated`).\",\n");
+        d.push_str("      \"case_kind\": \"encrypt\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&pt_chat)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_catalog_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_chat)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_catalog_key_hex\": \"{}\",\n",
+            hex_lower(catalog_key.as_slice())
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_catalog_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_chat)
+        ));
+        d.push_str("    },\n");
+
+        d.push_str("    {\n");
+        d.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-unknown-scope-tolerated\",\n",
+        );
+        d.push_str("      \"description\": \"Forward-compat (§9.10.2): a sealed plaintext carrying a scope value this version does not know (`note`) MUST decode as `library` rather than fail the catalog, and a canonical re-encode drops the key. expected_plaintext_canonical_utf8_hex is that re-encode, NOT the sealed bytes; informational_sealed_plaintext_utf8_hex carries the sealed plaintext verbatim.\",\n");
+        d.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_future)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_sealed_plaintext_utf8_hex\": \"{}\",\n",
+            hex_lower(pt_future)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt_future_expected)
+        ));
+        d.push_str("    }\n");
+
+        std::fs::write(
+            "/tmp/myne_attachments_catalog_scope_vectors.json",
+            d.as_bytes(),
+        )
+        .expect("write scope fragment");
     }
 
     // ---- KAT vector APPEND generator: structural parse rejects --------
