@@ -43,7 +43,7 @@ import {
   useAiBackendClass,
   useAiSurfaceState,
 } from "../../hooks/useAiModelReady";
-import { useAgent } from "../agent/agentStore";
+import { reviewableRun, useAgent } from "../agent/agentStore";
 import { useChat } from "../ai/chatStore";
 import { buildMentionTargets } from "../ai/noteMentions";
 import { useResolverNotes } from "../resolverNotes";
@@ -217,6 +217,7 @@ export function AiChatTab({
    * grows (each streamed turn would otherwise look like a note switch).
    */
   const lastNoteRef = useRef<string | null>(openNoteId);
+  const pendingSwitchRef = useRef(false);
   const turnsRef = useRef(0);
   turnsRef.current = chat.turns.length;
   const runningRef = useRef(false);
@@ -233,12 +234,37 @@ export function AiChatTab({
       return;
     }
     if (keepConversation) return;
-    // Nothing to abandon yet, and a run in flight belongs to the note the user
-    // started it on: cancelling it here would throw away work they asked for.
-    // The next switch starts fresh, which is the same rule applied later.
-    if (turnsRef.current === 0 || runningRef.current) return;
+    // Nothing to abandon yet.
+    if (turnsRef.current === 0) return;
+    // **A run in flight is DEFERRED, not dropped** (myne-md/myne#913). Cancelling
+    // it here would throw away work the user asked for, but returning without a
+    // record was the same defect one step later: the switch never happened, so
+    // the next message continued the OLD note's conversation beside the new one,
+    // which is the behaviour this change exists to remove. The flag makes the
+    // switch happen when the run settles.
+    if (runningRef.current) {
+      pendingSwitchRef.current = true;
+      return;
+    }
     startNewConversation();
   }, [keepConversation, openNoteId]);
+
+  /**
+   * The switch a note change asked for while a run was in flight.
+   *
+   * **A proposal waiting for review is the one case that keeps the
+   * conversation.** Clearing it would destroy an unapplied proposal the user has
+   * not seen — worse than a transcript about the previous note — and the review
+   * screen is the only surface that can apply or reject it. The flag is cleared
+   * either way so a later settle cannot come back and clear it by surprise.
+   */
+  useEffect(() => {
+    if (agent.running || !pendingSwitchRef.current) return;
+    pendingSwitchRef.current = false;
+    if (keepConversation) return;
+    if (reviewableRun(agent) !== null) return;
+    startNewConversation();
+  }, [agent, keepConversation]);
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
   // only while open so every opening re-fetches the roster.
   const [historyOpen, setHistoryOpen] = useState(false);

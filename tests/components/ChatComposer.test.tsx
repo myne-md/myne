@@ -1255,6 +1255,41 @@ describe("ChatComposer: pasted files", () => {
     expect(chip.textContent).toContain("image.png");
   });
 
+  it("refuses a paste past the four-document cap instead of importing it", async () => {
+    // The cap is a POST-STORE rule too (a fifth file would already be encrypted
+    // and synced by the time the host dropped it), so the composer refuses
+    // before the first import. Four pastes fill it; the fifth is a sentence, not
+    // a fifth file.
+    mount();
+    for (let i = 0; i < 4; i++) {
+      fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+        clipboardData: {
+          files: [new File(["x"], `f${i}.png`, { type: "image/png" })],
+        },
+      });
+      // Sequential, because the next paste has to see the previous one's chip:
+      // the room is computed from state, not from a counter.
+      await waitFor(() =>
+        expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(i + 1),
+      );
+    }
+    expect(attachmentImport).toHaveBeenCalledTimes(4);
+
+    const notPrevented = fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [new File(["x"], "f5.png", { type: "image/png" })] },
+    });
+    // `preventDefault` means the paste was intercepted, and the refusal is said
+    // out loud rather than the file vanishing into a textarea.
+    expect(notPrevented).toBe(false);
+    expect(attachmentImport).toHaveBeenCalledTimes(4);
+    // The KEY, because this harness renders translation keys rather than the
+    // catalog's sentence (the copy itself is asserted where it lives). The count
+    // rides the key, so the user is told the number rather than "too many".
+    expect((await screen.findByTestId("ai.composer-attachment-error")).textContent).toContain(
+      "agent.attachments.cap:4",
+    );
+  });
+
   it("does not swallow a paste that carries no file", () => {
     // Ordinary text paste must reach the textarea untouched: intercepting it
     // would mean typing a sentence into the box stops working.

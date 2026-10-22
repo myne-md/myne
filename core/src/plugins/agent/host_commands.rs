@@ -1330,9 +1330,8 @@ impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
 /// this line is the other half: a report can be diagnosed from the log without a
 /// rebuild. `kind()` is the bounded, content-free tag, the variant id only,
 /// never the note id or any text (`src-tauri/AGENTS.md`'s DENY list).
-#[allow(clippy::too_many_arguments)]
-/// Fired once per successful apply, so the WebView can refresh what it renders
-/// from the vault rather than from the run (myne-md/myne#913).
+/// Fired once per successful apply OR undo, so the WebView can refresh what it
+/// renders from the vault rather than from the run (myne-md/myne#913).
 ///
 /// The sidebar had no way to learn that an agent run created, deleted or moved a
 /// note: the only "notes changed" event in the tree is the CLI bridge's, and the
@@ -1344,8 +1343,14 @@ impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
 /// emits would be ten identical reloads. The name is the agent's own rather than
 /// the CLI's, because a shared name would tell a future reader that the CLI wrote
 /// the note.
+///
+/// **Above the `#[allow]`, not between it and the function.** It was inserted
+/// there first, which moved `too_many_arguments` off the eleven-parameter
+/// `apply_from_host` and onto the const, so `clippy --all-targets -D warnings`
+/// failed on a branch whose tests were green.
 pub const AGENT_NOTES_CHANGED_EVENT: &str = "myne://agent-notes-changed";
 
+#[allow(clippy::too_many_arguments)]
 pub async fn apply_from_host<R: Runtime>(
     app: AppHandle<R>,
     run_id: String,
@@ -1786,6 +1791,14 @@ pub async fn undo_from_host<R: Runtime>(
             settings: failed_settings,
         });
     }
+    // **An undo changes notes too, so it emits the same event the apply does**
+    // (myne-md/myne#913). Without it the sidebar kept the applied title or folder
+    // after a successful undo: the review screen's undo refreshed because it calls
+    // `onNotesWritten(restored)`, and this path — the panel's own — refreshed only
+    // the open note's content. Emitted on a PARTIAL undo as well, because the
+    // notes that did revert are on disk, and once per undo rather than per note
+    // for the reason the apply states.
+    let _ = app.emit(AGENT_NOTES_CHANGED_EVENT, ());
     Ok(AgentUndoResult {
         reverted,
         failed: failed_ids,
