@@ -44,7 +44,6 @@ vi.mock("../../src/lib/seed-memory", () => ({
   SEED_STALE_COOLDOWN_DAYS: 14,
   SEED_STALE_RATIO: 0.25,
   SEED_SUGGEST_MIN_NOTES: 10,
-  SEED_SUGGEST_MIN_FOLDERS: 2,
 }));
 
 vi.mock("../../src/lib/memory", () => ({

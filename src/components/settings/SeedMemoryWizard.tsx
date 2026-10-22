@@ -568,7 +568,12 @@ export function SeedMemoryWizard(props: {
 }
 
 /** The Settings > AI > Memory row that opens the wizard. */
-export function SeedMemoryRow(props: { onShowToast: (message: string) => void }) {
+export function SeedMemoryRow(props: {
+  onShowToast: (message: string) => void;
+  /** Ask the enclosing Memory panel to re-read its list. Without it the panel
+   *  keeps the pre-seed roster while the group appears one full mount later. */
+  onApplied?: () => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<SeedStatus | null>(null);
@@ -599,6 +604,7 @@ export function SeedMemoryRow(props: { onShowToast: (message: string) => void })
       style={CARD}
       data-testid="settings.memory.seed-row"
       data-setting-anchor="ai.memorySeed"
+      data-seeded={seeded ? "true" : "false"}
     >
       <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
         {t("settings.memory.seed.rowTitle")}
@@ -662,6 +668,7 @@ export function SeedMemoryRow(props: { onShowToast: (message: string) => void })
         }}
         onApplied={() => {
           void reload();
+          props.onApplied?.();
           props.onShowToast(t("settings.memory.seed.appliedToast"));
         }}
       />

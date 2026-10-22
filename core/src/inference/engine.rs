@@ -520,7 +520,17 @@ fn seed_script(prompt: &str) -> Option<String> {
     if !prompt.contains("VAULT OUTLINE") {
         return None;
     }
-    let folder = prompt.lines().find_map(|line| {
+    // Scan ONLY the outline. A rebuild carries EXISTING MEMORY, whose lines are
+    // also `- ...`; reading those as folder requests asked for a folder named
+    // after a memory entry and the host correctly refused with NoBodiesReadable.
+    let outline = prompt
+        .split("VAULT OUTLINE")
+        .nth(1)
+        .unwrap_or("")
+        .split("EXISTING MEMORY")
+        .next()
+        .unwrap_or("");
+    let folder = outline.lines().find_map(|line| {
         let rest = line.strip_prefix("- ")?;
         if rest.starts_with("(vault root)") {
             return None;
@@ -2353,6 +2363,17 @@ mod seed_script_tests {
         let v: serde_json::Value = serde_json::from_str(&reply).expect("valid JSON");
         assert_eq!(v["entries"].as_array().unwrap().len(), 3);
         assert_eq!(v["read"][0]["folder"], "Projects");
+    }
+
+    #[test]
+    fn existing_memory_lines_are_not_read_as_folder_requests() {
+        // A rebuild carries `EXISTING MEMORY`, whose entries are also `- ...`
+        // lines. Reading them as read requests asked for a folder named after a
+        // memory entry, and the host refused the run with NoBodiesReadable.
+        let prompt = "VAULT OUTLINE\nLive notes: 2\n\n- (vault root) (2 notes)\n  - A\n\nEXISTING MEMORY\n- Projects: Myne.\n";
+        let reply = seed_script(prompt).expect("a seed prompt answers");
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("valid JSON");
+        assert!(v["read"].as_array().unwrap().is_empty());
     }
 
     #[test]
