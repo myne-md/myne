@@ -45,6 +45,12 @@ import {
 } from "../../hooks/useAiModelReady";
 import { reviewableRun, useAgent } from "../agent/agentStore";
 import { useChat } from "../ai/chatStore";
+import {
+  keepConversationPinned,
+  requestNoteSwitch,
+  setKeepConversationPinned,
+  takeNoteSwitch,
+} from "../ai/conversationBinding";
 import { buildMentionTargets } from "../ai/noteMentions";
 import { useResolverNotes } from "../resolverNotes";
 import { useWorkspace } from "../workspaceContext";
@@ -210,29 +216,48 @@ export function AiChatTab({
    * user who pinned a conversation yesterday did not ask for yesterday's
    * conversation to survive a restart.
    */
-  const [keepConversation, setKeepConversation] = useState(false);
+  // **Held in `conversationBinding`, not here** (myne-md/myne#913, review round
+  // two): this component unmounts on every right-panel tab switch, so a
+  // `useState` pin silently reset and a `useRef` deferred switch was dropped.
+  // Both are session facts, and the session outlives the tab.
+  const [keepConversation, setKeepConversationState] = useState(
+    keepConversationPinned,
+  );
+  const setKeepConversation = useCallback((next: boolean) => {
+    setKeepConversationPinned(next);
+    setKeepConversationState(next);
+  }, []);
   /**
-   * The note the panel last saw, and the transcript's size, both read through
-   * refs so the effect that compares notes does not re-run when the transcript
-   * grows (each streamed turn would otherwise look like a note switch).
+   * The note whose conversation the panel is showing, and the transcript's size,
+   * both read through refs so the effect that compares notes does not re-run
+   * when the transcript grows (each streamed turn would otherwise look like a
+   * note switch).
+   *
+   * **It tracks the last note that HAD a conversation, not the last note the
+   * panel saw.** The first version updated it on every change, including the
+   * move to "no note open", so closing note A and then opening note B looked
+   * like a first mount and B kept A's transcript.
    */
-  const lastNoteRef = useRef<string | null>(openNoteId);
-  const pendingSwitchRef = useRef(false);
+  const lastConversationNoteRef = useRef<string | null>(
+    chat.turns.length > 0 ? openNoteId : null,
+  );
   const turnsRef = useRef(0);
   turnsRef.current = chat.turns.length;
   const runningRef = useRef(false);
   runningRef.current = agent.running;
+
   useEffect(() => {
-    const previous = lastNoteRef.current;
-    if (previous === openNoteId) return;
-    lastNoteRef.current = openNoteId;
-    // Only a move BETWEEN two notes is a switch. Opening a note where there was
-    // none (or closing the last one) has no previous conversation to leave, and
-    // treating it as a switch would start a new conversation on the first
-    // mount of every session.
-    if (previous === null || previous === "" || openNoteId === null || openNoteId === "") {
+    // No destination yet: closing the last note is not a switch, and there is
+    // nothing to compare until a note is open again.
+    if (openNoteId === null || openNoteId === "") return;
+    const previous = lastConversationNoteRef.current;
+    if (previous === null) {
+      // First note of the session; the remembering effect above takes over as
+      // soon as the conversation has a turn in it.
       return;
     }
+    if (previous === openNoteId) return;
+    lastConversationNoteRef.current = openNoteId;
     if (keepConversation) return;
     // Nothing to abandon yet.
     if (turnsRef.current === 0) return;
@@ -243,24 +268,37 @@ export function AiChatTab({
     // which is the behaviour this change exists to remove. The flag makes the
     // switch happen when the run settles.
     if (runningRef.current) {
-      pendingSwitchRef.current = true;
+      requestNoteSwitch();
       return;
     }
     startNewConversation();
   }, [keepConversation, openNoteId]);
+
+  // **Declared AFTER the switch effect, not before it** (myne-md/myne#913): both
+  // run on the same render, and a remembering effect that advanced the ref first
+  // made the switch effect compare the new note against itself, so nothing was
+  // ever cleared. Declaration order is the ordering here.
+  //
+  // It remembers the note as soon as its conversation has something in it, so a
+  // later switch has something to compare against.
+  useEffect(() => {
+    if (openNoteId === null || openNoteId === "") return;
+    if (chat.turns.length === 0) return;
+    lastConversationNoteRef.current = openNoteId;
+  }, [chat.turns.length, openNoteId]);
 
   /**
    * The switch a note change asked for while a run was in flight.
    *
    * **A proposal waiting for review is the one case that keeps the
    * conversation.** Clearing it would destroy an unapplied proposal the user has
-   * not seen — worse than a transcript about the previous note — and the review
-   * screen is the only surface that can apply or reject it. The flag is cleared
+   * not seen, worse than a transcript about the previous note, and the review
+   * screen is the only surface that can apply or reject it. The flag is taken
    * either way so a later settle cannot come back and clear it by surprise.
    */
   useEffect(() => {
-    if (agent.running || !pendingSwitchRef.current) return;
-    pendingSwitchRef.current = false;
+    if (agent.running) return;
+    if (!takeNoteSwitch()) return;
     if (keepConversation) return;
     if (reviewableRun(agent) !== null) return;
     startNewConversation();
@@ -429,7 +467,7 @@ export function AiChatTab({
                 tooltip
                 active={keepConversation}
                 testId="ai.keep-conversation"
-                onClick={() => setKeepConversation((keep) => !keep)}
+                onClick={() => setKeepConversation(!keepConversation)}
               />
               {keepConversation ? (
                 <span

@@ -77,6 +77,7 @@ import {
 import { bumpPrefsNonce } from "../notes/prefsNonce";
 import {
   approvedNewNoteIndices,
+  landedNewNoteIndices,
   currentRunEpoch,
   failRun,
   keptEdits,
@@ -320,7 +321,9 @@ export function AgentReview({
           // The creates that LANDED are resolved, not pending (myne-md/myne#913):
           // without this the card offered "Approve 1 change" beside "2 changes
           // applied" and a second press re-sent an index the host had consumed.
-          newNoteIndices,
+          // `landed`, not `sent`: a create the host REFUSED has to stay
+          // actionable, or the card calls a failed create done.
+          landedNewNoteIndices(newNoteIndices, outcome),
         )
       ) {
         return;

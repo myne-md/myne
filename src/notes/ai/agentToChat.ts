@@ -59,6 +59,7 @@ import {
   failRun,
   getAgent,
   landedEditIndices,
+  landedNewNoteIndices,
   openRun,
   reportRunProgress,
   settleApply,
@@ -466,9 +467,17 @@ async function autoApplyRun(
     );
     // The creates are passed for the same reason the edits are: this path DOES
     // send them (`agentApply` above), so a defaulted-empty argument here left a
-    // created note in the actionable set on the automatic route — the defect the
+    // created note in the actionable set on the automatic route, the defect the
     // review screen's own call site fixed, surviving on its twin.
-    if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch, [], newNotes)) {
+    if (
+      !settleApply(
+        outcome,
+        landedEditIndices(indices, outcome),
+        epoch,
+        [],
+        landedNewNoteIndices(newNotes, outcome),
+      )
+    ) {
       return;
     }
     const changed = [...outcome.notesWritten, ...outcome.notesCreated];

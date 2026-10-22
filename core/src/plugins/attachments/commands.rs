@@ -1135,7 +1135,7 @@ pub(crate) async fn catalog_list_with_dir(
         .entries
         .into_iter()
         // A tombstoned entry is a sync deletion marker (MYND-468), not a
-        // library item — never listed. And a chat attachment belongs to the
+        // library item, never listed. And a chat attachment belongs to the
         // conversation that owns it (myne-md/myne#913): it is stored, encrypted
         // and synced like any other, and it is not one of the files the user
         // curated into their library.
@@ -1277,15 +1277,50 @@ pub(crate) async fn attachment_unused_list_with_dir(
     )
     .await?;
 
+    // **Conversations are the second reference source** (myne-md/myne#913). A
+    // chat-scoped row's reference is a conversation turn, which the note scan
+    // cannot see; reading only notes made every pasted file look unreferenced
+    // seven days later, and the first version of this fix answered that by
+    // refusing to offer chat rows AT ALL, which turned an over-eager erase into
+    // a file with no erasure path: a discarded paste, or a file whose
+    // conversation was deleted, stayed on disk, in the backup and on the sync
+    // server forever. Counting the reference is the honest middle, and a read
+    // failure falls back to the conservative side (offer none).
+    let catalog_ids: std::collections::BTreeSet<String> = catalog.entries.keys().cloned().collect();
+    let mut referenced = referenced;
+    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+        io,
+        vault_dir,
+        state,
+        &catalog_ids,
+    )
+    .await
+    {
+        Ok(chat_ids) => referenced.extend(chat_ids),
+        Err(error) => {
+            // Fail SAFE rather than open: an unreadable conversation proves
+            // nothing about what it names, so every chat-scoped row stays out of
+            // the list.
+            tracing::debug!(
+                target: "myne_core::attachments",
+                event = "unused_list_chat_scan_failed",
+                error_kind = ?error
+            );
+            referenced.extend(
+                catalog
+                    .entries
+                    .iter()
+                    .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
+                    .map(|(id, _)| id.clone()),
+            );
+        }
+    }
+
     let rows: Vec<CatalogEntry> = catalog
         .entries
         .into_iter()
         // A tombstone is already deleted — never offered for cleanup (MYND-468).
-        // **A chat-scoped row is never offered either** (myne-md/myne#913): its
-        // reference is a conversation turn, and this scan reads NOTES, so every
-        // pasted file would look unreferenced seven days later and the sweep
-        // would crypto-erase a file a transcript chip still names.
-        .filter(|(_, meta)| !meta.is_tombstone() && meta.scope == AttachmentScope::Library)
+        .filter(|(_, meta)| !meta.is_tombstone())
         .filter(|(id, _meta)| !referenced.contains(id))
         // SYNC-10 grace: withhold a freshly-added, never-referenced attachment
         // (e.g. a just-shared, not-yet-filed file) from the erase review for
@@ -1367,17 +1402,14 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
         match catalog.entries.get(id) {
             // Present, live, still zero-reference → erase. (Capture size
             // before the scrub so the summary can report bytes freed.)
-            Some(meta)
-                if !meta.is_tombstone()
-                    && meta.scope == AttachmentScope::Library
-                    && !referenced.contains(id) =>
-            {
+            Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
                 survivors.push((id.clone(), meta.size))
             }
-            // Absent / already tombstoned (gone) / now referenced (TOCTOU) /
-            // chat-scoped (myne-md/myne#913) → skip. The scope test is repeated
-            // HERE rather than trusted from the list because the ids arrive from
-            // the caller: the list is a review surface, not the guard.
+            // Absent / already tombstoned (gone) / now referenced (TOCTOU) →
+            // skip. **`referenced` is the whole guard** (myne-md/myne#913): the
+            // ids arrive from the caller, so this re-reads the live references
+            // itself. A chat-scoped id reaches here only when its conversations
+            // were read and none of them names it.
             _ => skipped += 1,
         }
     }
@@ -1513,13 +1545,57 @@ pub async fn attachment_clean_unused_with_dir(
     // window between this scan and the catalog write below is not covered —
     // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
     let notes_dir = vault_dir.join("notes");
-    let referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
+    let mut referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
         io,
         &notes_dir,
         &items_key,
         &items_key_id,
     )
     .await?;
+    // The conversation half, for the reason the list states (myne-md/myne#913).
+    // This is the re-verify that closes the review-to-confirm window, so it reads
+    // the CURRENT conversations rather than the ones the list saw.
+    let catalog_ids: std::collections::BTreeSet<String> = read_catalog(
+        io,
+        &vault_dir.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+        meta_version,
+    )
+    .await
+    .map(|c| c.entries.into_keys().collect())
+    .unwrap_or_default();
+    match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+        io,
+        vault_dir,
+        state,
+        &catalog_ids,
+    )
+    .await
+    {
+        Ok(chat_ids) => referenced.extend(chat_ids),
+        Err(_) => {
+            // Fail SAFE: without a conversation scan, no chat-scoped id can be
+            // shown to be unreferenced, so all of them are withheld.
+            let chat_ids: Vec<String> = read_catalog(
+                io,
+                &vault_dir.join("vault.attachments"),
+                &catalog_key,
+                &account_number_hash,
+                meta_version,
+            )
+            .await
+            .map(|c| {
+                c.entries
+                    .into_iter()
+                    .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
+                    .map(|(id, _)| id)
+                    .collect()
+            })
+            .unwrap_or_default();
+            referenced.extend(chat_ids);
+        }
+    }
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -4669,22 +4745,39 @@ mod tests {
         });
     }
 
-    /// **A chat-scoped attachment is never offered for cleanup**
-    /// (myne-md/myne#913).
+    /// **A conversation counts as a reference** (myne-md/myne#913).
     ///
-    /// Its only reference is a conversation turn, and the unused scan reads
-    /// NOTES, so without this filter every file pasted into a chat would look
-    /// unreferenced once the SYNC-10 grace window passed and the erase dialog
-    /// would offer to crypto-erase a file a transcript chip still names.
+    /// The note scan cannot see a chat attachment's only reference, so reading
+    /// notes alone made every pasted file look unreferenced seven days later.
+    /// The sweep now reads the conversations too, which is what makes BOTH
+    /// directions true: a file a live conversation names is never offered, and a
+    /// file nothing names (a discarded paste, or one whose conversation was
+    /// deleted) is not stranded forever with no erasure path.
     #[test]
-    fn unused_list_never_offers_a_chat_scoped_attachment() {
+    fn unused_list_counts_a_conversation_as_a_reference() {
         rt().block_on(async {
             let (tmp, state) = temp_vault().await;
-            let pasted = import_tagged_scoped(&tmp, &state, 21, AttachmentScope::Chat).await;
-            let library = import_tagged(&tmp, &state, 22).await;
+            let named = import_tagged_scoped(&tmp, &state, 31, AttachmentScope::Chat).await;
+            let orphan = import_tagged_scoped(&tmp, &state, 32, AttachmentScope::Chat).await;
+            // The payload is the client's own shape; this crate only needs it to
+            // be an object with `turns`, and the id is found by the hex scan.
+            let payload = format!("{{\"turns\":[{{\"attachments\":[{{\"id\":\"{named}\"}}]}}]}}");
+            crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: &payload,
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
+            )
+            .await
+            .expect("create conversation");
 
-            // Past the grace window, so the ONLY thing keeping the pasted row
-            // out of the list is the scope filter.
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -4697,43 +4790,53 @@ mod tests {
             let ids: Vec<&str> = listed.iter().map(|entry| entry.id.as_str()).collect();
 
             assert!(
-                ids.contains(&library.as_str()),
-                "control: an unreferenced LIBRARY row is still offered: {ids:?}"
+                !ids.contains(&named.as_str()),
+                "a file a live conversation names is never offered: {ids:?}"
             );
             assert!(
-                !ids.contains(&pasted.as_str()),
-                "a chat-scoped row must never be offered: {ids:?}"
+                ids.contains(&orphan.as_str()),
+                "a chat row nothing names is offered, or it can never be erased: {ids:?}"
             );
         });
     }
 
-    /// And the sweep itself refuses one, because the list is a review surface
-    /// and the ids it returns come back as a caller-supplied argument.
+    /// And the sweep itself makes the same call, because the ids come back from
+    /// the caller: a named file is skipped, an orphan is erased.
     #[test]
-    fn clean_unused_refuses_a_chat_scoped_id() {
+    fn clean_unused_skips_a_chat_attachment_a_conversation_names() {
         rt().block_on(async {
             let (tmp, state) = temp_vault().await;
-            let pasted = import_tagged_scoped(&tmp, &state, 23, AttachmentScope::Chat).await;
-
-            let result = attachment_clean_unused_with_dir(tmp.path(), &state, vec![pasted.clone()])
-                .await
-                .expect("clean");
-
-            assert_eq!(result.deleted, 0, "a chat-scoped attachment is not erased");
-            assert_eq!(result.skipped, 1);
-            // The RAW catalog, not `catalog_list`: that command filters to the
-            // library, so it cannot see the row this test is about. Asserting
-            // through it would have passed with the row erased.
-            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
-            let catalog = read_catalog(
-                &tmp.path().join("vault.attachments"),
-                &catalog_key,
-                &[SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+            let named = import_tagged_scoped(&tmp, &state, 33, AttachmentScope::Chat).await;
+            let orphan = import_tagged_scoped(&tmp, &state, 34, AttachmentScope::Chat).await;
+            let payload = format!("{{\"turns\":[{{\"attachments\":[{{\"id\":\"{named}\"}}]}}]}}");
+            crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: &payload,
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
             )
             .await
-            .expect("catalog");
-            assert!(catalog.entries.contains_key(&pasted));
-            assert!(blob_exists(&tmp, &pasted));
+            .expect("create conversation");
+
+            let result = attachment_clean_unused_with_dir(
+                tmp.path(),
+                &state,
+                vec![named.clone(), orphan.clone()],
+            )
+            .await
+            .expect("clean");
+
+            assert_eq!(result.deleted, 1, "only the orphan is erased");
+            assert_eq!(result.skipped, 1);
+            assert!(blob_exists(&tmp, &named), "the named file survives");
+            assert!(!blob_exists(&tmp, &orphan), "the orphan is erased");
         });
     }
 

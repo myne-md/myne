@@ -432,7 +432,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 /// library, `Some("chat")` for a file pasted into a
                 /// conversation. Declared here because the shared binding sends
                 /// it on every import and Tauri/serde drops an unknown argument
-                /// silently — without the field a web paste would import into
+                /// silently: without the field a web paste would import into
                 /// the library and nothing would complain.
                 #[serde(default)]
                 scope: Option<String>,

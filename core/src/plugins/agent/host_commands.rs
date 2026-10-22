@@ -1794,7 +1794,7 @@ pub async fn undo_from_host<R: Runtime>(
     // **An undo changes notes too, so it emits the same event the apply does**
     // (myne-md/myne#913). Without it the sidebar kept the applied title or folder
     // after a successful undo: the review screen's undo refreshed because it calls
-    // `onNotesWritten(restored)`, and this path — the panel's own — refreshed only
+    // `onNotesWritten(restored)`, and this path (the panel's own) refreshed only
     // the open note's content. Emitted on a PARTIAL undo as well, because the
     // notes that did revert are on disk, and once per undo rather than per note
     // for the reason the apply states.

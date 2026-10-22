@@ -125,7 +125,7 @@ pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 /// user dropped into a question does not turn up beside the ones they curated.
 ///
 /// **`Library` is the default and is never written.** The field is emitted only
-/// for `Chat`, so every existing catalog — and every ordinary import — encodes
+/// for `Chat`, so every existing catalog, and every ordinary import, encodes
 /// byte-identically to the pre-#913 shape. An older reader drops the unknown key
 /// (§9.10.2's additive-field rule) and lists the file in its library, which is
 /// the safe direction: the file is still theirs, still encrypted, and still
