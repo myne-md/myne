@@ -1219,8 +1219,10 @@ pub async fn attachment_unused_list<R: Runtime>(
 /// possibly-shared, and every chat-scoped row is withheld from the sweep. The
 /// cost is stated rather than hidden: on a B2B vault a chat-scoped attachment is
 /// not offered for cleanup until the sweep can enumerate every participant's
-/// conversations. An unreadable or unparseable meta answers `true`, which is the
-/// same conservative side.
+/// conversations. A meta that is ABSENT answers `None` rather than "shared",
+/// because an absent one means a locked or absent vault and the caller's slot
+/// check owns that answer; a meta that is present but does not parse also answers
+/// `None`, and the catalog read on the same bytes refuses a line later.
 pub(crate) async fn vault_conversations_may_be_person_scoped(
     io: &dyn VaultIo,
     vault_dir: &Path,
@@ -1344,6 +1346,15 @@ pub(crate) async fn attachment_unused_list_with_dir(
         &items_key_id,
     )
     .await?;
+    // **The conversation references are older than the note references by the
+    // length of the note scan**, because they had to be read before the slot guard
+    // (the reentrancy hazard above). A file attached to a conversation inside that
+    // window is in `requested` and would be erased. The note half documents the
+    // same class of residual as sub-millisecond; this one is wider and is stated
+    // rather than left to be discovered (myne-md/myne#913, review round ten).
+    // Closing it needs the conversation scan to be re-runnable under the guard,
+    // which means giving it a seal the sweep already holds instead of acquiring
+    // one.
 
     // **Conversations are the second reference source** (myne-md/myne#913). A
     // chat-scoped row's reference is a conversation turn, which the note scan
@@ -1591,6 +1602,16 @@ pub async fn attachment_clean_unused_with_dir(
     // `slots.read()`, and re-entering that `RwLock` under a held guard deadlocks
     // against a queued writer. A conversation that cannot be read aborts the whole
     // sweep, before anything is held or written.
+    // **The session first**: a locked NTV6 vault has a `vault.meta` on disk, so
+    // the shared-vault predicate below would answer "shared" and the user would be
+    // told the conversations could not be read instead of being asked to unlock
+    // (review round ten).
+    if !matches!(
+        &*state.slot_read_active().await,
+        crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+    ) {
+        return Err(AttachmentCleanUnusedError::Locked);
+    }
     // **A shared vault refuses the sweep** (myne-md/myne#913, review round
     // eight): a LIBRARY row can be referenced only by a turn too, and another
     // person's turns are unreadable here, so no row can be shown to be unused.
@@ -3060,6 +3081,16 @@ mod tests {
         state: &VaultRuntimeState,
         now: u64,
     ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+        // **The session first**: a locked NTV6 vault has a `vault.meta` on disk, so
+        // the shared-vault predicate below would answer "shared" and the user would be
+        // told the conversations could not be read instead of being asked to unlock
+        // (review round ten).
+        if !matches!(
+            &*state.slot_read_active().await,
+            crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+        ) {
+            return Err(AttachmentUnusedListError::Locked);
+        }
         super::attachment_unused_list_with_dir(io(), vault_dir, state, now).await
     }
 
