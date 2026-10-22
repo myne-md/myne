@@ -218,7 +218,9 @@ describe("tab title reveal (myne-md/myne#908 item 6)", () => {
     expect(label?.style.textOverflow).toBe("ellipsis");
     // And the text is `inline` at rest, because an inline-block child is an
     // atomic box that swallows the parent's ellipsis.
-    expect(label?.firstElementChild?.style.display).toBe("inline");
+    expect((label?.firstElementChild as HTMLElement | null)?.style.display).toBe(
+      "inline",
+    );
   });
 });
 
