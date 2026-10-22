@@ -71,7 +71,7 @@ export type ImportSource =
   | { kind: "bytes"; bytes: number[]; filename: string | null }
   | { kind: "path"; path: string };
 
-/** Where an imported file belongs (myne-md/myne#913) — mirror of the Rust
+/** Where an imported file belongs (myne-md/myne#913), mirror of the Rust
  *  `AttachmentScope`. `"library"` is the absent value on the wire. */
 export type AttachmentScope = "library" | "chat";
 
@@ -221,8 +221,8 @@ export async function catalogList(): Promise<CatalogEntry[]> {
 export async function attachmentImport(
   source: ImportSource,
   /**
-   * Where the file lands (myne-md/myne#913). `"library"` — the default and what
-   * every existing caller means — is the vault's attachment library; `"chat"` is
+   * Where the file lands (myne-md/myne#913). `"library"`, the default and what
+   * every existing caller means, is the vault's attachment library; `"chat"` is
    * a file pasted into one conversation, stored and encrypted exactly the same
    * way but absent from the library listing.
    *

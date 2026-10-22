@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   landedEditIndices,
+  landedNewNoteIndices,
   landedSettingIndices,
 } from "../../src/notes/agent/agentStore";
 import type { ProposedSetting } from "../../src/lib/agent-protocol";
@@ -146,5 +147,26 @@ describe("landedSettingIndices", () => {
       refusedSettings: [settingRefusal(7, "a")],
     });
     expect(landed).toEqual([0]);
+  });
+});
+
+describe("landedNewNoteIndices", () => {
+  it("keeps a create the host refused actionable", () => {
+    // The defect one round after the fix that introduced it (myne-md/myne#913):
+    // `settleApply` was handed the SENT list, so a create the host refused (an
+    // unsafe title, an excluded folder, a write failure) was recorded as
+    // applied. Its row then read "Created" and `approvedNewNoteIndices` filtered
+    // it out, so the note could never be created for the rest of the run.
+    //
+    // `RefusedNewNote::index` is a position in the PROPOSAL list, the same space
+    // `sent` uses, so this subtraction is direct rather than positional.
+    const landed = landedNewNoteIndices([2, 5], {
+      refusedNewNotes: [{ index: 5, reason: "excludedFolder" }],
+    });
+    expect(landed).toEqual([2]);
+  });
+
+  it("keeps every create when nothing was refused", () => {
+    expect(landedNewNoteIndices([0, 1], { refusedNewNotes: [] })).toEqual([0, 1]);
   });
 });

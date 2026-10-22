@@ -390,7 +390,7 @@ aiDescribe("ac3 the run's footprint is one line in the transcript", () => {
 // that cannot be driven as UI are set up through PRODUCTION IPC from the page
 // seat, the `al1` precedent: an import terminates at a native file dialog
 // WebDriver cannot drive (`attachment_import` with inline bytes), and the
-// chat-scope half is the command a PASTED file goes through — a real clipboard
+// chat-scope half is the command a PASTED file goes through: a real clipboard
 // file cannot be placed by WebDriver either, so the command is invoked with the
 // scope the composer's paste handler sends and the RESULT is what is asserted.
 //
@@ -414,7 +414,7 @@ async function importDoc(
   return (r.ok as { id: string }).id;
 }
 
-/** The ids the attachment LIBRARY lists — the same command the picker reads. */
+/** The ids the attachment LIBRARY lists, the same command the picker reads. */
 async function libraryIds(s: Session): Promise<string[]> {
   const r = await pageSeatInvoke(s, "plugin:attachments|catalog_list", {}, 20_000);
   expect(r.err, "catalog_list should succeed").toBeUndefined();
@@ -437,7 +437,7 @@ aiDescribe("ac2 chat attachments → picker → sent on the turn", () => {
         await waitForSaved(s);
 
         // A library document: the picker offers it, and a picked file is NOT
-        // re-scoped — it is the library's file, and the library keeps it.
+        // re-scoped, because it is the library's file, and the library keeps it.
         const docId = await importDoc(
           s,
           "Field notes. The lake was still and the road was empty.\n",

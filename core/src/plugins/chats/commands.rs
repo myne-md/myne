@@ -701,6 +701,59 @@ pub async fn chats_list_with_dir(
     Ok(rows)
 }
 
+/// The attachment ids any LIVE conversation's payload mentions
+/// (myne-md/myne#913).
+///
+/// **A hex scan, not a parse, and that is deliberate.** The conversation
+/// payload is opaque to this crate: the client owns its shape, and teaching Rust
+/// to read `turn.attachments` would make one client's JSON a wire contract for
+/// the backend. What this needs is not the shape but the IDS, and an id has a
+/// shape the crate already validates everywhere (`HybridId`-class 64 lowercase
+/// hex). So the payload is decrypted and scanned for 64-hex runs, and only the
+/// runs that name a catalog candidate come back.
+///
+/// A false positive is harmless by construction: the ONLY consequence of
+/// matching is that a file is not offered for cleanup. A false negative would be
+/// the dangerous direction, which is why an unreadable conversation answers
+/// `Err` and the caller then keeps every chat-scoped row (see the sweep), rather
+/// than treating "could not read" as "nothing referenced".
+pub async fn referenced_attachment_ids_with_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    candidates: &std::collections::BTreeSet<String>,
+) -> Result<std::collections::BTreeSet<String>, ChatsReadError> {
+    use std::collections::BTreeSet;
+    if candidates.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+    let (_, seal) = seal_from_slot_for_read(io, vault_dir, state).await?;
+    let map = read_catalog_in_dir(io, vault_dir, &seal).await?;
+    let mut found = BTreeSet::new();
+    for (id, entry) in map {
+        if !entry.is_live() {
+            continue;
+        }
+        let plaintext = read_conversation_in_dir(io, vault_dir, &id, &seal).await?;
+        let text = String::from_utf8_lossy(&plaintext);
+        for run in hex_runs(&text) {
+            if candidates.contains(run) {
+                found.insert(run.to_string());
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// Every maximal run of lowercase hex at least 64 characters long, yielded as
+/// the run's own slice. Only a candidate match matters, and every candidate is
+/// exactly 64, so a longer run is truncated to 64 by the caller's set lookup
+/// failing: a 65-character run is not an id.
+fn hex_runs(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !c.is_ascii_hexdigit() || c.is_ascii_uppercase())
+        .filter(|run| run.len() >= 64)
+}
+
 // ---------------------------------------------------------------------------
 // chats_rename
 // ---------------------------------------------------------------------------

@@ -67,6 +67,7 @@ import {
 } from "../agent/agentStore";
 import { startAgentRun } from "../ai/agentToChat";
 import {
+  attachmentDelete,
   attachmentImport,
   attachmentReadExtractedText,
   type CatalogEntry,
@@ -849,8 +850,9 @@ export function ChatComposer({
     // the import is still asking the vault for keys, or there is no feedback at
     // all during the part the user notices.
     setPasting(batch.map((file, i) => `${i}:${file.name || t("agent.attachments.pastedFile")}`));
+    // Declared OUTSIDE the `try` so the catch can erase what already landed.
+    const imported: CatalogEntry[] = [];
     try {
-      const imported: CatalogEntry[] = [];
       for (const file of batch) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const att = await attachmentImport(
@@ -873,6 +875,15 @@ export function ChatComposer({
         [...docs, ...imported].slice(0, MAX_RUN_ATTACHMENTS),
       );
     } catch {
+      // **A batch that fails part-way leaves the files it already stored with
+      // nothing naming them** (myne-md/myne#913, review round two): no chip, no
+      // turn, and, because pasted files are chat-scoped, no library row either.
+      // They are crypto-erased here rather than left for a cleanup sweep the user
+      // has no reason to run. Best effort: a failed delete leaves an
+      // unreferenced row, which the unused-attachment sweep now offers.
+      for (const doc of imported) {
+        void attachmentDelete(doc.id).catch(() => {});
+      }
       setAttachmentError(t("agent.attachments.pasteFailed"));
     } finally {
       setPasting([]);

@@ -34,11 +34,13 @@ const agentPreviewGrant = vi.fn();
 const catalogList = vi.fn();
 const attachmentReadExtractedText = vi.fn();
 const attachmentImport = vi.fn();
+const attachmentDelete = vi.fn();
 vi.mock("../../src/lib/attachments", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/attachments")>()),
   catalogList: (...a: unknown[]) => catalogList(...a),
   attachmentReadExtractedText: (...a: unknown[]) => attachmentReadExtractedText(...a),
   attachmentImport: (...a: unknown[]) => attachmentImport(...a),
+  attachmentDelete: (...a: unknown[]) => attachmentDelete(...a),
 }));
 
 vi.mock("../../src/lib/agent-run", () => ({
@@ -122,6 +124,7 @@ beforeEach(() => {
   attachmentReadExtractedText
     .mockReset()
     .mockResolvedValue({ text: "the lecture, in words", source_format: "pdf", truncated: false });
+  attachmentDelete.mockReset().mockResolvedValue(undefined);
   attachmentImport.mockReset().mockResolvedValue({
     id: "0184a2b3c4d5e6f708192a3b4c5d6e81",
     content_type: "image/png",
@@ -1288,6 +1291,43 @@ describe("ChatComposer: pasted files", () => {
     expect((await screen.findByTestId("ai.composer-attachment-error")).textContent).toContain(
       "agent.attachments.cap:4",
     );
+  });
+
+  it("erases the files a failed batch had already stored", async () => {
+    // A batch that fails on its second file used to leave the first as an
+    // encrypted chat-scoped blob with no chip, no turn and no library row
+    // (myne-md/myne#913, review round two). Nothing named it, and the cleanup
+    // sweep is the last thing a user would think to run.
+    mount();
+    attachmentImport
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: "aa11",
+        content_type: "image/png",
+        filename: "first.png",
+        size: 3,
+        created_at: 2,
+        deduplicated: false,
+        original_size: 3,
+        container_changed: false,
+      })
+      .mockRejectedValueOnce(new Error("no keys"));
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [
+          new File(["one"], "first.png", { type: "image/png" }),
+          new File(["two"], "second.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() => expect(attachmentDelete).toHaveBeenCalledWith("aa11"));
+    // Nothing landed on the composer: a half-attached message is not a message.
+    expect(screen.queryAllByTestId("ai.composer-attachment")).toHaveLength(0);
+    expect(
+      (await screen.findByTestId("ai.composer-attachment-error")).textContent,
+    ).toContain("agent.attachments.pasteFailed");
   });
 
   it("does not swallow a paste that carries no file", () => {

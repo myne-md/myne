@@ -1578,7 +1578,7 @@ mod tests {
     ///
     /// The report: a run said it moved a note to "Areas", and the sidebar grew a
     /// new top-level folder beside the user's `02 - AREAS`. Nothing wrote a
-    /// folder there — a `folder:` value IS the folder — so the app had no way to
+    /// folder there, a `folder:` value IS the folder, so the app had no way to
     /// say "that is not a folder you have". This is that way.
     ///
     /// The set is the vault's own: the root, the folders notes live in, and the
