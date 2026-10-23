@@ -1406,20 +1406,23 @@ pre-push:
         - "**/*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
       run: pnpm build
 
-    vitest:
-      # Frontend unit tests (Vitest). `tests/` lives OUTSIDE `tsc`'s
-      # include:["src"], so `pnpm-build` above type-checks src but never runs
-      # or type-checks the specs — Vitest is their only local gate (CI runs it
-      # too). Closes the "JS test red only surfaces after push" gap.
-      #
-      # Globbed with `pnpm-build` above. The handful of specs that read a Rust
-      # file (tests/scripts/*.test.ts) are guard-injection specs whose guards
-      # already run in `pre-commit` against exactly those staged paths, so a
-      # Rust-only push loses no local coverage it did not keep there.
-      glob:
-        - "*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
-        - "**/*.{ts,tsx,js,jsx,mts,cts,json,html,css}"
-      run: pnpm test
+    # `vitest` used to run here: the whole suite, 1 024 files, on every push that
+    # touched a JS file. It was removed deliberately, not by accident.
+    #
+    # What it cost: four to five minutes of laptop per push to re-run what
+    # `.woodpecker/main.yml` runs anyway, on a machine that is not the one that
+    # ships the artefact. And it was unreliable under exactly the load pre-push
+    # creates: `tests/scripts/hexHelpers.test.ts` shells out over every Rust file
+    # in the checkout and blew past vitest's default timeout twice, while the same
+    # suite passed standalone minutes earlier. A gate that fails on the machine
+    # rather than on the code teaches people to bypass gates, and twice here it
+    # did: `LEFTHOOK_EXCLUDE=vitest git push`.
+    #
+    # What replaces it: CI on `develop`, which is where the suite ran the whole
+    # time and where a red result belongs. The cost is real and worth stating:
+    # a broken JS test now surfaces after the push instead of before it. Run
+    # `pnpm test` by hand before a push you are unsure about; it is the same
+    # command the hook used.
 
 # Reject accidental AI co-author / attribution trailers in commit messages
 # (project policy — see root guidance). Lefthook passes the commit-message
