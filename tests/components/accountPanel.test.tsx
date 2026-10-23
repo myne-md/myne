@@ -19,13 +19,29 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 // ── Mock the IPC-boundary lib wrappers, keeping the pure helpers real ──────
 const listAccounts = vi.fn();
 const renameAccount = vi.fn();
+const splitVault = vi.fn();
+const moveVault = vi.fn();
 const listVaults = vi.fn();
+const personAccountNumber = vi.fn();
 
 vi.mock("../../src/lib/account", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/account")>()),
   listAccounts: (...a: unknown[]) => listAccounts(...a),
   renameAccount: (...a: unknown[]) => renameAccount(...a),
+  splitVault: (...a: unknown[]) => splitVault(...a),
+  moveVault: (...a: unknown[]) => moveVault(...a),
 }));
+vi.mock("../../src/lib/personAccount", () => ({
+  personAccountNumber: (...a: unknown[]) => personAccountNumber(...a),
+  // The register block is not exercised in this suite; the panel imports the
+  // module for the number read and must not reach the real IPC layer.
+  personRegister: vi.fn(),
+  readSyncEndpoint: vi.fn(),
+  writeSyncEndpoint: vi.fn(),
+}));
+vi.mock("../../src/lib/clipboard", () => ({ copyText: vi.fn() }));
+vi.mock("../../src/platform/clipboardManager", () => ({ writeText: vi.fn() }));
+vi.mock("../../src/components/toast/toastStore", () => ({ toast: vi.fn() }));
 vi.mock("../../src/lib/vault-list", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/vault-list")>()),
   listVaults: (...a: unknown[]) => listVaults(...a),
@@ -69,6 +85,9 @@ beforeEach(() => {
   listAccounts.mockReset().mockResolvedValue([ACCOUNT]);
   renameAccount.mockReset().mockResolvedValue({ ...ACCOUNT, label: "Personal" });
   listVaults.mockReset().mockResolvedValue({ ok: VAULTS });
+  splitVault.mockReset().mockResolvedValue([ACCOUNT]);
+  moveVault.mockReset().mockResolvedValue([ACCOUNT]);
+  personAccountNumber.mockReset().mockResolvedValue(null);
 });
 
 afterEach(cleanup);
@@ -188,5 +207,146 @@ describe("AccountPanel — states that are not 'an account'", () => {
     expect(rows).toHaveLength(2);
     // Both rows still render, and neither invents a name from the id.
     for (const row of rows) expect(row.textContent).toContain("Another vault");
+  });
+});
+
+// 2026-10-23: the roster stopped being a read-out. A count that said "1 vaults",
+// rows with no glyph or state, no way to act, and a closing sentence pointing at
+// a panel the user had to find by hand.
+describe("AccountPanel — the vault roster", () => {
+  it("uses the singular for one vault", async () => {
+    listAccounts.mockResolvedValue([{ ...ACCOUNT, vaults: ["v-active"] }]);
+    renderPanel();
+    const count = await screen.findByTestId("settings.account-vaults-count");
+    expect(count.textContent).toBe("1 vault");
+  });
+
+  it("keeps the plural for several", async () => {
+    renderPanel();
+    const count = await screen.findByTestId("settings.account-vaults-count");
+    expect(count.textContent).toBe("2 vaults");
+  });
+
+  it("offers the grouping actions the picker already performs", async () => {
+    // Two accounts, so a move DESTINATION exists: the backend takes a target
+    // vault id, so a destination can only be an account that already holds one.
+    const other = { id: "acct-2", label: "Home", vaults: ["v-third"] };
+    listAccounts.mockResolvedValue([ACCOUNT, other]);
+    splitVault.mockResolvedValue([
+      { ...ACCOUNT, vaults: ["v-other"] },
+      { id: "acct-3", label: "", vaults: ["v-active"] },
+    ]);
+    renderPanel();
+    const actions = await screen.findAllByTestId("settings.account-vault-actions");
+    fireEvent.click(actions[0]!);
+    fireEvent.click(await screen.findByTestId("settings.account-vault-split"));
+    await waitFor(() => expect(splitVault).toHaveBeenCalledWith("v-active"));
+
+    // The panel stays on the account it was SHOWING rather than following the
+    // open vault into the account the split just created: swapping the panel's
+    // subject mid-edit is the failure this anchors against (2026-10-23 review).
+    await waitFor(() => expect(splitVault).toHaveBeenCalled());
+    expect(
+      (screen.getByTestId("settings.account-name-input") as HTMLInputElement).value,
+    ).toBe("Work");
+  });
+
+  it("moves a vault into another account by that account's first vault", async () => {
+    const other = { id: "acct-2", label: "Home", vaults: ["v-third"] };
+    listAccounts.mockResolvedValue([ACCOUNT, other]);
+    renderPanel();
+    const actions = await screen.findAllByTestId("settings.account-vault-actions");
+    fireEvent.click(actions[0]!);
+    const destinations = await screen.findAllByTestId("settings.account-vault-move");
+    fireEvent.click(destinations[0]!);
+    await waitFor(() => expect(moveVault).toHaveBeenCalledWith("v-active", "v-third"));
+  });
+
+  it("offers only 'move to a new account' when there is no destination yet", async () => {
+    // With one vault there is nowhere to move it TO (the backend needs a target
+    // vault id), so the menu keeps the split and drops the empty heading.
+    listAccounts.mockResolvedValue([{ ...ACCOUNT, vaults: ["v-active"] }]);
+    renderPanel();
+    const actions = await screen.findAllByTestId("settings.account-vault-actions");
+    expect(actions).toHaveLength(1);
+    fireEvent.click(actions[0]!);
+    expect(await screen.findByTestId("settings.account-vault-split")).toBeTruthy();
+    expect(screen.queryByTestId("settings.account-vault-move")).toBeNull();
+  });
+
+  it("shows the person account number, and only when the device has one", async () => {
+    personAccountNumber.mockResolvedValue("XX95H84N8WE46C6KXRN2");
+    renderPanel();
+    const box = await screen.findByTestId("settings.account-number");
+    expect((box as HTMLInputElement).value).toBe("MY-XX95-H84N-8WE4-6C6K-XRN2");
+    expect(screen.getByTestId("settings.account-number-copy")).toBeTruthy();
+  });
+
+  it("states that there is no identity instead of hiding the number row", async () => {
+    // The settings-search entry for the number is not runtime-gated, so the row
+    // has to exist in every grouping state: a hit that lands on an absent anchor
+    // degrades to a silent panel switch (2026-10-23 review).
+    personAccountNumber.mockResolvedValue(null);
+    renderPanel();
+    await screen.findByTestId("settings.account-number-empty");
+    expect(screen.queryByTestId("settings.account-number")).toBeNull();
+    expect(screen.queryByTestId("settings.account-number-copy")).toBeNull();
+  });
+
+  it("opens the Sync panel instead of pointing at it", async () => {
+    const onOpenPanel = vi.fn();
+    renderPanel({ onOpenPanel });
+    fireEvent.click(await screen.findByTestId("settings.account-open-sync"));
+    expect(onOpenPanel).toHaveBeenCalledWith("sync");
+  });
+});
+
+// 2026-10-23 review: the three arms the roster grew and did not pin.
+describe("AccountPanel — the roster's careful arms", () => {
+  it("asks before splitting the account's only vault, and cancelling writes nothing", async () => {
+    listAccounts.mockResolvedValue([{ ...ACCOUNT, vaults: ["v-active"] }]);
+    renderPanel();
+    fireEvent.click((await screen.findAllByTestId("settings.account-vault-actions"))[0]!);
+    fireEvent.click(await screen.findByTestId("settings.account-vault-split"));
+    // The split deletes the account's id AND its name, which the menu's own
+    // wording cannot say, so it is a second step rather than a click.
+    expect(splitVault).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("settings.account-vault-confirm-run")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("settings.account-vault-confirm-cancel"));
+    expect(splitVault).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("settings.account-vault-split"));
+    fireEvent.click(await screen.findByTestId("settings.account-vault-confirm-run"));
+    await waitFor(() => expect(splitVault).toHaveBeenCalledWith("v-active"));
+  });
+
+  it("does not claim a state for a vault the list could not read", async () => {
+    // The list failure folds to [], so every id in the record is a vault this
+    // device did not enumerate. "Device only" would be a claim from no data.
+    listVaults.mockResolvedValue({ ok: [] });
+    renderPanel();
+    await screen.findByTestId("settings.account-vaults");
+    const rows = screen.getAllByTestId("settings.account-vault-row");
+    expect(rows[0]!.textContent).toContain("Not read on this device");
+    expect(screen.queryAllByTestId("settings.account-vault-actions")).toHaveLength(0);
+  });
+
+  it("copies the number and reports both outcomes", async () => {
+    const { copyText } = await import("../../src/lib/clipboard");
+    const copyMock = vi.mocked(copyText);
+    copyMock.mockClear();
+    personAccountNumber.mockResolvedValue("XX95H84N8WE46C6KXRN2");
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("settings.account-number-copy"));
+    expect(copyMock).toHaveBeenCalled();
+    const value = copyMock.mock.calls[0]![1];
+    expect(value).toBe("MY-XX95-H84N-8WE4-6C6K-XRN2");
+    // Both arms are wired; a failure must not read as a success.
+    const options = copyMock.mock.calls[0]![2] as {
+      onSuccess: { kind: string };
+      onFailure: { kind: string };
+    };
+    expect(options.onSuccess.kind).toBe("toast");
+    expect(options.onFailure.kind).toBe("toast");
   });
 });

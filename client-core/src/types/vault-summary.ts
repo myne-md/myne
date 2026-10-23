@@ -1,9 +1,9 @@
 // TypeScript mirror of the Rust vault_list IPC contract (SYNC-4).
 //
 // Source-of-truth Rust definitions:
-//   - src-tauri/src/plugins/vault_unlock/commands.rs
+//   - core/src/plugins/vault_unlock/commands.rs
 //       (VaultSummary struct + VaultSummaryStatus enum + vault_list command)
-//   - src-tauri/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
+//   - core/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
 //
 // `vault_list` is the multi-vault generalization of `vault_status`: where
 // `vault_status` probes the single legacy vault.meta, `vault_list` enumerates

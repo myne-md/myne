@@ -11,8 +11,8 @@
    `:active`, `:focus-visible` or a media query, so three costs compounded:
 
      1. Every variant was re-derived by hand at each call site, which is how
-        95 files came to render a raw `<button>` against 58 importing the
-        primitive.
+        most screens came to render a raw `<button>` while only a handful
+        imported the primitive.
      2. State motion had nowhere to live -- there was no class change to
         transition on.
      3. `src/styles/tokens.css` grew a row of `[data-testid="…"]:focus-visible`
@@ -92,6 +92,24 @@
   border-color: var(--line-2);
 }
 
+/* A RESTING fill, not `transparent` (2026-10-23).
+   A ghost button that paints nothing until it is hovered is invisible as a
+   control: it reads as a label, so the quietest action in a dialog or a card is
+   the one a user cannot find. The fill is a translucent step of the hover ramp
+   so it sits on both surfaces a ghost button is used on (`--paper` panels and
+   `--paper-2` cards) without needing a second rule per parent.
+
+   Two exclusions, both load-bearing:
+   - `:enabled`, so a disabled control keeps the flat `transparent` from the
+     base rule below rather than falling through to the user agent's button
+     face. The base rule KEEPS its `background` for exactly that arm.
+   - `:not([role="menuitem"])`, so a menu is not a stack of filled bars: a row
+     whose every sibling is filled has no affordance left, and the menu item is
+     the one call site where "hoverable" is the whole signal. Hover still paints
+     one full step for it, like every other ghost button. */
+.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"]) {
+  background: color-mix(in srgb, var(--bg-3) 70%, transparent);
+}
 .myne-btn[data-variant="ghost"] {
   background: transparent;
   color: var(--fg-2);

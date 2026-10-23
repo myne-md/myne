@@ -577,8 +577,9 @@ describe("MemberRosterPanel rename", () => {
 });
 
 // myne-md/myne#851 task 9 (story 22): a member who accepted before the name step
-// shipped is invited once, on their OWN row, and the invitation goes away once a
-// name is set. It writes nothing and blocks nothing.
+// shipped still needs a way to set one. It is the `Set a name` button on their
+// OWN unverified row and nothing else (2026-10-23: the sentence beside it and its
+// session-scoped `Not now` were removed, see the panel's own comment).
 describe("MemberRosterPanel name invitation", () => {
   const setup = () => {
     mockGroupKeyEpoch = 3; // shared: the store exists, so a name can be set
@@ -587,7 +588,7 @@ describe("MemberRosterPanel name invitation", () => {
     namesMocks.clearMyMemberName.mockClear();
   };
 
-  it("invites the caller whose row has no name, and only their own row", () => {
+  it("offers the setter on the caller's own row, and only there", () => {
     const previous = mockMembers;
     setup();
     mockMembers = [
@@ -606,16 +607,17 @@ describe("MemberRosterPanel name invitation", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      const invites = screen.getAllByTestId("member-roster.name-invite");
-      expect(invites).toHaveLength(1);
-      // ...on the caller's row, and the affordance beside it sets rather than renames.
       const ownRow = screen
         .getAllByTestId("member-roster.row")
         .find((li) => li.getAttribute("data-fingerprint") === "aa".repeat(32).slice(0, 16));
-      expect(within(ownRow!).getByTestId("member-roster.name-invite")).toBeDefined();
       expect(within(ownRow!).getByTestId("member-roster.name-edit").textContent).toBe(
         "sync.memberRoster.nameInviteCta",
       );
+      // The sentence and its `Not now` link are gone: the button is the whole
+      // invitation, so the row has exactly one affordance to set a name.
+      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
+      expect(screen.queryByTestId("member-roster.name-invite-dismiss")).toBeNull();
+      expect(screen.getAllByTestId("member-roster.name-edit")).toHaveLength(1);
     } finally {
       cleanup();
       mockMembers = previous;
@@ -623,7 +625,7 @@ describe("MemberRosterPanel name invitation", () => {
     }
   });
 
-  it("goes away once a name is set", () => {
+  it("offers only a rename once a name is set", () => {
     const previous = mockMembers;
     setup();
     mockMembers = [
@@ -636,32 +638,11 @@ describe("MemberRosterPanel name invitation", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
-      // The row still offers a rename: an invitation to SET a name is not the same
+      // The row still offers a rename: the ability to SET a name is not the same
       // as the standing ability to change one.
       expect(screen.getByTestId("member-roster.name-edit").textContent).toBe(
         "sync.memberRoster.nameEdit",
       );
-    } finally {
-      cleanup();
-      mockMembers = previous;
-      mockGroupKeyEpoch = null;
-    }
-  });
-
-  it("is dismissible, and dismissing writes nothing", () => {
-    const previous = mockMembers;
-    setup();
-    mockMembers = [
-      rowView({ is_self: true, display_name: "", name_state: "absent" }),
-    ];
-    render(<MemberRosterPanel />);
-    try {
-      fireEvent.click(screen.getByTestId("member-roster.name-invite-dismiss"));
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
-      expect(namesMocks.setMyMemberName).not.toHaveBeenCalled();
-      // The affordance stays: dismissing the ASK must not take away the ability.
-      expect(screen.getByTestId("member-roster.name-edit")).toBeDefined();
     } finally {
       cleanup();
       mockMembers = previous;
@@ -676,7 +657,6 @@ describe("MemberRosterPanel name invitation", () => {
     mockMembers = [rowView({ is_self: true, display_name: "", name_state: "absent" })];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
       expect(screen.queryByTestId("member-roster.name-edit")).toBeNull();
     } finally {
       cleanup();

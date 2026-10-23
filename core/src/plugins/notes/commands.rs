@@ -2210,7 +2210,7 @@ pub fn note_ids_from_entries(entries: &[crate::vault_io::DirEntry]) -> Vec<NoteI
                 // `.myn` extension but malformed UUIDv7 stem — corruption
                 // canary. The closed `InvalidNoteIdCause` enum's Debug
                 // impl emits a bare variant name (DENY-list-safe per the
-                // pattern in `src-tauri/src/plugins/notes/note_id.rs`).
+                // pattern in `core/src/plugins/notes/note_id.rs`).
                 // The offending stem string itself is **not** logged.
                 tracing::warn!(stage = "skip_malformed_uuid", cause = ?cause);
             }

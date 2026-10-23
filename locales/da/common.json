@@ -4032,7 +4032,8 @@
       "nameSaving": "Gemmer…",
       "vaultsLabel": "Bokse i denne konto",
       "vaultsHelper": "De bokse, som denne enhed grupperer under navnet ovenfor. Gruppering er et organisationsvalg pr. enhed, så det er ikke en del af nogen boks' indhold og følger ikke med den.",
-      "vaultsCount": "{{count}} bokse",
+      "vaultsCount_one": "{{count}} bokse",
+      "vaultsCount_other": "{{count}} bokse",
       "currentVault": "Denne boks",
       "unknownVault": "En anden boks på denne enhed",
       "standaloneHelper": "Denne boks er ikke grupperet under en konto på denne enhed, så den står alene. Gruppering er pr. enhed: en anden enhed kan vise den inde i en.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Navne kan angives, når denne boks er delt.",
       "nameErrorLocked": "Lås boksen op for at ændre dit navn.",
       "nameErrorGeneric": "Kunne ikke gemme dit navn. Prøv igen.",
-      "nameInvite": "Du har endnu ikke noget visningsnavn. De øvrige medlemmer ser dit fingeraftryk.",
       "nameInviteCta": "Angiv et navn",
-      "nameInviteDismiss": "Ikke nu",
       "noInvitations": "Ingen invitationer sendt endnu.",
       "identityHeading": "Din identitet",
       "membersHeading": "Medlemmer",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Gendannelsessætning — hvis du glemmer din adgangskode",
       "save": "Gem gendannelsessæt",
       "saveFailed": "Kunne ikke gemme filen. Kopiér sættet i stedet, eller skriv begge dele ned.",
-      "savedToFile": "Gemt. Det er en almindelig tekstfil med begge hemmeligheder, så opbevar den et sted, hvor kun du kan læse den.",
-      "whyEnglish": "Ordene er engelske på alle sprog. De er en del af BIP-39-standarden, så enhver Myne-klient kan læse en sætning skrevet af enhver anden. Oversæt dem ikke: oversatte ord findes ikke på ordlisten, og sætningen ville holde op med at virke."
+      "savedToFile": "Gemt. Det er en almindelig tekstfil med begge hemmeligheder, så opbevar den et sted, hvor kun du kan læse den."
     },
     "name": {
       "back": "Tilbage",

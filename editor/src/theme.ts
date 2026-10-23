@@ -686,11 +686,11 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     boxSizing: "border-box",
     overflowX: "auto",
-    backgroundColor: "var(--paper)",
+    backgroundColor: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
-    color: "var(--ink-1)",
+    color: "var(--diagram-ink)",
   },
   ".cm-mermaid-fallback .cm-mermaid-card": {
     display: "block",
@@ -718,7 +718,7 @@ export const myneTheme = EditorView.theme({
     // deliberately non-theme-aware `--diagram-surface`, so the theme token would
     // put pale salmon on near-white at roughly 2.5:1. That is the exact drift
     // #629 is about, one element over: the surface fixed and the ink moving.
-    color: "var(--danger)",
+    color: "var(--diagram-danger)",
   },
 
   // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the

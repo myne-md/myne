@@ -147,3 +147,36 @@ describe("the legacy add-device form", () => {
     expect(screen.queryByTestId("sync.enroll")).toBeNull();
   });
 });
+
+// 2026-10-23. A refused publish used to REPLACE the row's muted helper with
+// another muted sentence: no alert, no colour, nothing announced. Reported as
+// "clicking does nothing", which is what it looked like. The refusal is an error
+// now, and the readout keeps saying what the vault actually is.
+describe("the publish refusal", () => {
+  it("is announced as an error, and leaves the readout intact", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:sync|sync_publish_vault") throw { kind: "PersonNotRegistered" };
+      if (cmd === "plugin:sync|sync_published_state") {
+        return {
+          published: false,
+          namespace_hex: null,
+          published_at_ms: null,
+          person_born: true,
+        };
+      }
+      return syncPanelCommandRouter({ syncState: "not_enrolled" })(cmd);
+    });
+    setActiveSettingsTopic("sync", "devices");
+    renderSyncPanel();
+    await waitFor(() => expect(screen.getByTestId("sync.panel.publish")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("sync.panel.publish"));
+
+    const message = await screen.findByText(/Register your identity first/);
+    expect(message.getAttribute("role")).toBe("alert");
+    expect(screen.getByTestId("sync.panel.publish-state").textContent).toContain(
+      "exists only on this device",
+    );
+    // The control stays enabled: the retry is the same button.
+    expect((screen.getByTestId("sync.panel.publish") as HTMLButtonElement).disabled).toBe(false);
+  });
+});

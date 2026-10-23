@@ -4032,7 +4032,8 @@
       "nameSaving": "Opslaan…",
       "vaultsLabel": "Kluizen in dit account",
       "vaultsHelper": "De kluizen die dit apparaat onder de naam hierboven groepeert. Groeperen is een organisatorische keuze per apparaat, dus het maakt geen deel uit van de inhoud van een kluis en reist er niet mee.",
-      "vaultsCount": "{{count}} kluizen",
+      "vaultsCount_one": "{{count}} kluizen",
+      "vaultsCount_other": "{{count}} kluizen",
       "currentVault": "Deze kluis",
       "unknownVault": "Een andere kluis op dit apparaat",
       "standaloneHelper": "Deze kluis is op dit apparaat niet onder een account gegroepeerd, dus staat hij op zichzelf. Groeperen is per apparaat: een ander apparaat kan hem binnen een account tonen.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Namen kunnen worden ingesteld zodra deze kluis is gedeeld.",
       "nameErrorLocked": "Ontgrendel de kluis om je naam te wijzigen.",
       "nameErrorGeneric": "Kon je naam niet opslaan. Probeer het opnieuw.",
-      "nameInvite": "Je hebt nog geen weergavenaam. De andere leden zien je vingerafdruk.",
       "nameInviteCta": "Een naam instellen",
-      "nameInviteDismiss": "Niet nu",
       "noInvitations": "Nog geen uitnodigingen verstuurd.",
       "identityHeading": "Je identiteit",
       "membersHeading": "Leden",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Herstelzin — als je je wachtwoord vergeet",
       "save": "Herstelkit opslaan",
       "saveFailed": "Kon het bestand niet opslaan. Kopieer in plaats daarvan de kit, of schrijf beide delen op.",
-      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst dat beide geheimen bevat, dus bewaar het op een plek waar alleen jij het kunt lezen.",
-      "whyEnglish": "De woorden zijn Engels in elke taal. Ze maken deel uit van de BIP-39-standaard, zodat elke Myne-client een zin kan lezen die door een andere is geschreven. Vertaal ze niet: vertaalde woorden staan niet in de woordenlijst, en de zin zou ophouden te werken."
+      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst dat beide geheimen bevat, dus bewaar het op een plek waar alleen jij het kunt lezen."
     },
     "name": {
       "back": "Terug",

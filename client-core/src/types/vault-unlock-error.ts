@@ -1,7 +1,7 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
-//   - src-tauri/src/io_failure_kind.rs                  (IoFailureKind)
-//   - src-tauri/src/plugins/vault_unlock/error.rs       (VaultUnlockError)
+//   - core/src/io_failure_kind.rs                  (IoFailureKind)
+//   - core/src/plugins/vault_unlock/error.rs       (VaultUnlockError)
 //
 // Plan: derive `ts_rs::TS` on those enums, run `cargo test` to emit
 // the file at this path, and have CI fail if `git diff --exit-code`
@@ -13,7 +13,7 @@
 // **Distinct from `IoErrorKind` in protocol-error.ts.** That mirror
 // covers the inline `IoErrorKind` enum local to the `vault_creation`
 // plugin (predates the top-level helper). `IoFailureKind` below is
-// the repo-wide canonical enum from `src-tauri/src/io_failure_kind.rs`
+// the repo-wide canonical enum from `core/src/io_failure_kind.rs`
 // (introduced by `vault-unlock-password` Task 1) and is what the
 // `VaultUnlockError::IoError` variant carries. The two error-mapping
 // enums temporarily coexist; migration is a separate follow-on.

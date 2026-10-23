@@ -4032,7 +4032,8 @@
       "nameSaving": "Đang lưu…",
       "vaultsLabel": "Các kho trong tài khoản này",
       "vaultsHelper": "Các kho mà thiết bị này nhóm dưới tên ở trên. Việc nhóm là một lựa chọn tổ chức theo từng thiết bị, nên nó không thuộc nội dung của kho nào và không đi kèm theo kho.",
-      "vaultsCount": "{{count}} kho",
+      "vaultsCount_one": "{{count}} kho",
+      "vaultsCount_other": "{{count}} kho",
       "currentVault": "Kho này",
       "unknownVault": "Một kho khác trên thiết bị này",
       "standaloneHelper": "Kho này không được nhóm dưới một tài khoản trên thiết bị này, nên nó đứng riêng. Việc nhóm là theo từng thiết bị: một thiết bị khác có thể hiển thị nó bên trong một nhóm.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Tên có thể được đặt sau khi kho này được chia sẻ.",
       "nameErrorLocked": "Hãy mở khóa kho để đổi tên của bạn.",
       "nameErrorGeneric": "Không lưu được tên của bạn. Hãy thử lại.",
-      "nameInvite": "Bạn chưa có tên hiển thị. Các thành viên khác thấy dấu vân tay của bạn.",
       "nameInviteCta": "Đặt một tên",
-      "nameInviteDismiss": "Không phải bây giờ",
       "noInvitations": "Chưa gửi lời mời nào.",
       "identityHeading": "Danh tính của bạn",
       "membersHeading": "Thành viên",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Cụm từ khôi phục — nếu bạn quên mật khẩu",
       "save": "Lưu bộ công cụ khôi phục",
       "saveFailed": "Không lưu được tệp. Hãy sao chép bộ công cụ thay thế, hoặc ghi lại cả hai phần.",
-      "savedToFile": "Đã lưu. Đây là một tệp văn bản thuần chứa cả hai bí mật, nên hãy giữ nó ở nơi chỉ bạn đọc được.",
-      "whyEnglish": "Các từ này là tiếng Anh trong mọi ngôn ngữ. Chúng thuộc tiêu chuẩn BIP-39, nên bất kỳ ứng dụng Myne nào cũng đọc được cụm từ do ứng dụng khác viết. Đừng dịch chúng: các từ đã dịch không có trong danh sách từ, và cụm từ sẽ ngừng hoạt động."
+      "savedToFile": "Đã lưu. Đây là một tệp văn bản thuần chứa cả hai bí mật, nên hãy giữ nó ở nơi chỉ bạn đọc được."
     },
     "name": {
       "back": "Quay lại",

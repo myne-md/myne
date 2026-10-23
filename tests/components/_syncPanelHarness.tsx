@@ -29,6 +29,9 @@ export interface SyncPanelRoute {
    *  Defaults to "no identity on this device". */
   readonly person?: {
     readonly enrolled?: boolean;
+    /** The three-state lifecycle (myne-md/myne#911). `reserved` and `pending`
+     *  are the two states that cannot list invites and need registration. */
+    readonly state?: "reserved" | "pending" | "enrolled" | null;
     readonly identity_unlocked?: boolean;
     readonly person_id_hex?: string | null;
     readonly identity_code?: string | null;
@@ -95,6 +98,7 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     if (cmd === "plugin:sync|sync_person_status") {
       return {
         enrolled: false,
+        state: null,
         identity_unlocked: false,
         person_id_hex: null,
         identity_code: null,

@@ -4032,7 +4032,8 @@
       "nameSaving": "Sparar…",
       "vaultsLabel": "Valv i det här kontot",
       "vaultsHelper": "Valven som den här enheten grupperar under namnet ovan. Gruppering är ett organisatoriskt val per enhet, så det är inte en del av något valvs innehåll och följer inte med det.",
-      "vaultsCount": "{{count}} valv",
+      "vaultsCount_one": "{{count}} valv",
+      "vaultsCount_other": "{{count}} valv",
       "currentVault": "Det här valvet",
       "unknownVault": "Ett annat valv på den här enheten",
       "standaloneHelper": "Det här valvet är inte grupperat under ett konto på den här enheten, så det står för sig självt. Gruppering gäller per enhet: en annan enhet kan visa det inuti en grupp.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Namn kan anges när valvet har delats.",
       "nameErrorLocked": "Lås upp valvet för att ändra ditt namn.",
       "nameErrorGeneric": "Det gick inte att spara ditt namn. Försök igen.",
-      "nameInvite": "Du har inget visningsnamn än. De andra medlemmarna ser ditt fingeravtryck.",
       "nameInviteCta": "Ange ett namn",
-      "nameInviteDismiss": "Inte nu",
       "noInvitations": "Inga inbjudningar skickade än.",
       "identityHeading": "Din identitet",
       "membersHeading": "Medlemmar",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Återställningsfras — om du glömmer ditt lösenord",
       "save": "Spara återställningspaket",
       "saveFailed": "Det gick inte att spara filen. Kopiera paketet i stället, eller skriv ner båda delarna.",
-      "savedToFile": "Sparat. Det är en klartextfil som innehåller båda hemligheterna, så förvara den någonstans där bara du kan läsa den.",
-      "whyEnglish": "Orden är engelska på alla språk. De är en del av BIP-39-standarden, så vilken Myne-klient som helst kan läsa en fras skriven av en annan. Översätt dem inte: översatta ord finns inte i ordlistan, och frasen skulle sluta fungera."
+      "savedToFile": "Sparat. Det är en klartextfil som innehåller båda hemligheterna, så förvara den någonstans där bara du kan läsa den."
     },
     "name": {
       "back": "Tillbaka",

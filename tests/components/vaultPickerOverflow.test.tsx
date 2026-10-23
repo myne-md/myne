@@ -55,6 +55,8 @@ async function renderPicker() {
       onCreateAnother={() => {}}
       onRestoreBackup={() => {}}
       onJoinDevice={() => {}}
+      inviteCount={0}
+      onInvites={() => {}}
     />,
   );
   await waitFor(() => expect(screen.getAllByTestId("picker.vault-row").length).toBe(24));

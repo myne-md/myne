@@ -88,6 +88,32 @@ export async function personRegister(phrase: string): Promise<PersonSetupView> {
 }
 
 /**
+ * The device-local sync endpoint, or `null` when this browser has none.
+ *
+ * The twin of the shared module's wrapper (2026-10-23): the register form asks
+ * for an address when the device has none, and this client's endpoint is fixed by
+ * the deployment, so the read usually answers it rather than `null`.
+ */
+export async function readSyncEndpoint(): Promise<string | null> {
+  const view = await invoke<{ endpoint_url: string | null } | null>(
+    "plugin:sync|sync_get_endpoint",
+  );
+  return view?.endpoint_url ?? null;
+}
+
+/**
+ * Point this browser at a sync server. `inviteCode: null` PRESERVES a stored
+ * admission code; the backend reads `Some("")` as an explicit clear, and the
+ * shared module's docblock carries the whole reason.
+ */
+export async function writeSyncEndpoint(
+  endpointUrl: string,
+  inviteCode: string | null = null,
+): Promise<void> {
+  await invoke("plugin:sync|sync_set_endpoint", { endpointUrl, inviteCode });
+}
+
+/**
  * The person's account number, in canonical form, or `null` when this device
  * holds no identity (myne-md/myne#911 review).
  *

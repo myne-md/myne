@@ -4032,7 +4032,8 @@
       "nameSaving": "Tallennetaan…",
       "vaultsLabel": "Tämän tilin holvit",
       "vaultsHelper": "Holvit, jotka tämä laite ryhmittelee yllä olevan nimen alle. Ryhmittely on laitekohtainen järjestelyvalinta, joten se ei ole osa minkään holvin sisältöä eikä kulje sen mukana.",
-      "vaultsCount": "{{count}} holvia",
+      "vaultsCount_one": "{{count}} holvia",
+      "vaultsCount_other": "{{count}} holvia",
       "currentVault": "Tämä holvi",
       "unknownVault": "Toinen holvi tällä laitteella",
       "standaloneHelper": "Tätä holvia ei ole ryhmitelty tilin alle tällä laitteella, joten se on oma erillinen kokonaisuutensa. Ryhmittely on laitekohtaista: toinen laite voi näyttää sen jonkin ryhmän sisällä.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Nimet voidaan asettaa, kun tämä holvi on jaettu.",
       "nameErrorLocked": "Avaa holvi vaihtaaksesi nimesi.",
       "nameErrorGeneric": "Nimeäsi ei voitu tallentaa. Yritä uudelleen.",
-      "nameInvite": "Sinulla ei ole vielä näyttönimeä. Muut jäsenet näkevät sormenjälkesi.",
       "nameInviteCta": "Aseta nimi",
-      "nameInviteDismiss": "Ei nyt",
       "noInvitations": "Ei vielä lähetettyjä kutsuja.",
       "identityHeading": "Identiteettisi",
       "membersHeading": "Jäsenet",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Palautuslause — jos unohdat salasanasi",
       "save": "Tallenna palautuspaketti",
       "saveFailed": "Tiedostoa ei voitu tallentaa. Kopioi paketti sen sijaan tai kirjoita molemmat osat ylös.",
-      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joka sisältää molemmat salaisuudet, joten pidä se paikassa, josta vain sinä voit lukea sen.",
-      "whyEnglish": "Sanat ovat englanniksi kaikilla kielillä. Ne ovat osa BIP-39-standardia, joten mikä tahansa Myne-asiakasohjelma voi lukea toisen kirjoittaman lauseen. Älä käännä niitä: käännetyt sanat eivät ole sanalistassa, ja lause lakkaisi toimimasta."
+      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joka sisältää molemmat salaisuudet, joten pidä se paikassa, josta vain sinä voit lukea sen."
     },
     "name": {
       "back": "Takaisin",

@@ -37,6 +37,13 @@ interface WelcomeProps {
   /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
   onRestoreBackup: () => void;
   /**
+   * The invited door: someone else's vault, addressed to this person's identity.
+   * Runs the identity ceremony and lands on the identity home rather than on
+   * vault creation, because an invited person needs an identity and not a vault
+   * of their own to accept it.
+   */
+  onInvited: () => void;
+  /**
    * Open the device-join modal (MYND-424). The modal itself is mounted by
    * App.tsx over every stage since myne#221 — this screen was its only host,
    * and `welcome` is produced only at ZERO vaults, so the first vault a user
@@ -49,7 +56,7 @@ interface WelcomeProps {
 // options come straight from the config.
 const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
-export function Welcome({ onStart, onRestoreBackup, onJoinDevice }: WelcomeProps) {
+export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: WelcomeProps) {
   const { t, i18n } = useTranslation();
   const active = i18n.resolvedLanguage ?? i18n.language;
   const language = SUPPORTED_CODES.includes(active) ? active : "en";
@@ -127,11 +134,31 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice }: WelcomeProps
           </div>
         </div>
 
-        {/* The two doors that create nothing. Both say what they are for in one
-            sentence, because "restore" and "join" are only distinguishable to
-            someone who already knows which situation they are in. */}
+        {/* The two doors that create nothing, plus the invited door, which
+            creates an IDENTITY and deliberately not a vault. All three say what
+            they are for in one sentence, because "restore", "invite" and "join"
+            are only distinguishable to someone who already knows which
+            situation they are in. */}
         <div style={{ width: "100%", marginTop: "var(--space-4)" }}>
           <ChoiceCard>
+            {/* FIRST, because it is the arm a person who has never used Myne
+                arrives on: someone invited their identity to a vault they do not
+                own yet. It runs the same identity ceremony as Create and lands
+                on the identity home, where the invite is listed (myne-md/myne#911
+                follow-up). */}
+            <ChoiceRow
+              title={t("welcome.invitedTitle")}
+              body={t("welcome.invitedBody")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={onInvited}
+                  data-testid="welcome.invited-cta"
+                >
+                  {t("welcome.invitedAction")}
+                </Button>
+              }
+            />
             <ChoiceRow
               title={t("welcome.restoreTitle")}
               body={t("welcome.restoreBody")}

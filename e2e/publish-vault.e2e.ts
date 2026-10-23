@@ -25,6 +25,19 @@
 // What is NOT proved here, and cannot be: "publishes and opens on a second
 // device". Opening it elsewhere is the person-scoped device-add flow (task 9), so
 // nothing in this file claims it.
+//
+// **And the register-from-Settings door ("this refusal's remedy") is not drivable
+// here either, stated rather than faked (2026-10-23).** It renders only for a
+// `reserved` identity, and this harness cannot construct "reserved identity plus a
+// vault": the first run enrols the identity whenever a server answers (see the
+// comment in the retry scenario below), while a vault cannot be created without
+// an endpoint. An offline first run stays reserved but never reaches a vault. The
+// flow is covered at the unit tier instead, where the state is a prop:
+// `tests/components/personRegisterForm.test.tsx` (submit, address-before-phrase
+// order, both failure arms, the beta-terms gate) and the Settings mount in
+// `tests/components/SyncPanel.identity-block.test.tsx`. The refusal-to-alert half
+// IS driven here, by the transport-failure scenario below, which is the same
+// `SettingRow.error` slot.
 
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";

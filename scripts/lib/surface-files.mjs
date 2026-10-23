@@ -7,9 +7,8 @@
 // `ProvisioningStep.tsx`, and the recursive walk "caught it by this gate rather
 // than by a reviewer". `check-manual-test-roster.mjs` (myne-md/myne#548) was
 // written later with a shallow copy, and the fix one guard over did not travel:
-// 88 files exist under `src/screens/` and `src/components/settings/` and the
-// shallow walk returned 61. The 27 it missed were all of
-// `src/screens/vault-creation/`, all of `src/screens/vault-recover/` and all of
+// the shallow walk missed whole subtrees — all of `src/screens/vault-creation/`,
+// all of `src/screens/vault-recover/` and all of
 // `src/components/settings/search/`, the recovery-phrase display step among them,
 // sitting outside a denominator whose whole premise is that every file in it is
 // accounted for. Nothing reported it, and the guard printed `ok`.

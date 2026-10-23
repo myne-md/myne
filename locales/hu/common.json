@@ -4032,7 +4032,8 @@
       "nameSaving": "Mentés…",
       "vaultsLabel": "Széfek ebben a fiókban",
       "vaultsHelper": "Azok a széfek, amelyeket ez az eszköz a fenti név alá csoportosít. A csoportosítás eszközönkénti szervezési döntés, ezért nem része egyetlen széf tartalmának sem, és nem utazik vele.",
-      "vaultsCount": "{{count}} széf",
+      "vaultsCount_one": "{{count}} széf",
+      "vaultsCount_other": "{{count}} széf",
       "currentVault": "Ez a széf",
       "unknownVault": "Egy másik széf ezen az eszközön",
       "standaloneHelper": "Ez a széf ezen az eszközön nincs fiók alá csoportosítva, ezért önmagában áll. A csoportosítás eszközönkénti: egy másik eszköz egy fiókon belül mutathatja.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "A nevek akkor állíthatók be, ha ez a széf már meg van osztva.",
       "nameErrorLocked": "A név megváltoztatásához oldd fel a széfet.",
       "nameErrorGeneric": "Nem sikerült elmenteni a nevedet. Próbáld újra.",
-      "nameInvite": "Még nincs megjelenített neved. A többi tag az ujjlenyomatodat látja.",
       "nameInviteCta": "Név beállítása",
-      "nameInviteDismiss": "Most nem",
       "noInvitations": "Még nincs elküldött meghívó.",
       "identityHeading": "Az identitásod",
       "membersHeading": "Tagok",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Helyreállító mondat — ha elfelejted a jelszavadat",
       "save": "Helyreállítási csomag mentése",
       "saveFailed": "Nem sikerült elmenteni a fájlt. Másold inkább a csomagot, vagy írd le mindkét részt.",
-      "savedToFile": "Elmentve. Ez egy egyszerű szövegfájl, amely mindkét titkot tartalmazza, ezért tartsd olyan helyen, ahol csak te olvashatod.",
-      "whyEnglish": "A szavak minden nyelven angolul vannak. A BIP-39 szabvány részei, ezért bármely Myne-kliens be tudja olvasni bármely másik által írt mondatot. Ne fordítsd le őket: a lefordított szavak nincsenek benne a szólistában, és a mondat működésképtelenné válna."
+      "savedToFile": "Elmentve. Ez egy egyszerű szövegfájl, amely mindkét titkot tartalmazza, ezért tartsd olyan helyen, ahol csak te olvashatod."
     },
     "name": {
       "back": "Vissza",

@@ -27,7 +27,15 @@ export interface PersonSetupView {
   /** The out-of-band identity code an owner pastes to invite this person
    *  (public material only). */
   identity_code: string;
-  /** False when a second password-path device is awaiting approval. */
+  /**
+   * Always `false` on the two arms `personSetup` can take: create does not
+   * register and recover does not either, so neither knows whether a device is
+   * awaiting approval. Only `personRegister` computes it. A caller that needs
+   * the real lifecycle reads `personStatus().state` (`reserved` / `pending` /
+   * `enrolled`); the identity panel's pending note is gated on that, and gating
+   * it on this field is what once told every first device it was waiting for
+   * another device (myne-md/myne#911).
+   */
   approved: boolean;
 }
 
@@ -75,6 +83,43 @@ export async function personRegister(phrase: string): Promise<PersonSetupView> {
  */
 export async function personAccountNumber(): Promise<string | null> {
   return invoke<string | null>("plugin:sync|sync_person_account_number");
+}
+
+/**
+ * The device-local sync endpoint, or `null` when this device has none.
+ *
+ * Lives here, next to `personRegister`, because registration is the one person
+ * act that CANNOT work without a server and the identity home is reachable at
+ * zero vaults, where Settings (the endpoint's own home, `SyncPanel` →
+ * `EndpointConfig`) does not exist. Reading it there is what decides whether the
+ * register block offers an address field instead of telling the user to go to a
+ * screen they cannot open (2026-10-23).
+ */
+export async function readSyncEndpoint(): Promise<string | null> {
+  const view = await invoke<{ endpoint_url: string | null } | null>(
+    "plugin:sync|sync_get_endpoint",
+  );
+  return view?.endpoint_url ?? null;
+}
+
+/**
+ * Point this device at a sync server, before registering against it.
+ *
+ * The host validates the address and its TLS trust as part of the write, so a
+ * failure here is the honest "that server is not reachable" rather than a
+ * refusal to register.
+ *
+ * `inviteCode` defaults to `null` on purpose: the backend reads `None` as "I
+ * know nothing about the admission code, preserve what is stored" and `Some("")`
+ * as an EXPLICIT CLEAR (`core/src/plugins/sync/config.rs::resolve_invite_code`).
+ * A caller that only wants to change the address must not erase a gated server's
+ * code, which is the only copy of the admission word and cannot be re-derived.
+ */
+export async function writeSyncEndpoint(
+  endpointUrl: string,
+  inviteCode: string | null = null,
+): Promise<void> {
+  await invoke("plugin:sync|sync_set_endpoint", { endpointUrl, inviteCode });
 }
 
 /** Whether this device holds a person account, and whose it is. */

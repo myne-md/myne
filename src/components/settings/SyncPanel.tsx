@@ -22,6 +22,7 @@ import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
+import { PersonRegisterForm } from "../sync/PersonRegisterForm";
 import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
@@ -191,6 +192,18 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // Rendering the empty state first would flash the "Add an identity" CTA on a
   // device that holds one.
   const identityLoaded = person !== null || identityReady || identityOwnerCode != null;
+  // Registration (2026-10-23). The identity home offers this, and it is the only
+  // place that did: that screen renders at ZERO vaults, so a user sitting in a
+  // vault had no door to register from, and the publish row's own refusal
+  // (`PersonNotRegistered`) told them to go to a screen they could not open.
+  //
+  // `reserved` ONLY. A `pending` device has already registered and is waiting for
+  // another device's approval; re-registering mints a second device id (so the
+  // owner is asked to approve a row nothing holds any more) and the recovery path
+  // self-approves, which would silently skip the wait this panel is describing.
+  // The identity home gates on `reserved` for the same reason.
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const needsRegistration = hasIdentity && person?.state === "reserved";
   // Copy the public identity code. Outcome-only feedback, never the value
   // (`lib/clipboard.ts`), the same arm `MemberRosterPanel` uses
   // (myne-md/myne#818).
@@ -610,6 +623,38 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
               {t("identityHome.shareCodeHint")}
             </p>
           ) : null}
+          {/* Registration, where the need appears (2026-10-23). A `reserved`
+              identity has sent nothing and a `pending` one has no token, so
+              neither can be invited, published under, or found. The identity
+              home is the only other place this act exists and it renders at zero
+              vaults; this block is the one a user with a vault is looking at. */}
+          {needsRegistration ? (
+            registerOpen ? (
+              <PersonRegisterForm
+                testIdPrefix="sync.panel.register"
+                onRegistered={() => {
+                  setRegisterOpen(false);
+                  // Re-probe rather than assume: the lifecycle is DERIVED from
+                  // disk, and this panel's block is the thing being re-rendered.
+                  // The cycle kick clears the status dot without waiting for the
+                  // retry ladder.
+                  probePerson();
+                  void syncNow();
+                }}
+                onCancel={() => setRegisterOpen(false)}
+              />
+            ) : (
+              <div>
+                <Button
+                  variant="secondary"
+                  data-testid="sync.panel.register-cta"
+                  onClick={() => setRegisterOpen(true)}
+                >
+                  {t("identityHome.registerCta")}
+                </Button>
+              </div>
+            )
+          ) : null}
         </SettingRow>
       )}
 
@@ -743,13 +788,23 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         syncStatus?.state !== "disabled" && (
         <SettingRow
           anchorId="sync.publish"
+          testId="sync.panel.publish-row"
           label={t("sync.panel.publish.label")}
           helper={
+            published
+              ? t("sync.panel.publish.publishedHelper")
+              : t("sync.panel.publish.deviceOnlyHelper")
+          }
+          // A REFUSAL is an error, not a readout (2026-10-23). It used to
+          // replace the helper paragraph, so a click that failed changed a muted
+          // sentence into another muted sentence: no alert, no colour, no focus.
+          // Reported as "clicking does nothing", which is what it looked like.
+          // `SettingRow`'s `error` slot is the announcing one, and the button
+          // stays enabled so the retry is the same control.
+          error={
             publishRun === "error"
               ? t(`sync.panel.publish.error.${publishError ?? "Other"}`)
-              : published
-                ? t("sync.panel.publish.publishedHelper")
-                : t("sync.panel.publish.deviceOnlyHelper")
+              : null
           }
           helperTestId="sync.panel.publish-state"
           control={

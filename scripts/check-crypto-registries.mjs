@@ -263,7 +263,7 @@ const KNOWN = [
       "`if &blob[0..MAGIC.len()] != MAGIC` is the correct behaviour for it: the version-aware " +
       "entry point is `decode_note_any` in `core/src/plugins/notes/decode.rs`, which reads the " +
       "first four bytes, decides the generation, and calls this codec only once it has " +
-      "established the blob IS `MY01`. Structurally identical to the `vault_meta.rs` entry above, " +
+      "established the blob IS `MY01`. Structurally identical to the `vault_meta.rs` entry, " +
       "and recorded for the same reason: a codec behind a dispatcher, not the myne-md/myne#638 " +
       "shape of a reader that silently answers `None`. " +
       "This file became visible to rule 5 only when `EXTRA_MAGIC_PAIRS` gained `selfToken`: the " +

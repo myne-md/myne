@@ -4032,7 +4032,8 @@
       "nameSaving": "正在保存…",
       "vaultsLabel": "此账户中的保险库",
       "vaultsHelper": "本设备归在上方名称之下的保险库。分组是每台设备各自的组织方式，因此不属于任何保险库的内容，也不会随之传送。",
-      "vaultsCount": "{{count}} 个保险库",
+      "vaultsCount_one": "{{count}} 个保险库",
+      "vaultsCount_other": "{{count}} 个保险库",
       "currentVault": "此保险库",
       "unknownVault": "本设备上的另一个保险库",
       "standaloneHelper": "此保险库在本设备上未归入任何账户，因此独立存在。分组按设备进行：另一台设备可能将它显示在某个账户内。",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "此保险库共享之后才能设置名称。",
       "nameErrorLocked": "请解锁保险库以更改你的名称。",
       "nameErrorGeneric": "无法保存你的名称。请重试。",
-      "nameInvite": "你还没有显示名称。其他成员看到的是你的指纹。",
       "nameInviteCta": "设置名称",
-      "nameInviteDismiss": "暂不",
       "noInvitations": "还没有发出邀请。",
       "identityHeading": "你的身份",
       "membersHeading": "成员",
@@ -4974,8 +4973,7 @@
       "phraseFor": "恢复短语——当你忘记密码时使用",
       "save": "保存恢复套件",
       "saveFailed": "无法保存文件。请改为复制恢复套件，或把两部分都写下来。",
-      "savedToFile": "已保存。它是一个包含两项机密的纯文本文件，请存放在只有你能读取的地方。",
-      "whyEnglish": "这些单词在任何语言中都是英文。它们属于 BIP-39 标准的一部分，因此任何 Myne 客户端都能读取由任何其他客户端写下的短语。请勿翻译它们：翻译后的单词不在词表中，短语将无法使用。"
+      "savedToFile": "已保存。它是一个包含两项机密的纯文本文件，请存放在只有你能读取的地方。"
     },
     "name": {
       "back": "返回",

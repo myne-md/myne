@@ -4,8 +4,7 @@
 // Under `prefers-reduced-motion: reduce` it keeps turning at HALF SPEED, not
 // frozen: `tokens.css`'s blanket `animation-duration: 0ms` carves `.myne-spinner`
 // out (MYND-630), on the reasoning that a spinner stopped mid-arc reads as hung
-// rather than as calm. This header used to claim the opposite, and the two
-// statements sat in the same repo contradicting each other.
+// rather than as calm.
 //
 // The small inline marks that used to live beside it are gone (myne-md/myne#603):
 // the three-quarter arc, and the triangle that briefly replaced part of it.

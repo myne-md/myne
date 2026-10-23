@@ -4032,7 +4032,8 @@
       "nameSaving": "Wird gespeichert…",
       "vaultsLabel": "Tresore in diesem Konto",
       "vaultsHelper": "Die Tresore, die dieses Gerät unter dem Namen oben gruppiert. Gruppierung ist eine organisatorische Wahl pro Gerät, sie ist also nicht Teil des Inhalts eines Tresors und reist nicht mit ihm.",
-      "vaultsCount": "{{count}} Tresore",
+      "vaultsCount_one": "{{count}} Tresore",
+      "vaultsCount_other": "{{count}} Tresore",
       "currentVault": "Dieser Tresor",
       "unknownVault": "Ein anderer Tresor auf diesem Gerät",
       "standaloneHelper": "Dieser Tresor ist auf diesem Gerät nicht unter einem Konto gruppiert, er steht also für sich. Gruppierung gilt pro Gerät: Ein anderes Gerät kann ihn in einem anzeigen.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Namen lassen sich festlegen, sobald dieser Tresor geteilt ist.",
       "nameErrorLocked": "Entsperren Sie den Tresor, um Ihren Namen zu ändern.",
       "nameErrorGeneric": "Ihr Name konnte nicht gespeichert werden. Versuchen Sie es erneut.",
-      "nameInvite": "Sie haben noch keinen Anzeigenamen. Die anderen Mitglieder sehen Ihren Fingerabdruck.",
       "nameInviteCta": "Namen festlegen",
-      "nameInviteDismiss": "Nicht jetzt",
       "noInvitations": "Noch keine Einladungen gesendet.",
       "identityHeading": "Ihre Identität",
       "membersHeading": "Mitglieder",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Wiederherstellungsphrase — falls Sie Ihr Passwort vergessen",
       "save": "Wiederherstellungs-Kit speichern",
       "saveFailed": "Die Datei konnte nicht gespeichert werden. Kopieren Sie stattdessen das Kit oder schreiben Sie beide Teile auf.",
-      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, die beide Geheimnisse enthält, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können.",
-      "whyEnglish": "Die Wörter sind in jeder Sprache englisch. Sie sind Teil des BIP-39-Standards, daher kann jeder Myne-Client eine Phrase lesen, die ein anderer geschrieben hat. Übersetzen Sie sie nicht: Übersetzte Wörter stehen nicht in der Wortliste, und die Phrase würde aufhören zu funktionieren."
+      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, die beide Geheimnisse enthält, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können."
     },
     "name": {
       "back": "Zurück",

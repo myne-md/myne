@@ -527,7 +527,7 @@ const V = {
   "src/lib/vault-status.ts": ["ported", "Boot probe."],
   "src/lib/vault-switch.ts": ["adapted", "Reachable only with ≥2 vaults, which one origin cannot have."],
   "src/lib/vault-unlock.ts": ["ported", "The unlock IPC — the one path web needs most."],
-  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` one line up documents."],
+  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` documents."],
   "src/lib/voice-record.ts": ["adapted", "Voice capture is desktop-only; the editor host omits the recorder."],
   "src/lib/workspace-persist.ts": ["ported", "`MYW1` IPC; ported into core and dispatched in task 65."],
   "src/lib/writing-assistant.ts": ["adapted", "Unreachable where `localAi` is absent."],
@@ -591,6 +591,10 @@ const V = {
     "Pure DOM: the React binding for the shared overlay `inert` owner (myne#728). No host call, and the browser client renders the same overlays from the same `src/` tree.",
   ],
   "src/hooks/useIdleAutoLock.ts": ["adapted", "Same signal difference as useActivityHeartbeat."],
+  "src/hooks/usePendingInvites.ts": [
+    "ported",
+    "Runs, and does nothing where `personIdentity` is absent: the effect returns before any invoke. That is the correct web answer rather than a gap, because an invitation is addressed to a person identity and the browser has no person-identity carrier, so neither the picker nor the switcher notice can appear there.",
+  ],
   "src/hooks/useIsFullscreen.ts": [
     "adapted",
     "Answers the Fullscreen API on web — the seam's `isFullscreen` is `document.fullscreenElement !== null`, which is the question the caller is asking.",

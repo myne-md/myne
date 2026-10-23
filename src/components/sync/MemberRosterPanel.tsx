@@ -111,25 +111,6 @@ const ERROR_STYLE: CSSProperties = {
   color: "var(--danger)",
 };
 
-/** The invitation on an unnamed caller's own row (myne-md/myne#851 task 9, story
- *  22). `--fg-2`, not `--warning`: a member who joined before this shipped has done
- *  nothing wrong, and the copy asks, it does not flag. */
-const INVITE_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-2)",
-};
-
-/** The dismissal inside that invitation: a link-shaped button, not a second
- *  control competing with the one that sets the name. */
-const LINK_STYLE: CSSProperties = {
-  font: "inherit",
-  color: "var(--accent)",
-  background: "none",
-  border: 0,
-  padding: 0,
-  cursor: "pointer",
-};
-
 /** The unverified-name marker (`myne-md/myne#851` task 5). `--warning` rather
  *  than `--danger`: a name record whose signature does not check out is a fact to
  *  state plainly, not an alarm about a vault that is broken here and now, and the
@@ -216,12 +197,6 @@ export function MemberRosterPanel({
   } | null>(null);
   const [nameBusy, setNameBusy] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-  // The once-only invitation for a member who accepted before this shipped (task 9,
-  // story 22). Session-scoped on purpose: making the dismissal durable would mean a
-  // new preference field, whose registration chain is a dozen sites (src/AGENTS.md),
-  // and the invitation asks rather than blocks, so re-asking next session is
-  // tolerable where a silently-persisted "never ask again" would not be.
-  const [nameOfferDismissed, setNameOfferDismissed] = useState(false);
 
   const openNameEditor = (m: RosterMember) => {
     setNameError(null);
@@ -624,26 +599,13 @@ export function MemberRosterPanel({
                       : t("sync.memberRoster.nameInviteCta")}
                   </Button>
                 ) : null}
-                {/* The invitation, on the caller's OWN row and only there: a member
-                    who joined before this shipped never saw the accept name step.
-                    Dismissible, and it writes nothing until they act. */}
-                {m.is_self &&
-                shared &&
-                m.name_state !== "verified" &&
-                !nameOfferDismissed ? (
-                  <span data-testid="member-roster.name-invite" style={INVITE_STYLE}>
-                    {t("sync.memberRoster.nameInvite")}{" "}
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      data-testid="member-roster.name-invite-dismiss"
-                      onClick={() => setNameOfferDismissed(true)}
-                      style={LINK_STYLE}
-                    >
-                      {t("sync.memberRoster.nameInviteDismiss")}
-                    </Button>
-                  </span>
-                ) : null}
+                {/* The invitation used to be a sentence plus a `Not now` link
+                    (myne-md/myne#851 task 9). Both are gone: the dismissal was
+                    session-scoped, so it promised a silence it could not keep
+                    and the prompt returned on the next launch, and the sentence
+                    restated what the button beside it already says. What
+                    remains is the one control that acts: `Set a name` on the
+                    caller's own unverified row. */}
                 {/* A cryptographic key change and an owner-confirmed relink are
                     DIFFERENT states and must read differently: the first is a
                     new identity the owner has not vouched for, the second is the

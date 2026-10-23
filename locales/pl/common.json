@@ -4284,7 +4284,8 @@
       "nameSaving": "Zapisywanie…",
       "vaultsLabel": "Skarbce na tym koncie",
       "vaultsHelper": "Skarbce, które to urządzenie grupuje pod powyższą nazwą. Grupowanie to wybór organizacyjny na poziomie urządzenia, więc nie jest częścią treści żadnego skarbca i nie wędruje razem z nim.",
-      "vaultsCount": "{{count}} skarbców",
+      "vaultsCount_one": "{{count}} skarbców",
+      "vaultsCount_other": "{{count}} skarbców",
       "currentVault": "Ten skarbiec",
       "unknownVault": "Inny skarbiec na tym urządzeniu",
       "standaloneHelper": "Ten skarbiec nie jest pogrupowany pod żadnym kontem na tym urządzeniu, więc występuje samodzielnie. Grupowanie działa na poziomie urządzenia: inne urządzenie może pokazywać go wewnątrz jakiegoś konta.",
@@ -4296,7 +4297,9 @@
       "sections": {
         "extensions": "Rozszerzenia przeglądarki",
         "grouping": "To konto"
-      }
+      },
+      "vaultsCount_few": "{{count}} skarbców",
+      "vaultsCount_many": "{{count}} skarbców"
     },
     "plainFile": {
       "errorSaveSetting": "Nie udało się zapisać ustawienia plików lokalnych.",
@@ -4736,9 +4739,7 @@
       "nameErrorUnshared": "Nazwy można ustawić, gdy ten skarbiec zostanie udostępniony.",
       "nameErrorLocked": "Odblokuj skarbiec, aby zmienić swoją nazwę.",
       "nameErrorGeneric": "Nie udało się zapisać Twojej nazwy. Spróbuj ponownie.",
-      "nameInvite": "Nie masz jeszcze nazwy wyświetlanej. Inni członkowie widzą Twój odcisk palca.",
       "nameInviteCta": "Ustaw nazwę",
-      "nameInviteDismiss": "Nie teraz",
       "noInvitations": "Nie wysłano jeszcze żadnych zaproszeń.",
       "identityHeading": "Twoja tożsamość",
       "membersHeading": "Członkowie",
@@ -5244,8 +5245,7 @@
       "phraseFor": "Fraza odzyskiwania — jeśli zapomnisz hasła",
       "save": "Zapisz zestaw odzyskiwania",
       "saveFailed": "Nie udało się zapisać pliku. Skopiuj zestaw albo zapisz obie części ręcznie.",
-      "savedToFile": "Zapisano. To zwykły plik tekstowy zawierający oba sekrety, więc trzymaj go w miejscu, w którym tylko Ty możesz go odczytać.",
-      "whyEnglish": "Słowa są angielskie w każdym języku. Są częścią standardu BIP-39, więc każdy klient Myne potrafi odczytać frazę zapisaną przez dowolny inny. Nie tłumacz ich: przetłumaczone słowa nie występują na liście słów, więc fraza przestałaby działać."
+      "savedToFile": "Zapisano. To zwykły plik tekstowy zawierający oba sekrety, więc trzymaj go w miejscu, w którym tylko Ty możesz go odczytać."
     },
     "name": {
       "back": "Wstecz",

@@ -44,6 +44,9 @@ import { Toaster } from "./components/toast/Toaster";
 import { UpdateNotice } from "./components/update/UpdateNotice";
 import { UpdatingScreen } from "./screens/UpdatingScreen";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
+import { InvitesDialog } from "./components/sync/InvitesDialog";
+import { unclaimedInvites } from "./hooks/usePendingInvites";
+import { usePendingInvites } from "./hooks/usePendingInvites";
 import { resetPersonIdentityState, setPersonIdentityState } from "./components/sync/personIdentityState";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
@@ -163,6 +166,11 @@ function App() {
   // substituted away in the web build, where the join door is `AccountBootstrap`
   // and an origin holds exactly one container.
   const [joinOpen, setJoinOpen] = useState(false);
+  // The invitations dialog (myne-md/myne#911 follow-up): the ONE surface on
+  // which an invitation can be accepted by a device that already holds a vault.
+  // It is a modal over whatever is showing, like the join, because its two
+  // entries (the picker's notice row and the switcher's) land differently.
+  const [invitesOpen, setInvitesOpen] = useState(false);
   // Identity-only home (myne-md/myne#711): at zero vaults, if this device
   // already holds a person account, show the identity home instead of Welcome.
   // Probe-only state; a failed probe leaves `false` (the pre-B2B Welcome path).
@@ -180,6 +188,18 @@ function App() {
   // formatted through the shared presentation module, so the grouping matches
   // every client.
   const [personAccountNumberValue, setPersonAccountNumberValue] = useState<string | null>(null);
+
+  // Unaccepted invitations, read once per process and shared by the picker's
+  // notice row, the switcher's, and the dialog itself. Gated on the lifecycle
+  // rather than firing blind: an invitation cannot exist for an identity the
+  // server has never seen, and the hook says so without a request.
+  //
+  // This is the one client-side call that talks to the sync server BEFORE any
+  // vault is unlocked. It is the same call the identity home already makes when
+  // it is the landing screen, and it carries only the device token: no vault
+  // key, no note, nothing that needs `root_key`.
+  const pendingInvites = usePendingInvites(personAccountState === "enrolled");
+  const inviteCount = unclaimedInvites(pendingInvites.invites).length;
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
   // (disk enumeration) + `vault_slot_kind(None)` (the active runtime
@@ -694,6 +714,25 @@ function App() {
     })();
   };
 
+  // The switcher's invitations door (myne-md/myne#911 follow-up). Same teardown
+  // and for the same reason `onJoinDeviceFromEditor` states: accepting an
+  // invitation materializes and UNLOCKS a member vault, and SYNC-1 zeroizes the
+  // open one on the way, so a dialog left over a mounted editor would sit on
+  // plaintext whose keys are already gone.
+  //
+  // Unlike the join, the dialog is not tied to one stage: cancelling it leaves
+  // the user on the unlock screen they were just routed to, which is coherent
+  // (retype the password), and accepting re-probes, which is the one place that
+  // knows whether the new member vault makes this a picker or a single-vault
+  // device.
+  const onInvitesFromEditor = () => {
+    void (async () => {
+      await leaveActiveVault({ onSavingChange: setSwitching });
+      dispatch({ type: "editor.lock" });
+      setInvitesOpen(true);
+    })();
+  };
+
   // Where a completed join lands, per the stage that opened the modal. One
   // action per source (the convention `*.create-vault` and `*.restore-backup`
   // already follow), each producing a vault-addressed `editor` stage — the
@@ -817,6 +856,10 @@ function App() {
             // welcome screen no longer decides between the two.
             onStart={() => dispatch({ type: "welcome.start" })}
             onRestoreBackup={() => dispatch({ type: "welcome.restore-backup" })}
+            // The invited door: the same ceremony, landing on the identity home
+            // so the invitation is listed and can be accepted without creating a
+            // vault of one's own (myne-md/myne#911 follow-up).
+            onInvited={() => dispatch({ type: "welcome.invited-start" })}
             // The modal itself is mounted below, over every stage (myne#221) —
             // this screen only opens it. Nothing is unlocked here, so unlike the
             // switcher entry there is nothing to tear down first.
@@ -831,7 +874,15 @@ function App() {
         // knows what a device holding one should see next.
         return (
           <FirstRun
-            onIdentityCreated={() => dispatch({ type: "create-vault.start" })}
+            // Which door opened the ceremony decides its landing, and only that:
+            // the create door continues into vault creation, the invited door
+            // re-probes into the identity home (where invitations are listed).
+            // `after` is fixed at dispatch time, so this is a constant per mount.
+            onIdentityCreated={
+              stage.after === "identity-home"
+                ? () => void reprobe()
+                : () => dispatch({ type: "create-vault.start" })
+            }
             onAbandon={() => void reprobe()}
           />
         );
@@ -847,8 +898,6 @@ function App() {
               // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
               // boot routing decides the return surface — welcome at 0
               // vaults, the lone vault's unlock at 1, the picker at ≥2.
-              // (The former `create-vault.back` → welcome arm stranded
-              // picker/editor entrants on Welcome.)
               onBack={reprobe}
               onAutoUnlockSuccess={onCreateAutoUnlockSuccess}
               onAutoUnlockFailed={onCreateAutoUnlockFailed}
@@ -940,6 +989,12 @@ function App() {
               onJoinDevice={
                 has("localOnlyVault") ? onJoinDeviceFromEditor : undefined
               }
+              // The invitation notice needs no capability of its own: the hook
+              // is gated on `personIdentity` internally and renders no row where
+              // that is absent. Passed only with its opener, so a count can never
+              // render without a door.
+              inviteCount={inviteCount}
+              onInvites={onInvitesFromEditor}
               onRestoreBackup={() =>
                 dispatch({ type: "editor.restore-backup" })
               }
@@ -986,6 +1041,8 @@ function App() {
             // existed. Picking a row never unlocked anything, so the modal opens
             // straight over the picker.
             onJoinDevice={() => setJoinOpen(true)}
+            inviteCount={inviteCount}
+            onInvites={() => setInvitesOpen(true)}
           />
         );
       case "updating":
@@ -1148,6 +1205,30 @@ function App() {
           // the reprobe is again the whole routing.
           onAccountJoined={() => {
             setJoinOpen(false);
+            void reprobe();
+          }}
+        />
+      )}
+      {/* The invitations dialog (myne-md/myne#911 follow-up): the ONE surface on
+          which a device that already holds a vault can accept an invitation.
+          Mounted over whatever stage is showing, like the join above, because
+          its two entries (the picker's row and the switcher's) land differently:
+          the picker needs no teardown, the switcher has already run one. */}
+      {invitesOpen && (
+        <InvitesDialog
+          open
+          invites={pendingInvites.invites}
+          loading={pendingInvites.loading}
+          unavailable={pendingInvites.unavailable}
+          onClose={() => setInvitesOpen(false)}
+          onRetry={pendingInvites.reload}
+          onAccepted={() => {
+            setInvitesOpen(false);
+            // The member vault is on disk and unlocked by the accept. Boot
+            // routing is the one place that knows what that makes this device
+            // (picker, or the lone vault's unlock), and the reload is what drops
+            // the row that was just accepted.
+            pendingInvites.reload();
             void reprobe();
           }}
         />

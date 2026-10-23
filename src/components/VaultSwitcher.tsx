@@ -20,8 +20,11 @@
 // `onJoinDevice`, myne#221 — the door that was previously offered on the
 // welcome screen alone, i.e. only while the machine held no vault at all).
 //
-// The whole switcher hides when fewer than two vaults exist (nothing to switch
-// to — the create path is still reachable from the command palette / picker).
+// The whole switcher hides at ZERO vaults and renders at one (`vaults !== null
+// && ordered.length < 1` in the body), so a single-vault device still has the
+// dropdown: this comment said "fewer than two vaults" for a while and the code
+// never did that. The create path is also reachable from the command palette and
+// the picker.
 //
 // Penpot canon: `flow--vault-switcher (MYND-205)`, page "4c - Navigation &
 // Sidebar". Tokens-only (no raw hex, no Tailwind) per `src/AGENTS.md`.
@@ -36,6 +39,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import { Button } from "./primitives/Button";
 import { HOVER_TRANSITION } from "./primitives/hoverSurface";
 import { interactiveSurface } from "./primitives/interactiveSurface";
 import { FolderGlyph } from "../notes/components/FolderGlyph";
@@ -75,6 +79,18 @@ interface VaultSwitcherProps {
    * row, not the switcher.
    */
   onJoinDevice?: () => void;
+  /**
+   * Unaccepted invitations addressed to this identity (myne-md/myne#911
+   * follow-up). Zero renders no row.
+   *
+   * It lives in the dropdown footer because this is the only vault LIST an
+   * already-unlocked device has: the picker is a boot surface, and a user who
+   * works inside their vault would otherwise have to lock it and quit to learn
+   * that someone invited them.
+   */
+  inviteCount?: number;
+  /** Open the invitations dialog. The caller tears the vault down first. */
+  onInvites?: () => void;
   /**
    * True while a switch's `vault_lock()` IPC is in flight (the "switching…"
    * window). Disables the chip + marks the most-recently-selected row.
@@ -312,6 +328,8 @@ export function VaultSwitcher({
   onSwitchVault,
   onCreateAnother,
   onJoinDevice,
+  inviteCount = 0,
+  onInvites,
   switching,
 }: VaultSwitcherProps) {
   const { t } = useTranslation();
@@ -747,6 +765,21 @@ export function VaultSwitcher({
           </div>
 
           <hr style={DIVIDER_STYLE} aria-hidden="true" />
+
+          {inviteCount > 0 && onInvites !== undefined && (
+            <Button
+              variant="ghost"
+              icon="id-card"
+              onClick={() => {
+                setOpen(false);
+                onInvites();
+              }}
+              style={FOOTER_STYLE}
+              data-testid="switcher.invites-notice"
+            >
+              <span>{t("invites.notice", { count: inviteCount })}</span>
+            </Button>
+          )}
 
           <button
             type="button"

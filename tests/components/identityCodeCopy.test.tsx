@@ -134,7 +134,7 @@ const surfaces = [
           onCreateVault={() => {}}
           onAccepted={() => {}}
           onForgotten={() => {}}
-          accountState={null}
+          accountState="enrolled"
           onRegistered={() => {}}
         />,
       ),
@@ -269,7 +269,7 @@ describe("identity-code textareas are themed", () => {
             onCreateVault={() => {}}
             onAccepted={() => {}}
             onForgotten={() => {}}
-            accountState={null}
+            accountState="enrolled"
             onRegistered={() => {}}
           />,
         );
@@ -309,7 +309,7 @@ describe("IdentityHome invite phrase", () => {
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );

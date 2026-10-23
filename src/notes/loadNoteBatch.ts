@@ -47,7 +47,7 @@ import type {
 
 /**
  * Per-call cap mirrored from the Rust constant `NOTE_TITLES_BATCH_CAP`
- * (`src-tauri/src/plugins/notes/commands.rs`). Bumping the value
+ * (`core/src/plugins/notes/commands.rs`). Bumping the value
  * requires updating both sides + the `BatchTooLarge { cap }` payload
  * documentation.
  */

@@ -25,12 +25,9 @@ import {
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
-import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
-import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
 import { MyneMark } from "../components/primitives/MyneMark";
 import {
   personListInvites,
-  personRegister,
   type InviteSummary,
   type PersonAccountState,
 } from "../lib/personAccount";
@@ -42,6 +39,7 @@ import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { AcceptInviteWizard, JoinVaultWizard } from "../components/sync/InviteWizard";
 import { MemberNameGate } from "../components/sync/MemberNameGate";
+import { PersonRegisterForm } from "../components/sync/PersonRegisterForm";
 
 /** How often the pending-invite list re-polls while the identity home is
  *  mounted and visible. The relay has no push channel for a person account, so
@@ -219,6 +217,18 @@ interface IdentityHomeProps {
   onRegistered: () => void;
 }
 
+/** Whether a rejected `sync_person_list_invites` means "the server does not know
+ *  this identity yet" rather than a real failure. `NotEnrolled` is the backend's
+ *  answer for a person credential with no device token; the copy that follows it
+ *  points at the register block below instead of at the connection. */
+function invitesRefusal(error: unknown): boolean {
+  const kind =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { kind?: unknown }).kind
+      : undefined;
+  return kind === "NotEnrolled";
+}
+
 export function IdentityHome({
   identityCode,
   accountNumber,
@@ -231,6 +241,14 @@ export function IdentityHome({
   const { t } = useTranslation();
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // The identity the server does not know yet, as a state rather than an error
+  // (2026-10-23). An invitation is addressed to a `person_id_hash` a server
+  // holds, so a `reserved` identity (nothing sent) or a `pending` one (no token
+  // yet) has none to miss, and asking the relay can only be refused. The same
+  // rule is `usePendingInvites`' and its own comment states it; this screen is
+  // the surface that was skipping it.
+  const [notEnrolled, setNotEnrolled] = useState(false);
+  const invitesReadable = accountState === "enrolled";
   // Which invite each wizard is open for (myne-md/myne#871), or null for none.
   // The screen owns only that choice: the wizard owns its own step, its own
   // fields and its own secrets, so unmounting it (Cancel, or the accept
@@ -248,13 +266,10 @@ export function IdentityHome({
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
-  // Registration (myne-md/myne#911). The phrase is the proof of possession, so
-  // it lives in this screen's state only until the call returns and is never
-  // persisted here: the backend derives the SCRAM secret and forgets the phrase.
+  // Registration (myne-md/myne#911). The host owns one boolean; the form owns
+  // the phrase, the address and the beta-terms gate, so two surfaces cannot
+  // drift about any of the three (2026-10-23 review).
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [registerPhrase, setRegisterPhrase] = useState("");
-  const [registerBusy, setRegisterBusy] = useState(false);
-  const [registerError, setRegisterError] = useState(false);
   // Forget-this-identity-on-this-device (myne-md/myne#782). A short
   // acknowledgement gates the destructive button; the warning above it is the
   // only place the consequence is stated.
@@ -262,45 +277,6 @@ export function IdentityHome({
   const [forgetAck, setForgetAck] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetError, setForgetError] = useState(false);
-
-  const betaTerms = useBetaTermsGate();
-  const [termsOpen, setTermsOpen] = useState(false);
-
-  /**
-   * The beta-terms gate (myne-ops#15, myne-md/myne#911 review).
-   *
-   * Registration is a server-facing act: it creates the account the phrase derives
-   * and enrols this device on it. `useBetaTermsGate` stands in front of the three
-   * other doors that turn sync on, and `SyncPanel` states the rule this closes: a
-   * consent screen at one door is not a consent screen. The identity screen was the
-   * fourth door and had none.
-   */
-  const doRegister = async () => {
-    setRegisterBusy(true);
-    setRegisterError(false);
-    try {
-      await personRegister(registerPhrase);
-      setRegisterOpen(false);
-      setRegisterPhrase("");
-      onRegistered();
-    } catch {
-      // The phrase is not kept across a failure: the user retypes it on the
-      // retry, which the copy already asks for, and a mounted component holding
-      // it is one devtools panel away from exposure (myne-md/myne#911 review).
-      setRegisterPhrase("");
-      setRegisterError(true);
-    } finally {
-      setRegisterBusy(false);
-    }
-  };
-
-  const register = async () => {
-    if (betaTerms.needed) {
-      setTermsOpen(true);
-      return;
-    }
-    await doRegister();
-  };
 
   const forgetIdentity = async () => {
     setForgetBusy(true);
@@ -345,7 +321,17 @@ export function IdentityHome({
       const list = await personListInvites();
       setInvites((previous) => (sameInvites(previous, list) ? previous : list));
       setFailed(false);
-    } catch {
+      setNotEnrolled(false);
+    } catch (e) {
+      // A stale `accountState` (registered on another surface this session) can
+      // still reach the relay through a prop that has not reprobed yet. The
+      // refusal is the same fact as the prop's, so it lands in the same place
+      // rather than in the error banner.
+      if (invitesRefusal(e)) {
+        setNotEnrolled(true);
+        setFailed(false);
+        return;
+      }
       if (!silent) setFailed(true);
     }
   }, []);
@@ -356,6 +342,7 @@ export function IdentityHome({
   // that arrives while the identity home is already mounted never appears until
   // the app is restarted (myne-md/myne#794).
   useEffect(() => {
+    if (!invitesReadable) return;
     let alive = true;
     const run = (silent: boolean) => {
       if (alive) void loadInvites(silent);
@@ -373,7 +360,7 @@ export function IdentityHome({
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loadInvites]);
+  }, [loadInvites, invitesReadable]);
 
   // Unclaimed and claimed are two different offers, not one list with a filter. An
   // unclaimed invite is an identity that is not a member yet and is accepted with the
@@ -519,7 +506,21 @@ export function IdentityHome({
 
         <div style={BLOCK_STYLE}>
           <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.invitesHeading")}</h2>
-          {failed ? (
+          {accountState === null ? (
+            // The lifecycle probe has not answered (a failed status read falls
+            // back to Welcome, so this is a transient). Claiming "not
+            // registered" here would be a guess about the one fact the section
+            // depends on, so the section stays empty until the answer exists.
+            null
+          ) : !invitesReadable || notEnrolled ? (
+            <p data-testid="identity-home.invites-unavailable" style={HINT_STYLE}>
+              {t(
+                accountState === "pending"
+                  ? "identityHome.invitesPending"
+                  : "identityHome.invitesNotEnrolled",
+              )}
+            </p>
+          ) : failed ? (
             <DestructiveBanner testId="identity-home.error">
               {t("identityHome.invitesError")}
             </DestructiveBanner>
@@ -584,45 +585,11 @@ export function IdentityHome({
         {accountState === "reserved" ? (
           <div style={BLOCK_STYLE} data-testid="identity-home.account-state">
             <p style={BODY_SMALL_STYLE}>{t("identityHome.accountStateReserved")}</p>
-            <BetaTermsConsent
-              open={termsOpen}
-              testId="identity.register.beta-terms"
-              onAccept={() => {
-                setTermsOpen(false);
-                // `accept()` then the body directly, because `needed` is still
-                // true for this render and `register()` would reopen the dialog.
-                void betaTerms.accept().then(() => doRegister());
-              }}
-              // Declining closes the dialog and leaves the gate standing: nothing
-              // was sent, so there is nothing to take back.
-              onCancel={() => setTermsOpen(false)}
-            />
             {registerOpen ? (
-              <div data-testid="identity-home.register-form">
-                <p style={BODY_SMALL_STYLE}>{t("identityHome.registerPrompt")}</p>
-                <Input
-                  type="password"
-                  value={registerPhrase}
-                  onChange={(e) => setRegisterPhrase(e.target.value)}
-                  aria-label={t("identityHome.registerPhraseLabel")}
-                  data-testid="identity-home.register-phrase"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {registerError ? (
-                  <p role="alert" data-testid="identity-home.register-error">
-                    {t("identityHome.registerError")}
-                  </p>
-                ) : null}
-                <Button
-                  variant="primary"
-                  onClick={() => void register()}
-                  disabled={registerBusy || registerPhrase.trim() === ""}
-                  data-testid="identity-home.register-submit"
-                >
-                  {t("identityHome.registerSubmit")}
-                </Button>
-              </div>
+              <PersonRegisterForm
+                testIdPrefix="identity-home.register"
+                onRegistered={onRegistered}
+              />
             ) : (
               <Button
                 onClick={() => setRegisterOpen(true)}

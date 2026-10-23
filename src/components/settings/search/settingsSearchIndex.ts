@@ -228,6 +228,18 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.accountVaults",
   },
   {
+    // The person account number (2026-10-23). It is derived from the identity
+    // phrase, so this entry is a READ: the copy button is the only control, and
+    // the value itself is never in the index (it is generated, not authored).
+    id: "account.number",
+    agentWritability: WRITABILITY_NONE,
+    panelId: "account",
+    testid: "settings.account-number-copy",
+    titleKey: "settings.account.numberLabel",
+    descriptionKey: "identityHome.accountNumberHint",
+    keywordsKey: "settings.search.keywords.accountNumber",
+  },
+  {
     // Moved here from the Storage section: the control it names
     // (`settings.clipper-install`, rendered by `ConnectedExtensions`) has lived
     // in this panel since the 2026-06-21 decision moved it, so the entry was

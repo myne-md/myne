@@ -804,7 +804,7 @@ export function SettingsModal({
   if (!open) return null;
 
   const panelContent: Record<PanelId, ReactNode> = {
-    account: <AccountPanel vaultId={vaultId} />,
+    account: <AccountPanel vaultId={vaultId} onOpenPanel={setSelected} />,
     vault: (
       <VaultPanel
         vaultId={vaultId}

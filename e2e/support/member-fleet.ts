@@ -120,13 +120,15 @@ export async function createMemberIdentity(member: AppSession): Promise<string> 
   // so the type-back challenge does not apply and the dialog goes straight to the
   // recovered result (`identitySetup.recovered`), whose only exit is Done.
   await member.session.byTestId("first-run.identity.close-cta", { timeoutMs: 90_000 });
-  // Asserted, not assumed: a device awaiting approval holds no token, and the invite
-  // listing a caller is about would then fail rather than show anything. The FIRST
-  // device of a person account is approved, which is the arm a fresh server puts this
-  // device in.
+  // Asserted, not assumed, and for a different reason than the note it reads:
+  // the identity ceremony does not register this device, so a fresh device is
+  // `reserved` and there is no approval for anyone to give. The note is gated on
+  // the disk lifecycle (`pending`), so its absence here is the proof that the
+  // panel stopped answering from `PersonSetupView.approved`, which is
+  // hardcoded false and used to show the wait on every first device.
   expect(
     await member.session.byTestIdAll("first-run.identity.pending"),
-    "the member's first device is approved without a second-device wait",
+    "a freshly created device is reserved, so nothing is awaiting approval",
   ).toHaveLength(0);
   // Done hands off to vault creation; the identity home is the ABANDON path
   // (Back from the briefing re-probes, and "identity, no vault" routes home).

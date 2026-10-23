@@ -1,22 +1,24 @@
-// Terminal post-vault-creation screen - empty shell.
-//
-// Mounted by App.tsx when stage transitions to "editor" from
-// <CreateVault>'s onComplete callback (which fires from <ReadyStep>'s
-// "Done" button).
+// The editor screen: the vault's working surface, mounted by `App.tsx` once a
+// vault is unlocked (`stage === "editor"`). A detached (pop-out) window mounts
+// it too, with `detachedNoteId` naming the one note it opens and both sidebars
+// collapsed.
 //
 // T-shape layout (per design session 2026-04-28-empty-editor-shell.md
 // Q2 = A): outer flex column with a row of three panes on top
 // (260 left + flex center + 280 right) and a 28 px full-width status
 // bar on the bottom.
 //
-// All copy is intentionally honest: no "Encrypted" / "synced" claims
-// (there is no sync server, no per-note encryption pipeline yet);
-// the account-number chip is a static MY-XXXX-… placeholder
-// (the real account number is owned by <CreateVault>'s reducer and
-// not threaded through to App-level - it becomes a vault-unlock
-// concern when that feature lands). The status-bar word counter is
-// live (MYND-143): it counts the active note's body words, frontmatter
-// excluded, on a short debounce.
+// Sync is live on this screen: `SyncBanners` and `RemoteMergeHint` report what
+// the sync engine is doing, and note bodies are encrypted at rest. Copy here
+// follows one rule rather than a claim list: it may only say what the capability
+// descriptor (`platform/capabilities`) lets THIS client do, so a served build
+// never promises a desktop-only affordance.
+//
+// The account number is not rendered here. It lives where the user needs to
+// read or copy it: Settings (`AccountPanel`) and the join / enrol flows.
+//
+// The status-bar word counter is live (MYND-143): it counts the active note's
+// body words, frontmatter excluded, on a short debounce.
 //
 // References:
 //   - PRD: myne-agents/features/empty-editor-shell/prd.md
@@ -496,6 +498,22 @@ interface EditorProps {
    */
   onJoinDevice?: () => void;
   /**
+   * Unaccepted invitations for the account-chip dropdown's notice row
+   * (myne-md/myne#911 follow-up). Read by App from `usePendingInvites` and passed
+   * down, so the fetch happens once per process rather than per mount.
+   *
+   * Zero renders no row, and the pair is omitted together: a count with no way
+   * to open the dialog would be a badge that leads nowhere.
+   */
+  inviteCount?: number;
+  /**
+   * Open the invitations dialog. App tears this vault down first (`flush +
+   * vault_lock` + `editor.lock`) for the same reason `onJoinDevice` does:
+   * accepting an invitation installs and unlocks a DIFFERENT vault, and SYNC-1
+   * zeroizes this one on the way.
+   */
+  onInvites?: () => void;
+  /**
    * True while a switch's `vault_lock()` IPC is in flight (the brief
    * "switching…" window during which the prior vault flushes + tears down).
    * The account-chip dropdown (task 5) reads it to disable the chip + show the
@@ -531,6 +549,8 @@ export function Editor({
   onSwitchVault,
   onCreateAnother,
   onJoinDevice,
+  inviteCount = 0,
+  onInvites,
   switching = false,
   detachedNoteId = null,
 }: EditorProps) {
@@ -728,6 +748,8 @@ export function Editor({
           onSwitchVault={onSwitchVault}
           onCreateAnother={onCreateAnother}
           onJoinDevice={onJoinDevice}
+          inviteCount={inviteCount}
+          onInvites={onInvites}
           switching={switching}
           detachedNoteId={detachedNoteId}
           settingsOpen={settingsOpen}
@@ -767,6 +789,8 @@ type EditorChromeProps = {
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
   onJoinDevice?: () => void;
+  inviteCount?: number;
+  onInvites?: () => void;
   switching: boolean;
   /** Detached (pop-out) note id, or null in the main window. See `EditorProps`. */
   detachedNoteId: string | null;
@@ -785,6 +809,8 @@ function EditorChrome({
   onSwitchVault,
   onCreateAnother,
   onJoinDevice,
+  inviteCount,
+  onInvites,
   switching,
   detachedNoteId,
   settingsOpen,
@@ -2451,6 +2477,8 @@ function EditorChrome({
                 onSwitchVault={onSwitchVault}
                 onCreateAnother={onCreateAnother}
                 onJoinDevice={onJoinDevice}
+                inviteCount={inviteCount}
+                onInvites={onInvites}
                 switching={switching}
               />
               <NotesSidebarList
@@ -3186,11 +3214,15 @@ function SidebarVaultSwitcher({
   onSwitchVault,
   onCreateAnother,
   onJoinDevice,
+  inviteCount,
+  onInvites,
   switching,
 }: {
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
   onJoinDevice?: () => void;
+  inviteCount?: number;
+  onInvites?: () => void;
   switching: boolean;
 }) {
   // `onJoinDevice` is deliberately absent from this gate: it is capability-
@@ -3212,6 +3244,8 @@ function SidebarVaultSwitcher({
         onSwitchVault={onSwitchVault}
         onCreateAnother={onCreateAnother}
         onJoinDevice={onJoinDevice}
+        inviteCount={inviteCount}
+        onInvites={onInvites}
         switching={switching}
       />
     </div>
@@ -3463,10 +3497,6 @@ function CommandPaletteHost({
     paletteWs.focusedLeaf.activeTab?.kind === "note"
       ? paletteWs.focusedLeaf.activeTab.id
       : null;
-  // (The palette's real-time-sync toggle was dropped in the develop merge - the
-  // sync engine now manages SSE as an always-on baseline with an info-only
-  // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
-  // mock removed on develop.)
   // Drop the ephemeral AI render store when the editor session tears down
   // (lock / vault-switch unmounts this host) - the AS1 artifact (the chat
   // transcript) never outlives the open vault (SYNC-8; conversational-ai-chat
