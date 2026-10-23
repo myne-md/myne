@@ -305,7 +305,11 @@ export function KitStep({
           `protocol.md` §7 so any client can read a phrase any other client
           wrote; without this line an untranslated grid in a translated UI looks
           like a missing translation, and a user "helpfully" translating the
-          words back has destroyed their only backup. */}
+          words back has destroyed their only backup.
+          Restored (myne-md/myne#911 review): the identity-phrase screen carries
+          this note, but the vault kit still renders a 24-word phrase for every
+          vault that is not person-born, so dropping it here left the older path
+          with no warning at all. */}
       <p
         style={{
           fontSize: "var(--text-sm)",
@@ -318,8 +322,7 @@ export function KitStep({
         {t("vaultCreation.kit.whyEnglish")}
       </p>
 
-
-      <SecretDisplayCaveats testIdPrefix="create.kit" />
+      <SecretDisplayCaveats testIdPrefix="create.kit" secret="vault" />
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
         {onCancelSession && (

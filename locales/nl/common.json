@@ -5106,18 +5106,11 @@
     "residueBanner": "Achtergebleven bestanden van een onderbroken verwijdering ({{n}}). Ruim ze op voordat je een kluis aanmaakt.",
     "cleanUpFiles": "Achtergebleven bestanden opruimen",
     "connect": "Verbinden met mijn account",
-    "startIdentity": "Een identiteit aanmaken",
-    "startLocal": "In plaats daarvan een lokale kluis aanmaken",
     "tagline": "Versleutelde markdown-notities. Geen e-mailadres bij het aanmelden.",
-    "identityTitle": "Een identiteit aanmaken",
-    "identityBody": "Eén identiteit voor al je kluizen, zodat mensen je kunnen uitnodigen. Vereist een synchronisatieserver.",
-    "localTitle": "Een lokale kluis aanmaken",
-    "localBody": "Een versleutelde kluis op dit apparaat. Voeg later synchronisatie of een identiteit toe.",
     "restoreTitle": "Herstellen vanuit back-up",
     "restoreBody": "Open een .myne-backup-bestand dat je eerder hebt opgeslagen.",
     "joinTitle": "Dit apparaat aan een account toevoegen",
     "joinBody": "Gebruik een kluis die je al op een ander apparaat hebt.",
-    "createAction": "Aanmaken",
     "restoreAction": "Herstellen",
     "joinAction": "Apparaat toevoegen",
     "version": "Versie {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Identiteit hersteld.",
     "title": "Een identiteit aanmaken",
     "errorAlreadyHeld": "Dit apparaat bevat al een identiteit. Herstel hem met zijn herstelzin, of vergeet hem en maak een nieuwe aan.",
-    "errorNotConfigured": "Kon de identiteit niet instellen. Controleer of er een synchronisatieserver is geconfigureerd en probeer het opnieuw.",
     "forgetCancel": "Bewaren",
     "forgetConfirm": "Vergeten en nieuwe aanmaken",
     "forgetCta": "Deze identiteit vergeten en een nieuwe aanmaken",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Herstel hem op dit apparaat met zijn herstelzin van 24 woorden.",
     "recoverAction": "Herstellen",
     "back": "Terug",
-    "changeServer": "Synchronisatieserver wijzigen of verifiëren",
-    "errorTlsFailure": "Kon het HTTPS-certificaat van de server niet verifiëren. Controleer het serveradres en het certificaat ervan.",
     "phraseTitle": "Sla je identiteitszin op",
     "phraseContinue": "Doorgaan",
     "confirmTitle": "Bevestig je zin"
@@ -5509,15 +5499,6 @@
       "hint": "Opnieuw proberen begint de download vanaf het begin.",
       "retry": "Opnieuw proberen",
       "back": "Terug naar ontgrendelen"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Kies een synchronisatieserver",
-      "intro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Je notities blijven op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
-      "notConfigured": "Voer hierboven een serveradres in en druk op Verbinden om door te gaan.",
-      "back": "Terug",
-      "continue": "Doorgaan"
     }
   },
   "identityFlow": {

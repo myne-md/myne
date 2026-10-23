@@ -5247,18 +5247,11 @@
     "residueBanner": "File residui di un'eliminazione interrotta ({{n}}). Ripuliscili prima di creare una cassaforte.",
     "cleanUpFiles": "Ripulisci i file residui",
     "connect": "Connettiti al mio account",
-    "startIdentity": "Crea un'identità",
-    "startLocal": "Crea invece una cassaforte locale",
     "tagline": "Note markdown crittografate. Nessuna email alla registrazione.",
-    "identityTitle": "Crea un'identità",
-    "identityBody": "Una sola identità per tutte le tue casseforti, così le persone possono invitarti. Richiede un server di sincronizzazione.",
-    "localTitle": "Crea una cassaforte locale",
-    "localBody": "Una cassaforte crittografata su questo dispositivo. Aggiungi la sincronizzazione o un'identità in seguito.",
     "restoreTitle": "Ripristina da backup",
     "restoreBody": "Apri un file .myne-backup che hai salvato in precedenza.",
     "joinTitle": "Aggiungi questo dispositivo a un account",
     "joinBody": "Usa una cassaforte che hai già su un altro dispositivo.",
-    "createAction": "Crea",
     "restoreAction": "Ripristina",
     "joinAction": "Aggiungi dispositivo",
     "version": "Versione {{version}} · pre-alpha"
@@ -5492,7 +5485,6 @@
     "recovered": "Identità recuperata.",
     "title": "Crea un'identità",
     "errorAlreadyHeld": "Questo dispositivo contiene già un'identità. Recuperala con la sua frase di recupero, oppure dimenticala e creane una nuova.",
-    "errorNotConfigured": "Non è stato possibile configurare l'identità. Verifica che sia configurato un server di sincronizzazione, poi riprova.",
     "forgetCancel": "Mantienila",
     "forgetConfirm": "Dimentica e crea nuova",
     "forgetCta": "Dimentica questa identità e creane una nuova",
@@ -5507,8 +5499,6 @@
     "recoverHint": "Recuperala su questo dispositivo con la sua frase di recupero di 24 parole.",
     "recoverAction": "Recupera",
     "back": "Indietro",
-    "changeServer": "Cambia o verifica il server di sincronizzazione",
-    "errorTlsFailure": "Impossibile verificare il certificato HTTPS del server. Controlla l'indirizzo del server e il suo certificato.",
     "phraseTitle": "Salva la tua frase identità",
     "phraseContinue": "Continua",
     "confirmTitle": "Conferma la tua frase"
@@ -5657,15 +5647,6 @@
       "hint": "Riprovando, il download riparte da capo.",
       "retry": "Riprova",
       "back": "Torna allo sblocco"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Scegli un server di sincronizzazione",
-      "intro": "Myne ha bisogno di un server per conservare le tue note crittografate e per raggiungerti in caso di inviti. Le tue note restano crittografate su questo dispositivo prima di uscirne; il server memorizza solo testo cifrato.",
-      "notConfigured": "Inserisci un indirizzo del server qui sopra e premi Connetti per continuare.",
-      "back": "Indietro",
-      "continue": "Continua"
     }
   },
   "identityFlow": {

@@ -32,6 +32,104 @@ impl TransportResponseExt {
     }
 }
 
+/// A transport that names the vault on every sync request
+/// (myne-md/myne#911 task 8).
+///
+/// A person-born (`NTV7`) vault has no vault SCRAM account: its namespace is
+/// `vault.meta`'s random binding and the credential is the person token, so the
+/// namespace has to travel WITH the request rather than inside the bearer. The
+/// server's rule (task 7) is an optional `?account=<account_number_hash>` on the
+/// sync routes, refused with `403` when the caller is not bound to that vault.
+///
+/// # Why a transport wrapper rather than a parameter on every engine call
+///
+/// The engine's four request builders (`pull_page`, `download_blob`,
+/// `download_blobs`, `push`) are called from ~15 places in the orchestrator,
+/// every one of which already threads a token and would have to thread a second
+/// string through the same depth. The namespace is a property of the CONVERSATION
+/// (this transport, this vault), not of any individual call, so it belongs here:
+/// wrap once where the vault is known and the whole cycle inherits it.
+///
+/// # What it touches, and what it deliberately does not
+///
+/// The vault-scoped paths are rewritten: everything under `/sync/`, the three
+/// `/attachments/` routes, and `/vault.meta` (publishing is exactly
+/// `PUT /vault.meta?account=<binding>`). `/auth/*` is NOT: a SCRAM handshake is
+/// about the account the credential names.
+///
+/// The attachment routes belong here and used to be left out, on the claim that
+/// "the byte transport carries its selector itself". It does not: the upload and
+/// download paths are built from the id alone, so a person session's attachment
+/// bytes were stored in the PERSON's namespace and no other device could ever
+/// fetch them (myne-md/myne#911 review). The server now authorizes the same
+/// parameter against the membership table on those routes.
+pub struct NamespacedTransport<'a> {
+    inner: &'a dyn SyncTransport,
+    namespace: &'a str,
+}
+
+impl<'a> NamespacedTransport<'a> {
+    /// Wrap `inner` so its sync requests name `namespace`.
+    pub fn new(inner: &'a dyn SyncTransport, namespace: &'a str) -> Self {
+        Self { inner, namespace }
+    }
+
+    /// The rewrite itself, and the reason it is a function: one place decides
+    /// which paths are vault-scoped.
+    fn scoped(path: &str, namespace: &str) -> String {
+        if !(path.starts_with("/sync/")
+            || path.starts_with("/attachments/")
+            || path == "/vault.meta")
+        {
+            return path.to_string();
+        }
+        let sep = if path.contains('?') { '&' } else { '?' };
+        format!("{path}{sep}account={namespace}")
+    }
+}
+
+impl SyncTransport for NamespacedTransport<'_> {
+    fn request(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponse, TransportError> {
+        self.inner
+            .request(method, &Self::scoped(path, self.namespace), body, token)
+    }
+
+    fn request_ext(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        extra_headers: &[(&str, &str)],
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponseExt, TransportError> {
+        self.inner.request_ext(
+            method,
+            &Self::scoped(path, self.namespace),
+            extra_headers,
+            body,
+            token,
+        )
+    }
+
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        // The poke channel is per namespace as well: the server keys it on the
+        // account the request resolves to.
+        self.inner
+            .open_sse(&Self::scoped(path, self.namespace), token, read_timeout)
+    }
+}
+
 /// The blind-relay transport contract. One method: issue a request with an
 /// optional per-device bearer token, get a status + opaque body.
 pub trait SyncTransport: Send + Sync {
@@ -647,3 +745,73 @@ mod default_binding_tests {
 /// precisely so an AI response is never silently held to a number chosen for
 /// batch blob fetches (ai-ollama-local task 1).
 pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
+
+#[cfg(test)]
+mod namespaced_tests {
+    use super::*;
+
+    /// What the wrapper must touch, and what it must not (myne-md/myne#911
+    /// task 8). The sync routes and `/vault.meta` are vault-scoped; the SCRAM
+    /// handshake and the attachment byte-transport are not, and adding a
+    /// selector to either would authenticate or address the wrong thing.
+    #[test]
+    fn only_vault_scoped_paths_learn_the_namespace() {
+        let ns = "0102030405060708090a0b0c0d0e0f10";
+        assert_eq!(
+            NamespacedTransport::scoped("/sync/push", ns),
+            format!("/sync/push?account={ns}")
+        );
+        // An existing query keeps its own separator, or the cursor would be lost.
+        assert_eq!(
+            NamespacedTransport::scoped("/sync/pull?cursor=7", ns),
+            format!("/sync/pull?cursor=7&account={ns}")
+        );
+        assert_eq!(
+            NamespacedTransport::scoped("/vault.meta", ns),
+            format!("/vault.meta?account={ns}")
+        );
+        // The attachment routes are vault-scoped too: their bytes belong to the
+        // vault namespace, not to the person's own one (myne-md/myne#911 review).
+        for scoped in ["/attachments/ab", "/attachments/ab?offset=0&total=8"] {
+            assert_eq!(
+                NamespacedTransport::scoped(scoped, ns),
+                if scoped.contains('?') {
+                    format!("{scoped}&account={ns}")
+                } else {
+                    format!("{scoped}?account={ns}")
+                }
+            );
+        }
+        for untouched in ["/auth/scram/init", "/auth/scram/final"] {
+            assert_eq!(NamespacedTransport::scoped(untouched, ns), untouched);
+        }
+    }
+
+    /// The wrapper really rewrites the request it forwards, end to end through
+    /// the seam rather than only in the helper: a fake transport records what it
+    /// was asked for.
+    #[test]
+    fn the_wrapped_transport_forwards_the_scoped_path() {
+        let fake = FakeTransport::new();
+        let ns = "aabbccddeeff00112233445566778899";
+        // The fake answers per exact path, which is what makes this an assertion
+        // about the path: a canned response on the SCOPED path can only be found
+        // if the wrapper rewrote it.
+        fake.on(
+            HttpMethod::Post,
+            &format!("/sync/push?account={ns}"),
+            200,
+            b"{}".to_vec(),
+        );
+        let wrapped = NamespacedTransport::new(&fake, ns);
+        wrapped
+            .request(HttpMethod::Post, "/sync/push", b"{}", Some("tok"))
+            .expect("fake answers");
+        let seen = fake.requests();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].1, format!("/sync/push?account={ns}"));
+        // The bearer is untouched: the namespace names the vault, the token names
+        // the credential, and they are two different facts.
+        assert_eq!(seen[0].3.as_deref(), Some("tok"));
+    }
+}

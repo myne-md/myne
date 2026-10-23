@@ -73,10 +73,12 @@ export function exportPath(filename: string) {
     <cloud-backup>
         <exclude domain="external" path="Documents" />
         <exclude domain="external" path="Pictures" />
+        <exclude domain="file" path="person-auth.json" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="external" path="Documents" />
         <exclude domain="external" path="Pictures" />
+        <exclude domain="file" path="person-auth.json" />
     </device-transfer>
 </data-extraction-rules>
 `,
@@ -84,6 +86,7 @@ export function exportPath(filename: string) {
 <full-backup-content>
     <exclude domain="external" path="Documents" />
     <exclude domain="external" path="Pictures" />
+    <exclude domain="file" path="person-auth.json" />
 </full-backup-content>
 `,
     [ANDROID_MANIFEST]: `<manifest>
@@ -122,6 +125,14 @@ pub const EXPORT_DESTINATION: ExportDir = ExportDir::Documents;
 
 pub fn ensure_export_dir<R>(app: &AppHandle<R>) -> Result<PathBuf, EnsureError> {
     ensure(app, EXPORT_DESTINATION)
+}
+
+pub fn init<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
+    if let Ok(dir) = app.path().app_config_dir() {
+        let path = dir.to_string_lossy().to_string();
+        let _ = exclude_from_backup_at(&path);
+    }
 }
 `,
     [RUST_SETUP]: `mod backup_exclude;
@@ -340,6 +351,39 @@ describe("drift class 1: the seam reaches for a path accessor again (rule 0, inv
       listMergedManifests: () => [],
     }) as { failures: string[] };
     expect(out.failures.join("\n")).toContain("no .ts/.tsx files found, so rule 0 read nothing");
+  });
+});
+
+describe("drift class 2b: the person token is backed up", () => {
+  it("fails when the Android 12+ rules stop excluding person-auth.json", () => {
+    const files = healthyFiles();
+    files[ANDROID_RULES_MODERN] = files[ANDROID_RULES_MODERN].replace(
+      '        <exclude domain="file" path="person-auth.json" />\n',
+      "",
+    );
+    const out = messages(files);
+    expect(out).toContain("person-auth.json");
+    expect(out).toContain("every vault the account is bound to");
+  });
+
+  it("fails when only the device-transfer half loses it, because that is a separate copy path", () => {
+    const files = healthyFiles();
+    files[ANDROID_RULES_MODERN] = files[ANDROID_RULES_MODERN].replace(
+      '    <device-transfer>\n        <exclude domain="external" path="Documents" />\n        <exclude domain="external" path="Pictures" />\n        <exclude domain="file" path="person-auth.json" />',
+      '    <device-transfer>\n        <exclude domain="external" path="Documents" />\n        <exclude domain="external" path="Pictures" />',
+    );
+    expect(messages(files)).toContain("person-auth.json");
+  });
+
+  it("fails when the iOS call stops naming the config directory", () => {
+    const files = healthyFiles();
+    files[RUST_MODULE] = files[RUST_MODULE].replace(
+      "if let Ok(dir) = app.path().app_config_dir() {",
+      "if let Ok(dir) = Ok::<std::path::PathBuf, ()>(std::path::PathBuf::new()) {",
+    );
+    const out = messages(files);
+    expect(out).toContain("app-config directory");
+    expect(out).toContain("one platform fixed and the other silently not");
   });
 });
 

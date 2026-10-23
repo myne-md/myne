@@ -42,7 +42,14 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
       // The vault-less identity probe (myne-md/myne#711): a fresh device holds
       // no person account, so the welcome arm renders.
       if (cmd === "plugin:sync|sync_person_status") {
-        return { enrolled: false, identity_unlocked: false, person_id_hex: null, identity_code: null };
+        return {
+          enrolled: false,
+          state: null,
+          identity_unlocked: false,
+          person_id_hex: null,
+          identity_code: null,
+          sealed_keypair_present: false,
+        };
       }
       return undefined;
     });
@@ -71,9 +78,11 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
       if (cmd === "plugin:sync|sync_person_status") {
         return {
           enrolled: true,
+          state: "enrolled",
           identity_unlocked: true,
           person_id_hex: "11".repeat(16),
           identity_code: "MYNE-PERSON-1:runtime",
+          sealed_keypair_present: true,
         };
       }
       if (cmd === "plugin:sync|sync_person_list_invites") return [];
@@ -87,5 +96,32 @@ describe("App boot probe (story 12: the IPC pair fires exactly once)", () => {
       ready: true,
       ownerCode: "MYNE-PERSON-1:runtime",
     });
+  });
+
+  it("routes a RESERVED identity to the identity home, not the welcome screen", async () => {
+    // myne-md/myne#911's zero-vault acceptance line. A `reserved` identity has
+    // no token by definition, so the old `enrolled` gate sent it to Welcome,
+    // where "Create an identity" is guaranteed to fail (the device already holds
+    // a sealed frame it did not write).
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "plugin:vault-unlock|vault_list") return [];
+      if (cmd === "plugin:vault-unlock|vault_slot_kind") return "Empty";
+      if (cmd === "plugin:sync|sync_person_status") {
+        return {
+          enrolled: false,
+          state: "reserved",
+          identity_unlocked: true,
+          person_id_hex: "22".repeat(16),
+          identity_code: "MYNE-PERSON-1:reserved",
+          sealed_keypair_present: true,
+        };
+      }
+      if (cmd === "plugin:sync|sync_person_list_invites") return [];
+      return undefined;
+    });
+
+    render(<App />);
+    await screen.findByTestId("identity-home.root");
+    expect(screen.queryByTestId("welcome.root")).toBeNull();
   });
 });

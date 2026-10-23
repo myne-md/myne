@@ -30,6 +30,8 @@ permissions = [
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
+    "allow-sync-publish-vault",
+    "allow-sync-published-state",
     "allow-resolve-identity",
     "allow-sync-person-create-invite",
     "allow-sync-list-vault-invites",
@@ -48,7 +50,23 @@ permissions = [
     "allow-sync-list-roster",
     "allow-sync-person-unlock",
     "allow-sync-person-setup",
+    "allow-sync-person-join-device",
+    "allow-sync-person-claim-device",
+    "allow-sync-person-list-vaults",
+    "allow-sync-person-join-qr",
+    "allow-sync-decode-join-qr",
     "allow-sync-person-status",
+    # The explicit registration act (decisions/protocol/0719). It was DEFINED
+    # below and absent from this bundle, so `sync:default` refused it and the
+    # identity home's register button failed on every press (myne-md/myne#911
+    # review). `allow-sync-publish-vault` was the same omission one task earlier.
+    #
+    # `allow-sync-person-create-identity` is deliberately NOT here: that command
+    # had no caller on any client (the first run creates through `person_setup`,
+    # which is what web dispatches too), so the command is deleted rather than
+    # granted. A grant for a dead command is a permission nobody can audit.
+    "allow-sync-person-register",
+    "allow-sync-person-account-number",
     "allow-sync-person-list-invites",
     "allow-sync-person-lock",
     "allow-sync-start-b2b-migration",
@@ -125,6 +143,36 @@ description = "Allow invoking sync:sync_now (request an immediate sync; returns 
 commands.allow = ["sync_now"]
 
 [[permission]]
+identifier = "allow-sync-publish-vault"
+description = "Allow invoking sync:sync_publish_vault (publish this vault's metadata under the identity the device holds, binding the owner on the server's first write). Writes no vault content: one opaque vault.meta PUT plus a device-local record."
+commands.allow = ["sync_publish_vault"]
+
+[[permission]]
+identifier = "allow-sync-published-state"
+description = "Allow invoking sync:sync_published_state (read-only durable publish state for the active vault: published or device only, the recorded namespace, and whether the vault was born under an identity). Reads device-local state plus the vault.meta generation byte: no key material, no network."
+commands.allow = ["sync_published_state"]
+
+[[permission]]
+identifier = "allow-sync-person-join-device"
+description = "Allow invoking sync:sync_person_join_device (myne-md/myne#911 task 9 - admit THIS device to a person's account from a scanned person QR and the 24-word phrase). The phrase crosses IPC once, exactly as the identity-unlock path does; the device lands pending until an existing device approves it. Never grants vault content: admission is an account binding, and each vault still asks for its own password."
+commands.allow = ["sync_person_join_device"]
+
+[[permission]]
+identifier = "allow-sync-person-claim-device"
+description = "Allow invoking sync:sync_person_claim_device (myne-md/myne#911 task 9 - finish a pending device's enrolment once an existing device approved it, using the session's cached derived SCRAM secret; no phrase re-entry, no new credential on disk beyond the device token the server issues)."
+commands.allow = ["sync_person_claim_device"]
+
+[[permission]]
+identifier = "allow-sync-person-list-vaults"
+description = "Allow invoking sync:sync_person_list_vaults (myne-md/myne#911 task 9 - list every vault the person account is bound to and write a local container for each one this device does not hold yet). Writes frames only: the vault.meta the server already holds plus the device-local namespace record. No key material, no password, no vault content, and no decryption; opening a listed vault still asks for that vault's own password."
+commands.allow = ["sync_person_list_vaults"]
+
+[[permission]]
+identifier = "allow-sync-person-join-qr"
+description = "Allow invoking sync:sync_person_join_qr (myne-md/myne#911 task 9 - render the code that admits another device to this PERSON's account). Takes no argument: the person id comes from the identity this device holds and the endpoint from its own sync config. The payload carries only the person id, which is public material; no secret, no vault content, and it cannot describe an account this device is not in."
+commands.allow = ["sync_person_join_qr"]
+
+[[permission]]
 identifier = "allow-resolve-identity"
 description = "Allow invoking sync:resolve_identity (map an Automerge actor to a {Device, Person, Unknown} identity for the version-history panel; reads vault.prefs device_names, no id hash crosses to the frontend)."
 commands.allow = ["resolve_identity"]
@@ -138,6 +186,16 @@ commands.allow = ["sync_person_unlock"]
 identifier = "allow-sync-person-setup"
 description = "Allow invoking sync:sync_person_setup (B2B identity-only setup: generates a recovery phrase when none is supplied, derives and seals the person keypair, derives the person SCRAM secret, reads the device-scoped endpoint, and registers the person account at that endpoint under person_id_hash. The phrase is returned ONCE when generated and never logged; the token is stored device-scoped). No vault access."
 commands.allow = ["sync_person_setup"]
+
+[[permission]]
+identifier = "allow-sync-person-register"
+description = "Allow invoking sync:sync_person_register (myne-md/myne#911: the explicit registration act. Opens the sealed identity under the supplied phrase, derives the person SCRAM secret, reads the device-scoped endpoint and registers the account there under person_id_hash, storing the device token when the device is approved. A failure leaves the identity reserved and unchanged: a device with no endpoint stays fully usable)."
+commands.allow = ["sync_person_register"]
+
+[[permission]]
+identifier = "allow-sync-person-account-number"
+description = "Allow invoking sync:sync_person_account_number (read-only: the person account number in canonical form, derived from the person id this device already holds. No phrase, no network, no key material)."
+commands.allow = ["sync_person_account_number"]
 
 [[permission]]
 identifier = "allow-sync-person-status"
@@ -319,6 +377,11 @@ commands.allow = ["sync_restore_quarantine"]
 identifier = "allow-sync-delete-quarantine"
 description = "Allow invoking sync:sync_delete_quarantine (permanently remove ONE quarantined note blob; strict file-name validation; requires an unlocked active vault (Slot::Unlocked, enforced in the shared core), and the UI confirms first — the single path that destroys quarantine evidence). No decrypt, no vault-blob access beyond the quarantine dir."
 commands.allow = ["sync_delete_quarantine"]
+
+[[permission]]
+identifier = "allow-sync-decode-join-qr"
+description = "Allow invoking sync:sync_decode_join_qr (myne-md/myne#911 task 9 - decode a pasted join code into the confirm-screen view). Pure over the scanned string plus the clock: it validates a versioned, self-describing payload (magic, kind, endpoint URL, target id) and checks its freshness window. No vault access, no IO, no network, no secret (the payload carries public ids only, which is what makes a QR readable). Granted to the desktop because a device with no camera pastes the code a phone is showing, which is the only way the identity-model join reaches a laptop."
+commands.allow = ["sync_decode_join_qr"]
 
 [[permission]]
 identifier = "allow-sync-device-join-qr"

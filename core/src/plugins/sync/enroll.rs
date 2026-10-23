@@ -2072,7 +2072,7 @@ pub(crate) async fn write_bootstrap_meta(
 /// The sibling enrol path already validates immediately after parsing and says
 /// why ("a hostile server could pin an absurd `m_kib` … the sync enroll path was
 /// the one gap"); this is the other half of that gap.
-fn validate_fetched_meta(
+pub(crate) fn validate_fetched_meta(
     meta_bytes: &[u8],
     account_hash: &[u8; 16],
 ) -> Result<(), SyncDeviceError> {
@@ -2597,7 +2597,12 @@ mod join_credential_tests {
         let id = crate::vault_id::VaultId::mint();
         let session = build_session(id, PASSWORD, FAST_TEST_KDF).expect("build_session");
         let root: [u8; 32] = *session.root_key;
-        let phrase = (*session.phrase.join_normalized()).to_string();
+        let phrase = (*session
+            .phrase
+            .as_ref()
+            .expect("build_session always mints a phrase")
+            .join_normalized())
+        .to_string();
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize");
         let scratch = ScratchVault::new("join_credential");
         scratch.write_meta(&bytes);

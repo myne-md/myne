@@ -170,7 +170,13 @@ export type Action =
   | { type: "BEGIN_REQUESTED" }
   | {
       type: "BEGIN_OK";
-      phrase: string[];
+      /**
+       * `null` for a person-born vault, whose phrase is retired
+       * (myne-md/myne#911 task 5). The flow then skips the kit AND the
+       * type-back, because there is nothing to save and nothing to prove: the
+       * identity phrase was already saved when the identity was created.
+       */
+      phrase: string[] | null;
       accountNumber: string;
       sessionToken: string;
       /**
@@ -252,22 +258,42 @@ export function vaultCreationReducer(
       return { ...state, step: "name", error: null };
     case "BEGIN_REQUESTED":
       return { ...state, step: "encrypting", error: null };
-    case "BEGIN_OK":
+    case "BEGIN_OK": {
+      // A person-born vault has no phrase, so there is no kit to show and no
+      // type-back to pass: it goes straight to writing the vault. Ordering
+      // matters in the other direction too, so `provisioning` keeps precedence
+      // where sync is required (web), since the phrase there still exists.
+      const noPhrase = action.phrase === null;
       return {
         ...state,
-        step: action.requiresProvisioning ? "provisioning" : "kit",
+        step: action.requiresProvisioning
+          ? "provisioning"
+          : noPhrase
+            ? "committing"
+            : "kit",
         phrase: action.phrase,
         accountNumber: action.accountNumber,
         sessionToken: action.sessionToken,
-        confirmPositions: drawConfirmPositions(),
+        confirmPositions: noPhrase ? null : drawConfirmPositions(),
         confirmInputs: {},
         phraseRevealed: false,
         error: null,
       };
+    }
     case "BEGIN_ERR":
       return { ...state, step: "password", error: action.error };
     case "PROVISION_OK":
-      return { ...state, step: "kit", error: null };
+      // The `BEGIN_OK` arm above states the ordering rule: provisioning keeps
+      // precedence "since the phrase there still exists". That assumption is
+      // false for a PERSON-BORN vault created in a browser, where the phrase is
+      // null and provisioning still runs because sync is required
+      // (myne-md/myne#911 task 13). Without this branch the flow lands on the
+      // kit with an empty 24-word grid and gates "finish" behind words that do
+      // not exist, which is the exact screen the phrase-less `BEGIN_OK` arm
+      // exists to skip.
+      return state.phrase === null
+        ? { ...state, step: "committing", error: null }
+        : { ...state, step: "kit", error: null };
     case "PROVISION_ERR":
       // Dedicated rather than inline, and terminal rather than retryable: the
       // container has been erased and the session cancelled, so there is
@@ -319,6 +345,15 @@ export function vaultCreationReducer(
       // now that the account number no longer has a step of its own. The typed
       // words are still in state, so the inline banner appears above a challenge
       // the user has already passed and can retry with one click.
+      //
+      // A person-born vault has no confirm step to return to, and staying on
+      // `committing` would re-fire the commit effect against a failure that is
+      // not transient. It goes back to the password step with the error shown
+      // there: the vault was not written, so starting over costs a password
+      // entry and nothing else.
+      if (state.phrase === null) {
+        return { ...initialState, step: "password", vaultName: state.vaultName, error: action.error };
+      }
       return { ...state, step: "confirm", error: action.error };
     case "RESET_TO_PASSWORD":
     case "RESET":

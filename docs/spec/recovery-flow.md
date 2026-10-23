@@ -6,6 +6,15 @@
 
 ## 1. Scope
 
+> **Generation-scoped (myne-md/myne#911).** This document specifies the **vault**
+> recovery phrase's ceremony. Since `protocol.md` §9.3.5 a vault born under a
+> person identity has no vault phrase: the recovery wrap is required to be all
+> zero, creation skips §2 entirely (no kit, no type-back), and the second
+> credential is the identity phrase, whose display and type-back live in the
+> identity ceremony (`decisions/protocol/0717`, `decisions/ui/0721`). Everything
+> below remains normative for every vault that carries a vault phrase
+> (`MYV1`/`NTV5`/`NTV6`), which stays readable and recoverable forever.
+
 This document covers two halves of the same lifecycle:
 
 1. **Create-time recovery UX** — the screens and rules that present the freshly generated recovery phrase to the user at vault creation and force its confirmation. Already implemented in `src/screens/vault-creation/` (B3a + B3b); this section captures the canonical behavior.
@@ -20,6 +29,8 @@ Out of scope:
 ---
 
 ## 2. Create-time recovery UX
+
+> **Generation scope (myne-md/myne#911).** This section applies only to a vault that carries a vault phrase (`MYV1`/`NTV5`/`NTV6`). A vault born under the person plane has no phrase screen and no confirmation step: §2.1 does not generate a vault phrase, §2.2's kit is not shown, and §2.3's type-back is not asked, because the identity ceremony already revealed the identity phrase behind a reveal and passed it through its own four-word challenge before that vault existed (`protocol.md` §7 scope note, `decisions/protocol/0717`, `decisions/ui/0721`). The desktop creation flow goes from the password step straight to writing the vault. Everything in this section stays normative for a vault that has a phrase.
 
 ### 2.1 Phrase generation
 

@@ -49,9 +49,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_unsynced_edits,
             commands::sync_materialisation_progress,
             commands::sync_now,
+            commands::sync_publish_vault,
+            commands::sync_published_state,
+            commands::sync_person_list_vaults,
+            // The desktop had never registered the decoder: it has no camera, so the
+            // only join code it could ever see is the text a user pastes
+            // (myne-md/myne#911 task 9).
+            commands::sync_decode_join_qr,
             identity_resolver::resolve_identity,
             commands::sync_person_unlock,
             person_account::sync_person_setup,
+            person_account::sync_person_register,
+            person_account::sync_person_account_number,
+            person_account::sync_person_join_device,
+            person_account::sync_person_claim_device,
             person_account::sync_person_status,
             person_account::sync_person_list_invites,
             person_account::sync_list_vault_invites,
@@ -96,6 +107,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_delete_quarantine,
             qr::sync_device_join_qr,
             qr::sync_member_join_qr,
+            qr::sync_person_join_qr,
             legal::sync_beta_terms_accepted,
             legal::sync_accept_beta_terms,
             tor::sync_get_tor_routing,

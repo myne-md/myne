@@ -5106,18 +5106,11 @@
     "residueBanner": "Resterende filer fra en afbrudt sletning ({{n}}). Ryd dem op, før du opretter en boks.",
     "cleanUpFiles": "Ryd resterende filer op",
     "connect": "Forbind til min konto",
-    "startIdentity": "Opret en identitet",
-    "startLocal": "Opret en lokal boks i stedet",
     "tagline": "Krypterede markdown-noter. Ingen e-mail ved oprettelse.",
-    "identityTitle": "Opret en identitet",
-    "identityBody": "Én identitet til alle dine bokse, så folk kan invitere dig. Kræver en synkroniseringsserver.",
-    "localTitle": "Opret en lokal boks",
-    "localBody": "En krypteret boks på denne enhed. Tilføj synkronisering eller en identitet senere.",
     "restoreTitle": "Gendan fra sikkerhedskopi",
     "restoreBody": "Åbn en .myne-backup-fil, du gemte tidligere.",
     "joinTitle": "Føj denne enhed til en konto",
     "joinBody": "Brug en boks, du allerede har på en anden enhed.",
-    "createAction": "Opret",
     "restoreAction": "Gendan",
     "joinAction": "Tilføj enhed",
     "version": "Version {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Identitet gendannet.",
     "title": "Opret en identitet",
     "errorAlreadyHeld": "Denne enhed har allerede en identitet. Gendan den med dens gendannelsessætning, eller glem den, og opret en ny.",
-    "errorNotConfigured": "Kunne ikke opsætte identiteten. Tjek, at der er konfigureret en synkroniseringsserver, og prøv igen.",
     "forgetCancel": "Behold den",
     "forgetConfirm": "Glem, og opret ny",
     "forgetCta": "Glem denne identitet, og opret en ny",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Gendan den på denne enhed med dens 24-ords gendannelsessætning.",
     "recoverAction": "Gendan",
     "back": "Tilbage",
-    "changeServer": "Ændr eller verificer synkroniseringsserver",
-    "errorTlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen og dens certifikat.",
     "phraseTitle": "Gem din identitetssætning",
     "phraseContinue": "Fortsæt",
     "confirmTitle": "Bekræft din sætning"
@@ -5509,15 +5499,6 @@
       "hint": "Et nyt forsøg starter downloadet forfra.",
       "retry": "Prøv igen",
       "back": "Tilbage til oplåsning"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Vælg en synkroniseringsserver",
-      "intro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Dine noter forbliver krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
-      "notConfigured": "Indtast en serveradresse ovenfor, og tryk på Opret forbindelse for at fortsætte.",
-      "back": "Tilbage",
-      "continue": "Fortsæt"
     }
   },
   "identityFlow": {

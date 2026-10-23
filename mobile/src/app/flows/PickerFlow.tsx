@@ -50,6 +50,7 @@ const PLACEHOLDER_VAULTS: VaultSummary[] = [
     label: "Personal",
     icon: null,
     last_unlock: Date.now() - 2 * 60 * 1000,
+    published: false,
   },
   {
     id: "00000000-0000-7000-8000-000000000002",
@@ -57,6 +58,7 @@ const PLACEHOLDER_VAULTS: VaultSummary[] = [
     label: "Work",
     icon: null,
     last_unlock: Date.now() - 26 * 60 * 60 * 1000,
+    published: false,
   },
 ];
 

@@ -258,6 +258,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/account-number/v0.1/cases.json"),
         ),
         (
+            "person-account-number",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/person-account-number/v0.2/cases.json"),
+        ),
+        (
             "argon2id",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/argon2id/v0.1/cases.json"),
@@ -470,6 +475,11 @@ mod embedded {
             "vault-meta",
             "v0.2",
             include_str!("../../myne-test-vectors/vectors/vault-meta/v0.2/cases.json"),
+        ),
+        (
+            "vault-meta-ntv7",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/vault-meta-ntv7/v0.2/cases.json"),
         ),
         (
             "vault-prefs",
@@ -2563,6 +2573,365 @@ fn argon2id_wrap_vectors() {
     }
 }
 
+/// `person-account-number` (myne-md/myne#911): the number a person identity
+/// derives, pinned from the phrase all the way to the display form.
+///
+/// The family exists because the number is load-bearing through IDENTITY rather
+/// than through cryptography: two ports that read a different 95-bit window of
+/// the person id print different numbers for the same phrase, and the number is
+/// what two people read to each other during a support handoff or a self-host
+/// setup. Nothing here is secret.
+#[test]
+fn person_account_number_vectors() {
+    use protocol::{account_number_from_person_id, person_id_hash};
+
+    let Some(raw) = cases_json_v0_2("person-account-number") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[person-account-number/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "person-account-number");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 5,
+        "person-account-number must carry at least 5 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("person-account-number/v0.2", cases);
+
+    // The two cases whose EXPECTED value is hand-computable. Asserting they are
+    // present is what keeps the family from degrading into "whatever our
+    // implementation printed": a swapped window cannot pass these two.
+    let mut saw_zero_id = false;
+    let mut saw_top_bit = false;
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let person_id: [u8; 16] = hex_decode_array(
+            case["input_person_id_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing input_person_id_hex")),
+        );
+        let expected_canonical = case["expected_canonical_ascii"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing expected_canonical_ascii"));
+        let expected_display = case["expected_display_ascii"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing expected_display_ascii"));
+        let expected_hash: [u8; 16] = hex_decode_array(
+            case["expected_account_number_hash_hex"]
+                .as_str()
+                .unwrap_or_else(|| panic!("[{id}] missing expected_account_number_hash_hex")),
+        );
+
+        // Hop 1, where a phrase is carried: the id is a pure function of the
+        // normalized phrase, so a port that games hop 2 still has to agree here.
+        if let Some(phrase_hex) = case["input_phrase_utf8_hex"].as_str() {
+            let phrase = hex_decode(phrase_hex);
+            let phrase = core::str::from_utf8(&phrase)
+                .unwrap_or_else(|e| panic!("[{id}] phrase is not UTF-8: {e}"));
+            assert_eq!(
+                person_id_hash(phrase),
+                person_id,
+                "[{id}] person id does not match SHA-256('myne.person-id|' || phrase)[:16]"
+            );
+        }
+
+        let acct = account_number_from_person_id(&person_id);
+        assert_eq!(
+            &acct.canonical,
+            expected_canonical.as_bytes(),
+            "[{id}] canonical mismatch (expected {expected_canonical})"
+        );
+        assert_eq!(acct.display, expected_display, "[{id}] display mismatch");
+        assert_eq!(
+            &acct.hash, &expected_hash,
+            "[{id}] account_number_hash mismatch"
+        );
+
+        // The derived number is an ordinary account number: the one parser must
+        // accept it, or a number read out loud cannot be typed back.
+        let reparsed = protocol::parse_account_number(expected_display)
+            .unwrap_or_else(|e| panic!("[{id}] derived display must parse: {e:?}"));
+        assert_eq!(reparsed, acct, "[{id}] parse round-trip mismatch");
+
+        if person_id == [0u8; 16] {
+            saw_zero_id = true;
+            assert_eq!(
+                expected_canonical, "00000000000000000000",
+                "[{id}] an all-zero id must encode as the all-zero body"
+            );
+        }
+        let mut top_bit = [0u8; 16];
+        top_bit[0] = 0x80;
+        if person_id == top_bit {
+            saw_top_bit = true;
+            assert_eq!(
+                expected_canonical, "G000000000000000000F",
+                "[{id}] bit 127 must land in the FIRST five-bit group"
+            );
+        }
+    }
+
+    assert!(
+        saw_zero_id && saw_top_bit,
+        "person-account-number must keep the two hand-computable orientation \
+         cases (all-zero id, bit 127 only); without them a swapped 95-bit window \
+         passes every other case in the family"
+    );
+}
+
+/// `vault-meta-ntv7` (myne-md/myne#911): the person-wrapped generation.
+///
+/// Three things are pinned and none of them is the seal's randomness: the FRAME
+/// (parse then re-serialize is byte-identical), its STRUCTURAL rejections (the
+/// three retired phrase-wrap fields included), and that a given envelope opens
+/// to one root key or fails closed.
+#[test]
+fn vault_meta_ntv7_vectors() {
+    use protocol::vault_meta_ntv7::{
+        open_person_wrapped_root_key, parse_vault_meta_ntv7, serialize_vault_meta_ntv7, PersonWrap,
+    };
+
+    let Some(raw) = cases_json_v0_2("vault-meta-ntv7") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-meta-ntv7/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "vault-meta-ntv7");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 13,
+        "vault-meta-ntv7 must carry at least 13 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-meta-ntv7/v0.2", cases);
+
+    let mut kinds = std::collections::HashSet::new();
+    let mut phrase_wrap_rejects = 0usize;
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        kinds.insert(kind.to_string());
+
+        match kind {
+            "roundtrip" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_blob = hex_decode(
+                    case["expected_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_blob_hex")),
+                );
+                let meta = parse_vault_meta_ntv7(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] NTV7 frame must parse: {e:?}"));
+
+                assert_eq!(
+                    meta.group_key_epoch as u64,
+                    case["expected_group_key_epoch"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_group_key_epoch")),
+                    "[{id}] group_key_epoch"
+                );
+                assert_eq!(
+                    meta.signed_roster_envelope.len(),
+                    case["expected_signed_roster_len"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_signed_roster_len")
+                        as usize,
+                    "[{id}] signed_roster_len"
+                );
+                assert_eq!(
+                    hex_encode(&meta.base.account_number_hash),
+                    case["expected_base_account_number_hash_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_base_account_number_hash_hex"),
+                    "[{id}] base account_number_hash"
+                );
+                assert_eq!(
+                    hex_encode(&meta.base.items_key_id),
+                    case["expected_base_items_key_id_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_base_items_key_id_hex"),
+                    "[{id}] base items_key_id"
+                );
+                assert_eq!(
+                    hex_encode(&meta.person_wrap.ml_kem_ct),
+                    case["expected_person_wrap_ml_kem_ct_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_person_wrap_ml_kem_ct_hex")
+                );
+                assert_eq!(
+                    hex_encode(&meta.person_wrap.ed_ephemeral_pk),
+                    case["expected_person_wrap_ed_ephemeral_pk_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_person_wrap_ed_ephemeral_pk_hex")
+                );
+                assert_eq!(
+                    hex_encode(&meta.person_wrap.nonce),
+                    case["expected_person_wrap_nonce_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_person_wrap_nonce_hex")
+                );
+                assert_eq!(
+                    hex_encode(&meta.person_wrap.wrapped_root_key),
+                    case["expected_person_wrap_wrapped_root_key_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_person_wrap_wrapped_root_key_hex")
+                );
+
+                // Re-serialization is the half a parse-only case cannot see: a
+                // port that reads every field and writes a different frame is
+                // caught here and nowhere else.
+                let re = serialize_vault_meta_ntv7(&meta)
+                    .unwrap_or_else(|e| panic!("[{id}] re-serialize failed: {e:?}"));
+                assert_eq!(
+                    hex_encode(&re),
+                    hex_encode(&expected_blob),
+                    "[{id}] parse then re-serialize is not byte-identical"
+                );
+
+                // The generation boundary, checked from the OLD reader's side: a
+                // client that predates NTV7 must refuse the magic rather than
+                // read the tail as an NTV6 one and stop at the roster.
+                assert!(
+                    protocol::parse_vault_meta_ntv6(&blob).is_err(),
+                    "[{id}] an NTV6 reader must refuse an NTV7 frame"
+                );
+                assert!(
+                    protocol::parse_vault_meta_v0_2(&blob).is_err(),
+                    "[{id}] the NTV5 reader must refuse an NTV7 frame"
+                );
+                assert_eq!(
+                    protocol::meta_version_of(&blob),
+                    Some(protocol::MetaVersion::V0_2),
+                    "[{id}] NTV7 is a v0.2 generation, not a fifth client generation"
+                );
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                assert_eq!(
+                    case["expected_kind"].as_str(),
+                    Some("invalid_meta"),
+                    "[{id}] the family pins ONE non-distinguishing rejection"
+                );
+                assert!(
+                    parse_vault_meta_ntv7(&blob).is_err(),
+                    "[{id}] must be rejected: {}",
+                    case["informational_reason"].as_str().unwrap_or("")
+                );
+                // The phrase-wrap trio is the load-bearing subset of this kind:
+                // those three cases are what make "the generation retired the
+                // phrase wrap" a checked claim rather than a comment.
+                if id.contains("live-recovery") {
+                    phrase_wrap_rejects += 1;
+                }
+            }
+            "person_wrap_open" | "person_wrap_open_fail" => {
+                let kem_seed: [u8; 64] = hex_decode_array(
+                    case["input_kem_seed_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_kem_seed_hex")),
+                );
+                let ed_seed: [u8; 32] = hex_decode_array(
+                    case["input_ed25519_seed_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_ed25519_seed_hex")),
+                );
+                let mldsa_seed: [u8; 32] = hex_decode_array(
+                    case["input_mldsa_seed_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_mldsa_seed_hex")),
+                );
+                let items_key_id: [u8; 16] = hex_decode_array(
+                    case["input_items_key_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_items_key_id_hex")),
+                );
+                let wrap = PersonWrap {
+                    ml_kem_ct: hex_decode_array(
+                        case["input_person_wrap_ml_kem_ct_hex"]
+                            .as_str()
+                            .expect("[{id}] missing input_person_wrap_ml_kem_ct_hex"),
+                    ),
+                    ed_ephemeral_pk: hex_decode_array(
+                        case["input_person_wrap_ed_ephemeral_pk_hex"]
+                            .as_str()
+                            .expect("[{id}] missing input_person_wrap_ed_ephemeral_pk_hex"),
+                    ),
+                    nonce: hex_decode_array(
+                        case["input_person_wrap_nonce_hex"]
+                            .as_str()
+                            .expect("[{id}] missing input_person_wrap_nonce_hex"),
+                    ),
+                    wrapped_root_key: hex_decode_array(
+                        case["input_person_wrap_wrapped_root_key_hex"]
+                            .as_str()
+                            .expect("[{id}] missing input_person_wrap_wrapped_root_key_hex"),
+                    ),
+                };
+                let owner = protocol::PersonKeyPair::generate_raw(&kem_seed, &ed_seed, &mldsa_seed);
+                let opened = open_person_wrapped_root_key(&owner, &wrap, &items_key_id);
+                if kind == "person_wrap_open" {
+                    let expected: [u8; 32] = hex_decode_array(
+                        case["expected_root_key_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] missing expected_root_key_hex")),
+                    );
+                    let opened =
+                        opened.unwrap_or_else(|e| panic!("[{id}] person wrap must open: {e:?}"));
+                    assert_eq!(&*opened, &expected, "[{id}] root_key mismatch");
+                } else {
+                    assert_eq!(
+                        case["expected_kind"].as_str(),
+                        Some("aead_fail"),
+                        "[{id}] a refused open is one non-distinguishing result"
+                    );
+                    assert!(
+                        opened.is_err(),
+                        "[{id}] must fail closed: {}",
+                        case["informational_reason"].as_str().unwrap_or("")
+                    );
+                }
+            }
+            other => panic!("[{id}] unknown case_kind {other:?}"),
+        }
+    }
+
+    for required in [
+        "roundtrip",
+        "parse_fail",
+        "person_wrap_open",
+        "person_wrap_open_fail",
+    ] {
+        assert!(
+            kinds.contains(required),
+            "vault-meta-ntv7 lost its {required} case kind"
+        );
+    }
+    assert_eq!(
+        phrase_wrap_rejects, 3,
+        "all three retired phrase-wrap fields (salt, nonce, ciphertext) must keep \
+         their own rejection case"
+    );
+}
+
 /// `person-keypair` v0.2: the B2B person-keypair wrap-key derivation under the
 /// `"myne.v0.2 argon2id-person-keypair|"` salt domain (`decisions/protocol/0592`).
 ///
@@ -3485,6 +3854,14 @@ fn aad_construction_v0_2_vectors() {
                 );
                 protocol::person_key::aad_person_wrap(&fingerprint, &account_number_hash())
             }
+            "aad_person_wrap_root_key" => {
+                let fingerprint: [u8; 32] = hex_decode_array(
+                    case["input_recipient_fingerprint_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_recipient_fingerprint_hex")),
+                );
+                protocol::person_key::aad_person_wrap_root_key(&fingerprint, &items_key_id())
+            }
             "aad_person_keypair" => protocol::person_key::aad_person_keypair(),
             "aad_vault_invite" => protocol::person_invite::aad_vault_invite(),
             "aad_awareness_frame" => {
@@ -3572,7 +3949,7 @@ fn aad_construction_v0_2_vectors() {
         pinned_builders.insert(builder_name.to_string());
     }
 
-    let required: [&str; 14] = [
+    let required: [&str; 15] = [
         "aad_password_wrap_v0_2",
         "aad_recovery_wrap_v0_2",
         "aad_vault_items_key_wrap_v0_2",
@@ -3582,6 +3959,7 @@ fn aad_construction_v0_2_vectors() {
         "aad_person_binding_blob",
         "aad_membership_roster_blob",
         "aad_person_wrap",
+        "aad_person_wrap_root_key",
         "aad_person_keypair",
         "aad_vault_invite",
         "aad_awareness_frame",

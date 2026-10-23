@@ -2405,8 +2405,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         // `icon: "book"` on the active row is deliberate: browser-dev is the only
         // surface where the VaultMark glyph branch can be seen without a device.
         setVaults([
-          { id: vaultId ?? "dev-personal", status: { kind: "Exists" }, label: "Personal", icon: "book", last_unlock: Date.now() },
-          { id: "dev-work", status: { kind: "Exists" }, label: "Work", icon: null, last_unlock: Date.now() - 86_400_000 },
+          // `published: false` is the honest answer for a browser-dev placeholder:
+          // nothing here has a sync record behind it.
+          { id: vaultId ?? "dev-personal", status: { kind: "Exists" }, label: "Personal", icon: "book", last_unlock: Date.now(), published: false },
+          { id: "dev-work", status: { kind: "Exists" }, label: "Work", icon: null, last_unlock: Date.now() - 86_400_000, published: false },
         ]);
       }
     })();

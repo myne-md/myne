@@ -54,17 +54,19 @@ import { PhraseTypeBack } from "@app/components/PhraseTypeBack";
 import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
 import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
+import { PersonPhraseUnlock } from "@app/components/PersonPhraseUnlock";
+import { VaultFormatUpgrade } from "@app/components/settings/VaultFormatUpgrade";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
 import { PhraseEntryGrid } from "@app/components/PhraseEntryGrid";
 import { ErrorBanner } from "@app/components/ErrorBanner";
 import { ExportEgressNotice } from "@app/components/export/ExportEgressNotice";
 import { FailClosedError } from "@app/components/FailClosedError";
-import { FirstRunServerStep } from "@app/components/sync/FirstRunServerStep";
 import { Icon } from "@app/components/primitives/Icon";
 import { IdentityHome } from "@app/screens/IdentityHome";
 import { AcceptInviteWizard, JoinVaultWizard } from "@app/components/sync/InviteWizard";
 import { IdentitySetupDialog } from "@app/components/IdentitySetupDialog";
+import { IdentitySetupPanel } from "@app/components/IdentitySetupPanel";
 import { ImportPlainFileButton } from "@app/components/plain/ImportPlainFileButton";
 import { IntegrityAlertBanner } from "@app/components/sync/IntegrityAlertBanner";
 import { JoinDeviceModal } from "@app/components/sync/JoinDeviceModal";
@@ -1164,18 +1166,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "components/firstrunserverstep/default",
-    group: "components",
-    surface: "FirstRunServerStep",
-    state: "default",
-    description:
-      "The first-run step that points the client at a sync server, with Connect and Back. It is the door for a fresh install that will sync rather than stay local.",
-    tags: ["components", "sync", "first-run", "server", "onboarding", "connect"],
-    render: () => (
-      <FirstRunServerStep onConnected={action("onConnected")} onBack={action("onBack")} />
-    ),
-  },
-  {
     id: "components/integrityalertbanner/default",
     group: "components",
     surface: "IntegrityAlertBanner",
@@ -1635,6 +1625,19 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     tags: ["components", "identity", "setup", "dialog", "recovery-phrase", "b2b"],
     fixture: "unlocked",
     render: () => <IdentitySetupDialog open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/identitysetuppanel/default",
+    group: "components",
+    surface: "IdentitySetupPanel",
+    state: "default",
+    description:
+      "The identity ceremony as a PANEL: the same body the Settings dialog mounts, and the body the first run mounts inline. One create row and one recover row, no server address anywhere, because creating an identity is network-free and registration is a separate act. Look for the absence of an endpoint field and of any modal chrome.",
+    tags: ["components", "identity", "setup", "panel", "recovery-phrase", "offline", "first-run"],
+    fixture: "unlocked",
+    render: () => (
+      <IdentitySetupPanel onDone={action("onDone")} onCancel={action("onCancel")} />
+    ),
   },
   {
     id: "components/newnotefromtemplatemodal/default",
@@ -2295,5 +2298,53 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       "The prompt that unlocks a person's identity keypair when an action needs it outside a vault session. It is the person-plane credential prompt, separate from the vault unlock.",
     tags: ["components", "identity", "person", "unlock", "prompt", "b2b"],
     render: () => <PersonIdentityUnlock open onOpenChange={action("onOpenChange")} />,
+  },
+  {
+    id: "components/personphraseunlock/default",
+    group: "components",
+    surface: "PersonPhraseUnlock",
+    state: "default",
+    description:
+      "The identity-phrase credential for an upgraded vault, as the unlock screen's sub-view: 24 cells, one paste target and one non-distinguishing failure. It replaces the vault-recovery link on a person-wrapped vault, because the explicit upgrade retired that vault's own phrase.",
+    tags: [
+      "components",
+      "unlock",
+      "identity",
+      "phrase",
+      "person",
+      "one-phrase",
+      "a11y",
+    ],
+    render: () => (
+      <PersonPhraseUnlock
+        onUnlocked={action("onUnlocked")}
+        onCancel={action("onCancel")}
+      />
+    ),
+  },
+  {
+    id: "components/vaultformatupgrade/default",
+    group: "components",
+    surface: "VaultFormatUpgrade",
+    state: "default",
+    description:
+      "The explicit upgrade of an existing vault to one-phrase recovery, as the Settings row offers it: one CTA, and the confirmation appears only after a press. The fixture answers the person-wrap probe with false, which is the only state in which the row renders anything at all.",
+    tags: [
+      "components",
+      "settings",
+      "vault",
+      "format",
+      "migration",
+      "one-phrase",
+      "irreversible",
+    ],
+    fixture: {
+      description:
+        "a vault that has not been upgraded yet, so the row offers the upgrade",
+      handlers: {
+        "plugin:vault-unlock|vault_is_person_wrapped": () => false,
+      },
+    },
+    render: () => <VaultFormatUpgrade />,
   },
 ];

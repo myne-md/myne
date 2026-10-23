@@ -5106,18 +5106,11 @@
     "residueBanner": "Các tệp còn sót lại từ một lần xóa bị gián đoạn ({{n}}). Dọn dẹp chúng trước khi tạo kho lưu trữ.",
     "cleanUpFiles": "Dọn dẹp tệp còn sót lại",
     "connect": "Kết nối tới tài khoản của tôi",
-    "startIdentity": "Tạo một danh tính",
-    "startLocal": "Tạo một kho cục bộ thay thế",
     "tagline": "Ghi chú markdown được mã hóa. Không cần email khi đăng ký.",
-    "identityTitle": "Tạo một danh tính",
-    "identityBody": "Một danh tính cho mọi kho của bạn, để người khác có thể mời bạn. Cần một máy chủ đồng bộ.",
-    "localTitle": "Tạo một kho cục bộ",
-    "localBody": "Một kho được mã hóa trên thiết bị này. Thêm đồng bộ hoặc một danh tính sau.",
     "restoreTitle": "Khôi phục từ bản sao lưu",
     "restoreBody": "Mở một tệp .myne-backup bạn đã lưu trước đó.",
     "joinTitle": "Thêm thiết bị này vào một tài khoản",
     "joinBody": "Dùng một kho bạn đã có trên thiết bị khác.",
-    "createAction": "Tạo",
     "restoreAction": "Khôi phục",
     "joinAction": "Thêm thiết bị",
     "version": "Phiên bản {{version}} · tiền alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Đã khôi phục danh tính.",
     "title": "Tạo danh tính",
     "errorAlreadyHeld": "Thiết bị này đã giữ một danh tính. Hãy khôi phục nó bằng cụm từ khôi phục, hoặc quên nó và tạo một danh tính mới.",
-    "errorNotConfigured": "Không thiết lập được danh tính. Hãy kiểm tra xem đã cấu hình máy chủ đồng bộ chưa rồi thử lại.",
     "forgetCancel": "Giữ lại",
     "forgetConfirm": "Quên và tạo mới",
     "forgetCta": "Quên danh tính này và tạo một danh tính mới",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Hãy khôi phục nó trên thiết bị này bằng cụm từ khôi phục 24 từ của nó.",
     "recoverAction": "Khôi phục",
     "back": "Quay lại",
-    "changeServer": "Đổi hoặc xác minh máy chủ đồng bộ",
-    "errorTlsFailure": "Không xác minh được chứng chỉ HTTPS của máy chủ. Hãy kiểm tra địa chỉ máy chủ và chứng chỉ của nó.",
     "phraseTitle": "Lưu cụm từ danh tính của bạn",
     "phraseContinue": "Tiếp tục",
     "confirmTitle": "Xác nhận cụm từ của bạn"
@@ -5509,15 +5499,6 @@
       "hint": "Thử lại sẽ bắt đầu tải xuống từ đầu.",
       "retry": "Thử lại",
       "back": "Quay lại màn hình mở khóa"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Chọn một máy chủ đồng bộ",
-      "intro": "Myne cần một máy chủ để giữ ghi chú đã mã hóa của bạn và để liên lạc với bạn cho các lời mời. Ghi chú của bạn vẫn được mã hóa trên thiết bị này trước khi rời khỏi nó; máy chủ chỉ lưu bản mã.",
-      "notConfigured": "Hãy nhập địa chỉ máy chủ ở trên và nhấn Kết nối để tiếp tục.",
-      "back": "Quay lại",
-      "continue": "Tiếp tục"
     }
   },
   "identityFlow": {

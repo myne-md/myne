@@ -2734,12 +2734,13 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "identity.first-run",
-    title: "Identity-first first run: fork, server step, identity phrase",
+    title: "Identity-first first run: one door, identity phrase, then the vault",
     paths: [
       "src/screens/Welcome.tsx",
+      "src/screens/FirstRun.tsx",
+      "src/components/IdentitySetupPanel.tsx",
       "src/components/IdentitySetupDialog.tsx",
       "src/components/SecretPhraseReveal.tsx",
-      "src/components/sync/FirstRunServerStep.tsx",
       "src/components/sync/EndpointConfig.tsx",
       "src/screens/IdentityHome.tsx",
       "mobile/src/app/flows/WelcomeFlow.tsx",
@@ -2750,8 +2751,11 @@ export const ROSTER = Object.freeze([
       "mobile/src/components/layout.tsx",
       "mobile/src-tauri/src/plugins/member_names/",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/first-run-offline.e2e.ts",
+      "e2e-web/identity-first-entry.e2e.ts",
+      "e2e-web/person-unlock.e2e.ts",
       "e2e/member-roster.e2e.ts",
       "e2e/member-devices.e2e.ts",
       "mobile/tests/flow-logic/sync/member-accept.flow.ts",
@@ -2760,8 +2764,8 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm the phrase is followed by a SEPARATE type-back step whose Done is gated on four matching words, and that while that challenge is unanswered Esc, a backdrop click and the close button all leave the dialog open. It must be the words, not a click, that finish the ceremony, because the identity already exists server-side by then and the phrase is shown once.",
-        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same device walk also observes HTTPS trust on the native WebView and host.",
+        see: "On a fresh profile with no vault and no server configured, press the one create button and confirm the FIRST thing asked for is the identity, with no server address field anywhere and no way to skip to a vault. Then confirm the identity phrase renders hidden until revealed and re-hides when the window loses focus or the tab is hidden, that it is followed by a SEPARATE type-back step whose Continue is gated on four matching words, and that a wrong word leaves it refused. Finish the ceremony and confirm vault creation follows with no phrase of its own: no kit screen, no type-back, and nothing asking you to write a second set of words down. Then leave the app at that point and reopen it: it must land on the identity home rather than refusing the vault it half-created. The desktop walk is where the blur re-hide and the 'no second phrase' claim are observable at all.",
+        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same walk observes that the first run asks for no server address, which a driver cannot assert beyond the absence of the control (the E2E scenario covers that half).",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
         tier: "core",
@@ -5459,15 +5463,19 @@ export const ROSTER = Object.freeze([
   },
   {
     // The panel split out of Account: the vault's own label, icon, change
-    // password and danger zone. Machines judge these (see the exemptionReason),
-    // so it carries no manual item; the entry exists because the panel is a
-    // surface a release plan schedules against and the guard fails on a file in
-    // the denominator that no entry claims.
+    // password, danger zone and the explicit upgrade to one-phrase recovery
+    // (myne-md/myne#911). The split controls are machine-checked; the upgrade's
+    // item is not, because the two sentences a person reads before an
+    // irreversible credential change have to be read on the platforms that ship
+    // them, and the scenario written for the container half has never executed
+    // (its whyNotAutomated says so rather than implying otherwise).
     id: "settings.panel.vault",
     title: "Vault panel",
     paths: [
       "src/components/settings/VaultPanel.tsx",
+      "src/components/settings/VaultFormatUpgrade.tsx",
       "src/lib/vault-delete.ts",
+      "src/lib/vault-format-upgrade.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
@@ -5476,10 +5484,20 @@ export const ROSTER = Object.freeze([
       "e2e/state-machine.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
+      "e2e/vault-format-upgrade.e2e.ts",
       "e2e-web/vault-delete.e2e.ts",
     ],
-    manual: [],
-    exemptionReason: "Every control here is asserted by a scenario on this entry's automatedBy list, including the danger-zone copy branch and the web client's sign-out variant, and the part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking (myne-md/myne#554).",
+    manual: [
+      {
+        see: "On macOS, the Linux AppImage and Windows, open an existing vault that still carries its own recovery phrase, run the upgrade from the Vault panel, and read the confirmation before pressing it. Confirm both consequences are stated where the button is: that the saved vault phrase stops opening this vault, and that an older version of the app cannot open it once the upgrade syncs. Then attempt the retired vault phrase once and confirm it is REFUSED, confirm the password still opens the vault, and confirm the identity phrase opens it from the lock screen. Finally open the same vault on a second device still running the previous released build, let the upgrade sync, and confirm that build REFUSES the vault rather than opening it.",
+        whyNotAutomated:
+          "The one automated lane that could reach this is a Linux container against WebKitGTK, and the scenario written for it (`e2e/vault-format-upgrade.e2e.ts`) is WRITTEN AND HAS NEVER EXECUTED on this branch: four container builds died at `myne_desktop_lib` with signal 9 (the OOM recorded in `agent-tooling/features/person-account/progress.md`), and the decision was to run the suite once at the end of the feature, so no run has touched even the Linux half. Until a green run is recorded here, this item carries the walkthrough on all three desktop clients, including the Linux one the container would otherwise cover. macOS and Windows have no automated UI lane at all, so the two sentences a user must read before an irreversible credential change are verified on the platforms that ship them and nowhere else, and a second build is a second install rather than a filter. `e2e/vault-format-upgrade.e2e.ts` stays in automatedBy because the guard requires every scenario file to be credited somewhere; what it must not do is tell the manual half that CI already covers this.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
   },
   {
     id: "settings.panel.ai",
@@ -5731,6 +5749,8 @@ export const ROSTER = Object.freeze([
       "e2e/device-join-qr.e2e.ts",
       "e2e/sync-cert-reverify.e2e.ts",
       "e2e/invite-code-gate.e2e.ts",
+      "e2e/publish-vault.e2e.ts",
+      "e2e/person-device-enrolment.e2e.ts",
     ],
     manual: [
       {
@@ -6703,6 +6723,7 @@ export const ROSTER = Object.freeze([
       "e2e/vault-label.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/workspace-state.e2e.ts",
+      "e2e-web/multi-vault.e2e.ts",
     ],
     manual: [
       {
@@ -7068,7 +7089,7 @@ export const ROSTER = Object.freeze([
       "web/src/components/settings/ConnectedExtensions.tsx",
       "web/src/components/sync/EndpointConfig.tsx",
       "web/src/screens/Welcome.tsx",
-      "web/src/screens/VaultPicker.tsx",
+      "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
       "web/src/components/sync/DeviceAttributionPanel.tsx",
       "web/src/components/settings/MigrateVaultForm.tsx",

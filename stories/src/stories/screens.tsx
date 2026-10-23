@@ -8,6 +8,7 @@
 
 import type { StoryDescriptor } from "../types";
 import { Welcome } from "@app/screens/Welcome";
+import { FirstRun } from "@app/screens/FirstRun";
 import { AccountNumberEntry } from "@app/screens/AccountNumberEntry";
 import { StorageLost } from "@app/screens/StorageLost";
 import { DeviceRevoked } from "@app/screens/DeviceRevoked";
@@ -16,21 +17,37 @@ import { action } from "../actions";
 
 export const SCREEN_STORIES: StoryDescriptor[] = [
   {
+    id: "screens/firstrun/default",
+    group: "screens",
+    surface: "FirstRun",
+    state: "default",
+    description:
+      "The first run (myne-md/myne#911): the identity, with the one phrase that recovers everything and the type-back that proves it was saved. This screen replaced the welcome fork, so the vault that follows has no phrase of its own. Look for one create row and one recover row inside the panel, and that the phrase is not on screen until it is revealed.",
+    fullBleed: true,
+    tags: ["screens", "first-run", "identity", "onboarding", "phrase", "type-back", "offline", "zero-vault"],
+    fixture: "no-vault",
+    render: () => (
+      <FirstRun
+        onIdentityCreated={action("onIdentityCreated")}
+        onAbandon={action("onAbandon")}
+      />
+    ),
+  },
+  {
     id: "screens/welcome/default",
     group: "screens",
     surface: "Welcome",
     state: "default",
     description:
-      "The zero-vault entry screen: the mark, the tagline and the four doors in one card. Identity comes first (make a person invitable before owning a vault), then a local vault, a restore from a `.myne-backup`, and joining an existing device; the language picker and version sit below. Look for the ordered fork and that every door is a real button.",
+      "The zero-vault entry screen: the mark, the tagline, ONE create door that starts the first run (identity, then vault), and the two doors that create nothing, restore from a `.myne-backup`, and joining an existing account. The language picker and version sit below. Look for the single primary button and that the old identity/local fork is gone.",
     fullBleed: true,
-    tags: ["screens", "welcome", "first-run", "zero-vault", "vault-creation", "restore-backup", "join-device", "identity", "onboarding", "language"],
+    tags: ["screens", "welcome", "first-run", "zero-vault", "restore-backup", "join-device", "identity", "onboarding", "language"],
     fixture: "no-vault",
     render: () => (
       <Welcome
-        onCreateVault={action("onCreateVault")}
+        onStart={action("onStart")}
         onRestoreBackup={action("onRestoreBackup")}
         onJoinDevice={action("onJoinDevice")}
-        onIdentityCreated={action("onIdentityCreated")}
       />
     ),
   },

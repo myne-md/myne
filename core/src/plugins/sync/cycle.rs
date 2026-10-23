@@ -352,10 +352,21 @@ async fn signed_head_ctx(
     is_owner: bool,
 ) -> Option<super::head_authority::SignedHeadCtx> {
     let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
-    if bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        return None;
-    }
-    let b2b = protocol::parse_vault_meta_ntv6(&bytes).ok()?;
+    // The head format follows the GENERATION (decisions 0603), and there are now
+    // two generations that carry the B2B tail. `NTV7` needs no new mechanism: it
+    // IS `NTV6` plus a person wrap, so the tail accessor is the whole difference.
+    // Reading only `NTV6` here would have authored an HMAC (`0x01`) head for every
+    // vault born under an identity, i.e. a downgrade the `NTV6` guard below
+    // already refuses and no compiler can see (myne-md/myne#911 task 8).
+    let b2b = match bytes.get(..4) {
+        Some(magic) if magic == protocol::VAULT_META_NTV6_MAGIC.as_slice() => {
+            protocol::parse_vault_meta_ntv6(&bytes).ok()?
+        }
+        Some(magic) if magic == protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            protocol::parse_vault_meta_ntv7(&bytes).ok()?.as_ntv6_tail()
+        }
+        _ => return None,
+    };
     let group_key = shared.group_bytes()?;
     let envelope = protocol::person_invite::open_group_roster(
         &group_key,
@@ -399,6 +410,47 @@ async fn signed_head_ctx(
         b2b.base.account_number_hash,
         roster_publics,
     ))
+}
+
+/// The person session's device token, as raw bytes (myne-md/myne#911 task 8).
+///
+/// Read per cycle rather than cached: the token is rotated by re-enrolment and by
+/// a person-key rotation, and a cached copy would outlive the credential it
+/// names. `None` on an absent file (no identity on this device), an all-zero or
+/// unparseable one, or an empty token (an identity that never registered).
+async fn person_token_bytes(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Option<Vec<u8>> {
+    let path = super::person_auth::person_auth_path_for_read(host).ok()?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .ok()??;
+    if auth.token_hex.is_empty() {
+        return None;
+    }
+    // One lowercase-hex contract (audit T6.10(c)); a hand-rolled copy here was
+    // the third one in the crate.
+    let out = protocol::hex::decode_lower_vec(&auth.token_hex)?;
+    (!out.is_empty()).then_some(out)
+}
+
+/// The person session's 16-byte device id (myne-md/myne#911 task 8).
+///
+/// A person-born vault has no enrolment record, so this is the only device actor
+/// its heads can be authored under. Read per cycle for the same reason the token
+/// is: re-enrolment rotates it, and a cached copy would outlive the credential it
+/// names. `None` on an absent file or an unparseable id, which parks the cycle
+/// rather than authoring a head under a made-up actor.
+async fn person_device_id(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Option<[u8; 16]> {
+    let path = super::person_auth::person_auth_path_for_read(host).ok()?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .ok()??;
+    hex16(&auth.device_id_hex)
 }
 
 pub async fn run_active_cycle_from_host(
@@ -483,13 +535,69 @@ pub async fn run_active_cycle_from_host(
             return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
         }
     };
-    let (Some(acct_hex), Some(dev_hex)) = (st.account_hash_hex.clone(), st.device_id_hex.clone())
-    else {
-        return CycleOutcome::NotReady; // not enrolled
+    // A PUBLISHED person-born vault (myne-md/myne#911 task 8). Its namespace is
+    // `vault.meta`'s random binding and its credential is the person session, so
+    // the request names the vault (`?account=`) and the recorded
+    // `account_hash_hex` is the PERSON's id, deliberately not the namespace.
+    // Absent on every pre-existing vault: there the credential names the
+    // namespace and nothing below changes.
+    //
+    // Only a person-born vault ever records one (`publish_vault` says why), so
+    // its presence here can stand in for the generation: a legacy vault that has
+    // been enrolled must NOT take the branch below.
+    //
+    // The record is a CACHE and the frame is the authority (myne-md/myne#911
+    // review): `sync-state.json` is evictable device-local state, so losing it
+    // used to leave a vault that opens, lists and then parks at `NotReady`
+    // forever with nothing saying why. §9.3 offset 6 carries the same value in
+    // `vault.meta`, so an absent record is read from there.
+    let published_namespace = match st.namespace_hex.as_deref().and_then(hex16) {
+        Some(namespace) => Some(namespace),
+        None => {
+            // **Only a person-wrapped frame answers here.** A legacy vault's
+            // offset-6 bytes are its account hash, which its own credential already
+            // names; reading those as a namespace would switch an enrolled legacy
+            // vault onto a credential it does not have.
+            let root =
+                crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+                    .ok();
+            match root {
+                Some(root) => {
+                    crate::plugins::sync::person_discovery::person_frame_namespace(io, &root).await
+                }
+                None => None,
+            }
+        }
     };
-    let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
-        return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+    // The cycle's identity: the namespace it addresses and the device actor it
+    // authors heads under.
+    let (account_hash, device_id) = match published_namespace {
+        Some(namespace) => {
+            // A person-born vault has no enrolment record at all. Creation writes
+            // neither an account hash nor a device id, because there is no vault
+            // account to enrol on; the namespace stands in for the account, and
+            // the person session is the only place a device id exists. Without a
+            // session the cycle parks exactly as a still-pending device does,
+            // because nothing it could do would fix that.
+            let Some(device_id) = person_device_id(io, host).await else {
+                return CycleOutcome::NotReady;
+            };
+            (namespace, device_id)
+        }
+        None => {
+            let (Some(acct_hex), Some(dev_hex)) =
+                (st.account_hash_hex.clone(), st.device_id_hex.clone())
+            else {
+                return CycleOutcome::NotReady; // not enrolled
+            };
+            let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            };
+            (account_hash, device_id)
+        }
     };
+    let published_ns_hex: Option<String> =
+        published_namespace.map(|ns| protocol::hex::encode_lower(&ns));
     // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
     // the cycle needs the itemsKey material. The OWNER root key is optional: a
     // MEMBER holds no `root_key` (that is the point of sharing) and the shared
@@ -516,8 +624,9 @@ pub async fn run_active_cycle_from_host(
     // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
     // a device whose enrolment names another account must not go on to claim a
     // token under that account's SCRAM username either.
+    let expected_identity = published_namespace.unwrap_or(account_hash);
     let (meta_version, account_number_hash) =
-        match cycle_account_number_hash(io, &dir, &account_hash).await {
+        match cycle_account_number_hash(io, &dir, &expected_identity).await {
             Ok(hash) => hash,
             Err(AccountHashRefusal::MetaUnavailable) => {
                 tracing::error!(
@@ -542,25 +651,34 @@ pub async fn run_active_cycle_from_host(
     // claim one now if an existing device approved it (re-handshake under the
     // unlocked root key). A member's per-vault token was stored at invite accept,
     // so a missing one means the membership is not materialised here.
-    let token = match super::token_store::default_store().read(io, &dir).await {
-        Ok(Some(t)) => t,
-        _ => match &root_key {
-            Some(root_key) => {
-                match try_claim_token(
-                    io,
-                    url.clone(),
-                    dir.clone(),
-                    root_key.clone(),
-                    account_hash,
-                    device_id,
-                )
-                .await
-                {
-                    Some(t) => t,
-                    None => return CycleOutcome::NotReady, // still pending approval
+    let token = match published_namespace {
+        // No vault account exists to claim a token against, so the person token
+        // is the only credential; without a session the cycle parks exactly as a
+        // pending device does, because nothing it can do would fix that.
+        Some(_) => match person_token_bytes(io, host).await {
+            Some(t) => t,
+            None => return CycleOutcome::NotReady,
+        },
+        None => match super::token_store::default_store().read(io, &dir).await {
+            Ok(Some(t)) => t,
+            _ => match &root_key {
+                Some(root_key) => {
+                    match try_claim_token(
+                        io,
+                        url.clone(),
+                        dir.clone(),
+                        root_key.clone(),
+                        account_hash,
+                        device_id,
+                    )
+                    .await
+                    {
+                        Some(t) => t,
+                        None => return CycleOutcome::NotReady, // still pending approval
+                    }
                 }
-            }
-            None => return CycleOutcome::NotReady, // member with no stored token
+                None => return CycleOutcome::NotReady, // member with no stored token
+            },
         },
     };
 
@@ -591,12 +709,20 @@ pub async fn run_active_cycle_from_host(
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
     // user runs the person unlock. Refuse loudly instead of downgrading.
     {
-        let is_ntv6 = io
+        // BOTH B2B generations, not just the first one: a head that a roster
+        // vouches for is what an `NTV7` vault needs exactly as much as an `NTV6`
+        // one, and checking one magic would let the newer generation author the
+        // downgraded head this guard exists to refuse (myne-md/myne#911 task 8).
+        let needs_signed_head = io
             .read(&dir.join("vault.meta"))
             .await
-            .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
+            .map(|b| {
+                let magic = b.get(..4);
+                magic == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+                    || magic == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+            })
             .unwrap_or(false);
-        if is_ntv6 && signed_ctx.is_none() {
+        if needs_signed_head && signed_ctx.is_none() {
             // A missing person identity is the one cause of `signed_ctx == None`
             // the user can fix in place (unlock the identity), so it gets its own
             // class and the UI its own sentence. Any OTHER
@@ -624,6 +750,16 @@ pub async fn run_active_cycle_from_host(
         let transport = super::http_transport::build_transport(&url).map_err(|e| {
             super::orchestrator::SyncCycleError::Pull(super::engine::PullError::Transport(e))
         })?;
+        // A published person vault names itself on every sync request; the
+        // wrapper rewrites only `/sync/*` and `/vault.meta`, so the SCRAM and
+        // attachment paths are untouched (see `NamespacedTransport`).
+        let scoped_transport = published_ns_hex
+            .as_deref()
+            .map(|ns| super::transport::NamespacedTransport::new(transport.as_ref(), ns));
+        let transport_ref: &dyn super::transport::SyncTransport = match &scoped_transport {
+            Some(t) => t,
+            None => transport.as_ref(),
+        };
         // The full `SyncCycleError` crosses the spawn_blocking boundary intact —
         // the integrity verdict (SYNC-10) and the scheduler's retry class are
         // both derived from it on the other side.
@@ -647,7 +783,7 @@ pub async fn run_active_cycle_from_host(
         // roles above (the SCRAM username in the claim, the enrolment identity).
         super::orchestrator::run_sync_cycle(
             io,
-            transport.as_ref(),
+            transport_ref,
             root_key.as_deref(),
             &shared,
             account_number_hash,

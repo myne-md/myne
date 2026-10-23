@@ -1,13 +1,125 @@
+// The web client's `personAccount` module.
+//
+// # Two halves, and they are not the same shape
+//
+// **The IDENTITY plane is REAL here since myne-md/myne#911 task 13.** The
+// commands dispatch through the Worker, and every one of them reads and writes
+// through the in-memory person io (`web/wasm/src/person_io.rs`): a browser keeps
+// no phrase-derived keypair and no device token at rest, so a reload asks for the
+// phrase again and the phrase step's caveat says so
+// (`personCredentialPersisted` is absent on this client).
+//
+// **The MEMBER plane is still absent** (`memberSharing`, refused in
+// `web/wasm/src/capability.rs`): invites, the roster, member names and the
+// device-binding map all need a group key and a signed roster this client does
+// not carry, and their command cores are gated off wasm32 inside
+// `person_account`. Those symbols exist so the shared screens that import them
+// still bundle and type-check; reads answer a neutral value and mutators throw a
+// typed refusal, which is the honest shape for a feature this client does not
+// have.
+//
+// # Why the identity wrappers are spelled out here rather than re-exported
+//
+// `web/vite.config.ts` aliases this module path EXACTLY, so
+// `web/src/lib/personAccount.ts` REPLACES `src/lib/personAccount.ts` in the web
+// build and an import of the shared file from here resolves back to this one (a
+// `TS2303` circular-alias error, which is how this file learned that). The
+// wrappers below are the shared ones' shape, one invoke each, and the two files
+// must agree: a field added to a view on one side and not the other is a drift
+// the shared component tree cannot see. The types are what a reviewer should diff.
+
+import { invoke } from "../../src/platform/core";
+
+// ── The identity plane ──────────────────────────────────────────────────────
+
+/** The identity-only setup result, as the backend serializes it. */
+export interface PersonSetupView {
+  /** Non-null ONLY when this call generated a new identity. */
+  phrase: string | null;
+  fingerprint_hex: string;
+  person_id_hex: string;
+  /** The out-of-band identity code an owner pastes to invite this person. */
+  identity_code: string;
+  /** False when a second password-path device is awaiting approval. */
+  approved: boolean;
+}
+
+/** The three-state account lifecycle (myne-md/myne#911 task 4). */
+export type PersonAccountState = "reserved" | "pending" | "enrolled";
+
+/** Whether this device holds a person account, and whose it is. */
 export interface PersonStatusView {
   enrolled: boolean;
+  /** The three-state lifecycle; `null` when there is no identity. */
+  state: PersonAccountState | null;
   identity_unlocked: boolean;
   person_id_hex: string | null;
   identity_code: string | null;
+  sealed_keypair_present: boolean;
+}
+
+/** Mirrors the Rust `PersonJoinView` (myne-md/myne#911 task 9). */
+export interface PersonJoinView {
+  /** The person this device now belongs to, 32 lowercase hex. */
+  person_id_hex: string;
+  /** False while the device waits for an existing device to approve it. */
+  approved: boolean;
+}
+
+/** One vault the person account is bound to. */
+export interface PersonVaultRow {
+  account_hash_hex: string;
+  role: "owner" | "member";
+  vault_id: string | null;
 }
 
 export async function personStatus(): Promise<PersonStatusView> {
-  return { enrolled: false, identity_unlocked: false, person_id_hex: null, identity_code: null };
+  return invoke<PersonStatusView>("plugin:sync|sync_person_status");
 }
+
+export async function personSetup(phrase?: string): Promise<PersonSetupView> {
+  return invoke<PersonSetupView>("plugin:sync|sync_person_setup", {
+    phrase: phrase ?? null,
+  });
+}
+
+export async function personRegister(phrase: string): Promise<PersonSetupView> {
+  return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
+}
+
+/**
+ * The person's account number, in canonical form, or `null` when this device
+ * holds no identity (myne-md/myne#911 review).
+ *
+ * Derived from the person id, so it needs no phrase and no network. Format it
+ * for display with `@myne/client-core`'s `formatPersonAccountNumber`, which is
+ * the one place the `MY-` grouping lives on the client side.
+ */
+export async function personAccountNumber(): Promise<string | null> {
+  return invoke<string | null>("plugin:sync|sync_person_account_number");
+}
+
+export async function personJoinDevice(
+  personIdHex: string,
+  endpointUrl: string,
+  phrase: string,
+): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_join_device", {
+    personIdHex,
+    endpointUrl,
+    phrase,
+  });
+}
+
+export async function personClaimDevice(): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_claim_device");
+}
+
+export async function personListVaults(): Promise<PersonVaultRow[]> {
+  return invoke<PersonVaultRow[]>("plugin:sync|sync_person_list_vaults");
+}
+
+// ── The member plane: neutral reads, refused writes ─────────────────────────
 
 export async function memberVaultStatus(_vaultId: string): Promise<boolean> {
   return false;
@@ -17,13 +129,6 @@ export async function personUnlockMemberVault(_vaultId: string, _phrase: string)
   throw new Error("member vaults are unavailable on web");
 }
 
-// The member-vault fast-unlock surface (password / PIN / biometric) is absent on
-// web for the same reason member vaults are: a browser cannot hold a person
-// identity. These mirror the shared `src/lib/personAccount.ts` signatures so the
-// shared settings screen that imports them (`MemberPasswordSettings.tsx`) still
-// bundles and type-checks; the mutators throw the same not-here error the phrase
-// unlock above does, and the status probe answers "no method configured" rather
-// than throwing, matching the neutral-value shape of `memberVaultStatus`.
 export type MemberUnlockMethod = "password" | "pin" | "biometric";
 
 export async function memberUnlockStatus(
@@ -46,29 +151,6 @@ export async function setMemberBiometric(): Promise<void> {
 
 export async function clearMemberUnlock(): Promise<void> {
   throw new Error("member vaults are unavailable on web");
-}
-
-// The identity-plane surface the member UI imports (myne-md/myne#851, #852).
-// These arrived when the phrase restriction was retired (`decisions.md`
-// 2026-10-18, entry 0704): `IdentityHome`, `InviteWizard` and
-// `MemberVaultUnlockCard` stopped being substituted out of the bundle, so every
-// symbol they import has to exist here. Same rule as the block above — reads
-// answer a neutral value, mutators throw the not-here error — because the
-// capability is still absent (`memberSharing`, and the person plane wholesale)
-// and the dispatcher would refuse these commands anyway. What this file buys is
-// a typed refusal rather than a generic one, plus call sites that still
-// type-check against the real signatures.
-
-export interface PersonSetupView {
-  phrase: string | null;
-  fingerprint_hex: string;
-  person_id_hex: string;
-  identity_code: string;
-  approved: boolean;
-}
-
-export async function personSetup(_phrase?: string): Promise<PersonSetupView> {
-  throw new Error("person identities are unavailable on web");
 }
 
 export interface InviteSummary {

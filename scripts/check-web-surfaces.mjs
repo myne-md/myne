@@ -144,6 +144,10 @@ const V = {
     "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only and its recovery-phrase credential is substituted out of the web bundle; a browser client joins an already-current account and never migrates.",
     "migrate.phrase-input",
   ],
+  "src/components/settings/VaultFormatUpgrade.tsx": [
+    "typed-unsupported",
+    "The explicit upgrade of an existing vault to one-phrase recovery (myne-md/myne#911 task 10). Desktop-only: the person envelope is sealed to a person identity, and a browser origin holds none. `vault_is_person_wrapped` answers the typed refusal on web, the component renders nothing when that probe fails, and `vaultMigration` (absent on web) is what keeps the whole row off the panel.",
+  ],
   "src/components/settings/SettleMigrationBlock.tsx": ["typed-unsupported", "The post-migration settle surface (§10.4.1 point 5, #430) — abort / confirm over the `legacy/` snapshot. Desktop-only for the same reason as the form above: a browser client never migrates, so it never has a `legacy/` snapshot to settle. Its status probe answers the typed refusal, and the block renders nothing when the probe fails, so on web it is simply absent."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/NetworkPanel.tsx": [
@@ -251,6 +255,13 @@ const V = {
     "Module-scope state over the `local-inference` download/cancel commands and their progress event (myne-md/myne#814). Same verdict and reason as `ai-model-download.ts`, which it wraps: the plugin is `Class::Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. No AI surface renders on web (`localAi` is absent), so nothing reaches it; `typed-unsupported` rather than `excluded` because its backend answers a typed refusal rather than the code being absent.",
   ],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/sync-publish.ts": [
+    "typed-unsupported",
+    "SHIPS but is unreachable on web: the only binding it wraps (plugin:sync|sync_publish_vault) is " +
+      "Class::Unsupported there (myne-md/myne#911 task 13 owes the person plane), so the dispatcher " +
+      "answers its typed refusal and the SyncPanel row that calls it is gated on `memberSharing`. " +
+      "Typed rather than excluded because nothing substitutes the module out of the bundle.",
+  ],
   "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
@@ -491,6 +502,7 @@ const V = {
   ],
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
+  "src/lib/vault-format-upgrade.ts": ["typed-unsupported", "The NTV6→NTV7 upgrade and its two probes (myne-md/myne#911 task 10). Desktop-only for the same reason `vault-migrate.ts` is: the person envelope is sealed to a person identity, which a browser origin does not hold. The upgrade command is `Class::Unsupported` through the `vault-migrate` plugin and the two `vault-unlock` probes are `Pending`, so all three answer a typed refusal rather than running."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
   "src/lib/vault-label.ts": [
     "adapted",

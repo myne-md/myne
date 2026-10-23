@@ -84,57 +84,60 @@ describe("IdentitySetupDialog", () => {
     );
   });
 
-  it("puts the server link below the create and recover choices", async () => {
-    render(<IdentitySetupDialog open onClose={() => {}} />);
+  // A RECOVERED identity returns `phrase: null`, and the frame used to derive
+  // "a ceremony happened" from `phraseShown`. That is true only of the CREATE
+  // arm, so Done on the recovery path closed the dialog without telling the
+  // host, which never re-probed and left the user on a stale panel
+  // (myne-md/myne#911 review). The assertion is on the callback, not the copy,
+  // because the defect was invisible on screen.
+  it("reports a recovered identity to the host when Done lands", async () => {
+    const onCreated = vi.fn();
+    render(<IdentitySetupDialog open onClose={() => {}} onCreated={onCreated} />);
 
-    const create = await screen.findByTestId("identity-setup.create-cta");
-    const recover = screen.getByTestId("identity-setup.recover-open");
-    const changeServer = screen.getByTestId("identity-setup.change-server");
+    fireEvent.click(await screen.findByTestId("identity-setup.recover-open"));
+    fillPhrase();
+    fireEvent.click(await screen.findByTestId("identity-setup.recover-cta"));
 
-    // `FOLLOWING` on the first operand means the second is later in the DOM.
-    expect(
-      create.compareDocumentPosition(changeServer) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      recover.compareDocumentPosition(changeServer) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    // The recovery arm's Done is the only way out: a recovered identity has
+    // nothing to reveal and nothing to type back.
+    fireEvent.click(await screen.findByTestId("identity-setup.close-cta"));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 
-  it("fronts the first-run server step when no endpoint is configured", async () => {
+  it("asks for no server address anywhere in the ceremony", () => {
+    // myne-md/myne#911 task 6. Creating an identity is network-free: the keypair
+    // derives from the phrase and registration is a separate act the identity
+    // home offers later. The first-run server step and its "change server" link
+    // therefore have no door here, and the assertion is on BOTH ids because a
+    // hidden-but-mounted form is the failure a single query cannot see.
+    render(<IdentitySetupDialog open onClose={() => {}} />);
+    expect(screen.queryByTestId("identity-setup.change-server")).toBeNull();
+    expect(screen.queryByTestId("first-run-server.root")).toBeNull();
+    expect(screen.queryByTestId("sync.endpoint-config")).toBeNull();
+  });
+
+  it("reaches the identity form with no endpoint configured", async () => {
+    // The same removal, from the direction that used to bite: a device with no
+    // server at all is the ORDINARY first-run state now, and it must still be
+    // able to create an identity.
     invoke.mockReset().mockResolvedValue({ endpoint_url: null });
     render(<IdentitySetupDialog open onClose={() => {}} />);
-
-    const step = await screen.findByTestId("first-run-server.root");
-    expect(step).toBeTruthy();
-    // The URL form is the only door, and there is no hosted one. The identity
-    // form is not reachable until a server is configured.
-    expect(screen.getByTestId("sync.endpoint-config")).toBeTruthy();
-    expect(screen.queryByTestId("first-run-server.myne-sync")).toBeNull();
-    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
+    expect(await screen.findByTestId("identity-setup.create-cta")).toBeTruthy();
+    expect(screen.queryByTestId("first-run-server.root")).toBeNull();
   });
 
-  it("reaches the server step without Settings when a vault-less device has an old endpoint", async () => {
-    render(<IdentitySetupDialog open onClose={() => {}} />);
-    fireEvent.click(await screen.findByTestId("identity-setup.change-server"));
-
-    expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
-    expect(screen.queryByTestId("identity-setup.create-cta")).toBeNull();
-    fireEvent.click(screen.getByTestId("first-run-server.back"));
-    // Back on the identity form: its recover door is the choice row's button
-    // (the 24-word grid opens behind it, #772), not the grid's own submit.
-    expect(screen.getByTestId("identity-setup.recover-open")).toBeTruthy();
-  });
-
-  it("keeps a pin failure distinct and provides recovery from the identity form", async () => {
-    personSetup.mockRejectedValue({ kind: "TlsFailure" });
+  it("reports a setup failure without offering a server door", async () => {
+    // Registration used to be part of setup, so a TLS failure had its own
+    // message and a link to fix the endpoint. Setup no longer registers, so any
+    // failure here is the generic arm, and the remedy is not a server address.
+    personSetup.mockRejectedValue({ kind: "Internal" });
     render(<IdentitySetupDialog open onClose={() => {}} />);
     fireEvent.click(await screen.findByTestId("identity-setup.create-cta"));
 
     expect((await screen.findByTestId("identity-setup.error")).textContent).toBe(
-      "identitySetup.errorTlsFailure",
+      "identitySetup.error",
     );
-    fireEvent.click(screen.getByTestId("identity-setup.change-server"));
-    expect(await screen.findByTestId("sync.endpoint-config")).toBeTruthy();
+    expect(screen.queryByTestId("identity-setup.change-server")).toBeNull();
   });
 
   // myne-md/myne#780: a device that already holds a sealed identity is offered

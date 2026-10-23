@@ -646,7 +646,9 @@ pub fn stamp_membership_field(
     // (group-key wrap, epoch, signed roster), leaving a vault whose `items_key`
     // is group-sealed but whose meta claims the root tier. `meta_version_of`
     // reports `NTV6` as `V0_2`, so the magic must be checked directly here.
-    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+        || meta_bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+    {
         return meta_bytes.to_vec();
     }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
@@ -699,7 +701,9 @@ pub fn stamp_person_binding_field(
     // the root tier, so no unlock path can open it (`items_key_unwrap` fails and
     // it reports "corrupted vault"). An `NTV6` vault already binds its owner
     // through the signed roster, so stamping is a no-op there by design.
-    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+        || meta_bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+    {
         return meta_bytes.to_vec();
     }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
@@ -1125,5 +1129,73 @@ mod tests {
             "stamping a membership must not change the vault generation"
         );
         assert_eq!(stamped, bytes, "an NTV6 meta must be returned untouched");
+    }
+
+    /// The third generation, and the one with the most to lose
+    /// (myne-md/myne#911 review). Both stamp functions guard against rewriting a
+    /// B2B frame through the `NTV5` serializer; a `NTV7` frame carries the same
+    /// tail PLUS the person wrap, so a stamp that reached the serializer would
+    /// drop the vault's only second credential.
+    ///
+    /// The fixture is a REAL frame, minted by the app's own person-session
+    /// builder. That matters: the first version of this test used a hand-typed
+    /// `NTV7` prefix with junk after it, and removing the guard left it green
+    /// because the parse failed and the function returned the bytes untouched
+    /// for the wrong reason. A fixture that cannot reach the defective state is
+    /// not a test.
+    #[test]
+    fn the_stamp_guards_return_an_ntv7_meta_untouched() {
+        use crate::plugins::vault_creation::commands::{
+            build_and_serialize_person_vault_meta, build_person_session,
+        };
+        use crate::plugins::vault_creation::state::CreationPerson;
+
+        const FAST: protocol::KdfParams = protocol::KdfParams {
+            m_kib: protocol::MIN_KDF_M_KIB,
+            t: 1,
+            p: 1,
+            argon2_version: 0x13,
+        };
+        const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
+
+        let person_id = protocol::kdf::person_id_hash(PHRASE);
+        let seed = protocol::kdf::derive_person_identity_seed(PHRASE, &person_id, &FAST)
+            .expect("identity seed");
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        let session = build_person_session(
+            crate::paths::web_single_vault_id(),
+            "stamp-guard-fixture-pw",
+            FAST,
+            CreationPerson {
+                pair: protocol::PersonKeyPair::generate_raw(
+                    &seeds.kem,
+                    &seeds.ed25519,
+                    &seeds.mldsa,
+                ),
+                person_id,
+                number: protocol::account_number_from_person_id(&person_id),
+            },
+        )
+        .expect("person session");
+        let (bytes, _group) =
+            build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
+        assert_eq!(bytes.get(..4), Some(b"NTV7".as_slice()));
+
+        let stamped_person =
+            stamp_person_binding_field(&[0x11; AEAD_KEY_LEN], &[0x51; 16], &[0x44; 16], &bytes);
+        assert_eq!(
+            stamped_person, bytes,
+            "an NTV7 meta must be returned untouched by the person-binding stamp"
+        );
+        let stamped_membership = stamp_membership_field(
+            &[0x11; AEAD_KEY_LEN],
+            &[0xAB; ACCOUNT_ID_LEN],
+            &[0x44; 16],
+            &bytes,
+        );
+        assert_eq!(
+            stamped_membership, bytes,
+            "an NTV7 meta must be returned untouched by the membership stamp"
+        );
     }
 }

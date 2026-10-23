@@ -5106,18 +5106,11 @@
     "residueBanner": "Keskeytyneestä poistosta jääneitä tiedostoja ({{n}}). Siivoa ne ennen holvin luomista.",
     "cleanUpFiles": "Siivoa jäljelle jääneet tiedostot",
     "connect": "Yhdistä tiliini",
-    "startIdentity": "Luo identiteetti",
-    "startLocal": "Luo sen sijaan paikallinen holvi",
     "tagline": "Salattuja markdown-muistiinpanoja. Ei sähköpostia rekisteröityessä.",
-    "identityTitle": "Luo identiteetti",
-    "identityBody": "Yksi identiteetti kaikille holvillesi, jotta ihmiset voivat kutsua sinut. Vaatii synkronointipalvelimen.",
-    "localTitle": "Luo paikallinen holvi",
-    "localBody": "Salattu holvi tällä laitteella. Lisää synkronointi tai identiteetti myöhemmin.",
     "restoreTitle": "Palauta varmuuskopiosta",
     "restoreBody": "Avaa aiemmin tallentamasi .myne-backup-tiedosto.",
     "joinTitle": "Lisää tämä laite tilille",
     "joinBody": "Käytä holvia, joka sinulla on jo toisella laitteella.",
-    "createAction": "Luo",
     "restoreAction": "Palauta",
     "joinAction": "Lisää laite",
     "version": "Versio {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Identiteetti palautettu.",
     "title": "Luo identiteetti",
     "errorAlreadyHeld": "Tällä laitteella on jo identiteetti. Palauta se sen palautuslauseella tai unohda se ja luo uusi.",
-    "errorNotConfigured": "Identiteettiä ei voitu määrittää. Tarkista, että synkronointipalvelin on määritetty, ja yritä sitten uudelleen.",
     "forgetCancel": "Säilytä se",
     "forgetConfirm": "Unohda ja luo uusi",
     "forgetCta": "Unohda tämä identiteetti ja luo uusi",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Palauta se tällä laitteella sen 24-sanaisella palautuslauseella.",
     "recoverAction": "Palauta",
     "back": "Takaisin",
-    "changeServer": "Vaihda tai vahvista synkronointipalvelin",
-    "errorTlsFailure": "Palvelimen HTTPS-varmennetta ei voitu varmistaa. Tarkista palvelimen osoite ja sen varmenne.",
     "phraseTitle": "Tallenna identiteettilauseesi",
     "phraseContinue": "Jatka",
     "confirmTitle": "Vahvista lauseesi"
@@ -5509,15 +5499,6 @@
       "hint": "Uudelleen yrittäminen aloittaa latauksen alusta.",
       "retry": "Yritä uudelleen",
       "back": "Takaisin avaamiseen"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Valitse synkronointipalvelin",
-      "intro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
-      "notConfigured": "Syötä palvelimen osoite ylle ja paina Yhdistä jatkaaksesi.",
-      "back": "Takaisin",
-      "continue": "Jatka"
     }
   },
   "identityFlow": {

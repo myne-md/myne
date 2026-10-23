@@ -77,7 +77,7 @@ describe("joining with the recovery phrase (task 7)", () => {
     });
     const onJoined = vi.fn();
     const onRecovering = vi.fn();
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={onRecovering} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={onRecovering} onAccountJoined={vi.fn()} />);
     fillCommon();
     fireEvent.click(await screen.findByTestId("join.mode-recovery"));
     // The warning is on screen BEFORE the grid is filled, not after submit.
@@ -110,7 +110,7 @@ describe("joining with the recovery phrase (task 7)", () => {
       return "linux";
     });
     const onJoined = vi.fn();
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     fillCommon();
     fireEvent.change(screen.getByTestId("join.password-input"), {
       target: { value: "correct horse battery staple" },
@@ -124,7 +124,7 @@ describe("joining with the recovery phrase (task 7)", () => {
     // The web client's posture (`phraseEnrolment` absent): absent, not hidden.
     caps.phraseEnrolment = false;
     invokeMock.mockResolvedValue("linux");
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     expect(screen.queryByTestId("join.mode")).toBeNull();
     expect(screen.getByTestId("join.password-input")).toBeTruthy();
   });
@@ -151,7 +151,7 @@ describe("the waiting screen's escape (task 8)", () => {
       return "linux";
     });
     const onJoined = vi.fn();
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={onJoined} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     fillCommon();
     fireEvent.change(screen.getByTestId("join.password-input"), {
       target: { value: "correct horse battery staple" },
@@ -188,7 +188,7 @@ describe("the waiting screen's escape (task 8)", () => {
       }
       return "linux";
     });
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     fillCommon();
     fireEvent.change(screen.getByTestId("join.password-input"), {
       target: { value: "correct horse battery staple" },
@@ -203,7 +203,7 @@ describe("full screen, not a modal card (task 10)", () => {
   it("renders in the auth shell and keeps its dialog semantics", () => {
     invokeMock.mockResolvedValue("linux");
     const { container } = render(
-      <JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />,
+      <JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />,
     );
     const root = screen.getByTestId("join.modal");
     // Still modal over the stage beneath — the inert background depends on it.

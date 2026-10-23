@@ -70,6 +70,13 @@ describe("capability descriptor", () => {
       "osIdleAutoLock",
       "screenCaptureProtection",
       "vaultMigration",
+      // The person identity is session-only here (myne-md/myne#911 task 13): the
+      // sealed keypair and the device token live in the Worker's memory, so a
+      // reload asks for the phrase again. `personVaultCredential` and
+      // `personIdentity` are NOT in this list any more: the web person plane
+      // dispatches, so the unlock screen's identity-phrase arm and the identity
+      // row are offers the commands answer.
+      "personCredentialPersisted",
       "backup",
       "nativeSaveAs",
       // `decisions/clients/0551`, myne-md/myne#464. Absent because a browser
@@ -150,10 +157,10 @@ describe("capability descriptor", () => {
       // could deliver.
       "cliAccess",
       // myne-md/myne#411, and named for the NAMES rather than for the Privacy
-      // switch that hides them. Both halves are missing on web: the locked
-      // picker a cached name exists to label is unreachable (an origin holds
-      // exactly one container, so `VaultPicker.tsx` is `excluded`), and the
-      // `MYL1` store is sealed under an OS keychain a page does not have. The
+      // switch that hides them. The locked picker a cached name exists to label
+      // now ships on web (myne-md/myne#911 task 13 made several containers real,
+      // so `VaultPicker.tsx` is `ported`), and what stays missing is the `MYL1`
+      // store, sealed under an OS keychain a page does not have. The
       // FORMAT is not what is absent, the same way `spellCheck` leaves `MYD1`
       // alone: `MYL1` is unchanged and desktop's row is ungated.
       "lockedVaultNames",
@@ -229,6 +236,12 @@ describe("capability descriptor", () => {
       // browser, a page can hold the vault and its awareness socket like any
       // other client, so web is not second-class for its own devices.
       "liveCollabPeerPresence",
+      // The identity plane, split from `memberSharing` by task 13 and PRESENT here
+      // since the web person plane dispatches. The split is the point: the member
+      // surface (roster, invites, member names, device bindings) is still absent.
+      "personIdentity",
+      // The phrase is a vault credential here too (myne-md/myne#911 task 13).
+      "personVaultCredential",
       "phraseRecovery",
       "pinQuickUnlock",
       // A page CAN write prefs: the plugin's setters are dispatched through the

@@ -36,6 +36,7 @@ function summary(over: Partial<VaultSummary> & { id: string }): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
     ...over,
   };
 }
@@ -162,5 +163,36 @@ describe("VaultPicker: the fallback number", () => {
     await screen.findAllByTestId("picker.vault-row");
     expect(rowText("v1")).toContain("Work");
     expect(rowText("v1")).not.toContain("Vault");
+  });
+});
+
+// The device-only marker (myne-md/myne#911 task 8).
+//
+// "Where does this vault actually live" is the one fact this screen can answer
+// that the vault itself cannot: a vault that exists only on this machine has no
+// copy anywhere else, and before this the fact lived only inside the Sync panel
+// of a vault the user had already unlocked. Both directions are asserted, because
+// a marker that never clears would read as "nothing is ever published" and one
+// that never appears would read as "everything is".
+describe("VaultPicker: the publish state", () => {
+  it("marks a vault that exists only on this device", async () => {
+    renderPicker({
+      ok: [
+        summary({ id: "v1", label: "Work" }),
+        summary({ id: "v2", label: "Home", published: true }),
+      ],
+    });
+    await screen.findAllByTestId("picker.vault-row");
+    const markers = () =>
+      screen
+        .getAllByTestId("picker.vault-row")
+        .map((row) => [
+          row.getAttribute("data-vault-id"),
+          row.querySelector('[data-testid="picker.vault-row-publish"]')?.textContent ?? "",
+        ]);
+    expect(markers()).toEqual([
+      ["v1", "Device only"],
+      ["v2", ""],
+    ]);
   });
 });

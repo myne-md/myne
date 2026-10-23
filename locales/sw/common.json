@@ -5106,18 +5106,11 @@
     "residueBanner": "Mafaili yaliyobaki kutoka kwenye ufutaji uliokatizwa ({{n}}). Yasafishe kabla ya kuunda kasha.",
     "cleanUpFiles": "Safisha mafaili yaliyobaki",
     "connect": "Unganisha kwenye akaunti yangu",
-    "startIdentity": "Tengeneza utambulisho",
-    "startLocal": "Tengeneza kasha la ndani badala yake",
     "tagline": "Madokezo ya markdown yaliyosimbwa. Hakuna barua pepe wakati wa kujisajili.",
-    "identityTitle": "Tengeneza utambulisho",
-    "identityBody": "Utambulisho mmoja kwa makasha yako yote, ili watu wakukaribishe. Unahitaji seva ya usawazishaji.",
-    "localTitle": "Tengeneza kasha la ndani",
-    "localBody": "Kasha lililosimbwa kwenye kifaa hiki. Ongeza usawazishaji au utambulisho baadaye.",
     "restoreTitle": "Rejesha kutoka hifadhi rudufu",
     "restoreBody": "Fungua faili la .myne-backup ulilohifadhi awali.",
     "joinTitle": "Ongeza kifaa hiki kwenye akaunti",
     "joinBody": "Tumia kasha ulilo nalo tayari kwenye kifaa kingine.",
-    "createAction": "Tengeneza",
     "restoreAction": "Rejesha",
     "joinAction": "Ongeza kifaa",
     "version": "Toleo {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Utambulisho umerejeshwa.",
     "title": "Unda utambulisho",
     "errorAlreadyHeld": "Kifaa hiki tayari kina utambulisho. Kirejeshe kwa kifungu chake cha urejeshaji, au kisahau na utengeneze kipya.",
-    "errorNotConfigured": "Imeshindwa kusanidi utambulisho. Hakikisha seva ya usawazishaji imesanidiwa, kisha ujaribu tena.",
     "forgetCancel": "Ihifadhi",
     "forgetConfirm": "Sahau na tengeneza mpya",
     "forgetCta": "Sahau utambulisho huu na utengeneze mpya",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Urejeshe kwenye kifaa hiki kwa kifungu chake cha urejeshaji cha maneno 24.",
     "recoverAction": "Rejesha",
     "back": "Nyuma",
-    "changeServer": "Badilisha au thibitisha seva ya usawazishaji",
-    "errorTlsFailure": "Imeshindwa kuthibitisha cheti cha HTTPS cha seva. Kagua anwani ya seva na cheti chake.",
     "phraseTitle": "Hifadhi kifungu chako cha utambulisho",
     "phraseContinue": "Endelea",
     "confirmTitle": "Thibitisha kifungu chako"
@@ -5509,15 +5499,6 @@
       "hint": "Kujaribu tena huanza upakuaji upya.",
       "retry": "Jaribu tena",
       "back": "Rudi kwenye kufungua"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Chagua seva ya usawazishaji",
-      "intro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
-      "notConfigured": "Weka anwani ya seva juu na ubonyeze Unganisha ili kuendelea.",
-      "back": "Nyuma",
-      "continue": "Endelea"
     }
   },
   "identityFlow": {

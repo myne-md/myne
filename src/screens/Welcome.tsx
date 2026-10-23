@@ -1,10 +1,24 @@
-import { useState } from "react";
+// SPDX-License-Identifier: AGPL-3.0
+// The zero-vault entry screen (MYND-80).
+//
+// # One create door (myne-md/myne#911 task 6)
+//
+// This screen used to draw a fork: create an identity, or create a local vault
+// with no identity, each with its own row and its own button, plus a skip that
+// was implied by which one you pressed. That is gone. "Create" means one thing
+// now: the identity first (one phrase, saved and proven), then the vault. The
+// first run itself lives on its own stage (`FirstRun`), because it replaces the
+// fork rather than sitting on top of this screen.
+//
+// The two secondary doors stay, and they are secondary by position rather than
+// by being hidden: RESTORE is for a device whose vault exists somewhere else,
+// and JOIN is for a device that already belongs to an account. Neither creates
+// anything, so neither is a variant of "create".
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "../components/ChoiceList";
+import { ChoiceCard, ChoiceRow } from "../components/ChoiceList";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
-import { IdentitySetupDialog } from "../components/IdentitySetupDialog";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { SearchableSelect } from "../components/primitives/SearchableSelect";
 import { setLanguage } from "../i18n";
@@ -18,7 +32,8 @@ import { SUPPORTED_CODES, SUPPORTED_LANGUAGES, type LanguageCode } from "../i18n
 // a device with no vault has no Settings to host it.
 
 interface WelcomeProps {
-  onCreateVault: () => void;
+  /** The one create door: the first run, identity then vault. */
+  onStart: () => void;
   /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
   onRestoreBackup: () => void;
   /**
@@ -28,21 +43,14 @@ interface WelcomeProps {
    * created made the join door unreachable.
    */
   onJoinDevice: () => void;
-  /** Fired after identity-only setup succeeds, so App re-probes and lands on
-   *  the identity home (`myne-md/myne#711`). */
-  onIdentityCreated?: () => void;
 }
 
 // The endonyms are not translated (same as Settings → Appearance), so the
 // options come straight from the config.
 const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
-export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdentityCreated }: WelcomeProps) {
+export function Welcome({ onStart, onRestoreBackup, onJoinDevice }: WelcomeProps) {
   const { t, i18n } = useTranslation();
-  // Identity-only setup (myne-md/myne#711): a vault-less person can create an
-  // identity and be invite-addressed before owning any vault. The dialog is
-  // local to this screen, like the other modal carve-outs; it creates no vault.
-  const [identityOpen, setIdentityOpen] = useState(false);
   const active = i18n.resolvedLanguage ?? i18n.language;
   const language = SUPPORTED_CODES.includes(active) ? active : "en";
   return (
@@ -95,72 +103,63 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdenti
           <RepairResidueBanner />
         </div>
 
+        {/* The primary door, on its own so it reads as the thing this screen is
+            asking for rather than the first of four equal rows. */}
         <div style={{ width: "100%", marginTop: "var(--space-5)" }}>
-        <ChoiceCard>
-          {/* The fork (myne-md/myne#768, decisions/ui/0615). Identity comes
-              first, because Myne is organised around it: an identity is what
-              makes a person addressable for invites, and one identity spans
-              many vaults. The local vault sits directly under it rather than
-              behind a link, since an offline vault with no identity is a
-              legitimate choice and the identity can be added later. */}
-          <ChoiceRow
-            title={t("welcome.identityTitle")}
-            body={t("welcome.identityBody")}
-            action={
-              <Button
-                variant="primary"
-                onClick={() => setIdentityOpen(true)}
-                data-testid="welcome.identity-cta"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("welcome.createAction")}
-              </Button>
-            }
-          />
-          <ChoiceRow
-            title={t("welcome.localTitle")}
-            body={t("welcome.localBody")}
-            action={
-              <Button
-                variant="secondary"
-                onClick={onCreateVault}
-                data-testid="welcome.create-cta"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("welcome.createAction")}
-              </Button>
-            }
-          />
-          <ChoiceRow
-            title={t("welcome.restoreTitle")}
-            body={t("welcome.restoreBody")}
-            action={
-              <Button
-                variant="secondary"
-                onClick={onRestoreBackup}
-                data-testid="welcome.restore-cta"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("welcome.restoreAction")}
-              </Button>
-            }
-          />
-          <ChoiceRow
-            title={t("welcome.joinTitle")}
-            body={t("welcome.joinBody")}
-            action={
-              <Button
-                variant="secondary"
-                onClick={onJoinDevice}
-                data-testid="welcome.join-cta"
-                style={CHOICE_ACTION_STYLE}
-              >
-                {t("welcome.joinAction")}
-              </Button>
-            }
-            last
-          />
-        </ChoiceCard>
+          <Button
+            variant="primary"
+            onClick={onStart}
+            data-testid="welcome.create-cta"
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            {t("welcome.startAction")}
+          </Button>
+          <div
+            style={{
+              marginTop: "var(--space-2)",
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-3)",
+              textAlign: "center",
+              lineHeight: 1.5,
+            }}
+          >
+            {t("welcome.startHint")}
+          </div>
+        </div>
+
+        {/* The two doors that create nothing. Both say what they are for in one
+            sentence, because "restore" and "join" are only distinguishable to
+            someone who already knows which situation they are in. */}
+        <div style={{ width: "100%", marginTop: "var(--space-4)" }}>
+          <ChoiceCard>
+            <ChoiceRow
+              title={t("welcome.restoreTitle")}
+              body={t("welcome.restoreBody")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={onRestoreBackup}
+                  data-testid="welcome.restore-cta"
+                >
+                  {t("welcome.restoreAction")}
+                </Button>
+              }
+            />
+            <ChoiceRow
+              title={t("welcome.joinTitle")}
+              body={t("welcome.joinBody")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={onJoinDevice}
+                  data-testid="welcome.join-cta"
+                >
+                  {t("welcome.joinAction")}
+                </Button>
+              }
+              last
+            />
+          </ChoiceCard>
         </div>
 
         <div
@@ -193,12 +192,6 @@ export function Welcome({ onCreateVault, onRestoreBackup, onJoinDevice, onIdenti
           </div>
         </div>
       </div>
-
-      <IdentitySetupDialog
-        open={identityOpen}
-        onClose={() => setIdentityOpen(false)}
-        onCreated={onIdentityCreated}
-      />
     </div>
   );
 }

@@ -1,0 +1,74 @@
+// @vitest-environment jsdom
+
+// The zero-vault entry screen has ONE create door (myne-md/myne#911 task 6).
+//
+// What this guards, stated as the failure: the screen used to draw a fork
+// between "create an identity" and "create a local vault", and a user who took
+// the second one ended up with a vault and no identity, could not be invited to
+// anyone's vault, and never met the model Myne is built around. The fix is not a
+// better label on the fork. It is that "create" now means one thing, on one
+// button, and the two doors that remain create nothing.
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en", resolvedLanguage: "en" },
+  }),
+  Trans: ({ children }: { children?: React.ReactNode }) => children ?? null,
+}));
+
+const setLanguage = vi.fn().mockResolvedValue(true);
+vi.mock("../../src/i18n", () => ({ setLanguage: (c: string) => setLanguage(c) }));
+
+import { Welcome } from "../../src/screens/Welcome";
+
+afterEach(() => cleanup());
+
+function renderWelcome(overrides: Partial<Parameters<typeof Welcome>[0]> = {}) {
+  const props = {
+    onStart: vi.fn(),
+    onRestoreBackup: vi.fn(),
+    onJoinDevice: vi.fn(),
+    ...overrides,
+  };
+  render(<Welcome {...props} />);
+  return props;
+}
+
+describe("Welcome first run", () => {
+  it("offers ONE create door and no identity/local fork", () => {
+    renderWelcome();
+    expect(screen.getByTestId("welcome.create-cta")).toBeTruthy();
+    // The fork's two buttons are the thing that went away, so both ids are
+    // asserted absent rather than only the new one being present: a leftover
+    // second door is exactly the regression.
+    expect(screen.queryByTestId("welcome.identity-cta")).toBeNull();
+    expect(screen.queryByTestId("welcome.local-cta")).toBeNull();
+  });
+
+  it("opens the first run from the create door", () => {
+    const props = renderWelcome();
+    fireEvent.click(screen.getByTestId("welcome.create-cta"));
+    expect(props.onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the two doors that create nothing, and wires them", () => {
+    const props = renderWelcome();
+    fireEvent.click(screen.getByTestId("welcome.restore-cta"));
+    fireEvent.click(screen.getByTestId("welcome.join-cta"));
+    expect(props.onRestoreBackup).toHaveBeenCalledTimes(1);
+    expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for no server address", () => {
+    renderWelcome();
+    // The first-run server step used to be reachable from here through the
+    // identity dialog. Onboarding does not configure a server any more; its
+    // endpoint control lives in Settings.
+    expect(screen.queryByTestId("first-run-server.root")).toBeNull();
+    expect(screen.queryByTestId("sync.endpoint-config")).toBeNull();
+  });
+});

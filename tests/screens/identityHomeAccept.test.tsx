@@ -78,9 +78,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     await waitFor(() => expect(personListInvites).toHaveBeenCalled());
@@ -94,9 +97,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     const open = await screen.findByTestId("identity-home.accept-open");
@@ -121,9 +127,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -181,9 +190,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -200,9 +212,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={onForgotten}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
 
@@ -233,9 +248,12 @@ describe("IdentityHome invite refresh (myne-md/myne#794)", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
 
@@ -332,9 +350,12 @@ describe("IdentityHome accept requires a device password", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -434,9 +455,12 @@ describe("IdentityHome accept requires a device password", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -484,9 +508,12 @@ describe("IdentityHome accept reaches the name gate", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));

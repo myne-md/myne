@@ -5106,18 +5106,11 @@
     "residueBanner": "上次中断的删除留下的残留文件（{{n}}）。请在创建保险库前清理它们。",
     "cleanUpFiles": "清理残留文件",
     "connect": "连接到我的账户",
-    "startIdentity": "创建身份",
-    "startLocal": "改为创建本地保险库",
     "tagline": "加密的 markdown 笔记。注册无需邮箱。",
-    "identityTitle": "创建身份",
-    "identityBody": "一个身份统辖你的所有保险库，让人们可以邀请你。需要同步服务器。",
-    "localTitle": "创建本地保险库",
-    "localBody": "本设备上的加密保险库。以后再添加同步或身份。",
     "restoreTitle": "从备份恢复",
     "restoreBody": "打开你先前保存的 .myne-backup 文件。",
     "joinTitle": "将此设备添加到账户",
     "joinBody": "使用你在另一台设备上已有的保险库。",
-    "createAction": "创建",
     "restoreAction": "恢复",
     "joinAction": "添加设备",
     "version": "版本 {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "身份已恢复。",
     "title": "创建身份",
     "errorAlreadyHeld": "此设备已持有一个身份。请用其恢复短语恢复它，或忘记它并创建一个新的。",
-    "errorNotConfigured": "无法设置身份。请确认已配置同步服务器，然后重试。",
     "forgetCancel": "保留",
     "forgetConfirm": "忘记并新建",
     "forgetCta": "忘记此身份并创建一个新的",
@@ -5359,8 +5351,6 @@
     "recoverHint": "用其 24 个单词的恢复短语在此设备上恢复它。",
     "recoverAction": "恢复",
     "back": "返回",
-    "changeServer": "更改或核对同步服务器",
-    "errorTlsFailure": "无法验证服务器的 HTTPS 证书。请检查服务器地址及其证书。",
     "phraseTitle": "保存你的身份短语",
     "phraseContinue": "继续",
     "confirmTitle": "确认你的短语"
@@ -5509,15 +5499,6 @@
       "hint": "重试会重新开始下载。",
       "retry": "重试",
       "back": "返回解锁"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "选择同步服务器",
-      "intro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
-      "notConfigured": "请在上方输入服务器地址，然后按“连接”继续。",
-      "back": "返回",
-      "continue": "继续"
     }
   },
   "identityFlow": {

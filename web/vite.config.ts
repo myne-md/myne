@@ -69,13 +69,20 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "screens",
     "titlebar",
   ),
-  // Unreachable on web AND undesirable to ship (task 70). `Welcome` offers
-  // vault creation, `VaultPicker` exists for the ≥2-vault case that a
-  // single-container origin cannot reach (task 85), and `RestoreBackup` drives
-  // backup commands the web dispatcher answers `Unsupported`. Boot routing
-  // already sends web elsewhere in all three cases, so leaving them in the
-  // bundle would ship three flows that can only be reached by a routing bug —
-  // and would make "excluded" mean "unreachable", which is the weaker claim
+  // Unreachable on web AND undesirable to ship (task 70). `Welcome` offers the
+  // desktop one-door first run, and `RestoreBackup` drives backup commands the
+  // web dispatcher answers `Unsupported`. Boot routing already sends web
+  // elsewhere in both cases, so leaving them in the bundle would ship surfaces
+  // nothing can reach.
+  //
+  // **`VaultPicker` left this list with myne-md/myne#911 task 13.** It was
+  // substituted because an origin held exactly one container, so the ≥2-vault
+  // branch was unreachable; the walk that landed there makes two containers
+  // real, and the shared picker already answers the one thing a browser lacks
+  // (the account grouping is skipped when the keychain answers unavailable).
+  //
+  // What remains here ships two flows that can only be reached by a routing
+  // bug, and would make "excluded" mean "unreachable", which is the weaker claim
   // this feature keeps refusing to settle for.
   [path.join(repoRoot, "src", "screens", "Welcome")]: path.join(
     repoRoot,
@@ -83,13 +90,6 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "src",
     "screens",
     "Welcome",
-  ),
-  [path.join(repoRoot, "src", "screens", "VaultPicker")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "screens",
-    "VaultPicker",
   ),
   [path.join(repoRoot, "src", "screens", "RestoreBackup")]: path.join(
     repoRoot,

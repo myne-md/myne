@@ -76,15 +76,18 @@ function runSurfaces(bundleText: string): { code: number; output: string } {
 
 describe("check-web-screens", () => {
   it("catches an excluded screen's marker in the bundle", () => {
-    // `IdentityHome` used to carry this needle and no longer does: it is `gated`
-    // rather than `excluded` since `decisions.md` 2026-10-18 (entry 0704), so it
-    // ships and has no marker to leak. `VaultPicker` is the marker that proves
-    // the arm still works, and the choice is deliberate rather than incidental —
-    // a test that greps for a needle nothing declares passes for the wrong
-    // reason.
-    const result = run('const marker = "picker.vault-row";');
+    // The needle has to come from an entry that is STILL `excluded`, and this
+    // line has been updated twice for the same reason: a replacement that is no
+    // longer excluded makes the guard's absence arm unfalsifiable while the test
+    // stays green for the wrong reason. `IdentityHome` left `excluded` when
+    // `decisions.md` 2026-10-18 (entry 0704) let it ship; `VaultPicker` left it
+    // with myne-md/myne#911 task 13, because one origin can hold several
+    // containers and the shared screen now ships. `RestoreBackup` is excluded by
+    // decision (`decisions.md` 2026-07-26) and still carries a marker nothing
+    // else in the tree emits.
+    const result = run('const marker = "restore.pick-file";');
     expect(result.code).not.toBe(0);
-    expect(result.output).toContain("picker.vault-row");
+    expect(result.output).toContain("restore.pick-file");
   });
 
   it("catches a screen with no roster verdict", () => {

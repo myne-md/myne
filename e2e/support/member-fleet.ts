@@ -104,28 +104,34 @@ export async function typePhrase(
  * second-device join is built on.
  */
 export async function createMemberIdentity(member: AppSession): Promise<string> {
-  await (await member.session.byTestId("welcome.identity-cta")).click();
-  await (await member.session.byTestId("identity-setup.recover-open")).click();
+  // The first run's ONE door (myne-md/myne#911 task 6): the identity ceremony is
+  // inline on its own stage, so the ids are the first-run panel's rather than
+  // the Settings dialog's. The RECOVER arm itself is unchanged.
+  await (await member.session.byTestId("welcome.create-cta")).click();
+  await (await member.session.byTestId("first-run.identity.recover-open")).click();
   await typePhrase(
     member.session,
-    "identity-setup.phrase-input",
-    "identity-setup.phrase-cell",
+    "first-run.identity.phrase-input",
+    "first-run.identity.phrase-cell",
     MEMBER_PHRASE,
   );
-  await (await member.session.byTestId("identity-setup.recover-cta")).click();
+  await (await member.session.byTestId("first-run.identity.recover-cta")).click();
   // The recover arm echoes no phrase and generated nothing to prove possession of,
   // so the type-back challenge does not apply and the dialog goes straight to the
   // recovered result (`identitySetup.recovered`), whose only exit is Done.
-  await member.session.byTestId("identity-setup.close-cta", { timeoutMs: 90_000 });
+  await member.session.byTestId("first-run.identity.close-cta", { timeoutMs: 90_000 });
   // Asserted, not assumed: a device awaiting approval holds no token, and the invite
   // listing a caller is about would then fail rather than show anything. The FIRST
   // device of a person account is approved, which is the arm a fresh server puts this
   // device in.
   expect(
-    await member.session.byTestIdAll("identity-setup.pending"),
+    await member.session.byTestIdAll("first-run.identity.pending"),
     "the member's first device is approved without a second-device wait",
   ).toHaveLength(0);
-  await (await member.session.byTestId("identity-setup.close-cta")).click();
+  // Done hands off to vault creation; the identity home is the ABANDON path
+  // (Back from the briefing re-probes, and "identity, no vault" routes home).
+  await (await member.session.byTestId("first-run.identity.close-cta")).click();
+  await (await member.session.byTestId("create.briefing-back")).click();
   await member.session.byTestId("identity-home.root");
   return readValue(member.session, "identity-home.identity-code");
 }

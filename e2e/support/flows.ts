@@ -1228,6 +1228,9 @@ export async function unlockAndEnroll(
   await dismissImporterOffer(session);
   await openSettings(session);
   await (await session.byTestId("settings.tab-sync")).click();
+  // The enrol form moved to the panel's DEVICES topic (myne-md/myne#885); the
+  // panel opens on Connection, so this is a real step rather than a no-op.
+  await selectSettingsTopic(session, "sync", "devices");
   await (await session.byTestId("sync.enroll.account-input")).sendKeys(account);
   await (await session.byTestId("sync.enroll.password-input")).sendKeys(password);
   await (await session.byTestId("sync.enroll.submit")).click();
@@ -2650,4 +2653,105 @@ export async function openExportSubmenuItem(
     { label: `export submenu open, ${format} present` },
   );
   return session.waitForElement(leaf);
+}
+
+/**
+ * Walk the desktop FIRST RUN from the welcome screen: the one create door, the
+ * identity's phrase ceremony (reveal, continue, 4-of-24 type-back), and Done,
+ * which hands off to vault creation (myne-md/myne#911 task 6).
+ *
+ * It returns nothing, because everything a caller needs to assert about the
+ * identity is the fact that it exists: the phrase is never returned, never
+ * logged, and never written to an artefact (SYNC-13). The words are scraped in
+ * one in-page pass, used to fill the challenge, and dropped.
+ *
+ * What it does NOT do is save the phrase to a file: the save action goes through
+ * the OS dialog, which this harness cannot answer, and the type-back is the gate
+ * the flow actually enforces. A scenario that needs the phrase on disk for a
+ * later recovery step must scrape it itself and treat it as a credential.
+ *
+ * Every scenario that used to click `welcome.create-cta` and land in vault
+ * creation now calls this first, because the welcome screen no longer creates a
+ * vault directly: identity first, then the vault.
+ */
+export async function startFirstRunIdentity(session: Session): Promise<string[]> {
+  await (await session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+  await session.byTestId("first-run.root", { timeoutMs: 15_000 });
+  await (await session.byTestId("first-run.identity.create-cta", { timeoutMs: 20_000 })).click();
+
+  // Step 1: the phrase. Continue is gated on the words having been revealed,
+  // and revealing is what makes them readable to the scrape below.
+  await session.byTestId("first-run.identity.phrase", { timeoutMs: 120_000 });
+  await (await session.byTestId("first-run.identity.phrase-reveal")).click();
+  const words = await session.execute<string[]>(
+    "var words = [];" +
+      "for (var i = 1; i <= 24; i++) {" +
+      "  var el = document.querySelector(" +
+      "    '[data-testid=\"first-run.identity.phrase-word\"][data-index=\"' + i + '\"] span:last-child');" +
+      "  words.push(el ? el.textContent || '' : '');" +
+      "}" +
+      "return words;",
+  );
+  expect(words.length).toBe(24);
+  expect(words.every((w) => w.length > 0)).toBe(true);
+
+  const cont = await session.byTestId("first-run.identity.phrase-continue");
+  await session.waitUntil(() => cont.enabled(), {
+    label: "identity phrase continue enabled after reveal",
+    timeoutMs: 10_000,
+  });
+  await cont.click();
+
+  // Step 2: the type-back. Each input declares its 1-based position.
+  const cells = await session.byTestIdAll("first-run.identity.confirm-input");
+  expect(cells.length).toBe(4);
+  for (const cell of cells) {
+    const pos = Number(await cell.attribute("data-index"));
+    expect(pos).toBeGreaterThanOrEqual(1);
+    expect(pos).toBeLessThanOrEqual(24);
+    await cell.sendKeys(words[pos - 1]);
+  }
+  const done = await session.byTestId("first-run.identity.close-cta");
+  await session.waitUntil(() => done.enabled(), {
+    label: "identity done enabled after type-back",
+    timeoutMs: 10_000,
+  });
+  await done.click();
+
+  // Returned so a scenario that needs the identity LATER can use it: unlocking
+  // the identity for a session is a real, frequent step (the person keypair is
+  // session-scoped, decision 0612, so a vault unlock does not carry it), and the
+  // phrase is the only credential that performs it.
+  return words;
+}
+
+/**
+ * [`startFirstRunIdentity`] plus the vault steps that follow it on the FIRST RUN:
+ * the safety briefing (three acknowledgements), and the vault-name step, so the
+ * caller lands on the password form (myne-md/myne#911 task 6).
+ *
+ * The briefing is still shown here, and it is not an oversight: its three
+ * statements are about the PASSWORD and the phrase, and the phrase it names is
+ * the identity's, which the user has just proved they saved. What it no longer
+ * has is a vault kit after it.
+ */
+export async function startFirstRunToVault(session: Session): Promise<void> {
+  await startFirstRunIdentity(session);
+
+  await session.byTestId("create.briefing", { timeoutMs: 15_000 });
+  const cont = await session.byTestId("create.briefing-continue");
+  const acks = await session.byTestIdAll("create.briefing-ack");
+  expect(acks.length).toBe(3);
+  for (const ack of acks) {
+    await ack.click();
+  }
+  await session.waitUntil(() => cont.enabled(), {
+    label: "briefing continue enabled (3/3 acknowledged)",
+    timeoutMs: 10_000,
+  });
+  await cont.click();
+
+  await (await session.byTestId("create.name-input", { timeoutMs: 15_000 })).sendKeys("E2E Kasa");
+  await (await session.byTestId("create.name-continue")).click();
+  await session.byTestId("create.password-input", { timeoutMs: 10_000 });
 }

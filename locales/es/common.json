@@ -5247,18 +5247,11 @@
     "residueBanner": "Archivos sobrantes de una eliminación interrumpida ({{n}}). Límpialos antes de crear una bóveda.",
     "cleanUpFiles": "Limpiar archivos sobrantes",
     "connect": "Conectar a mi cuenta",
-    "startIdentity": "Crear una identidad",
-    "startLocal": "Crear una bóveda local en su lugar",
     "tagline": "Notas markdown cifradas. Sin correo electrónico al registrarte.",
-    "identityTitle": "Crear una identidad",
-    "identityBody": "Una identidad para todas tus bóvedas, para que puedan invitarte. Necesita un servidor de sincronización.",
-    "localTitle": "Crear una bóveda local",
-    "localBody": "Una bóveda cifrada en este dispositivo. Añade sincronización o una identidad más adelante.",
     "restoreTitle": "Restaurar desde una copia de seguridad",
     "restoreBody": "Abre un archivo .myne-backup que guardaras antes.",
     "joinTitle": "Añadir este dispositivo a una cuenta",
     "joinBody": "Usa una bóveda que ya tengas en otro dispositivo.",
-    "createAction": "Crear",
     "restoreAction": "Restaurar",
     "joinAction": "Añadir dispositivo",
     "version": "Versión {{version}} · pre-alpha"
@@ -5492,7 +5485,6 @@
     "recovered": "Identidad recuperada.",
     "title": "Crear una identidad",
     "errorAlreadyHeld": "Este dispositivo ya contiene una identidad. Recupérala con su frase de recuperación, u olvídala y crea una nueva.",
-    "errorNotConfigured": "No se pudo configurar la identidad. Comprueba que haya un servidor de sincronización configurado e inténtalo de nuevo.",
     "forgetCancel": "Conservarla",
     "forgetConfirm": "Olvidar y crear una nueva",
     "forgetCta": "Olvidar esta identidad y crear una nueva",
@@ -5507,8 +5499,6 @@
     "recoverHint": "Recupérala en este dispositivo con su frase de recuperación de 24 palabras.",
     "recoverAction": "Recuperar",
     "back": "Atrás",
-    "changeServer": "Cambiar o verificar el servidor de sincronización",
-    "errorTlsFailure": "No se pudo verificar el certificado HTTPS del servidor. Comprueba la dirección del servidor y su certificado.",
     "phraseTitle": "Guarda tu frase de identidad",
     "phraseContinue": "Continuar",
     "confirmTitle": "Confirma tu frase"
@@ -5657,15 +5647,6 @@
       "hint": "Intentarlo de nuevo reinicia la descarga desde el principio.",
       "retry": "Inténtalo de nuevo",
       "back": "Volver al desbloqueo"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Elige un servidor de sincronización",
-      "intro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
-      "notConfigured": "Introduce una dirección de servidor arriba y pulsa Conectar para continuar.",
-      "back": "Atrás",
-      "continue": "Continuar"
     }
   },
   "identityFlow": {

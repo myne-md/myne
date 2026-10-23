@@ -143,7 +143,18 @@ export type AppError =
    * unreachable from the form; it stays mapped because a direct-IPC caller can
    * still produce it, and because an unmapped variant is a hang.
    */
-  | { kind: "WeakNewPassword" };
+  | { kind: "WeakNewPassword" }
+  /**
+   * A person identity is sealed on this device but its session is not installed,
+   * and a vault is being created under it (myne-md/myne#911 task 5).
+   *
+   * An `NTV7` vault's roster is signed by the OWNER, so creation needs the
+   * private half of the identity keypair rather than only its public half.
+   * Refusing is what keeps "one phrase per person" true: the legacy birth would
+   * mint a second recovery phrase, and a partial frame would seal a vault nobody
+   * can recover. Retryable: unlocking the identity is one action.
+   */
+  | { kind: "PersonLocked" };
 
 /**
  * Type-narrowing helper. `if (isIoError(e)) { e.detail.kind ... }`.
@@ -162,8 +173,14 @@ export interface BeginResult {
    * 24-word BIP-39 English recovery phrase. Cloned from the
    * `RecoveryPhrase` master copy in the backend session; the master
    * stays Zeroized in Rust until `commit` consumes it.
+   *
+   * `null` for a PERSON-BORN vault (myne-md/myne#911 task 5): the vault
+   * phrase is retired there, so the backend mints none, returns none and
+   * wraps none. The identity phrase is the only recovery credential and it
+   * already exists on the device. The creation flow skips the kit and the
+   * type-back in that case rather than rendering an empty phrase grid.
    */
-  phrase: string[];
+  phrase: string[] | null;
   /**
    * Account-number display form: `"MY-XXXX-XXXX-XXXX-XXXX-XXXX"`
    * (27 ASCII bytes; the schematic `MY-XXXX-XXXX-XXXX-XXXX-X` shown

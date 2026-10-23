@@ -94,6 +94,13 @@ export const ANDROID_RULES_MODERN =
 export const ANDROID_RULES_LEGACY =
   "mobile/android-widgets/src/main/res/xml/myne_backup_rules_legacy.xml";
 /**
+ * The one app-config file that holds a credential rather than a preference
+ * (myne-md/myne#911). Compare the header's list of app-private files that are
+ * deliberately NOT tracked, which are the encrypted vault and the re-enterable
+ * config: this one is neither.
+ */
+export const PERSON_AUTH_FILE = "person-auth.json";
+/**
  * Where Gradle writes the manifest that actually ships. Git-ignored and absent
  * until somebody runs an Android build, so it is checked opportunistically: the
  * committed library manifest is the input, and this is the only place the
@@ -317,6 +324,26 @@ export function excludedPaths(xml) {
     if (domain?.[1] === "external" && path) dirs.add(path[1].replace(/\/+$/, ""));
   }
   return dirs;
+}
+
+/**
+ * Every `<exclude domain="file" path="…"/>` in a rules block.
+ *
+ * A SECOND extractor rather than a parameter on `excludedPaths`, because the two
+ * domains mean different things: `external` is the plaintext export directory
+ * (myne-md/myne#491) and `file` is the app's internal storage, where the person
+ * device token lives (myne-md/myne#911). Merging them into one set would let an
+ * `external` exclude satisfy a `file` requirement, which is the drift this pair
+ * of rules exists to prevent.
+ */
+export function excludedInternalFiles(xml) {
+  const paths = new Set();
+  for (const match of xml.matchAll(/<exclude\b[^>]*\/?>/g)) {
+    const domain = match[0].match(/domain\s*=\s*"([^"]*)"/);
+    const path = match[0].match(/path\s*=\s*"([^"]*)"/);
+    if (domain?.[1] === "file" && path) paths.add(path[1].replace(/\/+$/, ""));
+  }
+  return paths;
 }
 
 /** The text between `<name>` and `</name>`, or null. */
@@ -729,6 +756,41 @@ export function analyse(io) {
           );
         }
       }
+      // The person device token (myne-md/myne#911 review). Plaintext in
+      // `<app_config_dir>/person-auth.json`, and it authorizes every vault the
+      // account is bound to, so one restored backup is a credential for the whole
+      // set rather than for one vault. `domain="file"` is the internal files dir,
+      // which is where tauri's app_config_dir resolves on Android; the legacy
+      // file has a single cloud-only block, so the same path is required there.
+      const internal = excludedInternalFiles(body);
+      if (!internal.has(PERSON_AUTH_FILE)) {
+        fail(
+          `${file}: <${name}> does not exclude domain="file" path="${PERSON_AUTH_FILE}". ` +
+            `That file holds the person device token in plaintext and the token reaches every ` +
+            `vault the account is bound to, so a backup carries the whole set.`,
+        );
+      }
+    }
+  }
+
+  // ── 2b. The iOS half of the same credential ────────────────────────────────
+  // Android is declarative and checked above; iOS is a call, so it is checked by
+  // reading the call rather than by trusting the comment beside it. Both halves
+  // must name the config directory, and neither can be inferred from the other.
+  const rustSource = readOrFail(RUST_MODULE, "missing, no exclusion code at all");
+  if (rustSource !== null) {
+    const initBody = rustSource.match(/pub fn init<R: tauri::Runtime>[\s\S]*?\n}/);
+    if (initBody === null) {
+      fail(`${RUST_MODULE}: no readable \`init\` body, so the startup exclusion cannot be checked`);
+    } else if (
+      !/app_config_dir\(\)/.test(initBody[0]) ||
+      !/exclude_from_backup_at\(/.test(initBody[0])
+    ) {
+      fail(
+        `${RUST_MODULE}: \`init\` does not exclude the app-config directory. iOS then backs ` +
+          `\`${PERSON_AUTH_FILE}\` up while the Android XML excludes it, which is one platform ` +
+          `fixed and the other silently not.`,
+      );
     }
   }
 

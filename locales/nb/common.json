@@ -5106,18 +5106,11 @@
     "residueBanner": "Gjenværende filer fra en avbrutt sletting ({{n}}). Rydd dem opp før du oppretter et hvelv.",
     "cleanUpFiles": "Rydd opp gjenværende filer",
     "connect": "Koble til kontoen min",
-    "startIdentity": "Opprett en identitet",
-    "startLocal": "Opprett et lokalt hvelv i stedet",
     "tagline": "Krypterte markdown-notater. Ingen e-post ved registrering.",
-    "identityTitle": "Opprett en identitet",
-    "identityBody": "Én identitet for alle hvelvene dine, så folk kan invitere deg. Krever en synkroniseringsserver.",
-    "localTitle": "Opprett et lokalt hvelv",
-    "localBody": "Et kryptert hvelv på denne enheten. Legg til synkronisering eller en identitet senere.",
     "restoreTitle": "Gjenopprett fra sikkerhetskopi",
     "restoreBody": "Åpne en .myne-backup-fil du lagret tidligere.",
     "joinTitle": "Legg denne enheten til en konto",
     "joinBody": "Bruk et hvelv du allerede har på en annen enhet.",
-    "createAction": "Opprett",
     "restoreAction": "Gjenopprett",
     "joinAction": "Legg til enhet",
     "version": "Versjon {{version}} · pre-alfa"
@@ -5344,7 +5337,6 @@
     "recovered": "Identitet gjenopprettet.",
     "title": "Opprett en identitet",
     "errorAlreadyHeld": "Denne enheten har allerede en identitet. Gjenopprett den med gjenopprettingsfrasen, eller glem den og opprett en ny.",
-    "errorNotConfigured": "Kunne ikke sette opp identiteten. Sjekk at en synkroniseringsserver er konfigurert, og prøv igjen.",
     "forgetCancel": "Behold den",
     "forgetConfirm": "Glem og opprett ny",
     "forgetCta": "Glem denne identiteten og opprett en ny",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Gjenopprett den på denne enheten med den 24 ord lange gjenopprettingsfrasen.",
     "recoverAction": "Gjenopprett",
     "back": "Tilbake",
-    "changeServer": "Endre eller verifiser synkroniseringsserver",
-    "errorTlsFailure": "Kunne ikke verifisere HTTPS-sertifikatet til serveren. Sjekk serveradressen og sertifikatet.",
     "phraseTitle": "Lagre identitetsfrasen din",
     "phraseContinue": "Fortsett",
     "confirmTitle": "Bekreft frasen din"
@@ -5509,15 +5499,6 @@
       "hint": "Å prøve igjen starter nedlastingen på nytt.",
       "retry": "Prøv igjen",
       "back": "Tilbake til opplåsing"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Velg en synkroniseringsserver",
-      "intro": "Myne trenger en server til å oppbevare de krypterte notatene dine og til å nå deg for invitasjoner. Notatene dine forblir kryptert på denne enheten før de forlater den; serveren lagrer bare chiffertekst.",
-      "notConfigured": "Skriv inn en serveradresse ovenfor og trykk Koble til for å fortsette.",
-      "back": "Tilbake",
-      "continue": "Fortsett"
     }
   },
   "identityFlow": {

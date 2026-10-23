@@ -108,25 +108,34 @@ pub mod stream_supervisor;
 // 39). Three atomics rather than an event per note or a host threaded through
 // `run_sync_cycle`: the readout has to be observable DURING the loop, and the
 // loop deliberately has no host.
-#[cfg(not(target_arch = "wasm32"))]
+// UNGATED with `person_account` below (myne-md/myne#911 task 13), and for the
+// same reason: none of the three touches a keychain or a raw socket. Each is a
+// sealed file through the `VaultIo` seam, so a browser can carry the module; what
+// a browser does not carry is the MEMBER surface that calls two of them, and that
+// refusal lives in the capability table rather than in a cfg.
 pub mod member_key_store;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod member_unlock_store;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod person_vault_carrier;
-// The person account, membership and invite plane: host-only, like the
-// `rustls_transport` it drives. Gated off wasm32 (the web client is
-// capability-absent for B2B), so its `TauriHost`/`rustls_transport` references
-// never reach the wasm build.
-#[cfg(not(target_arch = "wasm32"))]
+// The person account, membership and invite plane. UNGATED as of myne-md/myne#911
+// task 13, and the reason the gate came off is the same one `loop_control`'s
+// comment states: the `SyncTransport` trait is the seam, so gating belongs at the
+// raw-TLS implementation (`rustls_transport`, still gated) and not at every
+// caller. What the old comment named as the blocker had already been handled
+// underneath it: every `TauriHost` reference in this module is inside a
+// `#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]` command
+// wrapper, and the network calls go through `super::transport` rather than
+// through `rustls_transport` directly. The web client's own transport
+// (`web/wasm/src/sync_transport.rs`) is what fills the seam there.
 pub mod person_account;
 pub mod person_ai_store;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod person_ai_sync;
 pub mod person_auth;
+pub mod person_discovery;
 pub mod prefs_classification;
 pub mod prefs_merge;
 pub mod progress;
+pub mod publish;
 // Where the transport is allowed to send bytes when device-local Tor routing is
 // on (MYND-650). Shared rather than desktop-only even though only the desktop
 // host can spawn the arti sidecar: the *decision* — and specifically the

@@ -72,6 +72,17 @@ describeE2E("a seeded vault.meta reaches an unlocked vault with no sync server",
       // single assertion would widen the client for a test's convenience.
       expect(await session.execute<string>("return location.pathname;")).toContain("/unlock");
 
+      // The other half of the identity door's probe: a LEGACY (`NTV5`) container
+      // must keep the vault-recovery link. `vault_is_person_wrapped` answers
+      // `false` both for "not a person vault" and for "the command did not run",
+      // so this assertion is what stops the person-unlock scenario from being
+      // satisfied by a probe that is simply broken in the false direction.
+      const recoveryLink = await session.byTestId("unlock.recovery-link");
+      expect(
+        await recoveryLink.textContent(),
+        "a legacy vault offers the vault recovery phrase, not the identity phrase",
+      ).toContain("recovery phrase");
+
       await unlockField.sendKeys(vault.password);
       const submit = await session.findElement(testIdSelector("unlock.submit"));
       await submit.click();

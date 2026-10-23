@@ -5388,18 +5388,11 @@
     "residueBanner": "Zbylé soubory z přerušeného mazání ({{n}}). Před vytvořením trezoru je ukliďte.",
     "cleanUpFiles": "Uklidit zbylé soubory",
     "connect": "Připojit se k mému účtu",
-    "startIdentity": "Vytvořit identitu",
-    "startLocal": "Vytvořit místo toho místní trezor",
     "tagline": "Šifrované poznámky v markdownu. Žádný e-mail při registraci.",
-    "identityTitle": "Vytvořit identitu",
-    "identityBody": "Jedna identita pro všechny vaše trezory, takže vás lidé mohou zvát. Potřebuje synchronizační server.",
-    "localTitle": "Vytvořit místní trezor",
-    "localBody": "Zašifrovaný trezor na tomto zařízení. Synchronizaci nebo identitu přidáte později.",
     "restoreTitle": "Obnovit ze zálohy",
     "restoreBody": "Otevřete soubor .myne-backup, který jste si dříve uložili.",
     "joinTitle": "Přidat toto zařízení k účtu",
     "joinBody": "Použijte trezor, který už máte na jiném zařízení.",
-    "createAction": "Vytvořit",
     "restoreAction": "Obnovit",
     "joinAction": "Přidat zařízení",
     "version": "Verze {{version}} · pre-alpha"
@@ -5640,7 +5633,6 @@
     "recovered": "Identita obnovena.",
     "title": "Vytvořit identitu",
     "errorAlreadyHeld": "Toto zařízení už má identitu. Obnovte ji pomocí její fráze pro obnovení, nebo ji zapomeňte a vytvořte novou.",
-    "errorNotConfigured": "Identitu se nepodařilo nastavit. Zkontrolujte, zda je nastavený synchronizační server, a zkuste to znovu.",
     "forgetCancel": "Ponechat ji",
     "forgetConfirm": "Zapomenout a vytvořit novou",
     "forgetCta": "Zapomenout tuto identitu a vytvořit novou",
@@ -5655,8 +5647,6 @@
     "recoverHint": "Obnovte ji na tomto zařízení pomocí její 24slovné fráze pro obnovení.",
     "recoverAction": "Obnovit",
     "back": "Zpět",
-    "changeServer": "Změnit nebo ověřit synchronizační server",
-    "errorTlsFailure": "HTTPS certifikát serveru se nepodařilo ověřit. Zkontrolujte adresu serveru a jeho certifikát.",
     "phraseTitle": "Uložte si svou frázi identity",
     "phraseContinue": "Pokračovat",
     "confirmTitle": "Potvrdit svou frázi"
@@ -5805,15 +5795,6 @@
       "hint": "Nový pokus spustí stahování od začátku.",
       "retry": "Zkusit znovu",
       "back": "Zpět na odemknutí"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Zvolte synchronizační server",
-      "intro": "Myne potřebuje server, který uchová vaše zašifrované poznámky a přes nějž vás zastihnou pozvánky. Vaše poznámky zůstávají zašifrované na tomto zařízení, než ho opustí; server ukládá jen šifrovaný text.",
-      "notConfigured": "Zadejte výše adresu serveru a pokračujte stisknutím Připojit.",
-      "back": "Zpět",
-      "continue": "Pokračovat"
     }
   },
   "identityFlow": {

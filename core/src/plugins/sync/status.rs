@@ -164,7 +164,29 @@ pub async fn read_status(
             let identity = persisted
                 .as_ref()
                 .is_some_and(|s| s.device_id_hex.is_some());
+            // A PUBLISHED person-born vault has neither a vault token nor an
+            // enrolment record: its credential is the person session (myne-md/myne#911
+            // task 8). Reading the pair above alone would call it "not enrolled",
+            // which is a lie about a vault that is on a server AND hides the one
+            // manual sync trigger, so the session's token is counted here as the
+            // token and its device id as the enrolment.
+            let person_published = if persisted
+                .as_ref()
+                .is_some_and(|s| s.namespace_hex.is_some())
+            {
+                match super::person_auth::person_auth_path_for_read(host) {
+                    Ok(path) => matches!(
+                        super::person_auth::read_person_auth(io, &path).await,
+                        Ok(Some(auth)) if !auth.token_hex.is_empty()
+                    ),
+                    Err(_) => false,
+                }
+            } else {
+                false
+            };
             last_success_at = persisted.and_then(|s| s.last_success_at_ms);
+            let token = token || person_published;
+            let identity = identity || person_published;
             // Unresolved conflict copies (decryption-free — reads the staging dir).
             let conflicts = super::orchestrator::list_pending_conflicts(io, dir)
                 .await
@@ -245,6 +267,79 @@ mod tests {
             status_from(true, false, false),
             SyncRuntimeStatus::NotEnrolled
         );
+    }
+
+    /// A published person-born vault is ENROLLED, in the only sense that applies
+    /// to it (myne-md/myne#911 task 8): it holds no vault token and no enrolment
+    /// record, so the vault-local pair reads false and the status said "Not
+    /// enrolled" about a vault that was on a server and could sync. Two things
+    /// followed, both wrong: the indicator told the user to add a device that
+    /// cannot exist here, and the "Sync now" trigger was hidden.
+    ///
+    /// Driven through the real reader against real files, because the claim is
+    /// about what is on disk: a recorded namespace plus a person session token.
+    #[test]
+    fn a_published_person_vault_reads_as_enrolled() {
+        use crate::host::test_host::TestHost;
+        use crate::plugins::sync::person_auth::{write_person_auth, PersonAuth, PERSON_AUTH_FILE};
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::VaultIo as _;
+
+        let tmp = ScopedTempDir::new("published-status").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let io = crate::vault_io::StdVaultIo;
+        let state = VaultRuntimeState::default();
+
+        block_on(async {
+            super::super::config::set_endpoint(
+                &host,
+                &io,
+                Some("http://127.0.0.1:1".to_string()),
+                None,
+                None,
+            )
+            .await
+            .expect("endpoint");
+
+            let dir = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&dir).await.unwrap();
+            let st = super::super::state::SyncState {
+                namespace_hex: Some("ef".repeat(16)),
+                ..Default::default()
+            };
+            super::super::state::write_sync_state(&io, &dir, &st)
+                .await
+                .unwrap();
+
+            // Without a session the vault is published but cannot authenticate:
+            // "idle" would be a green light for a cycle that parks.
+            assert!(matches!(
+                read_status(&host, &io, &state, None).await.unwrap(),
+                SyncRuntimeStatus::NotEnrolled
+            ));
+
+            let auth = PersonAuth {
+                person_id_hex: "01".repeat(16),
+                device_id_hex: "02".repeat(16),
+                registered: true,
+                token_hex: "ab".repeat(32),
+                ..PersonAuth::default()
+            };
+            write_person_auth(
+                &io,
+                &tmp.path().join("config").join(PERSON_AUTH_FILE),
+                &auth,
+            )
+            .await
+            .expect("person session");
+
+            assert_eq!(
+                read_status(&host, &io, &state, None).await.unwrap(),
+                SyncRuntimeStatus::Idle,
+                "a published person vault with a session is enrolled and idle"
+            );
+        });
     }
 
     /// The three-way collapse that made two commands disagree (MYND-635).

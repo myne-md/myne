@@ -53,6 +53,7 @@ const VAULTS = [
     label: "Active vault",
     icon: null,
     last_unlock: null,
+    published: false,
   },
   {
     id: "v-other",
@@ -60,6 +61,7 @@ const VAULTS = [
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   },
 ];
 
