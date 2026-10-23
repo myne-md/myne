@@ -267,7 +267,11 @@ describe("check-hex-helpers (real tree)", () => {
     });
     expect(out).toContain("hex helpers: ok");
     expect(out).toContain("local decoder(s) recorded as debt");
-  });
+    // This one shells out over every Rust file in the checkout, so it inherits the
+    // machine's load rather than the test's work: measured at 5.5 s under the
+    // pre-push battery against vitest's 5 s default, which made `git push` fail on a
+    // test that passes in 1.4 s standalone. The timeout is the fix, not a retry.
+  }, 60_000);
 });
 
 describe("decoder detector (direct arms)", () => {
