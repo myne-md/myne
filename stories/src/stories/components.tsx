@@ -19,7 +19,6 @@ import {
   clearAgentForLock,
   failRun,
   currentRunEpoch,
-  settleApply,
   settleStep,
 } from "@app/notes/agent/agentStore";
 import { AnsweredByIndicator } from "@app/components/AnsweredByIndicator";
@@ -1185,7 +1184,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description:
       "The modal for pairing a new device: it runs the join flow and reports back joined, or recovering when a device has to fall back to the phrase.",
     tags: ["components", "sync", "join", "device", "pairing", "modal"],
-    render: () => <JoinDeviceModal onCancel={action("onCancel")} onJoined={action("onJoined")} onRecovering={action("onRecovering")} />,
+    render: () => (
+      <JoinDeviceModal
+        onCancel={action("onCancel")}
+        onJoined={action("onJoined")}
+        onRecovering={action("onRecovering")}
+        onAccountJoined={action("onAccountJoined")}
+      />
+    ),
   },
   {
     id: "components/membernamegate/default",
@@ -1914,7 +1920,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description:
       "The provisioning step of vault creation: the blocking surface while the fresh vault's device-local artefacts are created and the runtime slot is populated.",
     tags: ["components", "vault-creation", "provisioning", "step", "progress", "ceremony"],
-    render: () => <ProvisioningStep />,
+    render: () => <ProvisioningStep expectsPhrase />,
   },
   {
     id: "components/readystep/default",
@@ -2067,9 +2073,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => (
       <IdentityHome
         identityCode={null}
+        accountNumber={null}
         onCreateVault={action("onCreateVault")}
         onAccepted={action("onAccepted")}
         onForgotten={action("onForgotten")}
+        accountState={null}
+        onRegistered={action("onRegistered")}
       />
     ),
   },
@@ -2157,6 +2166,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onRestoreBackup={action("onRestoreBackup")}
         onCreateAnother={action("onCreateAnother")}
         onJoinDevice={action("onJoinDevice")}
+        inviteCount={0}
+        onInvites={action("onInvites")}
       />
     ),
   },

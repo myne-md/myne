@@ -23,6 +23,10 @@ function vault(overrides: Partial<VaultSummary> = {}): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    // Local-only by default: a fixture vault has no sync server behind it unless
+    // a story says otherwise, and `VaultSummary.published` is required (the
+    // picker distinguishes a joined vault from one made on this device).
+    published: false,
     ...overrides,
   };
 }
