@@ -4032,7 +4032,8 @@
       "nameSaving": "Inahifadhi…",
       "vaultsLabel": "Makasha katika akaunti hii",
       "vaultsHelper": "Makasha ambayo kifaa hiki kinapanga chini ya jina lililo juu. Kupanga ni chaguo la mpangilio la kila kifaa, hivyo si sehemu ya maudhui ya kasha lolote na havisafiri navyo.",
-      "vaultsCount": "Makasha {{count}}",
+      "vaultsCount_one": "Makasha {{count}}",
+      "vaultsCount_other": "Makasha {{count}}",
       "currentVault": "Kasha hili",
       "unknownVault": "Kasha jingine kwenye kifaa hiki",
       "standaloneHelper": "Kasha hili halijapangwa chini ya akaunti kwenye kifaa hiki, hivyo linajitegemea. Kupanga ni kwa kila kifaa: kifaa kingine kinaweza kukionyesha ndani ya moja.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Majina yanaweza kuwekwa mara kasha hili linaposhirikiwa.",
       "nameErrorLocked": "Fungua kasha ili kubadilisha jina lako.",
       "nameErrorGeneric": "Imeshindwa kuhifadhi jina lako. Jaribu tena.",
-      "nameInvite": "Bado huna jina la kuonyesha. Wanachama wengine wanaona alama yako ya kidole.",
       "nameInviteCta": "Weka jina",
-      "nameInviteDismiss": "Si sasa",
       "noInvitations": "Hakuna mialiko iliyotumwa bado.",
       "identityHeading": "Utambulisho wako",
       "membersHeading": "Wanachama",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Kifungu cha urejeshaji — ikiwa utasahau nenosiri lako",
       "save": "Hifadhi kifurushi cha urejeshaji",
       "saveFailed": "Imeshindwa kuhifadhi faili. Nakili kifurushi badala yake, au andika sehemu zote mbili.",
-      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi lenye siri zote mbili, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma.",
-      "whyEnglish": "Maneno ni ya Kiingereza katika kila lugha. Ni sehemu ya kiwango cha BIP-39, hivyo mteja yeyote wa Myne anaweza kusoma kifungu kilichoandikwa na mwingine yeyote. Usiyatafsiri: maneno yaliyotafsiriwa hayapo kwenye orodha ya maneno, na kifungu kitaacha kufanya kazi."
+      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi lenye siri zote mbili, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma."
     },
     "name": {
       "back": "Nyuma",

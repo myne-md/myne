@@ -34,8 +34,8 @@ const UNLOCK_TIMEOUT_MS = 60_000;
  *  and a fresh browser profile has no consent — so on the web client it is the
  *  FIRST screen, every time. This helper used to wait only for the three
  *  admitted surfaces, none of which exists behind the gate, and every scenario
- *  in the lane died in `openApp` with a boot timeout: 12 of 20 tests, all with
- *  the same message, which reads like the bundle failing to start rather than
+ *  in the lane died in `openApp` with a boot timeout, all with the same message,
+ *  which reads like the bundle failing to start rather than
  *  like one screen that was added in front of it.
  *
  *  The desktop lane was given a consent seed (`multi-device.ts`'s

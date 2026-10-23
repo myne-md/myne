@@ -33,7 +33,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "./ChoiceList";
 import { Input } from "./primitives/Input";
-import { personSetup, personStatus, type PersonSetupView } from "../lib/personAccount";
+import { personSetup, personStatus, type PersonAccountState, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "./PhraseEntryGrid";
 import { SecretDisplayCaveats } from "./SecretDisplayCaveats";
@@ -124,6 +124,13 @@ export function IdentitySetupPanel({
   const [result, setResult] = useState<PersonSetupView | null>(null);
   // True when a sealed identity exists on this device even if it never enrolled.
   const [heldIdentity, setHeldIdentity] = useState(false);
+  // The device's account lifecycle, read from DISK (`sync_person_status`) rather
+  // than from `PersonSetupView.approved`, and the distinction is the whole point:
+  // `sync_person_setup` registers nothing, so both of its arms answer
+  // `approved: false` unconditionally and the note that field gated said
+  // "waiting for another device" on every first device, where nothing waits
+  // (myne-md/myne#911). `pending` is the only state that is actually waiting.
+  const [accountState, setAccountState] = useState<PersonAccountState | null>(null);
   // The held identity's public code, shown while it is held/locked so the panel
   // shows THAT identity rather than only a recover form (myne-md/myne#792
   // follow-up). Public material; also shown in the member roster when unlocked.
@@ -159,7 +166,9 @@ export function IdentitySetupPanel({
 
   // Read the held-identity state whenever the panel mounts, so a device that
   // already holds a sealed keypair (from an earlier session or another B2B
-  // flow) is steered to Recover rather than offered a doomed Create.
+  // flow) is steered to Recover rather than offered a doomed Create. The same
+  // probe carries the account lifecycle, which is what the pending note reads:
+  // one device-local read, two facts.
   useEffect(() => {
     let alive = true;
     void personStatus()
@@ -167,6 +176,7 @@ export function IdentitySetupPanel({
         if (alive) {
           setHeldIdentity(status.sealed_keypair_present);
           setHeldCode(status.identity_code);
+          setAccountState(status.state);
         }
       })
       .catch(() => {
@@ -178,12 +188,29 @@ export function IdentitySetupPanel({
     };
   }, []);
 
+  /**
+   * Re-read the lifecycle after a ceremony. Best-effort by design: a failed read
+   * leaves no note rather than claiming a wait nobody can end.
+   */
+  async function refreshAccountState() {
+    try {
+      setAccountState((await personStatus()).state);
+    } catch {
+      setAccountState(null);
+    }
+  }
+
   async function run(phrase?: string) {
     setBusy(true);
     setError(null);
     try {
       const view = await personSetup(phrase);
       setResult(view);
+      // After the result, because the ceremony itself changes the answer: a
+      // create leaves the device `reserved`, a recovery of a pending device
+      // leaves it `pending`. Not awaited before `setResult`, so a slow or
+      // failing probe cannot delay the one screen that shows the phrase.
+      void refreshAccountState();
       setConfirmPositions(view.phrase ? drawConfirmPositions() : null);
       setConfirmInputs({});
       setRecoveryCells(emptyRecoveryCells());
@@ -269,18 +296,6 @@ export function IdentitySetupPanel({
                     cleared, whether a browser extension can read the page, and
                     whether this client will ask for the words again. */}
                 <SecretDisplayCaveats testIdPrefix={testId("phrase.caveats")} />
-                {/* The vault kit carried this note until the kit was retired for
-                    person-born vaults, and this phrase REPLACED that one: an
-                    untranslated grid in a translated UI reads as a missing
-                    translation, and a user who "helpfully" translates the words
-                    has destroyed the account's only credential
-                    (myne-md/myne#911 review). */}
-                <div
-                  data-testid={testId("phrase.why-english")}
-                  style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", lineHeight: 1.6 }}
-                >
-                  {t("vaultCreation.kit.whyEnglish")}
-                </div>
               </>
             ) : (
               // Step 2: the type-back (myne-md/myne#855; two-step split
@@ -311,7 +326,7 @@ export function IdentitySetupPanel({
             </div>
           )}
 
-          {!result.approved ? (
+          {accountState === "pending" ? (
             <div data-testid={testId("pending")} style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
               {t("identitySetup.pending")}
             </div>

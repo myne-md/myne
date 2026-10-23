@@ -106,8 +106,11 @@ pub struct PersonSetupView {
     /// addressable person id plus the public halves an owner pastes to invite
     /// this person. Public material only; never a secret.
     pub identity_code: String,
-    /// False when the device is awaiting approval (a second password-path
-    /// device); the caller shows "pending" and does not expect a token.
+    /// Always `false` on the two arms [`person_setup_from_host`] can take:
+    /// neither the create nor the recover path registers, so neither can know
+    /// whether this device is awaiting approval. Only
+    /// [`person_register_from_host`] computes it. A caller that needs the real
+    /// lifecycle reads `sync_person_status`'s three-state field instead.
     pub approved: bool,
 }
 
@@ -1089,11 +1092,19 @@ pub async fn person_list_invites_from_host(
     io: &dyn VaultIo,
 ) -> Result<Vec<InviteSummary>, SyncDeviceError> {
     let auth_path = person_auth_path_for_read(host).map_err(|_| SyncDeviceError::Internal)?;
+    // A credential file with no token is `NotEnrolled`, not `NotConfigured`
+    // (2026-10-23). The two name different remedies and the caller renders both:
+    // `NotConfigured` means "no sync endpoint is set", which belongs to the
+    // config read below, while a person without a device token has sent nothing
+    // and needs to REGISTER. Collapsing them told an unregistered identity that
+    // its connection or server was broken, which is the one reading that sends a
+    // user looking in the wrong place. `usePendingInvites` already documents the
+    // `NotEnrolled` answer this now actually produces.
     let auth = read_person_auth(io, &auth_path)
         .await
         .map_err(|_| SyncDeviceError::Internal)?
         .filter(|a| !a.token_hex.is_empty())
-        .ok_or(SyncDeviceError::NotConfigured)?;
+        .ok_or(SyncDeviceError::NotEnrolled)?;
 
     let cfg_path = super::config::config_path_from_host(host, io)
         .await
@@ -4315,6 +4326,31 @@ mod tests {
             assert_eq!(locked.identity_code, unlocked.identity_code);
 
             assert_eq!(after.person_id_hex.as_deref(), Some(&*"11".repeat(16)));
+        });
+    }
+
+    // A token-less identity has nothing addressed to it, and the honest refusal
+    // is `NotEnrolled` (2026-10-23). `NotConfigured` names a MISSING SYNC SERVER,
+    // a different remedy, and the identity home rendered it as "check your
+    // connection and sync server" on a state that is normal first run.
+    //
+    // Injection check: reverting the mapping to `NotConfigured` makes this test
+    // fail by naming the variant, which is the whole point of pinning it.
+    #[test]
+    fn listing_invites_without_a_person_token_is_not_enrolled() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-invites-unenrolled").expect("tmp");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+
+            let refused = person_list_invites_from_host(&host, &io)
+                .await
+                .expect_err("an identity with no device token cannot list invites");
+            assert!(
+                matches!(refused, SyncDeviceError::NotEnrolled),
+                "expected NotEnrolled, got {refused:?}"
+            );
         });
     }
 

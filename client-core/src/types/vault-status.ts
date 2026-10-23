@@ -1,8 +1,8 @@
 // TypeScript mirror of the Rust vault_status IPC contract.
 //
 // Source-of-truth Rust definitions:
-//   - src-tauri/src/plugins/vault_unlock/commands.rs (VaultStatus enum)
-//   - src-tauri/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
+//   - core/src/plugins/vault_unlock/commands.rs (VaultStatus enum)
+//   - core/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
 //
 // Wire shape: `#[serde(tag = "kind", content = "detail")]` on the error
 // type, plain `#[serde(tag = "kind")]` on the OK enum (no payload variants).

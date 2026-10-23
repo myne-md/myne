@@ -53,6 +53,7 @@ import { PhraseGrid } from "@app/components/PhraseGrid";
 import { PhraseTypeBack } from "@app/components/PhraseTypeBack";
 import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
 import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
+import { InvitesDialog } from "@app/components/sync/InvitesDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
 import { PersonPhraseUnlock } from "@app/components/PersonPhraseUnlock";
 import { VaultFormatUpgrade } from "@app/components/settings/VaultFormatUpgrade";
@@ -73,6 +74,7 @@ import { JoinDeviceModal } from "@app/components/sync/JoinDeviceModal";
 import { Keycaps } from "@app/components/primitives/Keycaps";
 import { MemberNameGate } from "@app/components/sync/MemberNameGate";
 import { MemberRosterPanel } from "@app/components/sync/MemberRosterPanel";
+import { PersonRegisterForm } from "@app/components/sync/PersonRegisterForm";
 import { MemberVaultUnlockCard } from "@app/components/sync/MemberVaultUnlockCard";
 import { ModalShell } from "@app/components/primitives/ModalShell";
 import { MyneMark } from "@app/components/primitives/MyneMark";
@@ -1241,6 +1243,28 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <MemberRosterPanel />,
   },
   {
+    id: "components/personregisterform/default",
+    group: "components",
+    surface: "PersonRegisterForm",
+    state: "default",
+    description:
+      "The one register-an-identity form, mounted by the identity home and by Settings → Sync. It asks for the 24 words in the shared grid and, when the device has no sync server yet, for the address too: registering is a write against a server, and the identity home is reachable at zero vaults, where Settings does not exist. The catch every failure arm shares is that a registration failure wipes the words while an address failure keeps them.",
+    tags: ["components", "sync", "identity", "register", "recovery phrase", "b2b"],
+    fixture: {
+      description: "a device with no sync server configured",
+      handlers: {
+        "plugin:sync|sync_get_endpoint": () => ({ endpoint_url: null }),
+        "plugin:sync|sync_beta_terms_accepted": () => true,
+      },
+    },
+    render: () => (
+      <PersonRegisterForm
+        testIdPrefix="story.register"
+        onRegistered={() => {}}
+      />
+    ),
+  },
+  {
     id: "components/membervaultunlockcard/default",
     group: "components",
     surface: "MemberVaultUnlockCard",
@@ -1614,6 +1638,32 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       offerMeetingAi("story-note", "A short meeting transcript.");
       return <MeetingAiDialog />;
     },
+  },
+  {
+    id: "components/invitesdialog/default",
+    group: "components",
+    surface: "InvitesDialog",
+    state: "default",
+    description:
+      "The invitations dialog a device that already holds a vault uses to accept one: the recipient-scoped list, one row per invitation addressed to this identity, with the accept wizard behind the row. It exists because the identity home, which carried this list, renders only at ZERO vaults, so a device with a vault had no surface on which an invitation could be accepted.",
+    tags: ["components", "invites", "dialog", "b2b", "member", "onboarding"],
+    render: () => (
+      <InvitesDialog
+        open
+        invites={[
+          {
+            invite_id_hex: "aa".repeat(16),
+            vault_account_hash_hex: "bb".repeat(32),
+            claimed: false,
+          },
+        ]}
+        loading={false}
+        unavailable={null}
+        onClose={action("onClose")}
+        onRetry={action("onRetry")}
+        onAccepted={action("onAccepted")}
+      />
+    ),
   },
   {
     id: "components/identitysetupdialog/default",

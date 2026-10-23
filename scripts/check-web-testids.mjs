@@ -4,7 +4,7 @@
 // # Why this needs a script when the desktop convention does not have one
 //
 // `src/AGENTS.md` states the rule flatly — "a screen without testids is
-// invisible to E2E" — and 489 `data-testid` attributes in `src/` are held to it
+// invisible to E2E" — and every `data-testid` attribute in `src/` is held to it
 // by **review alone**. That works while every screen has an owner who reviews
 // it. The web client's screens do not: tasks 61/59/74/105/106 CONSUME testids
 // (`byTestId` is the only sanctioned selector in `e2e/AGENTS.md`), while the

@@ -32,35 +32,15 @@
 //
 // PROVENANCE OF THE SHIPPED NUMBERS — read this before reacting to a failure.
 //
-// `stable: 290` / `stable_max_failures: 33` are MEASURED, from CI (pipeline
-// 431), not invented and not from a laptop. They started as 279 / 15 from a
-// local container run; CI's first end-to-end run in months disagreed, which the
-// first version of this note predicted it might, and these are the re-record.
-// Both differences are explained rather than mysterious:
+// The numbers are MEASURED, from CI, not invented and not from a laptop.
+// `scripts/e2e-scenario-floor.json` is the record and this file does not restate
+// them: a first local container run disagreed with CI, which is exactly why the
+// record lives in its own artefact. The machine that matters is the one that runs
+// every scenario, including the AI and sync groups a laptop skips.
 //
-//   +11 executed — CI runs the ~8 AI scenarios this machine skips
-//                  (MYNE_E2E_AI=1 + the local-inference-stub feature), and the
-//                  sync scenarios that only started running when the e2e step
-//                  learned to build myne-server.
-//   +18 failed   — the same two groups. Six AI specs and sync-attachments fail
-//                  in CI and had simply never run anywhere before, so this is
-//                  newly VISIBLE breakage, not new breakage.
-//
-// What the 33 is made of, so the number carries its own explanation:
-//   ~8  click/wait timeouts — the same "one click then a blind wait" class as
-//       flows.ts::clickNewMenuItem and clickUntilVisible. Cheapest to close.
-//       (ai-chat, ai-summarize, transcription, vault-migrate, ai-ux-surface,
-//        tag-browser, tag-suggestion-band, task-panel)
-//   ~1  a real sync bug, first ever observed: sync-attachments fails with
-//       `attachment_import failed: {"kind":"Locked"}`.
-//   rest real assertion failures (ai-degradation, ai-embeddings-persistence,
-//       note-export-html, theme-deep-link, right-panel-visibility, ...).
-//
-// The ceiling is a DEBT, not a target. It was 25 before the Views specs were
-// repaired, then 15 measured locally, and is 33 as CI actually sees it. Raising
-// it to make a red pipeline green is the one edit that is never legitimate; this
-// raise is the opposite — replacing a number from the wrong machine with the
-// first honest measurement from the one that matters. It goes down from here.
+// The ceiling is a DEBT, not a target. Raising it to make a red pipeline green is
+// the one edit that is never legitimate; re-recording is only legitimate when the
+// drop is intended and the commit message says why. It goes down from here.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";

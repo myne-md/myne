@@ -76,9 +76,9 @@ export async function scenario(
 ): Promise<void> {
   // The per-scenario FIXED cost (seed the fixture vault, spawn the driver and
   // the app, wait for the handshake), recorded as a wait so the profiler can put
-  // it beside the in-test waits it competes with. With 466 executed scenarios
-  // this is the suite's floor and the first thing to look at when asking whether
-  // a shard count is the lever or the waits are.
+  // it beside the in-test waits it competes with. Across the whole suite this is
+  // the floor and the first thing to look at when asking whether a shard count
+  // is the lever or the waits are.
   const launchStarted = Date.now();
   const app = await launchApp(opts);
   recordWait(`[launch] ${label}`, Date.now() - launchStarted, false);

@@ -5,10 +5,11 @@
 // `plugin:<plugin>|<cmd>` form Tauri uses to authorize plugin invokes
 // (tauri-utils `acl/resolved.rs::resolve_command`). Mirror of the desktop
 // `src-tauri/build.rs`, covering the plugins registered on mobile: vault
-// lifecycle + notes (CRUD/list) + prefs + quick-unlock (PIN only) + vault-indices
-// + snapshots + attachments (no voice) + search + export + secret-export. The
-// still-desktop-only surfaces (biometric quick-unlock, attachment text
-// extraction / voice, native PDF capture) are not carried over.
+// lifecycle + notes (CRUD/list) + prefs + quick-unlock (PIN everywhere, biometric
+// on iOS) + vault-indices + snapshots + attachments (image OCR; no voice) +
+// search + export + secret-export + PDF capture (`pdf_export`). Not carried over:
+// voice capture, PDF/DOCX/text extraction on the attachment path, and clipper
+// pairing.
 fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new()

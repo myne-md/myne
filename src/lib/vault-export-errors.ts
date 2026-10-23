@@ -6,7 +6,7 @@
 // engine is all-or-nothing (staging dir discarded, one atomic publish),
 // so every failure line may honestly say nothing landed at the
 // destination. The enum is closed on the Rust side
-// (`src-tauri/src/plugins/export/error.rs`); the exhaustive switch makes
+// (`core/src/plugins/export/error.rs`); the exhaustive switch makes
 // a new variant a compile error here, and
 // `tests/notes/vaultExportFlow.test.ts` pins non-empty, pairwise-distinct
 // copy per variant at runtime.

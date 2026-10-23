@@ -4284,7 +4284,8 @@
       "nameSaving": "Ukládá se…",
       "vaultsLabel": "Trezory v tomto účtu",
       "vaultsHelper": "Trezory, které toto zařízení seskupuje pod výše uvedeným názvem. Seskupování je organizační volba pro jednotlivá zařízení, takže není součástí obsahu žádného trezoru a neputuje s ním.",
-      "vaultsCount": "{{count}} trezorů",
+      "vaultsCount_one": "{{count}} trezorů",
+      "vaultsCount_other": "{{count}} trezorů",
       "currentVault": "Tento trezor",
       "unknownVault": "Jiný trezor na tomto zařízení",
       "standaloneHelper": "Tento trezor není na tomto zařízení seskupen pod účtem, takže stojí samostatně. Seskupování je pro každé zařízení zvlášť: jiné zařízení ho může zobrazovat v nějakém účtu.",
@@ -4296,7 +4297,9 @@
       "sections": {
         "extensions": "Rozšíření prohlížeče",
         "grouping": "Tento účet"
-      }
+      },
+      "vaultsCount_few": "{{count}} trezorů",
+      "vaultsCount_many": "{{count}} trezorů"
     },
     "plainFile": {
       "errorSaveSetting": "Nastavení prostých souborů se nepodařilo uložit.",
@@ -4736,9 +4739,7 @@
       "nameErrorUnshared": "Jména lze nastavit, jakmile je tento trezor sdílený.",
       "nameErrorLocked": "Chcete-li změnit své jméno, odemkněte trezor.",
       "nameErrorGeneric": "Vaše jméno se nepodařilo uložit. Zkuste to znovu.",
-      "nameInvite": "Zatím nemáte zobrazované jméno. Ostatní členové vidí váš otisk.",
       "nameInviteCta": "Nastavit jméno",
-      "nameInviteDismiss": "Teď ne",
       "noInvitations": "Zatím nebyly odeslány žádné pozvánky.",
       "identityHeading": "Vaše identita",
       "membersHeading": "Členové",
@@ -5244,8 +5245,7 @@
       "phraseFor": "Fráze pro obnovení — pokud zapomenete heslo",
       "save": "Uložit sadu pro obnovení",
       "saveFailed": "Soubor se nepodařilo uložit. Zkopírujte místo toho sadu, nebo si obě části zapište.",
-      "savedToFile": "Uloženo. Je to soubor v prostém textu obsahující obě tajemství, takže ho uchovejte tam, kde si ho přečtete jen vy.",
-      "whyEnglish": "Slova jsou v každém jazyce anglicky. Jsou součástí standardu BIP-39, takže libovolný klient Myne dokáže přečíst frázi vytvořenou kterýmkoli jiným. Nepřekládejte je: přeložená slova nejsou v seznamu slov a fráze by přestala fungovat."
+      "savedToFile": "Uloženo. Je to soubor v prostém textu obsahující obě tajemství, takže ho uchovejte tam, kde si ho přečtete jen vy."
     },
     "name": {
       "back": "Zpět",

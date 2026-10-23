@@ -23,7 +23,7 @@
 // flow actually enforces.
 
 import { expect, it } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import { startFirstRunIdentity } from "./support/flows";
@@ -116,6 +116,35 @@ describeE2E("first run offline (myne-md/myne#911 task 6)", () => {
       // Done → auto-unlock chain (production Argon2id again) → editor.
       await done.click();
       await app.session.byTestId("editor.root", { timeoutMs: KDF_BUDGET_MS });
+    });
+  });
+
+  // The INVITED door (myne-md/myne#911 follow-up). Same ceremony, different
+  // landing: a person invited to someone else's vault needs an identity and NOT
+  // a vault, so finishing here must reach the identity home (where the
+  // invitation is listed) and must never enter vault creation.
+  //
+  // Both halves are asserted. The landing alone would pass if the ceremony were
+  // reachable from the create door, and the absence alone would pass on a broken
+  // flow that stalled; together they pin the door's contract.
+  it("the invited door ends on the identity home, with no vault created", async () => {
+    await scenario("first-run-invited", {}, async (app) => {
+      await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+      await startFirstRunIdentity(app.session, "welcome.invited-cta");
+
+      await app.session.byTestId("identity-home.root", { timeoutMs: 30_000 });
+      expect(await app.session.byTestIdAll("create.briefing")).toHaveLength(0);
+      expect(await app.session.byTestIdAll("create.name-input")).toHaveLength(0);
+
+      // The claim in one line: no vault exists. A fresh install has no `vaults/`
+      // directory at all, so its absence is the same fact as an empty one.
+      const vaultsDir = join(app.appDataDir, "vaults");
+      if (existsSync(vaultsDir)) {
+        const ids = readdirSync(vaultsDir, { withFileTypes: true }).filter(
+          (d: { isDirectory(): boolean }) => d.isDirectory(),
+        );
+        expect(ids).toHaveLength(0);
+      }
     });
   });
 });

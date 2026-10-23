@@ -2674,8 +2674,17 @@ export async function openExportSubmenuItem(
  * creation now calls this first, because the welcome screen no longer creates a
  * vault directly: identity first, then the vault.
  */
-export async function startFirstRunIdentity(session: Session): Promise<string[]> {
-  await (await session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+export async function startFirstRunIdentity(
+  session: Session,
+  /**
+   * Which welcome door opens the ceremony. The create door by default; the
+   * invited door (`welcome.invited-cta`) runs the SAME ceremony and only its
+   * landing differs, so one helper serves both rather than a copy that could
+   * drift on the phrase or the type-back.
+   */
+  doorTestId = "welcome.create-cta",
+): Promise<string[]> {
+  await (await session.byTestId(doorTestId, { timeoutMs: 20_000 })).click();
   await session.byTestId("first-run.root", { timeoutMs: 15_000 });
   await (await session.byTestId("first-run.identity.create-cta", { timeoutMs: 20_000 })).click();
 

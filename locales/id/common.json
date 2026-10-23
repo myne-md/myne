@@ -4032,7 +4032,8 @@
       "nameSaving": "Menyimpan…",
       "vaultsLabel": "Brankas di akun ini",
       "vaultsHelper": "Brankas yang dikelompokkan perangkat ini di bawah nama di atas. Pengelompokan adalah pilihan organisasi per perangkat, jadi bukan bagian dari konten brankas mana pun dan tidak ikut berpindah dengannya.",
-      "vaultsCount": "{{count}} brankas",
+      "vaultsCount_one": "{{count}} brankas",
+      "vaultsCount_other": "{{count}} brankas",
       "currentVault": "Brankas ini",
       "unknownVault": "Brankas lain di perangkat ini",
       "standaloneHelper": "Brankas ini tidak dikelompokkan di bawah akun mana pun di perangkat ini, jadi berdiri sendiri. Pengelompokan bersifat per perangkat: perangkat lain mungkin menampilkannya di dalam salah satunya.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Nama dapat disetel setelah brankas ini dibagikan.",
       "nameErrorLocked": "Buka kunci brankas untuk mengubah nama Anda.",
       "nameErrorGeneric": "Nama Anda tidak dapat disimpan. Coba lagi.",
-      "nameInvite": "Anda belum punya nama tampilan. Anggota lain melihat sidik jari Anda.",
       "nameInviteCta": "Setel nama",
-      "nameInviteDismiss": "Jangan sekarang",
       "noInvitations": "Belum ada undangan yang dikirim.",
       "identityHeading": "Identitas Anda",
       "membersHeading": "Anggota",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Frasa pemulihan — jika Anda lupa kata sandi",
       "save": "Simpan kit pemulihan",
       "saveFailed": "Berkas tidak dapat disimpan. Salin kit-nya saja, atau tuliskan kedua bagiannya.",
-      "savedToFile": "Tersimpan. Ini berkas teks biasa yang memuat kedua rahasia itu, jadi simpan di tempat yang hanya Anda yang dapat membacanya.",
-      "whyEnglish": "Kata-katanya berbahasa Inggris di setiap bahasa. Kata-kata itu bagian dari standar BIP-39, sehingga klien Myne mana pun dapat membaca frasa yang ditulis klien lain. Jangan menerjemahkannya: kata yang diterjemahkan tidak ada di daftar kata, dan frasanya akan berhenti berfungsi."
+      "savedToFile": "Tersimpan. Ini berkas teks biasa yang memuat kedua rahasia itu, jadi simpan di tempat yang hanya Anda yang dapat membacanya."
     },
     "name": {
       "back": "Kembali",

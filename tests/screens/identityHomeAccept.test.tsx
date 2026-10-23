@@ -10,6 +10,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personListInvites = vi.hoisted(() => vi.fn());
+const personRegister = vi.hoisted(() => vi.fn());
+const readSyncEndpoint = vi.hoisted(() => vi.fn());
+const writeSyncEndpoint = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
@@ -31,6 +34,9 @@ vi.mock("../../src/components/PasswordInput", async (importOriginal) => {
 vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personAcceptInvite,
+  personRegister,
+  readSyncEndpoint,
+  writeSyncEndpoint,
 }));
 
 vi.mock("../../src/lib/invite", () => ({
@@ -46,6 +52,11 @@ vi.mock("../../src/lib/memberNames", async (importOriginal) => {
 vi.mock("../../src/lib/clipboard", () => ({ copyText: vi.fn() }));
 vi.mock("../../src/platform/clipboardManager", () => ({ writeText: vi.fn() }));
 vi.mock("../../src/components/toast/toastStore", () => ({ toast: vi.fn() }));
+// The register door is behind the beta-terms gate (operations#15). Settled here so
+// a submit reaches `personRegister`; the gate has its own specs.
+vi.mock("../../src/hooks/useBetaTermsGate", () => ({
+  useBetaTermsGate: () => ({ pending: false, needed: false, accept: vi.fn() }),
+}));
 
 import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
 import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
@@ -60,6 +71,9 @@ function continueAccept(): void {
 
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
+  personRegister.mockReset().mockResolvedValue({});
+  readSyncEndpoint.mockReset().mockResolvedValue("https://sync.example");
+  writeSyncEndpoint.mockReset().mockResolvedValue(undefined);
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
   listRoster.mockReset();
@@ -82,7 +96,7 @@ describe("IdentityHome accept path", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -101,7 +115,7 @@ describe("IdentityHome accept path", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -131,7 +145,7 @@ describe("IdentityHome accept path", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -194,7 +208,7 @@ describe("IdentityHome accept path", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -216,7 +230,7 @@ describe("IdentityHome accept path", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={onForgotten}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -252,7 +266,7 @@ describe("IdentityHome invite refresh (myne-md/myne#794)", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -354,7 +368,7 @@ describe("IdentityHome accept requires a device password", () => {
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -459,7 +473,7 @@ describe("IdentityHome accept requires a device password", () => {
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -512,7 +526,7 @@ describe("IdentityHome accept reaches the name gate", () => {
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );
@@ -597,5 +611,148 @@ describe("IdentityHome accept reaches the name gate", () => {
     cleanup();
     expect(setMyMemberName).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
+  });
+});
+
+// 2026-10-23. The invitation list is addressed to a `person_id_hash` the server
+// holds, so a `reserved` identity (nothing sent) or a `pending` one (no token)
+// has none to miss. The screen used to ask the relay anyway and paint the
+// refusal as "could not load invites. Check your connection and sync server",
+// which turned a normal first-run state into a fault and pointed the user at
+// the one cause that was not the problem.
+describe("IdentityHome invitation state follows the account lifecycle", () => {
+  const renderWith = (accountState: "reserved" | "pending" | "enrolled") =>
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState={accountState}
+        onRegistered={() => {}}
+      />,
+    );
+
+  it("does not ask the relay for a reserved identity, and says why", async () => {
+    renderWith("reserved");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(personListInvites).not.toHaveBeenCalled();
+    expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
+      "identityHome.invitesNotEnrolled",
+    );
+    expect(screen.queryByTestId("identity-home.error")).toBeNull();
+  });
+
+  it("does not ask the relay for a pending device, and says why", async () => {
+    renderWith("pending");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(personListInvites).not.toHaveBeenCalled();
+    expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
+      "identityHome.invitesPending",
+    );
+  });
+
+  it("reads a NotEnrolled refusal as the same state, not as a connection error", async () => {
+    // A stale `accountState` (registered on another surface this session) can
+    // still reach the relay; the refusal is the same fact as the prop's and must
+    // land in the same place. Injection: mapping it back to `failed` reddens this.
+    personListInvites.mockRejectedValue({ kind: "NotEnrolled" });
+    renderWith("enrolled");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(screen.queryByTestId("identity-home.error")).toBeNull();
+  });
+
+  it("keeps a genuine failure as the connection banner", async () => {
+    personListInvites.mockRejectedValue({ kind: "Transport" });
+    renderWith("enrolled");
+    await screen.findByTestId("identity-home.error");
+    expect(screen.queryByTestId("identity-home.invites-unavailable")).toBeNull();
+  });
+});
+
+// 2026-10-23: the register form is the shared 24-cell grid, and the server
+// address is asked for HERE when the device has none, because this screen is
+// reachable at zero vaults, where Settings does not exist.
+describe("IdentityHome registration", () => {
+  const PHRASE = Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => `word${i + 1}`);
+
+  const renderReserved = () =>
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="reserved"
+        onRegistered={() => {}}
+      />,
+    );
+
+  const fillCells = (prefix: string) => {
+    for (let i = 0; i < PHRASE_CELL_COUNT; i += 1) {
+      const id =
+        i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
+      fireEvent.change(screen.getByTestId(id), { target: { value: PHRASE[i] } });
+    }
+  };
+
+  it("asks for the phrase in 24 cells, and keeps Register disabled until they are full", async () => {
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await screen.findByTestId("identity-home.register-phrase-grid");
+    const submit = screen.getByTestId(
+      "identity-home.register-submit",
+    ) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId("identity-home.register-phrase"), {
+      target: { value: PHRASE[0] },
+    });
+    expect(submit.disabled).toBe(true);
+
+    fillCells("identity-home.register");
+    expect(submit.disabled).toBe(false);
+  });
+
+  it("asks for the sync server when the device has none, and sets it before registering", async () => {
+    readSyncEndpoint.mockResolvedValue(null);
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    const server = await screen.findByTestId("identity-home.register-server");
+    fillCells("identity-home.register");
+    fireEvent.change(server, { target: { value: "https://sync.example" } });
+    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+
+    await waitFor(() => expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example"));
+    await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
+  });
+
+  it("keeps the field out of the way when an endpoint is already configured", async () => {
+    readSyncEndpoint.mockResolvedValue("https://sync.example");
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
+    expect(screen.queryByTestId("identity-home.register-server")).toBeNull();
+  });
+
+  it("reveals the server field when registration is refused for a missing endpoint", async () => {
+    readSyncEndpoint.mockRejectedValue(new Error("probe failed"));
+    personRegister.mockRejectedValue({ kind: "NotConfigured" });
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
+    fillCells("identity-home.register");
+    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+
+    expect((await screen.findByTestId("identity-home.register-error")).textContent).toBe(
+      "identityHome.registerNeedsServer",
+    );
+    expect(await screen.findByTestId("identity-home.register-server")).toBeTruthy();
+    // The phrase does not survive the failure.
+    expect(
+      (screen.getByTestId("identity-home.register-phrase") as HTMLInputElement).value,
+    ).toBe("");
   });
 });

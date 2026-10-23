@@ -4158,7 +4158,8 @@
       "nameSaving": "Enregistrement…",
       "vaultsLabel": "Coffres de ce compte",
       "vaultsHelper": "Les coffres que cet appareil regroupe sous le nom ci-dessus. Le regroupement est un choix d'organisation propre à chaque appareil, il ne fait donc partie du contenu d'aucun coffre et ne voyage pas avec lui.",
-      "vaultsCount": "{{count}} coffres",
+      "vaultsCount_one": "{{count}} coffres",
+      "vaultsCount_other": "{{count}} coffres",
       "currentVault": "Ce coffre",
       "unknownVault": "Un autre coffre sur cet appareil",
       "standaloneHelper": "Ce coffre n'est regroupé sous aucun compte sur cet appareil, il est donc autonome. Le regroupement est propre à chaque appareil : un autre appareil peut l'afficher dans un compte.",
@@ -4170,7 +4171,8 @@
       "sections": {
         "extensions": "Extensions de navigateur",
         "grouping": "Ce compte"
-      }
+      },
+      "vaultsCount_many": "{{count}} coffres"
     },
     "plainFile": {
       "errorSaveSetting": "Impossible d'enregistrer le réglage des fichiers bruts.",
@@ -4604,9 +4606,7 @@
       "nameErrorUnshared": "Les noms peuvent être définis une fois ce coffre partagé.",
       "nameErrorLocked": "Déverrouillez le coffre pour modifier votre nom.",
       "nameErrorGeneric": "Impossible d'enregistrer votre nom. Réessayez.",
-      "nameInvite": "Vous n'avez pas encore de nom d'affichage. Les autres membres voient votre empreinte.",
       "nameInviteCta": "Définir un nom",
-      "nameInviteDismiss": "Pas maintenant",
       "noInvitations": "Aucune invitation envoyée pour l'instant.",
       "identityHeading": "Votre identité",
       "membersHeading": "Membres",
@@ -5109,8 +5109,7 @@
       "phraseFor": "Phrase de récupération — si vous oubliez votre mot de passe",
       "save": "Enregistrer le kit de récupération",
       "saveFailed": "Impossible d'enregistrer le fichier. Copiez plutôt le kit, ou notez les deux parties.",
-      "savedToFile": "Enregistré. C'est un fichier texte brut contenant les deux secrets, conservez-le donc dans un endroit que vous seul pouvez lire.",
-      "whyEnglish": "Les mots sont en anglais dans toutes les langues. Ils font partie de la norme BIP-39, ainsi tout client Myne peut lire une phrase écrite par n'importe quel autre. Ne les traduisez pas : les mots traduits ne figurent pas dans la liste de mots, et la phrase cesserait de fonctionner."
+      "savedToFile": "Enregistré. C'est un fichier texte brut contenant les deux secrets, conservez-le donc dans un endroit que vous seul pouvez lire."
     },
     "name": {
       "back": "Retour",

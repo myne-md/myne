@@ -885,7 +885,7 @@ pub fn ensure_export_dir<R>(app: &AppHandle<R>) -> Result<PathBuf, EnsureError> 
 describe("drift class 5: the chokepoint comes unwired", () => {
   // The five-site ACL LOCKSTEP that used to live here moved to
   // `scripts/check-mobile-plugin-acl.mjs` and `tests/scripts/mobilePluginAcl.test.ts`,
-  // widened from this one plugin to all 27 mobile permission directories. It is
+  // widened from this one plugin to every mobile permission directory. It is
   // an availability property; what stays here is the export path's own wiring.
 
   it("fails when the seam stops calling the chokepoint", () => {

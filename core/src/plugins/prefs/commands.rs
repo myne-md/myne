@@ -618,8 +618,6 @@ pub async fn set_screen_capture_protection_from_host(
     Ok(())
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_screen_capture_protection<R: Runtime>(
@@ -689,8 +687,6 @@ pub async fn set_spell_enabled_from_host(
     set_spell_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_spell_enabled<R: Runtime>(
@@ -755,8 +751,6 @@ pub async fn set_editor_line_numbers_from_host(
     set_editor_line_numbers_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_line_numbers<R: Runtime>(
@@ -821,8 +815,6 @@ pub async fn set_editor_vim_mode_from_host(
     set_editor_vim_mode_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_vim_mode<R: Runtime>(
@@ -890,8 +882,6 @@ pub async fn set_archive_disabled_from_host(
     set_archive_disabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_archive_disabled<R: Runtime>(
@@ -956,8 +946,6 @@ pub async fn set_show_task_marker_from_host(
     set_show_task_marker_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_show_task_marker<R: Runtime>(
@@ -1025,8 +1013,6 @@ pub async fn set_folder_notes_enabled_from_host(
     set_folder_notes_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_folder_notes_enabled<R: Runtime>(
@@ -1095,8 +1081,6 @@ pub async fn set_transcription_enabled_from_host(
     set_transcription_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_transcription_enabled<R: Runtime>(
@@ -1167,8 +1151,6 @@ pub async fn set_auto_tag_enabled_from_host(
     set_auto_tag_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_auto_tag_enabled<R: Runtime>(
@@ -1690,8 +1672,6 @@ pub async fn set_reminders_enabled_from_host(
     set_reminders_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_reminders_enabled<R: Runtime>(
@@ -1758,8 +1738,6 @@ pub async fn set_reminder_horizon_days_from_host(
     set_reminder_horizon_days_with_dir(&dir, state, hooks, days, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_reminder_horizon_days<R: Runtime>(
@@ -1835,8 +1813,6 @@ pub async fn set_active_workspace_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_active_workspace<R: Runtime>(
@@ -1883,8 +1859,6 @@ pub async fn set_editor_default_view_mode_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_default_view_mode<R: Runtime>(
@@ -1920,8 +1894,6 @@ pub async fn set_editor_focus_dim_inactive_from_host(
     set_editor_focus_dim_inactive_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_focus_dim_inactive<R: Runtime>(
@@ -1986,8 +1958,6 @@ pub async fn set_editor_focus_typewriter_from_host(
     set_editor_focus_typewriter_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_focus_typewriter<R: Runtime>(
@@ -2053,8 +2023,6 @@ pub async fn set_show_note_timestamps_from_host(
     set_show_note_timestamps_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_show_note_timestamps<R: Runtime>(
@@ -2121,8 +2089,6 @@ pub async fn set_spell_languages_from_host(
     set_spell_languages_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_spell_languages<R: Runtime>(
@@ -2207,8 +2173,6 @@ pub async fn set_keymap_binding_from_host(
     set_keymap_binding_with_dir(&dir, state, hooks, command_id, chords, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_keymap_binding<R: Runtime>(
@@ -2290,8 +2254,6 @@ pub async fn set_deliberate_folders_from_host(
     set_deliberate_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_deliberate_folders<R: Runtime>(
@@ -2431,8 +2393,6 @@ pub async fn set_archived_folders_from_host(
     set_archived_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_archived_folders<R: Runtime>(
@@ -2512,8 +2472,6 @@ pub async fn set_ai_enabled_from_host(
     Ok(())
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ai_enabled<R: Runtime>(
@@ -2578,8 +2536,6 @@ pub async fn set_attachment_ocr_enabled_from_host(
     set_attachment_ocr_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_attachment_ocr_enabled<R: Runtime>(
@@ -2728,8 +2684,6 @@ pub async fn set_developer_mode_from_host(
     set_developer_mode_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_developer_mode<R: Runtime>(
@@ -2796,8 +2750,6 @@ pub async fn set_attachment_compression_enabled_from_host(
     set_attachment_compression_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_attachment_compression_enabled<R: Runtime>(
@@ -2865,8 +2817,6 @@ pub async fn set_ai_excluded_folders_from_host(
     Ok(refused)
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ai_excluded_folders<R: Runtime>(
@@ -2943,8 +2893,6 @@ pub async fn set_cli_enabled_from_host(
     set_cli_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_cli_enabled<R: Runtime>(
@@ -3006,8 +2954,6 @@ pub async fn set_cli_excluded_folders_from_host(
     set_cli_excluded_folders_with_dir(&dir, state, hooks, mutation, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_cli_excluded_folders<R: Runtime>(
@@ -3085,8 +3031,6 @@ pub async fn set_cli_rate_limit_disabled_from_host(
     set_cli_rate_limit_disabled_with_dir(&dir, state, hooks, disabled, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_cli_rate_limit_disabled<R: Runtime>(
@@ -3156,8 +3100,6 @@ pub async fn set_item_order_from_host(
     set_item_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_item_order<R: Runtime>(
@@ -3231,8 +3173,6 @@ pub async fn set_hidden_bar_items_from_host(
     set_hidden_bar_items_with_dir(&dir, state, hooks, items, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_hidden_bar_items<R: Runtime>(
@@ -3301,8 +3241,6 @@ pub async fn upsert_saved_view_from_host(
     upsert_saved_view_with_dir(&dir, state, hooks, view, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn upsert_saved_view<R: Runtime>(
@@ -3370,8 +3308,6 @@ pub async fn delete_saved_view_from_host(
     delete_saved_view_with_dir(&dir, state, hooks, id, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn delete_saved_view<R: Runtime>(
@@ -3439,8 +3375,6 @@ pub async fn set_view_order_from_host(
     set_view_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_view_order<R: Runtime>(
@@ -3505,8 +3439,6 @@ pub async fn set_bar_items_order_from_host(
     set_bar_items_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_bar_items_order<R: Runtime>(
@@ -3581,8 +3513,6 @@ pub async fn set_right_panel_active_tab_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_active_tab<R: Runtime>(
@@ -3619,8 +3549,6 @@ pub async fn set_right_panel_hidden_tabs_from_host(
     set_right_panel_hidden_tabs_with_dir(&dir, state, hooks, items, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_hidden_tabs<R: Runtime>(
@@ -3689,8 +3617,6 @@ pub async fn set_right_panel_tab_order_from_host(
     set_right_panel_tab_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_tab_order<R: Runtime>(
@@ -3758,8 +3684,6 @@ pub async fn set_editor_toolbar_order_from_host(
     set_editor_toolbar_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_toolbar_order<R: Runtime>(
@@ -3820,8 +3744,6 @@ pub async fn set_editor_toolbar_hidden_from_host(
     set_editor_toolbar_hidden_with_dir(&dir, state, hooks, items, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_toolbar_hidden<R: Runtime>(
@@ -3882,8 +3804,6 @@ pub async fn set_editor_slash_order_from_host(
     set_editor_slash_order_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_slash_order<R: Runtime>(
@@ -3940,8 +3860,6 @@ pub async fn set_editor_slash_hidden_from_host(
     set_editor_slash_hidden_with_dir(&dir, state, hooks, items, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_slash_hidden<R: Runtime>(
@@ -4005,8 +3923,6 @@ pub async fn set_daily_date_format_from_host(
     set_daily_date_format_with_dir(&dir, state, hooks, format, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_date_format<R: Runtime>(
@@ -4067,8 +3983,6 @@ pub async fn set_daily_folder_from_host(
     set_daily_folder_with_dir(&dir, state, hooks, folder, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_folder<R: Runtime>(
@@ -4229,8 +4143,6 @@ pub async fn set_daily_template_from_host(
     set_daily_template_with_dir(&dir, state, hooks, template_id, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_template<R: Runtime>(
@@ -4297,8 +4209,6 @@ pub async fn set_ribbon_items_from_host(
     set_ribbon_items_with_dir(&dir, state, hooks, items, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ribbon_items<R: Runtime>(
@@ -4371,8 +4281,6 @@ pub async fn set_ribbon_visible_from_host(
     set_ribbon_visible_with_dir(&dir, state, hooks, visible, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ribbon_visible<R: Runtime>(
@@ -4454,8 +4362,6 @@ pub async fn set_periodic_note_setting_from_host(
     set_periodic_note_setting_with_dir(&dir, state, hooks, period, setting, value, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_periodic_note_setting<R: Runtime>(
@@ -4582,8 +4488,6 @@ pub async fn set_new_note_location_from_host(
     set_new_note_location_with_dir(&dir, state, hooks, location, folder, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_new_note_location<R: Runtime>(
@@ -4691,8 +4595,6 @@ pub async fn set_editor_text_size_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_text_size<R: Runtime>(
@@ -4736,8 +4638,6 @@ pub async fn set_editor_line_spacing_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_line_spacing<R: Runtime>(
@@ -4781,8 +4681,6 @@ pub async fn set_editor_content_width_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_content_width<R: Runtime>(
@@ -4831,8 +4729,6 @@ pub async fn set_date_format_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_date_format<R: Runtime>(
@@ -4878,8 +4774,6 @@ pub async fn set_time_format_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_time_format<R: Runtime>(
@@ -4934,8 +4828,6 @@ pub async fn set_timezone_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_timezone<R: Runtime>(
@@ -4979,8 +4871,6 @@ pub async fn set_editor_font_family_from_host(
     .await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_font_family<R: Runtime>(
@@ -5019,8 +4909,6 @@ pub async fn set_startup_open_from_host(
     set_startup_open_with_dir(&dir, state, hooks, mode, note, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_startup_open<R: Runtime>(
@@ -5084,8 +4972,6 @@ pub async fn set_favorites_from_host(
     set_favorites_with_dir(&dir, state, hooks, order, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_favorites<R: Runtime>(
@@ -5147,8 +5033,6 @@ pub async fn set_auto_lock_timeout_from_host(
     set_auto_lock_timeout_with_dir(&dir, state, hooks, seconds, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_auto_lock_timeout<R: Runtime>(
@@ -5239,8 +5123,6 @@ pub async fn set_editor_layout_from_host(
     set_editor_layout_with_dir(&dir, state, hooks, layout, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_layout<R: Runtime>(
@@ -5330,8 +5212,6 @@ pub async fn set_theme_from_host(
     set_theme_with_dir(&dir, state, hooks, theme, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_theme<R: Runtime>(
@@ -5408,8 +5288,6 @@ pub async fn set_custom_theme_from_host(
     set_custom_theme_with_dir(&dir, state, hooks, custom_theme, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_custom_theme<R: Runtime>(
@@ -5480,8 +5358,6 @@ pub async fn set_item_colors_from_host(
     set_item_colors_with_dir(&dir, state, hooks, colors, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_item_colors<R: Runtime>(
@@ -5546,8 +5422,6 @@ pub async fn set_folder_icons_from_host(
     set_folder_icons_with_dir(&dir, state, hooks, icons, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_folder_icons<R: Runtime>(
@@ -5686,8 +5560,6 @@ pub async fn set_device_name_from_host(
     set_device_name_with_dir(&dir, state, hooks, device_id_hex, name, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_device_name<R: Runtime>(
@@ -5789,8 +5661,6 @@ pub async fn vault_set_label_from_host(
     vault_set_label_with_dir(&dir, state, hooks, label, io, host, keychain).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_set_label<R: Runtime>(
@@ -5904,8 +5774,6 @@ pub async fn vault_set_icon_from_host(
     vault_set_icon_with_dir(&dir, state, hooks, icon, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_set_icon<R: Runtime>(
@@ -5989,8 +5857,6 @@ pub async fn set_color_groups_from_host(
     set_color_groups_with_dir(&dir, state, hooks, groups, io, host).await
 }
 
-/// IPC wrapper. Delegates; the command name and payload the frontend
-/// sends are unchanged because this IS the registered command.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_color_groups<R: Runtime>(

@@ -97,6 +97,17 @@ interface VaultPickerProps {
    * moment this screen could appear at all.
    */
   onJoinDevice: () => void;
+  /**
+   * How many invitations addressed to this identity are still unaccepted
+   * (myne-md/myne#911 follow-up). Zero renders nothing: an invitation that does
+   * not exist is not a notification.
+   *
+   * It is a count rather than the list because the list lives in the dialog,
+   * which owns the two wizards and their error states.
+   */
+  inviteCount: number;
+  /** Open the invitations dialog. */
+  onInvites: () => void;
 }
 
 // `loading` until the `vault_list()` IPC resolves; `loaded` carries the
@@ -502,6 +513,37 @@ function CreateAnother({
   );
 }
 
+/**
+ * The invitation notice, above the vault list (myne-md/myne#911 follow-up).
+ *
+ * Deliberately a row rather than a toast or a badge on a button that does not
+ * exist yet: the picker is where a returning user lands, and an invitation is
+ * not a transient event to be missed while the window was closed.
+ *
+ * Renders NOTHING at zero, which is what keeps an uninvited user's picker
+ * exactly as it was before this feature.
+ */
+function InvitesNotice({ count, onOpen }: { count: number; onOpen: () => void }) {
+  const { t } = useTranslation();
+  if (count <= 0) return null;
+  return (
+    <Button
+      variant="secondary"
+      onClick={onOpen}
+      data-testid="picker.invites-notice"
+      style={NOTICE_STYLE}
+    >
+      {t("invites.notice", { count })}
+    </Button>
+  );
+}
+
+const NOTICE_STYLE: CSSProperties = {
+  width: "100%",
+  justifyContent: "flex-start",
+  marginBottom: "var(--space-2)",
+};
+
 /** A single vault row. Hover/focus lifts fill + stroke (no transform). */
 function VaultRow({
   vault,
@@ -587,7 +629,7 @@ function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
-  onRestoreBackup, onJoinDevice }: VaultPickerProps) {
+  onRestoreBackup, onJoinDevice, inviteCount, onInvites }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // The last account-grouping failure, shown as a banner. `null` is no error.
@@ -715,7 +757,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
             onJoinDevice={onJoinDevice}
           />
         }
-      />
+      >
+        <InvitesNotice count={inviteCount} onOpen={onInvites} />
+      </PickerCard>
     );
   }
 
@@ -833,6 +877,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
           {accountsError}
         </p>
       )}
+      <InvitesNotice count={inviteCount} onOpen={onInvites} />
       {/* The fade is applied here rather than baked into LIST_STYLE because it
           is conditional on scroll position; see `useScrollEdges.ts` for why a
           fixed mask on both edges is wrong at rest. */}

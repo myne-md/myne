@@ -4032,7 +4032,8 @@
       "nameSaving": "Lagrer…",
       "vaultsLabel": "Hvelv i denne kontoen",
       "vaultsHelper": "Hvelvene denne enheten grupperer under navnet ovenfor. Gruppering er et organisasjonsvalg per enhet, så det er ikke en del av innholdet i noe hvelv og følger ikke med det.",
-      "vaultsCount": "{{count}} hvelv",
+      "vaultsCount_one": "{{count}} hvelv",
+      "vaultsCount_other": "{{count}} hvelv",
       "currentVault": "Dette hvelvet",
       "unknownVault": "Et annet hvelv på denne enheten",
       "standaloneHelper": "Dette hvelvet er ikke gruppert under en konto på denne enheten, så det står for seg selv. Gruppering er per enhet: en annen enhet kan vise det inne i en konto.",
@@ -4472,9 +4473,7 @@
       "nameErrorUnshared": "Navn kan angis når dette hvelvet er delt.",
       "nameErrorLocked": "Lås opp hvelvet for å endre navnet ditt.",
       "nameErrorGeneric": "Kunne ikke lagre navnet ditt. Prøv igjen.",
-      "nameInvite": "Du har ikke noe visningsnavn ennå. De andre medlemmene ser fingeravtrykket ditt.",
       "nameInviteCta": "Angi et navn",
-      "nameInviteDismiss": "Ikke nå",
       "noInvitations": "Ingen invitasjoner sendt ennå.",
       "identityHeading": "Identiteten din",
       "membersHeading": "Medlemmer",
@@ -4974,8 +4973,7 @@
       "phraseFor": "Gjenopprettingsfrase — hvis du glemmer passordet",
       "save": "Lagre gjenopprettingssett",
       "saveFailed": "Kunne ikke lagre filen. Kopier settet i stedet, eller skriv ned begge delene.",
-      "savedToFile": "Lagret. Det er en ren tekstfil som inneholder begge hemmelighetene, så oppbevar den et sted bare du kan lese.",
-      "whyEnglish": "Ordene er engelske på alle språk. De er en del av BIP-39-standarden, så enhver Myne-klient kan lese en frase skrevet av en annen. Ikke oversett dem: oversatte ord finnes ikke i ordlisten, og frasen ville slutte å virke."
+      "savedToFile": "Lagret. Det er en ren tekstfil som inneholder begge hemmelighetene, så oppbevar den et sted bare du kan lese."
     },
     "name": {
       "back": "Tilbake",

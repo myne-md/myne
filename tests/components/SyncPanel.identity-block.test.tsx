@@ -31,6 +31,7 @@ import {
   setPersonIdentityState,
 } from "../../src/components/sync/personIdentityState";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
+import { setActiveSettingsTopic } from "../../src/components/settings/SettingsTabs";
 
 function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
   invokeMock.mockImplementation(syncPanelCommandRouter(route));
@@ -180,5 +181,73 @@ describe("the Identity block, per device identity state", () => {
 
     await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
     expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
+  });
+});
+
+// 2026-10-23. Registration was reachable only from the identity home, which
+// renders at ZERO vaults. A user sitting in a vault therefore had no door, and
+// the publish row's own refusal sent them to that screen.
+describe("the identity block's register door", () => {
+  it("offers registration for a reserved identity, with the shared 24-cell grid", async () => {
+    setActiveSettingsTopic("sync", "connection");
+    invokeMock.mockImplementation(
+      syncPanelCommandRouter({
+        person: { state: "reserved", sealed_keypair_present: true, identity_code: "code" },
+      }),
+    );
+    renderSyncPanel();
+    fireEvent.click(await screen.findByTestId("sync.panel.register-cta"));
+    expect(await screen.findByTestId("sync.panel.register-phrase-grid")).toBeTruthy();
+    // No endpoint is configured in the harness, so the address is asked for here
+    // rather than in a Settings screen the user cannot reach without a vault.
+    expect(await screen.findByTestId("sync.panel.register-server")).toBeTruthy();
+  });
+
+  it("does not offer it for an enrolled identity", async () => {
+    setActiveSettingsTopic("sync", "connection");
+    invokeMock.mockImplementation(
+      syncPanelCommandRouter({
+        person: { state: "enrolled", enrolled: true, identity_code: "code" },
+      }),
+    );
+    renderSyncPanel();
+    await waitFor(() => expect(screen.queryByTestId("sync.panel.register-cta")).toBeNull());
+  });
+});
+
+// 2026-10-23 review: the Settings door's submit path used to be unexecuted
+// (only its CTA and grid were asserted), so an empty body would have stayed
+// green. One click through the shared form.
+describe("the Settings register door submits", () => {
+  it("writes the address and then registers, in that order", async () => {
+    setActiveSettingsTopic("sync", "connection");
+    const calls: string[] = [];
+    invokeMock.mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === "plugin:sync|sync_person_register") {
+        calls.push(`register:${String(args?.phrase ?? "").split(" ").length}`);
+        return {};
+      }
+      if (cmd === "plugin:sync|sync_set_endpoint") {
+        calls.push("endpoint");
+        return { pin_source: "platform_trust_store" };
+      }
+      return syncPanelCommandRouter({
+        person: { state: "reserved", sealed_keypair_present: true, identity_code: "code" },
+      })(cmd);
+    });
+    renderSyncPanel();
+    fireEvent.click(await screen.findByTestId("sync.panel.register-cta"));
+    const grid = await screen.findByTestId("sync.panel.register-phrase-grid");
+    for (let i = 0; i < 24; i += 1) {
+      const id =
+        i === 0 ? "sync.panel.register-phrase" : `sync.panel.register-phrase-cell-${i + 1}`;
+      fireEvent.change(screen.getByTestId(id), { target: { value: `word${i + 1}` } });
+    }
+    fireEvent.change(await screen.findByTestId("sync.panel.register-server"), {
+      target: { value: "https://sync.example" },
+    });
+    fireEvent.click(screen.getByTestId("sync.panel.register-submit"));
+    await waitFor(() => expect(calls).toEqual(["endpoint", "register:24"]));
+    expect(grid).toBeTruthy();
   });
 });

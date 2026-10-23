@@ -32,6 +32,7 @@ function renderWelcome(overrides: Partial<Parameters<typeof Welcome>[0]> = {}) {
     onStart: vi.fn(),
     onRestoreBackup: vi.fn(),
     onJoinDevice: vi.fn(),
+    onInvited: vi.fn(),
     ...overrides,
   };
   render(<Welcome {...props} />);
@@ -61,6 +62,16 @@ describe("Welcome first run", () => {
     fireEvent.click(screen.getByTestId("welcome.join-cta"));
     expect(props.onRestoreBackup).toHaveBeenCalledTimes(1);
     expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
+  });
+
+  // The invited door (myne-md/myne#911 follow-up). It creates an IDENTITY and no
+  // vault, which is why it is a third door rather than a second create door: a
+  // person invited to someone else's vault must not be pushed through vault
+  // creation to reach their invitation.
+  it("offers the invited door, and wires it", () => {
+    const props = renderWelcome();
+    fireEvent.click(screen.getByTestId("welcome.invited-cta"));
+    expect(props.onInvited).toHaveBeenCalledTimes(1);
   });
 
   it("asks for no server address", () => {
