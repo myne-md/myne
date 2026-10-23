@@ -123,3 +123,6 @@ web/bench/pkg/
 # Agent scratch: local permission allow-lists and per-machine settings. The
 # website ignores the same directory; nothing in it is a repo artefact.
 /.claude/
+
+# Sidebar state: written by myne-sidebar.ts, machine-local, never committed.
+.pi/.state/
