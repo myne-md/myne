@@ -8,6 +8,13 @@
 # Tauri archive (myne-md/myne#803).
 set -euo pipefail
 
+# Nothing was staged for a simulator build (see ios-watch-build.sh): a simulator
+# app carries no watch companion, so there is nothing to embed either.
+if [ "${PLATFORM_NAME:-}" = "iphonesimulator" ]; then
+  echo "ios-watch-embed: skipped (simulator build embeds no watch companion)"
+  exit 0
+fi
+
 GEN_DIR="${SRCROOT:-$(cd "$(dirname "$0")/../src-tauri/gen/apple" && pwd)}"
 SRC="$GEN_DIR/watch-build/MyneWatch.app"
 DEST="${TARGET_BUILD_DIR:-$GEN_DIR/build/Debug-iphoneos}/${WRAPPER_NAME:-Myne.app}/Watch"
