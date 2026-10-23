@@ -144,7 +144,10 @@ pub fn signal_local_change() {
 pub async fn poke_target() -> Option<String> {
     use myne_core::plugins::sync::token_store::TokenStore as _;
     let host = host();
-    let io = crate::dispatch::vault_io();
+    // The PERSON decorator, for the same reason the cycle takes it: the person
+    // credential lives in the Worker's memory, so the plain vault io answers "no
+    // token" and the poke stream never opens on a person-born vault.
+    let io = crate::dispatch::person_vault_io_ref();
     let state = crate::session::state();
     let cfg_path = myne_core::plugins::sync::config::config_path_from_host(host, io)
         .await
@@ -159,11 +162,24 @@ pub async fn poke_target() -> Option<String> {
         .read(io, &dir)
         .await
         .ok()
-        .flatten()?;
-    let mut token_hex = String::with_capacity(token.len() * 2);
-    for b in &token {
-        token_hex.push_str(&format!("{b:02x}"));
-    }
+        .flatten();
+    // A person-born vault has no per-vault token: the person token is the only
+    // credential it has, and the poke stream authenticates with the same one the
+    // cycle uses.
+    let token_hex = match token {
+        Some(token) => protocol::hex::encode_lower(&token),
+        None => {
+            let path =
+                myne_core::plugins::sync::person_auth::person_auth_path_for_read(host).ok()?;
+            let auth = myne_core::plugins::sync::person_auth::read_person_auth(io, &path)
+                .await
+                .ok()??;
+            if auth.token_hex.is_empty() {
+                return None;
+            }
+            auth.token_hex
+        }
+    };
     serde_json::to_string(&serde_json::json!({
         "endpoint": url,
         "token": token_hex,
@@ -226,9 +242,17 @@ pub async fn tick() -> String {
     let allow_push = matches!(action, SyncAction::Push | SyncAction::PullAndPush);
 
     // The borrow is dropped before this await — see the `SCHED` doc.
+    //
+    // The io must be the PERSON decorator, not `vault_io()`. The cycle reads the
+    // device token through the io it is handed, and on this client the person
+    // credential deliberately lives in the Worker's memory rather than OPFS
+    // (`crate::person_io`). Handing it the plain vault io answers "no token", the
+    // cycle returns `NotReady`, and a person-born vault syncs only when the user
+    // presses "Sync now", edits after that never leave the browser, while the
+    // panel keeps showing the green dot the manual run earned.
     let outcome = myne_core::plugins::sync::cycle::run_active_cycle_from_host(
         host,
-        crate::dispatch::vault_io(),
+        crate::dispatch::person_vault_io_ref(),
         state,
         crate::session::hooks(),
         crate::session::live_sessions(),

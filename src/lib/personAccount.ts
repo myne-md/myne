@@ -42,9 +42,46 @@ export async function personSetup(phrase?: string): Promise<PersonSetupView> {
   });
 }
 
+/**
+ * The account lifecycle (myne-md/myne#911). `null` on the status means this
+ * device holds no identity at all, which is the only case Welcome is for.
+ *
+ * - `reserved`: a sealed identity that has never been registered. Nothing has
+ *   been sent, and nothing needs to be.
+ * - `pending`: registered, awaiting this device's approval (no token yet).
+ * - `enrolled`: registered and holding a device token.
+ */
+export type PersonAccountState = "reserved" | "pending" | "enrolled";
+
+/**
+ * Register an existing identity with the configured server (myne-md/myne#911).
+ *
+ * The explicit act, and the phrase is the proof: it opens the sealed identity
+ * this device already holds, so a wrong phrase cannot mint a second one. A
+ * failure leaves the identity `reserved` and fully usable, which is why the
+ * caller can offer this without a warning.
+ */
+export async function personRegister(phrase: string): Promise<PersonSetupView> {
+  return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
+}
+
+/**
+ * The person's account number, in canonical form, or `null` when this device
+ * holds no identity (myne-md/myne#911 review).
+ *
+ * Derived from the person id, so it needs no phrase and no network. Format it
+ * for display with `@myne/client-core`'s `formatPersonAccountNumber`, which is
+ * the one place the `MY-` grouping lives on the client side.
+ */
+export async function personAccountNumber(): Promise<string | null> {
+  return invoke<string | null>("plugin:sync|sync_person_account_number");
+}
+
 /** Whether this device holds a person account, and whose it is. */
 export interface PersonStatusView {
   enrolled: boolean;
+  /** The three-state lifecycle; `null` when there is no identity. */
+  state: PersonAccountState | null;
   identity_unlocked: boolean;
   person_id_hex: string | null;
   /** The out-of-band public identity code; available while the private identity is locked. */
@@ -235,4 +272,80 @@ export async function personUnlockMemberVaultWithBiometric(
   return invoke("plugin:sync|sync_person_unlock_member_vault_with_biometric", {
     vaultIdHex,
   });
+}
+
+/**
+ * What a scanned person QR plus the 24 words produced (myne-md/myne#911 task 9).
+ * Mirrors the Rust `PersonJoinView`.
+ */
+export interface PersonJoinView {
+  /** The person this device now belongs to, 32 lowercase hex. It equals the id
+   *  the QR carried: a phrase for anyone else is refused (`PersonMismatch`). */
+  person_id_hex: string;
+  /** False while the device waits for an existing device to approve it. */
+  approved: boolean;
+}
+
+/**
+ * Admit THIS device to a person's account from a scanned person QR and the
+ * phrase (myne-md/myne#911 task 9).
+ *
+ * The phrase crosses IPC once, exactly as the identity-unlock path does. The
+ * device lands `pending` in the ordinary case: one QR and one phrase admit it
+ * only after an existing device approves it, which is what a stolen phrase alone
+ * cannot do.
+ */
+export async function personJoinDevice(
+  personIdHex: string,
+  endpointUrl: string,
+  phrase: string,
+): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_join_device", {
+    personIdHex,
+    endpointUrl,
+    phrase,
+  });
+}
+
+/**
+ * Finish a pending device's enrolment once it has been approved.
+ *
+ * Polls the same handshake with the session's cached derived secret, so no
+ * phrase is entered a second time. Answers `approved: false` until the approval
+ * lands; `PersonSessionRequired` means the session (or the app) was restarted
+ * between the two acts, and the phrase has to be entered again.
+ */
+export async function personClaimDevice(): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_claim_device");
+}
+
+/**
+ * One vault the person account is bound to (myne-md/myne#911 task 9). Mirrors the
+ * Rust `PersonVaultRow`.
+ *
+ * `vault_id` is present once this device holds a container for it: the listing
+ * writes each vault's FRAME, so the picker shows the vault and opening it still
+ * asks for that vault's password. `null` means the frame could not be fetched
+ * (the account is bound to it, this device just does not hold it yet).
+ */
+export interface PersonVaultRow {
+  /** The vault's namespace, 32 lowercase hex. Public: it is the vault's server
+   *  address and the value its own frame carries. */
+  account_hash_hex: string;
+  /** `"owner"` or `"member"`, the binding's role. */
+  role: "owner" | "member";
+  /** The local `VaultId` once a container exists here. */
+  vault_id: string | null;
+}
+
+/**
+ * List every vault the account is bound to, writing a local frame for each one
+ * this device does not hold yet (myne-md/myne#911 task 9).
+ *
+ * Listing only. No password is asked for, no key is installed, and no content is
+ * downloaded: each listed vault opens later with its own password, and sync
+ * pulls the corpus after that.
+ */
+export async function personListVaults(): Promise<PersonVaultRow[]> {
+  return invoke<PersonVaultRow[]>("plugin:sync|sync_person_list_vaults");
 }

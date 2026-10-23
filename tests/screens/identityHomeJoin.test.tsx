@@ -77,9 +77,12 @@ function renderHome(onAccepted: () => void = () => {}) {
   return render(
     <IdentityHome
       identityCode="code"
+      accountNumber={null}
       onCreateVault={() => {}}
       onAccepted={onAccepted}
       onForgotten={() => {}}
+      accountState={null}
+      onRegistered={() => {}}
     />,
   );
 }

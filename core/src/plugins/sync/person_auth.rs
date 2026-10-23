@@ -37,6 +37,16 @@ pub const PERSON_AUTH_FILE: &str = "person-auth.json";
 pub struct PersonAuth {
     pub person_id_hex: String,
     pub device_id_hex: String,
+    /// Whether this identity has been registered with a server (myne-md/myne#911).
+    ///
+    /// The persistent half of the three-state lifecycle: a sealed identity with
+    /// `registered == false` is `reserved` and has sent nothing; `true` with an
+    /// empty token is `pending`. `#[serde(default)]` keeps a pre-feature
+    /// credential file readable, and the status derivation deliberately decides
+    /// `enrolled` from the TOKEN rather than from this flag, so a legacy file
+    /// with a token still reads as enrolled rather than as reserved.
+    #[serde(default)]
+    pub registered: bool,
     pub token_hex: String,
     #[serde(default)]
     pub kem_ek_hex: String,
@@ -139,6 +149,7 @@ mod tests {
             let auth = PersonAuth {
                 person_id_hex: "11".repeat(16),
                 device_id_hex: "22".repeat(16),
+                registered: false,
                 token_hex: "33".repeat(32),
                 ..Default::default()
             };

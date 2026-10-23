@@ -42,6 +42,7 @@ const personStatus = vi.hoisted(() => vi.fn());
 const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
+const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
@@ -53,6 +54,10 @@ vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personLock,
   personAcceptInvite,
+  // The gate shows the account number once it lands on home (myne-md/myne#911);
+  // a mock that omits the export makes that call throw inside the probe's
+  // `.then`, which keeps the flow on the gate and reads as a routing bug.
+  personAccountNumber,
 }));
 vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
@@ -152,12 +157,17 @@ const SELF_ROW = {
 };
 
 beforeEach(() => {
+  personAccountNumber.mockReset().mockResolvedValue("MY-ABCD-EFGH-JKMN-PQRS-TUVW");
   personStatus.mockReset().mockResolvedValue({
     enrolled: true,
     identity_unlocked: true,
     person_id_hex: "person",
     identity_code: OWNER_CODE,
     sealed_keypair_present: true,
+    // The lifecycle state is what routes the flow past the gate (myne-md/myne#911
+    // task 12): the mock is a copy of the status contract, and a copy that omits a
+    // field the flow reads sends an enrolled device to the gate.
+    state: "enrolled",
   });
   personListInvites.mockReset().mockResolvedValue([
     { invite_id_hex: INVITE_ID, vault_account_hash_hex: "a".repeat(64), claimed: false },

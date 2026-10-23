@@ -5247,18 +5247,11 @@
     "residueBanner": "Ficheiros residuais de uma eliminação interrompida ({{n}}). Limpe-os antes de criar um cofre.",
     "cleanUpFiles": "Limpar ficheiros residuais",
     "connect": "Ligar à minha conta",
-    "startIdentity": "Criar uma identidade",
-    "startLocal": "Criar antes um cofre local",
     "tagline": "Notas markdown encriptadas. Sem email no registo.",
-    "identityTitle": "Criar uma identidade",
-    "identityBody": "Uma identidade para todos os seus cofres, para que as pessoas o possam convidar. Precisa de um servidor de sincronização.",
-    "localTitle": "Criar um cofre local",
-    "localBody": "Um cofre encriptado neste dispositivo. Adicione a sincronização ou uma identidade mais tarde.",
     "restoreTitle": "Restaurar a partir de uma cópia de segurança",
     "restoreBody": "Abra um ficheiro .myne-backup que guardou anteriormente.",
     "joinTitle": "Adicionar este dispositivo a uma conta",
     "joinBody": "Use um cofre que já tem noutro dispositivo.",
-    "createAction": "Criar",
     "restoreAction": "Restaurar",
     "joinAction": "Adicionar dispositivo",
     "version": "Versão {{version}} · pré-alfa"
@@ -5492,7 +5485,6 @@
     "recovered": "Identidade recuperada.",
     "title": "Criar uma identidade",
     "errorAlreadyHeld": "Este dispositivo já contém uma identidade. Recupere-a com a sua frase de recuperação, ou esqueça-a e crie uma nova.",
-    "errorNotConfigured": "Não foi possível configurar a identidade. Verifique que há um servidor de sincronização configurado e tente novamente.",
     "forgetCancel": "Mantê-la",
     "forgetConfirm": "Esquecer e criar nova",
     "forgetCta": "Esquecer esta identidade e criar uma nova",
@@ -5507,8 +5499,6 @@
     "recoverHint": "Recupere-a neste dispositivo com a sua frase de recuperação de 24 palavras.",
     "recoverAction": "Recuperar",
     "back": "Voltar",
-    "changeServer": "Alterar ou verificar o servidor de sincronização",
-    "errorTlsFailure": "Não foi possível verificar o certificado HTTPS do servidor. Verifique o endereço do servidor e o seu certificado.",
     "phraseTitle": "Guarde a sua frase de identidade",
     "phraseContinue": "Continuar",
     "confirmTitle": "Confirmar a sua frase"
@@ -5657,15 +5647,6 @@
       "hint": "Tentar novamente recomeça a descarga.",
       "retry": "Tentar novamente",
       "back": "Voltar ao desbloqueio"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Escolha um servidor de sincronização",
-      "intro": "O Myne precisa de um servidor para guardar as suas notas encriptadas e para o alcançar para convites. As suas notas permanecem encriptadas neste dispositivo antes de o deixarem; o servidor guarda apenas texto cifrado.",
-      "notConfigured": "Introduza um endereço de servidor acima e prima Ligar para continuar.",
-      "back": "Voltar",
-      "continue": "Continuar"
     }
   },
   "identityFlow": {

@@ -536,10 +536,13 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // root-tier derive fails there; derive the group key first and build
             // the slot with it, or the running session reads shared singletons
             // through the wrong tier.
-            let (items_key, group_key) = if meta_bytes.get(..4)
-                == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
-            {
-                let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes)
+            // `has_b2b_tail`, not a magic test: the `NTV7` generation was
+            // classified as "not NTV6" here, so the root-tier derive AEAD-failed
+            // and every PIN or biometric attempt on a person-born vault failed
+            // while enrolment had succeeded (myne-md/myne#911 review). This is
+            // the same class myne-md/myne#442 fixed for `NTV6`.
+            let (items_key, group_key) = if protocol::has_b2b_tail(&meta_bytes) {
+                let b2b = protocol::parse_b2b_tail_any(&meta_bytes)
                     .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;
                 let g = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
                     .map_err(|_| QuickUnlockError::InvalidVaultMeta)?;

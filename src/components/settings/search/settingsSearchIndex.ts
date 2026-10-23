@@ -277,6 +277,22 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.changePassword",
   },
   {
+    // The one-phrase upgrade (myne-md/myne#911). Gated on `vaultMigration`, the
+    // capability the row's control renders behind (`VaultPanel`): the upgrade
+    // needs a desktop vault directory and the person plane beside it. It was
+    // gated on `personVaultCredential`, which the browser HAS, so a web search
+    // would have scrolled to a section that client never draws.
+    id: "vault.format",
+    agentWritability: WRITABILITY_NONE,
+    capability: "vaultMigration",
+    panelId: "vault",
+    topic: "vault",
+    testid: "settings.vault.format-cta",
+    titleKey: "settings.vault.format.heading",
+    descriptionKey: "settings.vault.format.intro",
+    keywordsKey: "settings.search.keywords.vaultFormat",
+  },
+  {
     id: "vault.danger-zone",
     agentWritability: WRITABILITY_NONE,
     panelId: "vault",
@@ -445,6 +461,28 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     topic: "devices",
     titleKey: "sync.panel.devices.label",
     keywordsKey: "settings.search.keywords.syncDevices",
+  },
+  {
+    // Publishing (myne-md/myne#911): the explicit act that makes a device-local
+    // vault reachable from the person's other devices.
+    //
+    // Gated on `localOnlyVault`, which is the fact the commands answer for: a
+    // vault can be device-only WHERE a vault may live with no server behind it.
+    // The web client has no such state (`decisions.md` 2026-07-26 makes sync
+    // required there) and both `sync_published_state` and `sync_publish_vault`
+    // are `Class::Unsupported` in its dispatcher, so `publishState` stays null
+    // and the row never renders. `personIdentity` was the gate before, and the
+    // browser has it since task 13: search offered a row that client cannot
+    // draw.
+    id: "sync.publish",
+    agentWritability: WRITABILITY_NONE,
+    capability: "localOnlyVault",
+    panelId: "sync",
+    topic: "devices",
+    testid: "sync.panel.publish",
+    titleKey: "sync.panel.publish.label",
+    descriptionKey: "sync.panel.publish.deviceOnlyHelper",
+    keywordsKey: "settings.search.keywords.publishVault",
   },
   {
     id: "sync.members",

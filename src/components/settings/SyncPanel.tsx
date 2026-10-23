@@ -15,6 +15,7 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
+import { publishErrorKind, publishVault, readPublishState, type PublishState } from "../../lib/sync-publish";
 import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
@@ -215,6 +216,32 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   };
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
+  // Publish state (myne-md/myne#911 task 8). Two facts, and they are different
+  // ones: `publishState` is the DURABLE answer read from disk on mount (so a
+  // published vault says so after a restart), and `publishRun` is this session's
+  // own click (busy / error / the answer the user just got).
+  const [publishState, setPublishState] = useState<PublishState | null>(null);
+  const [publishRun, setPublishRun] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [publishError, setPublishError] = useState<string | null>(null);
+  // Whether the vault is on a server, from either source: the record read on
+  // mount, or the click that just succeeded.
+  const published = publishRun === "done" || publishState?.published === true;
+  // The legacy "add this device" form is the VAULT ACCOUNT flow (account number +
+  // password), and a person-born vault has no such account: its credential is the
+  // identity, so publishing is what puts it on a server. Offering the form there
+  // would ask for a number that does not exist (myne-md/myne#911 task 8).
+  const showEnrollForm = showEnroll && publishState?.person_born !== true;
+  // The durable read, re-run when the identity becomes ready: that is exactly
+  // when a device-only person vault starts being publishable, and the row's gate
+  // keys off this answer.
+  const probePublishState = useCallback(() => {
+    void readPublishState()
+      .then((s) => setPublishState(s))
+      .catch(() => setPublishState(null));
+  }, []);
+  useEffect(() => {
+    probePublishState();
+  }, [probePublishState, identityReady]);
   const betaTerms = useBetaTermsGate();
   // The terms dialog, opened from the gate below. Local, and reported up so
   // the Settings shell stops competing for Esc while it is open. The cleanup
@@ -485,13 +512,20 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           accent rule unconditionally, so an ungated section would show a title
           above nothing on a v0.2 vault and on web. */}
       <SettingsSection title={t("sync.panel.sections.account")}>
-      {/* Identity block (myne-md/myne#768). Shown whenever sharing is available:
-          with no identity on this device it offers to add one; with an identity
-          it shows THAT identity (its public code) and, while the private identity
-          is locked for the session (decisions/protocol/0612), the unlock action.
-          Before, the block vanished once an identity existed, so a locked
-          identity had no surface here at all (myne-md/myne#792 follow-up). */}
-      {hasCapability("memberSharing") && identityLoaded && (
+      {/* Identity block (myne-md/myne#768). Shown wherever the IDENTITY plane
+          exists: with no identity on this device it offers to add one; with an
+          identity it shows THAT identity (its public code) and, while the private
+          identity is locked for the session (decisions/protocol/0612), the unlock
+          action. Before, the block vanished once an identity existed, so a locked
+          identity had no surface here at all (myne-md/myne#792 follow-up).
+
+          **Gated on `personIdentity`, not `memberSharing`** (myne-md/myne#911
+          task 13). One flag used to cover both planes, so a client that shipped
+          the identity could not have it without also shipping the member surface.
+          Web is now exactly the case that flag could not express: the identity
+          plane dispatches there, and the roster, the invites, member names and
+          the device-binding map still do not. */}
+      {hasCapability("personIdentity") && identityLoaded && (
         // A `SettingRow` (myne-md/myne#885 visual pass): the actions sit in the
         // control slot on the right, side by side, and the phrase entry the
         // unlock needs is a dialog rather than 24 cells expanded under the row.
@@ -590,7 +624,10 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
         <SyncStatusIndicator
           onUnlockIdentity={
-            hasCapability("memberSharing") ? () => setIdentityUnlockOpen(true) : undefined
+            // Same plane as the identity block above, so the same gate: the
+            // unlock action opens the identity's own prompt, which needs no
+            // member surface (myne-md/myne#911 task 13).
+            hasCapability("personIdentity") ? () => setIdentityUnlockOpen(true) : undefined
           }
         />
         <BuildingIndexState building={buildingIndex} />
@@ -684,6 +721,66 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           one, the roster, the member each device is claimed by) against the
           people the vault is shared with. */}
       <SettingsSection title={t("sync.panel.sections.devices")}>
+      {/* Publish this vault (myne-md/myne#911 task 8). A vault created under an
+          identity is device-only until the user says otherwise, and publishing is
+          that act: it binds the owner on the server's first write and records the
+          vault's namespace locally so sync can address it.
+
+          The gate is the READ, and the read is the capability. `publishState`
+          answers only where the command exists (desktop today; the browser and
+          mobile refuse it, myne-md/myne#911 tasks 12 and 13), so a client without
+          the read does not offer a button that would fail. `disabled` is the one
+          status that hides it too: publishing needs somewhere to publish TO, and
+          the Server section above is how that gets set. */}
+      {/* The identity plane, not the member plane. Publishing a person-born
+          vault is an identity act (its refusals are `PersonSessionRequired` and
+          `PersonNotRegistered`), and the split exists so a client with the
+          identity does not have to ship the member surface to offer it
+          (myne-md/myne#911 review). `publishState` still carries the real gate:
+          it is non-null only where the command exists. */}
+      {hasCapability("personIdentity") &&
+        publishState !== null &&
+        syncStatus?.state !== "disabled" && (
+        <SettingRow
+          anchorId="sync.publish"
+          label={t("sync.panel.publish.label")}
+          helper={
+            publishRun === "error"
+              ? t(`sync.panel.publish.error.${publishError ?? "Other"}`)
+              : published
+                ? t("sync.panel.publish.publishedHelper")
+                : t("sync.panel.publish.deviceOnlyHelper")
+          }
+          helperTestId="sync.panel.publish-state"
+          control={
+            <Button
+              variant={published ? "secondary" : "primary"}
+              disabled={publishRun === "busy"}
+              onClick={() => {
+                setPublishRun("busy");
+                setPublishError(null);
+                void publishVault()
+                  .then(() => {
+                    setPublishRun("done");
+                    // The durable record now says published; re-read rather than
+                    // infer, so the panel and the vault row cannot disagree.
+                    probePublishState();
+                  })
+                  .catch((e: unknown) => {
+                    setPublishError(publishErrorKind(e));
+                    setPublishRun("error");
+                  });
+              }}
+              data-testid="sync.panel.publish"
+            >
+              {published
+                ? t("sync.panel.publish.republishCta")
+                : t("sync.panel.publish.cta")}
+            </Button>
+          }
+        />
+      )}
+
       {/* The beta-terms gate (myne-ops#15). One of three doors that turn sync
           on, and the gate stands in front of each — a consent screen at one
           door is not a consent screen.
@@ -697,7 +794,7 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           place until they are accepted. The form is not merely covered — it is
           not rendered — so dismissing the dialog cannot reveal a route past the
           text it was asking about. */}
-      {showEnroll && !betaTerms.pending && (
+      {showEnrollForm && !betaTerms.pending && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.add-device" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>
             {t("sync.panel.addDevice.label")}
@@ -879,7 +976,15 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         onCreated={handleIdentityCreated}
       />
 
-      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
+      {/* The owner's device-join code. A vault born under an identity has no
+          account number, so its code names the PERSON and the payload comes from
+          this device's own identity (myne-md/myne#911 task 9); a legacy vault
+          keeps the account-number form. */}
+      <DeviceJoinQrDialog
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        variant={publishState?.person_born ? "person" : "account"}
+      />
 
       <Toast
         message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}

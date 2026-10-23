@@ -5247,18 +5247,11 @@
     "residueBanner": "Fișiere rămase de la o ștergere întreruptă ({{n}}). Curăță-le înainte de a crea un seif.",
     "cleanUpFiles": "Curăță fișierele rămase",
     "connect": "Conectează-te la contul meu",
-    "startIdentity": "Creează o identitate",
-    "startLocal": "Creează în schimb un seif local",
     "tagline": "Note markdown criptate. Fără e-mail la înregistrare.",
-    "identityTitle": "Creează o identitate",
-    "identityBody": "O singură identitate pentru toate seifurile tale, ca oamenii să te poată invita. Are nevoie de un server de sincronizare.",
-    "localTitle": "Creează un seif local",
-    "localBody": "Un seif criptat pe acest dispozitiv. Adaugă sincronizare sau o identitate mai târziu.",
     "restoreTitle": "Restaurează din copie de rezervă",
     "restoreBody": "Deschide un fișier .myne-backup pe care l-ai salvat mai devreme.",
     "joinTitle": "Adaugă acest dispozitiv la un cont",
     "joinBody": "Folosește un seif pe care îl ai deja pe alt dispozitiv.",
-    "createAction": "Creează",
     "restoreAction": "Restaurează",
     "joinAction": "Adaugă dispozitiv",
     "version": "Versiunea {{version}} · pre-alpha"
@@ -5492,7 +5485,6 @@
     "recovered": "Identitatea a fost recuperată.",
     "title": "Creează o identitate",
     "errorAlreadyHeld": "Acest dispozitiv deține deja o identitate. Recupereaz-o cu fraza ei de recuperare sau uită-o și creează una nouă.",
-    "errorNotConfigured": "Identitatea nu a putut fi configurată. Verifică dacă este configurat un server de sincronizare, apoi încearcă din nou.",
     "forgetCancel": "Păstreaz-o",
     "forgetConfirm": "Uită și creează una nouă",
     "forgetCta": "Uită această identitate și creează una nouă",
@@ -5507,8 +5499,6 @@
     "recoverHint": "Recupereaz-o pe acest dispozitiv cu fraza ei de recuperare de 24 de cuvinte.",
     "recoverAction": "Recuperează",
     "back": "Înapoi",
-    "changeServer": "Schimbă sau verifică serverul de sincronizare",
-    "errorTlsFailure": "Certificatul HTTPS al serverului nu a putut fi verificat. Verifică adresa serverului și certificatul acestuia.",
     "phraseTitle": "Salvează-ți fraza de identitate",
     "phraseContinue": "Continuă",
     "confirmTitle": "Confirmă-ți fraza"
@@ -5657,15 +5647,6 @@
       "hint": "Dacă încerci din nou, descărcarea o ia de la capăt.",
       "retry": "Încearcă din nou",
       "back": "Înapoi la deblocare"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Alege un server de sincronizare",
-      "intro": "Myne are nevoie de un server care să găzduiască notele tale criptate și să te contacteze pentru invitații. Notele tale rămân criptate pe acest dispozitiv înainte de a-l părăsi; serverul stochează doar text cifrat.",
-      "notConfigured": "Introdu o adresă de server mai sus și apasă Conectare pentru a continua.",
-      "back": "Înapoi",
-      "continue": "Continuă"
     }
   },
   "identityFlow": {

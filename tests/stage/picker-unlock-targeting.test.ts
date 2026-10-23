@@ -24,7 +24,14 @@ const VID_A = "00000000-0000-7000-8000-00000000000a";
 const VID_B = "00000000-0000-7000-8000-00000000000b";
 
 function existsVault(id: string): VaultSummary {
-  return { id, status: { kind: "Exists" }, label: null, last_unlock: null };
+  return {
+    id,
+    status: { kind: "Exists" },
+    label: null,
+    icon: null,
+    last_unlock: null,
+    published: false,
+  };
 }
 
 describe("picker.select-vault carries the chosen vaultId onto the unlock Stage", () => {

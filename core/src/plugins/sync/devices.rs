@@ -555,6 +555,7 @@ mod tests {
                 &PersonAuth {
                     person_id_hex: "aa".repeat(16),
                     device_id_hex: person_device.clone(),
+                    registered: false,
                     token_hex: "cc".repeat(32),
                     ..Default::default()
                 },
@@ -693,6 +694,36 @@ pub enum SyncDeviceError {
     /// owner-only affordances from members, so this is the backend contract
     /// for the future member client rather than a button a member sees.
     NotOwner,
+    /// The vault is person-born (`NTV7`) and no person session is installed, so
+    /// there is no credential that could publish it (myne-md/myne#911 task 8).
+    ///
+    /// Its own variant rather than `NotEnrolled`: this device IS the owner and
+    /// holds the identity, it is merely locked. "Enrol this device" would send
+    /// the user to a join flow they do not need; unlocking the identity is the
+    /// remedy, and it is one action.
+    PersonSessionRequired,
+    /// The vault is person-born and the identity exists on this device but has
+    /// never been REGISTERED with a server, so it holds no token to publish with
+    /// (myne-md/myne#911 task 8).
+    ///
+    /// Its own variant rather than [`Self::PersonSessionRequired`] because the
+    /// two refusals carry OPPOSITE remedies and the surface worded them the same
+    /// way: an unregistered identity is already unlocked, so "unlock your
+    /// identity first" sends the user to a control that will not change
+    /// anything, while the act that fixes it (registration, which asks for the
+    /// 24 words) lives on the identity home. Publishing cannot register on the
+    /// user's behalf: the SCRAM secret derives from the phrase, and the session
+    /// deliberately holds only the derived keypair.
+    PersonNotRegistered,
+    /// The scanned QR named one person and the phrase belongs to another
+    /// (myne-md/myne#911 task 9).
+    ///
+    /// Its own variant rather than `BadRequest` because the two halves of the
+    /// join disagree with each other rather than one of them being wrong in
+    /// isolation: the code came from a screen the user is looking at and the
+    /// phrase is what they wrote down, so the message has to say the CODE and the
+    /// PHRASE do not match, not that one of them is invalid.
+    PersonMismatch,
     /// A create was asked for on a device that already holds a sealed person
     /// identity under a different phrase (myne-md/myne#780).
     ///
@@ -815,6 +846,46 @@ pub enum AccountPlane {
     Person,
 }
 
+/// Which account plane the DEVICE-MANAGEMENT commands speak for, on a
+/// person-born vault (myne-md/myne#911 task 9).
+///
+/// [`account_plane_from_host`] answers "is this a member session", which is the
+/// whole question for a vault that has an account of its own. It is NOT the whole
+/// question for an `NTV7` vault: an OWNER of one is not a member and still has no
+/// vault account, so the vault plane would read a token that does not exist and
+/// the roster would answer `NotEnrolled` on the device a user is holding.
+///
+/// Kept as a separate resolver rather than folded into `account_plane_from_host`
+/// because the MEMBER QR command needs the narrower question: it must refuse an
+/// owner (a QR that led an owner down the member path would create a member
+/// device for a vault they own), and a person-born owner is an owner.
+pub async fn account_plane_io_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> AccountPlane {
+    if account_plane_from_host(state).await == AccountPlane::Person {
+        return AccountPlane::Person;
+    }
+    let Ok(root) =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        return AccountPlane::Vault;
+    };
+    let person_born = io
+        .read(&root.join("vault.meta"))
+        .await
+        .ok()
+        .is_some_and(|bytes| {
+            bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+        });
+    if person_born {
+        AccountPlane::Person
+    } else {
+        AccountPlane::Vault
+    }
+}
+
 /// The ACTIVE vault's account plane.
 ///
 /// Read off the unlock slot rather than off disk, because
@@ -877,7 +948,7 @@ pub(crate) async fn account_plane_transport_from_host(
     io: &dyn crate::vault_io::VaultIo,
     state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
 ) -> Result<(AccountPlaneCredential, Box<dyn SyncTransport>), SyncDeviceError> {
-    let credential = match account_plane_from_host(state).await {
+    let credential = match account_plane_io_from_host(host, io, state).await {
         AccountPlane::Person => person_plane_credential_from_host(host, io).await?,
         AccountPlane::Vault => vault_plane_credential_from_host(host, io, state).await?,
     };
@@ -997,6 +1068,20 @@ pub struct AccountStatusView {
     pub quota_bytes: u64,
     /// Effective device cap; `0` = unlimited.
     pub max_devices: u64,
+    /// True when `stored_bytes` is an ACCOUNT total over `vault_count` owned
+    /// vaults rather than one vault's own figure (myne-md/myne#911 task 11).
+    ///
+    /// The server reports one figure per person account, and a client that
+    /// ignored this bit would render that total as a per-vault figure against a
+    /// ceiling no single vault is judged against. `serde(default)` so an older
+    /// server's body (no `person` field) still parses, which is the same
+    /// tolerance `AccountStatusView` has always had for a body that predates a
+    /// field.
+    #[serde(default)]
+    pub person: bool,
+    /// How many owned vaults the account total covers; `0` for a vault session.
+    #[serde(default)]
+    pub vault_count: u64,
 }
 
 /// List the account's devices, marking which row is this device.

@@ -20,6 +20,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use super::proxy::{self, Route};
 use super::token_store::TokenStore as _;
+use crate::vault_io::VaultIo as _;
 
 /// SSE dead-connection read-timeout: two missed 30 s server heartbeats plus
 /// margin (the server's heartbeat cadence; change them together).
@@ -154,11 +155,43 @@ pub(crate) async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<Co
         .read(&crate::vault_io::StdVaultIo, &dir)
         .await
         .ok()
-        .flatten()?;
-    let mut token_hex = String::with_capacity(token.len() * 2);
-    for b in &token {
-        token_hex.push_str(&format!("{b:02x}"));
-    }
+        .flatten();
+    // A person-born (`NTV7`) vault has no per-vault token, exactly as the cycle
+    // says: its credential is the person token. Without this fallback `None` here
+    // reads as "not enrolled", no listener is spawned, and every cross-device
+    // change on a person-born vault waits for the 30 s poll while the web twin
+    // (which got the same fix) pokes on the same edit (myne-md/myne#911 review).
+    let token_hex = match token {
+        Some(token) => protocol::hex::encode_lower(&token),
+        // Gated the way `cycle.rs` gates the same decision: only a PERSON-wrapped
+        // vault has no per-vault token and a person token that names it. Without
+        // the gate, a legacy or member vault with no stored token (a partial
+        // materialisation, an interrupted enrolment) would open a stream under a
+        // credential that names a different account instead of reporting "not
+        // enrolled" (myne-md/myne#911 review).
+        None if matches!(
+            crate::vault_io::StdVaultIo
+                .read(&dir.join("vault.meta"))
+                .await
+                .ok()
+                .map(|b| protocol::vault_meta_generation(&b)),
+            Some(protocol::VaultMetaGeneration::Person)
+        ) =>
+        {
+            let path = super::person_auth::person_auth_path_for_read(
+                &crate::host::tauri_host::TauriHost::new(app.clone()),
+            )
+            .ok()?;
+            let auth = super::person_auth::read_person_auth(&crate::vault_io::StdVaultIo, &path)
+                .await
+                .ok()??;
+            if auth.token_hex.is_empty() {
+                return None;
+            }
+            auth.token_hex
+        }
+        None => return None,
+    };
     Some(ConnSnapshot { url, token_hex })
 }
 

@@ -17,6 +17,7 @@ const personSetup = vi.hoisted(() => vi.fn());
 const personStatus = vi.hoisted(() => vi.fn());
 const personListInvites = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
+const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/lib/app-window", () => ({ HAS_TAURI: true }));
@@ -25,6 +26,8 @@ vi.mock("../../src/lib/personAccount", () => ({
   personStatus,
   personListInvites,
   personLock,
+  // The gate shows the account number once it lands on home (myne-md/myne#911).
+  personAccountNumber,
 }));
 vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint }));
 // `useTranslation` echoes keys, so the header's back chevron is reachable by the
@@ -55,12 +58,16 @@ beforeEach(() => {
     identity_code: "code",
     approved: true,
   });
+  personAccountNumber.mockReset().mockResolvedValue("MY-ABCD-EFGH-JKMN-PQRS-TUVW");
   personStatus.mockReset().mockResolvedValue({
     enrolled: false,
     identity_unlocked: false,
     person_id_hex: null,
     identity_code: null,
     sealed_keypair_present: false,
+    // No identity at all: the flow lands on the gate, which is where this spec
+    // starts (myne-md/myne#911 task 12).
+    state: null,
   });
   personListInvites.mockReset().mockResolvedValue([]);
   personLock.mockReset().mockResolvedValue(undefined);
@@ -72,11 +79,10 @@ afterEach(() => cleanup());
 /** Walk gate -> server -> create, and land on the phrase step. */
 async function reachPhrase(reveal: boolean): Promise<void> {
   render(<IdentityFlow onCancel={() => {}} />);
+  // The gate's create door goes straight to the create step: creating an
+  // identity is network-free, so the server step is no longer in this chain
+  // (myne-md/myne#911 task 12).
   fireEvent.click(await screen.findByTestId("identity-flow.start"));
-  fireEvent.change(await screen.findByTestId("identity-flow.server-input"), {
-    target: { value: "https://sync.example" },
-  });
-  fireEvent.click(screen.getByTestId("identity-flow.server-connect"));
   fireEvent.click(await screen.findByTestId("identity-flow.create"));
   await screen.findByTestId("identity-flow.phrase-reveal");
   if (reveal) fireEvent.click(screen.getByTestId("identity-flow.phrase-reveal"));

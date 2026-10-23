@@ -58,6 +58,11 @@ myne-core = { path = "../../core", default-features = false }
 # re-export. Already in the graph via `myne-core`.
 protocol = { path = "../../protocol" }
 serde = { version = "1", features = ["derive"] }
+# The identity-phrase command wraps the phrase before it is read, so the one copy
+# the page handed the Worker is zeroized on drop like every other copy
+# (`src-tauri/AGENTS.md`'s Zeroizing pattern; myne-md/myne#911 review). Already in
+# the workspace lock through `myne-core`, so this adds no crate to the tree.
+zeroize = { version = "1.8", features = ["alloc"] }
 # Implementing `myne_core::vault_io::VaultIo` (the OPFS arm, task 17) requires
 # the same macro the trait is declared with — an `#[async_trait]` trait can only
 # be implemented by an `#[async_trait]` impl, because the macro is what rewrites

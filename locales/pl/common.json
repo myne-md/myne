@@ -5388,18 +5388,11 @@
     "residueBanner": "Pozostałe pliki z przerwanego usuwania ({{n}}). Wyczyść je przed utworzeniem sejfu.",
     "cleanUpFiles": "Wyczyść pozostałe pliki",
     "connect": "Połącz z moim kontem",
-    "startIdentity": "Utwórz tożsamość",
-    "startLocal": "Utwórz zamiast tego lokalny skarbiec",
     "tagline": "Zaszyfrowane notatki w Markdownie. Bez e-maila przy rejestracji.",
-    "identityTitle": "Utwórz tożsamość",
-    "identityBody": "Jedna tożsamość do wszystkich Twoich skarbców, aby inni mogli Cię zapraszać. Wymaga serwera synchronizacji.",
-    "localTitle": "Utwórz lokalny skarbiec",
-    "localBody": "Zaszyfrowany skarbiec na tym urządzeniu. Synchronizację lub tożsamość dodasz później.",
     "restoreTitle": "Przywróć z kopii zapasowej",
     "restoreBody": "Otwórz plik .myne-backup zapisany wcześniej.",
     "joinTitle": "Dodaj to urządzenie do konta",
     "joinBody": "Użyj skarbca, który masz już na innym urządzeniu.",
-    "createAction": "Utwórz",
     "restoreAction": "Przywróć",
     "joinAction": "Dodaj urządzenie",
     "version": "Wersja {{version}} · pre-alfa"
@@ -5640,7 +5633,6 @@
     "recovered": "Tożsomość odzyskana.",
     "title": "Utwórz tożsamość",
     "errorAlreadyHeld": "To urządzenie ma już tożsamość. Odzyskaj ją jej frazą odzyskiwania albo zapomnij ją i utwórz nową.",
-    "errorNotConfigured": "Nie udało się skonfigurować tożsamości. Sprawdź, czy skonfigurowano serwer synchronizacji, i spróbuj ponownie.",
     "forgetCancel": "Zachowaj ją",
     "forgetConfirm": "Zapomnij i utwórz nową",
     "forgetCta": "Zapomnij tę tożsamość i utwórz nową",
@@ -5655,8 +5647,6 @@
     "recoverHint": "Odzyskaj ją na tym urządzeniu jej 24-słowną frazą odzyskiwania.",
     "recoverAction": "Odzyskaj",
     "back": "Wstecz",
-    "changeServer": "Zmień lub zweryfikuj serwer synchronizacji",
-    "errorTlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera i jego certyfikat.",
     "phraseTitle": "Zapisz swoją frazę tożsamości",
     "phraseContinue": "Kontynuuj",
     "confirmTitle": "Potwierdź swoją frazę"
@@ -5805,15 +5795,6 @@
       "hint": "Ponowna próba rozpoczyna pobieranie od nowa.",
       "retry": "Spróbuj ponownie",
       "back": "Powrót do odblokowania"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Wybierz serwer synchronizacji",
-      "intro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
-      "notConfigured": "Wprowadź powyżej adres serwera i naciśnij Połącz, aby kontynuować.",
-      "back": "Wstecz",
-      "continue": "Kontynuuj"
     }
   },
   "identityFlow": {

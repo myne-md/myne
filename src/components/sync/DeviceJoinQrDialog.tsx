@@ -27,15 +27,30 @@ export function DeviceJoinQrDialog({
 }) {
   const { t } = useTranslation();
   const isMember = variant === "member";
+  const isPerson = variant === "person";
+  const titleKey = isMember
+    ? "sync.memberJoinQr.title"
+    : isPerson
+      ? "sync.personJoinQr.title"
+      : "sync.deviceJoinQr.title";
+  const testId = isMember
+    ? "sync.member-join-qr.dialog"
+    : isPerson
+      ? "sync.person-join-qr.dialog"
+      : "sync.device-join-qr.dialog";
   return (
     <ModalShell
       open={open}
-      title={t(isMember ? "sync.memberJoinQr.title" : "sync.deviceJoinQr.title")}
+      title={t(titleKey)}
       onClose={onClose}
-      labelId={isMember ? "member-join-qr-title" : "device-join-qr-title"}
-      testId={
-        isMember ? "sync.member-join-qr.dialog" : "sync.device-join-qr.dialog"
+      labelId={
+        isMember
+          ? "member-join-qr-title"
+          : isPerson
+            ? "person-join-qr-title"
+            : "device-join-qr-title"
       }
+      testId={testId}
     >
       <div style={BODY_STYLE}>
         <DeviceJoinQr showTitle={false} variant={variant} />

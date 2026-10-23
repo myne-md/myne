@@ -249,7 +249,26 @@ const PANELS: ReadonlyArray<{
       // `not_enrolled` is what renders the enrol form, which is one of this
       // panel's registry entries; the gate withholds it from every other state
       // (`SyncPanel.enrol-gate.test.tsx` owns that behaviour).
-      invokeMock.mockImplementation(syncPanelCommandRouter({ syncState: "not_enrolled" }));
+      //
+      // `publishState` is supplied too, and it is what makes the publish row
+      // render: that row exists only where the read answers (`publishState !==
+      // null`), so the harness's default `null` would report the registry's
+      // `sync.publish` entry as having no home. A device-only state is the
+      // ordinary one for a vault that has not been published.
+      invokeMock.mockImplementation(
+        syncPanelCommandRouter({
+          syncState: "not_enrolled",
+          // `person_born: false` on purpose: a person-born vault hides the
+          // account-number enrol form (its join is the identity code), and this
+          // walk needs that form rendered to find `sync.add-device`.
+          publishState: {
+            published: false,
+            namespace_hex: null,
+            published_at_ms: null,
+            person_born: false,
+          },
+        }),
+      );
       renderSyncPanel();
     },
   },

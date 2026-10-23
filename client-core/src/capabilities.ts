@@ -35,6 +35,58 @@ export type Capability =
   | "diagnosticLog"
   /** Legacy single-vault → multi-vault migration. */
   | "vaultMigration"
+  /**
+   * The owner's identity phrase as a credential for opening a vault
+   * (myne-md/myne#911 task 10).
+   *
+   * The person-wrapped (`NTV7`) generation ships two credentials: the vault
+   * password, unchanged, and the identity phrase, which replaces the per-vault
+   * recovery phrase the explicit upgrade retires. This flag is what decides
+   * whether the unlock screen's escape hatch can offer that second credential.
+   *
+   * **Present on all three clients since task 13**, which is what turned the web
+   * person plane on: the commands dispatch there now, so the arm has something to
+   * call. It was absent on web for one task, and the reason is worth keeping
+   * rather than deleting: the arm is only offered where the command answers.
+   */
+  | "personVaultCredential"
+  /**
+   * The person identity plane: creating an identity, registering it, unlocking
+   * it with the phrase, and joining an account from a scanned code
+   * (myne-md/myne#911 tasks 9 and 13).
+   *
+   * Split from `memberSharing` by task 13, and the split is the point even though
+   * NO client yet differs on it: both used to be one flag, which meant a client
+   * that shipped the identity could not have it without also shipping the member
+   * surface. They are different planes, the identity is the user's own keypair
+   * and token, while the member surface is invites, the roster, member names and
+   * the device-binding map, all of which need a group key and a SIGNED roster,
+   * and the split is what lets a client ship one without the other.
+   *
+   * **Present on all three clients since task 13**, which is what turned the web
+   * person plane on: `sync::person_account` is ungated for wasm32 (its member
+   * surface stays gated per function), the identity commands dispatch, and the
+   * two person files live in the Worker's memory rather than in OPFS.
+   */
+  | "personIdentity"
+  /**
+   * Whether this client keeps the person identity AT REST (myne-md/myne#911 task
+   * 13).
+   *
+   * A native client writes a phrase-derived sealed keypair and the device token
+   * to its app-config directory, so a reload finds the identity where it left it.
+   * A browser holds NEITHER on disk: the two files live in the Worker's memory
+   * for the session, because an origin's storage is readable by any script on
+   * that origin and a phrase-derived keypair at rest there is an offline cracking
+   * target that no password change rotates (threat-model A15/TB11, A18). The cost
+   * is that a reload asks for the 24 words again, so the caveat beside the phrase
+   * says so.
+   *
+   * A capability rather than a platform check at the call site, for the reason
+   * the descriptor exists: the phrase screens are shared code, and "does this
+   * client keep it" is a product fact, not a runtime probe.
+   */
+  | "personCredentialPersisted"
   /** Encrypted backup export and restore. */
   | "backup"
   /** Native Save-As to a user-chosen path. */
@@ -398,6 +450,9 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   screenCaptureProtection: true,
   diagnosticLog: true,
   vaultMigration: true,
+  personVaultCredential: true,
+  personIdentity: true,
+  personCredentialPersisted: true,
   backup: true,
   nativeSaveAs: true,
   vaultCreation: true,

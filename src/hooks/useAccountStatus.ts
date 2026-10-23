@@ -34,6 +34,14 @@ export interface AccountStatus {
   max_devices: number;
   /** Operator freeze: push + enroll blocked, pull never blocked. */
   frozen: boolean;
+  /**
+   * `stored_bytes` is an ACCOUNT total over `vault_count` owned vaults rather
+   * than one vault's own figure (myne-md/myne#911 task 11). Absent on a vault
+   * session, and absent on a server that predates the field.
+   */
+  person?: boolean;
+  /** How many owned vaults the account total covers; `0`/absent for a vault. */
+  vault_count?: number;
 }
 
 export interface AccountStatusHook {

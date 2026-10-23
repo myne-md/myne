@@ -5106,18 +5106,11 @@
     "residueBanner": "Berkas sisa dari penghapusan yang terputus ({{n}}). Bersihkan sebelum membuat brankas.",
     "cleanUpFiles": "Bersihkan berkas sisa",
     "connect": "Hubungkan ke akun saya",
-    "startIdentity": "Buat identitas",
-    "startLocal": "Buat brankas lokal saja",
     "tagline": "Catatan markdown terenkripsi. Tanpa email saat mendaftar.",
-    "identityTitle": "Buat identitas",
-    "identityBody": "Satu identitas untuk semua brankas Anda, agar orang dapat mengundang Anda. Memerlukan server sinkronisasi.",
-    "localTitle": "Buat brankas lokal",
-    "localBody": "Brankas terenkripsi di perangkat ini. Tambahkan sinkronisasi atau identitas nanti.",
     "restoreTitle": "Pulihkan dari cadangan",
     "restoreBody": "Buka berkas .myne-backup yang Anda simpan sebelumnya.",
     "joinTitle": "Tambahkan perangkat ini ke akun",
     "joinBody": "Gunakan brankas yang sudah Anda miliki di perangkat lain.",
-    "createAction": "Buat",
     "restoreAction": "Pulihkan",
     "joinAction": "Tambah perangkat",
     "version": "Versi {{version}} · pra-alfa"
@@ -5344,7 +5337,6 @@
     "recovered": "Identitas dipulihkan.",
     "title": "Buat identitas",
     "errorAlreadyHeld": "Perangkat ini sudah menyimpan sebuah identitas. Pulihkan dengan frasa pemulihannya, atau lupakan lalu buat yang baru.",
-    "errorNotConfigured": "Identitas tidak dapat disiapkan. Periksa apakah server sinkronisasi sudah dikonfigurasi, lalu coba lagi.",
     "forgetCancel": "Simpan",
     "forgetConfirm": "Lupakan dan buat baru",
     "forgetCta": "Lupakan identitas ini dan buat yang baru",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Pulihkan di perangkat ini dengan frasa pemulihan 24 katanya.",
     "recoverAction": "Pulihkan",
     "back": "Kembali",
-    "changeServer": "Ubah atau verifikasi server sinkronisasi",
-    "errorTlsFailure": "Tidak dapat memverifikasi sertifikat HTTPS server. Periksa alamat server dan sertifikatnya.",
     "phraseTitle": "Simpan frasa identitas Anda",
     "phraseContinue": "Lanjutkan",
     "confirmTitle": "Konfirmasi frasa Anda"
@@ -5509,15 +5499,6 @@
       "hint": "Mencoba lagi akan memulai ulang unduhannya.",
       "retry": "Coba lagi",
       "back": "Kembali ke buka kunci"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Pilih server sinkronisasi",
-      "intro": "Myne memerlukan server untuk menyimpan catatan terenkripsi Anda dan menjangkau Anda untuk undangan. Catatan Anda tetap terenkripsi di perangkat ini sebelum meninggalkannya; server hanya menyimpan ciphertext.",
-      "notConfigured": "Masukkan alamat server di atas dan tekan Sambungkan untuk melanjutkan.",
-      "back": "Kembali",
-      "continue": "Lanjutkan"
     }
   },
   "identityFlow": {

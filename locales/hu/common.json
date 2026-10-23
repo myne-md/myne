@@ -5106,18 +5106,11 @@
     "residueBanner": "Maradék fájlok egy megszakadt törlésből ({{n}}). Takarítsa el őket, mielőtt széfet hoz létre.",
     "cleanUpFiles": "Maradék fájlok eltakarítása",
     "connect": "Csatlakozás a fiókomhoz",
-    "startIdentity": "Identitás létrehozása",
-    "startLocal": "Inkább helyi széf létrehozása",
     "tagline": "Titkosított markdown jegyzetek. Regisztrációhoz nem kell e-mail.",
-    "identityTitle": "Identitás létrehozása",
-    "identityBody": "Egy identitás az összes széfedhez, hogy az emberek meghívhassanak. Szinkronszervert igényel.",
-    "localTitle": "Helyi széf létrehozása",
-    "localBody": "Egy titkosított széf ezen az eszközön. A szinkront vagy egy identitást később is hozzáadhatod.",
     "restoreTitle": "Visszaállítás biztonsági mentésből",
     "restoreBody": "Nyiss meg egy korábban mentett .myne-backup fájlt.",
     "joinTitle": "Az eszköz hozzáadása egy fiókhoz",
     "joinBody": "Használj egy széfet, amely már megvan egy másik eszközödön.",
-    "createAction": "Létrehozás",
     "restoreAction": "Visszaállítás",
     "joinAction": "Eszköz hozzáadása",
     "version": "{{version}} verzió · pre-alfa"
@@ -5344,7 +5337,6 @@
     "recovered": "Identitás visszaállítva.",
     "title": "Identitás létrehozása",
     "errorAlreadyHeld": "Ez az eszköz már tárol egy identitást. Állítsd helyre a helyreállító mondatával, vagy felejtsd el, és hozz létre egy újat.",
-    "errorNotConfigured": "Nem sikerült beállítani az identitást. Ellenőrizd, hogy be van állítva szinkronszerver, majd próbáld újra.",
     "forgetCancel": "Megtartom",
     "forgetConfirm": "Elfelejtem, és újat hozok létre",
     "forgetCta": "Az identitás elfelejtése és új létrehozása",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Állítsd helyre ezen az eszközön a 24 szavas helyreállító mondatával.",
     "recoverAction": "Helyreállítás",
     "back": "Vissza",
-    "changeServer": "Szinkronszerver módosítása vagy ellenőrzése",
-    "errorTlsFailure": "Nem sikerült ellenőrizni a szerver HTTPS-tanúsítványát. Ellenőrizd a szerver címét és a tanúsítványát.",
     "phraseTitle": "Mentsd el az identitásmondatodat",
     "phraseContinue": "Folytatás",
     "confirmTitle": "Mondat megerősítése"
@@ -5509,15 +5499,6 @@
       "hint": "Az újrapróbálkozás elölről kezdi a letöltést.",
       "retry": "Újrapróbálás",
       "back": "Vissza a feloldáshoz"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Válassz szinkronszervert",
-      "intro": "A Myne-nek kell egy szerver, amely tárolja a titkosított jegyzeteidet, és elér téged a meghívókhoz. A jegyzeteid titkosítva maradnak ezen az eszközön, mielőtt elhagyják; a szerver csak titkosított szöveget tárol.",
-      "notConfigured": "Adj meg fent egy szervercímet, és a folytatáshoz nyomd meg a Csatlakozás gombot.",
-      "back": "Vissza",
-      "continue": "Folytatás"
     }
   },
   "identityFlow": {

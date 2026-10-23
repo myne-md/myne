@@ -62,6 +62,7 @@ function listAnswering(ids: string[]): unknown {
     // Descending, so `orderByLastUnlock` puts ids[0] at the head, which is
     // exactly the answer the deleted function would have returned.
     last_unlock: 1_000 - i,
+    published: false,
   }));
 }
 

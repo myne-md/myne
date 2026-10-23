@@ -52,6 +52,14 @@ fn main() {
                     // carried the deleted function and could not call this
                     // command at all, because it was registered nowhere here.
                     "vault_active_id",
+                    // myne-md/myne#911: the identity phrase as a vault credential.
+                    // The sealed `NTV7` person wrap is opened by the person phrase,
+                    // and the probe decides whether an unlock screen offers that
+                    // door at all. Granted at
+                    // `permissions/vault-unlock/default.toml` and registered in the
+                    // plugin; this mirror was the missing third of the four steps.
+                    "unlock_with_person_phrase",
+                    "vault_is_person_wrapped",
                 ]),
             )
             .plugin(
@@ -423,6 +431,13 @@ fn main() {
                     "sync_set_endpoint",
                     "sync_status",
                     "sync_now",
+                    "sync_publish_vault",
+                    "sync_published_state",
+                    "sync_person_list_vaults",
+                    "sync_person_register",
+                    "sync_person_account_number",
+                    "sync_person_join_device",
+                    "sync_person_claim_device",
                     "sync_person_unlock",
                     "sync_person_setup",
                     "sync_person_status",

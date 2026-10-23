@@ -166,6 +166,20 @@ Also: the lane needs `web/wasm/pkg`, which is a derived artefact and is NOT in
 the repo. `pnpm web:build` fails with `Could not resolve
 '../../wasm/pkg/myne_web_wasm.js'` until `./scripts/build-wasm.sh` has run once.
 
+**And `pnpm web:build` does not rebuild it.** It compiles the TypeScript and
+bundles whatever `web/wasm/pkg` already holds, so a `cargo` change to
+`web/wasm/`, `core/` or `protocol/` is invisible to this lane until
+`./scripts/build-wasm.sh` runs. Measured cost, 2026-10-22: the lane spent a
+session reporting that the new multi-container vault walk did not work, and the
+walk was fine, the bundle carried a wasm binary built five days before the
+change. `scripts/check-web-wasm-freshness.mjs` now gates both runners on a
+content digest of the wasm's source trees (recorded by `build-wasm.sh` into
+`web/wasm/pkg/.source-digest`), so a stale binary stops the lane with the
+rebuild command rather than defining what the lane proves. It is a digest rather
+than an mtime because `tests/scripts/ignoredTests.test.ts` rewrites one `core/`
+file and restores it, which would make any fresh build read as stale after a
+unit run.
+
 Underneath them is `pnpm web:build` (the lane refuses to run without a built
 bundle) and `pnpm test:e2e:web`. Calling those two by hand works, with one
 caveat that costs an afternoon to rediscover: `MYNE_WEB_E2E_DRIVER_PORT` is an
@@ -215,12 +229,25 @@ settles any argument with this section):
 - **Fixtures** under `fixtures/`, all emitted by the shared Rust generators
   (`cargo run -p myne-core --features test-support --example …`):
   `double-buffer.json` (the six double-buffer crash cases),
-  `unlockable-vault.json`, and `chats-history.json` (an unlockable vault with
+  `unlockable-vault.json`, `chats-history.json` (an unlockable vault with
   `vault.prefs` AI-enabled plus one seeded `vault.chats` roster +
-  `chats/<id>` conversation, for the history-reload scenario below).
+  `chats/<id>` conversation, for the history-reload scenario below), and
+  **`person-wrapped-vault.json`** (an `NTV7` vault minted by
+  `emit-vault-fixture -- --person`, carrying the 24 words its identity is
+  derived from: the fixture's `phrase` field IS the credential
+  `person-unlock.e2e.ts` types. It derives the identity under the DEFAULT KDF
+  parameters on purpose, because that is what the unlock path derives them
+  under; a fixture minted with fast test parameters would produce a different
+  keypair from the same words and read as a broken unlock).
 - **Scenarios**: `smoke` (production headers over HTTP, then a browser boot to
   the first-run identity step), `capability-gating`, `device-class-refusal`,
   `isolation-and-viewport`, `no-third-party`, `opfs-seed`, `unlock-from-fixture`,
+  `person-unlock` (myne-md/myne#911 task 13: a person-wrapped vault offers the
+  identity-phrase door and the 24 words open it; `unlock-from-fixture` asserts
+  the opposite for a legacy container, so the probe is pinned in both
+  directions), `multi-vault` (two containers under one origin boot to the picker,
+  survive a reload and open from a row), `identity-first-entry` (the create door
+  opens the ceremony and the phrase step carries the session-only caveat),
   `pending-approval`, `plaintext-residue-web`, `a11y`, `quarantine-roundtrip`,
   `single-tab-lock` (#254: two tabs on one origin; the second is refused),
   `chat-history-reload` (myne-md/myne#675: a seeded conversation lists, opens,

@@ -90,6 +90,9 @@ import { Button } from "../components/primitives/Button";
 import { Icon } from "../components/primitives/Icon";
 import { CredentialField } from "../components/primitives/CredentialField";
 import { MemberVaultUnlockCard } from "../components/sync/MemberVaultUnlockCard";
+import { PersonPhraseUnlock } from "../components/PersonPhraseUnlock";
+import { vaultIsPersonWrapped } from "../lib/vault-format-upgrade";
+import * as capabilities from "../platform/capabilities";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
@@ -595,6 +598,45 @@ export function Unlock({
   // other locked boot surface (MYND-628) — see the hook for why both need it.
   useRevealAfterIdleLock();
 
+  // The person-wrapped generation's second credential (myne-md/myne#911 task 10).
+  // The explicit upgrade retires a vault's saved recovery phrase, so on an
+  // upgraded vault the "unlock with recovery phrase" link would point at a
+  // credential that no longer exists: this swaps the link for the identity-phrase
+  // sub-view. Probed rather than assumed, and gated on the capability, because a
+  // client without the person plane must not offer it (the `vault-unlock` plugin
+  // is `Pending` there, so the call would refuse).
+  const [identityPhraseMode, setIdentityPhraseMode] = useState(false);
+  const [personWrapped, setPersonWrapped] = useState(false);
+  // Whether the probe could not be answered. Rendering a failed call as "this
+  // vault's phrase is the vault phrase" hands a user whose vault was upgraded a
+  // credential that cannot open it (myne-md/myne#911 review): the two states are
+  // different, so they are different here.
+  const [personWrapProbeFailed, setPersonWrapProbeFailed] = useState(false);
+  useEffect(() => {
+    if (!capabilities.has("personVaultCredential")) return;
+    let alive = true;
+    vaultIsPersonWrapped(vaultId)
+      .then((wrapped) => {
+        if (alive) setPersonWrapped(wrapped);
+      })
+      .catch(() => {
+        if (alive) setPersonWrapProbeFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [vaultId]);
+
+  if (identityPhraseMode) {
+    return (
+      <PersonPhraseUnlock
+        vaultId={vaultId}
+        onUnlocked={onUnlocked}
+        onCancel={() => setIdentityPhraseMode(false)}
+      />
+    );
+  }
+
   // MYND-108-bis delete-vault sub-view. Mounts when the user clicks
   // the tertiary "Lost both password and recovery phrase? Delete vault
   // and start over" link below the recovery link. The IPC accepts via
@@ -947,14 +989,22 @@ export function Unlock({
               </button>
             )
           )}
+          {personWrapProbeFailed ? (
+            <p
+              data-testid="unlock.person-wrap-probe-failed"
+              style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}
+            >
+              {t("unlock.personWrapProbeFailed")}
+            </p>
+          ) : null}
           <button
             type="button"
-            onClick={onStartRecovery}
+            onClick={personWrapped ? () => setIdentityPhraseMode(true) : onStartRecovery}
             style={RECOVER_LINK_STYLE}
             className="myne-text-link"
             data-testid="unlock.recovery-link"
           >
-            {t("unlock.recoveryLink")}
+            {personWrapped ? t("unlock.identityPhraseLink") : t("unlock.recoveryLink")}
           </button>
         </div>
       )}

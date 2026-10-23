@@ -5106,18 +5106,11 @@
     "residueBanner": "Übrig gebliebene Dateien von einem unterbrochenen Löschvorgang ({{n}}). Bereinige sie, bevor du einen Tresor erstellst.",
     "cleanUpFiles": "Übrig gebliebene Dateien bereinigen",
     "connect": "Mit meinem Konto verbinden",
-    "startIdentity": "Eine Identität erstellen",
-    "startLocal": "Stattdessen einen lokalen Tresor erstellen",
     "tagline": "Verschlüsselte Markdown-Notizen. Keine E-Mail bei der Anmeldung.",
-    "identityTitle": "Eine Identität erstellen",
-    "identityBody": "Eine Identität für alle Ihre Tresore, damit Menschen Sie einladen können. Braucht einen Sync-Server.",
-    "localTitle": "Einen lokalen Tresor erstellen",
-    "localBody": "Ein verschlüsselter Tresor auf diesem Gerät. Sync oder eine Identität später hinzufügen.",
     "restoreTitle": "Aus Sicherung wiederherstellen",
     "restoreBody": "Öffnen Sie eine .myne-backup-Datei, die Sie früher gespeichert haben.",
     "joinTitle": "Dieses Gerät einem Konto hinzufügen",
     "joinBody": "Verwenden Sie einen Tresor, den Sie bereits auf einem anderen Gerät haben.",
-    "createAction": "Erstellen",
     "restoreAction": "Wiederherstellen",
     "joinAction": "Gerät hinzufügen",
     "version": "Version {{version}} · Pre-Alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Identität wiederhergestellt.",
     "title": "Eine Identität erstellen",
     "errorAlreadyHeld": "Dieses Gerät hält bereits eine Identität. Stellen Sie sie mit ihrer Wiederherstellungsphrase wieder her, oder vergessen Sie sie und erstellen Sie eine neue.",
-    "errorNotConfigured": "Die Identität konnte nicht eingerichtet werden. Prüfen Sie, ob ein Sync-Server konfiguriert ist, und versuchen Sie es dann erneut.",
     "forgetCancel": "Behalten",
     "forgetConfirm": "Vergessen und neu erstellen",
     "forgetCta": "Diese Identität vergessen und eine neue erstellen",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Stellen Sie sie auf diesem Gerät mit ihrer 24-Wort-Wiederherstellungsphrase wieder her.",
     "recoverAction": "Wiederherstellen",
     "back": "Zurück",
-    "changeServer": "Sync-Server ändern oder prüfen",
-    "errorTlsFailure": "Das HTTPS-Zertifikat des Servers konnte nicht verifiziert werden. Prüfen Sie die Serveradresse und ihr Zertifikat.",
     "phraseTitle": "Identitätsphrase speichern",
     "phraseContinue": "Weiter",
     "confirmTitle": "Bestätigen Sie Ihre Phrase"
@@ -5509,15 +5499,6 @@
       "hint": "Ein erneuter Versuch startet den Download von vorne.",
       "retry": "Erneut versuchen",
       "back": "Zurück zur Entsperrung"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Einen Sync-Server wählen",
-      "intro": "Myne braucht einen Server, um Ihre verschlüsselten Notizen zu halten und Sie für Einladungen zu erreichen. Ihre Notizen bleiben auf diesem Gerät verschlüsselt, bevor sie es verlassen; der Server speichert nur Geheimtext.",
-      "notConfigured": "Geben Sie oben eine Serveradresse ein und drücken Sie Verbinden, um fortzufahren.",
-      "back": "Zurück",
-      "continue": "Weiter"
     }
   },
   "identityFlow": {

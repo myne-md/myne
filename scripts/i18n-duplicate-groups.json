@@ -354,14 +354,6 @@
     "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
   },
   {
-    "value": "Couldn't reach that server. Check the address and try again.",
-    "keys": [
-      "identityFlow.serverUnreachable",
-      "sync.settings.connectError"
-    ],
-    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
-  },
-  {
     "value": "Double-check this number. It doesn't look right.",
     "keys": [
       "join.accountHint",

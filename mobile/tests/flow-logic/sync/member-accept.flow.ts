@@ -83,7 +83,10 @@ function secretDigest(value: string): number {
  *  the gate; the invite row is then the only control that opens an accept. */
 async function openIdentity(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create an identity" }).click();
+  // Welcome's ONE create door (myne-md/myne#911 task 12). The identity flow opens
+  // at the gate or straight at the home depending on `personStatus`, so this helper
+  // does not click a second time: the specs using it configure an enrolled device.
+  await page.getByTestId("welcome.create-cta").click();
   await expect(page.getByTestId("identity-flow.invite-row")).toBeVisible();
 }
 
@@ -153,6 +156,10 @@ const ENROLLED = {
   person_id_hex: "person",
   identity_code: OWNER_CODE,
   sealed_keypair_present: true,
+  // The lifecycle state routes the flow past the gate (myne-md/myne#911 task 12):
+  // `state` is what the identity flow reads, not `enrolled`, because a `reserved`
+  // identity is an identity too.
+  state: "enrolled",
 };
 
 const ONE_INVITE = [

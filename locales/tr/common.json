@@ -5106,18 +5106,11 @@
     "residueBanner": "Tamamlanmamış bir silmeden kalan artık dosyalar ({{n}}). Kasa oluşturmadan önce bunları temizleyin.",
     "cleanUpFiles": "Artık dosyaları temizle",
     "connect": "Hesabıma bağlan",
-    "startIdentity": "Bir kimlik oluştur",
-    "startLocal": "Bunun yerine yerel bir kasa oluştur",
     "tagline": "Şifreli markdown notlar. Kayıtta e-posta yok.",
-    "identityTitle": "Bir kimlik oluştur",
-    "identityBody": "Tüm kasalarınız için tek bir kimlik, böylece insanlar sizi davet edebilir. Bir eşitleme sunucusu gerektirir.",
-    "localTitle": "Yerel bir kasa oluştur",
-    "localBody": "Bu cihazda şifreli bir kasa. Eşitlemeyi ya da bir kimliği daha sonra ekleyin.",
     "restoreTitle": "Yedekten geri yükle",
     "restoreBody": "Daha önce kaydettiğiniz bir .myne-backup dosyasını açın.",
     "joinTitle": "Bu cihazı bir hesaba ekle",
     "joinBody": "Başka bir cihazda zaten sahip olduğunuz bir kasayı kullanın.",
-    "createAction": "Oluştur",
     "restoreAction": "Geri yükle",
     "joinAction": "Cihaz ekle",
     "version": "Sürüm {{version}} · pre-alpha"
@@ -5344,7 +5337,6 @@
     "recovered": "Kimlik kurtarıldı.",
     "title": "Bir kimlik oluşturun",
     "errorAlreadyHeld": "Bu cihaz zaten bir kimlik barındırıyor. Onu kurtarma ifadesiyle kurtarın ya da unutup yeni bir tane oluşturun.",
-    "errorNotConfigured": "Kimlik kurulamadı. Bir eşitleme sunucusunun yapılandırıldığını kontrol edip tekrar deneyin.",
     "forgetCancel": "Koru",
     "forgetConfirm": "Unut ve yeni oluştur",
     "forgetCta": "Bu kimliği unut ve yeni bir tane oluştur",
@@ -5359,8 +5351,6 @@
     "recoverHint": "Bu cihazda onu 24 sözcüklük kurtarma ifadesiyle kurtarın.",
     "recoverAction": "Kurtar",
     "back": "Geri",
-    "changeServer": "Eşitleme sunucusunu değiştir ya da doğrula",
-    "errorTlsFailure": "Sunucunun HTTPS sertifikası doğrulanamadı. Sunucu adresini ve sertifikasını kontrol edin.",
     "phraseTitle": "Kimlik ifadenizi kaydedin",
     "phraseContinue": "Devam et",
     "confirmTitle": "İfadenizi onaylayın"
@@ -5509,15 +5499,6 @@
       "hint": "Yeniden denemek indirmeyi baştan başlatır.",
       "retry": "Yeniden dene",
       "back": "Kilit açmaya dön"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Bir eşitleme sunucusu seçin",
-      "intro": "Myne'in şifreli notlarınızı tutması ve davetler için size ulaşması adına bir sunucuya ihtiyacı var. Notlarınız bu cihazdan çıkmadan önce bu cihazda şifrelenmiş kalır; sunucu yalnızca şifreli metni saklar.",
-      "notConfigured": "Devam etmek için yukarıya bir sunucu adresi girip Bağlan'a basın.",
-      "back": "Geri",
-      "continue": "Devam et"
     }
   },
   "identityFlow": {

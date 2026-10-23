@@ -171,6 +171,25 @@ pub struct SyncState {
     /// shared by hand), so it is stored in the clear like the account hash.
     #[serde(default)]
     pub owner_identity_code: Option<String>,
+    /// The vault's server NAMESPACE when it is not the credential's own account
+    /// (myne-md/myne#911 task 8): the random binding an `NTV7` vault writes at
+    /// §9.3 offset 6, lowercase hex.
+    ///
+    /// Present only after an explicit publish. Its presence is what tells the
+    /// cycle to address this vault with `?account=<hex>` and authenticate with
+    /// the PERSON token, because a person-born vault has no vault SCRAM account
+    /// at all. Absent on every pre-existing vault, where the credential names the
+    /// namespace and no selector is sent.
+    #[serde(default)]
+    pub namespace_hex: Option<String>,
+    /// Epoch-ms of the publish that recorded [`Self::namespace_hex`], or `None`
+    /// while the vault is device-only (myne-md/myne#911 task 8).
+    ///
+    /// Coarse for the same reason `last_success_at_ms` is: it is a device-local
+    /// fact about when a user acted, and a per-second stamp would make this file
+    /// a sharper activity log than the value it carries is worth.
+    #[serde(default)]
+    pub published_at_ms: Option<u64>,
     /// Whether the last completed cycle PROVED this device holds every content
     /// blob the server's head commits to (phase3-web-client task 89).
     ///
@@ -899,6 +918,8 @@ mod tests {
             owner_member_token_hex: Some("ff".repeat(32)),
             owner_member_person_id_hex: Some("12".repeat(16)),
             owner_identity_code: Some("MYNE-PERSON-1:aa".to_string()),
+            namespace_hex: None,
+            published_at_ms: None,
         };
         let defaulted = SyncState::default();
 

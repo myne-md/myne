@@ -43,6 +43,7 @@ const MANY: VaultSummary[] = Array.from({ length: 24 }, (_, i) => ({
   label: `Vault ${i}`,
   icon: null,
   last_unlock: 1000 + i,
+  published: false,
   status: { kind: "Exists" } as const,
 }));
 

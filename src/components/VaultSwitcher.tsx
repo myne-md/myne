@@ -674,11 +674,18 @@ export function VaultSwitcher({
               : isHover
                 ? "hover"
                 : "rest";
+            // One caption line, and the publish state rides ON it rather than
+            // under it: the row is a fixed 48px, so a second line would clip.
+            // Only the exceptional answer is written down, because "published"
+            // is the ordinary state and a menu row has no space for badges
+            // (myne-md/myne#911 task 8).
+            const lastSeen =
+              v.last_unlock !== null ? formatRelativeTime(new Date(v.last_unlock)) : "";
             const caption = isSaving
               ? t("vaultSwitcher.switching")
-              : v.last_unlock !== null
-                ? formatRelativeTime(new Date(v.last_unlock))
-                : "";
+              : [lastSeen, v.published ? "" : t("vaultSwitcher.deviceOnly")]
+                  .filter((part) => part !== "")
+                  .join(" · ");
             return (
               <button
                 key={v.id}
@@ -688,6 +695,7 @@ export function VaultSwitcher({
                 data-testid="switcher.vault-row"
                 data-vault-id={v.id}
                 data-active={isActive}
+                data-publish={v.published ? "published" : "device-only"}
                 onClick={() => {
                   if (isActive) {
                     // Selecting the active vault is a no-op; just dismiss.

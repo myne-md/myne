@@ -39,6 +39,18 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   "screenCaptureProtection",
   // Legacy single-vault layout never existed in OPFS.
   "vaultMigration",
+  // The person identity is SESSION-only on this client (myne-md/myne#911 task
+  // 13): the two person files (the sealed keypair and the device token) live in
+  // the Worker's memory, so a reload asks for the 24 words again. An origin's
+  // storage is readable by any script on that origin, and a phrase-derived
+  // keypair at rest there is an offline cracking target that no password change
+  // rotates. What this absence changes is COPY, not a control: the phrase step
+  // says the words are asked for again on reload.
+  //
+  // `personVaultCredential` and `personIdentity` are NOT here any more: the web
+  // person plane dispatches, so the unlock screen's identity-phrase arm and the
+  // identity row are offers the commands answer.
+  "personCredentialPersisted",
   // Owner decision, 2026-07-27 (task 72). Repair scans a vault DIRECTORY for
   // orphan artefacts — a thing that exists because a desktop directory is
   // writable by other software. An OPFS container has exactly one writer, and
@@ -219,14 +231,15 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // sentence keeps and because the browser is where a user cannot open a
   // devtools panel and read a failure back.
   "diagnosticLog",
-  // Live-collab, `SYNC-31`. Multi-user co-editing needs a PERSON identity: the
-  // B2B group substrate, the roster and the member removal rekey, all held in a
+  // Live-collab, `SYNC-31`. Multi-user co-editing needs the B2B member plane:
+  // the group substrate, the roster and the member removal rekey, held in a
   // device-local sealed file outside browser storage whose panel prompt is
-  // substituted out of the bundle. A browser origin cannot hold a person
-  // identity, so this is absent for the same reasons `memberSharing` is. Split
-  // from `liveCollabPeerPresence`, which stays PRESENT here, so the client is
-  // not second-class for its own devices while never implying multi-user works
-  // in a page. Omitted, not greyed.
+  // refused in the served bundle. A browser can hold a person identity for the
+  // session (myne-md/myne#911 task 13, which made `personIdentity` present
+  // here), but it cannot hold the member half, so this is absent for the same
+  // reasons `memberSharing` is. Split from `liveCollabPeerPresence`, which stays
+  // PRESENT here, so the client is not second-class for its own devices while
+  // never implying multi-user works in a page. Omitted, not greyed.
   //
   // No command surface of its own: the transport exposes wasm exports, not an
   // IPC command, and the person/membership commands it would depend on are

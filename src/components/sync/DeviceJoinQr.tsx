@@ -26,8 +26,10 @@ import { formatAccountNumberInput } from "../../lib/account-number-format";
 import {
   generateDeviceJoinQr,
   generateMemberJoinQr,
+  generatePersonJoinQr,
   deviceJoinQrErrorMessage,
   memberJoinQrErrorMessage,
+  personJoinQrErrorMessage,
 } from "../../lib/deviceJoinQr";
 import { svgToObjectUrl } from "../../lib/noteImageCard";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
@@ -141,8 +143,12 @@ const STEPS: CSSProperties = {
  *
  * `member` — a member's own second device: no input, because the payload is built
  * from the active session, and the scanning device proves the 24-word phrase.
+ *
+ * `person`, a device added to the identity itself (myne-md/myne#911 task 9): the
+ * payload again comes from the session, and the scanning device types the identity
+ * phrase and then waits for THIS device to approve it.
  */
-export type DeviceJoinQrVariant = "account" | "member";
+export type DeviceJoinQrVariant = "account" | "member" | "person";
 
 export function DeviceJoinQr({
   showTitle = true,
@@ -153,6 +159,10 @@ export function DeviceJoinQr({
 } = {}) {
   const { t } = useTranslation();
   const isMember = variant === "member";
+  const isPerson = variant === "person";
+  // Both non-account variants mint from the ACTIVE session, so neither takes an
+  // input: that IS the difference between them and `account`.
+  const noInput = isMember || isPerson;
   const [account, setAccount] = useState("");
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +185,9 @@ export function DeviceJoinQr({
         // active session backend-side, so this call cannot name another vault.
         const res = isMember
           ? await generateMemberJoinQr()
-          : await generateDeviceJoinQr(accountNumber);
+          : isPerson
+            ? await generatePersonJoinQr()
+            : await generateDeviceJoinQr(accountNumber);
         setSvg(res.svg);
         clearTimer();
         const delay =
@@ -186,13 +198,17 @@ export function DeviceJoinQr({
         setSvg(null);
         clearTimer();
         setError(
-          isMember ? memberJoinQrErrorMessage(e) : deviceJoinQrErrorMessage(e),
+          isMember
+            ? memberJoinQrErrorMessage(e)
+            : isPerson
+              ? personJoinQrErrorMessage(e)
+              : deviceJoinQrErrorMessage(e),
         );
       } finally {
         setBusy(false);
       }
     },
-    [isMember],
+    [isMember, isPerson],
   );
 
   // Cancel any pending refresh on unmount.
@@ -206,13 +222,13 @@ export function DeviceJoinQr({
   // identity flow's the fromQr effect uses for the same reason.
   const mintedOnce = useRef(false);
   useEffect(() => {
-    if (!isMember || mintedOnce.current) return;
+    if (!noInput || mintedOnce.current) return;
     mintedOnce.current = true;
     void generate("");
     // `generate` carries the variant, and the mint is deliberately keyed on the
     // mount alone: the refresh timer owns every later mint.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMember]);
+  }, [noInput]);
 
   const onInput = (raw: string) => {
     setAccount(formatAccountNumberInput(raw));
@@ -241,27 +257,58 @@ export function DeviceJoinQr({
   return (
     <div
       style={ROOT}
-      data-testid={isMember ? "sync.member-join-qr" : "sync.device-join-qr"}
+      data-testid={
+        isMember
+          ? "sync.member-join-qr"
+          : isPerson
+            ? "sync.person-join-qr"
+            : "sync.device-join-qr"
+      }
     >
       {/* The dialog supplies the title (myne-md/myne#831); the inline block
           keeps its own heading. */}
       {showTitle ? (
         <div style={LABEL}>
-          {t(isMember ? "sync.memberJoinQr.title" : "sync.deviceJoinQr.title")}
+          {t(
+            isMember
+              ? "sync.memberJoinQr.title"
+              : isPerson
+                ? "sync.personJoinQr.title"
+                : "sync.deviceJoinQr.title",
+          )}
         </div>
       ) : null}
       <div style={HINT}>
-        {t(isMember ? "sync.memberJoinQr.hint" : "sync.deviceJoinQr.hint")}
+        {t(
+          isMember
+            ? "sync.memberJoinQr.hint"
+            : isPerson
+              ? "sync.personJoinQr.hint"
+              : "sync.deviceJoinQr.hint",
+        )}
       </div>
-      {isMember ? (
-        // The path the code shortcuts, spelled out: a member's second device
-        // cannot be added by typing an account number and a vault password,
-        // because a member holds neither.
-        <ol style={STEPS} data-testid="sync.member-join-qr.steps">
-          <li>{t("sync.memberJoinQr.stepIdentity")}</li>
-          <li>{t("sync.memberJoinQr.stepPhrase")}</li>
-          <li>{t("sync.memberJoinQr.stepJoin")}</li>
-        </ol>
+      {noInput ? (
+        // The path the code shortcuts, spelled out. Two DIFFERENT paths share
+        // this arm, so they cannot share one list: a member's second device
+        // holds no account number and joins through an invitation, while a
+        // person's device holds no identity yet, types the identity phrase, and
+        // waits for this device to approve it. Rendering the member copy under
+        // the person testid told a user to look for invitations that do not
+        // exist for an identity join (myne-md/myne#911 review).
+        isPerson ? (
+          <ol style={STEPS} data-testid="sync.person-join-qr.steps">
+            <li>{t("sync.personJoinQr.stepCode")}</li>
+            <li>{t("sync.personJoinQr.stepPhrase")}</li>
+            <li>{t("sync.personJoinQr.stepApprove")}</li>
+            <li>{t("sync.personJoinQr.stepVaults")}</li>
+          </ol>
+        ) : (
+          <ol style={STEPS} data-testid="sync.member-join-qr.steps">
+            <li>{t("sync.memberJoinQr.stepIdentity")}</li>
+            <li>{t("sync.memberJoinQr.stepPhrase")}</li>
+            <li>{t("sync.memberJoinQr.stepJoin")}</li>
+          </ol>
+        )
       ) : (
         <>
           <label style={LABEL} htmlFor="device-join-qr-account">
@@ -303,7 +350,11 @@ export function DeviceJoinQr({
         <div
           style={ERROR}
           data-testid={
-            isMember ? "sync.member-join-qr.error" : "sync.device-join-qr.error"
+            isMember
+              ? "sync.member-join-qr.error"
+              : isPerson
+                ? "sync.person-join-qr.error"
+                : "sync.device-join-qr.error"
           }
         >
           {error}
@@ -313,13 +364,23 @@ export function DeviceJoinQr({
         <div
           style={QR_WRAP}
           data-testid={
-            isMember ? "sync.member-join-qr.image" : "sync.device-join-qr.image"
+            isMember
+              ? "sync.member-join-qr.image"
+              : isPerson
+                ? "sync.person-join-qr.image"
+                : "sync.device-join-qr.image"
           }
         >
           <img
             style={QR_IMG}
             src={imgSrc}
-            alt={t(isMember ? "sync.memberJoinQr.title" : "sync.deviceJoinQr.title")}
+            alt={t(
+            isMember
+              ? "sync.memberJoinQr.title"
+              : isPerson
+                ? "sync.personJoinQr.title"
+                : "sync.deviceJoinQr.title",
+          )}
           />
           <div
             style={SCAN_LABEL}

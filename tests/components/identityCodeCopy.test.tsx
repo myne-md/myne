@@ -130,9 +130,12 @@ const surfaces = [
       render(
         <IdentityHome
           identityCode={IDENTITY_CODE}
+          accountNumber={null}
           onCreateVault={() => {}}
           onAccepted={() => {}}
           onForgotten={() => {}}
+          accountState={null}
+          onRegistered={() => {}}
         />,
       ),
     prepare: async () => {},
@@ -262,9 +265,12 @@ describe("identity-code textareas are themed", () => {
         render(
           <IdentityHome
             identityCode={IDENTITY_CODE}
+            accountNumber={null}
             onCreateVault={() => {}}
             onAccepted={() => {}}
             onForgotten={() => {}}
+            accountState={null}
+            onRegistered={() => {}}
           />,
         );
         await screen.findByTestId("identity-home.invite-row");
@@ -299,9 +305,12 @@ describe("IdentityHome invite phrase", () => {
     render(
       <IdentityHome
         identityCode={IDENTITY_CODE}
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
+        accountState={null}
+        onRegistered={() => {}}
       />,
     );
 

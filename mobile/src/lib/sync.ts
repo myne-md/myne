@@ -131,6 +131,22 @@ export type JoinQrView =
       /** The vault's `account_number_hash`, 32 lowercase hex. Not a secret. */
       account_hash_hex: string;
       fresh: boolean;
+    }
+  | {
+      /**
+       * The PERSON (myne-md/myne#911 task 9): an owner's device-join on the
+       * identity model, added to the wire in payload v3.
+       *
+       * Carried through rather than dropped: `JoinFlow` hands it to the shell,
+       * which opens the identity flow's person-join wizard (the phrase, then the
+       * owner's approval). This client's person plane is live (task 12), so the
+       * person arm has somewhere to go.
+       */
+      kind: "person";
+      endpoint_url: string;
+      /** The person id, 32 lowercase hex. Public material, not a secret. */
+      person_id_hex: string;
+      fresh: boolean;
     };
 
 /** Decode a scanned device-join QR string into its confirm-screen view. Rejects a
@@ -210,6 +226,17 @@ export interface AccountStatusView {
   frozen: boolean;
   quota_bytes: number;
   max_devices: number;
+  /**
+   * `stored_bytes` is an ACCOUNT total over `vault_count` owned vaults rather
+   * than one vault's own figure (myne-md/myne#911 task 11). Optional because a
+   * server that predates the field omits it; the mobile person plane is task 12,
+   * and the rendering arm that reads it lives beside this type so the day a
+   * phone session can be a person session the figure is not misread as one
+   * vault's.
+   */
+  person?: boolean;
+  /** How many owned vaults the account total covers; absent for a vault. */
+  vault_count?: number;
 }
 
 export function syncAccountStatus(): Promise<AccountStatusView | null> {

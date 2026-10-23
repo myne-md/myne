@@ -30,6 +30,7 @@ function summary(over: Partial<VaultSummary> & { id: string }): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
     ...over,
   };
 }
@@ -347,5 +348,32 @@ describe("VaultSwitcher — dropdown", () => {
     expect((screen.getByTestId("switcher.chip") as HTMLButtonElement).disabled).toBe(
       true,
     );
+  });
+});
+
+// Whether the vault in the row exists anywhere but this machine
+// (myne-md/myne#911 task 8). The switcher is how a user moves between vaults
+// mid-session, so it is a place the fact has to be readable; both directions are
+// asserted because a marker that never clears reads as "nothing is published".
+describe("VaultSwitcher: the publish state", () => {
+  it("marks only the rows that exist on this device alone", async () => {
+    renderSwitcher([
+      summary({ id: "v1", label: "Work" }),
+      summary({ id: "v2", label: "Home", published: true }),
+    ]);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const rows = await screen.findAllByTestId("switcher.vault-row");
+    const row = (id: string) => {
+      const found = rows.find((r) => r.getAttribute("data-vault-id") === id);
+      if (found === undefined) throw new Error(`no row for ${id}`);
+      return found;
+    };
+    // The state itself, not only its wording: a copy edit must not be able to
+    // make this test pass while the marker disappears.
+    expect(row("v1").getAttribute("data-publish")).toBe("device-only");
+    expect(row("v1").textContent).toContain("Device only");
+    expect(row("v2").getAttribute("data-publish")).toBe("published");
+    expect(row("v2").textContent).not.toContain("Device only");
   });
 });

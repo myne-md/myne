@@ -71,6 +71,20 @@ pub enum JoinQrView {
         /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
         fresh: bool,
     },
+    /// The PERSON (myne-md/myne#911 task 9): an owner's device-join on the
+    /// identity model. The scanner proves the 24-word phrase and registers as a
+    /// device of that person's account, which admits it to every vault the
+    /// person owns after one approval.
+    Person {
+        /// Endpoint URL the QR carried (prefills the settle step / endpoint set).
+        endpoint_url: String,
+        /// The person id, 32 lowercase hex. Public material: it is the hash the
+        /// identity code already carries, and it is what the joining device
+        /// checks the account it reached against.
+        person_id_hex: String,
+        /// See [`JoinQrView::Account::fresh`].
+        fresh: bool,
+    },
     /// A shared vault, joined by a MEMBER's own second device.
     MemberVault {
         /// Endpoint URL the QR carried.
@@ -102,6 +116,11 @@ fn decode_join_qr_view(
         QrJoinTarget::MemberVault { account_hash_hex } => JoinQrView::MemberVault {
             endpoint_url,
             account_hash_hex,
+            fresh,
+        },
+        QrJoinTarget::Person { person_id_hex } => JoinQrView::Person {
+            endpoint_url,
+            person_id_hex,
             fresh,
         },
     })
@@ -344,6 +363,72 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
         live_registry.inner(),
     )
     .await)
+}
+
+/// Publish this vault to the sync server (myne-md/myne#911 task 8).
+///
+/// The explicit act that turns a device-only vault into a server vault: it PUTs
+/// `vault.meta` to the vault's namespace (binding the owner on the server's first
+/// write) and records the namespace on this device so every later sync request
+/// addresses it. Idempotent, and deliberately not part of creation.
+#[tauri::command]
+pub async fn sync_publish_vault<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+) -> Result<super::publish::PublishOutcome, SyncDeviceError> {
+    let host = crate::host::tauri_host::TauriHost::new(app);
+    // The ACTIVE vault, never `sole_vault_id()`: that is `None` on every desktop
+    // install, and the disk fallback it triggers answers the pre-multi-vault
+    // `vault/` directory as soon as two vaults exist, so publishing failed on
+    // any multi-vault device (myne-md/myne#911 review).
+    let active = state.active_vault_id().await;
+    let root = crate::paths::active_vault_root_from_host(&host, active)
+        .map_err(|_| SyncDeviceError::NotEnrolled)?;
+    super::publish::publish_vault(&host, &crate::vault_io::StdVaultIo, &root).await
+}
+
+/// Report where this vault stands with respect to the server (myne-md/myne#911
+/// task 8): published or device only, the namespace publish recorded, and
+/// whether the vault was born under an identity.
+///
+/// A sibling of [`sync_status`] rather than a field on it, and read-only in the
+/// same way: it reads device-local state and four bytes of `vault.meta`, touches
+/// no key material and no network, so it is safe to ask on mount. The reason it
+/// exists separately from the vault row's `published` flag is the active vault's
+/// own panel, which needs the durable answer WITHOUT re-listing every vault.
+#[tauri::command]
+pub async fn sync_published_state<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
+) -> Result<super::publish::PublishState, SyncDeviceError> {
+    let host = crate::host::tauri_host::TauriHost::new(app);
+    // The active vault, for the reason `sync_publish_vault` states above: the
+    // sole-vault fallback answers "device only" for a vault that is published.
+    let active = state.active_vault_id().await;
+    let Ok(root) = crate::paths::active_vault_root_from_host(&host, active) else {
+        // No vault on this device yet: nothing to publish, and "device only" is
+        // the truthful reading rather than an error a caller would have to map.
+        return Ok(super::publish::PublishState::default());
+    };
+    Ok(super::publish::published_state(&crate::vault_io::StdVaultIo, &root).await)
+}
+
+/// List every vault the person account is bound to, materialising the frames
+/// this device does not hold yet (myne-md/myne#911 task 9).
+///
+/// Each returned row is one vault: its namespace, the binding's role, and the
+/// local `vault_id` once a container exists here. Listing writes only frames, so
+/// it needs no vault password and installs no key; opening one still asks for
+/// THAT vault's password.
+#[tauri::command]
+pub async fn sync_person_list_vaults<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Vec<super::person_discovery::PersonVaultRow>, SyncDeviceError> {
+    super::person_discovery::list_person_vaults(
+        &crate::host::tauri_host::TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Mobile lifecycle ingress (SYNC-37/38): the WebView's `visibilitychange`
@@ -883,6 +968,21 @@ pub async fn invite_member_from_host(
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
         return Err(SyncDeviceError::MigrationRequired);
     }
+    // Sharing is not available on the person-wrapped generation yet, and the
+    // refusal is explicit rather than a fall-through. Before this, an `NTV7`
+    // frame took the legacy branch below, ran a whole invite and then died in
+    // `write_roster_row` because the `NTV5` membership field is absent, which
+    // surfaced as a generic bad request with no reason (myne-md/myne#911 review).
+    // The upgrade that could create such a vault is gated on a single-member
+    // roster for the same reason; see `vault_migrate::ntv7`.
+    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
+        tracing::warn!(
+            stage = "member_invite",
+            event = "person_generation_sharing_unsupported",
+            "refusing to invite a member to a person-wrapped vault"
+        );
+        return Err(SyncDeviceError::BadRequest);
+    }
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
         // The `NTV6` invite writes the owner-signed roster, and the member's
         // grant is a group-key package rather than an `itemsKey` wrap.
@@ -1405,9 +1505,11 @@ pub async fn sync_list_roster<R: Runtime>(
     // key-generation state. An OWNER session holds that identity directly; a
     // MEMBER session holds only the owner's public half, pinned out-of-band at
     // accept (`owner_identity_code`), exactly as `signed_head_ctx` resolves it.
-    if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        let b2b =
-            protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    // Both B2B generations carry the owner-signed roster. Reading only `NTV6`
+    // here made a person-born vault's roster render empty, which hid its own
+    // owner row from the panel (myne-md/myne#911 review).
+    if protocol::has_b2b_tail(&bytes) {
+        let b2b = protocol::parse_b2b_tail_any(&bytes).map_err(|_| SyncDeviceError::BadRequest)?;
         // The roster is sealed under the group tier; open it first, then verify
         // the owner signature.
         let group_key = group_key.ok_or(SyncDeviceError::NotOwner)?;

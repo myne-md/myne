@@ -51,6 +51,10 @@ pub mod dispatch;
 /// it.
 pub mod kdf_ceiling;
 pub mod outcome;
+/// The person credential, held in the Worker's memory (myne-md/myne#911 task 13).
+/// Deliberately NOT `wasm32`-gated: it is a `VaultIo` decorator with no JS in it,
+/// so `cargo test -p myne-web-wasm` exercises its rules on the host.
+pub mod person_io;
 
 // ── wasm32-only ──────────────────────────────────────────────────────────────
 //

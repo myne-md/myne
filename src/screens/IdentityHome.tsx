@@ -25,8 +25,15 @@ import {
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
+import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
+import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { personListInvites, type InviteSummary } from "../lib/personAccount";
+import {
+  personListInvites,
+  personRegister,
+  type InviteSummary,
+  type PersonAccountState,
+} from "../lib/personAccount";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
 import { personLock } from "../lib/invite";
@@ -192,6 +199,11 @@ interface IdentityHomeProps {
   /** The out-of-band invite code. Public material remains available while the
    *  private identity is locked. */
   identityCode: string | null;
+  /** The person account number in DISPLAY form, or `null` when this device holds
+   *  no identity (myne-md/myne#911 review). It is derived from the phrase, so it
+   *  is not a secret and does not need saving: the story it answers is "one
+   *  number names my account", and a number nobody can see answers nothing. */
+  accountNumber: string | null;
   onCreateVault: () => void;
   /** Called after an invite is accepted and a shared vault is unlocked, so the
    *  app re-probes into the editor. */
@@ -199,13 +211,22 @@ interface IdentityHomeProps {
   /** Called after this device's identity is forgotten, so the app re-probes to
    *  the Welcome screen (myne-md/myne#782). */
   onForgotten: () => void;
+  /** The account lifecycle (myne-md/myne#911). `reserved` offers registration;
+   *  `pending` explains the wait; `enrolled` needs neither. */
+  accountState: PersonAccountState | null;
+  /** Called after registration succeeds, so the app re-probes into the new
+   *  state rather than trusting a local copy of it. */
+  onRegistered: () => void;
 }
 
 export function IdentityHome({
   identityCode,
+  accountNumber,
   onCreateVault,
   onAccepted,
   onForgotten,
+  accountState,
+  onRegistered,
 }: IdentityHomeProps) {
   const { t } = useTranslation();
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
@@ -227,6 +248,13 @@ export function IdentityHome({
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+  // Registration (myne-md/myne#911). The phrase is the proof of possession, so
+  // it lives in this screen's state only until the call returns and is never
+  // persisted here: the backend derives the SCRAM secret and forgets the phrase.
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerPhrase, setRegisterPhrase] = useState("");
+  const [registerBusy, setRegisterBusy] = useState(false);
+  const [registerError, setRegisterError] = useState(false);
   // Forget-this-identity-on-this-device (myne-md/myne#782). A short
   // acknowledgement gates the destructive button; the warning above it is the
   // only place the consequence is stated.
@@ -234,6 +262,45 @@ export function IdentityHome({
   const [forgetAck, setForgetAck] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetError, setForgetError] = useState(false);
+
+  const betaTerms = useBetaTermsGate();
+  const [termsOpen, setTermsOpen] = useState(false);
+
+  /**
+   * The beta-terms gate (myne-ops#15, myne-md/myne#911 review).
+   *
+   * Registration is a server-facing act: it creates the account the phrase derives
+   * and enrols this device on it. `useBetaTermsGate` stands in front of the three
+   * other doors that turn sync on, and `SyncPanel` states the rule this closes: a
+   * consent screen at one door is not a consent screen. The identity screen was the
+   * fourth door and had none.
+   */
+  const doRegister = async () => {
+    setRegisterBusy(true);
+    setRegisterError(false);
+    try {
+      await personRegister(registerPhrase);
+      setRegisterOpen(false);
+      setRegisterPhrase("");
+      onRegistered();
+    } catch {
+      // The phrase is not kept across a failure: the user retypes it on the
+      // retry, which the copy already asks for, and a mounted component holding
+      // it is one devtools panel away from exposure (myne-md/myne#911 review).
+      setRegisterPhrase("");
+      setRegisterError(true);
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
+
+  const register = async () => {
+    if (betaTerms.needed) {
+      setTermsOpen(true);
+      return;
+    }
+    await doRegister();
+  };
 
   const forgetIdentity = async () => {
     setForgetBusy(true);
@@ -370,6 +437,30 @@ export function IdentityHome({
 
         <p style={CARD_BODY_STYLE}>{t("identityHome.subtitle")}</p>
 
+        {/* The account number, where the identity is named: one value for
+            support and for a self-host handoff, derived rather than generated so
+            losing it costs nothing (myne-md/myne#911 review). */}
+        {accountNumber ? (
+          <div style={BLOCK_STYLE}>
+            <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.accountNumberHeading")}</h2>
+            <Input
+              data-testid="identity-home.account-number"
+              aria-label={t("identityHome.accountNumberHeading")}
+              autoComplete="off"
+              readOnly
+              value={accountNumber}
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "var(--text-base)",
+                color: "var(--fg-1)",
+                width: "100%",
+                userSelect: "all",
+              }}
+            />
+            <p style={BODY_SMALL_STYLE}>{t("identityHome.accountNumberHint")}</p>
+          </div>
+        ) : null}
+
         {/* The person-id hex line that used to sit here is gone (myne-md/myne#869):
             an unlabeled 32-byte blob that no one can read or compare, directly
             between the subtitle and the one piece of public material the user is
@@ -485,6 +576,68 @@ export function IdentityHome({
             </div>
           )}
         </div>
+
+        {/* The account lifecycle (myne-md/myne#911). A `reserved` identity is
+            complete and offline; registering is an explicit act that asks for
+            the phrase, so "I exist locally" and "a server knows me" cannot be
+            confused. `pending` needs no action, only an explanation. */}
+        {accountState === "reserved" ? (
+          <div style={BLOCK_STYLE} data-testid="identity-home.account-state">
+            <p style={BODY_SMALL_STYLE}>{t("identityHome.accountStateReserved")}</p>
+            <BetaTermsConsent
+              open={termsOpen}
+              testId="identity.register.beta-terms"
+              onAccept={() => {
+                setTermsOpen(false);
+                // `accept()` then the body directly, because `needed` is still
+                // true for this render and `register()` would reopen the dialog.
+                void betaTerms.accept().then(() => doRegister());
+              }}
+              // Declining closes the dialog and leaves the gate standing: nothing
+              // was sent, so there is nothing to take back.
+              onCancel={() => setTermsOpen(false)}
+            />
+            {registerOpen ? (
+              <div data-testid="identity-home.register-form">
+                <p style={BODY_SMALL_STYLE}>{t("identityHome.registerPrompt")}</p>
+                <Input
+                  type="password"
+                  value={registerPhrase}
+                  onChange={(e) => setRegisterPhrase(e.target.value)}
+                  aria-label={t("identityHome.registerPhraseLabel")}
+                  data-testid="identity-home.register-phrase"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {registerError ? (
+                  <p role="alert" data-testid="identity-home.register-error">
+                    {t("identityHome.registerError")}
+                  </p>
+                ) : null}
+                <Button
+                  variant="primary"
+                  onClick={() => void register()}
+                  disabled={registerBusy || registerPhrase.trim() === ""}
+                  data-testid="identity-home.register-submit"
+                >
+                  {t("identityHome.registerSubmit")}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setRegisterOpen(true)}
+                data-testid="identity-home.register-cta"
+              >
+                {t("identityHome.registerCta")}
+              </Button>
+            )}
+          </div>
+        ) : null}
+        {accountState === "pending" ? (
+          <p style={BODY_SMALL_STYLE} data-testid="identity-home.account-state">
+            {t("identityHome.accountStatePending")}
+          </p>
+        ) : null}
 
         <div style={BLOCK_STYLE}>
           <Button variant="primary" onClick={onCreateVault} data-testid="identity-home.create-vault-cta">

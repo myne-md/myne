@@ -32,10 +32,16 @@ import { HAS_TAURI } from "../../lib/app-window";
 import {
   personSetup,
   personStatus,
+  personAccountNumber,
+  personRegister,
   personListInvites,
   personAcceptInvite,
   personJoinVault,
+  personJoinDevice,
+  personClaimDevice,
+  personListVaults,
   personLock,
+  type PersonAccountState,
   type PersonSetupView,
   type InviteSummary,
 } from "../../lib/personAccount";
@@ -49,7 +55,6 @@ import type { IdentityFlowProps } from "./types";
 type Step =
   | "gate"
   | "held"
-  | "server"
   | "create"
   // The gate's third door: this device has never held the identity, and the user
   // brings it across with its 24-word phrase instead of minting a new one. It
@@ -62,11 +67,42 @@ type Step =
   // of them back. On one screen the challenge read as a footnote to the grid.
   | "typeback"
   | "home"
+  /**
+   * The explicit registration (myne-md/myne#911 task 12, mirroring the desktop
+   * identity home's register block).
+   *
+   * Creating an identity is network-free, so a phone that has no server
+   * configured still ends up with one: `reserved`, sealed on disk, usable, and
+   * not reachable by anybody else. Registration is the separate act that asks for
+   * the 24 words as proof of possession, and without this step a phone-created
+   * identity could never become invitable at all.
+   */
+  | "register"
   | "accept-owner"
   | "accept-phrase"
   | "accept-password"
   | "join-phrase"
   | "join-password"
+  /**
+   * The PERSON device join (myne-md/myne#911 task 9, wired on this client by
+   * task 12): a fresh device scans the owner's code, types the identity phrase,
+   * and waits for an existing device to approve it. Distinct from the two join
+   * steps above, which join a MEMBER to one shared vault and end with the vault on
+   * disk: this one admits the device to the whole account and installs no key
+   * material, so the vaults it then lists still open with their own passwords.
+   */
+  | "person-phrase"
+  | "person-pending"
+  /**
+   * The join is admitted and only the account's vault list is outstanding
+   * (myne-md/myne#911 review). A step rather than a fire-and-forget call,
+   * because `sync_person_list_vaults` materialises each vault's frame locally
+   * and is the ONLY thing that puts the account's vaults on this device: a
+   * failure used to be swallowed and the flow routed onward to a picker with
+   * nothing in it, with a comment claiming a later discovery retries, which was
+   * not true. Here the failure is visible and retryable.
+   */
+  | "person-finishing"
   | "name";
 
 /** The accept wizard's steps, in order. A step-changing control names the step
@@ -88,32 +124,15 @@ const PHRASE_WORDS = 24;
  *  would otherwise hit. `RecoverFlow` and `MemberUnlockBlock` carry the same
  *  local mirror. */
 
-/**
- * Map a failed `sync_set_endpoint` invoke to user copy. The gated-server
- * refusals (`InviteCodeRequired` / `InviteCodeInvalid`, myne-md/myne#800) are
- * not reachability failures: the server answered, and the remedy is the
- * operator's invite code, so "couldn't reach the server" would send the user to
- * fix the wrong thing. Same mapping the sync settings panel uses.
- */
-function serverConnectError(
-  error: unknown,
-  t: (key: string) => string,
-): string {
-  const kind =
-    typeof error === "object" && error !== null && "kind" in error
-      ? (error as { kind?: unknown }).kind
-      : undefined;
-  if (kind === "InviteCodeRequired") return t("sync.enroll.error.inviteCodeRequired");
-  if (kind === "InviteCodeInvalid") return t("sync.enroll.error.inviteCodeInvalid");
-  if (kind === "TlsFailure") return t("sync.endpoint.tlsFailure");
-  return t("identityFlow.serverUnreachable");
-}
-
 /** Small uppercase field label, the shape every wired flow uses (`JoinFlow`,
- *  `RecoverFlow`, `CreateVaultFlow` each keep a local copy). */
-function FieldLabel({ children }: { children: ReactNode }) {
+ *  `RecoverFlow`, `CreateVaultFlow` each keep a local copy). `id` exists so a
+ *  phrase grid's `aria-labelledby` can point at a label that is actually in the
+ *  document: it is a `<div>`, not a `<label>`, so nothing associates the two by
+ *  structure. */
+function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
   return (
     <div
+      id={id}
       style={{
         fontSize: "var(--text-xs)",
         fontWeight: "var(--weight-semibold)",
@@ -326,7 +345,13 @@ function DevicePasswordField({
  * mobile flow: `Screen` → `FlowHeader` → padded `ScreenScroll` carrying a
  * `Title`/`Lead`, and a `FooterBar` for the step's actions.
  */
-export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps) {
+export function IdentityFlow({
+  onCancel,
+  onAccepted,
+  onCreateVault,
+  fromQr,
+  fromPersonQr,
+}: IdentityFlowProps) {
   const { t } = useTranslation();
   // Names the accept step's phrase grid, which is 24 bare inputs with no visible
   // label of their own.
@@ -335,6 +360,9 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
   // ids rather than one: the accept's `aria-labelledby` must not point at a label
   // that belongs to a step that is not on screen.
   const joinPhraseLabelId = useId();
+  /** The register and person-join grids' labels, same reason as the two above. */
+  const registerPhraseLabelId = useId();
+  const personPhraseLabelId = useId();
   // …and the recover step's, a third grid of the same fields, for the same reason
   // a third time.
   const recoverPhraseLabelId = useId();
@@ -342,21 +370,13 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Server step. A scanned member-vault QR prefills the address (its issuer's
-  // endpoint), so a device with no endpoint reaches the server step with the right
-  // one already typed. A PREFILL, and for this step nothing more: it is a visible,
-  // editable input, and this screen never writes the config itself.
-  //
-  // The one place the flow does write it is the recover arm below, and only when
-  // nothing is configured (there is no step to reach from that door, and
-  // `personSetup` resolves the endpoint before it can register anything). It is the
-  // same `syncSetEndpoint` call this step makes, so it verifies TLS before it
-  // writes; a device that already has an endpoint is never repointed.
-  const [serverUrl, setServerUrl] = useState(fromQr?.endpointUrl ?? "");
-  // The shared invite code for a gated server (myne-md/myne#800); empty for an
-  // open one. Identity creation registers a new account, so a gated server
-  // refuses it without the code.
-  const [inviteCode, setInviteCode] = useState("");
+  // NO server step (myne-md/myne#911 task 12). It used to gate the create door,
+  // which made an offline first run impossible on this client, and the endpoint it
+  // collected lives in Settings (Sync), where a gated server's invite code is
+  // collected too. What is left of the endpoint in this flow is the RECOVER arm's
+  // one write below, and only when nothing is configured: `personSetup` resolves the
+  // endpoint before it can register anything, and a scanned code's issuer is a
+  // channel the user already trusts.
 
   // Identity
   const [result, setResult] = useState<PersonSetupView | null>(null);
@@ -373,6 +393,29 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
   // Home
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [identityCode, setIdentityCode] = useState<string | null>(null);
+  // The person account number, display form, for the home (myne-md/myne#911
+  // review): derived from the phrase, so it needs no network and cannot be
+  // lost, and it is the one value support or a server operator reads back.
+  const [accountNumber, setAccountNumber] = useState<string | null>(null);
+  /**
+   * The identity's lifecycle state (myne-md/myne#911 task 12): `reserved` means
+   * this identity was created with no server account, so the home offers the
+   * explicit registration beside the create-vault action. `null` until the probe
+   * answers, and the register block is simply absent until then.
+   */
+  const [accountState, setAccountState] = useState<PersonAccountState | null>(null);
+  /** The registration step's phrase cells, wiped when the step is left. */
+  const [registerWords, setRegisterWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+  /** The person join's phrase cells, and whether the claim still needs them. */
+  const [personWords, setPersonWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+  const [personBusy, setPersonBusy] = useState(false);
+  const [personError, setPersonError] = useState<string | null>(null);
+  const [personClaimNeedsPhrase, setPersonClaimNeedsPhrase] = useState(false);
+  /** The listing step's own failure, kept apart from `personError` because the
+   *  phrase screen and the finishing screen are different screens: one is a
+   *  refused credential, the other is an admitted device whose vault list did not
+   *  arrive. */
+  const [personListError, setPersonListError] = useState<string | null>(null);
   // Forget-this-identity acknowledgement (myne-md/myne#782).
   const [forgetAck, setForgetAck] = useState(false);
 
@@ -434,6 +477,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     joinPassword: string;
     joinConfirmPassword: string;
     recoverWords: string[];
+    registerWords: string[];
   }>({
     ownerCode: "",
     words: [],
@@ -443,6 +487,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     joinPassword: "",
     joinConfirmPassword: "",
     recoverWords: [],
+    registerWords: [],
   });
   const wipeSecrets = useCallback(() => {
     acceptSecretsRef.current = {
@@ -454,6 +499,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
       joinPassword: "",
       joinConfirmPassword: "",
       recoverWords: [],
+      registerWords: [],
     };
   }, []);
   useEffect(() => {
@@ -466,6 +512,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
       joinPassword,
       joinConfirmPassword,
       recoverWords,
+      registerWords,
     };
   });
   useEffect(() => () => wipeSecrets(), [wipeSecrets]);
@@ -473,6 +520,15 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
 
   // Gate on boot: if an identity already exists, skip straight to the home.
   useEffect(() => {
+    // The person join comes FIRST, before any status probe (myne-md/myne#911 task
+    // 12): a device that scanned an owner's code has no identity yet, and the
+    // phrase it is about to type is what creates one. Probing first would send it
+    // to the gate and offer to mint a SECOND person id, which is the opposite of
+    // joining the account whose code it just scanned.
+    if (fromPersonQr) {
+      setStep("person-phrase");
+      return;
+    }
     if (!HAS_TAURI) {
       setStep("gate");
       return;
@@ -481,9 +537,24 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     void personStatus()
       .then((s) => {
         if (cancelled) return;
-        if (s.enrolled) {
+        // `state` is the authoritative three-way answer (myne-md/myne#911 task
+        // 4), and a `reserved` identity IS an identity: it was created offline,
+        // it is sealed on disk, and its phrase is the only copy. Landing it on
+        // the gate offered to create a second one, and landing it on `held`
+        // offered to forget the one it has (myne-md/myne#780's surface is for a
+        // sealed frame this device CANNOT open, which `state === null` with a
+        // seal present is and `reserved` is not).
+        if (s.state != null) {
           setIdentityCode(s.identity_code);
+          setAccountState(s.state);
           setStep("home");
+          // Read separately and tolerated: a device with no number to show still
+          // has a working home, and the number is derived rather than stored.
+          void personAccountNumber()
+            .then((n) => {
+              if (!cancelled) setAccountNumber(n);
+            })
+            .catch(() => {});
         } else if (s.sealed_keypair_present) {
           // A sealed identity this device cannot open with a fresh phrase
           // (myne-md/myne#780): offer to forget it rather than loop through a
@@ -501,7 +572,10 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     };
   }, []);
 
-  // Load invites whenever the home step is shown.
+  // Load invites whenever the home step is shown, and refresh the lifecycle
+  // state with them: registration happens on another step and must remove its own
+  // block from this one (myne-md/myne#911 task 12), which is what re-reading
+  // `state` here does rather than the register step trying to unset it.
   useEffect(() => {
     if (step !== "home" || !HAS_TAURI) return;
     let cancelled = false;
@@ -512,25 +586,17 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
       .catch(() => {
         if (!cancelled) setInvites([]);
       });
+    void personStatus()
+      .then((s) => {
+        if (!cancelled) setAccountState(s.state);
+      })
+      .catch(() => {
+        /* keep the last-known state */
+      });
     return () => {
       cancelled = true;
     };
   }, [step]);
-
-  const connectServer = useCallback(async () => {
-    const trimmed = serverUrl.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await syncSetEndpoint(trimmed, inviteCode.trim());
-      setStep("create");
-    } catch (e) {
-      setError(serverConnectError(e, t));
-    } finally {
-      setBusy(false);
-    }
-  }, [serverUrl, inviteCode, t]);
 
   // Forget a held identity this device cannot open with a fresh phrase, so a
   // create can proceed (myne-md/myne#780).
@@ -558,14 +624,49 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
       setAnswers(["", "", "", ""]);
       setStep("phrase");
     } catch {
-      // The typed `NotConfigured` case means the endpoint did not take; send the
-      // user back to the server step rather than showing a dead end.
+      // No server step to send the user back to any more (myne-md/myne#911 task
+      // 12): creating an identity is network-free, so a failure here is a real
+      // one (a held identity this device cannot open, a full disk) and the honest
+      // place for it is the screen that asked.
       setError(t("identityFlow.createFailed"));
-      setStep("server");
     } finally {
       setBusy(false);
     }
   }, [t]);
+
+  /**
+   * Register this identity with the server, using the phrase as proof of
+   * possession (myne-md/myne#911 task 12).
+   *
+   * A failure leaves the identity exactly where it was (`reserved`, sealed, and
+   * usable), which is what makes registration safe to attempt: nothing about the
+   * local identity depends on the server answering.
+   */
+  const registerIdentity = useCallback(async () => {
+    if (!registerWords.every((word) => word.length > 0)) return;
+    const phrase = registerWords.join(" ");
+    setBusy(true);
+    setError(null);
+    try {
+      const view = await personRegister(phrase);
+      setIdentityCode(view.identity_code);
+      setRegisterWords(Array(PHRASE_WORDS).fill(""));
+      // Re-probe rather than assume: the lifecycle state is DERIVED from disk
+      // (myne-md/myne#911 task 4), and the home step's own effect reads it on
+      // entry. Setting it from this call's answer would be a second opinion about
+      // a fact the probe already owns.
+      setStep("home");
+    } catch (e) {
+      const kind = (e as { kind?: string } | null)?.kind;
+      setError(
+        kind === "NotConfigured"
+          ? t("identityFlow.register.needsServer")
+          : t("identityFlow.register.failed"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [registerWords, t]);
 
   const finishPhrase = useCallback(() => {
     setResult(null);
@@ -574,6 +675,103 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     setAnswers(["", "", "", ""]);
     setStep("home");
   }, []);
+
+  // ── The person join (myne-md/myne#911 tasks 9 and 12) ──────────────────────
+
+  /**
+   * The join's last step: materialise the account's vaults locally, then leave.
+   *
+   * `personListVaults` is what writes each vault's frame on this device, so it is
+   * the difference between the picker showing the account's vaults and showing
+   * none. Its failure is NOT a join failure (the device is admitted), so the flow
+   * does not treat it as one, and it does not swallow it either: it stays on its
+   * own step and says so, with a Retry that runs the same call again. Nothing
+   * else re-runs it, which is what the deleted comment here claimed: `onAccepted`
+   * closes the overlay and the probe that follows reads only what is already on
+   * disk (myne-md/myne#911 review).
+   */
+  const finishPersonJoin = useCallback(() => {
+    setStep("person-finishing");
+    setPersonListError(null);
+    void personListVaults()
+      .then(() => onAccepted())
+      .catch(() => setPersonListError(t("identityFlow.personJoin.listFailed")));
+  }, [onAccepted, t]);
+
+  /**
+   * Type the identity phrase and ask to be admitted.
+   *
+   * The device lands PENDING rather than approved: an existing device has to
+   * approve it, which is what stops a stolen phrase from attaching a device on its
+   * own (story 16). The backend caches the DERIVED secret for the pending window,
+   * never the phrase, so the poll below can finish without a second entry.
+   */
+  const submitPersonPhrase = useCallback(async () => {
+    if (!fromPersonQr || !personWords.every((word) => word.length > 0) || personBusy) return;
+    const phrase = personWords.join(" ");
+    setPersonWords(Array(PHRASE_WORDS).fill(""));
+    setPersonBusy(true);
+    setPersonError(null);
+    setPersonClaimNeedsPhrase(false);
+    try {
+      const view = await personJoinDevice(
+        fromPersonQr.personIdHex,
+        fromPersonQr.endpointUrl,
+        phrase,
+      );
+      if (view.approved) {
+        finishPersonJoin();
+        return;
+      }
+      setStep("person-pending");
+    } catch (e) {
+      const kind = (e as { kind?: string } | null)?.kind;
+      setPersonError(
+        kind === "PersonMismatch"
+          ? t("identityFlow.personJoin.mismatch")
+          : kind === "TlsFailure"
+            ? t("sync.endpoint.tlsFailure")
+            : t("identityFlow.personJoin.failed"),
+      );
+    } finally {
+      setPersonBusy(false);
+    }
+  }, [fromPersonQr, personWords, personBusy, finishPersonJoin, t]);
+
+  // While the device waits, ask the server whether the approval has landed. The
+  // poll re-runs the SAME handshake with the session's cached secret, which is why
+  // it can finish without the phrase; a session that ended in between answers
+  // `PersonSessionRequired`, and the screen asks for the phrase again rather than
+  // polling a credential it no longer has.
+  useEffect(() => {
+    if (step !== "person-pending") return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      void personClaimDevice()
+        .then((view) => {
+          if (cancelled) return;
+          if (view.approved) {
+            finishPersonJoin();
+            return;
+          }
+          timer = setTimeout(tick, 2000);
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          if ((e as { kind?: string } | null)?.kind === "PersonSessionRequired") {
+            setPersonClaimNeedsPhrase(true);
+            return; // stop polling: only the phrase can restart the handshake
+          }
+          timer = setTimeout(tick, 2000);
+        });
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [step, finishPersonJoin]);
 
   // ── Accept step (myne-md/myne#851 task 14) ──────────────────────────────────
 
@@ -979,53 +1177,6 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     }
   }, [nameDraft, nameBusy, t]);
 
-  const renderServer = () => (
-    <Screen>
-      <FlowHeader label={t("identityFlow.server.title")} onBack={() => setStep("gate")} />
-      <ScreenScroll style={{ padding: "18px 22px 0" }}>
-        <Title>{t("identityFlow.server.title")}</Title>
-        <Lead>{t("identityFlow.server.lead")}</Lead>
-        <div style={{ marginTop: "var(--space-4)" }}>
-          <FieldLabel>{t("identityFlow.server.urlLabel")}</FieldLabel>
-          <MonoField
-            value={serverUrl}
-            onChange={setServerUrl}
-            placeholder="https://sync.example"
-            inputMode="url"
-            testId="identity-flow.server-input"
-          />
-        </div>
-        <div style={{ marginTop: "var(--space-4)" }}>
-          <FieldLabel>{t("sync.endpoint.inviteLabel")}</FieldLabel>
-          <MonoField
-            value={inviteCode}
-            onChange={setInviteCode}
-            placeholder={t("sync.endpoint.invitePlaceholder")}
-            testId="identity-flow.server-invite"
-          />
-        </div>
-        {error ? (
-          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
-            {error}
-          </Banner>
-        ) : null}
-      </ScreenScroll>
-      <FooterBar>
-        <Button variant="secondary" full={false} onClick={() => setStep("gate")} data-testid="identity-flow.server-back">
-          {t("identityFlow.back")}
-        </Button>
-        <Button
-          onClick={() => void connectServer()}
-          disabled={busy || !serverUrl.trim()}
-          data-testid="identity-flow.server-connect"
-        >
-          {busy ? t("identityFlow.server.connecting") : t("identityFlow.server.connect")}
-        </Button>
-      </FooterBar>
-      {busy && <BlockingOverlay title={t("identityFlow.server.connecting")} />}
-    </Screen>
-  );
-
   const renderHeld = () => (
     <Screen>
       <FlowHeader label={t("identityFlow.held.title")} onBack={onCancel} />
@@ -1057,7 +1208,14 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
         <Lead>{t("identityFlow.lead")}</Lead>
       </ScreenScroll>
       <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
-        <Button onClick={() => setStep("server")} data-testid="identity-flow.start">
+        {/* Straight to the create step, with no server step in front of it
+            (myne-md/myne#911 task 12). Creating an identity is network-free, so a
+            phone with no server configured still ends up with a working one; the
+            server step used to gate this door and made an offline first run
+            impossible on this client. The endpoint is configured from Settings
+            when the user wants sync, and registration is the explicit act on the
+            identity home. */}
+        <Button onClick={() => setStep("create")} data-testid="identity-flow.start">
           {t("identityFlow.start")}
         </Button>
         {/* The third door, between the two that were already here. A device that
@@ -1077,7 +1235,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
 
   const renderCreate = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.create.title")} onBack={() => setStep("server")} />
+      <FlowHeader label={t("identityFlow.create.title")} onBack={() => setStep("gate")} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.create.title")}</Title>
         <Lead>{t("identityFlow.create.lead")}</Lead>
@@ -1088,7 +1246,7 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
         ) : null}
       </ScreenScroll>
       <FooterBar>
-        <Button variant="secondary" full={false} onClick={() => setStep("server")}>
+        <Button variant="secondary" full={false} onClick={() => setStep("gate")}>
           {t("identityFlow.back")}
         </Button>
         <Button onClick={() => void createIdentity()} disabled={busy} data-testid="identity-flow.create">
@@ -1096,6 +1254,220 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
         </Button>
       </FooterBar>
       {busy && <BlockingOverlay title={t("identityFlow.create.working")} />}
+    </Screen>
+  );
+
+  /**
+   * The explicit registration (myne-md/myne#911 task 12).
+   *
+   * The phrase is the proof of possession, so it is asked for here rather than
+   * being read out of the session: a device that can register itself from a
+   * session it already holds is a device that can register from a stolen unlock.
+   * The backend derives the SCRAM secret from it and stores nothing.
+   */
+  const renderRegister = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.register.title")} onBack={() => setStep("home")} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.register.title")}</Title>
+        <Lead>{t("identityFlow.register.lead")}</Lead>
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <FieldLabel id={registerPhraseLabelId}>
+            {t("identityFlow.register.phraseLabel")}
+          </FieldLabel>
+        </div>
+        <div style={HINT_STYLE}>{t("identityFlow.register.phraseHint")}</div>
+        <PhraseEntryGrid
+            cells={registerWords}
+            onCells={(next) => {
+              setError(null);
+              setRegisterWords(next.map((w) => w.replace(/\s+/g, "")));
+            }}
+            testIdPrefix="identity-flow.register"
+            cellTestId={(i) =>
+              i === 0 ? "identity-flow.register-cell" : `identity-flow.register-cell-${i + 1}`
+            }
+            cellLabel={(i) => t("sync.enroll.wordAria", { number: i + 1 })}
+            labelledBy={registerPhraseLabelId}
+            style={PHRASE_GRID_STYLE}
+          />
+        {error ? (
+          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+            {error}
+          </Banner>
+        ) : null}
+      </ScreenScroll>
+      <FooterBar>
+        <Button
+          variant="secondary"
+          full={false}
+          onClick={() => {
+            // The 24 words go with the step. Every other phrase grid on this
+            // screen drops its own on the way out "so a second accept can never
+            // inherit the first invite's ... phrase", and this one is the
+            // account's only credential (myne-md/myne#911 review).
+            setRegisterWords(Array(PHRASE_WORDS).fill(""));
+            setStep("home");
+          }}
+        >
+          {t("identityFlow.back")}
+        </Button>
+        <Button
+          onClick={() => void registerIdentity()}
+          disabled={busy || !registerWords.every((word) => word.length > 0)}
+          data-testid="identity-flow.register-submit"
+        >
+          {busy ? t("identityFlow.register.working") : t("identityFlow.register.cta")}
+        </Button>
+      </FooterBar>
+      {busy && <BlockingOverlay title={t("identityFlow.register.working")} />}
+    </Screen>
+  );
+
+  /**
+   * The person join's credential step (myne-md/myne#911 task 12).
+   *
+   * The code already named the person and the server; the phrase is the proof
+   * that this device is that person's, and typing it is also what seals the
+   * identity locally. Nothing about the words reaches a log.
+   */
+  const renderPersonPhrase = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.personJoin.title")} onBack={onCancel} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.personJoin.title")}</Title>
+        <Lead>{t("identityFlow.personJoin.lead")}</Lead>
+        {personClaimNeedsPhrase ? (
+          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+            {t("identityFlow.personJoin.sessionEnded")}
+          </Banner>
+        ) : null}
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <FieldLabel id={personPhraseLabelId}>
+            {t("identityFlow.personJoin.phraseLabel")}
+          </FieldLabel>
+        </div>
+        <div style={HINT_STYLE}>{t("identityFlow.personJoin.phraseHint")}</div>
+        <PhraseEntryGrid
+          cells={personWords}
+          onCells={(next) => {
+            setPersonError(null);
+            setPersonWords(next.map((w) => w.replace(/\s+/g, "")));
+          }}
+          testIdPrefix="identity-flow.person-join"
+          cellTestId={(i) =>
+            i === 0 ? "identity-flow.person-join-cell" : `identity-flow.person-join-cell-${i + 1}`
+          }
+          cellLabel={(i) => t("sync.enroll.wordAria", { number: i + 1 })}
+          labelledBy={personPhraseLabelId}
+          style={PHRASE_GRID_STYLE}
+        />
+        {personError ? (
+          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+            {personError}
+          </Banner>
+        ) : null}
+      </ScreenScroll>
+      <FooterBar>
+        <Button
+          onClick={() => void submitPersonPhrase()}
+          disabled={personBusy || !personWords.every((word) => word.length > 0)}
+          data-testid="identity-flow.person-join-submit"
+        >
+          {personBusy ? t("identityFlow.personJoin.working") : t("identityFlow.personJoin.cta")}
+        </Button>
+      </FooterBar>
+      {personBusy && <BlockingOverlay title={t("identityFlow.personJoin.working")} />}
+    </Screen>
+  );
+
+  /**
+   * The pending screen: this device is admitted but not yet approved.
+   *
+   * It says what is happening and what the other device must do, because the
+   * alternative is a spinner with no explanation, and the wait can be long (the
+   * owner may not be holding their phone).
+   */
+  const renderPersonPending = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.personJoin.pendingTitle")} onBack={onCancel} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.personJoin.pendingTitle")}</Title>
+        <Lead>{t("identityFlow.personJoin.pendingLead")}</Lead>
+        <div style={{ marginTop: "var(--space-5)", display: "flex", justifyContent: "center" }}>
+          <Spinner />
+        </div>
+        <div style={{ marginTop: "var(--space-4)" }} data-testid="identity-flow.person-join-pending">
+          {t("identityFlow.personJoin.pendingHint")}
+        </div>
+        {personClaimNeedsPhrase ? (
+          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+            {t("identityFlow.personJoin.sessionEnded")}
+          </Banner>
+        ) : null}
+      </ScreenScroll>
+      <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
+        {personClaimNeedsPhrase ? (
+          <Button
+            onClick={() => setStep("person-phrase")}
+            data-testid="identity-flow.person-join-rephrase"
+          >
+            {t("identityFlow.personJoin.reenter")}
+          </Button>
+        ) : null}
+        <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.person-join-cancel">
+          {t("identityFlow.back")}
+        </Button>
+      </FooterBar>
+    </Screen>
+  );
+
+  /**
+   * The last step of a person join: the device is admitted, and its vault list is
+   * being fetched (myne-md/myne#911 review).
+   *
+   * It exists so a failed `personListVaults` has somewhere to be visible. The
+   * device is approved either way, so this is not an error screen: it says the
+   * join worked, names the one thing that did not, and offers the retry. Nothing
+   * else would run that call again.
+   */
+  const renderPersonFinishing = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.personJoin.finishingTitle")} onBack={onCancel} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.personJoin.finishingTitle")}</Title>
+        <Lead>{t("identityFlow.personJoin.finishingLead")}</Lead>
+        {personListError ? (
+          <Banner
+            kind="warning"
+            style={{ marginTop: "var(--space-4)" }}
+            testID="identity-flow.person-join-list-error"
+          >
+            {personListError}
+          </Banner>
+        ) : (
+          <div style={{ marginTop: "var(--space-5)", display: "flex", justifyContent: "center" }}>
+            <Spinner />
+          </div>
+        )}
+      </ScreenScroll>
+      <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
+        {personListError ? (
+          <Button
+            onClick={finishPersonJoin}
+            data-testid="identity-flow.person-join-list-retry"
+          >
+            {t("identityFlow.personJoin.listRetry")}
+          </Button>
+        ) : null}
+        <Button
+          variant="ghost"
+          onClick={onCancel}
+          data-testid="identity-flow.person-join-finish-cancel"
+        >
+          {t("identityFlow.back")}
+        </Button>
+      </FooterBar>
     </Screen>
   );
 
@@ -1279,6 +1651,16 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
           <Title>{t("identityFlow.home.title")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
 
+          {accountNumber ? (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <FieldLabel>{t("identityHome.accountNumberHeading")}</FieldLabel>
+              <MonoBox value={accountNumber} testId="identity-flow.home-account-number" />
+              <Lead style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
+                {t("identityHome.accountNumberHint")}
+              </Lead>
+            </div>
+          ) : null}
+
           {identityCode ? (
             <div style={{ marginTop: "var(--space-5)" }}>
               <FieldLabel>{t("identityFlow.home.codeLabel")}</FieldLabel>
@@ -1394,6 +1776,48 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
                   </div>
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {/* The two actions this identity home exists for (myne-md/myne#911
+              task 12): create a vault, and register the identity if it was
+              created offline. Both are explicit, and neither is a side effect of
+              the other. */}
+          {onCreateVault ? (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <FieldLabel>{t("identityFlow.home.vaultHeading")}</FieldLabel>
+              <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
+                {t("identityFlow.home.vaultHint")}
+              </div>
+              <Button
+                onClick={onCreateVault}
+                style={{ marginTop: "var(--space-3)" }}
+                data-testid="identity-flow.home-create-vault"
+              >
+                {t("identityHome.createVaultCta")}
+              </Button>
+            </div>
+          ) : null}
+
+          {/* A `reserved` identity is one created with no server account: sealed,
+              usable, and not reachable by anybody else. Registration is the act
+              that makes it invitable, and it asks for the phrase because the
+              phrase is the proof of possession. */}
+          {accountState === "reserved" ? (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <FieldLabel>{t("identityFlow.home.registerHeading")}</FieldLabel>
+              <div data-testid="identity-flow.home-register-hint" style={HINT_STYLE}>
+                {t("identityFlow.home.registerHint")}
+              </div>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={() => setStep("register")}
+                style={{ marginTop: "var(--space-3)" }}
+                data-testid="identity-flow.home-register-open"
+              >
+                {t("identityFlow.register.open")}
+              </Button>
             </div>
           ) : null}
 
@@ -1871,12 +2295,15 @@ export function IdentityFlow({ onCancel, onAccepted, fromQr }: IdentityFlowProps
     <Screen style={{ padding: 0 }}>
       {step === "gate" && renderGate()}
       {step === "held" && renderHeld()}
-      {step === "server" && renderServer()}
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}
       {step === "typeback" && renderTypeback()}
       {step === "recover" && renderRecover()}
       {step === "home" && renderHome()}
+      {step === "register" && renderRegister()}
+      {step === "person-phrase" && renderPersonPhrase()}
+      {step === "person-pending" && renderPersonPending()}
+      {step === "person-finishing" && renderPersonFinishing()}
       {(step === "accept-owner" || step === "accept-phrase" || step === "accept-password") &&
         renderAccept()}
       {(step === "join-phrase" || step === "join-password") && renderJoin()}

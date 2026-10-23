@@ -285,6 +285,17 @@ const ROW_META_STYLE: CSSProperties = {
   color: "var(--ink-3)",
 };
 
+// The row's caption line: the last-unlock time and, when the vault has never
+// been published, the device-only marker. One line rather than two, because a
+// row is 60px and a second caption would push the label out of its own rhythm.
+const ROW_META_LINE_STYLE: CSSProperties = {
+  ...ROW_META_STYLE,
+  display: "flex",
+  alignItems: "baseline",
+  gap: "var(--space-2)",
+  minWidth: 0,
+};
+
 // The account group header: a small, secondary-ink label above a group of
 // vault rows. Standalone vaults (no account) render no header, so the header
 // only ever names a real grouping.
@@ -496,6 +507,7 @@ function VaultRow({
   vault,
   label,
   meta,
+  publishNote,
   onSelect,
   onContextMenu,
   rowRef,
@@ -503,6 +515,10 @@ function VaultRow({
   vault: VaultSummary;
   label: string;
   meta: string;
+  /** "Device only" for a vault that exists nowhere but here; empty once
+   *  published, because the normal state does not need a badge
+   *  (myne-md/myne#911 task 8). */
+  publishNote: string;
   onSelect: (vaultId: VaultId) => void;
   onContextMenu: (vault: VaultSummary, pos: { x: number; y: number }) => void;
   rowRef: (vaultId: VaultId, el: HTMLButtonElement | null) => void;
@@ -544,7 +560,14 @@ function VaultRow({
       <span style={ROW_LEFT_STYLE}>
         <span style={LABEL_COL_STYLE}>
           <span style={rowLabelStyle(real)}>{label}</span>
-          {meta !== "" && <span style={ROW_META_STYLE}>{meta}</span>}
+          {(meta !== "" || publishNote !== "") && (
+            <span style={ROW_META_LINE_STYLE}>
+              {meta !== "" && <span>{meta}</span>}
+              {publishNote !== "" && (
+                <span data-testid="picker.vault-row-publish">{publishNote}</span>
+              )}
+            </span>
+          )}
         </span>
       </span>
       <Icon name="chevron-right" size={16} style={CHEVRON_STYLE} />
@@ -822,6 +845,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
                 vault={vault}
                 label={vaultDisplayName(vault, state.vaults, t)}
                 meta={lastUnlockText(vault.last_unlock, t)}
+                publishNote={
+                  vault.published ? "" : t("vaultPicker.deviceOnly")
+                }
                 onSelect={onSelect}
                 onContextMenu={(v, pos) => setMenu({ vault: v, x: pos.x, y: pos.y })}
                 rowRef={(id, el) => {
