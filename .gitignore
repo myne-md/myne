@@ -63,6 +63,7 @@ coverage/
 /myne-branding
 /internal-service
 /homebrew-tap
+/myne-pi-plugin
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/
