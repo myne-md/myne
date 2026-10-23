@@ -1747,7 +1747,18 @@ steps:
       # driver's major version must match the browser's, which is why they are
       # installed as a PAIR from the same distro archive rather than pinned
       # separately (chromedriver 151 refuses a Chrome 150 session outright).
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+      #
+      # `pkg-config` + `libdbus-1-dev` are NOT browser plumbing: this is a stock
+      # `rust:1.96.0-slim` image, so it lacks what the `*ci_image` base already
+      # carries, and the native lane below compiles `myne-core` on Linux.
+      # `myne-core` depends on `tauri`, whose Linux runtime reaches
+      # `tauri-runtime-wry` -> `tao` -> `dbus` -> `libdbus-sys`, and that crate's
+      # build script aborts with `pkg-config` missing. chromium's own apt pull
+      # brings the dbus RUNTIME library (`libdbus-1-3`), never the `-dev` package
+      # carrying the `.pc` file the build script reads, so the two look installed
+      # while the build still fails. Measured: pipeline 760 (2026-10-19) and 898
+      # both died here with `explicit panic` at `libdbus-sys-0.2.7/build.rs:25`.
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl pkg-config libdbus-1-dev chromium chromium-driver
       - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
       # Native lane: the desktop and mobile execution target.
       - cargo test -p protocol --test vectors
