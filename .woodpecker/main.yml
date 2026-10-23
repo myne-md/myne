@@ -1724,7 +1724,21 @@ steps:
   # it empty and this step skips cleanly instead of failing; the same holds for
   # a fork PR, which gets no secrets at all.
   vector-verification:
-    image: rust:1.96.0-slim
+    # `*ci_image`, not a stock `rust:slim`. This step's NATIVE lane compiles
+    # `myne-core` on Linux, and `myne-core` depends on `tauri`, so the build walks
+    # `tauri-runtime-wry` -> `tao` -> `glib`/`dbus`/webkit and needs the full Tauri
+    # sysdep header chain. The image bakes exactly that set for the five steps that
+    # used to install it one by one (`ci/Dockerfile` is the list and the history),
+    # and this step was the sixth doing its own subset: it carried no `pkg-config`
+    # at all, so `libdbus-sys` aborted the build at `build.rs:25`, and adding only
+    # that plus `libdbus-1-dev` merely moved the failure one crate over to
+    # `glib-sys`, which wants `glib-2.0.pc` and then the rest of gtk3. Enumerating
+    # the eleven packages here a third time is the drift the image exists to end.
+    #
+    # Chromium is NOT baked: no push step uses it, and baking it would make every
+    # push pull a browser. It stays a per-step install, as a pair with its driver,
+    # because a chromedriver/browser major mismatch refuses the session outright.
+    image: *ci_image
     when: *code-paths
     depends_on: [cargo-test]
     environment:
@@ -1746,19 +1760,9 @@ steps:
       # chromium and its driver are what make the browser lane possible, and the
       # driver's major version must match the browser's, which is why they are
       # installed as a PAIR from the same distro archive rather than pinned
-      # separately (chromedriver 151 refuses a Chrome 150 session outright).
-      #
-      # `pkg-config` + `libdbus-1-dev` are NOT browser plumbing: this is a stock
-      # `rust:1.96.0-slim` image, so it lacks what the `*ci_image` base already
-      # carries, and the native lane below compiles `myne-core` on Linux.
-      # `myne-core` depends on `tauri`, whose Linux runtime reaches
-      # `tauri-runtime-wry` -> `tao` -> `dbus` -> `libdbus-sys`, and that crate's
-      # build script aborts with `pkg-config` missing. chromium's own apt pull
-      # brings the dbus RUNTIME library (`libdbus-1-3`), never the `-dev` package
-      # carrying the `.pc` file the build script reads, so the two look installed
-      # while the build still fails. Measured: pipeline 760 (2026-10-19) and 898
-      # both died here with `explicit panic` at `libdbus-sys-0.2.7/build.rs:25`.
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl pkg-config libdbus-1-dev chromium chromium-driver
+      # separately (chromedriver 151 refuses a Chrome 150 session outright). The
+      # rest of what this step needs is already in the image, see above.
+      - apt-get update && apt-get install -y --no-install-recommends chromium chromium-driver
       - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
       # Native lane: the desktop and mobile execution target.
       - cargo test -p protocol --test vectors
