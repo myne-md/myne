@@ -100,7 +100,7 @@ pnpm install            # install JS toolchain
 pnpm tauri dev          # full Tauri dev (Vite on :1420 + Rust core)
 pnpm dev                # Vite only (strictPort — fails if 1420 is taken)
 pnpm tauri build        # production desktop bundle
-pnpm sidecar            # build + stage both externalBin sidecars (myne CLI + myne-tor)
+pnpm sidecar            # build + stage all three externalBin sidecars (myne CLI, myne-mcp, myne-tor)
 
 pnpm web:local          # web client on :1421 + a local sync server, in one command
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
