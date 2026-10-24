@@ -262,8 +262,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "AccountPanel",
     state: "default",
     description:
-      "Settings → Account: the device-local grouping of vaults, the account name, and the paired browser extensions. It is deliberately the account level, not the vault's own label, which lives in the Vault panel.",
-    tags: ["settings", "account", "device-local", "vault-group", "paired-extensions", "name"],
+      "Settings → Account: the person account number, the device-local grouping of vaults, and the paired browser extensions. It is deliberately the account level, not the vault's own label, which lives in the Vault panel.",
+    tags: ["settings", "account", "device-local", "vault-group", "paired-extensions", "account-number"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>

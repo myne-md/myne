@@ -435,14 +435,6 @@
     "reason": "Same hidden-names notice on the picker twins; identical screens, identical string."
   },
   {
-    "value": "That name is too long. Keep it under 512 characters.",
-    "keys": [
-      "picker.labelTooLong",
-      "vaultPicker.labelTooLong"
-    ],
-    "reason": "Same label-length error on the picker twins; identical screens, identical string."
-  },
-  {
     "value": "The account grouping could not be read on this device. Nothing was changed.",
     "keys": [
       "picker.accountUnreadable",

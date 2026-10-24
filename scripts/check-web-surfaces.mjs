@@ -510,7 +510,7 @@ const V = {
   ],
   "src/lib/account.ts": [
     "adapted",
-    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
+    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the three `plugin:account|...` wrappers, plus the pure grouping and heading helpers every picker shares. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/vaultDisplayName.ts": [

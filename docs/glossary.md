@@ -102,12 +102,14 @@ Used in: `design-notes/sync/0688`
 
 ### **account record** &nbsp; 📦 *Product*
 
-The device-local half of the account/vault split: a sealed record holding the account id, the member
-vault ids and the account label, stored under an OS-keychain wrap key (the sealed-label-store
-pattern). It is rebuilt from the on-disk vault scan when missing or corrupt, reconciled against
-discovery (adopting appearing vaults, pruning deleted ones, pruning emptied accounts), and never
-written in plaintext on any platform. Where the keychain is unavailable there is no record and no
-grouping. The per-vault half is the **vault membership** field.
+The device-local half of the account/vault split: a sealed record holding the account id and its
+member vault ids, stored under an OS-keychain wrap key (the sealed-label-store pattern). It carries
+no user-authored text: an account has no name, and a surface that groups vaults by account derives
+the group's heading from the group's own vault names (`decisions/ui/0728`). It is rebuilt from the
+on-disk vault scan when missing or corrupt, reconciled against discovery (adopting appearing vaults,
+pruning deleted ones, pruning emptied accounts), and never written in plaintext on any platform.
+Where the keychain is unavailable there is no record and no grouping. The per-vault half is the
+**vault membership** field.
 
 Used in: `spec/protocol.md` §9.3.1
 
@@ -4216,7 +4218,7 @@ Used in: `design-notes/protocol/0592`; `design-notes/protocol/0593`; `core/src/p
 
 ### **vault picker** &nbsp; 📦 *Product*
 
-The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped under that account's label, which is user-renamable and likewise readable pre-unlock from the sealed device-local account record. Pre-unlock it surfaces only the vault **count + last-unlock timing** plus account **labels and grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and account labels both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped by account, a relation likewise readable pre-unlock from the sealed device-local account record. An account has no name of its own: a surface that draws a group heading builds it from the names of the vaults inside it (`decisions/ui/0728`), and the desktop picker draws no heading at all (myne-md/myne#772). Pre-unlock it surfaces only the vault **count + last-unlock timing** plus the account **grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and the grouping both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
 

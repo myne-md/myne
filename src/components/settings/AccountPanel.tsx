@@ -2,21 +2,22 @@
 // Settings → Account panel: the account-level surface, and ONLY that.
 //
 // ── What "account" means here ───────────────────────────────────────────────
-// The account is the DEVICE-LOCAL grouping of vaults (myne-md/myne#684): the
-// name a user gives to the set of vaults this device treats as one identity.
-// It is a per-device organisational choice, sealed in the device-local record,
-// and it never syncs. The vault's OWN name (`vault.prefs.label`) is a different
-// thing entirely: it lives inside the sealed container and it does sync. That
-// one is in the Vault panel.
+// The account is the DEVICE-LOCAL grouping of vaults (myne-md/myne#684): the set
+// of vaults this device treats as one identity. It is a per-device
+// organisational choice, sealed in the device-local record, and it never syncs.
+// It has no name of its own (`design-notes/ui/0728`): the heading a picker
+// draws for a group is built from that group's own vault names, so this panel
+// no longer offers a rename. The vault's OWN name (`vault.prefs.label`) is a
+// different thing entirely: it lives inside the sealed container, it does sync,
+// and it is in the Vault panel.
 //
 // ── Why this panel was rewritten rather than extended ───────────────────────
 // Until the split this panel contained no account-level control at all: change
 // password, vault label, vault icon and the danger zone all act on the sealed
-// container, and the account the panel is named after appeared nowhere. A user
-// could not rename their account, or even see which vaults share it, anywhere
-// after unlock. Those five vault controls moved to the Vault panel
-// (`settings/VaultPanel.tsx`) and this panel kept the one thing that is
-// genuinely account-scoped: the grouping.
+// container, and the account the panel is named after appeared nowhere: a user
+// could not even see which vaults share it anywhere after unlock. Those five
+// vault controls moved to the Vault panel (`settings/VaultPanel.tsx`) and this
+// panel kept the one thing that is genuinely account-scoped: the grouping.
 //
 // ── The roster, as of 2026-10-23 ─────────────────────────────────────────────
 // The vault list was a naked `<ul>` of names under a paragraph of semantics, so
@@ -26,12 +27,14 @@
 // a secondary line, one control on the right), moves the per-device semantics
 // into the row's `explanation` disclosure, and offers the two grouping actions
 // the VAULT PICKER already performs on its context menu (`account_split`,
-// `account_move`, the same `vaultPicker.*` vocabulary) so the account can be
-// rearranged from where its name is set.
+// `account_move`, the same `vaultPicker.*` vocabulary) so the grouping can be
+// rearranged from the surface that shows it.
 //
-// The person account NUMBER lives here too: it is derived from the identity
-// phrase, so it never needs saving, but a value the picker and the identity home
-// can show should not be invisible on the surface named after the account.
+// The person account NUMBER is the panel's FIRST block, where the account name
+// used to be (`design-notes/ui/0728`). It is derived from the identity phrase,
+// so it never needs saving, it is the one value support and a self-host operator
+// ask for, and a value the picker and the identity home can show should not be
+// buried under a roster on the surface named after the account.
 //
 // ── What is deliberately NOT here yet ───────────────────────────────────────
 // Devices, the member roster and the person identity stay in the Sync panel.
@@ -64,10 +67,9 @@ import {
   accountCommandErrorKind,
   accountIdForVault,
   listAccounts,
+  accountHeading,
   moveVault,
-  renameAccount,
   splitVault,
-  truncateLabelToBytes,
   type AccountView,
 } from "../../lib/account";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
@@ -83,20 +85,8 @@ import { formatRelativeTime } from "../../notes/components/relativeTime";
 import type { VaultSummary } from "../../types/vault-summary";
 import i18n from "../../i18n";
 
-/**
- * The backend's byte cap on an account label (`ACCOUNT_LABEL_MAX_LEN`).
- *
- * Inputs count in characters while the backend counts UTF-8 bytes, so a
- * multibyte draft can pass `maxLength` and still trip `LabelTooLong`;
- * `truncateLabelToBytes` is what keeps the two in agreement. Same 512 the vault
- * picker's rename form uses.
- */
-const ACCOUNT_LABEL_MAX_LEN = 512;
-
 /** Copy for an account-command failure, or `null` for the kinds this panel has
- *  no honest sentence for. `LabelTooLong` cannot be reached through the input
- *  (it truncates), so it shares the generic line rather than getting a banner
- *  nothing can trigger. */
+ *  no honest sentence for. */
 function accountErrorCopy(e: unknown): string {
   switch (accountCommandErrorKind(e)) {
     case "Hidden":
@@ -369,13 +359,12 @@ function VaultRow({
 export interface AccountPanelProps {
   /**
    * The active vault's id, from `SettingsModal`. It is what resolves WHICH
-   * account this panel is about (`accountIdForVault`) and what
-   * `account_rename` takes, since the backend addresses an account through one
-   * of its member vaults.
+   * account this panel is about (`accountIdForVault`), since the backend
+   * addresses an account through one of its member vaults.
    *
    * `null` while a post-reload editor is still resolving it: the panel then
    * states that it does not know which vault it is looking at rather than
-   * aiming a rename at a guess.
+   * aiming a mutation at a guess.
    */
   vaultId: string | null;
   /**
@@ -410,22 +399,15 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
   const [accountNumber, setAccountNumber] = useState<string | null>(null);
   const [numberUnavailable, setNumberUnavailable] = useState(false);
 
-  // The draft mirrors `saved`; Save is enabled only while the two differ.
-  const [saved, setSaved] = useState("");
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   /**
    * Re-seed the panel from a backend answer after a grouping mutation.
    *
    * Anchored on the account the panel was SHOWING while that account still
    * exists, and only then on the active vault: a move can take the open vault
    * out of the account being edited, and re-anchoring on the vault would swap
-   * the panel's subject mid-edit (and silently discard a rename draft) rather
-   * than show the record the user was looking at. `null` is the fresh case: the
-   * shown account is gone, so the active vault's record is the only one left to
-   * show.
+   * the panel's subject mid-action rather than show the record the user was
+   * looking at. `null` is the fresh case: the shown account is gone, so the
+   * active vault's record is the only one left to show.
    */
   const applyAccounts = (next: AccountView[], shownAccountId: string | null) => {
     setAccounts(next);
@@ -436,12 +418,7 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
     const activeId = vaultId === null ? null : accountIdForVault(next, vaultId);
     const found =
       shown ?? (activeId === null ? null : (next.find((a) => a.id === activeId) ?? null));
-    const changedAccount = found?.id !== account?.id;
     setAccount(found);
-    if (changedAccount) {
-      setSaved(found?.label ?? "");
-      setDraft(found?.label ?? "");
-    }
   };
 
   useEffect(() => {
@@ -482,8 +459,6 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
         const id = vaultId === null ? null : accountIdForVault(list, vaultId);
         const found = id === null ? null : (list.find((a) => a.id === id) ?? null);
         setAccount(found);
-        setSaved(found?.label ?? "");
-        setDraft(found?.label ?? "");
         setVaults(orderByLastUnlock(vaultList));
       } catch (e) {
         if (cancelled) return;
@@ -499,35 +474,6 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
       cancelled = true;
     };
   }, [vaultId]);
-
-  const trimmed = draft.trim();
-  const changed = trimmed !== saved;
-  const saveDisabled = !changed || trimmed === "" || saving;
-
-  const handleSave = () => {
-    if (saveDisabled || vaultId === null) return;
-    setSaving(true);
-    setSaveError(null);
-    void (async () => {
-      try {
-        // `account_rename` answers with the updated record, so the panel
-        // re-seeds from the backend's own value rather than from the draft: a
-        // backend-side trim or cap then shows up here instead of being
-        // remembered wrongly.
-        const updated = await renameAccount(vaultId, trimmed);
-        setAccount(updated);
-        setAccounts((list) => list.map((a) => (a.id === updated.id ? updated : a)));
-        setSaved(updated.label);
-        setDraft(updated.label);
-      } catch (e) {
-        // Leave the draft as typed so the user can retry or correct it; the
-        // banner carries the reason.
-        setSaveError(accountErrorCopy(e));
-      } finally {
-        setSaving(false);
-      }
-    })();
-  };
 
   /** Run one grouping mutation. The backend answers with the whole account
    *  list, and that answer is what re-seeds the panel: re-reading would show the
@@ -625,64 +571,69 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
         </p>
       ) : (
         <SettingsSection title={t("settings.account.sections.grouping")}>
+          {/* The account number, first: derived from the identity phrase, so it
+              cannot be lost and needs no saving, but it is the value support and
+              a self-host operator ask for, and it now stands where the account
+              name used to (`design-notes/ui/0728`).
+
+              Rendered in EVERY grouping state, with an honest empty line when
+              the device holds no identity: the settings search entry for it is
+              not gated (the registry's only runtime axes are developer mode and
+              member-vault), and a hit that lands on a row which does not exist
+              degrades to a silent panel switch. `ControlBlock` rather than
+              `SettingRow` because a 27-character monospace value is the
+              "long value rendered inline" exception the row's own header names. */}
           <ControlBlock
-            label={t("settings.account.nameLabel")}
-            anchorId="account.name"
-            testId="settings.account-name-row"
-            helper={t("settings.account.nameHelper")}
+            label={t("settings.account.numberLabel")}
+            anchorId="account.number"
+            testId="settings.account-number-row"
+            helper={
+              accountNumber !== null
+                ? t("settings.account.numberHelper")
+                : numberUnavailable
+                  ? t("settings.account.numberUnavailable")
+                  : t("settings.account.numberEmpty")
+            }
             control={
-              <>
+              accountNumber !== null ? (
                 <div style={INPUT_ROW_STYLE}>
                   <Input
-                    className="account-name-input"
-                    data-testid="settings.account-name-input"
-                    type="text"
-                    value={draft}
-                    maxLength={ACCOUNT_LABEL_MAX_LEN}
-                    placeholder={t("settings.account.namePlaceholder")}
-                    aria-label={t("settings.account.nameLabel")}
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    disabled={saving}
-                    onChange={(e) =>
-                      setDraft(
-                        truncateLabelToBytes(
-                          e.target.value,
-                          ACCOUNT_LABEL_MAX_LEN,
-                        ),
-                      )
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleSave();
-                      }
+                    readOnly
+                    data-testid="settings.account-number"
+                    aria-label={t("settings.account.numberLabel")}
+                    value={accountNumber}
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--text-sm)",
+                      color: "var(--fg-1)",
+                      flex: 1,
+                      minWidth: 0,
+                      userSelect: "all",
                     }}
-                    style={{ flex: 1, minWidth: 0 }}
                   />
-                  <Button
-                    variant="primary"
-                    data-testid="settings.account-name-save"
-                    disabled={saveDisabled}
-                    onClick={handleSave}
-                  >
-                    {saving
-                      ? t("settings.account.nameSaving")
-                      : t("settings.account.nameSave")}
-                  </Button>
-                </div>
-                {saveError !== null && (
+                  <IconButton
+                    icon="copy"
+                    label={t("settings.account.copyAccountNumber")}
+                    bordered
+                    tooltip
+                    confirmed={numberCopied}
+                    testId="settings.account-number-copy"
+                    onClick={copyAccountNumber}
+                  />
                   <p
-                    role="alert"
-                    data-testid="settings.account-name-error"
-                    style={HELPER_STYLE}
+                    role="status"
+                    aria-live="polite"
+                    data-testid="settings.account-number-copy-status"
+                    style={VISUALLY_HIDDEN}
                   >
-                    {saveError}
+                    {numberCopied ? t("settings.account.numberCopied") : ""}
                   </p>
-                )}
-              </>
+                </div>
+              ) : (
+                <p data-testid="settings.account-number-empty" style={HELPER_STYLE}>
+                  {t("settings.account.numberEmpty")}
+                </p>
+              )
             }
           />
 
@@ -758,10 +709,11 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
                     if (anchor === undefined) continue;
                     actions.push({
                       id: `move:${destination.id}`,
-                      label:
-                        destination.label.trim() === ""
-                          ? t("picker.accountFallback")
-                          : destination.label,
+                      label: accountHeading(
+                        destination,
+                        (id) => vaultDisplayNameById(id, vaults, t),
+                        t("picker.accountFallback"),
+                      ),
                       onSelect: () =>
                         runAccountAction(() => moveVault(vault.id, anchor)),
                     });
@@ -787,72 +739,6 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
               })}
             </ul>
           </SettingRow>
-
-          {/* The account number: derived from the identity phrase, so it cannot
-              be lost and needs no saving, but it is the value support and a
-              self-host operator ask for and it should be readable on the
-              surface named after the account.
-
-              Rendered in EVERY grouping state, with an honest empty line when
-              the device holds no identity: the settings search entry for it is
-              not gated (the registry's only runtime axes are developer mode and
-              member-vault), and a hit that lands on a row which does not exist
-              degrades to a silent panel switch. `ControlBlock` rather than
-              `SettingRow` because a 27-character monospace value is the
-              "long value rendered inline" exception the row's own header names. */}
-          <ControlBlock
-            label={t("settings.account.numberLabel")}
-            anchorId="account.number"
-            testId="settings.account-number-row"
-            helper={
-              accountNumber !== null
-                ? t("settings.account.numberHelper")
-                : numberUnavailable
-                  ? t("settings.account.numberUnavailable")
-                  : t("settings.account.numberEmpty")
-            }
-            control={
-              accountNumber !== null ? (
-                <div style={INPUT_ROW_STYLE}>
-                  <Input
-                    readOnly
-                    data-testid="settings.account-number"
-                    aria-label={t("settings.account.numberLabel")}
-                    value={accountNumber}
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--text-sm)",
-                      color: "var(--fg-1)",
-                      flex: 1,
-                      minWidth: 0,
-                      userSelect: "all",
-                    }}
-                  />
-                  <IconButton
-                    icon="copy"
-                    label={t("settings.account.copyAccountNumber")}
-                    bordered
-                    tooltip
-                    confirmed={numberCopied}
-                    testId="settings.account-number-copy"
-                    onClick={copyAccountNumber}
-                  />
-                  <p
-                    role="status"
-                    aria-live="polite"
-                    data-testid="settings.account-number-copy-status"
-                    style={VISUALLY_HIDDEN}
-                  >
-                    {numberCopied ? t("settings.account.numberCopied") : ""}
-                  </p>
-                </div>
-              ) : (
-                <p data-testid="settings.account-number-empty" style={HELPER_STYLE}>
-                  {t("settings.account.numberEmpty")}
-                </p>
-              )
-            }
-          />
 
           {/* Where the rest of the account actually lives, with the door. The
               sentence used to end the panel with a direction the user could not

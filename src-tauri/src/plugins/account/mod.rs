@@ -2,20 +2,19 @@
 //! `account` Tauri plugin: the account-record command surface (the account/vault
 //! split, `decisions.md` 2026-09-07).
 //!
-//! Owns `account_list` + `account_rename` + `account_move` + `account_split`:
-//! the device-local account record that groups vaults under a name. The record
-//! itself lives in `myne_core::account`.
+//! Owns `account_list` + `account_move` + `account_split`: the device-local
+//! account record that groups vaults. The record itself lives in
+//! `myne_core::account`.
 //!
 //! ## Capability ACL
 //!
-//! `account:default` bundles the four commands, main-window-only. `list` is
+//! `account:default` bundles the three commands, main-window-only. `list` is
 //! reachable **pre-unlock** and deliberately so: the picker is the surface it
-//! serves and it runs before any vault is open. The three mutations (rename,
-//! move, split) are **refused while no vault is unlocked** (`Locked`): a
-//! locked-screen observer reads labels and grouping but never regroups
-//! without any vault password (myne-md/myne#684 land gate). None touches
-//! vault content, and the only value that crosses in either direction is the
-//! account label (the user's own text) plus vault ids.
+//! serves and it runs before any vault is open. The two mutations (move,
+//! split) are **refused while no vault is unlocked** (`Locked`): a
+//! locked-screen observer reads the grouping but never regroups without any
+//! vault password (myne-md/myne#684 land gate). None touches vault content, and
+//! the only values that cross are hex account ids and vault ids.
 
 // The command bodies and their error enum live in `myne-core` (shared with the
 // mobile client). Re-exported so `crate::plugins::account::…` resolves
@@ -32,7 +31,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("account")
         .invoke_handler(tauri::generate_handler![
             commands::account_list,
-            commands::account_rename,
             commands::account_move,
             commands::account_split,
         ])

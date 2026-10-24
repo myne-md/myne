@@ -376,7 +376,7 @@ fn main() {
             )
             .plugin(
                 // Account record (the account/vault split, myne-md/myne#684):
-                // shared from `myne-core`; the same FOUR commands the desktop
+                // shared from `myne-core`; the same THREE commands the desktop
                 // registers. On iOS the keychain exists so grouping works; on
                 // Android `platform_keychain` has no backend, so the store holds
                 // nothing and vaults show standalone (never an error, never
@@ -385,7 +385,6 @@ fn main() {
                 "account",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "account_list",
-                    "account_rename",
                     "account_move",
                     "account_split",
                 ]),

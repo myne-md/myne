@@ -5019,8 +5019,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows are grouped under one account header (the neutral \"Account\" label, since no label was set). Right-click a row and rename the account to \"Work\"; confirm the header updates. Right-click another row and choose \"Move to new account\"; confirm it now sits under a second header. Right-click it again and choose \"Move to account…\" back into the first; confirm the two headers collapse to one.",
-        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, rename, move and split all need a real Apple keychain.",
+        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows sit in one account group with no header over them (the desktop picker deliberately draws no group heading, myne-md/myne#772) and that Settings → Account shows the three vaults. Right-click a row, choose \"Move to account…\" where a destination exists, and confirm the grouping changes in Settings → Account. Open Settings → Account and confirm the person account number is the panel's first block and that no control anywhere offers to name the account.",
+        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, move and split all need a real Apple keychain.",
         clients: ["desktop-macos"],
         estimateMin: 10,
         tier: "core",

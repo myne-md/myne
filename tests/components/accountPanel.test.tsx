@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 //
 // Component tests for `src/components/settings/AccountPanel.tsx` — the
-// account-level panel, and only that: the device-local grouping of vaults, its
-// name, and the vaults in it. The vault's own controls (label, icon, change
+// account-level panel, and only that: the device-local grouping of vaults, the
+// person account number that now opens it, and the vaults in it. An account has
+// no name to rename (`design-notes/ui/0728`). The vault's own controls (label, icon, change
 // password, danger zone) live in `settings/VaultPanel.tsx` and are tested in
 // `tests/components/vaultPanel.test.tsx`.
 //
@@ -18,7 +19,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 // ── Mock the IPC-boundary lib wrappers, keeping the pure helpers real ──────
 const listAccounts = vi.fn();
-const renameAccount = vi.fn();
 const splitVault = vi.fn();
 const moveVault = vi.fn();
 const listVaults = vi.fn();
@@ -27,7 +27,6 @@ const personAccountNumber = vi.fn();
 vi.mock("../../src/lib/account", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/account")>()),
   listAccounts: (...a: unknown[]) => listAccounts(...a),
-  renameAccount: (...a: unknown[]) => renameAccount(...a),
   splitVault: (...a: unknown[]) => splitVault(...a),
   moveVault: (...a: unknown[]) => moveVault(...a),
 }));
@@ -59,7 +58,6 @@ import { AccountPanel } from "../../src/components/settings/AccountPanel";
 
 const ACCOUNT = {
   id: "acct-1",
-  label: "Work",
   vaults: ["v-active", "v-other"],
 };
 const VAULTS = [
@@ -79,11 +77,18 @@ const VAULTS = [
     last_unlock: null,
     published: false,
   },
+  {
+    id: "v-third",
+    status: { kind: "Exists" as const },
+    label: "Home vault",
+    icon: null,
+    last_unlock: null,
+    published: false,
+  },
 ];
 
 beforeEach(() => {
   listAccounts.mockReset().mockResolvedValue([ACCOUNT]);
-  renameAccount.mockReset().mockResolvedValue({ ...ACCOUNT, label: "Personal" });
   listVaults.mockReset().mockResolvedValue({ ok: VAULTS });
   splitVault.mockReset().mockResolvedValue([ACCOUNT]);
   moveVault.mockReset().mockResolvedValue([ACCOUNT]);
@@ -99,13 +104,9 @@ function renderPanel(overrides: Partial<Parameters<typeof AccountPanel>[0]> = {}
 }
 
 describe("AccountPanel — the account this vault belongs to", () => {
-  it("shows the account name and the vaults grouped under it", async () => {
+  it("shows the vaults grouped under the account", async () => {
     renderPanel();
-    await waitFor(() =>
-      expect((screen.getByTestId("settings.account-name-input") as HTMLInputElement).value).toBe(
-        "Work",
-      ),
-    );
+    await screen.findByTestId("settings.account-vaults");
     const rows = screen.getAllByTestId("settings.account-vault-row");
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain("Active vault");
@@ -128,56 +129,34 @@ describe("AccountPanel — the account this vault belongs to", () => {
   });
 });
 
-describe("AccountPanel — rename", () => {
-  it("saves through account_rename and re-seeds from the backend's answer", async () => {
+// `design-notes/ui/0728`: the account name is gone, and the person account
+// number took the block it used to open the panel with. Both halves are pinned
+// here, because "the number moved up" is a layout claim that no type can make.
+describe("AccountPanel — the number took the name's place", () => {
+  it("opens with the account number and offers no way to name the account", async () => {
+    personAccountNumber.mockResolvedValue("XX95H84N8WE46C6KXRN2");
     renderPanel();
-    const input = await screen.findByTestId("settings.account-name-input");
-    fireEvent.change(input, { target: { value: "Personal" } });
-    fireEvent.click(screen.getByTestId("settings.account-name-save"));
-    await waitFor(() =>
-      expect(renameAccount).toHaveBeenCalledWith("v-active", "Personal"),
-    );
-    // The panel takes the label the backend returned, not the draft.
-    await waitFor(() =>
-      expect((input as HTMLInputElement).value).toBe("Personal"),
-    );
-  });
-
-  it("disables Save until the name actually changes", async () => {
-    renderPanel();
-    const save = await screen.findByTestId("settings.account-name-save");
-    await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(true));
-    fireEvent.change(screen.getByTestId("settings.account-name-input"), {
-      target: { value: "Home" },
-    });
-    expect((save as HTMLButtonElement).disabled).toBe(false);
-    // Clearing the field is not a rename: an account with no name is what
-    // "standalone" already looks like in the picker.
-    fireEvent.change(screen.getByTestId("settings.account-name-input"), {
-      target: { value: "   " },
-    });
-    expect((save as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("shows the reason a rename failed and keeps the draft", async () => {
-    renameAccount.mockRejectedValue({ kind: "Hidden" });
-    renderPanel();
-    const input = await screen.findByTestId("settings.account-name-input");
-    fireEvent.change(input, { target: { value: "Secret" } });
-    fireEvent.click(screen.getByTestId("settings.account-name-save"));
-    const banner = await screen.findByTestId("settings.account-name-error");
-    expect(banner.textContent).not.toBe("");
-    // The draft survives, so a retry does not start from scratch.
-    expect((input as HTMLInputElement).value).toBe("Secret");
+    const number = await screen.findByTestId("settings.account-number-row");
+    // Nothing that could set a name survives anywhere on the panel.
+    expect(document.querySelector(".account-name-input")).toBeNull();
+    expect(screen.queryByTestId("settings.account-name-row")).toBeNull();
+    // The number is the FIRST block of the grouping section, ahead of the
+    // roster: an ordering a reader sees and a test has to pin, or the block
+    // drifts back under the list on the next edit.
+    const roster = await screen.findByTestId("settings.account-vaults-row");
+    expect(
+      number.compareDocumentPosition(roster) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
 describe("AccountPanel — states that are not 'an account'", () => {
-  it("a standalone vault says so instead of rendering an empty name field", async () => {
+  it("a standalone vault says so instead of rendering the grouping", async () => {
     listAccounts.mockResolvedValue([]);
     renderPanel();
     await screen.findByTestId("settings.account-standalone");
-    expect(screen.queryByTestId("settings.account-name-input")).toBeNull();
+    expect(screen.queryByTestId("settings.account-number-row")).toBeNull();
+    expect(screen.queryByTestId("settings.account-vaults")).toBeNull();
   });
 
   it("an unreadable grouping is an ERROR, never the standalone state", async () => {
@@ -188,13 +167,13 @@ describe("AccountPanel — states that are not 'an account'", () => {
     renderPanel();
     await screen.findByTestId("settings.account-error");
     expect(screen.queryByTestId("settings.account-standalone")).toBeNull();
-    expect(screen.queryByTestId("settings.account-name-input")).toBeNull();
+    expect(screen.queryByTestId("settings.account-number-row")).toBeNull();
   });
 
   it("an unresolved vault id states that rather than guessing", async () => {
     renderPanel({ vaultId: null });
     await screen.findByTestId("settings.account-unresolved");
-    expect(screen.queryByTestId("settings.account-name-input")).toBeNull();
+    expect(screen.queryByTestId("settings.account-number-row")).toBeNull();
   });
 
   it("a vault list failure costs the row names and not the panel", async () => {
@@ -230,11 +209,11 @@ describe("AccountPanel — the vault roster", () => {
   it("offers the grouping actions the picker already performs", async () => {
     // Two accounts, so a move DESTINATION exists: the backend takes a target
     // vault id, so a destination can only be an account that already holds one.
-    const other = { id: "acct-2", label: "Home", vaults: ["v-third"] };
+    const other = { id: "acct-2", vaults: ["v-third"] };
     listAccounts.mockResolvedValue([ACCOUNT, other]);
     splitVault.mockResolvedValue([
       { ...ACCOUNT, vaults: ["v-other"] },
-      { id: "acct-3", label: "", vaults: ["v-active"] },
+      { id: "acct-3", vaults: ["v-active"] },
     ]);
     renderPanel();
     const actions = await screen.findAllByTestId("settings.account-vault-actions");
@@ -244,20 +223,27 @@ describe("AccountPanel — the vault roster", () => {
 
     // The panel stays on the account it was SHOWING rather than following the
     // open vault into the account the split just created: swapping the panel's
-    // subject mid-edit is the failure this anchors against (2026-10-23 review).
+    // subject mid-action is the failure this anchors against (2026-10-23
+    // review). The shown account kept `v-other`, so its roster reads one vault.
     await waitFor(() => expect(splitVault).toHaveBeenCalled());
-    expect(
-      (screen.getByTestId("settings.account-name-input") as HTMLInputElement).value,
-    ).toBe("Work");
+    await waitFor(() =>
+      expect(screen.getByTestId("settings.account-vaults-count").textContent).toBe(
+        "1 vault",
+      ),
+    );
   });
 
-  it("moves a vault into another account by that account's first vault", async () => {
-    const other = { id: "acct-2", label: "Home", vaults: ["v-third"] };
+  it("names a move destination by its own vaults, and moves into its first", async () => {
+    const other = { id: "acct-2", vaults: ["v-third"] };
     listAccounts.mockResolvedValue([ACCOUNT, other]);
     renderPanel();
     const actions = await screen.findAllByTestId("settings.account-vault-actions");
     fireEvent.click(actions[0]!);
     const destinations = await screen.findAllByTestId("settings.account-vault-move");
+    // An account has no name of its own, so the menu identifies it by what is
+    // inside it (`design-notes/ui/0728`). A bare "Account" would make two
+    // destinations indistinguishable.
+    expect(destinations[0]!.textContent).toContain("Home vault");
     fireEvent.click(destinations[0]!);
     await waitFor(() => expect(moveVault).toHaveBeenCalledWith("v-active", "v-third"));
   });
@@ -308,8 +294,8 @@ describe("AccountPanel — the roster's careful arms", () => {
     renderPanel();
     fireEvent.click((await screen.findAllByTestId("settings.account-vault-actions"))[0]!);
     fireEvent.click(await screen.findByTestId("settings.account-vault-split"));
-    // The split deletes the account's id AND its name, which the menu's own
-    // wording cannot say, so it is a second step rather than a click.
+    // The split deletes the account's id, which the menu's own wording cannot
+    // say, so it is a second step rather than a click.
     expect(splitVault).not.toHaveBeenCalled();
     expect(await screen.findByTestId("settings.account-vault-confirm-run")).toBeTruthy();
     fireEvent.click(screen.getByTestId("settings.account-vault-confirm-cancel"));
