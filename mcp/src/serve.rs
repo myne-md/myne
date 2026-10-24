@@ -51,7 +51,34 @@ pub fn serve_with(
     max_frame_bytes: usize,
     transport: Transport,
 ) -> std::io::Result<()> {
-    let mut server = Server::with_transport(transport);
+    serve_session(
+        reader,
+        writer,
+        max_frame_bytes,
+        &mut Server::with_transport(transport),
+    )
+}
+
+/// [`serve_with`] over an already-built [`Server`], so a test can pin the
+/// session's own state (the declared connection name) instead of mutating the
+/// process environment, which no test can do safely beside its siblings.
+#[cfg(test)]
+pub fn serve_with_server(
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+    max_frame_bytes: usize,
+    server: &mut Server,
+) -> std::io::Result<()> {
+    serve_session(reader, writer, max_frame_bytes, server)
+}
+
+/// The loop itself: one line in, at most one line out, until EOF.
+fn serve_session(
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+    max_frame_bytes: usize,
+    server: &mut Server,
+) -> std::io::Result<()> {
     let mut line = Vec::new();
     loop {
         line.clear();

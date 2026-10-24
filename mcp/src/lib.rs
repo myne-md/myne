@@ -50,6 +50,7 @@
 //! immediately after the handshake and share one dispatcher. A later revision
 //! that this surface does use is a revisit, not an extension of the branch.
 
+pub mod dispatch;
 pub mod errors;
 pub mod protocol;
 pub mod serve;
@@ -64,6 +65,8 @@ pub mod transport;
 /// is about.
 pub use serve::{serve, MAX_FRAME_BYTES};
 
+#[cfg(test)]
+mod dispatch_test;
 #[cfg(test)]
 mod protocol_test;
 #[cfg(test)]

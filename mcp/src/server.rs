@@ -18,32 +18,37 @@
 //! It forwards, and it answers for a closed door. It does not enforce scope, does
 //! not know what a folder is, and does not decide what a verb means: those live
 //! host-side, behind the same door the CLI uses, so that one implementation is
-//! the authority for both front-ends. What this file owns is the refusal a caller
-//! gets when there is no door to ask, because a shim that answered a closed door
-//! with a protocol error would read to a client as a broken server and the
-//! session would be re-established rather than resumed.
+//! the authority for both front-ends. What this file owns is request validation
+//! and the refusal a caller gets when there is no door to ask, because a shim
+//! that answered a closed door with a protocol error would read to a client as a
+//! broken server and the session would be re-established rather than resumed.
+//! The envelope and the connection name live in [`crate::dispatch`].
 
 use serde_json::{json, Value};
 
+use crate::dispatch;
 use crate::errors;
 use crate::protocol::{self, Incoming, Revision};
 use crate::tools;
-use crate::transport::{DoorAnswer, Transport};
+use crate::transport::Transport;
 
 /// Reported as `serverInfo.name`. A client shows this, so it is the product
 /// name rather than the binary name.
 pub const SERVER_NAME: &str = "myne-mcp";
 
-/// The door command a tool call travels as. Declared here because this is where
-/// the envelope is built; the host's dispatcher answers the same name, and the
-/// per-tool payload shape is that side's contract.
-pub const DOOR_TOOL_CALL_CMD: &str = "mcp_call";
-
-/// One MCP session. The only state is the revision the first frame selected.
+/// One MCP session. The state is the revision the first frame selected and the
+/// name the client declared, both of which are fixed by the first frame that
+/// carries them.
 #[derive(Debug, Default)]
 pub struct Server {
     revision: Option<Revision>,
     transport: Transport,
+    /// `MYNE_MCP_CONNECTION`, read once: a process cannot change its own config
+    /// mid-session, and reading it per call would let a test's environment leak
+    /// into an unrelated assertion.
+    configured_name: Option<String>,
+    /// `clientInfo.name` from the handshake, when the client sent one.
+    declared_name: Option<String>,
 }
 
 impl Server {
@@ -54,12 +59,38 @@ impl Server {
         Self {
             revision: None,
             transport,
+            configured_name: std::env::var(dispatch::CONNECTION_ENV).ok(),
+            declared_name: None,
+        }
+    }
+
+    /// A session with the connection name pinned, bypassing the environment.
+    ///
+    /// The test seam for the name, the same shape as `Transport::at`: a test that
+    /// asserted the handshake name while `MYNE_MCP_CONNECTION` happened to be set
+    /// in the developer's shell would pass or fail by environment, which is the
+    /// flaky shape this avoids.
+    #[cfg(test)]
+    pub fn with_transport_named(transport: Transport, declared: Option<&str>) -> Self {
+        Self {
+            revision: None,
+            transport,
+            configured_name: None,
+            declared_name: declared.map(str::to_string),
         }
     }
 
     /// The revision this session speaks, or `None` before the first frame.
     pub fn revision(&self) -> Option<Revision> {
         self.revision
+    }
+
+    /// The name this session's calls travel under.
+    fn connection(&self) -> String {
+        dispatch::resolve(
+            self.configured_name.as_deref(),
+            self.declared_name.as_deref(),
+        )
     }
 
     /// Handle one newline-delimited frame.
@@ -99,7 +130,13 @@ impl Server {
         }
     }
 
-    fn answer(&self, id: Value, method: &str, params: Option<&Value>, revision: Revision) -> Value {
+    fn answer(
+        &mut self,
+        id: Value,
+        method: &str,
+        params: Option<&Value>,
+        revision: Revision,
+    ) -> Value {
         match method {
             // Answered in BOTH revisions, deliberately. A stateless client
             // never needs it, and a client that probed with `tools/list` first
@@ -107,7 +144,19 @@ impl Server {
             // dead-end a client that is merely old-fashioned, and the cost of
             // answering is that `protocolVersion` becomes the observable proof
             // of which revision the first frame selected.
-            "initialize" => protocol::response(id, self.handshake(revision)),
+            "initialize" => {
+                // The one piece of the handshake this session keeps. The FIRST
+                // declared name wins: a second `initialize` cannot rename a
+                // session into a different grant mid-stream.
+                if self.declared_name.is_none() {
+                    self.declared_name = params
+                        .and_then(|params| params.get("clientInfo"))
+                        .and_then(|info| info.get("name"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                }
+                protocol::response(id, self.handshake(revision))
+            }
             // The stateless revision's discovery method. A strict client of that
             // revision asks ONLY this, so leaving it at `-32601` was a hole in
             // the revision rather than a missing nicety: the payload is the
@@ -139,7 +188,8 @@ impl Server {
         payload
     }
 
-    /// Forward one tool call to the door, or answer for a closed door.
+    /// Validate one tool call, then forward it to the door through
+    /// [`dispatch::execute`], or answer for a closed door.
     fn tool_call(&self, id: Value, params: Option<&Value>) -> Value {
         let Some(params) = params else {
             return protocol::error_response(id, protocol::INVALID_PARAMS, "Invalid params");
@@ -170,16 +220,7 @@ impl Server {
             return protocol::error_response(id, protocol::INVALID_PARAMS, "Invalid params");
         }
 
-        let request = json!({
-            "cmd": DOOR_TOOL_CALL_CMD,
-            "tool": name,
-            "arguments": arguments,
-        });
-        let result = match self.transport.call(&request) {
-            Err(refusal) => refusal.result(),
-            Ok(DoorAnswer::Ok { result }) => errors::tool_success(result),
-            Ok(DoorAnswer::Refused { kind, message }) => errors::door_refusal(&kind, &message),
-        };
+        let result = dispatch::execute(&self.transport, name, arguments, &self.connection());
         protocol::response(id, result)
     }
 }
