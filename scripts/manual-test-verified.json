@@ -24,5 +24,510 @@
     "guard says so out loud on every run rather than letting an absent file read as",
     "a clean one."
   ],
-  "verified": {}
+  "verified": {
+    "a11y.wcag22-manual": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "ai.agent-hub": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "ai.agent-mode": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "ai.chat": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "ai.on-device-transcription": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "ai.summarize-and-ask": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "app.crash-recovery": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "app.language-and-i18n": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "app.reminders": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "app.self-update": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "app.window-chrome": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "attachments.uri-scheme-playback": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "backup.automatic-schedule": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "backup.manual-export": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "backup.restore": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "clipper.connected-extensions": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "clipper.locked-or-closed": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "clipper.pairing": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "editor.detached-window-pop-out": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "editor.tasks-inline": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "editor.text-editing": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "editor.transcription": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "editor.voice-recording": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "export.backup-exclusion": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "export.share-destination": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "identity.first-run": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "import.myne-vault": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "input.keybindings": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "install.desktop-artefacts": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "install.store-distribution-and-update": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "keyboard.ime-and-accessory-bar": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "layout.size-classes": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "lifecycle.background-grace-lock": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "lifecycle.sync-suspend-resume": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "links.backlinks-and-mentions": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "meeting.notes": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "navigation.back-gesture": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "network.ai-egress-gate": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "network.tor-routing": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "procedures.clipboard-sensitivity": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "reminders.android-delivery": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "reminders.ios-delivery": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "reminders.tap-landing": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "security.keychain-device-binding": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.ai-provider": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.datetime-display": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.hide-vault-names": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.new-note-location": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.screen-capture-protection.android": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.screen-capture-protection.ios": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.screen-capture-protection.linux": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.block.screen-capture-protection.macos": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.panel.privacy": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.panel.storage": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "settings.panel.sync": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "share-import.android-intent": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "share-import.ios-extension": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "sidebar.notes-and-folders": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "sync.conflicts": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "sync.cross-version": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "sync.device-join": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "sync.status-and-banners": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "unlock.argon2id-budget": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.auto-lock": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.change-password": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.creation": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.delete": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.migration-and-repair": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.picker-and-switcher": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.quick-unlock": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "vault.recover-from-phrase": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "watch.capture-drain": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "watch.meeting-capture": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.clipboard.write-per-engine": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.deploy.headers-and-isolation": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.opfs.double-buffer-crash": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.phrase.creation-and-recovery-in-a-page": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.storage.eviction-rebootstrap": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.storage.private-browsing": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.storage.quota-exhaustion": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "web.tab.single-tab-lock-lifecycle": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "webview.navigation-policy": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "widgets.deep-link-launchers": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    },
+    "workspace.navigation-history": {
+      "version": "v0.10.1",
+      "date": "2026-10-24",
+      "verdict": "override",
+      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+    }
+  }
 }
