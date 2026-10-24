@@ -78,7 +78,23 @@ fn an_id_makes_it_a_request_and_its_absence_makes_it_a_notification() {
         classify(json!({ "jsonrpc": "2.0", "id": 7, "method": "tools/list" })),
         Ok(Incoming::Request {
             id: json!(7),
-            method: "tools/list".to_string()
+            method: "tools/list".to_string(),
+            params: None,
+        })
+    );
+    // `params` rides along untouched, because `tools/call` is the only method
+    // that reads it and the envelope is not the place to validate an argument.
+    assert_eq!(
+        classify(json!({
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": { "name": "note_read", "arguments": { "note_id": "a" } }
+        })),
+        Ok(Incoming::Request {
+            id: json!(8),
+            method: "tools/call".to_string(),
+            params: Some(json!({ "name": "note_read", "arguments": { "note_id": "a" } })),
         })
     );
     assert_eq!(

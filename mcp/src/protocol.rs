@@ -22,13 +22,15 @@ pub const STATEFUL_REVISION: &str = "2025-11-25";
 /// handshake to send first.
 pub const STATELESS_REVISION: &str = "2026-07-28";
 
-/// JSON-RPC 2.0's reserved codes, the three this server can produce. The
+/// JSON-RPC 2.0's reserved codes, the four this server can produce. The
 /// application-level refusals (`vault_locked`, `door_disabled`,
-/// `app_not_running`) are tool results rather than protocol errors, and belong
-/// to the task that adds `tools/call`.
+/// `app_not_running`) are tool results rather than protocol errors, and are
+/// built in [`crate::errors`]: a client reads a protocol error as a broken
+/// server and reconnects, which is the failure lock survival exists to avoid.
 pub const PARSE_ERROR: i64 = -32700;
 pub const INVALID_REQUEST: i64 = -32600;
 pub const METHOD_NOT_FOUND: i64 = -32601;
+pub const INVALID_PARAMS: i64 = -32602;
 
 /// Which revision this session speaks. Selected exactly once, by the first
 /// frame, and then fixed: a client that changes its mind mid-session is not a
@@ -77,7 +79,15 @@ pub fn revision_for_first_frame(frame: &Value) -> Revision {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Incoming {
     /// A request: it always gets exactly one response.
-    Request { id: Value, method: String },
+    Request {
+        id: Value,
+        method: String,
+        /// The frame's `params`, carried only because `tools/call` reads them.
+        /// Nothing is validated here: a method that ignores them ignores them,
+        /// which is what keeps the envelope check separate from per-method
+        /// argument checking.
+        params: Option<Value>,
+    },
     /// A notification: it never gets a response, whatever its method.
     Notification,
 }
@@ -96,10 +106,9 @@ const INVALID: RpcError = RpcError {
 
 /// Check the envelope and split request from notification.
 ///
-/// `params` is deliberately not carried: this slice answers `tools/list` from a
-/// constant and `initialize` without reading the client's capabilities, so
-/// keeping the value around would be a field nobody reads. The task that adds
-/// `tools/call` extends this enum rather than re-parsing the frame.
+/// `params` is carried verbatim and never validated here: only `tools/call`
+/// reads it, and a per-method argument check belongs to the method rather than
+/// to the envelope.
 pub fn classify(frame: Value) -> Result<Incoming, RpcError> {
     let Some(object) = frame.as_object() else {
         return Err(INVALID);
@@ -120,6 +129,7 @@ pub fn classify(frame: Value) -> Result<Incoming, RpcError> {
         Some(id) => Ok(Incoming::Request {
             id: id.clone(),
             method,
+            params: object.get("params").cloned(),
         }),
         // The absent-`id` shape is how JSON-RPC says "notification". MCP's own
         // `notifications/initialized` and `notifications/cancelled` arrive

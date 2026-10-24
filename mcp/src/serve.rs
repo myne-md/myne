@@ -20,6 +20,7 @@ use std::io::{BufRead, ErrorKind, Write};
 
 use crate::protocol;
 use crate::server::Server;
+use crate::transport::Transport;
 
 /// One frame's ceiling. A `tools/list` response is a few kilobytes and a
 /// `tools/call` argument is a note's worth of text, so four mebibytes is far
@@ -36,7 +37,21 @@ pub fn serve(
     writer: &mut impl Write,
     max_frame_bytes: usize,
 ) -> std::io::Result<()> {
-    let mut server = Server::default();
+    serve_with(reader, writer, max_frame_bytes, Transport::new())
+}
+
+/// [`serve`], with the door client supplied.
+///
+/// The seam exists so a test can drive a whole session (one reader, one writer,
+/// one [`Server`]) against a fake door in a temp dir while every frame still
+/// travels the real stdio path. Production always takes [`Transport::new`].
+pub fn serve_with(
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+    max_frame_bytes: usize,
+    transport: Transport,
+) -> std::io::Result<()> {
+    let mut server = Server::with_transport(transport);
     let mut line = Vec::new();
     loop {
         line.clear();

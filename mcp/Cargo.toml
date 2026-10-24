@@ -23,3 +23,9 @@ path = "src/lib.rs"
 # the `Value` type and the `json!` macro this crate builds its whole surface
 # from; plain `serde` is not needed, so it is not declared.
 serde_json = "1"
+# Cross-platform data-dir resolution, matching Tauri's own `app_data_dir()`
+# exactly (`dirs::data_dir().join(identifier)`), the same edge `cli/Cargo.toml`
+# takes for the same reason: the shim computes the socket path independently of
+# the app, and this version is already resolved in the workspace `Cargo.lock`
+# through `tauri`, so it adds no new supply-chain surface.
+dirs = "6"

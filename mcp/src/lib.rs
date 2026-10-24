@@ -11,20 +11,28 @@
 //!
 //! ## What this slice is, and what it is not
 //!
-//! It is the protocol half: speak MCP over stdio, select the revision the
-//! client's first frame implies, and answer `tools/list` from a compiled-in
-//! schema. It deliberately reaches no vault. The tool *calls* land in later
-//! tasks, over the existing local door, and until they do a `tools/call` is
-//! answered as an unknown method rather than with an invented failure shape.
-//! That ordering is the point of the slice: a client can be configured and can
+//! It speaks MCP over stdio, selects the revision the client's first frame
+//! implies, and answers discovery (`tools/list` and `server/discover`) from a
+//! compiled-in schema. A `tools/call` is forwarded to the app over the existing
+//! local door, and answered here only when there is no door to ask: the vault is
+//! locked, external access is off, or the app is not running. Each of those
+//! returns a structured tool error naming the state plus one actionable
+//! sentence, and the client's session survives all three.
+//!
+//! What this binary still does NOT do is the part that needs a vault: resolve a
+//! connection's frozen scope, clamp a read to it, take a snapshot before a write
+//! or refuse a write outside its grant. Those live host-side, behind the same
+//! door the CLI uses, so one implementation is the authority for both
+//! front-ends. That ordering is also what lets a client be configured and
 //! discover the surface while the vault is locked, before anything can read it.
 //!
 //! Three properties are structural rather than incidental:
 //!
-//! - **Nothing listens.** stdio to the client, and (from a later task) the
-//!   existing 0600 Unix domain socket to the app. No port, no token, no
-//!   pairing ceremony, no second lifecycle. `ai-no-network-check.sh` check 4
-//!   flags `TcpListener::bind` and stays green because there is none to flag.
+//! - **Nothing listens.** stdio to the client, and the app's existing 0600 Unix
+//!   domain socket to the door. No port, no token, no pairing ceremony, no
+//!   second lifecycle. The AI egress ratchet does not scan this crate, and that
+//!   omission is a decision with a binding constraint attached to it, stated in
+//!   full at [`transport`].
 //! - **The tool list is compiled in.** [`tools::catalog`] is a constant
 //!   expression over string literals, never derived from vault content or from
 //!   anything a client sent. The tool-poisoning class depends on descriptions
@@ -42,10 +50,13 @@
 //! immediately after the handshake and share one dispatcher. A later revision
 //! that this surface does use is a revisit, not an extension of the branch.
 
+pub mod errors;
 pub mod protocol;
 pub mod serve;
 pub mod server;
+pub mod status;
 pub mod tools;
+pub mod transport;
 
 /// The stdio loop and its frame cap, re-exported at the crate root so `main`
 /// reads as wiring rather than as a module path. The module and the function
@@ -59,3 +70,5 @@ mod protocol_test;
 mod serve_test;
 #[cfg(test)]
 mod tools_test;
+#[cfg(test)]
+mod transport_test;
