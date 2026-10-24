@@ -85,21 +85,37 @@ export async function personAccountNumber(): Promise<string | null> {
   return invoke<string | null>("plugin:sync|sync_person_account_number");
 }
 
+/** The device's sync-server configuration, as the register dialog must state it. */
+export interface SyncEndpointConfig {
+  /** The server this device would register against today, or `null` for none. */
+  endpoint_url: string | null;
+  /** The stored admission code for a gated server (`MYNE_INVITE_CODE`), or
+   *  `null`. Device-local, never synced, and the only copy of the word. */
+  invite_code: string | null;
+}
+
 /**
- * The device-local sync endpoint, or `null` when this device has none.
+ * The device-local sync endpoint and its admission code.
  *
  * Lives here, next to `personRegister`, because registration is the one person
  * act that CANNOT work without a server and the identity home is reachable at
  * zero vaults, where Settings (the endpoint's own home, `SyncPanel` →
- * `EndpointConfig`) does not exist. Reading it there is what decides whether the
- * register block offers an address field instead of telling the user to go to a
- * screen they cannot open (2026-10-23).
+ * `EndpointConfig`) does not exist.
+ *
+ * It returns the CODE as well as the address (2026-10-24): the register dialog
+ * shows the server it is about to write this identity to, and a gated server's
+ * code has to be in that same row, because a self-hoster who restricts
+ * registration could otherwise never register from this surface at all. The
+ * address alone was enough while the field only appeared as a fallback.
  */
-export async function readSyncEndpoint(): Promise<string | null> {
-  const view = await invoke<{ endpoint_url: string | null } | null>(
+export async function readSyncConfig(): Promise<SyncEndpointConfig> {
+  const view = await invoke<SyncEndpointConfig | null>(
     "plugin:sync|sync_get_endpoint",
   );
-  return view?.endpoint_url ?? null;
+  return {
+    endpoint_url: view?.endpoint_url ?? null,
+    invite_code: view?.invite_code ?? null,
+  };
 }
 
 /**

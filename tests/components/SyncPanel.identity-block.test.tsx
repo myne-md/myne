@@ -195,8 +195,11 @@ describe("the Identity block, per device identity state", () => {
 // 2026-10-23. Registration was reachable only from the identity home, which
 // renders at ZERO vaults. A user sitting in a vault therefore had no door, and
 // the publish row's own refusal sent them to that screen.
+//
+// 2026-10-24: the same act is now the shared two-step DIALOG, so this door and
+// the identity home cannot answer "which server" differently.
 describe("the identity block's register door", () => {
-  it("offers registration for a reserved identity, with the shared 24-cell grid", async () => {
+  it("opens the shared dialog on its server step", async () => {
     setActiveSettingsTopic("sync", "connection");
     invokeMock.mockImplementation(
       syncPanelCommandRouter({
@@ -205,10 +208,12 @@ describe("the identity block's register door", () => {
     );
     renderSyncPanel();
     fireEvent.click(await screen.findByTestId("sync.panel.register-cta"));
-    expect(await screen.findByTestId("sync.panel.register-phrase-grid")).toBeTruthy();
-    // No endpoint is configured in the harness, so the address is asked for here
-    // rather than in a Settings screen the user cannot reach without a vault.
-    expect(await screen.findByTestId("sync.panel.register-server")).toBeTruthy();
+    expect(await screen.findByTestId("sync.panel.register-dialog")).toBeTruthy();
+    // Step one is the server, and the harness configures no endpoint, so the
+    // field is here and empty rather than hidden behind a refusal.
+    expect((await screen.findByTestId("sync.panel.register-server") as HTMLInputElement).value).toBe("");
+    // The phrase is the SECOND step, so it is not in this view.
+    expect(screen.queryByTestId("sync.panel.register-phrase-grid")).toBeNull();
   });
 
   it("does not offer it for an enrolled identity", async () => {
@@ -245,17 +250,19 @@ describe("the Settings register door submits", () => {
     });
     renderSyncPanel();
     fireEvent.click(await screen.findByTestId("sync.panel.register-cta"));
-    const grid = await screen.findByTestId("sync.panel.register-phrase-grid");
+    // Step one: the address, written on Continue.
+    fireEvent.change(await screen.findByTestId("sync.panel.register-server"), {
+      target: { value: "https://sync.example" },
+    });
+    fireEvent.click(screen.getByTestId("sync.panel.register-continue"));
+    // Step two: the phrase.
+    await screen.findByTestId("sync.panel.register-phrase-grid");
     for (let i = 0; i < 24; i += 1) {
       const id =
         i === 0 ? "sync.panel.register-phrase" : `sync.panel.register-phrase-cell-${i + 1}`;
       fireEvent.change(screen.getByTestId(id), { target: { value: `word${i + 1}` } });
     }
-    fireEvent.change(await screen.findByTestId("sync.panel.register-server"), {
-      target: { value: "https://sync.example" },
-    });
     fireEvent.click(screen.getByTestId("sync.panel.register-submit"));
     await waitFor(() => expect(calls).toEqual(["endpoint", "register:24"]));
-    expect(grid).toBeTruthy();
   });
 });

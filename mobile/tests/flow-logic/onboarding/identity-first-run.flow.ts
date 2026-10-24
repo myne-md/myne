@@ -60,7 +60,7 @@ test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
     await expect(page.getByTestId("create-vault.briefing-why").first()).toBeVisible();
   });
 
-  test("registering from the identity home sends the phrase and clears its own block", async ({
+  test("registering from the identity home names the server first, then sends the phrase", async ({
     page,
   }) => {
     await installMockIpc(page, {
@@ -71,6 +71,23 @@ test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
     await createIdentityToHome(page);
 
     await page.getByTestId("identity-flow.home-register-open").click();
+
+    // The server comes FIRST (2026-10-24). The step used to collect 24 words and
+    // then, on `NotConfigured`, tell the user to set a server in Settings — a
+    // screen with no door before the first vault exists. The address row is on
+    // the step, and nothing can be submitted without it.
+    const server = page.getByTestId("identity-flow.register-server");
+    await expect(server).toBeVisible();
+    await expect(server).toHaveValue("");
+
+    // No address, no way forward, and the phrase is not on this step at all.
+    await expect(page.getByTestId("identity-flow.register-continue")).toBeDisabled();
+    await expect(page.locator('input[data-testid^="identity-flow.register-cell"]')).toHaveCount(0);
+
+    await server.fill("https://sync.example");
+    await page.getByTestId("identity-flow.register-continue").click();
+
+    // Step two is the phrase.
     const cells = page.locator('input[data-testid^="identity-flow.register-cell"]');
     await expect(cells).toHaveCount(24);
     for (let i = 0; i < 24; i += 1) {
@@ -78,7 +95,14 @@ test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
     }
     await page.getByTestId("identity-flow.register-submit").click();
 
-    // The phrase crossed IPC once, as the proof of possession.
+    // The address went first, then the phrase crossed IPC once as the proof of
+    // possession.
+    const endpointArgs = await page.evaluate(
+      () =>
+        (window as unknown as { __setEndpointArgs?: { endpointUrl?: string }[] })
+          .__setEndpointArgs,
+    );
+    expect(endpointArgs?.[0]?.endpointUrl).toBe("https://sync.example");
     const args = await page.evaluate(
       () => (window as unknown as { __personRegisterArgs?: { phrase?: string } }).__personRegisterArgs,
     );

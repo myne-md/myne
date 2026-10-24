@@ -22,7 +22,7 @@ import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
-import { PersonRegisterForm } from "../sync/PersonRegisterForm";
+import { PersonRegisterDialog } from "../sync/PersonRegisterDialog";
 import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
@@ -640,10 +640,23 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
               identity has sent nothing and a `pending` one has no token, so
               neither can be invited, published under, or found. The identity
               home is the only other place this act exists and it renders at zero
-              vaults; this block is the one a user with a vault is looking at. */}
+              vaults; this block is the one a user with a vault is looking at.
+
+              The act itself is the shared DIALOG (2026-10-24), not a block that
+              expands in this row: it asks which server the identity is written
+              to before it asks for the phrase, and that is one component so the
+              two doors cannot answer it differently. */}
           {needsRegistration ? (
-            registerOpen ? (
-              <PersonRegisterForm
+            <div>
+              <Button
+                variant="secondary"
+                data-testid="sync.panel.register-cta"
+                onClick={() => setRegisterOpen(true)}
+              >
+                {t("identityHome.registerCta")}
+              </Button>
+              <PersonRegisterDialog
+                open={registerOpen}
                 testIdPrefix="sync.panel.register"
                 onRegistered={() => {
                   setRegisterOpen(false);
@@ -654,19 +667,9 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
                   probePerson();
                   void syncNow();
                 }}
-                onCancel={() => setRegisterOpen(false)}
+                onClose={() => setRegisterOpen(false)}
               />
-            ) : (
-              <div>
-                <Button
-                  variant="secondary"
-                  data-testid="sync.panel.register-cta"
-                  onClick={() => setRegisterOpen(true)}
-                >
-                  {t("identityHome.registerCta")}
-                </Button>
-              </div>
-            )
+            </div>
           ) : null}
         </SettingRow>
       )}

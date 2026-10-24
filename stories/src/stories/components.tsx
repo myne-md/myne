@@ -74,6 +74,7 @@ import { Keycaps } from "@app/components/primitives/Keycaps";
 import { MemberNameGate } from "@app/components/sync/MemberNameGate";
 import { MemberRosterPanel } from "@app/components/sync/MemberRosterPanel";
 import { PersonRegisterForm } from "@app/components/sync/PersonRegisterForm";
+import { PersonRegisterDialog } from "@app/components/sync/PersonRegisterDialog";
 import { MemberVaultUnlockCard } from "@app/components/sync/MemberVaultUnlockCard";
 import { ModalShell } from "@app/components/primitives/ModalShell";
 import { MyneMark } from "@app/components/primitives/MyneMark";
@@ -1249,17 +1250,17 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <MemberRosterPanel />,
   },
   {
-    id: "components/personregisterform/default",
+    id: "components/personregisterform/server-step",
     group: "components",
     surface: "PersonRegisterForm",
-    state: "default",
+    state: "server-step",
     description:
-      "The one register-an-identity form, mounted by the identity home and by Settings → Sync. It asks for the 24 words in the shared grid and, when the device has no sync server yet, for the address too: registering is a write against a server, and the identity home is reachable at zero vaults, where Settings does not exist. The catch every failure arm shares is that a registration failure wipes the words while an address failure keeps them.",
-    tags: ["components", "sync", "identity", "register", "recovery phrase", "b2b"],
+      "The register act's FIRST step: which server the identity is written to, plus the optional admission code a gated server asks for. The address is a decision and the phrase is a secret, so they never share a view, and a mistyped URL is refused here, before any word of the phrase is typed. Mounted by the identity home and by Settings → Sync, so the two doors cannot answer 'which server' differently.",
+    tags: ["components", "sync", "identity", "register", "server", "b2b"],
     fixture: {
-      description: "a device with no sync server configured",
+      description: "a device with no sync server configured yet",
       handlers: {
-        "plugin:sync|sync_get_endpoint": () => ({ endpoint_url: null }),
+        "plugin:sync|sync_get_endpoint": () => ({ endpoint_url: null, invite_code: null }),
         "plugin:sync|sync_beta_terms_accepted": () => true,
       },
     },
@@ -1267,6 +1268,33 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       <PersonRegisterForm
         testIdPrefix="story.register"
         onRegistered={() => {}}
+      />
+    ),
+  },
+  {
+    id: "components/personregisterdialog/server-step",
+    group: "components",
+    surface: "PersonRegisterDialog",
+    state: "server-step",
+    description:
+      "The register act as a dialog, which is how both doors open it: the identity home's card stays readable instead of growing a 24-cell grid inside its scroll region. The action row is pinned below the scroll region, so Register can never scroll out of view.",
+    tags: ["components", "sync", "identity", "register", "dialog", "b2b"],
+    fixture: {
+      description: "a device whose sync server is already configured",
+      handlers: {
+        "plugin:sync|sync_get_endpoint": () => ({
+          endpoint_url: "https://sync.example",
+          invite_code: null,
+        }),
+        "plugin:sync|sync_beta_terms_accepted": () => true,
+      },
+    },
+    render: () => (
+      <PersonRegisterDialog
+        open
+        testIdPrefix="story.register"
+        onRegistered={() => {}}
+        onClose={action("onClose")}
       />
     ),
   },
