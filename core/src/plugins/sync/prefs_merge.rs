@@ -886,6 +886,12 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         hidden_bar_items: local.hidden_bar_items.clone(),
         keymap: local.keymap.clone(),
         last_backup_at: local.last_backup_at,
+        // external-mcp-connection (myne-md/myne#923). **Device-local**: the
+        // consent record for opening the vault to a process Myne does not ship,
+        // so a peer's approval is never inherited here. A synced grant would also
+        // mean something different per device, because the frozen scope names
+        // folder paths and two devices can hold different trees after a merge.
+        mcp_connections: local.mcp_connections.clone(),
         paired_extensions: local.paired_extensions.clone(),
         right_panel_active_tab: local.right_panel_active_tab.clone(),
         right_panel_hidden_tabs: local.right_panel_hidden_tabs.clone(),

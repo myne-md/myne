@@ -202,6 +202,50 @@ pub struct EditorLayout {
     pub right_collapsed: bool,
 }
 
+/// One external MCP connection's grant: what a named client may read, when the
+/// user approved it, and when it last ran a tool (external-mcp-connection,
+/// myne-md/myne#923).
+///
+/// **The frozen unit is the folder-path SET, not a note list.** A connection's
+/// read grant is a folder list, so a note the user later puts in one of those
+/// folders is inside the grant, while a folder created AFTER approval is outside
+/// it. Freezing note ids instead would make the grant decay as the user works,
+/// which teaches them to re-approve without reading. A renamed folder falls out
+/// of the scope for the same reason it was in it: the grant stores paths.
+///
+/// **The name is a label, not a credential.** It distinguishes well-behaved
+/// clients and makes per-connection scope and revocation possible; it stops
+/// nothing a program running as the same OS user could not already do. That is
+/// why an approval is recorded per name on ONE device rather than as a secret:
+/// see [`PrefsView::mcp_connections`] for the classification and why it does not
+/// sync.
+///
+/// **No write scope lives here yet.** The separate, narrower write grant is
+/// task 13 of the same feature and must arrive as an ADDITIVE member of this
+/// object, so a grant written by this build decodes with no write scope rather
+/// than failing. `folders` is therefore the read set and stays named for that.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct McpConnectionGrant {
+    /// The canonical trailing-slash folder paths this connection may read, as
+    /// the frozen set captured at approval. **Set semantics**: NFC-normalized,
+    /// lexicographically sorted, exact-deduplicated by the encoder (the
+    /// `deliberate_folders` discipline), because the element SET is the value
+    /// and its order is not.
+    #[serde(default)]
+    pub folders: Vec<alloc::string::String>,
+    /// When the user approved this connection, in Unix epoch **seconds**
+    /// (`last_backup_at`'s unit: this is a "when did this happen" stamp shown to
+    /// a person, not a last-write-wins clock compared across devices).
+    #[serde(default)]
+    pub approved_at: u64,
+    /// When this connection last ran a tool, in Unix epoch seconds, or `None`
+    /// for "never". Omitted entirely from the canonical JSON when `None`, so a
+    /// freshly approved connection costs no bytes for a timestamp that does not
+    /// exist yet.
+    #[serde(default)]
+    pub last_used_at: Option<u64>,
+}
+
 /// serde-derive default for a `bool` field whose logical default is `true`
 /// (e.g. [`PrefsView::show_note_timestamps`]). serde's bare `#[serde(default)]`
 /// uses `bool::default()` (`false`), which would diverge from the hand-rolled
@@ -1144,6 +1188,39 @@ pub struct PrefsView {
     #[serde(default)]
     pub last_backup_at: Option<u64>,
 
+    /// **External MCP connection grants** (external-mcp-connection,
+    /// myne-md/myne#923), keyed by the connection name the client declares — one
+    /// [`McpConnectionGrant`] per name, carrying the frozen folder set, the
+    /// approval stamp and the last-use stamp.
+    ///
+    /// **Device-local, and that is the point rather than a detail.** This is the
+    /// consent record for opening the vault to a process Myne does not ship, and
+    /// a synced copy would let a newly enrolled device inherit an approval nobody
+    /// gave it. The same bug was found twice in this tree already (the AI provider
+    /// consent until myne-md/myne#456, and the plugin feature's post-audit pass),
+    /// and a synced grant would also mean something different per device: the
+    /// frozen set names folder paths, and two devices can hold different trees
+    /// after a merge. `sync-protocol.md` §10.2 classifies it `DeviceLocal`, so the
+    /// local value always survives the merge and a second device is asked again.
+    ///
+    /// A `BTreeMap` so the canonical encoder emits connection names in
+    /// lexicographic order, and the whole map is **omitted entirely when empty**,
+    /// so a vault that never granted a connection is byte-identical to a
+    /// pre-feature `vault.prefs`. A decoder that does not find the key MUST treat
+    /// it as the empty map, which is "no connection granted" — not an error, and
+    /// not a default grant.
+    ///
+    /// **Non-load-bearing** in the protective-envelope sense (a replay can at
+    /// worst restore or drop an approval; the host still re-reads the live blob
+    /// before serving a call), so it carries no clamp. AS3-class content: folder
+    /// paths, and they stay inside the AEAD envelope like every other field.
+    /// Every write goes through the one read-modify-write helper that bumps the
+    /// prefs nonce (`core/src/plugins/prefs/commands.rs::update_prefs_with_dir`).
+    /// Canonical key `mcp_connections` — sorts after `last_backup_at` (`las` <
+    /// `mcp`) and before `meeting_ai_prompt` (`mc` < `me`).
+    #[serde(default)]
+    pub mcp_connections: BTreeMap<alloc::string::String, McpConnectionGrant>,
+
     /// **Meeting AI prompt** (meeting-ai): the user's replacement for the meeting AI pass's reduce
     /// instruction. `None` or empty means the built-in default instruction (which carries the
     /// section headings and the language line); a non-empty value is used verbatim and replaces
@@ -1467,6 +1544,7 @@ impl Default for PrefsView {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -2149,6 +2227,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // mcp_connections (canonical key 'mcp' — after last_backup_at [las < mcp],
+    // before meeting_ai_prompt [mc < me], external-mcp-connection myne#923).
+    // The external MCP connection grants: one frozen folder set + approval and
+    // last-use stamps per declared connection name. Omitted ENTIRELY when the
+    // map is empty, so a vault that never granted a connection is byte-identical
+    // to a pre-feature vault.prefs. Names and folder paths are NFC-normalized;
+    // the map is a BTreeMap so names sort, and each grant object emits its own
+    // keys in canonical order (approved_at < folders < last_used_at).
+    if !prefs.mcp_connections.is_empty() {
+        out.extend_from_slice(b"\"mcp_connections\":");
+        push_mcp_connections_map(&mut out, &prefs.mcp_connections);
+        out.push(b',');
+    }
+
     // new_note_location (canonical key 'n' — after last_backup_at [l < n], before
     // new_note_location_folder [prefix] and paired_extensions [n < p], MYND-462). The new-note
     // default-location MODE (root/current/specific); omitted entirely when None. Trailing comma
@@ -2658,6 +2750,41 @@ fn push_container_keyed_order_map(out: &mut Vec<u8>, map: &BTreeMap<String, Vec<
 /// Returns [`PrefsBlobError::PlaintextParseFailed`] for any structural
 /// malformation (missing `{...}` wrapper, missing
 /// `screen_capture_protection` key, wrong value type, truncated).
+/// Emit the `mcp_connections` map (name → grant object) in canonical form.
+///
+/// Names are NFC-normalized and emitted in `BTreeMap` (lexicographic) order;
+/// each grant object's own keys are emitted in canonical order
+/// (`approved_at` < `folders` < `last_used_at`), `folders` goes through the
+/// canonical set encoding (NFC, sorted, exact-deduped), and `last_used_at` is
+/// omitted entirely when the connection has never run a tool. A second opinion
+/// about any of those rules is a second byte layout for the same field.
+fn push_mcp_connections_map(
+    out: &mut Vec<u8>,
+    map: &BTreeMap<alloc::string::String, McpConnectionGrant>,
+) {
+    out.push(b'{');
+    for (index, (name, grant)) in map.iter().enumerate() {
+        if index > 0 {
+            out.push(b',');
+        }
+        push_json_string(out, &name.nfc().collect::<String>());
+        out.push(b':');
+        out.push(b'{');
+        out.extend_from_slice(b"\"approved_at\":");
+        push_json_uint64(out, grant.approved_at);
+        out.push(b',');
+        out.extend_from_slice(b"\"folders\":");
+        push_ordered_string_array(out, &canonical_folder_list(&grant.folders));
+        if let Some(last_used_at) = grant.last_used_at {
+            out.push(b',');
+            out.extend_from_slice(b"\"last_used_at\":");
+            push_json_uint64(out, last_used_at);
+        }
+        out.push(b'}');
+    }
+    out.push(b'}');
+}
+
 fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> {
     // Substring-located fields within the wrapping object. Handles v0.1.0
     // (single field), the v0.1.x deliberate_folders addition, and future
@@ -3108,6 +3235,13 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // spec § 9.5.2 float ban (screen_capture_protection is mandatory and
     // canonically later, so a comma always follows a well-formed value).
     let last_backup_at = parse_optional_uint64_field(rest, &mut cursor, b"\"last_backup_at\":")?;
+    // mcp_connections (key 'mcp' — after last_backup_at [las < mcp], before
+    // meeting_ai_prompt [mc < me], external-mcp-connection myne#923). A nested
+    // object map (name → grant object), which is why it has its own parser
+    // rather than reusing the string-map one. Absent → empty, which is "no
+    // connection granted"; present-but-malformed → PlaintextParseFailed.
+    let mcp_connections =
+        parse_optional_mcp_connections_field(rest, &mut cursor, b"\"mcp_connections\":")?;
     // meeting_ai_prompt (key 'm', after last_backup_at [l < m], before
     // new_note_location [m < n], meeting-ai). Parsed from the same monotonic
     // cursor so a later field's key marker is never matched inside the prompt
@@ -3291,6 +3425,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         cli_enabled,
         cli_excluded_folders,
         cli_rate_limit_disabled,
+        mcp_connections,
         color_groups,
         icon,
         item_colors,
@@ -3798,6 +3933,155 @@ fn parse_optional_u64_map_field(
             Ok(map)
         }
         None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse the OPTIONAL `mcp_connections` field from the monotonic cursor
+/// (external-mcp-connection, myne-md/myne#923). Absent → empty map ("no
+/// connection granted"); present-but-malformed →
+/// [`PrefsBlobError::PlaintextParseFailed`], the same contract as every other
+/// optional field. Locating the marker from the cursor rather than by
+/// `strip_prefix` is what keeps a folder path in an earlier field (a value the
+/// user authored) from being read as this field's key.
+fn parse_optional_mcp_connections_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<BTreeMap<alloc::string::String, McpConnectionGrant>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let obj_start = *cursor + rel_idx + marker.len();
+            let (map, consumed) = parse_json_mcp_connections(&rest[obj_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = obj_start + consumed;
+            Ok(map)
+        }
+        None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse a JSON object of `connection name -> grant object` members starting at
+/// `bytes[0] == '{'`. Returns the decoded map + bytes consumed (through the
+/// closing `}`), or `None` on any malformation.
+///
+/// The one nested-object-map shape in this codec, which is why it is its own
+/// parser rather than a reuse of [`parse_json_string_map`]: a grant is an object,
+/// not a string. Member ORDER is not enforced, because the decoder's job is to
+/// read what an encoder wrote and the canonical order is the encoder's; the
+/// encoder's shape is pinned by the golden-byte tests instead.
+fn parse_json_mcp_connections(
+    bytes: &[u8],
+) -> Option<(BTreeMap<alloc::string::String, McpConnectionGrant>, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut out: BTreeMap<alloc::string::String, McpConnectionGrant> = BTreeMap::new();
+    if bytes.get(i) == Some(&b'}') {
+        return Some((out, i + 1));
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (name, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        let (grant, consumed) = parse_mcp_connection_grant(&bytes[i..])?;
+        i += consumed;
+        out.insert(name, grant);
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => return Some((out, i + 1)),
+            _ => return None,
+        }
+    }
+}
+
+/// Parse one grant object starting at `bytes[0] == '{'`.
+///
+/// `folders` is canonicalized on read too (NFC, sorted, deduped) rather than
+/// trusted: the value came out of an AEAD-verified blob, so this is not an
+/// attacker boundary, but a grant whose folder set is unsorted would otherwise
+/// round-trip to different bytes on the next write, and "read then write is
+/// byte-identical" is a property the vector family pins.
+///
+/// An UNKNOWN member is refused rather than skipped, unlike a whole unknown
+/// top-level field: the forward-compatible extension point for this object is
+/// the write grant that task 13 adds, and it arrives as a new member this build
+/// must not silently drop. Refusing means an older build reports an unreadable
+/// prefs blob instead of quietly narrowing a grant it cannot represent.
+fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut grant = McpConnectionGrant::default();
+    let mut seen_folders = false;
+    let mut seen_approved_at = false;
+    if bytes.get(i) == Some(&b'}') {
+        return None;
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (key, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        match key.as_str() {
+            "approved_at" => {
+                if seen_approved_at {
+                    return None;
+                }
+                let (value, consumed) = parse_json_uint64(&bytes[i..]).ok()?;
+                i += consumed;
+                grant.approved_at = value;
+                seen_approved_at = true;
+            }
+            "folders" => {
+                if seen_folders {
+                    return None;
+                }
+                let (folders, consumed) = parse_json_string_array(&bytes[i..])?;
+                i += consumed;
+                grant.folders = canonical_folder_list(&folders);
+                seen_folders = true;
+            }
+            "last_used_at" => {
+                if grant.last_used_at.is_some() {
+                    return None;
+                }
+                let (value, consumed) = parse_json_uint64(&bytes[i..]).ok()?;
+                i += consumed;
+                grant.last_used_at = Some(value);
+            }
+            _ => return None,
+        }
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => {
+                // Both required members must be present; an empty folder set is
+                // a legal grant (it can read nothing), a missing one is not.
+                if !(seen_approved_at && seen_folders) {
+                    return None;
+                }
+                return Some((grant, i + 1));
+            }
+            _ => return None,
+        }
     }
 }
 
@@ -4456,6 +4740,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -4543,6 +4828,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -5025,6 +5311,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                mcp_connections: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -5114,6 +5401,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                mcp_connections: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -5553,6 +5841,7 @@ mod tests {
         // sort after spell_languages, before theme (after screen_capture_protection).
         let prefs = PrefsView {
             last_backup_at: Some(42),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("current")),
             new_note_location_folder: Some(alloc::string::String::from("Notes/")),
@@ -6803,6 +7092,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -6829,6 +7119,7 @@ mod tests {
         // meeting_ai_prompt (m) < new_note_location (n).
         let view = PrefsView {
             last_backup_at: Some(1765000000),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: Some(alloc::string::String::from("Summarize tersely.")),
             new_note_location: Some(alloc::string::String::from("specific")),
             ..PrefsView::default()
@@ -6856,6 +7147,7 @@ mod tests {
     fn last_backup_at_round_trips_through_decode() {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -6881,6 +7173,7 @@ mod tests {
         // survive (no silent truncation).
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -7019,6 +7312,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -7628,6 +7922,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -7722,6 +8017,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -7814,6 +8110,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -7905,6 +8202,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8059,6 +8357,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8181,6 +8480,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8282,6 +8582,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8457,6 +8758,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8566,6 +8868,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8915,6 +9218,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9006,6 +9310,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9099,6 +9404,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9260,6 +9566,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9398,6 +9705,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9726,6 +10034,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9821,6 +10130,7 @@ mod tests {
             editor_vim_mode: None,
             label: None,
             last_backup_at: None,
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -10178,6 +10488,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                mcp_connections: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -10266,6 +10577,7 @@ mod tests {
                 editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
+                mcp_connections: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -10419,6 +10731,7 @@ mod tests {
             editor_vim_mode: Some(true),
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765432100),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("specific")),
             new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
@@ -11773,6 +12086,7 @@ mod tests {
         let prefs = PrefsView {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -12840,6 +13154,7 @@ mod tests {
         let nonce_maip: [u8; AEAD_NONCE_LEN] = [0xE0; AEAD_NONCE_LEN];
         let prefs_maip = PrefsView {
             last_backup_at: Some(1765432100),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: Some(String::from("Summarize tersely, decisions first.")),
             new_note_location: Some(String::from("specific")),
             ..PrefsView::default()
@@ -13975,6 +14290,7 @@ mod tests {
         // paired_extensions sorts after last_backup_at and before saved_views.
         let original = PrefsView {
             last_backup_at: Some(1_700_000_000),
+            mcp_connections: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: alloc::vec![sample_paired("e", "t", false)],
             saved_views: alloc::vec![sample_view("v1", "A")],
@@ -14573,5 +14889,225 @@ mod tests {
 
         std::fs::write("/tmp/myne_view_approval_prefs_cases.json", dump.as_bytes())
             .expect("write view-approval prefs cases dump");
+    }
+}
+
+#[cfg(test)]
+mod mcp_connections_tests {
+    //! The external MCP connection grant as a `vault.prefs` field
+    //! (external-mcp-connection task 3; myne-md/myne#923).
+    //!
+    //! Three properties, and each is an acceptance criterion rather than a
+    //! convenience: a blob written before this field existed decodes as "no
+    //! connection granted" AND re-encodes byte-identically (so the omission rule
+    //! is real rather than a claim in a doc comment), two grants round-trip
+    //! through the canonical encoder unchanged, and the folder set goes through
+    //! the canonical SET encoding (NFC, sorted, deduped) because the element set
+    //! is the value.
+    use super::*;
+    use alloc::vec;
+
+    fn grant(folders: &[&str], approved_at: u64, last_used_at: Option<u64>) -> McpConnectionGrant {
+        McpConnectionGrant {
+            folders: folders
+                .iter()
+                .map(|f| alloc::string::String::from(*f))
+                .collect(),
+            approved_at,
+            last_used_at,
+        }
+    }
+
+    #[test]
+    fn encoding_places_the_grants_between_last_backup_and_meeting_prompt() {
+        let mut prefs = PrefsView {
+            last_backup_at: Some(1765432100),
+            meeting_ai_prompt: Some(alloc::string::String::from("Summarize tersely.")),
+            ..PrefsView::default()
+        };
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("claude-desktop"),
+            grant(&["Work/"], 1765432100, None),
+        );
+
+        let encoded = canonical_json_encode(&prefs);
+        let text = alloc::string::String::from_utf8(encoded).expect("canonical JSON is UTF-8");
+
+        // The canonical slot is the load-bearing half: a decoder scans forward
+        // from `last_backup_at`, so an older client steps over this unknown key
+        // and reads `meeting_ai_prompt` and the mandatory
+        // `screen_capture_protection` correctly after it.
+        let pos = |needle: &str| {
+            text.find(needle)
+                .unwrap_or_else(|| panic!("no {needle} in {text}"))
+        };
+        assert!(pos("\"last_backup_at\"") < pos("\"mcp_connections\""));
+        assert!(pos("\"mcp_connections\"") < pos("\"meeting_ai_prompt\""));
+        assert!(pos("\"meeting_ai_prompt\"") < pos("\"screen_capture_protection\""));
+
+        // And the exact bytes, so a reordering of the grant object's own keys is
+        // caught here rather than by a byte diff in another repository.
+        assert_eq!(
+            text,
+            "{\"last_backup_at\":1765432100,\"mcp_connections\":{\"claude-desktop\":\
+             {\"approved_at\":1765432100,\"folders\":[\"Work/\"]}},\
+             \"meeting_ai_prompt\":\"Summarize tersely.\",\"screen_capture_protection\":true}"
+        );
+    }
+
+    #[test]
+    fn a_blob_without_the_field_is_no_connection_granted_and_re_encodes_byte_identically() {
+        // A pre-feature blob: no `mcp_connections` key at all. Decoding must
+        // produce the empty map (an absent key is "nobody was granted", not an
+        // error and not a default grant), and re-encoding must reproduce the
+        // input byte for byte, which is what makes "a vault that never granted a
+        // connection is byte-identical to its pre-feature self" a fact rather
+        // than a promise.
+        let original = br#"{"last_backup_at":1765432100,"screen_capture_protection":true}"#;
+        let decoded = canonical_json_decode(original).expect("a pre-feature blob decodes");
+        assert!(decoded.mcp_connections.is_empty());
+        assert_eq!(decoded.last_backup_at, Some(1765432100));
+        assert_eq!(canonical_json_encode(&decoded), original.to_vec());
+    }
+
+    #[test]
+    fn two_grants_round_trip_byte_identically_and_an_absent_name_resolves_to_nothing() {
+        let mut prefs = PrefsView::default();
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("claude-desktop"),
+            grant(&["Work/", "Projects/"], 1765432100, Some(1765432200)),
+        );
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("lm-studio"),
+            grant(&["Archive/"], 1765432150, None),
+        );
+
+        let encoded = canonical_json_encode(&prefs);
+        let decoded = canonical_json_decode(&encoded).expect("round trip");
+
+        // The encoder canonicalizes the folder SET on the way out, so the decoded
+        // map carries sorted folders rather than the caller's order. That is the
+        // point of a set field, and it is asserted here rather than left implied.
+        assert_eq!(
+            decoded
+                .mcp_connections
+                .get("claude-desktop")
+                .map(|g| g.folders.clone()),
+            Some(vec![
+                alloc::string::String::from("Projects/"),
+                alloc::string::String::from("Work/"),
+            ])
+        );
+        assert_eq!(
+            decoded
+                .mcp_connections
+                .get("lm-studio")
+                .map(|g| g.folders.clone()),
+            Some(vec![alloc::string::String::from("Archive/")])
+        );
+
+        // Byte-identical, which is stronger than equal values: `last_used_at` is
+        // omitted on the grant that has none and every set is already canonical,
+        // so a read-then-write is a no-op on disk.
+        assert_eq!(canonical_json_encode(&decoded), encoded);
+
+        // The three names: two granted, one never mentioned.
+        assert!(decoded.mcp_connections.contains_key("claude-desktop"));
+        assert!(decoded.mcp_connections.contains_key("lm-studio"));
+        assert_eq!(decoded.mcp_connections.get("cursor"), None);
+    }
+
+    #[test]
+    fn the_folder_set_is_nfc_sorted_and_exact_deduped() {
+        // Set semantics: the element SET is the value, so order and repetition
+        // are not. NFD input proves the NFC fold runs, and the duplicate proves
+        // the dedup, because an encoder that trusted caller order would write
+        // different bytes for the same grant on two devices.
+        let mut prefs = PrefsView::default();
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("claude-desktop"),
+            // "b/", "a/", "b/" and a decomposed "\u{0041}\u{030A}/" (Å/) that
+            // NFC-normalizes to "\u{00C5}/".
+            grant(&["b/", "a/", "b/", "A\u{030A}/"], 1, None),
+        );
+        let decoded = canonical_json_decode(&canonical_json_encode(&prefs)).expect("round trip");
+        let folders = &decoded
+            .mcp_connections
+            .get("claude-desktop")
+            .expect("the grant survives")
+            .folders;
+        assert_eq!(
+            folders,
+            &vec![
+                alloc::string::String::from("a/"),
+                alloc::string::String::from("b/"),
+                // NFC of "A" + U+030A is U+00C5, which sorts AFTER ASCII by its
+                // UTF-8 bytes (0xC3 0x85 > 0x62). That ordering is the encoder's,
+                // and pinning it here is what keeps two implementations from
+                // disagreeing about the byte layout of one set.
+                alloc::string::String::from("\u{00C5}/"),
+            ],
+            "the canonical set encoding must NFC-fold, sort and dedupe"
+        );
+    }
+
+    #[test]
+    fn a_grant_missing_a_required_member_rejects_the_parse() {
+        // `approved_at` and `folders` are required: a grant with no approval time
+        // cannot be shown as approved, and an absent folder list is not the same
+        // statement as an empty one. `{}` is the shape a partial writer produces.
+        for bad in [
+            br#"{"screen_capture_protection":true,"mcp_connections":{"x":{}}}"#.as_slice(),
+            br#"{"screen_capture_protection":true,"mcp_connections":{"x":{"folders":[]}}}"#
+                .as_slice(),
+            br#"{"screen_capture_protection":true,"mcp_connections":{"x":{"approved_at":1}}}"#
+                .as_slice(),
+        ] {
+            assert_eq!(
+                canonical_json_decode(bad),
+                Err(PrefsBlobError::PlaintextParseFailed),
+                "accepted {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unknown_member_inside_a_grant_is_refused_rather_than_dropped() {
+        // Unlike a whole unknown TOP-LEVEL field (tolerated per §9.5.2), an
+        // unknown member of a grant object is refused. The extension point is the
+        // write scope task 13 adds, and silently dropping it would narrow a grant
+        // this build cannot represent: an older client would report a connection
+        // as read-only when the user had granted writes.
+        let bad = br#"{"mcp_connections":{"x":{"approved_at":1,"folders":[],"write_folders":["Work/"]}},"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(bad),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        );
+    }
+
+    #[test]
+    fn the_map_is_not_emitted_when_empty_and_a_malformed_value_rejects() {
+        let text =
+            alloc::string::String::from_utf8(canonical_json_encode(&PrefsView::default())).unwrap();
+        assert!(!text.contains("mcp_connections"), "got: {text}");
+
+        for bad in [
+            // An array where the field is an object.
+            br#"{"mcp_connections":[],"screen_capture_protection":true}"#.as_slice(),
+            // A grant that is not an object.
+            br#"{"mcp_connections":{"x":[]},"screen_capture_protection":true}"#.as_slice(),
+            // A folder list that is not an array of strings.
+            br#"{"mcp_connections":{"x":{"approved_at":1,"folders":[1]}},"screen_capture_protection":true}"#
+                .as_slice(),
+            // A fractional approval stamp (floats are FORBIDDEN in §9.5.2).
+            br#"{"mcp_connections":{"x":{"approved_at":1.5,"folders":[]}},"screen_capture_protection":true}"#
+                .as_slice(),
+        ] {
+            assert_eq!(
+                canonical_json_decode(bad),
+                Err(PrefsBlobError::PlaintextParseFailed),
+                "accepted {bad:?}"
+            );
+        }
     }
 }

@@ -228,6 +228,10 @@ fn main() {
                 // matches.
                 "export_view_manifest",
                 "read_view_manifest",
+                // external-mcp-connection (myne-md/myne#923 task 3): the two
+                // writers over the device-local `mcp_connections` grant map.
+                "set_mcp_connection_grant",
+                "revoke_mcp_connection",
             ]),
         )
         .plugin(
