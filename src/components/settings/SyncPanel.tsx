@@ -55,6 +55,7 @@ import {
 } from "../../notes/conflictCopy";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
+import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
 import { Tooltip } from "../primitives/Tooltip";
 import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
@@ -209,21 +210,21 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // (myne-md/myne#818).
   const copyIdentityCode = () => {
     if (!identityCode) return;
-    setIdentityCopyFeedback(null);
     void copyText(clipboardWriteText, identityCode, {
       onSuccess: {
         kind: "toast",
         run: () => {
-          setIdentityCopyFeedback("success");
-          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+          setIdentityCopied(true);
+          if (identityCopyTimer.current !== null) window.clearTimeout(identityCopyTimer.current);
+          identityCopyTimer.current = window.setTimeout(() => {
+            setIdentityCopied(false);
+            identityCopyTimer.current = null;
+          }, 1600);
         },
       },
       onFailure: {
         kind: "toast",
-        run: () => {
-          setIdentityCopyFeedback("error");
-          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
-        },
+        run: () => toast({ message: t("personIdentityCode.copyFailed"), variant: "error" }),
       },
     });
   };
@@ -273,11 +274,18 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // A member's own-device QR dialog (myne-md/myne) — the same slot, a different
   // producer. Held separately from `qrOpen` so the two can never both be up.
   const [memberQrOpen, setMemberQrOpen] = useState(false);
-  // The identity-code copy outcome, for the icon-chip + inline line
-  // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
-  const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
-    "success" | "error" | null
-  >(null);
+  // The identity-code copy confirms itself (2026-10-24): the chip's glyph
+  // becomes a tick and pops, and the live region below says it out loud. The
+  // toast is kept for the FAILURE only, because a chip cannot report "that did
+  // not work" by looking happy.
+  const [identityCopied, setIdentityCopied] = useState(false);
+  const identityCopyTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (identityCopyTimer.current !== null) window.clearTimeout(identityCopyTimer.current);
+    },
+    [],
+  );
   // Any child ModalShell this panel mounts must stand the Settings shell's
   // Escape/keys down while it is up (myne-md/myne#831 added the QR dialog;
   // IdentitySetupDialog was the same latent gap). ModalShell calls
@@ -598,17 +606,22 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
                 onFocus={(e) => e.target.select()}
               />
               <IconButton
-                icon={
-                  identityCopyFeedback === "success"
-                    ? "check"
-                    : identityCopyFeedback === "error"
-                      ? "circle-x"
-                      : "copy"
-                }
+                icon="copy"
                 label={t("personIdentityCode.copy")}
+                bordered
+                tooltip
+                confirmed={identityCopied}
                 onClick={copyIdentityCode}
                 testId="sync.panel.copy-identity"
               />
+              <p
+                role="status"
+                aria-live="polite"
+                data-testid="sync.panel.copy-status"
+                style={VISUALLY_HIDDEN}
+              >
+                {identityCopied ? t("personIdentityCode.copied") : ""}
+              </p>
             </div>
           ) : null}
           {/* What the code is, beside the code itself (example-org/operations#54).

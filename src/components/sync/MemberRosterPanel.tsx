@@ -21,6 +21,8 @@ import { writeText as clipboardWriteText } from "../../platform/clipboardManager
 import { usePrefs } from "../../hooks/usePrefs";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { IconButton } from "../primitives/IconButton";
+import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
 import { EmptyState } from "../primitives/EmptyState";
 import { Input } from "../primitives/Input";
 import { HELPER_STYLE, MULTILINE_STYLE } from "../settings/panel-styles";
@@ -179,6 +181,17 @@ export function MemberRosterPanel({
   const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // The copy reports on the BUTTON (2026-10-24): a tick and one pop, said out
+  // loud in the live region below. A failure still goes to the toast, because a
+  // control cannot report "that did not work" by looking happy.
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
   // Forget this device's person identity (myne-md/myne#782). `lockPerson` is a
   // session lock; the `true` argument is the off-boarding erase.
   const [forgetOpen, setForgetOpen] = useState(false);
@@ -254,7 +267,12 @@ export function MemberRosterPanel({
       onSuccess: {
         kind: "toast",
         run: () => {
-          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+          setCopied(true);
+          if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+          copyTimer.current = window.setTimeout(() => {
+            setCopied(false);
+            copyTimer.current = null;
+          }, 1600);
         },
       },
       onFailure: {
@@ -366,20 +384,28 @@ export function MemberRosterPanel({
                   value={ownerCode}
                   style={{ ...CODE_STYLE, flex: 1, minWidth: 0, userSelect: "all" }}
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  data-testid="member-roster.copy-owner-code"
-                  style={ROW_ACTION_STYLE}
+                <IconButton
+                  icon="copy"
+                  label={t("personIdentityCode.copy")}
+                  bordered
+                  tooltip
+                  confirmed={copied}
+                  testId="member-roster.copy-owner-code"
                   onClick={copyOwnerCode}
-                >
-                  {t("personIdentityCode.copy")}
-                </Button>
+                />
                 {lockButton}
               </div>
-              {/* The copy reports through the toast alone, like the identity
-                  home's (2026-10-24): the line that used to sit here repeated the
-                  toast's own sentence under the field. */}
+              {/* The tick's screen-reader half. Nothing is drawn: the button IS
+                  the report (2026-10-24), and the line that used to sit here
+                  repeated the toast's own sentence under the field. */}
+              <p
+                role="status"
+                aria-live="polite"
+                data-testid="member-roster.copy-status"
+                style={VISUALLY_HIDDEN}
+              >
+                {copied ? t("personIdentityCode.copied") : ""}
+              </p>
             </>
           ) : (
             lockButton

@@ -3110,6 +3110,7 @@
       "numberCopy": "Copy",
       "numberCopied": "Account number copied",
       "numberCopyFailed": "Couldn't copy the account number",
+      "copyAccountNumber": "Copy account number",
       "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
       "unresolvedHelper": "Working out which vault is open…",
       "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",

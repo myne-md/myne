@@ -206,6 +206,115 @@
   opacity: 0.4;
 }
 
+/* Copy confirmation (2026-10-24): the button IS the report.
+   A copy used to fire a toast as well, which said the same thing one
+   screen-corner away from the press; the confirmation now happens where the
+   press did. Three parts, in the order the eye reads them:
+
+     1. the surface tints `--success`, so the change is visible at a glance;
+     2. the glyph pops in with a quarter-turn, which is what makes it read as a
+        micro-interaction rather than an icon swap that happened to be re-rendered;
+     3. the tick DRAWS itself (a stroke dash sweep) and a ring expands past the
+        button's edge and fades.
+
+   Everything moves `transform`, `opacity` or `stroke-dashoffset`: compositor and
+   paint, never layout. Durations and curves are tokens, so the motion vocabulary
+   holds, and the global `prefers-reduced-motion` rule in `src/styles/tokens.css`
+   zeroes all three without this block needing a second copy of it.
+
+   The caller owns the timer that clears the state, and announces the outcome in
+   a live region: a tick reaches nobody with a screen reader. */
+.myne-icon-btn {
+  /* The ring below is positioned against the button. */
+  position: relative;
+}
+
+/* The CLOSING half, which is why this selector keys on `data-copy-feedback`
+   rather than on `data-confirmed`: a transition is taken from the state being
+   ENTERED, so a slow fade can only be bought by declaring it on an attribute
+   present in BOTH states. `--duration-slow` on the surface and the ink, and the
+   returning copy glyph fades in rather than snapping (2026-10-24). */
+.myne-icon-btn[data-copy-feedback="true"] {
+  transition:
+    background var(--duration-slow) var(--ease-out),
+    color var(--duration-slow) var(--ease-out);
+}
+
+.myne-icon-btn[data-copy-feedback="true"]:not([data-confirmed="true"]) svg {
+  animation: myne-copy-restore var(--duration-slow) var(--ease-out);
+}
+
+.myne-icon-btn[data-confirmed="true"] {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.myne-icon-btn[data-confirmed="true"] svg {
+  animation: myne-copy-pop var(--duration-slow) var(--ease-out);
+}
+
+.myne-icon-btn[data-confirmed="true"] svg :is(path, polyline, line) {
+  stroke-dasharray: 24;
+  animation: myne-copy-draw var(--duration-slow) var(--ease-out) both;
+}
+
+.myne-icon-btn[data-confirmed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--success);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: myne-copy-ring var(--duration-slow) var(--ease-out) forwards;
+}
+
+@keyframes myne-copy-pop {
+  from {
+    transform: scale(0.4) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes myne-copy-restore {
+  from {
+    transform: scale(0.7);
+    opacity: 0.3;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes myne-copy-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes myne-copy-ring {
+  from {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+}
+
 /* Bordered variant: an icon control that FLOATS on content rather than sitting
    in chrome, so it needs its own edge to be findable against whatever is
    behind it. The graph pane's overlay cluster is the first, and it had forked
