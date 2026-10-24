@@ -1093,11 +1093,10 @@ mod tests {
 /// direction this bound should fail in.
 #[cfg(windows)]
 fn spawn_relay_listener_windows<R: Runtime>(app: AppHandle<R>, app_data_dir: std::path::PathBuf) {
-    let name = crate::cli_bridge::socket::windows_pipe_name(&app_data_dir)
-        .replacen("myne-cli-", "myne-clipper-", 1)
+    let name: Vec<u16> = clipper_pipe_name(&app_data_dir)
         .encode_utf16()
         .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
+        .collect();
     // ONE process-global rate limiter, created outside the connection closure
     // for the reason the Unix arm states: native messaging reconnects per
     // dispatch, so a per-connection limiter would hand every reconnect a fresh
@@ -1139,4 +1138,19 @@ fn spawn_relay_listener_windows<R: Runtime>(app: AppHandle<R>, app_data_dir: std
             );
         }
     }
+}
+
+/// The clipper relay's pipe name on Windows.
+///
+/// Derived from the CLI door's own function with the prefix substituted: one
+/// hash function, two names. Unlike the CLI's, this is not a cross-crate wire
+/// contract, so it needs no pinned vector: both the app and the host binary are
+/// this crate.
+#[cfg(windows)]
+pub fn clipper_pipe_name(app_data_dir: &std::path::Path) -> String {
+    crate::cli_bridge::socket::windows_pipe_name(app_data_dir).replacen(
+        "myne-cli-",
+        "myne-clipper-",
+        1,
+    )
 }
