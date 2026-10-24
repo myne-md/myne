@@ -49,12 +49,20 @@ describe("the debt figure is a property of the table, not of a reason string", (
     expect(debtTotal()).toBeGreaterThan(0);
   });
 
-  it("reads 3 today, and a change to that number is a deliberate act", () => {
+  it("reads 4 today, and a change to that number is a deliberate act", () => {
     // The ratchet's own rule (one-directional: the debt may only shrink) is what
     // makes pinning the figure correct rather than brittle — raising it means
     // editing this line too, which is the reviewable act.
-    expect(debtTotal()).toBe(3);
-    expect(DEBT.get("core/src/plugins/notes/commands.rs#note")?.[0]).toBe(3);
+    //
+    // 3 → 4 in view-manifests: `note_set_field` adds a FOURTH note-write path.
+    // It dispatches on `is_nc05_blob` exactly as `note_update` does, and its
+    // `MY01` arm calls `protocol::decode_note` because the re-encode needs that
+    // function's typestate (`encode_update_blob_raw` takes the handle, not the
+    // bytes), so it carries the same debt the other three do. `decode_note_any`
+    // cannot replace it here without dropping back to bytes this module has no
+    // way to re-seal.
+    expect(debtTotal()).toBe(4);
+    expect(DEBT.get("core/src/plugins/notes/commands.rs#note")?.[0]).toBe(4);
   });
 
   it("keeps the two tables disjoint, so the lookup cannot resolve by spread order", () => {

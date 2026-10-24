@@ -212,6 +212,12 @@ const MIRRORS: Mirror[] = [
     rsEnum: "NoteUpdateError",
   },
   {
+    ts: "client-core/src/types/note-set-field-error.ts",
+    tsType: "NoteSetFieldError",
+    rs: "core/src/plugins/notes/error.rs",
+    rsEnum: "NoteSetFieldError",
+  },
+  {
     ts: "client-core/src/types/live-session-error.ts",
     tsType: "LiveSessionCommandError",
     rs: "core/src/plugins/live/commands.rs",

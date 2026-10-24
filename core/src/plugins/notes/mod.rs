@@ -28,6 +28,7 @@ pub mod drawing_text;
 pub mod error;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod export_mtime;
+pub mod frontmatter_patch;
 pub mod note_id;
 pub mod search_sync_core;
 pub mod title_extract;
