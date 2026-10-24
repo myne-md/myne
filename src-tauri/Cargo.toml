@@ -321,17 +321,21 @@ tauri-plugin-single-instance = "2"
 windows-sys = { version = "0.60", features = [
     "Win32_Storage_FileSystem",
     "Win32_Foundation",
+    "Win32_System_Time",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_System_SystemInformation",
 ] }
 # PDF export native print-to-PDF arm, Windows (MYND-255):
 # `ICoreWebView2_7::PrintToPdf` via tauri's `with_webview` handle.
-# Transitive→direct promotions — `webview2-com 0.38.2` and
-# `windows 0.61.3` are already locked via tauri/wry on Windows; zero
-# dependency-tree expansion. Best-effort arm (no Windows lane);
-# ratified fallback is window.print() if unviable.
-webview2-com = "0.38"
-windows = "0.61"
+# Transitive→direct promotions — these must name the versions tauri/wry already
+# lock on Windows, or the tree carries TWO `windows-core` majors and the
+# `Interface` trait in scope is not the one implemented for the WebView2
+# interfaces: `core.cast()` failed with E0599 for exactly that reason under
+# `cargo xwin check --target x86_64-pc-windows-msvc`. Zero dependency-tree
+# expansion while the promotion matches the lock. Best-effort arm (no Windows
+# lane); ratified fallback is window.print() if unviable.
+webview2-com = "0.39"
+windows = "0.62"
 
 # Linux machine-level idle reader (MYND-121): the X11 ScreenSaver extension
 # (`XScreenSaverQueryInfo` equivalent) via the **pure-Rust** `x11rb` (talks
