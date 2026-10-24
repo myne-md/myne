@@ -2062,6 +2062,30 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/identityhome/enrolled",
+    group: "components",
+    surface: "IdentityHome",
+    state: "enrolled",
+    description:
+      "The same home with the identity's own material on screen: the account number and the invite code, each one field with its Copy control beside it, and the reservation paragraph that carries the Register action when the identity is not on a sync server yet. Look for one paragraph per state rather than two saying the same thing.",
+    tags: ["components", "identity", "home", "account-number", "invite-code", "register", "b2b"],
+    fixture: "unlocked",
+    render: () => (
+      <IdentityHome
+        identityCode={
+          "MYNE-PERSON-1:9a0bc51b14d2e6460450a9224ff49b9f3:eaf9564cc57dd8ae3f2b1a02cd77a41b:" +
+          "7d118c51239d2573e48aa3def8cf1b257d141f7c8be55516305269d42a8ab08d"
+        }
+        accountNumber="MY-M2Y5-3CAD-5SJ6-0H8A-J8JM"
+        onCreateVault={action("onCreateVault")}
+        onAccepted={action("onAccepted")}
+        onForgotten={action("onForgotten")}
+        accountState="reserved"
+        onRegistered={action("onRegistered")}
+      />
+    ),
+  },
+  {
     id: "components/identityhome/default",
     group: "components",
     surface: "IdentityHome",

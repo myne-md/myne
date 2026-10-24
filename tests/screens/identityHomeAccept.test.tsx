@@ -705,7 +705,15 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
     await screen.findByTestId("identity-home.invites-unavailable");
     expect(personListInvites).not.toHaveBeenCalled();
     expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
-      "identityHome.invitesNotEnrolled",
+      "identityHome.invitesUnregistered",
+    );
+    // The explanation and the action that ends the state are ONE block
+    // (2026-10-24): the paragraph says no invitation can reach this identity, and
+    // the register control sits under it rather than in a second block below the
+    // list. Injection: moving the control back out reddens this.
+    expect(screen.getByTestId("identity-home.register-cta")).toBeTruthy();
+    expect(screen.getByTestId("identity-home.account-state").textContent).toContain(
+      "identityHome.invitesUnregistered",
     );
     expect(screen.queryByTestId("identity-home.error")).toBeNull();
   });
@@ -717,6 +725,8 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
     expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
       "identityHome.invitesPending",
     );
+    // A wait has no action: the register control belongs to `reserved` alone.
+    expect(screen.queryByTestId("identity-home.register-cta")).toBeNull();
   });
 
   it("reads a NotEnrolled refusal as the same state, not as a connection error", async () => {

@@ -179,7 +179,6 @@ export function MemberRosterPanel({
   const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
   // Forget this device's person identity (myne-md/myne#782). `lockPerson` is a
   // session lock; the `true` argument is the off-boarding erase.
   const [forgetOpen, setForgetOpen] = useState(false);
@@ -239,7 +238,6 @@ export function MemberRosterPanel({
     setForgetError(false);
     try {
       await lockPerson(true);
-      setCopyFeedback(null);
       setPersonIdentityState({ ready: false, ownerCode: null });
       setForgetOpen(false);
       setForgetAck(false);
@@ -252,19 +250,16 @@ export function MemberRosterPanel({
 
   const copyOwnerCode = () => {
     if (!ownerCode) return;
-    setCopyFeedback(null);
     void copyText(clipboardWriteText, ownerCode, {
       onSuccess: {
         kind: "toast",
         run: () => {
-          setCopyFeedback("success");
           toast({ message: t("personIdentityCode.copied"), variant: "info" });
         },
       },
       onFailure: {
         kind: "toast",
         run: () => {
-          setCopyFeedback("error");
           toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
         },
       },
@@ -304,8 +299,7 @@ export function MemberRosterPanel({
       style={ROW_ACTION_STYLE}
       onClick={async () => {
         await lockPerson();
-        setCopyFeedback(null);
-        setPersonIdentityState({ ready: false, ownerCode: null });
+          setPersonIdentityState({ ready: false, ownerCode: null });
       }}
     >
       {t("sync.memberRoster.personLock")}
@@ -383,25 +377,9 @@ export function MemberRosterPanel({
                 </Button>
                 {lockButton}
               </div>
-              {copyFeedback === "error" ? (
-                <p
-                  data-testid="member-roster.copy-feedback"
-                  role="status"
-                  aria-live="polite"
-                  style={ERROR_STYLE}
-                >
-                  {t("personIdentityCode.copyFailed")}
-                </p>
-              ) : copyFeedback === "success" ? (
-                <p
-                  data-testid="member-roster.copy-feedback"
-                  role="status"
-                  aria-live="polite"
-                  style={STATUS_STYLE}
-                >
-                  {t("personIdentityCode.copied")}
-                </p>
-              ) : null}
+              {/* The copy reports through the toast alone, like the identity
+                  home's (2026-10-24): the line that used to sit here repeated the
+                  toast's own sentence under the field. */}
             </>
           ) : (
             lockButton

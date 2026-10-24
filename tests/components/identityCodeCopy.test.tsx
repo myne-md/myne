@@ -124,7 +124,7 @@ const surfaces = [
     code: IDENTITY_CODE,
     codeTestId: "identity-home.identity-code",
     copyTestId: "identity-home.copy-code",
-    feedbackTestId: "identity-home.copy-feedback",
+    copyLabel: "personIdentityCode.copy",
     render: () =>
 
       render(
@@ -210,7 +210,18 @@ describe.each(surfaces)("$name", (surface) => {
     expect(getToasts()).toHaveLength(1);
     expect(getToasts()[0].variant).toBe("info");
     expect(getToasts()[0].message).toBe("personIdentityCode.copied");
-    expect(screen.getByTestId(surface.feedbackTestId).textContent).toBe("personIdentityCode.copied");
+    // The toast is the ONLY report (2026-10-24). The line that used to repeat it
+    // under the field is gone from both surfaces, and the copy control is an
+    // icon-only button whose accessible label says what it copies.
+    expect(screen.queryByText("personIdentityCode.copied")).toBeNull();
+    // Where the control is ICON-ONLY its accessible label is the only thing that
+    // says what it copies, so that surface pins it here. The roster's copy is
+    // still a labelled button, which is why it declares no `copyLabel`.
+    if (surface.copyLabel !== undefined) {
+      expect(screen.getByTestId(surface.copyTestId).getAttribute("aria-label")).toBe(
+        surface.copyLabel,
+      );
+    }
   });
 
   it("reports a clipboard failure instead of presenting it as success", async () => {
@@ -225,7 +236,7 @@ describe.each(surfaces)("$name", (surface) => {
     await waitFor(() => expect(getToasts()).toHaveLength(1));
     expect(getToasts()[0].variant).toBe("error");
     expect(getToasts()[0].message).toBe("personIdentityCode.copyFailed");
-    expect(screen.getByTestId(surface.feedbackTestId).textContent).toBe("personIdentityCode.copyFailed");
+    expect(screen.queryByText("personIdentityCode.copyFailed")).toBeNull();
   });
 });
 

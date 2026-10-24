@@ -19,10 +19,10 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
+import { IconButton } from "../components/primitives/IconButton";
 import { Input } from "../components/primitives/Input";
 import { ModalShell } from "../components/primitives/ModalShell";
 import {
-  CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
 } from "../components/primitives/CenteredCard";
@@ -88,6 +88,18 @@ const BLOCK_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
+/** A field with its action BESIDE it, the `EndpointConfig` server-URL row's shape
+ *  (`MemberRosterPanel`'s owner-code row is the same one): the value takes the
+ *  flexible width and the control keeps its label on one line. It replaced the
+ *  full-width field with a full-width button under it, which made two of those
+ *  read as a pair of banners rather than as "this value, and what you can do with
+ *  it" (2026-10-24). */
+const FIELD_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
 const BRAND_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -120,18 +132,6 @@ const BODY_SMALL_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-sm)",
   lineHeight: "var(--leading-normal)",
-  color: "var(--fg-2)",
-};
-
-const COPY_ERROR_STYLE: CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-xs)",
-  color: "var(--danger)",
-};
-
-const COPY_SUCCESS_STYLE: CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-xs)",
   color: "var(--fg-2)",
 };
 
@@ -273,7 +273,6 @@ export function IdentityHome({
   // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
   // Registration (myne-md/myne#911). The host owns one boolean; the form owns
   // the phrase, the address and the beta-terms gate, so two surfaces cannot
   // drift about any of the three (2026-10-23 review).
@@ -286,21 +285,32 @@ export function IdentityHome({
 
   const copyIdentityCode = () => {
     if (!identityCode) return;
-    setCopyFeedback(null);
     void copyText(clipboardWriteText, identityCode, {
       onSuccess: {
         kind: "toast",
-        run: () => {
-          setCopyFeedback("success");
-          toast({ message: t("personIdentityCode.copied"), variant: "info" });
-        },
+        run: () => toast({ message: t("personIdentityCode.copied"), variant: "info" }),
       },
       onFailure: {
         kind: "toast",
-        run: () => {
-          setCopyFeedback("error");
-          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
-        },
+        run: () => toast({ message: t("personIdentityCode.copyFailed"), variant: "error" }),
+      },
+    });
+  };
+
+  // The same number Settings shows, so it reports the same words:
+  // `settings.account.numberCopied` / `numberCopyFailed` are reused rather than
+  // copied, because one value described two different ways is the drift
+  // `check-i18n-duplicates.mjs` exists to catch.
+  const copyAccountNumber = () => {
+    if (!accountNumber) return;
+    void copyText(clipboardWriteText, accountNumber, {
+      onSuccess: {
+        kind: "toast",
+        run: () => toast({ message: t("settings.account.numberCopied"), variant: "info" }),
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => toast({ message: t("settings.account.numberCopyFailed"), variant: "error" }),
       },
     });
   };
@@ -414,28 +424,37 @@ export function IdentityHome({
 
         <h1 style={CARD_TITLE_STYLE}>{t("identityHome.title")}</h1>
 
-        <p style={CARD_BODY_STYLE}>{t("identityHome.subtitle")}</p>
-
         {/* The account number, where the identity is named: one value for
             support and for a self-host handoff, derived rather than generated so
             losing it costs nothing (myne-md/myne#911 review). */}
         {accountNumber ? (
           <div style={BLOCK_STYLE}>
             <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.accountNumberHeading")}</h2>
-            <Input
-              data-testid="identity-home.account-number"
-              aria-label={t("identityHome.accountNumberHeading")}
-              autoComplete="off"
-              readOnly
-              value={accountNumber}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-base)",
-                color: "var(--fg-1)",
-                width: "100%",
-                userSelect: "all",
-              }}
-            />
+            <div style={FIELD_ROW_STYLE}>
+              <Input
+                data-testid="identity-home.account-number"
+                aria-label={t("identityHome.accountNumberHeading")}
+                autoComplete="off"
+                readOnly
+                value={accountNumber}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg-1)",
+                  flex: 1,
+                  minWidth: 0,
+                  userSelect: "all",
+                }}
+              />
+              <IconButton
+                icon="copy"
+                label={t("identityHome.copyAccountNumber")}
+                bordered
+                tooltip
+                testId="identity-home.copy-account-number"
+                onClick={copyAccountNumber}
+              />
+            </div>
             <p style={BODY_SMALL_STYLE}>{t("identityHome.accountNumberHint")}</p>
           </div>
         ) : null}
@@ -451,47 +470,37 @@ export function IdentityHome({
         {identityCode ? (
           <div style={BLOCK_STYLE}>
             <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.shareCodeHeading")}</h2>
-            <Input
-              data-testid="identity-home.identity-code"
-              aria-label={t("identityHome.shareCodeHeading")}
-              autoComplete="off"
-              readOnly
-              value={identityCode}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-xs)",
-                color: "var(--fg-2)",
-                width: "100%",
-                userSelect: "all",
-              }}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              data-testid="identity-home.copy-code"
-              onClick={copyIdentityCode}
-            >
-              {t("personIdentityCode.copy")}
-            </Button>
-            {copyFeedback === "error" ? (
-              <p
-                data-testid="identity-home.copy-feedback"
-                role="status"
-                aria-live="polite"
-                style={COPY_ERROR_STYLE}
-              >
-                {t("personIdentityCode.copyFailed")}
-              </p>
-            ) : copyFeedback === "success" ? (
-              <p
-                data-testid="identity-home.copy-feedback"
-                role="status"
-                aria-live="polite"
-                style={COPY_SUCCESS_STYLE}
-              >
-                {t("personIdentityCode.copied")}
-              </p>
-            ) : null}
+            <div style={FIELD_ROW_STYLE}>
+              <Input
+                data-testid="identity-home.identity-code"
+                aria-label={t("identityHome.shareCodeHeading")}
+                autoComplete="off"
+                readOnly
+                value={identityCode}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-2)",
+                  flex: 1,
+                  minWidth: 0,
+                  userSelect: "all",
+                }}
+              />
+              <IconButton
+                icon="copy"
+                label={t("personIdentityCode.copy")}
+                bordered
+                tooltip
+                testId="identity-home.copy-code"
+                onClick={copyIdentityCode}
+              />
+            </div>
+            {/* The copy reports through the toast alone (2026-10-24). The line
+                that used to appear here repeated the toast's own sentence under
+                the field, and on a screen that already carries three paragraphs
+                of explanation it was the fourth thing saying what just happened.
+                The toast is the app's one confirmation channel and it says the
+                same words. */}
             <p style={HINT_STYLE}>{t("identityHome.shareCodeHint")}</p>
           </div>
         ) : null}
@@ -505,13 +514,35 @@ export function IdentityHome({
             // depends on, so the section stays empty until the answer exists.
             null
           ) : !invitesReadable || notEnrolled ? (
-            <p data-testid="identity-home.invites-unavailable" style={HINT_STYLE}>
-              {t(
-                accountState === "pending"
-                  ? "identityHome.invitesPending"
-                  : "identityHome.invitesNotEnrolled",
+            // The state AND the action that ends it, once. This section used to say
+            // "this identity is not registered, so no invitation can reach it" and
+            // then explain the same state again in a block of its own below the
+            // list, with the register control down there (2026-10-24 pass over the
+            // panel: the same fact twice, five hundred pixels apart). The question
+            // "why is there nothing here?" is asked HERE, so the answer belongs
+            // here. `pending` states a wait and has no action.
+            <div data-testid="identity-home.account-state" style={BLOCK_STYLE}>
+              <p data-testid="identity-home.invites-unavailable" style={HINT_STYLE}>
+                {t(
+                  accountState === "pending"
+                    ? "identityHome.invitesPending"
+                    : "identityHome.invitesUnregistered",
+                )}
+              </p>
+              {accountState === "pending" ? null : registerOpen ? (
+                <PersonRegisterForm
+                  testIdPrefix="identity-home.register"
+                  onRegistered={onRegistered}
+                />
+              ) : (
+                <Button
+                  onClick={() => setRegisterOpen(true)}
+                  data-testid="identity-home.register-cta"
+                >
+                  {t("identityHome.registerCta")}
+                </Button>
               )}
-            </p>
+            </div>
           ) : failed ? (
             <DestructiveBanner testId="identity-home.error">
               {t("identityHome.invitesError")}
@@ -570,33 +601,10 @@ export function IdentityHome({
           )}
         </div>
 
-        {/* The account lifecycle (myne-md/myne#911). A `reserved` identity is
-            complete and offline; registering is an explicit act that asks for
-            the phrase, so "I exist locally" and "a server knows me" cannot be
-            confused. `pending` needs no action, only an explanation. */}
-        {accountState === "reserved" ? (
-          <div style={BLOCK_STYLE} data-testid="identity-home.account-state">
-            <p style={BODY_SMALL_STYLE}>{t("identityHome.accountStateReserved")}</p>
-            {registerOpen ? (
-              <PersonRegisterForm
-                testIdPrefix="identity-home.register"
-                onRegistered={onRegistered}
-              />
-            ) : (
-              <Button
-                onClick={() => setRegisterOpen(true)}
-                data-testid="identity-home.register-cta"
-              >
-                {t("identityHome.registerCta")}
-              </Button>
-            )}
-          </div>
-        ) : null}
-        {accountState === "pending" ? (
-          <p style={BODY_SMALL_STYLE} data-testid="identity-home.account-state">
-            {t("identityHome.accountStatePending")}
-          </p>
-        ) : null}
+        {/* The account lifecycle (myne-md/myne#911) lives with the invitation list
+            above: its `reserved` arm IS the invitations empty state's explanation
+            and carries the register control, and its `pending` arm is what
+            `invitesPending` already says. No second block here. */}
 
         <div style={BLOCK_STYLE}>
           <Button variant="primary" onClick={onCreateVault} data-testid="identity-home.create-vault-cta">
