@@ -249,6 +249,72 @@ describe("IdentityHome accept path", () => {
     await waitFor(() => expect(personLock).toHaveBeenCalledWith(true));
     await waitFor(() => expect(onForgotten).toHaveBeenCalled());
   });
+
+  // The confirmation is a DIALOG rather than a box expanding in the card
+  // (2026-10-24). What that buys the user has to be asserted, or the shell could
+  // be swapped back for a div and every test above would still pass: the surface
+  // says it is a modal, and Escape answers it without the erase running.
+  it("opens the forget confirmation as a dialog that Escape dismisses", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    // Nothing is expanded before the press: the card states the action, and the
+    // warning lives in the dialog.
+    expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+
+    const dialog = await screen.findByTestId("identity-home.forget-confirm");
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(screen.getByTestId("identity-home.forget-warning")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull(),
+    );
+    expect(personLock).not.toHaveBeenCalled();
+  });
+
+  // The acknowledgement is the dialog's own state, not the screen's, so closing
+  // the dialog throws it away instead of leaving a ticked box behind for whoever
+  // opens it next (which is what the inline box did by hand).
+  it("does not carry the acknowledgement across a close", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-ack"));
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+
+    fireEvent.click(screen.getByTestId("identity-home.forget-cancel"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-cta"));
+
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
 });
 
 // myne-md/myne#794: an invite that arrives while the identity home is already

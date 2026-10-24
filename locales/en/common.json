@@ -5341,8 +5341,7 @@
     "notice_other": "{{count}} invitations waiting"
   },
   "firstRun": {
-    "heading": "Create your identity",
-    "lead": "One identity covers every vault you make. Its 24-word phrase is the only way to recover them, so this is the one thing worth slowing down for."
+    "heading": "Create your identity"
   },
   "identityFlow": {
     "title": "Create an identity",
@@ -5458,8 +5457,7 @@
     "recoverTitle": "I already have one",
     "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
     "recoverAction": "Recover",
-    "back": "Back",
-    "notNow": "Not now"
+    "back": "Back"
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -5565,7 +5563,7 @@
     "connect": "Connect to my account",
     "tagline": "Encrypted markdown notes. No email at signup.",
     "startAction": "Create your identity and vault",
-    "startHint": "One phrase recovers everything. It is shown once, so have somewhere to write it.",
+    "startBody": "Start fresh on this device: a new identity, then the vault that belongs to it.",
     "restoreTitle": "Restore from backup",
     "restoreBody": "Open a .myne-backup file you saved earlier.",
     "joinTitle": "Add this device to an account",
@@ -5575,7 +5573,8 @@
     "invitedAction": "I was invited",
     "restoreAction": "Restore",
     "joinAction": "Add device",
-    "version": "Version {{version}} · pre-alpha"
+    "version": "Version {{version}} · pre-alpha",
+    "createAction": "Create"
   },
   "wikiGraph": {
     "canvasLabel": "Knowledge graph of {{count}} notes",
