@@ -616,14 +616,13 @@ fn main() {
         .plugin(
             "account",
             // myne-md/myne#684: the device-local account record (the
-            // account/vault split). `account_list` (read) + `account_rename` +
-            // `account_move` + `account_split` (writes). Same InlinedPlugin
+            // account/vault split). `account_list` (read) + `account_move` +
+            // `account_split` (writes). Same InlinedPlugin
             // discipline as the plugins above; without a matching
             // `commands.allow` entry in `permissions/account/default.toml` the
             // ACL resolver never authorizes the `plugin:account|<cmd>` invoke.
             tauri_build::InlinedPlugin::new().commands(&[
                 "account_list",
-                "account_rename",
                 "account_move",
                 "account_split",
             ]),

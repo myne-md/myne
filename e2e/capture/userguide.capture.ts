@@ -1904,15 +1904,17 @@ runner(
         },
       );
 
-      // ---- Frame: account (the grouping: name, vaults, extensions) ----
+      // ---- Frame: account (the account number, grouping, extensions) ----
       // The Account panel is the account grouping (`decisions/ui/0679`): the
-      // account name, the vaults it groups on this device, and the extension
-      // pairing block the connected-extensions frame below covers in detail.
+      // person account number that now opens it (`decisions/ui/0728`, where the
+      // account name used to be), the vaults it groups on this device, and the
+      // extension pairing block the connected-extensions frame below covers in
+      // detail.
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
-        "The Account settings panel showing the account name, the vaults grouped under it, and the browser-extension pairing controls.",
+        "The Account settings panel showing the account number, the vaults grouped under it, and the browser-extension pairing controls.",
         async () => {
           await (await s.byTestId("settings.tab-account")).click();
           await s.byTestId("settings.account-panel", { timeoutMs: 6000 });

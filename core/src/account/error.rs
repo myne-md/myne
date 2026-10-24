@@ -5,9 +5,9 @@
 //! Closed, `serde`-tagged set, following the `vault_label` precedent. No
 //! `String` field reaches the frontend; OS and codec detail is reduced to coarse
 //! variants per the secret-handling logging discipline (`src-tauri/AGENTS.md`).
-//! In particular **no variant can carry the account label**, which is the user's
-//! own text and is treated as AS3-sensitive exactly as the `vault.prefs` `label`
-//! field is.
+//! Since `docs/decisions/ui/0728` the record carries no user-authored text at
+//! all, so there is nothing here a variant could leak beyond a vault id or the
+//! account id an IPC read already returns.
 //!
 //! [`AccountError::KeychainUnavailable`] is deliberately its own variant rather
 //! than folded into [`AccountError::Backend`]: "this device has no usable
@@ -44,11 +44,6 @@ pub enum AccountError {
     /// Opaque backend failure (keychain API, CSPRNG, or blob codec).
     #[error("account record backend failure")]
     Backend,
-    /// The account label exceeds [`crate::account::store::ACCOUNT_LABEL_MAX_LEN`]
-    /// bytes. Labels are picker chrome, and an unbounded pre-unlock IPC input
-    /// must not bloat the sealed record.
-    #[error("account label too long")]
-    LabelTooLong,
     /// Account grouping is suppressed while hide-vault-names is on: the lock
     /// screen must not name accounts while claiming names are hidden.
     /// Mutations are rejected rather than applied invisibly.
@@ -82,7 +77,6 @@ pub fn account_error_kind(e: &AccountError) -> &'static str {
         AccountError::Io(_) => "io",
         AccountError::RecordUnreadable => "record_unreadable",
         AccountError::Backend => "backend",
-        AccountError::LabelTooLong => "label_too_long",
         AccountError::Hidden => "hidden",
     }
 }

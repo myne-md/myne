@@ -206,18 +206,10 @@ export const WRITABILITY_WRITABLE: AgentWritability = { verdict: "writable" };
 export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Account ────────────────────────────────────────────────────────────────
   // The account-level panel. Its namespace is the account grouping: which
-  // vaults this device treats as one account, and what that group is called.
-  // Everything that acts on a vault's own container lives under `vault.*`
-  // below.
-  {
-    id: "account.name",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "account",
-    testid: "settings.account-name-input",
-    titleKey: "settings.account.nameLabel",
-    descriptionKey: "settings.account.nameHelper",
-    keywordsKey: "settings.search.keywords.accountName",
-  },
+  // vaults this device treats as one account. An account has no name
+  // (`docs/decisions/ui/0728`), so there is no entry for one: the group heading
+  // is derived from the group's own vault names. Everything that acts on a
+  // vault's own container lives under `vault.*` below.
   {
     id: "account.vaults",
     agentWritability: WRITABILITY_NONE,
@@ -228,9 +220,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.accountVaults",
   },
   {
-    // The person account number (2026-10-23). It is derived from the identity
-    // phrase, so this entry is a READ: the copy button is the only control, and
-    // the value itself is never in the index (it is generated, not authored).
+    // The person account number (2026-10-23), and the panel's first block since
+    // `docs/decisions/ui/0728` replaced the account name with it. It is derived
+    // from the identity phrase, so this entry is a READ: the copy button is the
+    // only control, and the value itself is never in the index (it is generated,
+    // not authored).
     id: "account.number",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",

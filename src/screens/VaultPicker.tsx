@@ -64,16 +64,15 @@ import {
   listVaults,
   orderByLastUnlock,
 } from "../lib/vault-list";
-import { vaultDisplayName } from "../lib/vaultDisplayName";
+import { vaultDisplayName, vaultDisplayNameById } from "../lib/vaultDisplayName";
 import {
   listAccounts,
-  renameAccount,
   moveVault,
   splitVault,
+  accountHeading,
   accountIdForVault,
   accountCommandErrorKind,
   groupVaultsByAccount,
-  truncateLabelToBytes,
 } from "../lib/account";
 import type { AccountView, AccountCommandErrorKind } from "../lib/account";
 import { isVaultUnlocked } from "../lib/vault-unlock";
@@ -137,13 +136,23 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
 
 
 /**
- * The account label for a group header, or `null` when the vaults in that group
- * are standalone (no account). An account with an empty label shows the neutral
- * "Account" fallback, exactly as a vault with no name shows "Vault N".
+ * The heading for a group: the names of the vaults inside it, in the order the
+ * list holds them (`docs/decisions/ui/0728` removed the user-set account name;
+ * a group is identified by its own contents instead). The neutral "Account"
+ * fallback survives for the one case that has nothing to name: every member
+ * vault failed to enumerate.
  */
-function accountLabel(account: AccountView | null, t: TFunction): string {
+function accountLabel(
+  account: AccountView | null,
+  vaults: readonly VaultSummary[],
+  t: TFunction,
+): string {
   if (account === null) return "";
-  return account.label === "" ? t("vaultPicker.accountFallback") : account.label;
+  return accountHeading(
+    account,
+    (id) => vaultDisplayNameById(id, vaults, t),
+    t("vaultPicker.accountFallback"),
+  );
 }
 
 /**
@@ -161,7 +170,6 @@ function accountErrorCopy(
   t: TFunction,
 ): string {
   if (kind === "Hidden") return t("vaultPicker.accountHidden");
-  if (kind === "LabelTooLong") return t("vaultPicker.labelTooLong");
   if (kind === "RecordUnreadable") return t("vaultPicker.accountUnreadable");
   return t("vaultPicker.accountError");
 }
@@ -321,50 +329,6 @@ const ACCOUNTS_ERROR_STYLE: CSSProperties = {
   background: "var(--danger-soft)",
   borderRadius: "var(--radius-2)",
   padding: "var(--space-2) var(--space-3)",
-};
-
-// Inline rename form: one row, input growing, two buttons. Tokens only.
-const RENAME_FORM_STYLE: CSSProperties = {
-  flexShrink: 0,
-  margin: 0,
-  display: "flex",
-  gap: "var(--space-2)",
-  alignItems: "center",
-};
-
-const RENAME_INPUT_STYLE: CSSProperties = {
-  flexGrow: 1,
-  minWidth: 0,
-  fontSize: "var(--text-base)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--ink-1)",
-  background: "var(--paper)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-};
-
-const RENAME_SAVE_STYLE: CSSProperties = {
-  flexShrink: 0,
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--paper)",
-  background: "var(--accent)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-  cursor: "pointer",
-};
-
-const RENAME_CANCEL_STYLE: CSSProperties = {
-  flexShrink: 0,
-  fontSize: "var(--text-sm)",
-  color: "var(--ink-2)",
-  background: "transparent",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-  cursor: "pointer",
 };
 
 const CHEVRON_STYLE: CSSProperties = {
@@ -635,9 +599,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
   // The last account-grouping failure, shown as a banner. `null` is no error.
   // Grouping failures never strand the picker: the list renders standalone.
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  // Inline rename form state. `null` is no form; the menu closes when it opens.
-  const [renaming, setRenaming] = useState<{ vault: VaultSummary; draft: string } | null>(null);
-  // Whether some vault is unlocked. Account mutations (rename/move/split) are
+  // Whether some vault is unlocked. Account mutations (move/split) are
   // refused while locked (backend `Locked`), so the menu offers them only
   // when unlocked; the locked picker stays a read surface.
   const [unlocked, setUnlocked] = useState(false);
@@ -648,7 +610,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
   const { ref: listRef, fadeProps: listFade } = useScrollEdges<HTMLDivElement>();
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
-  // The open row context menu (rename / move / split), or null when closed.
+  // The open row context menu (move / split), or null when closed.
   const [menu, setMenu] = useState<{
     vault: VaultSummary;
     x: number;
@@ -785,9 +747,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
   };
 
   // Account actions are offered only for member vaults. A standalone vault
-  // (no account, keychain-less device, or hidden names) has no account to
-  // rename or move from, and every command would answer VaultNotFound, so
-  // offering them is offering a guaranteed failure.
+  // (no account, keychain-less device, or hidden names) has no account to move
+  // from, and every command would answer VaultNotFound, so offering them is
+  // offering a guaranteed failure.
   const menuAccountId =
     menu !== null && state.kind === "loaded"
       ? accountIdForVault(state.accounts, menu.vault.id)
@@ -802,19 +764,12 @@ export function VaultPicker({ onSelect, onCreateAnother,
           (a) => a.id !== menuAccountId && a.vaults.length > 0,
         )
       : [];
+  // The loaded list, for the display names a move destination's heading is
+  // built from. Empty while loading, which is also when the menu offers nothing.
+  const loadedVaults = state.kind === "loaded" ? state.vaults : [];
   const menuItems: ContextMenuItem[] =
     menu !== null && menuAccount !== null && unlocked
       ? [
-          {
-            id: "picker.account-rename",
-            label: t("vaultPicker.renameAccount"),
-            onSelect: () => {
-              const vault = menu.vault;
-              setMenu(null);
-              setRenaming({ vault, draft: menuAccount.label });
-              setAccountsError(null);
-            },
-          },
           {
             id: "picker.account-move-new",
             label: t("vaultPicker.moveToNewAccount"),
@@ -825,8 +780,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
             },
           },
           // The destination is chosen from the other accounts, never typed:
-          // the backend needs the TARGET VAULT id, and a typed label can
-          // never be one. Each child anchors on its account's first member.
+          // the backend needs the TARGET VAULT id, and a name can never be one.
+          // Each child names its account by that account's own vaults and
+          // anchors on the first member.
           ...(moveDestinations.length > 0
             ? [
                 {
@@ -834,7 +790,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
                   label: t("vaultPicker.moveToAccount"),
                   children: moveDestinations.map((a, i) => ({
                     id: `picker.account-move-to-${i}`,
-                    label: accountLabel(a, t),
+                    label: accountLabel(a, loadedVaults, t),
                     onSelect: () => {
                       const vault = menu.vault;
                       setMenu(null);
@@ -847,15 +803,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
             : []),
         ]
       : [];
-
-  const commitRename = (e?: { preventDefault: () => void }) => {
-    e?.preventDefault();
-    const target = renaming;
-    if (target === null || target.draft.trim() === "") return;
-    const label = target.draft.trim();
-    setRenaming(null);
-    runAccountAction(() => renameAccount(target.vault.id, label));
-  };
 
   return (
     <PickerCard
@@ -904,51 +851,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
           </Fragment>
         ))}
       </div>
-      {renaming !== null && (
-        <form onSubmit={commitRename} style={RENAME_FORM_STYLE}>
-          <input
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            value={renaming.draft}
-            maxLength={512}
-            placeholder={t("vaultPicker.renamePlaceholder")}
-            aria-label={t("vaultPicker.renameAccount")}
-            data-testid="picker.rename-input"
-            style={RENAME_INPUT_STYLE}
-            onChange={(e) =>
-              setRenaming({
-                vault: renaming.vault,
-                // 512 UTF-8 bytes, the backend `ACCOUNT_LABEL_MAX_LEN`: a
-                // multibyte draft can pass `maxLength` and still trip
-                // `LabelTooLong`, so truncate here instead of failing there.
-                draft: truncateLabelToBytes(e.target.value, 512),
-              })
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setRenaming(null);
-              }
-            }}
-          />
-          <button
-            type="submit"
-            disabled={renaming.draft.trim() === ""}
-            data-testid="picker.rename-save"
-            style={RENAME_SAVE_STYLE}
-          >
-            {t("vaultPicker.renameSave")}
-          </button>
-          <button
-            type="button"
-            data-testid="picker.rename-cancel"
-            style={RENAME_CANCEL_STYLE}
-            onClick={() => setRenaming(null)}
-          >
-            {t("vaultPicker.renameCancel")}
-          </button>
-        </form>
-      )}
       {menu !== null && menuItems.length > 0 && (
         <ContextMenu
           x={menu.x}
