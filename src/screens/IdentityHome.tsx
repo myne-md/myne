@@ -16,9 +16,11 @@
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { Input } from "../components/primitives/Input";
+import { ModalShell } from "../components/primitives/ModalShell";
 import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
@@ -173,24 +175,30 @@ const CHECKBOX_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
-const FORGET_BOX_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  border: "1px solid var(--danger)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3)",
-};
-
 const FORGET_ERROR_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-sm)",
   color: "var(--danger)",
 };
 
-const ACTIONS_ROW_STYLE: CSSProperties = {
+/** The forget dialog's body. `ModalShell`'s `.myne-modal-body` carries no
+ *  padding of its own, so the warning and the acknowledgement set their own
+ *  rhythm here rather than inheriting the card's. */
+const DIALOG_BODY_STYLE: CSSProperties = {
   display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  padding: "var(--space-4) var(--space-5)",
+};
+
+/** The dialog's footer: the destructive press right-most with the benign one
+ *  beside it, in the order `DeleteAttachmentDialog` uses so every confirmation in
+ *  the app is answered the same way. */
+const DIALOG_FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
   gap: "var(--space-2)",
+  padding: "0 var(--space-5) var(--space-4)",
 };
 
 interface IdentityHomeProps {
@@ -270,27 +278,11 @@ export function IdentityHome({
   // the phrase, the address and the beta-terms gate, so two surfaces cannot
   // drift about any of the three (2026-10-23 review).
   const [registerOpen, setRegisterOpen] = useState(false);
-  // Forget-this-identity-on-this-device (myne-md/myne#782). A short
-  // acknowledgement gates the destructive button; the warning above it is the
-  // only place the consequence is stated.
+  // Forget-this-identity-on-this-device (myne-md/myne#782). Only whether the
+  // confirmation is UP lives here: the acknowledgement, the in-flight state and
+  // the failure are the dialog's own, so closing it discards all three with it
+  // instead of leaving a ticked box behind for the next opening.
   const [forgetOpen, setForgetOpen] = useState(false);
-  const [forgetAck, setForgetAck] = useState(false);
-  const [forgetBusy, setForgetBusy] = useState(false);
-  const [forgetError, setForgetError] = useState(false);
-
-  const forgetIdentity = async () => {
-    setForgetBusy(true);
-    setForgetError(false);
-    try {
-      // Erases the sealed keypair and the device token; the server account
-      // survives and is recoverable with the phrase on another device.
-      await personLock(true);
-      onForgotten();
-    } catch {
-      setForgetError(true);
-      setForgetBusy(false);
-    }
-  };
 
   const copyIdentityCode = () => {
     if (!identityCode) return;
@@ -614,60 +606,138 @@ export function IdentityHome({
 
         {/* Forget this identity on this device. Device-local only: the server
             account and any vault it owns or joined are untouched, and the
-            phrase recovers the identity elsewhere. */}
-        {forgetOpen ? (
-          <div data-testid="identity-home.forget-confirm" style={FORGET_BOX_STYLE}>
-            <p style={BODY_SMALL_STYLE}>{t("identityHome.forgetWarning")}</p>
-            <label style={CHECKBOX_LABEL_STYLE}>
-              <input
-                type="checkbox"
-                data-testid="identity-home.forget-ack"
-                checked={forgetAck}
-                onChange={(e) => setForgetAck(e.target.checked)}
-                style={CHECKBOX_STYLE}
-              />
-              {t("identityHome.forgetCheckbox")}
-            </label>
-            {forgetError ? (
-              <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
-                {t("identityHome.forgetError")}
-              </p>
-            ) : null}
-            <div style={ACTIONS_ROW_STYLE}>
-              <Button
-                variant="ghost"
-                disabled={forgetBusy}
-                onClick={() => {
-                  setForgetOpen(false);
-                  setForgetAck(false);
-                }}
-                data-testid="identity-home.forget-cancel"
-              >
-                {t("identityHome.forgetCancel")}
-              </Button>
-              <div style={{ flex: 1 }} />
-              <Button
-                variant="danger"
-                disabled={!forgetAck || forgetBusy}
-                onClick={() => void forgetIdentity()}
-                data-testid="identity-home.forget-confirm-cta"
-              >
-                {t("identityHome.forgetConfirm")}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div style={BLOCK_STYLE}>
-            <Button
-              variant="ghost"
-              onClick={() => setForgetOpen(true)}
-              data-testid="identity-home.forget-cta"
-            >
-              {t("identityHome.forgetCta")}
-            </Button>
-          </div>
-        )}
+            phrase recovers the identity elsewhere. The confirmation is a DIALOG
+            rather than a box that expands here (2026-10-24): a destructive action
+            whose consequence needs this much stating deserves the chrome every
+            other destructive confirmation in the app has (`ModalShell`: backdrop,
+            Esc, focus trap, an inert page), and the card goes on saying what it
+            said before the press. */}
+        <div style={BLOCK_STYLE}>
+          <Button
+            variant="ghost"
+            onClick={() => setForgetOpen(true)}
+            data-testid="identity-home.forget-cta"
+          >
+            {t("identityHome.forgetCta")}
+          </Button>
+        </div>
+
+        {/* PORTALLED out of the card, not merely rendered at the end of it.
+            `CenteredCard` masks its scroll region with `mask-image` once the
+            content outgrows the window, and a mask clips its whole rendered
+            subtree, a fixed-position backdrop included, so a dialog mounted in
+            there is faded and cut at the edges exactly on the screens long enough
+            to need scrolling (this one, with an invite list). The portal keeps the
+            REACT tree and with it every provider and the translation context, and
+            moves only the DOM. */}
+        {forgetOpen
+          ? createPortal(
+              <ForgetIdentityDialog
+                onCancel={() => setForgetOpen(false)}
+                onForgotten={onForgotten}
+              />,
+              document.body,
+            )
+          : null}
       </div>
     </CenteredCard>
+  );
+}
+
+/** The forget confirmation (myne-md/myne#782), on the shared `ModalShell` instead
+ *  of the bordered box that used to expand inside the card.
+ *
+ *  **The acknowledgement still gates the destructive button.** The warning above
+ *  it is the only place the consequence is stated, and it states three things at
+ *  once: what survives (the server account and any vault it owns or joined), what
+ *  does not (this device's sealed keypair and its token), and the way back (the
+ *  24-word phrase, on another device). The tick is what separates "a button I
+ *  might hit" from "a consequence I read".
+ *
+ *  **It owns its own in-flight and failure state**, so the dialog and the erase
+ *  live in one place: closing it discards the acknowledgement, the error and any
+ *  half-run attempt with it, and the screen above decides only whether it is up.
+ *
+ *  **`canDismiss` closes the three ways out while the erase is in flight.** Esc, a
+ *  backdrop click and the × would each report "cancelled" for an erase the backend
+ *  has already committed, which is the one report this surface must never make. */
+function ForgetIdentityDialog({
+  onCancel,
+  onForgotten,
+}: {
+  onCancel: () => void;
+  /** Called once the erase succeeds, so the app re-probes to the Welcome screen
+   *  rather than trusting a local copy of the identity's state. */
+  onForgotten: () => void;
+}) {
+  const { t } = useTranslation();
+  const [ack, setAck] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(false);
+    try {
+      // Erases the sealed keypair and the device token; the server account
+      // survives and is recoverable with the phrase on another device.
+      await personLock(true);
+      onForgotten();
+    } catch {
+      setError(true);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell
+      open
+      title={t("identityHome.forgetCta")}
+      labelId="identity-home-forget-title"
+      closeLabel={t("identityHome.forgetCancel")}
+      canDismiss={() => !busy}
+      onClose={onCancel}
+      testId="identity-home.forget-confirm"
+    >
+      <div style={DIALOG_BODY_STYLE}>
+        <p data-testid="identity-home.forget-warning" style={BODY_SMALL_STYLE}>
+          {t("identityHome.forgetWarning")}
+        </p>
+        <label style={CHECKBOX_LABEL_STYLE}>
+          <input
+            type="checkbox"
+            data-testid="identity-home.forget-ack"
+            checked={ack}
+            disabled={busy}
+            onChange={(e) => setAck(e.target.checked)}
+            style={CHECKBOX_STYLE}
+          />
+          {t("identityHome.forgetCheckbox")}
+        </label>
+        {error ? (
+          <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
+            {t("identityHome.forgetError")}
+          </p>
+        ) : null}
+      </div>
+      <div style={DIALOG_FOOTER_STYLE}>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={onCancel}
+          data-testid="identity-home.forget-cancel"
+        >
+          {t("identityHome.forgetCancel")}
+        </Button>
+        <Button
+          variant="danger"
+          disabled={!ack || busy}
+          onClick={() => void confirm()}
+          data-testid="identity-home.forget-confirm-cta"
+        >
+          {t("identityHome.forgetConfirm")}
+        </Button>
+      </div>
+    </ModalShell>
   );
 }
