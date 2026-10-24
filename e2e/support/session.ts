@@ -310,8 +310,27 @@ export async function waitForDriverGone(
  *  (`worker-ports.ts`), so stepping by 1000 lands outside every band rather
  *  than inside a neighbour's. */
 const PORT_FALLBACK_STRIDE = 1000;
-/** How many alternates to try before giving up and saying so. */
-const PORT_FALLBACK_ATTEMPTS = 4;
+/**
+ * How many alternates to try before giving up and saying so.
+ *
+ * Raised from 4 after a run where 25 of 69 failures were this message and
+ * nothing else: one leaked driver per earlier hang fills a four-deep band, and
+ * from then on every later file fails for a reason that has nothing to do with
+ * the scenario it names. The cascade is what made the roster unreadable — the
+ * real failures were a handful in among the poison.
+ *
+ * This does NOT weaken what the search is for. The property it protects is
+ * "never attach this scenario to somebody else's driver", and every candidate is
+ * still probed before it is used, so a stray can never be adopted; it can only
+ * be stepped over. What changes is how many strays the run can carry before the
+ * problem becomes visible as itself.
+ *
+ * The leaks are still bugs and still worth fixing (a hang leaves a
+ * `WebKitWebDriver` the process-group kill does not reap). This makes them cost
+ * one scenario each instead of the rest of the suite, which is the cheaper of
+ * the two ways to stop the cascade while that is worked out.
+ */
+const PORT_FALLBACK_ATTEMPTS = 24;
 
 /**
  * A driver/native port pair nothing is answering on: the configured one when it
