@@ -6,6 +6,10 @@ edition = "2021"
 license = "AGPL-3.0"
 repository = "https://github.com/myne-md/myne"
 publish = false
+# Two bins ship from this package: the app and the browser clipper's host. Tauri
+# needs to be told which one is the application (`tauri build` says "failed to
+# find main binary" without it, and it lists no candidates).
+default-run = "myne-desktop"
 
 # The browser clipper's native-messaging host, as its own executable: a browser
 # launches a manifest's `path` with no arguments and host mode needs one, and a
