@@ -332,6 +332,16 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("keymap", PrefClass::DeviceLocal),
     ("label", PrefClass::Shared(SharedDiscipline::ScalarLww)),
     ("last_backup_at", PrefClass::DeviceLocal),
+    // external-mcp-connection (myne-md/myne#923). **DeviceLocal**, and this is
+    // the third time this exact shape would have shipped in this tree: the AI
+    // provider consent was shared until myne-md/myne#456, and the plugin
+    // feature's post-audit pass found the identical bug in its own design. A
+    // synced grant would let a newly enrolled device inherit an approval nobody
+    // at that device gave, for opening the vault to a process Myne does not
+    // ship. It would also mean something different per device: the frozen scope
+    // names folder paths, and two devices can hold different trees after a
+    // merge. The local value always survives; a second device is asked again.
+    ("mcp_connections", PrefClass::DeviceLocal),
     // Shared / ScalarLww (meeting-ai). The user's custom meeting-AI instruction
     // is vault content they want on every device, so it travels; last-writer-wins
     // is the right merge for a single text value.
@@ -536,6 +546,7 @@ mod tests {
             keymap: _,
             label: _,
             last_backup_at: _,
+            mcp_connections: _,
             meeting_ai_prompt: _,
             new_note_location: _,
             new_note_location_folder: _,
@@ -623,6 +634,7 @@ mod tests {
             "keymap",
             "label",
             "last_backup_at",
+            "mcp_connections",
             "meeting_ai_prompt",
             "new_note_location",
             "new_note_location_folder",
@@ -676,6 +688,58 @@ mod tests {
                 "duplicate classification row '{name}'"
             );
         }
+    }
+
+    /// The external MCP connection grant (external-mcp-connection task 3) is
+    /// **DeviceLocal**, and the two halves of that claim are asserted through the
+    /// mechanisms rather than by restating the enum:
+    ///
+    /// - a grant does not change the SHARED subset, which is what the sync push
+    ///   gate compares, so approving a connection opens no traffic; and
+    /// - a merge keeps THIS device's grants and drops the peer's, so a newly
+    ///   enrolled device is asked again instead of inheriting an approval nobody
+    ///   there gave. That is the bug this classification exists to prevent, and it
+    ///   would have shipped a third time.
+    #[test]
+    fn the_mcp_connection_grant_is_device_local_in_both_directions() {
+        use crate::plugins::sync::prefs_merge::{merge_prefs, shared_subset_hash};
+        use protocol::McpConnectionGrant;
+
+        assert_eq!(classify("mcp_connections"), Some(PrefClass::DeviceLocal));
+
+        let local = PrefsView::default();
+        let mut remote = PrefsView::default();
+        remote.mcp_connections.insert(
+            "claude-desktop".to_string(),
+            McpConnectionGrant {
+                folders: vec!["Work/".to_string()],
+                approved_at: 1_765_432_100,
+                last_used_at: None,
+            },
+        );
+        assert_eq!(
+            shared_subset_hash(&local),
+            shared_subset_hash(&remote),
+            "a connection grant must not enter the shared subset the sync push gate compares"
+        );
+        assert!(
+            merge_prefs(&local, &remote).mcp_connections.is_empty(),
+            "a peer's approval must never be inherited by this device"
+        );
+
+        // And the other direction: what THIS device approved survives a merge
+        // with a peer that has none.
+        let mut local = PrefsView::default();
+        local.mcp_connections.insert(
+            "lm-studio".to_string(),
+            McpConnectionGrant {
+                folders: vec!["Archive/".to_string()],
+                approved_at: 1_765_432_150,
+                last_used_at: Some(1_765_432_200),
+            },
+        );
+        let merged = merge_prefs(&local, &PrefsView::default());
+        assert_eq!(merged.mcp_connections, local.mcp_connections);
     }
 
     #[test]

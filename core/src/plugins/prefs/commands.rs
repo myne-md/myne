@@ -6054,6 +6054,203 @@ pub(crate) async fn set_view_approval_with_dir(
     Ok(())
 }
 
+// ---- external MCP connection grants (external-mcp-connection task 3) -----
+//
+// Two writers over `PrefsView::mcp_connections`: approve (or re-approve) one
+// named connection, and revoke one. Both are DEVICE-LOCAL per
+// `sync-protocol.md` §10.2, so neither stamps a field clock and neither bumps
+// the sync push window; both go through `update_prefs_with_dir`, which is the
+// one read-modify-write path that bumps the prefs nonce.
+//
+// Three shapes here are decisions rather than conveniences:
+//
+// - **The approval stamp is the HOST's clock.** The caller names the folders; it
+//   does not get to say when the approval happened.
+// - **The name is NFC-normalized on the way in.** The encoder NFC-normalizes map
+//   keys, so a caller passing a decomposed name would store one key and fail to
+//   find it on revoke, which is a silent failed revocation.
+// - **An addition is refused, not failed.** §9.5.4 requires an over-budget
+//   addition to be declined rather than turning the whole write into an error,
+//   because a full blob that refuses every write also refuses the removals that
+//   would fix it. The return value says whether the grant was accepted, so the
+//   Settings surface can say so; the write itself still succeeds.
+
+/// The largest grant map this build will accept, measured on the whole canonical
+/// plaintext. `PREFS_PLAINTEXT_BUDGET_BYTES` is the reference implementation's
+/// §9.5.4 bound (the cap less 4 KiB), shared with the set fields so one blob has
+/// one budget rather than one per feature.
+fn mcp_grant_fits(prefs: &protocol::PrefsView) -> bool {
+    protocol::canonical_plaintext_len(prefs) <= super::set_mutation::PREFS_PLAINTEXT_BUDGET_BYTES
+}
+
+/// The NFC form of a connection name, or `None` when the name is empty after
+/// normalization. Empty is refused because a grant keyed by nothing is a grant
+/// nothing can address and nothing can revoke by name.
+fn normalize_connection_name(name: &str) -> Option<String> {
+    use unicode_normalization::UnicodeNormalization;
+    let normalized: String = name.nfc().collect();
+    (!normalized.is_empty()).then_some(normalized)
+}
+
+/// Slot::Unlocked-gated approval (or re-approval) of one external MCP
+/// connection. Returns `false` when the grant did not fit the prefs budget; the
+/// existing grant is then left untouched rather than partially written.
+pub async fn set_mcp_connection_grant_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_mcp_connection_grant_with_dir(&dir, state, hooks, name, folders, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_mcp_connection_grant<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    name: String,
+    folders: Vec<String>,
+) -> Result<bool, PrefsWriteError> {
+    set_mcp_connection_grant_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        name,
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_mcp_connection_grant`].
+pub(crate) async fn set_mcp_connection_grant_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(name) = normalize_connection_name(&name) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let approved_at = host.now_unix_secs();
+    let folder_count = folders.len();
+    let mut accepted = false;
+
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            // Measure the WHOLE blob with the grant in place rather than adding a
+            // per-field share: five set fields already share one cap, and a
+            // sixth content-scaled consumer cannot be granted its own slice.
+            let mut candidate = prefs.clone();
+            let last_used_at = candidate
+                .mcp_connections
+                .get(&name)
+                .and_then(|existing| existing.last_used_at);
+            candidate.mcp_connections.insert(
+                name.clone(),
+                protocol::McpConnectionGrant {
+                    folders,
+                    approved_at,
+                    // Re-approval keeps the last-use stamp: the approval changed,
+                    // the usage history did not.
+                    last_used_at,
+                },
+            );
+            if mcp_grant_fits(&candidate) {
+                *prefs = candidate;
+                accepted = true;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    // COUNT only: a connection name is user text (AS3-class) and a folder path is
+    // a vault path, so neither reaches the log.
+    tracing::info!(
+        event = "prefs_written",
+        field = "mcp_connections",
+        accepted,
+        folders = folder_count
+    );
+    Ok(accepted)
+}
+
+/// Slot::Unlocked-gated revocation of one external MCP connection. Revoking a
+/// name that holds no grant is a successful no-op: the user's intent ("this name
+/// may not call") is already true, and a second confirmation dialog for a list
+/// row that has gone stale is worse than the no-op.
+pub async fn revoke_mcp_connection_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    revoke_mcp_connection_with_dir(&dir, state, hooks, name, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn revoke_mcp_connection<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    name: String,
+) -> Result<bool, PrefsWriteError> {
+    revoke_mcp_connection_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        name,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`revoke_mcp_connection`]. Returns whether a grant was
+/// actually removed.
+pub(crate) async fn revoke_mcp_connection_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(name) = normalize_connection_name(&name) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let mut removed = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            removed = prefs.mcp_connections.remove(&name).is_some();
+        },
+        io,
+        host,
+    )
+    .await?;
+    tracing::info!(event = "prefs_written", field = "mcp_connections", removed);
+    Ok(removed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -7118,6 +7315,7 @@ mod tests {
                     editor_vim_mode: None,
                     label: None,
                     last_backup_at: None,
+                    mcp_connections: Default::default(),
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
@@ -10024,5 +10222,200 @@ mod tests {
             prefs_blob_error_kind(&PrefsBlobError::MagicMismatch),
             "magic_mismatch"
         );
+    }
+
+    // ---- external MCP connection grants (external-mcp-connection task 3) ----
+
+    /// The end-to-end acceptance for the grant field: approve two connections
+    /// through the real write path, read them back through the real read path,
+    /// resolve an unapproved name to nothing, then revoke ONE and prove the other
+    /// survives.
+    ///
+    /// The write path is asserted rather than assumed: `update_prefs_with_dir` is
+    /// the only way in, which is what keeps the nonce bump and the
+    /// degrade-on-read refusal on the same path every other setter takes.
+    #[test]
+    fn mcp_connection_grants_round_trip_and_revoke_leaves_the_others() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x37).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            let approved = set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                vec![String::from("Work/"), String::from("Projects/")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve the first connection");
+            assert!(approved, "the grant fits, so it must be accepted");
+
+            let approved = set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("lm-studio"),
+                vec![String::from("Archive/")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve the second connection");
+            assert!(approved);
+
+            // Read back through the production read path, not the raw codec.
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read the stored prefs");
+            assert_eq!(stored.mcp_connections.len(), 2);
+            let claude = stored
+                .mcp_connections
+                .get("claude-desktop")
+                .expect("the first grant survives");
+            assert_eq!(
+                claude.folders,
+                vec![String::from("Projects/"), String::from("Work/")],
+                "the folder set is canonical: sorted, because it is a set"
+            );
+            assert_eq!(
+                claude.approved_at, 1_765_432_100,
+                "the approval stamp is the HOST's clock, not the caller's"
+            );
+            assert_eq!(claude.last_used_at, None, "never used yet");
+            // A third name nobody approved resolves to no grant at all.
+            assert!(!stored.mcp_connections.contains_key("cursor"));
+
+            // Revoke one; the other must be untouched.
+            let removed = revoke_mcp_connection_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("revoke the first connection");
+            assert!(removed);
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after revoke");
+            assert!(!stored.mcp_connections.contains_key("claude-desktop"));
+            assert!(
+                stored.mcp_connections.contains_key("lm-studio"),
+                "revoking one connection must not touch the others"
+            );
+
+            // Revoking an absent name is a successful no-op, not an error.
+            let removed = revoke_mcp_connection_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("revoking an absent name is a no-op");
+            assert!(!removed);
+        });
+    }
+
+    /// The connection name is a MAP KEY, and the encoder NFC-normalizes keys. A
+    /// caller passing a decomposed name would therefore store one key and fail to
+    /// find it on revoke, which is a silent failed revocation; the commands
+    /// normalize on the way in so both directions address the same entry.
+    #[test]
+    fn a_decomposed_connection_name_is_stored_and_revoked_as_one_entry() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x38).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+
+            // "Cafe" + U+0301 (combining acute) == "Café" (U+00E9) after NFC.
+            let decomposed = String::from("Cafe\u{0301}-client");
+            assert!(set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                decomposed.clone(),
+                vec![String::from("Work/")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve"));
+
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(stored.mcp_connections.len(), 1);
+            assert!(
+                stored.mcp_connections.contains_key("Caf\u{00e9}-client"),
+                "the stored key must be the NFC form: {:?}",
+                stored.mcp_connections.keys().collect::<Vec<_>>()
+            );
+
+            // Revoking with the SAME decomposed spelling finds it.
+            assert!(revoke_mcp_connection_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                decomposed,
+                &io,
+                &host,
+            )
+            .await
+            .expect("revoke"));
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after revoke");
+            assert!(stored.mcp_connections.is_empty());
+        });
+    }
+
+    /// An EMPTY name is refused rather than stored: a grant nothing can address
+    /// is a grant nothing can revoke by name.
+    #[test]
+    fn an_empty_connection_name_is_refused_on_both_paths() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x39).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+
+            assert!(matches!(
+                set_mcp_connection_grant_with_dir(
+                    tmp.path(),
+                    &state,
+                    &hooks,
+                    String::new(),
+                    Vec::new(),
+                    &io,
+                    &host,
+                )
+                .await,
+                Err(PrefsWriteError::InvalidValue)
+            ));
+            assert!(matches!(
+                revoke_mcp_connection_with_dir(
+                    tmp.path(),
+                    &state,
+                    &hooks,
+                    String::new(),
+                    &io,
+                    &host,
+                )
+                .await,
+                Err(PrefsWriteError::InvalidValue)
+            ));
+        });
     }
 }
