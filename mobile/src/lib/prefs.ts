@@ -154,6 +154,16 @@ export interface SavedView {
   /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
    *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
   image_aspect_ratio?: string;
+  /** Definition version (view-manifests) — a non-negative integer the APP
+   *  maintains. Declared here even though this client has no editor for it: the
+   *  view sheet spreads the stored definition, so an optional field this type
+   *  did not name would still survive a save, but a typed access to it would not
+   *  compile and the next author would assume it is absent. */
+  version?: number;
+  /** The property keys this view may write — its ENTIRE write authority, checked
+   *  by the host. Same reasoning as `version`: declared so a mobile edit cannot
+   *  silently look like it cleared a desktop-authored declaration. */
+  write_fields?: string[];
 }
 
 export interface PrefsView {
