@@ -101,6 +101,7 @@ pub enum StartError {
     /// windows-msvc and the release stopped bundling it rather than shipping a
     /// binary it could not build. A single sentence naming the platform is
     /// worth more than an IO error about a file the user cannot install.
+    #[cfg_attr(not(windows), allow(dead_code))]
     NotBuiltForThisPlatform,
 }
 

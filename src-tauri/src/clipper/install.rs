@@ -117,7 +117,9 @@ struct BrowserTarget {
     manifest_dir: PathBuf,
     /// The registry key this browser reads the host from, on Windows. `None` on
     /// the platforms where the manifest FILE in `manifest_dir` is the
-    /// registration itself.
+    /// registration itself, and unread there: the field exists on every platform
+    /// so the struct literals stay one shape.
+    #[cfg_attr(not(windows), allow(dead_code))]
     registry_key: Option<String>,
 }
 
