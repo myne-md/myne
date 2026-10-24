@@ -2778,6 +2778,30 @@
       "viewTypeList": "List",
       "viewTypeTable": "Table"
     },
+    "viewConsent": {
+      "allOf": "All of these apply:",
+      "anyOf": "Any one of these is enough:",
+      "dataNotCode": "A view only describes what to show. It cannot run code.",
+      "everyNote": "Every note in this vault.",
+      "inFolder": "Notes in {{folder}}",
+      "matching": "Notes matching “{{query}}”",
+      "noneOf": "Not any of this:",
+      "opAtLeast": "is at least",
+      "opAtMost": "is at most",
+      "opContains": "contains",
+      "opIs": "is",
+      "opIsNot": "is not",
+      "opLessThan": "is less than",
+      "opMoreThan": "is more than",
+      "propertyCondition": "Notes where {{key}} {{operator}} “{{value}}”",
+      "readsHeading": "Properties it reads",
+      "selectionHeading": "Notes it shows",
+      "tagged": "Notes tagged #{{tag}}",
+      "templateHeading": "Template",
+      "templateLine": "Notes created from this view start from the {{template}} template.",
+      "writesHeading": "Fields it can change",
+      "writesNote": "Myne checks every change against this list before it writes one, and refuses a change to a field that was edited elsewhere since the view last read it."
+    },
     "welcome": {
       "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
       "title": "Welcome to Myne"

@@ -114,6 +114,7 @@ import { SyncBanners } from "@app/components/sync/SyncBanners";
 import { SyncStatusIndicator } from "@app/components/sync/SyncStatusIndicator";
 import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
+import { ViewConsent } from "@app/components/ViewConsent";
 import { ThemeChiplet } from "@app/components/primitives/ThemeChiplet";
 import { ThemeInstallDialog } from "@app/components/ThemeInstallDialog";
 import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
@@ -1723,6 +1724,61 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "unlocked",
     render: () => (
       <TemplatesManager open onClose={action("onClose")} onOpenNote={action("onOpenNote")} />
+    ),
+  },
+  {
+    id: "components/viewconsent/default",
+    group: "components",
+    surface: "ViewConsent",
+    state: "default",
+    description:
+      "The capability summary shown before a view someone else wrote is approved: the notes it selects, the properties it reads and the fields it can change. Look for the read set to be enumerated property by property, including a key no column shows, rather than summarised.",
+    tags: ["components", "views", "consent", "capability", "sharing", "import"],
+    render: () => (
+      <div style={{ padding: "var(--space-5)", maxWidth: 480, background: "var(--paper)" }}>
+        <ViewConsent
+          definition={{
+            id: "v-books",
+            name: "Unread books",
+            view_type: "table",
+            filters: {
+              kind: "and",
+              children: [
+                { kind: "hasTag", tag: "books" },
+                { kind: "property", key: "finished", op: "==", value: "no" },
+              ],
+            },
+            columns: ["author", "status"],
+            image: "cover",
+            group_by: "series",
+            sort: { key: "added", direction: "desc" },
+            version: 3,
+            write_fields: ["status"],
+          }}
+        />
+      </div>
+    ),
+  },
+  {
+    id: "components/viewconsent/readonly",
+    group: "components",
+    surface: "ViewConsent",
+    state: "readonly",
+    description:
+      "The same surface for a read-only view: no declared write fields, so the write section is omitted rather than shown empty. Look for the absence of a 'none' row, which would read as a field nobody filled in.",
+    tags: ["components", "views", "consent", "capability", "read-only"],
+    render: () => (
+      <div style={{ padding: "var(--space-5)", maxWidth: 480, background: "var(--paper)" }}>
+        <ViewConsent
+          definition={{
+            id: "v-everything",
+            name: "Everything",
+            view_type: "list",
+            filters: { kind: "all" },
+            version: 1,
+          }}
+        />
+      </div>
     ),
   },
   {
