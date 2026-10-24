@@ -162,9 +162,12 @@ pub fn socket_path(app_data_dir: &Path) -> PathBuf {
 ///
 /// Pure, portable string logic (no `windows-sys` dependency), so it is typed
 /// and tested on every host including this repo's Linux dev/CI target.
+pub const PIPE_PREFIX: &str = "myne-cli-";
+
 pub fn windows_pipe_name(app_data_dir: &Path) -> String {
     format!(
-        r"\\.\pipe\myne-cli-{:016x}",
+        r"\\.\pipe\{}{:016x}",
+        PIPE_PREFIX,
         fnv1a64(app_data_dir.to_string_lossy().as_bytes())
     )
 }
