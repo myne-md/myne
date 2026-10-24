@@ -205,14 +205,12 @@ fn linux_targets(home: &Path, config: &Path) -> Vec<BrowserTarget> {
             manifest_dir: chrome.join("NativeMessagingHosts"),
             registry_key: None,
             base_dir: chrome,
-            registry_key: None,
         },
         BrowserTarget {
             browser: Browser::Edge,
             manifest_dir: edge.join("NativeMessagingHosts"),
             registry_key: None,
             base_dir: edge,
-            registry_key: None,
         },
     ]
 }
