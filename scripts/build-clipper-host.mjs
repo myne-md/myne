@@ -11,20 +11,6 @@
 // The staging mechanics (triple suffix, target-dir discovery, write-if-changed)
 // are shared and live in `scripts/lib/stage-sidecar.mjs`.
 //
-// ── The bootstrap, on a fresh clone ────────────────────────────────────────
-//
-// `src-tauri/build.rs` refuses to compile the package while an `externalBin`
-// entry is missing from disk, and this script's own `cargo build` is inside that
-// package: the first run on a fresh checkout fails on the file it is about to
-// produce. Bootstrap it once, by hand:
-//
-//   touch src-tauri/binaries/myne-clipper-host-<host triple>
-//   node scripts/build-clipper-host.mjs
-//
-// The staged file is gitignored build output, so this happens once per clone.
-// `myne` and `myne-tor` do not have the problem: they live in crates of their
-// own, so nothing about them is needed to compile this package.
-//
 // Zero dependencies, hand-runnable:
 //   node scripts/build-clipper-host.mjs [--profile debug|release] [--target <triple>]
 

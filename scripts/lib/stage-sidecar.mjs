@@ -116,6 +116,28 @@ export function stageSidecar({ scriptName, package: pkg, binName, args }) {
   const exeSuffix = triple.includes("windows") ? ".exe" : "";
 
   if (args.build) {
+    // ── The bootstrap, and why a placeholder is written BEFORE cargo runs ──
+    //
+    // `src-tauri/build.rs` refuses to compile the myne-desktop package while an
+    // `externalBin` entry is missing from disk. `myne` and `myne-tor` are crates
+    // of their own, so nothing about them is needed to compile that package. The
+    // browser clipper's host is a bin INSIDE it, which makes staging it a
+    // chicken-and-egg: the build that produces the file trips the check on the
+    // file it is about to produce.
+    //
+    // The placeholder is zero bytes and is overwritten two steps below by the
+    // real binary. It cannot be bundled by accident: a failed cargo run exits
+    // through `onToolFailure: "fatal"` before anything stages it.
+    const destination = join(
+      repoRoot,
+      "src-tauri",
+      "binaries",
+      `${binName}-${triple}${exeSuffix}`,
+    );
+    if (!existsSync(destination)) {
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, "");
+    }
     const cargoArgs = ["build", "-p", pkg, "--bin", binName];
     if (args.profile === "release") cargoArgs.push("--release");
     if (args.target) cargoArgs.push("--target", args.target);
