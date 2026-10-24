@@ -337,13 +337,21 @@ mod tests {
     }
 
     /// A unique-enough suffix without pulling `uuid` as a dev-dep.
+    ///
+    /// The clock alone is not enough: macOS resolves `SystemTime` to about a
+    /// microsecond, and two tests calling this inside the same microsecond get
+    /// the same directory, so one reads the other's `vault.meta` and fails with
+    /// `InvalidVaultMeta`. A process-local counter closes that window and costs
+    /// nothing; the timestamp stays so two concurrent processes still differ.
     fn uuid_like() -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
         use std::time::{SystemTime, UNIX_EPOCH};
+        static SEQ: AtomicU64 = AtomicU64::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        format!("{nanos}")
+        format!("{nanos}-{}", SEQ.fetch_add(1, Ordering::Relaxed))
     }
 
     #[test]
