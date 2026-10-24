@@ -23,6 +23,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
+import { orderSavedViews } from "../views/orderSavedViews";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { SidebarSearchRow } from "./SidebarSearchRow";
@@ -805,21 +806,13 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
   // double read, and a save from a sibling surface like the Tag browser lands
   // here too).
   const { prefs: viewsPrefs } = usePrefs();
-  const orderedViews = useMemo<SavedView[]>(() => {
-    const byId = new Map(viewsPrefs.saved_views.map((v) => [v.id, v]));
-    const ordered: SavedView[] = [];
-    for (const id of viewsPrefs.view_order) {
-      const v = byId.get(id);
-      if (v !== undefined) {
-        ordered.push(v);
-        byId.delete(id);
-      }
-    }
-    for (const v of viewsPrefs.saved_views) {
-      if (byId.has(v.id)) ordered.push(v);
-    }
-    return ordered;
-  }, [viewsPrefs.saved_views, viewsPrefs.view_order]);
+  // The join of `saved_views` with `view_order` lives in one pure helper now
+  // that the Views manager needs the same order: two copies of "walk the order,
+  // then append the leftovers" are two answers waiting to disagree.
+  const orderedViews = useMemo<SavedView[]>(
+    () => orderSavedViews(viewsPrefs.saved_views, viewsPrefs.view_order),
+    [viewsPrefs.saved_views, viewsPrefs.view_order],
+  );
   // Views feature toggle (device-local): the "Views" entry shows only when
   // enabled. Effective = stored pref, else back-compat default (has any views).
   // Re-read on the change event so the sidebar reflects the Settings toggle live.
