@@ -60,7 +60,7 @@ pub const RESERVED_WRITE_FIELDS: [&str; 3] = ["archived", "deleted", "trashed"];
 /// encoder's own failure, which cannot say why.
 pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 
-/// Every top-level key a manifest may carry — the canonical `SavedView` key set
+/// Every top-level key a manifest may carry: the canonical `SavedView` key set
 /// of §9.5.2 and nothing else.
 ///
 /// Kept as a literal so an unknown key can be REFUSED before the shared decode
@@ -91,7 +91,7 @@ pub const MANIFEST_KEYS: [&str; 12] = [
 /// deliberate: `UnknownKey` carries the offending key so the refusal can name it
 /// (the requirement, not a convenience), and `ReservedWriteField` carries the
 /// matched marker as a `&'static str` so it can only ever be one of
-/// [`RESERVED_WRITE_FIELDS`] — the type makes it impossible for this variant to
+/// [`RESERVED_WRITE_FIELDS`], so the type makes it impossible for this variant to
 /// echo arbitrary text out of a file.
 #[derive(Debug, Clone, PartialEq, Eq, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
@@ -125,7 +125,7 @@ pub enum ViewManifestError {
     /// A field is present at the wrong JSON type.
     #[error("a manifest field has the wrong JSON type")]
     WrongType,
-    /// A value outside the closed allow-list — an unknown `view_type`, filter
+    /// A value outside the closed allow-list: an unknown `view_type`, filter
     /// kind, comparison operator or sort direction.
     #[error("the manifest carries a value this build cannot represent")]
     Unrepresentable,
@@ -201,11 +201,11 @@ impl From<SavedViewParseError> for ViewManifestError {
 /// the feature ships. The fail-closed side is the import path, and it is closed
 /// there by `VersionRequired` rather than by this comparison.
 pub fn is_view_approved(
-    approvals: &alloc::collections::BTreeMap<String, u32>,
+    approvals: &alloc::collections::BTreeMap<String, u64>,
     view: &SavedView,
 ) -> bool {
     match view.version {
-        Some(version) => approvals.get(&view.id) == Some(&version),
+        Some(version) => approvals.get(&view.id) == Some(&u64::from(version)),
         None => true,
     }
 }
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn write_fields_preserves_author_order_and_nfc_folds() {
-        // Sequence semantics: order preserved verbatim (no sort, no dedup — the
+        // Sequence semantics: order preserved verbatim (no sort, no dedup, the
         // `columns` discipline), each element NFC.
         let mut v = view();
         v.write_fields = vec!["zeta".into(), "e\u{0301}".into(), "alpha".into()];
@@ -483,7 +483,7 @@ mod tests {
             !is_view_approved(&approvals, &v),
             "no entry is not approved"
         );
-        approvals.insert("v1".to_string(), 3);
+        approvals.insert("v1".to_string(), 3u64);
         assert!(is_view_approved(&approvals, &v));
         // A version bump revokes approval with no code touching the map: that is
         // the property, so it is asserted on the SAME map value.

@@ -3496,6 +3496,45 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        "plugin:prefs|set_view_approval" => {
+            // view-manifests: this device's approval of one saved view. Device-local
+            // per sync-protocol.md §10.2, and it round-trips on every client because
+            // the map lives in `vault.prefs`; the browser simply has no manifest UI
+            // yet, so the command is reachable but unrendered rather than absent.
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                view_id: String,
+                version: Option<u32>,
+                definition: Option<protocol::SavedView>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_view_approval_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                myne_core::plugins::prefs::commands::ViewApproval {
+                    view_id: a.view_id,
+                    version: a.version,
+                    definition: a.definition,
+                },
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:prefs|delete_saved_view" => {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]

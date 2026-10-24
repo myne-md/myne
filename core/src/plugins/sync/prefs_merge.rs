@@ -796,6 +796,15 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
         view_order: lww!("view_order", view_order),
+        // view_approvals (view-manifests): **device-local**, and the local side
+        // winning outright is the feature rather than a merge detail. An approval
+        // is a decision a person made AT a device, so a remote map may never
+        // arrive and open a view nobody here was asked about: the SYNC-22 defect
+        // that moved `ai_provider_consent` into this same block, wearing a
+        // different field name. Note the direction that costs something and is
+        // accepted: revoking on device A does not revoke on device B, because
+        // there is no remote vote to honour.
+        view_approvals: local.view_approvals.clone(),
         // ---- shared: whole-value LWW -------------------------------------
         // (saved_views / color_groups need their codec's canonical encoder —
         // serde would emit struct-declaration key order.)
@@ -1797,6 +1806,40 @@ mod tests {
         };
         assert_eq!(shared_subset_hash(&base), shared_subset_hash(&themed));
         assert_ne!(shared_subset_hash(&base), shared_subset_hash(&labeled));
+    }
+
+    #[test]
+    fn view_approvals_are_device_local_and_never_arrive_by_sync() {
+        // view-manifests: an approval is a decision a person made AT a device, so
+        // the merge keeps the LOCAL map and nothing a peer approved can arrive.
+        // This is the SYNC-22 lesson one field over (`ai_provider_consent`), and it
+        // is asserted in BOTH directions: a remote map is ignored, and a local one
+        // survives.
+        let remote_approving = PrefsView {
+            view_approvals: [(String::from("v1"), 3u64)].into_iter().collect(),
+            ..PrefsView::default()
+        };
+        let local_empty = PrefsView::default();
+
+        // A fresh device that syncs a peer's approvals keeps NONE of them: the
+        // view must ask the person at this device.
+        assert!(merge_prefs(&local_empty, &remote_approving)
+            .view_approvals
+            .is_empty());
+
+        // …and a local approval is never discarded by a peer that has none.
+        // Note the argument order carries the meaning here: `merge_prefs`'s first
+        // argument is the LOCAL side, so a device-local field is by design not
+        // symmetric, and asserting symmetry would be asserting the defect.
+        let kept = merge_prefs(&remote_approving, &local_empty);
+        assert_eq!(kept.view_approvals.get("v1"), Some(&3u64));
+
+        // Device-local also means it does not register on the §10.2.1 push gate:
+        // approving a view must not open a sync push window on its own.
+        assert_eq!(
+            shared_subset_hash(&local_empty),
+            shared_subset_hash(&remote_approving)
+        );
     }
 
     #[test]

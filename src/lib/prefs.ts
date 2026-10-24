@@ -135,14 +135,14 @@ export interface SavedView {
   /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
    *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
   image_aspect_ratio?: string;
-  /** Definition version (view-manifests) — a non-negative integer the APP
+  /** Definition version (view-manifests): a non-negative integer the APP
    *  maintains, never a form field: a local edit that changes the canonical bytes
    *  increments it. Absent on a view authored before the field existed, which is
    *  storage compatibility rather than a state the import path accepts (it
    *  refuses a manifest with no version). It is what an update is ordered
    *  against, and what this device's approval names. */
   version?: number;
-  /** The property keys this view may write — the ENTIRE write authority a shared
+  /** The property keys this view may write: the ENTIRE write authority a shared
    *  view carries, checked by the host rather than by the renderer. Sequence
    *  semantics: order preserved verbatim, NFC per element. The host-owned markers
    *  (`archived`, `trashed`, `deleted`) are refused by the import reader, so no
@@ -818,6 +818,14 @@ export interface PrefsView {
    * sorted/deduped; stale ids are the caller's to prune). Absent → `[]`.
    */
   view_order: string[];
+  /**
+   * This DEVICE's approval of saved views (view-manifests) — `{view id: approved
+   * version}`, device-local per `sync-protocol.md` §10.2, so it never arrives by
+   * sync and a second device asks again. A view counts as approved when the value
+   * here EQUALS its `version` (Rust `is_view_approved`), so bumping a definition
+   * revokes approval with nothing to clear. Absent → `{}`.
+   */
+  view_approvals: Record<string, number>;
 }
 
 /**
@@ -2068,6 +2076,36 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
+}
+
+/**
+ * Persist this DEVICE's approval of one saved view (view-manifests): a
+ * device-local map of `{view id: approved version}`, so approval never travels
+ * to another device (an approval is a decision somebody made HERE).
+ *
+ * Two shapes, one command:
+ *
+ * - `definition` omitted: the plain APPROVAL action. `version` is the definition
+ *   version being approved; pass `undefined` to CLEAR this device's approval of
+ *   `viewId`. Nothing else about the view changes.
+ * - `definition` present: a LOCAL EDIT, which writes the new definition and the
+ *   approval of its version in ONE prefs write. A local edit must never leave
+ *   the user's own view unapproved, and one write is the only way to promise
+ *   that. An IMPORTED update deliberately does not use this shape: new bytes
+ *   from elsewhere are a new decision.
+ *
+ * "Approved" is an equality against the stored version (Rust
+ * `is_view_approved`), so bumping a view's version revokes this device's
+ * approval with nothing to clear. The backend refuses (`InvalidValue`) when
+ * `definition.id` disagrees with `viewId`; a rejected promise means nothing was
+ * written, so an optimistic UI must revert.
+ */
+export async function setViewApproval(
+  viewId: string,
+  version: number | undefined,
+  definition?: SavedView,
+): Promise<void> {
+  await writePref("plugin:prefs|set_view_approval", { viewId, version, definition });
 }
 
 /**

@@ -218,6 +218,10 @@ fn main() {
                 // belt-and-suspenders pattern).
                 "set_chat_history_budget",
                 "set_developer_mode",
+                // view-manifests: the device-local view approval map. Both this
+                // mirror and permissions/prefs/default.toml must name it, or the
+                // `plugin:prefs|set_view_approval` authorize form never matches.
+                "set_view_approval",
             ]),
         )
         .plugin(

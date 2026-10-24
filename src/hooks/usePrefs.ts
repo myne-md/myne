@@ -60,6 +60,12 @@ import {
   setRightPanelHiddenTabs as persistRightPanelHiddenTabs,
   setRightPanelTabOrder as persistRightPanelTabOrder,
   setScreenCaptureProtection,
+  // Imported UNALIASED for the reason recorded above `setReminderHorizonDays`:
+  // `check-ipc-binding-callers.mjs` strips whole import statements and bare-word
+  // matches what is left, so `setViewApproval as persistViewApproval` plus a call
+  // to the alias would report this binding as dead.
+  setViewApproval,
+  type SavedView,
 } from "../lib/prefs";
 import { subscribePrefsNonce } from "../notes/prefsNonce";
 
@@ -155,6 +161,7 @@ export const DEFAULT_PREFS: PrefsView = {
   spell_languages: [],
   saved_views: [],
   view_order: [],
+  view_approvals: {},
   // myne-md/myne#699. `null` ribbon_items means never configured: the rail
   // renders its curated default set client-side.
   ribbon_items: null,
@@ -198,6 +205,19 @@ interface UsePrefsResult {
    * within one supervisor tick — this only writes the preference.
    */
   setCliEnabled: (enabled: boolean) => Promise<void>;
+  /**
+   * Record (or clear, with `version: undefined`) THIS DEVICE's approval of one
+   * saved view. Device-local, so it never travels: the second device asks again.
+   * Passing `definition` writes the definition and the approval of its version in
+   * ONE prefs write, which is what a LOCAL edit uses so editing your own view
+   * never leaves it unapproved; the import path approves without a definition,
+   * because new bytes from elsewhere are a new decision.
+   */
+  approveView: (
+    viewId: string,
+    version: number | undefined,
+    definition?: SavedView,
+  ) => Promise<void>;
   /** Add to and remove from the CLI excluded-folders set (optimistic). */
   setCliExcludedFolders: (
     mutation: SetMutation,
@@ -473,6 +493,37 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
 
   // Developer mode toggle (`developer-mode` feature, MYND-593). Same
   // optimistic-then-converge discipline as `setAiEnabledPref`.
+  const approveView = useCallback(
+    async (viewId: string, version: number | undefined, definition?: SavedView) => {
+      // Optimistic on the MAP only. A definition written in the same call arrives
+      // through the nonce-driven reload, because the write bumps the nonce; the
+      // approval is the part the caller's own render depends on immediately.
+      setPrefs((p) => {
+        const approvals = { ...p.view_approvals };
+        if (version === undefined) delete approvals[viewId];
+        else approvals[viewId] = version;
+        return { ...p, view_approvals: approvals };
+      });
+      try {
+        await setViewApproval(viewId, version, definition);
+      } catch {
+        // A refused write stored NOTHING (the host validates before it writes),
+        // so converging on disk truth is correct here and the optimistic map must
+        // not survive: an approval the host refused is an approval that never
+        // happened.
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed. Leave the optimistic value; the backend logged
+          // the original failure and the next nonce bump reloads.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
   const setDeveloperModePref = useCallback(
     async (enabled: boolean) => {
       setPrefs((p) => ({ ...p, developer_mode: enabled }));
@@ -872,6 +923,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setEditorContentWidth: setEditorContentWidthPref,
     setEditorFontFamily: setEditorFontFamilyPref,
     setKeymapBinding: setKeymapBindingPref,
+    approveView,
     reload,
   };
 }
