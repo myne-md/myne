@@ -5471,10 +5471,9 @@
     "invitesError": "Could not load invites. Check your connection and sync server.",
     "invitesHeading": "Invitations",
     "invitesLoading": "Checking for invitations…",
-    "invitesNotEnrolled": "This identity is not registered yet, so no invitation can reach it.",
     "invitesPending": "This device is waiting for approval. Invitations appear here once another device of yours approves it.",
+    "invitesUnregistered": "This identity is not on your sync server yet, so no invitation can reach it. Registering adds it there, and the phrase is asked for as proof.",
     "noInvites": "No invitations yet.",
-    "subtitle": "You have an identity on this device, so people can invite you to a vault. You do not need to create one to be invited.",
     "stepIndicator": "Step {{n}} of {{total}} · {{label}}",
     "stepVerifyOwner": "Verify the owner",
     "stepRecoveryPhrase": "Recovery phrase",
@@ -5518,8 +5517,6 @@
     "forgetCta": "Forget this identity on this device",
     "forgetError": "Could not forget the identity. Try again.",
     "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it.",
-    "accountStateReserved": "This identity exists only on this device. Registering it adds it to your sync server so other devices can find you; the phrase is asked for as proof.",
-    "accountStatePending": "Registered. This device is waiting for approval before it can sync.",
     "registerCta": "Register this identity",
     "registerPrompt": "Type your 24-word phrase to prove this identity is yours.",
     "registerSubmit": "Register",
@@ -5530,6 +5527,7 @@
     "registerServerError": "That server could not be reached. Check the address and try again. Your words are still here.",
     "accountNumberHeading": "Account number",
     "accountNumberHint": "Derived from your identity phrase, so it cannot be lost, and it is not a secret. Use it for support or for a server operator handoff.",
+    "copyAccountNumber": "Copy account number",
     "registerPhraseLabel": "Your identity phrase, 24 words"
   },
   "welcome": {
