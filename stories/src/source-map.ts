@@ -242,6 +242,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "VaultPicker": { file: "src/screens/VaultPicker.tsx", line: 631 },
   "VaultRecover": { file: "src/screens/VaultRecover.tsx", line: 178 },
   "VaultSwitcher": { file: "src/components/VaultSwitcher.tsx", line: 327 },
+  "ViewConsent": { file: "src/components/ViewConsent.tsx", line: 151 },
   "ViewSettings": { file: "src/notes/components/ViewSettings.tsx", line: 148 },
   "ViewsSection": { file: "src/notes/components/ViewsSection.tsx", line: 225 },
   "ViewsSettings": { file: "src/components/settings/ViewsSettings.tsx", line: 16 },
