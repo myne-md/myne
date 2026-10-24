@@ -313,7 +313,6 @@
     opacity: 0;
   }
 }
-}
 
 /* Bordered variant: an icon control that FLOATS on content rather than sitting
    in chrome, so it needs its own edge to be findable against whatever is
