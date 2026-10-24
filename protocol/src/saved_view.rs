@@ -213,7 +213,7 @@ pub struct SavedView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_aspect_ratio: Option<String>,
 
-    /// Definition version — a non-negative integer, omitted when absent
+    /// Definition version: a non-negative integer, omitted when absent
     /// (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
     ///
     /// The app maintains it, not the user: any local edit that changes the
@@ -221,18 +221,18 @@ pub struct SavedView {
     /// ordered against the definition this vault already holds (higher replaces,
     /// identical is a no-op, same-version-different-bytes is a refusal naming
     /// both, lower is refused), and so this device's APPROVAL can name exactly
-    /// the bytes it approved — approval is an equality against this value, which
+    /// the bytes it approved. Approval is an equality against this value, which
     /// is what makes a version bump revoke it with no clear step.
     ///
     /// `None` is STORAGE compatibility and nothing else: a view authored before
     /// this field existed has no version, and §9.5.2's additive discipline says
-    /// it must still decode. The import path does not tolerate it — see
+    /// it must still decode. The import path does not tolerate it; see
     /// [`crate::view_manifest`], which refuses a manifest with no `version`,
     /// because a file whose version cannot be read cannot be ordered at all.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<u32>,
 
-    /// The property keys this view's write intent covers — a sequence of
+    /// The property keys this view's write intent covers: a sequence of
     /// frontmatter keys, omitted when empty (`view-manifests`; §9.5.2).
     ///
     /// This is the ENTIRE write authority a shared view carries. A field absent
@@ -1018,7 +1018,7 @@ pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedView
     };
 
     // `version` (view-manifests): a non-negative integer bounded by `u32`, and
-    // OPTIONAL here on purpose — a view authored before the field existed must
+    // OPTIONAL here on purpose: a view authored before the field existed must
     // still decode (§9.5.2 additive discipline). The import path's stricter
     // "version required" rule lives in `crate::view_manifest`, because a stored
     // view without one is readable while a FILE without one cannot be ordered
@@ -1038,7 +1038,7 @@ pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedView
         None => Vec::new(),
     };
 
-    // `write_fields` — sequence semantics, stored verbatim. The reserved-marker
+    // `write_fields`: sequence semantics, stored verbatim. The reserved-marker
     // refusal is the strict reader's job (see the field's doc): the stored blob
     // is a peer's bytes and must not fail a whole parse over a declaration this
     // build would not honour.

@@ -434,6 +434,20 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "transcription_enabled",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
+    // view-manifests: **DeviceLocal**, and this row is the whole design decision
+    // rather than a detail of it. An approval says "the person at THIS device has
+    // read what this view can do and allowed it", so a shared map would mean a
+    // freshly enrolled device inheriting an approval nobody there gave: exactly
+    // the incident recorded for `ai_provider_consent` two rows up, and the reason
+    // this field exists as a separate map rather than as a flag on the view
+    // definition (which syncs).
+    //
+    // The cost is stated so the next reader does not rediscover it: the same view
+    // asks again on a second device, on purpose. The value is a version number,
+    // so a definition that changes anywhere also revokes the approval everywhere
+    // it was given, with no clear step. Preserved verbatim from the local side,
+    // which is what `.clone()` in `prefs_merge.rs` is doing.
+    ("view_approvals", PrefClass::DeviceLocal),
     (
         "view_order",
         PrefClass::Shared(SharedDiscipline::SequenceLww),
@@ -549,6 +563,7 @@ mod tests {
             time_format: _,
             timezone: _,
             transcription_enabled: _,
+            view_approvals: _,
             view_order: _,
         } = PrefsView::default();
 
@@ -632,6 +647,7 @@ mod tests {
             "time_format",
             "timezone",
             "transcription_enabled",
+            "view_approvals",
             "view_order",
         ];
 

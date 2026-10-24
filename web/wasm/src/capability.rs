@@ -126,6 +126,11 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_view_order",
     "plugin:prefs|set_bar_items_order",
     "plugin:prefs|set_color_groups",
+    // view-manifests: the device-local approval map. Dispatched rather than
+    // absent for the same reason as `set_developer_mode` below: the value lives in
+    // `vault.prefs`, which every client round-trips, even where the feature that
+    // consumes it has no affordance yet.
+    "plugin:prefs|set_view_approval",
     "plugin:prefs|set_right_panel_active_tab",
     "plugin:prefs|set_right_panel_hidden_tabs",
     "plugin:prefs|set_right_panel_tab_order",

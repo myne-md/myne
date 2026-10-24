@@ -153,6 +153,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // color-group rule list — order is precedence, no separate
             // `*_order` field, same shape as `set_bar_items_order`.
             commands::set_color_groups,
+            // view-manifests: this device's approval of one saved view, keyed by
+            // view id and carrying the approved VERSION (device-local per
+            // sync-protocol.md §10.2). Needs its own `allow-` entry in
+            // permissions/prefs/default.toml, or it is a security regression.
+            commands::set_view_approval,
         ])
         .build()
 }

@@ -96,6 +96,10 @@ permissions = [
   "allow-set-cli-excluded-folders",
   "allow-set-cli-rate-limit-disabled",
   "allow-set-color-groups",
+  # view-manifests: a write setter for this device's saved-view approval map, so
+  # it inherits the same main-window-only invariant as the other allow-set-*
+  # permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+  "allow-set-view-approval",
 ]
 
 [[permission]]
@@ -656,3 +660,16 @@ commands.allow = ["set_cli_rate_limit_disabled"]
 identifier = "allow-set-color-groups"
 description = "Allow invoking prefs:set_color_groups (Slot::Unlocked-gated whole-list-replace setter for the color_groups rule list — the graph pane's color-group editor; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim since order is rule precedence; logs count only, never a rule name, color key or filter)."
 commands.allow = ["set_color_groups"]
+
+# view-manifests: THIS DEVICE's approval of one saved view, keyed by view id and
+# carrying the definition VERSION that was approved. Device-local per
+# sync-protocol.md §10.2: an approval is a decision a person makes at a device,
+# so a freshly enrolled device never inherits one (the `ai_provider_consent`
+# lesson). Inherits the same main-window-only invariant as the other allow-set-*
+# permissions, so v0.2 multi-window MUST NOT grant this to any non-main window.
+# Atomic-writes vault.prefs with no native side-effect; logs a boolean and a
+# count only, never a view id or a version.
+[[permission]]
+identifier = "allow-set-view-approval"
+description = "Allow invoking prefs:set_view_approval (Slot::Unlocked-gated setter for the device-local view_approvals map of view id to approved_version, omitted on disk when empty so a vault that never approves anything stays byte-identical to a pre-feature blob; a definition may be written in the same call so a local edit never leaves the user's own view unapproved; class DeviceLocal per sync-protocol.md §10.2)."
+commands.allow = ["set_view_approval"]

@@ -3344,6 +3344,12 @@ pub(crate) async fn delete_saved_view_with_dir(
             prefs.saved_views.retain(|v| v.id != id);
             // Prune the id from the display order too (no dangling entry).
             prefs.view_order.retain(|vid| *vid != id);
+            // …and its approval, or the map accumulates decisions about views
+            // that no longer exist, and re-importing the same id later would
+            // arrive pre-approved by an entry nobody can see in the list.
+            // Deleting the view IS the revoke (the PRD's rule), and this is what
+            // makes that true of the stored map rather than only of the UI.
+            prefs.view_approvals.remove(&id);
             count = prefs.saved_views.len();
         },
         io,
@@ -3354,6 +3360,49 @@ pub(crate) async fn delete_saved_view_with_dir(
     // COUNT only — never the view id (AS3-Sensitive correlation surface).
     tracing::info!(event = "prefs_written", field = "saved_views", count);
     Ok(())
+}
+
+/// Slot::Unlocked-gated setter for THIS DEVICE's approval of one saved view
+/// (`view-manifests`; `docs/spec/protocol.md` §9.5). Read-modify-write under the
+/// per-plugin write mutex; **no native side-effect**. The field is device-local
+/// per `sync-protocol.md` §10.2, so `update_prefs_with_dir` stamps no clock for it
+/// and the merge keeps the local map. Pass `version: None` to clear an approval.
+/// See [`set_view_approval_with_dir`] for the two calling shapes and for why the
+/// id is authoritative over the definition's own.
+pub async fn set_view_approval_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    approval: ViewApproval,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_view_approval_with_dir(&dir, state, hooks, approval, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_view_approval<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    view_id: String,
+    version: Option<u32>,
+    definition: Option<SavedView>,
+) -> Result<(), PrefsWriteError> {
+    set_view_approval_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        ViewApproval {
+            view_id,
+            version,
+            definition,
+        },
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Slot::Unlocked-gated setter for the `view_order` sequence (MYND-273) — the
@@ -5902,6 +5951,109 @@ pub(crate) async fn set_color_groups_with_dir(
     Ok(())
 }
 
+/// One approval action, as the two call shapes need it: what to record, and
+/// optionally the definition to write in the SAME prefs write.
+///
+/// A struct rather than three parameters because the core took eight arguments,
+/// which clippy refuses and a reader should. It also names the pair that has to
+/// travel together: `version` is the approval being recorded and `definition` is
+/// the bytes it is expected to describe, so a local edit cannot land one without
+/// the other.
+pub struct ViewApproval {
+    /// The view being approved, and the map key. Authoritative: a `definition`
+    /// naming a different id is refused rather than approving bytes that were
+    /// never shown.
+    pub view_id: String,
+    /// The definition version being approved. `None` CLEARS this device's
+    /// approval of `view_id`.
+    pub version: Option<u32>,
+    /// The definition to upsert in the same write, for a LOCAL edit. `None` is the
+    /// plain approval action the import path uses.
+    pub definition: Option<SavedView>,
+}
+
+/// Testable core of [`set_view_approval`].
+///
+/// Records (or clears) THIS DEVICE's approval of one saved view, optionally in
+/// the same prefs write as the definition it approves. Device-local per
+/// `sync-protocol.md` §10.2; see `prefs_classification`'s row for why the merge
+/// keeps the local map. The value is a VERSION rather than a flag, so
+/// "approved" is an equality ([`protocol::is_view_approved`]) and a later
+/// version bump revokes it with nothing to clear.
+///
+/// Two callers, one command:
+///
+/// - `definition: None` is the plain APPROVAL action the import path uses: a
+///   pending view becomes approved, nothing else changes.
+/// - `definition: Some(_)` is a LOCAL EDIT, which must never leave the user's own
+///   view unapproved: the new definition and the approval of its version land in
+///   one write, so there is no window in which the app has stored a version this
+///   device has not approved. An IMPORTED update deliberately does not use this
+///   arm (§9.5.2's ordered comparison clears approval instead, so new bytes are a
+///   new decision).
+///
+/// `view_id` is the map key and is authoritative. A `definition` naming a
+/// different id is refused with [`PrefsWriteError::InvalidValue`] rather than
+/// approving one view while storing another, which would be an approval of bytes
+/// that were never shown.
+pub(crate) async fn set_view_approval_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    approval: ViewApproval,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let ViewApproval {
+        view_id,
+        version,
+        definition,
+    } = approval;
+    if let Some(ref def) = definition {
+        if def.id != view_id {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+    }
+
+    let mut count = 0usize;
+    let approved = version.is_some();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            if let Some(def) = definition.clone() {
+                match prefs.saved_views.iter_mut().find(|v| v.id == def.id) {
+                    Some(existing) => *existing = def,
+                    None => prefs.saved_views.push(def),
+                }
+            }
+            match version {
+                Some(v) => {
+                    prefs.view_approvals.insert(view_id.clone(), u64::from(v));
+                }
+                None => {
+                    prefs.view_approvals.remove(&view_id);
+                }
+            }
+            count = prefs.view_approvals.len();
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // COUNT and a boolean only, never the view id (AS3-Sensitive correlation
+    // surface, the `delete_saved_view` discipline) and never the version.
+    tracing::info!(
+        event = "prefs_written",
+        field = "view_approvals",
+        approved,
+        count
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6979,6 +7131,7 @@ mod tests {
                     startup_open_note: None,
                     saved_views: Vec::new(),
                     opaque_saved_views: Vec::new(),
+                    view_approvals: Default::default(),
                     view_order: Vec::new(),
                 },
                 &[0x77; AEAD_NONCE_LEN],
@@ -8117,6 +8270,285 @@ mod tests {
                 .await
                 .expect("read");
             assert_eq!(view.saved_views.len(), 1);
+        });
+    }
+
+    // ---- view_approvals (view-manifests) -------------------------------
+
+    /// The plain APPROVAL action: a pending view becomes approved at a version,
+    /// and nothing about the definition changes.
+    #[test]
+    fn set_view_approval_records_the_version_against_this_device() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x5a).await;
+            let mut def = test_view("v1", "Books");
+            def.version = Some(1);
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                def,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v1");
+
+            // Before approval: stored, readable, NOT approved.
+            let before = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(before.view_approvals.is_empty());
+            assert!(!protocol::is_view_approved(
+                &before.view_approvals,
+                &before.saved_views[0]
+            ));
+
+            set_view_approval_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                ViewApproval {
+                    view_id: String::from("v1"),
+                    version: Some(1),
+                    definition: None,
+                },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("approve v1");
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(after.view_approvals.get("v1"), Some(&1u64));
+            assert!(protocol::is_view_approved(
+                &after.view_approvals,
+                &after.saved_views[0]
+            ));
+            // The definition is untouched by an approval.
+            assert_eq!(after.saved_views[0].name, "Books");
+        });
+    }
+
+    /// A version bump makes the view unapproved WITHOUT the map being touched:
+    /// the whole "no clear step to forget" property, asserted on the SAME stored
+    /// approval rather than on a fresh one.
+    #[test]
+    fn a_version_bump_makes_the_view_unapproved_without_touching_the_map() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x5b).await;
+            let mut def = test_view("v1", "Books");
+            def.version = Some(1);
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                def,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v1");
+            set_view_approval_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                ViewApproval {
+                    view_id: String::from("v1"),
+                    version: Some(1),
+                    definition: None,
+                },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("approve v1");
+            assert!(
+                protocol::is_view_approved(
+                    &prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                        .await
+                        .expect("read")
+                        .view_approvals,
+                    &{
+                        let mut v = test_view("v1", "Books");
+                        v.version = Some(1);
+                        v
+                    }
+                ),
+                "v1 at version 1 is approved after the approval write"
+            );
+
+            // The definition moves to version 2 by an ORDINARY upsert, which is
+            // exactly what an app-side edit does.
+            let mut bumped = test_view("v1", "Books, revised");
+            bumped.version = Some(2);
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                bumped.clone(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("bump to v2");
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            // The map still names version 1. Nothing cleared it …
+            assert_eq!(after.view_approvals.get("v1"), Some(&1u64));
+            // … and the view is nonetheless NOT approved, which is the property.
+            assert!(!protocol::is_view_approved(&after.view_approvals, &bumped));
+        });
+    }
+
+    /// A LOCAL edit lands the definition and its approval in ONE write, which is
+    /// what keeps editing your own view from leaving it unapproved. The import
+    /// path deliberately does not use this arm.
+    #[test]
+    fn a_local_edit_records_the_definition_and_its_approval_in_one_write() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x5c).await;
+            let mut def = test_view("v1", "Books");
+            def.version = Some(4);
+            set_view_approval_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                ViewApproval {
+                    view_id: String::from("v1"),
+                    version: Some(4),
+                    definition: Some(def.clone()),
+                },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("local edit + approve");
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(after.saved_views.len(), 1);
+            assert_eq!(after.saved_views[0].version, Some(4));
+            assert_eq!(after.view_approvals.get("v1"), Some(&4u64));
+            assert!(protocol::is_view_approved(
+                &after.view_approvals,
+                &after.saved_views[0]
+            ));
+        });
+    }
+
+    /// An id mismatch between the map key and the definition is refused, and the
+    /// refusal writes NOTHING: approving one view while storing another would be
+    /// an approval of bytes nobody was shown.
+    #[test]
+    fn a_definition_naming_a_different_view_is_refused_and_writes_nothing() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x5d).await;
+            let mut def = test_view("v2", "Other");
+            def.version = Some(1);
+            let err = set_view_approval_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                ViewApproval {
+                    view_id: String::from("v1"),
+                    version: Some(1),
+                    definition: Some(def),
+                },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect_err("mismatched id must be refused");
+            assert!(matches!(err, PrefsWriteError::InvalidValue));
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(after.saved_views.is_empty(), "no definition was stored");
+            assert!(after.view_approvals.is_empty(), "no approval was recorded");
+        });
+    }
+
+    /// `version: None` clears the entry, and deleting the view prunes it: a stale
+    /// approval would pre-approve a re-imported definition of the same id.
+    #[test]
+    fn clearing_and_deleting_remove_the_approval_entry() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x5e).await;
+            for id in ["v1", "v2"] {
+                let mut def = test_view(id, "Books");
+                def.version = Some(1);
+                upsert_saved_view_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    def,
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("save");
+                set_view_approval_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    ViewApproval {
+                        view_id: String::from(id),
+                        version: Some(1),
+                        definition: None,
+                    },
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("approve");
+            }
+            let both = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(both.view_approvals.len(), 2);
+
+            // Explicit clear.
+            set_view_approval_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                ViewApproval {
+                    view_id: String::from("v1"),
+                    version: None,
+                    definition: None,
+                },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear v1");
+            // Delete prunes the other.
+            delete_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                String::from("v2"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("delete v2");
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(
+                after.view_approvals.is_empty(),
+                "a cleared approval and a deleted view's approval must both be gone; got {:?}",
+                after.view_approvals
+            );
         });
     }
 
