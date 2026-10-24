@@ -2826,6 +2826,7 @@
   "password": {
     "createForm": {
       "checkingStrength": "Checking strength…",
+      "strengthUnavailable": "The strength check could not load, so only the minimum length is checked.",
       "confirmLabel": "Confirm master password",
       "defaultEmptyCaption": "Choose something you can remember. It cannot be reset.",
       "mismatch": "Passwords do not match.",
@@ -3292,6 +3293,7 @@
     "changePassword": {
       "cancel": "Cancel",
       "checkingStrength": "Checking strength…",
+      "strengthUnavailable": "The strength check could not load, so only the minimum length is checked.",
       "confirmLabel": "Confirm new password",
       "currentLabel": "Current password",
       "mismatch": "Passwords do not match.",
