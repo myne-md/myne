@@ -212,6 +212,49 @@ pub struct SavedView {
     /// Omitted when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_aspect_ratio: Option<String>,
+
+    /// Definition version — a non-negative integer, omitted when absent
+    /// (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
+    ///
+    /// The app maintains it, not the user: any local edit that changes the
+    /// canonical bytes increments it. It exists so an imported manifest can be
+    /// ordered against the definition this vault already holds (higher replaces,
+    /// identical is a no-op, same-version-different-bytes is a refusal naming
+    /// both, lower is refused), and so this device's APPROVAL can name exactly
+    /// the bytes it approved — approval is an equality against this value, which
+    /// is what makes a version bump revoke it with no clear step.
+    ///
+    /// `None` is STORAGE compatibility and nothing else: a view authored before
+    /// this field existed has no version, and §9.5.2's additive discipline says
+    /// it must still decode. The import path does not tolerate it — see
+    /// [`crate::view_manifest`], which refuses a manifest with no `version`,
+    /// because a file whose version cannot be read cannot be ordered at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u32>,
+
+    /// The property keys this view's write intent covers — a sequence of
+    /// frontmatter keys, omitted when empty (`view-manifests`; §9.5.2).
+    ///
+    /// This is the ENTIRE write authority a shared view carries. A field absent
+    /// from the list may not be written through the view, and the host is what
+    /// checks the list (task 5's `note_set_field`), because write authority
+    /// resting on a renderer conditional is not authority at all.
+    ///
+    /// Two properties are load-bearing rather than incidental:
+    ///
+    /// - **Sequence semantics, preserved verbatim** (NFC per element, not sorted,
+    ///   not deduped), the `columns` discipline. The list is a declaration and
+    ///   its order carries no meaning, but keeping the author's bytes keeps the
+    ///   encoding a pure function of the value handed in, which is what makes an
+    ///   export then re-import byte-identical.
+    /// - **The host-owned markers are not writable.** `archived`, `trashed` and
+    ///   `deleted` are the frontmatter the app manages, and a view that could
+    ///   write them could hide notes from its own vault. They are refused by
+    ///   [`crate::view_manifest`] on the import path; this codec stores what it
+    ///   is given, because the stored blob is this same array and refusing there
+    ///   would fail a whole prefs parse over one view's declaration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write_fields: Vec<String>,
 }
 
 /// One `saved_views` array element this build cannot REPRESENT, carried
@@ -296,7 +339,9 @@ pub fn canonical_encode_saved_view(view: &SavedView) -> Vec<u8> {
 
 fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
     // Canonical key order: card_size, columns, filters, group_by, id, image,
-    // image_aspect_ratio, name, sort, view_type.
+    // image_aspect_ratio, name, sort, version, view_type, write_fields.
+    // (`version` < `view_type` on the third byte, `view_type` < `write_fields`
+    // on the second.)
     out.push(b'{');
     let mut first = true;
     if let Some(cs) = view.card_size {
@@ -338,9 +383,19 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
         out.extend_from_slice(b"\"sort\":");
         encode_sort_into(out, s);
     }
+    if let Some(v) = view.version {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"version\":");
+        push_uint(out, v);
+    }
     sep(out, &mut first);
     out.extend_from_slice(b"\"view_type\":");
     push_string(out, view_type_str(view.view_type));
+    if !view.write_fields.is_empty() {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"write_fields\":");
+        push_string_array(out, &view.write_fields);
+    }
     out.push(b'}');
 }
 
@@ -605,6 +660,20 @@ pub fn canonical_decode_saved_view(bytes: &[u8]) -> Result<SavedView, SavedViewP
         return Err(SavedViewParseError::Malformed);
     }
     saved_view_from_json(&v)
+}
+
+/// Decode exactly one JSON value from `bytes`, refusing any non-whitespace after
+/// it. The strict-entry-point counterpart of [`canonical_decode_saved_view`],
+/// shared with [`crate::view_manifest`] so both "decode one object" readers
+/// enforce the same trailing rule rather than each re-deriving it.
+pub(crate) fn parse_exactly_one(bytes: &[u8]) -> Result<JsonValue, SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let v = p.parse_value()?;
+    p.skip_ws();
+    if p.i != bytes.len() {
+        return Err(SavedViewParseError::Malformed);
+    }
+    Ok(v)
 }
 
 /// A minimal, dependency-free JSON value tree — only what the `SavedView`
@@ -932,7 +1001,7 @@ pub(crate) fn opt_string(
     }
 }
 
-fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError> {
+pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError> {
     let obj = as_object(v)?;
 
     let view_type = match as_str(req(obj, "view_type")?)? {
@@ -948,7 +1017,32 @@ fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError>
         None => None,
     };
 
+    // `version` (view-manifests): a non-negative integer bounded by `u32`, and
+    // OPTIONAL here on purpose — a view authored before the field existed must
+    // still decode (§9.5.2 additive discipline). The import path's stricter
+    // "version required" rule lives in `crate::view_manifest`, because a stored
+    // view without one is readable while a FILE without one cannot be ordered
+    // against anything.
+    let version = match find(obj, "version") {
+        Some(JsonValue::Int(n)) if *n >= 0 && *n <= i64::from(u32::MAX) => Some(*n as u32),
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => None,
+    };
+
     let columns = match find(obj, "columns") {
+        Some(JsonValue::Array(a)) => a
+            .iter()
+            .map(|e| as_str(e).map(String::from))
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => Vec::new(),
+    };
+
+    // `write_fields` — sequence semantics, stored verbatim. The reserved-marker
+    // refusal is the strict reader's job (see the field's doc): the stored blob
+    // is a peer's bytes and must not fail a whole parse over a declaration this
+    // build would not honour.
+    let write_fields = match find(obj, "write_fields") {
         Some(JsonValue::Array(a)) => a
             .iter()
             .map(|e| as_str(e).map(String::from))
@@ -973,6 +1067,8 @@ fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError>
         card_size,
         image: opt_string(obj, "image")?,
         image_aspect_ratio: opt_string(obj, "image_aspect_ratio")?,
+        version,
+        write_fields,
     })
 }
 
@@ -1085,6 +1181,8 @@ mod tests {
             card_size: Some(300),
             image: Some("image".into()),
             image_aspect_ratio: Some("1.65".into()),
+            version: None,
+            write_fields: Vec::new(),
         }
     }
 
@@ -1129,6 +1227,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let bytes = canonical_encode_saved_view(&v);
         assert_eq!(
@@ -1171,6 +1271,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded, v);
@@ -1202,6 +1304,8 @@ mod tests {
                 card_size: None,
                 image: None,
                 image_aspect_ratio: None,
+                version: None,
+                write_fields: Vec::new(),
             };
             assert_eq!(
                 canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap(),
@@ -1295,6 +1399,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.name, "\u{00e9}");
@@ -1338,6 +1444,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let bytes = canonical_encode_saved_views(&[a.clone(), b.clone()]);
         let (views, consumed) = parse_saved_views_array(&bytes).unwrap();
@@ -1824,6 +1932,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.sort, v.sort);
@@ -1920,6 +2030,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.filters, node);
@@ -1940,6 +2052,8 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
         };
         let forward = canonical_encode_saved_views(&[mk("a"), mk("b"), mk("c")]);
         let shuffled = canonical_encode_saved_views(&[mk("c"), mk("a"), mk("b")]);
@@ -2069,6 +2183,8 @@ mod tests {
                 card_size: None,
                 image: None,
                 image_aspect_ratio: None,
+                version: None,
+                write_fields: Vec::new(),
             },
         ]);
         emit_ok(&mut dump, "multi-sorted-by-id", "Two views: the array is emitted sorted by id (v0 before v1) regardless of caller order.", &two, true);

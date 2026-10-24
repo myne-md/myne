@@ -135,6 +135,19 @@ export interface SavedView {
   /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
    *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
   image_aspect_ratio?: string;
+  /** Definition version (view-manifests) — a non-negative integer the APP
+   *  maintains, never a form field: a local edit that changes the canonical bytes
+   *  increments it. Absent on a view authored before the field existed, which is
+   *  storage compatibility rather than a state the import path accepts (it
+   *  refuses a manifest with no version). It is what an update is ordered
+   *  against, and what this device's approval names. */
+  version?: number;
+  /** The property keys this view may write — the ENTIRE write authority a shared
+   *  view carries, checked by the host rather than by the renderer. Sequence
+   *  semantics: order preserved verbatim, NFC per element. The host-owned markers
+   *  (`archived`, `trashed`, `deleted`) are refused by the import reader, so no
+   *  view can hide notes from its own vault. Absent → no write authority. */
+  write_fields?: string[];
 }
 
 /** One color-group rule (graph-connection-ux-polish) — a stable id, a

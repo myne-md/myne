@@ -104,6 +104,9 @@ pub mod vault_meta;
 /// the phrase wrap retired and `root_key` sealed to the owner's person key.
 pub mod vault_meta_ntv7;
 pub mod vault_meta_v0_2;
+/// The `.myneview` view manifest: one `SavedView` read STRICTLY, for the import
+/// path only (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
+pub mod view_manifest;
 pub mod workspace_blob;
 
 /// Test-only shared formatting helpers (`hex_lower` / `json_escape`) for the
@@ -372,6 +375,10 @@ pub use vault_meta_v0_2::{
     unseal_membership_roster, unseal_person_binding, vault_meta_generation, B2bVaultMeta,
     VaultMetaGeneration, VAULT_META_NTV6_MAGIC, VAULT_META_NTV6_PROTOCOL_VERSION,
     VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
+};
+pub use view_manifest::{
+    is_view_approved, parse_view_manifest, ViewManifestError, MANIFEST_KEYS, MAX_MANIFEST_BYTES,
+    RESERVED_WRITE_FIELDS,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,
