@@ -162,8 +162,12 @@ pub fn socket_path(app_data_dir: &Path) -> PathBuf {
 ///
 /// Pure, portable string logic (no `windows-sys` dependency), so it is typed
 /// and tested on every host including this repo's Linux dev/CI target.
+// Named only by the Windows arm and by the tests that pin its derivation, so the
+// host build without tests has no reader for it.
+#[cfg(any(windows, test))]
 pub const PIPE_PREFIX: &str = "myne-cli-";
 
+#[cfg(any(windows, test))]
 pub fn windows_pipe_name(app_data_dir: &Path) -> String {
     format!(
         r"\\.\pipe\{}{:016x}",
@@ -173,6 +177,7 @@ pub fn windows_pipe_name(app_data_dir: &Path) -> String {
 }
 
 /// FNV-1a, 64-bit. Frozen arithmetic: see [`windows_pipe_name`].
+#[cfg(any(windows, test))]
 fn fnv1a64(bytes: &[u8]) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in bytes {
