@@ -940,6 +940,146 @@ impl From<std::io::Error> for NoteExportAttachmentsError {
     }
 }
 
+/// Failure surface for [`super::commands::note_set_field`] — the host-owned
+/// field write a saved view performs (`view-manifests`).
+///
+/// **Every variant is a REFUSAL with a name, and that is the point.** A view is
+/// data that can arrive from another person's file, so "did this write happen,
+/// and if not why" has to be answerable without guessing: the UI shows the
+/// reason, and the caller of a bulk operation reports one line per note instead
+/// of a single success flag.
+///
+/// | Variant | Meaning |
+/// |---|---|
+/// | `VaultLocked` | the slot is not `Slot::Unlocked` |
+/// | `InvalidNoteId` | the id is not a canonical v7 UUID (UI canary) |
+/// | `NoteNotFound` | the `.myn` file is gone (delete-vs-write race signal) |
+/// | `CannotDecrypt` | AEAD failed; non-distinguishing per §6.4 |
+/// | `NotApproved` | this device has not approved this definition version |
+/// | `FieldNotDeclared` | the field is not in the view's `write_fields` |
+/// | `FieldReserved` | the field is an `archived`/`trashed`/`deleted` marker |
+/// | `FieldChanged` | the field's value on disk is not the expected one |
+/// | `InvalidField` | the field name is not a plain YAML key this writer can find again |
+/// | `ValueTooLarge` | the write would push the note past the plaintext cap |
+/// | `LiveSessionOpen` | a live co-editing session owns the note (`SYNC-33`) |
+/// | `PrefsUnreadable` | the device-local approval map could not be read |
+/// | `Io` | residual filesystem failure |
+/// | `JoinFailure` | the blocking task panicked or the runtime shut down |
+///
+/// The last five are additions to the enumerated set the design doc names, each
+/// for a condition the enumerated set has no word for, and each recorded rather
+/// than folded into a neighbour it would misdescribe: `InvalidNoteId` (a
+/// `NoteId::parse` failure is not an `Io` failure), `InvalidField` (a field name
+/// that cannot be written is not an undeclared field), `LiveSessionOpen` (the
+/// same refusal `note_update` already makes, reused rather than racing the
+/// session's writer), `PrefsUnreadable` (told apart from `NotApproved` so the UI
+/// does not ask the user to approve something the app failed to read), and
+/// `JoinFailure` (a panicking blocking task is not a refusal).
+#[derive(Debug, Error, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum NoteSetFieldError {
+    /// Slot is `Empty` or `Recovering`.
+    #[error("vault not unlocked")]
+    VaultLocked,
+
+    /// `note_id` failed strict parse via [`super::note_id::NoteId::parse`].
+    #[error("invalid note id")]
+    InvalidNoteId,
+
+    /// `<vault>/notes/<note_id>.myn` does not exist.
+    #[error("note not found")]
+    NoteNotFound,
+
+    /// AEAD-tag failure on the existing blob. Single non-distinguishing tag per
+    /// `protocol.md` §6.4; the codec's sub-cause stays in `tracing::debug!`.
+    #[error("note cannot be decrypted")]
+    CannotDecrypt,
+
+    /// This device has not approved the view, or has approved a DIFFERENT
+    /// version of it. The comparison is an equality against the stored version
+    /// (`protocol::view_manifest::is_view_approved`), so a version bump revokes
+    /// approval with no clear step. A view id that does not exist at all reads
+    /// the same way: nothing approved it.
+    #[error("view is not approved on this device")]
+    NotApproved,
+
+    /// The field is not declared in the approved view's `write_fields`.
+    #[error("view does not declare this field as writable")]
+    FieldNotDeclared,
+
+    /// The field is one of `archived` / `trashed` / `deleted`. Refused even when
+    /// a view declares it: those markers move a note out of the live tree, and a
+    /// property write must never be able to make a note disappear.
+    #[error("field is a reserved marker")]
+    FieldReserved,
+
+    /// The field's value on disk is not the one the caller expected, so
+    /// something else changed it since the caller looked. Nothing was written,
+    /// and the note on disk is untouched. The comparison is on the scalar's text
+    /// after NFC folding, with a quoted and an unquoted occurrence of the same
+    /// characters treated as equal, so this variant means the VALUE changed and
+    /// never that the quoting did.
+    #[error("field value changed on disk")]
+    FieldChanged,
+
+    /// The field name is not a plain YAML key (`[A-Za-z0-9_-]+`), so a write
+    /// could not be found again by any reader.
+    #[error("field name is not writable")]
+    InvalidField,
+
+    /// The write would push the note past `protocol::MAX_PLAINTEXT_LEN`. A
+    /// distinct refusal rather than an IO collapse: the disk is fine, the value
+    /// is what does not fit, and the caller must be able to say so.
+    #[error("value is too large for a note")]
+    ValueTooLarge,
+
+    /// A live co-editing session owns this note (`SYNC-33`), so a stateless field
+    /// write is refused rather than racing the session's persistence. Same
+    /// refusal `note_update` makes, for the same reason.
+    #[error("a live session owns this note")]
+    LiveSessionOpen,
+
+    /// `vault.prefs` could not be read at all (a broken `vault.meta`, an IO
+    /// failure), so the approval map is unknown. Kept apart from
+    /// [`Self::NotApproved`] on purpose: the safe answer is the same (no write),
+    /// but the user-facing sentence must not be "approve this view" when the app
+    /// is what failed to read.
+    #[error("saved-view approvals could not be read")]
+    PrefsUnreadable,
+
+    /// Residual filesystem failure on the blob read or the atomic write.
+    #[error("io error")]
+    Io { io_error_kind: IoFailureKind },
+
+    /// `tokio::task::spawn_blocking` join handle returned an error (panic in the
+    /// blocking task, runtime shutdown).
+    #[error("blocking task join failure")]
+    JoinFailure,
+}
+
+/// Static-string label for [`NoteSetFieldError`] variants — same drift-detector
+/// discipline as [`note_create_error_kind`] / [`note_update_error_kind`]. A new
+/// variant compile-fails this match, and the label is what a `tracing` line
+/// records so the log carries no values.
+pub fn note_set_field_error_kind(e: &NoteSetFieldError) -> &'static str {
+    match e {
+        NoteSetFieldError::VaultLocked => "VaultLocked",
+        NoteSetFieldError::InvalidNoteId => "InvalidNoteId",
+        NoteSetFieldError::NoteNotFound => "NoteNotFound",
+        NoteSetFieldError::CannotDecrypt => "CannotDecrypt",
+        NoteSetFieldError::NotApproved => "NotApproved",
+        NoteSetFieldError::FieldNotDeclared => "FieldNotDeclared",
+        NoteSetFieldError::FieldReserved => "FieldReserved",
+        NoteSetFieldError::FieldChanged => "FieldChanged",
+        NoteSetFieldError::InvalidField => "InvalidField",
+        NoteSetFieldError::ValueTooLarge => "ValueTooLarge",
+        NoteSetFieldError::LiveSessionOpen => "LiveSessionOpen",
+        NoteSetFieldError::PrefsUnreadable => "PrefsUnreadable",
+        NoteSetFieldError::Io { .. } => "Io",
+        NoteSetFieldError::JoinFailure => "JoinFailure",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

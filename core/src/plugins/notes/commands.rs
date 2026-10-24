@@ -51,8 +51,8 @@ use super::daily_match::{
 };
 use super::drawing_text::{is_drawing, project_drawing_text};
 use super::error::{
-    NoteBatchError, NoteCreateError, NoteDeleteError, NoteListError, NoteReadError,
-    NoteTitleBatchError, NoteTitleError, NoteUpdateError,
+    note_set_field_error_kind, NoteBatchError, NoteCreateError, NoteDeleteError, NoteListError,
+    NoteReadError, NoteSetFieldError, NoteTitleBatchError, NoteTitleError, NoteUpdateError,
 };
 use super::note_id::NoteId;
 use super::title_extract::{extract_title_slices, resolve_note_title};
@@ -1363,6 +1363,520 @@ pub fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
         NoteUpdateError::BaseMismatch => "BaseMismatch",
         NoteUpdateError::LiveSessionOpen => "LiveSessionOpen",
     }
+}
+
+/// Outcome of a successful [`note_set_field`].
+///
+/// Carries the pre-write snapshot id the caller needs for a grouped undo, and
+/// nothing else: the new field value is the one the caller asked for, and
+/// echoing the whole note back would cross the IPC boundary with plaintext
+/// nobody asked for.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NoteSetFieldOutcome {
+    /// The pre-write snapshot captured before the overwrite, when one was
+    /// captured. `None` means the coalescing window skipped it (or the note is
+    /// a CRDT note, which captures no snapshots because its change graph IS its
+    /// history), so a bulk undo must report the note as not restorable from
+    /// that action rather than pretending it has a restore point.
+    pub snapshot_id: Option<String>,
+    /// The note's plaintext after the write, `Zeroizing` so it wipes on drop.
+    /// Returned rather than re-read so the caller can index and hand it to a
+    /// pane without a second decrypt; it never crosses the IPC boundary.
+    pub plaintext: Zeroizing<String>,
+}
+
+/// `note_set_field` — the host-owned, view-scoped field write (`view-manifests`,
+/// stories 19-20).
+///
+/// A saved view is data that can arrive from another person's file, so the
+/// authority to write a note's property is the HOST's, not the view's: the
+/// caller names the view, the field and the value it believes is there, and this
+/// command decides. Four checks run, in this order, and every one of them
+/// refuses rather than repairs:
+///
+/// 1. **the view is approved on this device** (`is_view_approved`: the stored
+///    approval must equal the definition's current `version`),
+/// 2. **the field is a reserved marker** — `archived` / `trashed` / `deleted`
+///    are refused even when a view declares them, because a property write must
+///    never be able to move a note out of the live tree,
+/// 3. **the field is in the view's `write_fields`**,
+/// 4. **the field's value on disk equals the expected one** — after NFC folding,
+///    with a quoted and an unquoted occurrence of the same text treated as
+///    equal, so a refusal means the VALUE changed and never that the quoting
+///    did.
+///
+/// Unlock is a precondition rather than a check, since nothing can be read
+/// without it: a locked vault refuses at the slot guard before any of the above
+/// runs, and that is the more conservative answer (it tells a locked caller
+/// nothing about the note).
+///
+/// **The precondition is value-anchored, not whole-note**, and that is the
+/// design. A table view can set `status` on a note whose body somebody is
+/// editing: the body is not this command's concern, the field is, so a
+/// body-only concurrent change does not block the write while a same-field
+/// change does. That is also why the check and the write happen under one
+/// acquisition of [`notes_write_mutex`] — a compare-then-write with the lock
+/// released between the two would be exactly the race the comparison exists to
+/// close.
+///
+/// The splice is [`super::frontmatter_patch::set_string_field`], a callable
+/// function rather than the inside of this command: `external-mcp-connection`
+/// needs the identical splice behind a connection-scoped writer, and a copy of
+/// it would be a second opinion about quoting, multi-line values and inline
+/// comments. The approval/declaration/precondition checks and the command body
+/// stay here.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the four field-write inputs (note, view, field, expected/new value) plus the seam pair; see note_update_with_dir"
+)]
+pub async fn note_set_field_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    note_id: String,
+    view_id: String,
+    field: String,
+    expected_value: Option<String>,
+    new_value: String,
+    io: &dyn VaultIo,
+    registry: &crate::plugins::live::LiveSessionRegistry,
+) -> Result<NoteSetFieldOutcome, NoteSetFieldError> {
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                stage = "notes_dir",
+                error_kind = "Io",
+                "note_set_field notes_dir resolution failed"
+            );
+            NoteSetFieldError::Io {
+                io_error_kind: from_io_error_kind(e.kind()),
+            }
+        })?;
+    let outcome = note_set_field_with_dir(
+        notes_dir,
+        state,
+        hooks,
+        note_id.clone(),
+        view_id,
+        field,
+        expected_value,
+        new_value,
+        io,
+        host,
+        registry,
+    )
+    .await?;
+    // Post-write side-effects live here, beside `note_update`'s, so a field
+    // write refreshes the same surfaces a body write does: the live search index
+    // (a `title:` field changes the resolved title) and the sync dirty-bump.
+    // `notes://deleted` is deliberately NOT emitted: the reserved markers are
+    // refused above, so the live-tree state cannot change, and re-emitting it
+    // for a note that was already archived would close pop-out windows for a
+    // note nobody removed.
+    let title = resolve_note_title(outcome.plaintext.as_bytes()).unwrap_or_default();
+    if !is_drawing(outcome.plaintext.as_bytes()) {
+        hooks.search_upsert(&note_id, &title, &outcome.plaintext);
+    }
+    hooks.bump_local_change();
+    Ok(outcome)
+}
+
+/// IPC wrapper. The registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "a Tauri command's parameters are its IPC payload; the count is the caller's shape, not a design choice"
+)]
+pub async fn note_set_field<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    registry: State<'_, crate::plugins::live::LiveSessionRegistry>,
+    note_id: String,
+    view_id: String,
+    field: String,
+    expected_value: Option<String>,
+    new_value: String,
+) -> Result<Option<String>, NoteSetFieldError> {
+    note_set_field_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        note_id,
+        view_id,
+        field,
+        expected_value,
+        new_value,
+        &crate::vault_io::StdVaultIo,
+        registry.inner(),
+    )
+    .await
+    .map(|outcome| outcome.snapshot_id)
+}
+
+/// Testable core of [`note_set_field`] — the whole write, minus the host-derived
+/// paths and the post-write index signals.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "seam pair plus the four field-write inputs; see note_update_with_dir"
+)]
+pub async fn note_set_field_with_dir(
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    note_id: String,
+    view_id: String,
+    field: String,
+    expected_value: Option<String>,
+    new_value: String,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
+    registry: &crate::plugins::live::LiveSessionRegistry,
+) -> Result<NoteSetFieldOutcome, NoteSetFieldError> {
+    // Plaintext-IPC discipline: the new value is caller-supplied plaintext, so
+    // it is bounded for the whole function and wiped on every early return.
+    let new_value = Zeroizing::new(new_value);
+
+    let note_id = NoteId::parse(&note_id).map_err(|_cause| {
+        tracing::debug!(
+            stage = "note_id_parse",
+            outcome = "invalid",
+            "note_set_field note_id refused"
+        );
+        NoteSetFieldError::InvalidNoteId
+    })?;
+
+    // Single-writer refusal, exactly as `note_update` makes it: while a live
+    // co-editing session owns the note it is the only durable writer.
+    if registry.is_note_open(&note_id.as_uuid().to_string()) {
+        tracing::debug!(
+            stage = "live_session",
+            outcome = "refused",
+            "note_set_field refused: a live co-editing session owns this note"
+        );
+        return Err(NoteSetFieldError::LiveSessionOpen);
+    }
+
+    let slot = state.slot_read_active().await;
+    let (items_key, items_key_id) = match &*slot {
+        Slot::Unlocked(uv) => (uv.items_key.clone(), uv.items_key_id),
+        Slot::Empty | Slot::Recovering { .. } | Slot::ImportSource { .. } => {
+            tracing::debug!(
+                stage = "slot_check",
+                outcome = "vault_locked",
+                "note_set_field rejected: slot is not Unlocked"
+            );
+            return Err(NoteSetFieldError::VaultLocked);
+        }
+    };
+
+    // The approval map and the definitions are one prefs read. A read that
+    // FAILS is `PrefsUnreadable` rather than `NotApproved` so the UI does not ask
+    // the user to approve something the app itself could not read; a read that
+    // degrades to defaults (§9.5.5) is indistinguishable from "nothing approved"
+    // and correctly refuses as `NotApproved`.
+    let vault_root = notes_dir.parent().map(|p| p.to_path_buf());
+    let prefs = match vault_root.as_deref() {
+        Some(root) => {
+            match crate::plugins::prefs::commands::prefs_read_with_dir(root, state, io).await {
+                Ok(view) => view,
+                Err(_cause) => {
+                    tracing::warn!(
+                        stage = "prefs_read",
+                        error_kind = "PrefsUnreadable",
+                        "note_set_field refused: the device-local approval map could not be read"
+                    );
+                    return Err(NoteSetFieldError::PrefsUnreadable);
+                }
+            }
+        }
+        None => return Err(NoteSetFieldError::PrefsUnreadable),
+    };
+
+    // Check 1: the view is approved on THIS device, at its current version.
+    let Some(view) = prefs.saved_views.iter().find(|v| v.id == view_id) else {
+        tracing::debug!(
+            stage = "approval",
+            outcome = "unknown_view",
+            "note_set_field refused: no such view"
+        );
+        return Err(NoteSetFieldError::NotApproved);
+    };
+    if !protocol::is_view_approved(&prefs.view_approvals, view) {
+        tracing::debug!(
+            stage = "approval",
+            outcome = "not_approved",
+            "note_set_field refused: this device has not approved the view's current version"
+        );
+        return Err(NoteSetFieldError::NotApproved);
+    }
+
+    // Check 2: reserved markers, refused even when the view declares them.
+    if protocol::RESERVED_WRITE_FIELDS.contains(&field.as_str()) {
+        tracing::debug!(
+            stage = "field_declaration",
+            outcome = "reserved",
+            "note_set_field refused: the field is a reserved marker"
+        );
+        return Err(NoteSetFieldError::FieldReserved);
+    }
+
+    // Check 3: the view declares this field writable.
+    if !view.write_fields.iter().any(|f| f == &field) {
+        tracing::debug!(
+            stage = "field_declaration",
+            outcome = "not_declared",
+            "note_set_field refused: the view does not declare the field as writable"
+        );
+        return Err(NoteSetFieldError::FieldNotDeclared);
+    }
+
+    // A field name the splice cannot write is refused BEFORE the read, so the
+    // caller gets the real reason rather than "the value changed".
+    if !super::frontmatter_patch::is_plain_key(&field) {
+        tracing::debug!(
+            stage = "field_declaration",
+            outcome = "invalid_field",
+            "note_set_field refused: the field name is not a plain YAML key"
+        );
+        return Err(NoteSetFieldError::InvalidField);
+    }
+
+    // One acquisition of the notes write mutex covers read → check → patch →
+    // write. Releasing it between the comparison and the write is the race the
+    // value-anchored precondition exists to close.
+    let notes_guard = notes_write_mutex().lock().await;
+
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+    let blob = match io.read(&path).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "NoteNotFound",
+                "note_set_field blob read failed"
+            );
+            return Err(NoteSetFieldError::NoteNotFound);
+        }
+        Err(io_error_kind) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "Io",
+                "note_set_field blob read failed"
+            );
+            return Err(NoteSetFieldError::Io { io_error_kind });
+        }
+    };
+
+    let now_ms = host.now_unix_millis();
+    let note_uuid_str = note_id.as_uuid().to_string();
+    let device_actor = match vault_root.as_deref() {
+        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        None => None,
+    };
+    let is_crdt = super::crdt::is_nc05_blob(&blob);
+    let expected_value = expected_value.map(|v| super::frontmatter_patch::compare_key(&v));
+    let field_owned = field.clone();
+    let value_owned = (*new_value).clone();
+    let blob_owned = blob.clone();
+
+    // decode → 4th check → splice → re-encode, all on the blocking pool: this is
+    // the same AEAD work `note_update` does, and it must not sit on the async
+    // runtime's thread.
+    let join = crate::task::run_blocking(
+        move || -> Result<(Vec<u8>, Zeroizing<String>), NoteSetFieldError> {
+            // `patch_one_field` runs here rather than outside, so the value
+            // comparison happens under the same mutex acquisition as the write
+            // and against the bytes the re-encode consumes.
+            if is_crdt {
+                use super::crdt::{CrdtNoteOpError, DecodeNoteBlobError};
+                let text = super::crdt::decode_note_blob(
+                    &blob_owned,
+                    &note_uuid_bytes,
+                    &items_key,
+                    &items_key_id,
+                )
+                .map_err(|e| match e {
+                    DecodeNoteBlobError::CannotDecrypt | DecodeNoteBlobError::Malformed => {
+                        NoteSetFieldError::CannotDecrypt
+                    }
+                })?;
+                let patched = patch_one_field(
+                    text.as_bytes(),
+                    &field_owned,
+                    &value_owned,
+                    expected_value.as_deref(),
+                )?;
+                let patched_text = into_plaintext(patched)?;
+                let upd = super::crdt::encode_note_edit_at_millis(
+                    &blob_owned,
+                    patched_text.as_str(),
+                    device_actor.as_ref(),
+                    &items_key,
+                    &items_key_id,
+                    &note_uuid_bytes,
+                    now_ms,
+                )
+                .map_err(|e| match e {
+                    CrdtNoteOpError::TooLarge => NoteSetFieldError::ValueTooLarge,
+                    CrdtNoteOpError::CannotDecrypt | CrdtNoteOpError::Malformed => {
+                        NoteSetFieldError::CannotDecrypt
+                    }
+                    CrdtNoteOpError::Csprng | CrdtNoteOpError::RevisionNotFound => {
+                        NoteSetFieldError::JoinFailure
+                    }
+                })?;
+                Ok((upd.blob, patched_text))
+            } else {
+                let decrypted =
+                    decode_note(&blob_owned, &note_uuid_bytes, &items_key, &items_key_id).map_err(
+                        |_: DecryptError| {
+                            tracing::debug!(
+                                stage = "decode_note",
+                                outcome = "cannot_decrypt",
+                                "note_set_field decode_note returned CannotDecrypt"
+                            );
+                            NoteSetFieldError::CannotDecrypt
+                        },
+                    )?;
+                let patched = patch_one_field(
+                    decrypted.plaintext(),
+                    &field_owned,
+                    &value_owned,
+                    expected_value.as_deref(),
+                )?;
+                let patched_text = into_plaintext(patched)?;
+                // `encode_update` consumes the typestate handle, so the splice
+                // reads the plaintext first and the fresh `content_nonce` is
+                // drawn inside it (§6.3): bytes 0..47+N stay byte-identical.
+                let new_blob = encode_update(decrypted, patched_text.as_bytes()).map_err(|e| {
+                    match e {
+                        ProtocolError::PlaintextTooLarge => NoteSetFieldError::ValueTooLarge,
+                        // Unreachable under v0.1's fixed parameters; a violation
+                        // of that invariant surfaces as a join-equivalent.
+                        _ => NoteSetFieldError::JoinFailure,
+                    }
+                })?;
+                Ok((new_blob, patched_text))
+            }
+        },
+    )
+    .await;
+
+    let (new_blob, plaintext) = match join {
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_set_field read+decode+encode panicked or runtime shutdown"
+            );
+            return Err(NoteSetFieldError::JoinFailure);
+        }
+        Ok(Err(e)) => return Err(e),
+        Ok(Ok(pair)) => pair,
+    };
+
+    // Pre-write snapshot of the OLD blob (MYND-96), reporting WHICH snapshot so
+    // a bulk undo knows what it can restore. A CRDT note captures none: its
+    // change graph is the history, so `snapshot_id` is `None` and the caller
+    // reports it as not restorable from this action rather than guessing.
+    let snapshot_id = if is_crdt {
+        None
+    } else {
+        match vault_root.as_deref() {
+            Some(root) => {
+                match hooks.capture_snapshot_reporting(
+                    root,
+                    &note_uuid_str,
+                    &blob,
+                    now_ms,
+                    /* force = */ false,
+                ) {
+                    crate::snapshot_store::CaptureOutcome::Captured(id) => Some(id),
+                    crate::snapshot_store::CaptureOutcome::Coalesced => None,
+                    crate::snapshot_store::CaptureOutcome::Failed => {
+                        // Non-blocking, exactly as `note_update` treats it: the
+                        // note saves and the caller learns it has no undo point.
+                        hooks.emit_snapshot_write_failed(&note_uuid_str);
+                        None
+                    }
+                }
+            }
+            None => None,
+        }
+    };
+
+    if let Err(io_error_kind) = io.write(&path, &new_blob, WriteOpts::default()).await {
+        let mapped = if !io.is_dir(&notes_dir).await.unwrap_or(true) {
+            NoteSetFieldError::Io {
+                io_error_kind: IoFailureKind::Other,
+            }
+        } else {
+            NoteSetFieldError::Io { io_error_kind }
+        };
+        tracing::error!(
+            stage = "atomic_write",
+            error_kind = note_set_field_error_kind(&mapped),
+            "note_set_field atomic_write failed"
+        );
+        return Err(mapped);
+    }
+
+    drop(notes_guard);
+    drop(slot);
+
+    tracing::debug!(stage = "success", event = "note_field_set");
+    Ok(NoteSetFieldOutcome {
+        snapshot_id,
+        plaintext,
+    })
+}
+
+/// The two field-level refusals shared by both note formats: the value on disk
+/// must be the expected one, and the splice must be able to write the field.
+///
+/// Split out rather than inlined twice because the two format arms must make the
+/// SAME decision: a note that reads as `FieldChanged` under `MY01` must not
+/// silently succeed after the migration to `NC05`.
+fn patch_one_field(
+    plaintext: &[u8],
+    field: &str,
+    new_value: &str,
+    expected_value: Option<&str>,
+) -> Result<Vec<u8>, NoteSetFieldError> {
+    let current = super::frontmatter_patch::read_string_field(plaintext, field);
+    let current_cmp = current
+        .as_deref()
+        .map(super::frontmatter_patch::compare_key);
+    if current_cmp != expected_value.map(str::to_string) {
+        tracing::debug!(
+            stage = "value_guard",
+            outcome = "mismatch",
+            "note_set_field refused: the field's value on disk is not the expected one"
+        );
+        return Err(NoteSetFieldError::FieldChanged);
+    }
+    super::frontmatter_patch::set_string_field(plaintext, field, new_value).map_err(|e| match e {
+        super::frontmatter_patch::FrontmatterPatchError::InvalidFieldName => {
+            NoteSetFieldError::InvalidField
+        }
+        super::frontmatter_patch::FrontmatterPatchError::NotUtf8 => {
+            NoteSetFieldError::CannotDecrypt
+        }
+    })
+}
+
+/// The spliced bytes as plaintext. A note's plaintext is UTF-8 by construction
+/// (the codec is content-type-agnostic, but every writer of a `.myn` hands it a
+/// `String`), so invalid UTF-8 here means the bytes are not what this format
+/// holds and the read is refused as undecryptable rather than lossily repaired.
+fn into_plaintext(bytes: Vec<u8>) -> Result<Zeroizing<String>, NoteSetFieldError> {
+    String::from_utf8(bytes)
+        .map(Zeroizing::new)
+        .map_err(|_| NoteSetFieldError::CannotDecrypt)
 }
 
 /// One note in a transactional batch rewrite: the canonical `note_id`
@@ -3651,5 +4165,486 @@ mod tests {
             logs_contain("skip_orphan"),
             "non-UTF-8 filename must hit the skip_orphan branch"
         );
+    }
+
+    // ---- note_set_field (view-manifests task 5) -----------------------------
+
+    mod set_field {
+        use super::super::*;
+        use crate::host::NoopHost;
+        use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+        use crate::test_support::ScopedTempDir;
+        use protocol::saved_view::{FilterNode, SavedView, ViewType};
+        use protocol::{derive_subkey, SubkeyRole, AEAD_NONCE_LEN};
+        use std::collections::BTreeMap;
+
+        const VIEW_ID: &str = "0190a000-0000-7000-8000-0000000000aa";
+        const NOTE_UUID: [u8; 16] = [
+            0x01, 0x90, 0xa0, 0x00, 0x00, 0x00, 0x70, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x0b,
+        ];
+        const ROOT_BYTE: u8 = 0x42;
+        const ITEMS_BYTE: u8 = 0x99;
+        const ACCOUNT_BYTE: u8 = 0x33;
+
+        fn note_id_string() -> String {
+            uuid::Uuid::from_bytes(NOTE_UUID).hyphenated().to_string()
+        }
+
+        fn view(write_fields: &[&str]) -> SavedView {
+            SavedView {
+                id: VIEW_ID.to_string(),
+                name: "Review queue".to_string(),
+                view_type: ViewType::Table,
+                filters: FilterNode::All,
+                sort: None,
+                group_by: None,
+                columns: vec!["status".to_string()],
+                card_size: None,
+                image: None,
+                image_aspect_ratio: None,
+                version: Some(1),
+                write_fields: write_fields.iter().map(|f| f.to_string()).collect(),
+            }
+        }
+
+        /// A vault on disk: `vault.meta` (for the prefs AAD), `vault.prefs`
+        /// carrying the view + its approval, and one note blob.
+        fn seed(
+            name: &str,
+            body: &str,
+            v: SavedView,
+            approvals: BTreeMap<String, u64>,
+            crdt: bool,
+        ) -> (ScopedTempDir, VaultRuntimeState) {
+            let tmp = ScopedTempDir::new(name).expect("tempdir");
+            let root = tmp.path();
+            let notes_dir = crate::paths::notes_dir_under(root).expect("notes dir");
+
+            let meta = protocol::VaultMeta {
+                account_number_hash: [ACCOUNT_BYTE; 16],
+                kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+                random_salt_password: [1u8; 16],
+                random_salt_recovery: [2u8; 16],
+                nonce_password_wrap: [3u8; 24],
+                enc_root_key_password: [4u8; 64],
+                nonce_recovery_wrap: [5u8; 24],
+                enc_root_key_recovery: [6u8; 64],
+                items_key_id: [7u8; 16],
+                items_key_nonce: [8u8; 24],
+                enc_items_key: [9u8; 64],
+                membership: None,
+                person_binding: None,
+            };
+            std::fs::write(
+                root.join("vault.meta"),
+                protocol::serialize_vault_meta(&meta),
+            )
+            .expect("seed vault.meta");
+
+            let prefs = protocol::PrefsView {
+                saved_views: vec![v],
+                opaque_saved_views: Vec::new(),
+                view_order: vec![VIEW_ID.to_string()],
+                view_approvals: approvals,
+                ..protocol::PrefsView::default()
+            };
+            let prefs_key = derive_subkey(&[ROOT_BYTE; 32], SubkeyRole::PrefsKey);
+            let blob = protocol::encode_prefs_blob_raw(
+                &prefs_key,
+                &[ACCOUNT_BYTE; 16],
+                &prefs,
+                &[0x77u8; AEAD_NONCE_LEN],
+            )
+            .expect("encode prefs");
+            std::fs::write(root.join("vault.prefs"), blob).expect("seed vault.prefs");
+
+            let items_key = [ITEMS_BYTE; 32];
+            let items_key_id = [1u8; 16];
+            let note_blob = if crdt {
+                crate::plugins::notes::crdt::encode_note_blob_at_millis(
+                    body,
+                    &items_key,
+                    &items_key_id,
+                    &NOTE_UUID,
+                    &[0x05u8; 16],
+                    1_765_432_000_000,
+                )
+                .expect("encode nc05 note")
+            } else {
+                protocol::encode_new_note_blob_raw(
+                    &items_key,
+                    &items_key_id,
+                    &NOTE_UUID,
+                    &[0x55u8; 32],
+                    &[8u8; 24],
+                    &[9u8; 24],
+                    body.as_bytes(),
+                )
+                .expect("encode my01 note")
+            };
+            std::fs::write(
+                notes_dir.join(format!("{}.myn", note_id_string())),
+                &note_blob,
+            )
+            .expect("seed note");
+
+            let state = VaultRuntimeState::default();
+            let unlocked = fixture_unlocked_with_keys(ROOT_BYTE, ITEMS_BYTE, 1);
+            futures_block_on(state.set_unlocked(test_vault_id(), unlocked));
+            (tmp, state)
+        }
+
+        fn futures_block_on<F: core::future::Future>(f: F) -> F::Output {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("runtime")
+                .block_on(f)
+        }
+
+        fn approved() -> BTreeMap<String, u64> {
+            BTreeMap::from([(VIEW_ID.to_string(), 1u64)])
+        }
+
+        fn read_note(root: &std::path::Path) -> Vec<u8> {
+            std::fs::read(
+                crate::paths::notes_dir_under(root)
+                    .expect("notes dir")
+                    .join(format!("{}.myn", note_id_string())),
+            )
+            .expect("read note blob")
+        }
+
+        fn decrypt_note(root: &std::path::Path) -> String {
+            let blob = read_note(root);
+            let decrypted = protocol::decode_note(
+                &blob,
+                &NOTE_UUID,
+                &zeroize::Zeroizing::new([ITEMS_BYTE; 32]),
+                &[1u8; 16],
+            )
+            .expect("decode note");
+            String::from_utf8(decrypted.plaintext().to_vec()).expect("note utf8")
+        }
+
+        fn set_field(
+            tmp: &ScopedTempDir,
+            state: &VaultRuntimeState,
+            view_id: &str,
+            field: &str,
+            expected: Option<&str>,
+            new_value: &str,
+        ) -> Result<NoteSetFieldOutcome, NoteSetFieldError> {
+            set_field_with_hooks(
+                tmp,
+                state,
+                std::sync::Arc::new(crate::hooks::NoopHooks),
+                view_id,
+                field,
+                expected,
+                new_value,
+            )
+        }
+
+        fn set_field_with_hooks(
+            tmp: &ScopedTempDir,
+            state: &VaultRuntimeState,
+            hooks: crate::hooks::Hooks,
+            view_id: &str,
+            field: &str,
+            expected: Option<&str>,
+            new_value: &str,
+        ) -> Result<NoteSetFieldOutcome, NoteSetFieldError> {
+            let registry = crate::plugins::live::LiveSessionRegistry::default();
+            futures_block_on(note_set_field_with_dir(
+                crate::paths::notes_dir_under(tmp.path()).expect("notes dir"),
+                state,
+                &hooks,
+                note_id_string(),
+                view_id.to_string(),
+                field.to_string(),
+                expected.map(str::to_string),
+                new_value.to_string(),
+                &crate::vault_io::StdVaultIo,
+                &NoopHost,
+                &registry,
+            ))
+        }
+
+        /// The core acceptance: the precondition is VALUE-anchored, so a body
+        /// that changed underneath the caller does not block a field write.
+        #[test]
+        fn a_body_only_change_does_not_block_the_write() {
+            let (tmp, state) = seed(
+                "set-field-body",
+                "---\nstatus: reading\n---\n\nfirst body\n",
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            // Somebody edited the BODY after the caller read the field value.
+            let blobs = read_note(tmp.path());
+            let decrypted = protocol::decode_note(
+                &blobs,
+                &NOTE_UUID,
+                &zeroize::Zeroizing::new([ITEMS_BYTE; 32]),
+                &[1u8; 16],
+            )
+            .expect("decode");
+            let edited = protocol::encode_update(
+                decrypted,
+                b"---\nstatus: reading\n---\n\na completely different body\n",
+            )
+            .expect("re-encode body");
+            std::fs::write(
+                crate::paths::notes_dir_under(tmp.path())
+                    .expect("notes dir")
+                    .join(format!("{}.myn", note_id_string())),
+                edited,
+            )
+            .expect("write edited body");
+
+            let hooks: crate::hooks::Hooks =
+                crate::test_support::RecordingHooks::capturing_snapshots("snap-7f3a");
+            let outcome = set_field_with_hooks(
+                &tmp,
+                &state,
+                hooks,
+                VIEW_ID,
+                "status",
+                Some("reading"),
+                "done",
+            )
+            .expect("the field did not change, so the write must land");
+            assert_eq!(
+                outcome.snapshot_id.as_deref(),
+                Some("snap-7f3a"),
+                "the pre-write snapshot id must reach the caller: a grouped undo needs to know which notes it can restore",
+            );
+            let after = decrypt_note(tmp.path());
+            assert!(after.contains("status: done"), "field written: {after}");
+            assert!(
+                after.contains("a completely different body"),
+                "the body the caller never claimed must be preserved: {after}",
+            );
+        }
+
+        /// The other direction: the same field changed underneath, so the write
+        /// refuses and the note on disk is byte-identical afterwards.
+        #[test]
+        fn a_same_field_change_refuses_and_leaves_the_note_untouched() {
+            let (tmp, state) = seed(
+                "set-field-changed",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            std::fs::write(
+                crate::paths::notes_dir_under(tmp.path())
+                    .expect("notes dir")
+                    .join(format!("{}.myn", note_id_string())),
+                {
+                    let blob = read_note(tmp.path());
+                    let decrypted = protocol::decode_note(
+                        &blob,
+                        &NOTE_UUID,
+                        &zeroize::Zeroizing::new([ITEMS_BYTE; 32]),
+                        &[1u8; 16],
+                    )
+                    .expect("decode");
+                    protocol::encode_update(decrypted, b"---\nstatus: abandoned\n---\n\nbody\n")
+                        .expect("re-encode")
+                },
+            )
+            .expect("write concurrent field change");
+            let before = read_note(tmp.path());
+
+            let err = set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done")
+                .expect_err("the field moved, so the write must refuse");
+            assert_eq!(err, NoteSetFieldError::FieldChanged);
+            assert_eq!(read_note(tmp.path()), before, "nothing may be written");
+        }
+
+        #[test]
+        fn an_unapproved_view_refuses_and_writes_nothing() {
+            let (tmp, state) = seed(
+                "set-field-unapproved",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["status"]),
+                BTreeMap::new(),
+                false,
+            );
+            let before = read_note(tmp.path());
+            let err = set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done")
+                .expect_err("an unapproved view must not write");
+            assert_eq!(err, NoteSetFieldError::NotApproved);
+            assert_eq!(read_note(tmp.path()), before);
+        }
+
+        #[test]
+        fn an_unknown_view_id_refuses_as_unapproved() {
+            let (tmp, state) = seed(
+                "set-field-unknown-view",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            let err = set_field(
+                &tmp,
+                &state,
+                "0190a000-0000-7000-8000-0000000000ff",
+                "status",
+                Some("reading"),
+                "done",
+            )
+            .expect_err("a view nobody stored cannot be approved");
+            assert_eq!(err, NoteSetFieldError::NotApproved);
+        }
+
+        /// Approval is an EQUALITY against the stored version, so a version bump
+        /// revokes it with nothing to clear.
+        #[test]
+        fn approving_an_older_version_refuses_after_a_bump() {
+            let (tmp, state) = seed(
+                "set-field-old-approval",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["status"]),
+                BTreeMap::from([(VIEW_ID.to_string(), 0u64)]),
+                false,
+            );
+            let err = set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done")
+                .expect_err("the stored approval names version 0, the definition is version 1");
+            assert_eq!(err, NoteSetFieldError::NotApproved);
+        }
+
+        #[test]
+        fn an_undeclared_field_refuses() {
+            let (tmp, state) = seed(
+                "set-field-undeclared",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["rating"]),
+                approved(),
+                false,
+            );
+            let err = set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done")
+                .expect_err("the view declares rating, not status");
+            assert_eq!(err, NoteSetFieldError::FieldNotDeclared);
+        }
+
+        /// A reserved marker refuses EVEN WHEN the view declares it, because a
+        /// property write must never be able to take a note out of the live
+        /// tree.
+        #[test]
+        fn a_declared_reserved_marker_still_refuses() {
+            let (tmp, state) = seed(
+                "set-field-reserved",
+                "---\nstatus: reading\n---\n\nbody\n",
+                view(&["trashed", "archived", "deleted"]),
+                approved(),
+                false,
+            );
+            for marker in ["trashed", "archived", "deleted"] {
+                let err = set_field(&tmp, &state, VIEW_ID, marker, None, "2026-01-01T00:00:00Z")
+                    .expect_err("a reserved marker must refuse even when declared");
+                assert_eq!(err, NoteSetFieldError::FieldReserved, "marker {marker}");
+            }
+        }
+
+        #[test]
+        fn a_quoted_and_an_unquoted_value_of_the_same_text_compare_equal() {
+            // The note holds a BARE `3`; the caller expects the string "3".
+            let (tmp, state) = seed(
+                "set-field-quoting",
+                "---\npriority: 3\n---\n\nbody\n",
+                view(&["priority"]),
+                approved(),
+                false,
+            );
+            set_field(&tmp, &state, VIEW_ID, "priority", Some("3"), "4")
+                .expect("quoting is not a value change");
+            let after = decrypt_note(tmp.path());
+            assert!(
+                after.contains("priority: \"4\""),
+                "written as a string: {after}"
+            );
+        }
+
+        #[test]
+        fn an_absent_field_expects_none_and_is_created() {
+            let (tmp, state) = seed(
+                "set-field-absent",
+                "---\ntitle: Notes\n---\n\nbody\n",
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            set_field(&tmp, &state, VIEW_ID, "status", None, "done")
+                .expect("an absent field matches an absent expectation");
+            let after = decrypt_note(tmp.path());
+            assert!(
+                after.contains("title: Notes"),
+                "other keys survive: {after}"
+            );
+            assert!(after.contains("status: done"), "field created: {after}");
+        }
+
+        /// The CRDT arm: the same command, the same checks, no snapshot (its
+        /// change graph is the history), and the body untouched.
+        #[test]
+        fn a_crdt_note_takes_the_same_field_write_and_reports_no_snapshot() {
+            let (tmp, state) = seed(
+                "set-field-crdt",
+                "---\nstatus: reading\n---\n\nnc05 body\n",
+                view(&["status"]),
+                approved(),
+                true,
+            );
+            let outcome = set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done")
+                .expect("nc05 field write");
+            assert_eq!(
+                outcome.snapshot_id, None,
+                "a CRDT note captures no snapshot: its change graph is the history",
+            );
+            let text = crate::plugins::notes::crdt::decode_note_blob(
+                &read_note(tmp.path()),
+                &NOTE_UUID,
+                &zeroize::Zeroizing::new([ITEMS_BYTE; 32]),
+                &[1u8; 16],
+            )
+            .expect("decode nc05");
+            assert!(text.contains("status: done"), "field written: {text}");
+            assert!(text.contains("nc05 body"), "body preserved: {text}");
+        }
+
+        #[test]
+        fn a_locked_vault_refuses_before_reading_anything() {
+            let tmp = ScopedTempDir::new("set-field-locked").expect("tempdir");
+            let state = VaultRuntimeState::default();
+            let err = set_field(&tmp, &state, VIEW_ID, "status", None, "done")
+                .expect_err("a locked vault must refuse");
+            assert_eq!(err, NoteSetFieldError::VaultLocked);
+        }
+
+        /// The patcher preserves everything outside the one key, end to end
+        /// through the real encrypt/decrypt path.
+        #[test]
+        fn the_write_preserves_the_body_other_keys_order_and_a_trailing_comment() {
+            let body = "---\ntitle: Books\nstatus: reading  # started in january\nrating: 4\n---\n\nLine one\nLine two\n";
+            let (tmp, state) = seed(
+                "set-field-preserves",
+                body,
+                view(&["status"]),
+                approved(),
+                false,
+            );
+            set_field(&tmp, &state, VIEW_ID, "status", Some("reading"), "done").expect("write");
+            assert_eq!(
+                decrypt_note(tmp.path()),
+                "---\ntitle: Books\nstatus: done  # started in january\nrating: 4\n---\n\nLine one\nLine two\n",
+            );
+        }
     }
 }

@@ -206,6 +206,7 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
+import { NOTE_FIELD_WRITE_EVENT } from "../notes/setNoteField";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
 import { clearChat } from "../notes/ai/chatStore";
@@ -1126,6 +1127,17 @@ function EditorChrome({
     const onWritten = (): void => ctx.reloadOpenNote();
     window.addEventListener(TASK_WRITE_EVENT, onWritten);
     return () => window.removeEventListener(TASK_WRITE_EVENT, onWritten);
+  }, [ctx]);
+  // A saved view's field write (`setNoteField`, view-manifests) is the same
+  // shape one layer over: the host patches one frontmatter key on disk, out of
+  // band of any pane's autosave, so every open pane must re-read. Same blanket
+  // bump and the same per-pane dirty guard, which is why a bulk set that lands on
+  // a note this editor holds does not clobber keystrokes typed a moment later.
+  useEffect(() => {
+    const onFieldWritten = (): void => ctx.reloadOpenNote();
+    window.addEventListener(NOTE_FIELD_WRITE_EVENT, onFieldWritten);
+    return () =>
+      window.removeEventListener(NOTE_FIELD_WRITE_EVENT, onFieldWritten);
   }, [ctx]);
   // Editor task-field chip activation (MYND-614 tasks 6 + 7): the chip
   // decoration dispatches a bubbling `myne-open-task-chip` event; open the

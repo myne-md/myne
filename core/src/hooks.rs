@@ -212,6 +212,36 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
         force: bool,
     ) -> bool;
 
+    /// [`Self::capture_snapshot`], reporting WHICH snapshot was written.
+    ///
+    /// Exists because one caller needs the id and the rest only need "did it
+    /// fail": a view's bulk field write groups several notes into one undo, so it
+    /// has to know which notes it can restore and which it cannot. Reporting the
+    /// id through this seam rather than calling
+    /// `snapshot_store::capture_snapshot_reporting_uuid` directly is what keeps a
+    /// client that has NO snapshot subsystem (web) from reaching into a
+    /// filesystem store it does not have.
+    ///
+    /// The default body delegates to [`Self::capture_snapshot`] and reports no
+    /// id, which is right for any client that captures nothing: web inherits it
+    /// and reports `Coalesced` without touching a store. Desktop and mobile
+    /// override it, both delegating to the same uuid-reporting function so the
+    /// capture rule cannot drift between the id-less and id-bearing callers.
+    fn capture_snapshot_reporting(
+        &self,
+        vault_root: &std::path::Path,
+        note_uuid: &str,
+        old_blob: &[u8],
+        now_ms: u64,
+        force: bool,
+    ) -> crate::snapshot_store::CaptureOutcome {
+        if self.capture_snapshot(vault_root, note_uuid, old_blob, now_ms, force) {
+            crate::snapshot_store::CaptureOutcome::Failed
+        } else {
+            crate::snapshot_store::CaptureOutcome::Coalesced
+        }
+    }
+
     /// Purge ALL snapshots of a note (note_delete, SYNC-1) — the cryptographic
     /// erase of the note's history. `vault_root` is the parent of `notes/`; the
     /// desktop impl derives the sibling `snapshots/` dir. Returns the number of

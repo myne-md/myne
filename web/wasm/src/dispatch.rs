@@ -1286,6 +1286,54 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // view-manifests: the host-owned, view-scoped field write. Same core
+        // function as the desktop command; the approval check reads the
+        // device-local map out of `vault.prefs`, so the only authority is the
+        // one in core and the web client cannot drift into a second opinion.
+        "plugin:notes|note_set_field" => {
+            use myne_core::plugins::notes::commands::note_set_field_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                note_id: String,
+                view_id: String,
+                field: String,
+                // `None` means "the field is expected to be absent".
+                #[serde(default)]
+                expected_value: Option<String>,
+                new_value: String,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match note_set_field_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.note_id,
+                a.view_id,
+                a.field,
+                a.expected_value,
+                a.new_value,
+                vault_io(),
+                crate::session::live_sessions(),
+            )
+            .await
+            {
+                // The IPC answer is the snapshot id (or null), exactly as on
+                // desktop: the grouping layer needs to know which notes it can
+                // restore, not what the note now holds.
+                Ok(outcome) => Outcome::ok(&outcome.snapshot_id),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // live-collab (`collab-editor-bridge` task 3): the collaborative-editor
         // live-session commands. Single-user multi-device presence ships on web
         // (SYNC-31), so these dispatch here.

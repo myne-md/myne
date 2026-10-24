@@ -14,6 +14,7 @@ permissions = [
     "allow-note-create",
     "allow-note-read",
     "allow-note-update",
+    "allow-note-set-field",
     "allow-note-write-batch-transactional",
     "allow-note-delete",
     "allow-note-list",
@@ -34,6 +35,11 @@ commands.allow = ["note_read"]
 identifier = "allow-note-update"
 description = "Allow invoking notes:note_update (re-encrypt an existing .myn note in place under the persistent item_key with a fresh content_nonce per protocol.md §6.3; bytes 0..47+N byte-identical across update revisions; atomic_write replace=true)."
 commands.allow = ["note_update"]
+
+[[permission]]
+identifier = "allow-note-set-field"
+description = "Allow invoking notes:note_set_field (view-manifests — the host-owned, view-scoped field write: the command checks that the saved view is approved on this device, that the field is declared in its write_fields and is not a reserved marker, and that the field's value on disk is the expected one, then replaces exactly that one frontmatter key through the shared splice and re-encrypts through the same note-edit path as note_update)."
+commands.allow = ["note_set_field"]
 
 [[permission]]
 identifier = "allow-note-write-batch-transactional"

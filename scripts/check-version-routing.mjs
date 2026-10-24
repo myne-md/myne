@@ -276,7 +276,7 @@ const DEBT = new Map([
   // v0.1 decoder with no `version` in hand. Moving this entry up into `ALLOWED`
   // is the deliberate act of accepting that; leaving it here is what keeps the
   // debt figure honest until somebody does.
-  ["core/src/plugins/notes/commands.rs#note", [3, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_write_batch"]],
+  ["core/src/plugins/notes/commands.rs#note", [4, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_set_field, note_write_batch"]],
 ]);
 
 // The lookup the budget check and the staleness check both use. Built here so

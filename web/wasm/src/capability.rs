@@ -414,6 +414,12 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:notes|note_titles_batch",
     "plugin:notes|note_create",
     "plugin:notes|note_update",
+    // view-manifests: the host-owned field write. Dispatched because the whole
+    // decision lives in `myne-core` and reads nothing a browser lacks — the
+    // approval map comes from `vault.prefs` (already dispatched), the splice is
+    // byte surgery on plaintext, and the snapshot reporting degrades to `None`
+    // where the web client captures none.
+    "plugin:notes|note_set_field",
     "plugin:notes|note_delete",
     "plugin:notes|note_write_batch_transactional",
     // Tasks 14 + 83 — the `MYS1` index, its lifecycle hooks and the query door.
