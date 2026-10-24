@@ -214,6 +214,47 @@ pub struct SavedView {
     pub image_aspect_ratio: Option<String>,
 }
 
+/// One `saved_views` array element this build cannot REPRESENT, carried
+/// verbatim so a re-encode re-emits it instead of dropping it.
+///
+/// The motivating case is a newer client's `view_type` (`"board"`, …): the
+/// array decoder cannot build a [`SavedView`] for it, and §9.5.5's
+/// whole-blob fall-back-to-defaults would then treat the entire `vault.prefs`
+/// as unreadable — resetting the theme, keymap and favorites alongside the one
+/// view this build does not know. Worse, a prefs write is a whole-blob rewrite,
+/// so that older client's next save would push the defaults back to every
+/// device. Keeping the element's raw bytes turns "one unknown view type resets
+/// all preferences" into "one view this build does not render".
+///
+/// The same carrier covers every `Unrepresentable` arm (an unknown filter
+/// `kind`, an unknown comparison operator, an unknown sort direction), because
+/// the failure is the same one: well-formed content from a newer client that
+/// this schema cannot express. Structural damage is NOT retained — see
+/// [`parse_saved_views_array_with_opaque`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OpaqueSavedView {
+    /// The element's `id` when that value is a string, empty otherwise. Used
+    /// only to sort the re-emitted array; §9.5.2's order is a byte sort on id.
+    id: Vec<u8>,
+    /// The element's exact input bytes (no surrounding whitespace), re-emitted
+    /// unchanged.
+    raw: Vec<u8>,
+}
+
+impl OpaqueSavedView {
+    /// The id bytes this entry sorts under. Empty for an entry whose `id` is
+    /// absent or not a string — such an entry is still retained (see
+    /// [`parse_saved_views_array_with_opaque`]), it just sorts first.
+    pub fn id_bytes(&self) -> &[u8] {
+        &self.id
+    }
+
+    /// The entry's raw JSON bytes, exactly as they appeared in the input.
+    pub fn raw(&self) -> &[u8] {
+        &self.raw
+    }
+}
+
 /// Closed failure surface for [`canonical_decode_saved_view`]. The bytes are
 /// decoded only AFTER the surrounding `vault.prefs` AEAD verified, so a
 /// failure here is structural (the `prefs_key` holder wrote malformed JSON),
@@ -311,15 +352,57 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
 /// (ASCII), so a raw byte sort is canonical. The caller omits the field
 /// entirely when the slice is empty, so this never emits `[]`.
 pub fn canonical_encode_saved_views(views: &[SavedView]) -> Vec<u8> {
-    let mut refs: Vec<&SavedView> = views.iter().collect();
-    refs.sort_by(|a, b| a.id.cmp(&b.id));
-    let mut out = Vec::with_capacity(128 * refs.len().max(1));
+    canonical_encode_saved_views_with_opaque(views, &[])
+}
+
+/// Encode the rendered set TOGETHER WITH the entries this build cannot
+/// represent, as one canonical JSON array — the form a `vault.prefs` re-write
+/// must emit, because dropping the opaque entries would delete a newer client's
+/// views from the shared blob.
+///
+/// Ordering is §9.5.2's byte sort on `id` across BOTH kinds, so the emitted
+/// array reads as one id-ordered set. An id tie between a represented and an
+/// opaque entry puts the represented one first (a stable sort, so equal ids
+/// within one kind keep their caller / input order), which keeps the ordering
+/// total and deterministic without letting an unrepresentable entry shadow a
+/// view this build does render.
+pub fn canonical_encode_saved_views_with_opaque(
+    views: &[SavedView],
+    opaque: &[OpaqueSavedView],
+) -> Vec<u8> {
+    enum Entry<'a> {
+        Represented(&'a SavedView),
+        Opaque(&'a OpaqueSavedView),
+    }
+    // `rank` is the tie position, not a property of the value: 0 wins over 1.
+    let mut entries: Vec<(u8, &[u8], Entry<'_>)> = Vec::with_capacity(views.len() + opaque.len());
+    entries.extend(
+        views
+            .iter()
+            .map(|v| (0u8, v.id.as_bytes(), Entry::Represented(v))),
+    );
+    entries.extend(
+        opaque
+            .iter()
+            .map(|o| (1u8, o.id.as_slice(), Entry::Opaque(o))),
+    );
+    // Stable: equal (rank, id) pairs keep their input order, which is what the
+    // rendered-only encoder did before this carrier existed.
+    entries.sort_by(|a, b| a.1.cmp(b.1).then(a.0.cmp(&b.0)));
+
+    let mut out = Vec::with_capacity(128 * entries.len().max(1));
     out.push(b'[');
-    for (i, v) in refs.iter().enumerate() {
+    for (i, (_, _, entry)) in entries.iter().enumerate() {
         if i > 0 {
             out.push(b',');
         }
-        encode_view_into(&mut out, v);
+        match entry {
+            Entry::Represented(v) => encode_view_into(&mut out, v),
+            // Raw bytes, deliberately: a canonical re-serialisation would
+            // require a generic encoder this codec does not have, and would
+            // rewrite the very fields it cannot represent.
+            Entry::Opaque(o) => out.extend_from_slice(&o.raw),
+        }
     }
     out.push(b']');
     out
@@ -344,6 +427,53 @@ pub fn parse_saved_views_array(
         views.push(saved_view_from_json(e)?);
     }
     Ok((views, p.i))
+}
+
+/// Parse a `saved_views` array keeping the elements this build cannot
+/// represent: returns the decoded views, those elements as opaque raw entries,
+/// and the bytes consumed. The `vault.prefs` codec uses THIS entry point, so a
+/// single unknown `view_type` no longer drives the §9.5.5 whole-blob fall-back
+/// (see [`OpaqueSavedView`]).
+///
+/// Only [`SavedViewParseError::Unrepresentable`] becomes an opaque entry. Every
+/// other arm stays fatal: a `Malformed` element is damaged bytes rather than a
+/// newer client's content, and silently retaining garbage under the banner of
+/// forward-compatibility would be a weaker promise than retaining a
+/// well-formed entry this schema happens not to express. An element carrying no
+/// usable `id` (absent, or not a string) is still retained — it just sorts
+/// first, and it is dropped only by a client that could never have shown it.
+pub fn parse_saved_views_array_with_opaque(
+    bytes: &[u8],
+) -> Result<(Vec<SavedView>, Vec<OpaqueSavedView>, usize), SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let elements = p.parse_top_level_array_spanned()?;
+    let mut views = Vec::with_capacity(elements.len());
+    let mut opaque = Vec::new();
+    for (value, start, end) in &elements {
+        match saved_view_from_json(value) {
+            Ok(view) => views.push(view),
+            Err(SavedViewParseError::Unrepresentable) => opaque.push(OpaqueSavedView {
+                id: opaque_id(value),
+                raw: bytes[*start..*end].to_vec(),
+            }),
+            Err(other) => return Err(other),
+        }
+    }
+    Ok((views, opaque, p.consumed()))
+}
+
+/// The sort id of an element this build cannot represent: its `id` bytes when
+/// that value is a string, empty otherwise. Deliberately lenient — the element
+/// is already unknown, so a malformed `id` is a reason to give it an empty sort
+/// key, never a reason to drop an entry we were asked to preserve verbatim.
+fn opaque_id(value: &JsonValue) -> Vec<u8> {
+    match value {
+        JsonValue::Object(obj) => match find(obj, "id") {
+            Some(JsonValue::Str(s)) => s.as_bytes().to_vec(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
 }
 
 fn encode_sort_into(out: &mut Vec<u8>, sort: &ViewSort) {
@@ -508,6 +638,62 @@ impl<'a> JsonParser<'a> {
     /// sibling `vault.prefs`-embedded array family) advances past.
     pub(crate) fn consumed(&self) -> usize {
         self.i
+    }
+
+    /// Parse a top-level JSON array, returning each element's value AND its
+    /// byte span in the INPUT — what a caller needs to keep an element it
+    /// cannot decode verbatim, without a generic canonical serialiser (which
+    /// this codec does not have, and inventing one would re-write exactly the
+    /// fields the caller could not represent).
+    ///
+    /// A non-array top level reports [`SavedViewParseError::WrongType`] once the
+    /// value parses, matching [`parse_saved_views_array`]'s pinned contract
+    /// (the `saved-view` vector family pins `non-array-top-level` as
+    /// `wrong_type`), while damaged bytes still report `Malformed`.
+    pub(crate) fn parse_top_level_array_spanned(
+        &mut self,
+    ) -> Result<Vec<(JsonValue, usize, usize)>, SavedViewParseError> {
+        self.skip_ws();
+        if self.b.get(self.i) != Some(&b'[') {
+            self.parse_value()?;
+            return Err(SavedViewParseError::WrongType);
+        }
+        self.parse_array_spanned()
+    }
+
+    fn parse_array_spanned(
+        &mut self,
+    ) -> Result<Vec<(JsonValue, usize, usize)>, SavedViewParseError> {
+        self.enter()?;
+        self.i += 1; // consume '['
+        let mut out: Vec<(JsonValue, usize, usize)> = Vec::new();
+        self.skip_ws();
+        if self.b.get(self.i) == Some(&b']') {
+            self.i += 1;
+            self.depth -= 1;
+            return Ok(out);
+        }
+        loop {
+            // The span brackets the VALUE, not the separator whitespace, so a
+            // retained element re-emits without the padding a pretty-printed
+            // input carried.
+            self.skip_ws();
+            let start = self.i;
+            let val = self.parse_value()?;
+            let end = self.i;
+            out.push((val, start, end));
+            self.skip_ws();
+            match self.b.get(self.i) {
+                Some(&b',') => self.i += 1,
+                Some(&b']') => {
+                    self.i += 1;
+                    break;
+                }
+                _ => return Err(SavedViewParseError::Malformed),
+            }
+        }
+        self.depth -= 1;
+        Ok(out)
     }
 
     fn skip_ws(&mut self) {
@@ -1188,7 +1374,142 @@ mod tests {
         assert_eq!(consumed, bytes.len());
     }
 
-    // ---- whitespace tolerance on decode (skip_ws) ----
+    // ---- opaque (unrepresentable) entries retained verbatim --------------
+    //
+    // §9.5.2 / §9.5.5: an array element from a NEWER client (an unknown
+    // `view_type`, an unknown filter kind, …) must not drive the whole-blob
+    // fall-back-to-defaults, because a prefs write rewrites the whole blob and
+    // would push those defaults to every device.
+
+    fn opaque_aware_round_trip(input: &[u8]) -> Vec<u8> {
+        let (views, opaque, _consumed) =
+            parse_saved_views_array_with_opaque(input).expect("opaque-aware parse");
+        canonical_encode_saved_views_with_opaque(&views, &opaque)
+    }
+
+    #[test]
+    fn unknown_view_type_is_retained_verbatim() {
+        // One `view_type: "board"` entry beside a represented one: the decode
+        // succeeds (it used to be Unrepresentable → the prefs codec's
+        // PlaintextParseFailed → every preference reset to its default), and
+        // the re-encode reproduces the input bytes exactly.
+        let input = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
+            "\"view_type\":\"board\"}]"
+        )
+        .as_bytes();
+        let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert_eq!(consumed, input.len());
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].id, "a");
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"b");
+        let encoded = canonical_encode_saved_views_with_opaque(&views, &opaque);
+        assert_eq!(encoded, input);
+    }
+
+    #[test]
+    fn opaque_entry_sorts_by_id_among_the_represented_ones() {
+        // Input order is NOT canonical (the board entry's id sorts after the
+        // cards entry's). Both kinds share §9.5.2's byte sort on id, so the
+        // re-encode interleaves them rather than appending the raw tail.
+        let input = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
+            "\"view_type\":\"board\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"}]"
+        )
+        .as_bytes();
+        let encoded = opaque_aware_round_trip(input);
+        let expected = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
+            "\"view_type\":\"board\"}]"
+        );
+        assert_eq!(core::str::from_utf8(&encoded).unwrap(), expected);
+    }
+
+    #[test]
+    fn opaque_entry_with_malformed_id_is_retained() {
+        // An unknown entry whose `id` is not a string is still retained: the
+        // id is read leniently (empty sort key) rather than as a reason to drop
+        // content this build cannot represent.
+        let input = b"[{\"id\":7,\"name\":\"Board\",\"view_type\":\"board\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(views.is_empty());
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"");
+        assert_eq!(opaque[0].raw(), &input[1..input.len() - 1]);
+        assert_eq!(opaque_aware_round_trip(input), input);
+    }
+
+    #[test]
+    fn unknown_filter_kind_is_retained_not_fatal() {
+        // The fix is general, not board-specific: any Unrepresentable element
+        // (here a formula node the anti-eval AST cannot express) is kept.
+        let input = b"[{\"filters\":{\"kind\":\"formula\",\"expr\":\"x+1\"},\"id\":\"f\",\"name\":\"F\",\"view_type\":\"table\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(views.is_empty());
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"f");
+        assert_eq!(opaque_aware_round_trip(input), input);
+    }
+
+    #[test]
+    fn structurally_damaged_or_wrong_type_entry_stays_fatal() {
+        // Retaining a well-formed entry from a newer client is a different
+        // promise from retaining garbage: Malformed and WrongType stay fatal.
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"[{\"filters\":{\"kind\":\"all\"},\"id\":7,\"name\":\"n\",\"view_type\":\"table\"}]"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\""
+            ),
+            Err(SavedViewParseError::Malformed)
+        );
+        // A non-array top level keeps the strict entry point's WrongType,
+        // which the `saved-view` vector family pins.
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn strict_entry_point_still_rejects_unknown_view_type() {
+        // `parse_saved_views_array` is unchanged on purpose: the `saved-view`
+        // vector family pins `map-view-type` as an `unrepresentable`
+        // `parse_fail`, and a caller that only wants the rendered set must not
+        // silently receive a shorter list.
+        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"B\",\"view_type\":\"board\"}]";
+        assert_eq!(
+            parse_saved_views_array(input),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn pre_feature_array_is_byte_identical_through_the_opaque_aware_codec() {
+        // No opaque entry → the opaque-aware pair must emit exactly what the
+        // rendered-only pair emits, so existing vault.prefs goldens do not move.
+        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(opaque.is_empty());
+        assert_eq!(
+            canonical_encode_saved_views_with_opaque(&views, &opaque),
+            input
+        );
+        assert_eq!(canonical_encode_saved_views(&views), input);
+    }
 
     #[test]
     fn decode_tolerates_insignificant_whitespace() {

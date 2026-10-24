@@ -6978,6 +6978,7 @@ mod tests {
                     startup_open: None,
                     startup_open_note: None,
                     saved_views: Vec::new(),
+                    opaque_saved_views: Vec::new(),
                     view_order: Vec::new(),
                 },
                 &[0x77; AEAD_NONCE_LEN],
