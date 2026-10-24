@@ -31,7 +31,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use crate::errors::Refusal;
-use crate::serve::{serve_with, MAX_FRAME_BYTES};
+use crate::serve::MAX_FRAME_BYTES;
 use crate::status;
 use crate::tools::catalog;
 use crate::transport::{socket_path, Transport, LENGTH_PREFIX_BYTES, MAX_FRAME_BODY};
@@ -187,13 +187,23 @@ struct Session {
 
 impl Session {
     fn start(dir: &Path) -> Self {
+        Self::start_named(dir, None)
+    }
+
+    /// A session whose calls travel under an explicit connection name, so the
+    /// name that reaches the door is asserted without touching the process
+    /// environment (`MYNE_MCP_CONNECTION` is read once, at `Server` construction).
+    fn start_named(dir: &Path, declared: Option<&str>) -> Self {
         let (client, server) = UnixStream::pair().expect("socket pair");
         let server_reader = server.try_clone().expect("clone the server end");
         let transport = Transport::at(dir.to_path_buf());
+        let declared = declared.map(str::to_string);
         let join = std::thread::spawn(move || {
             let mut reader = BufReader::new(server_reader);
             let mut writer = server;
-            serve_with(&mut reader, &mut writer, MAX_FRAME_BYTES, transport)
+            let mut session =
+                crate::server::Server::with_transport_named(transport, declared.as_deref());
+            crate::serve::serve_with_server(&mut reader, &mut writer, MAX_FRAME_BYTES, &mut session)
         });
         let reader = BufReader::new(client.try_clone().expect("clone the client end"));
         Self {
@@ -386,6 +396,52 @@ fn a_closed_door_never_gets_a_dial_and_an_open_one_never_gets_a_shim_side_refusa
     }
 
     session.close();
+}
+
+#[test]
+fn the_connection_name_travels_with_the_call_and_the_handshake_is_the_fallback() {
+    // Two sessions, because the precedence is the point: a client configured by
+    // hand is named by its own handshake, and a client whose config carries the
+    // approved name cannot rename itself by declaring a different one.
+    for (tag, pinned, handshake_name, expected) in [
+        ("name-handshake", None, "Claude Desktop", "Claude Desktop"),
+        (
+            "name-pinned",
+            Some("claude-desktop"),
+            "Claude Desktop",
+            "claude-desktop",
+        ),
+    ] {
+        let dir = TempDir::new(tag);
+        let door = FakeDoor::start(dir.path(), successful("ok"));
+        dir.set_marker(b"O");
+        let mut session = Session::start_named(dir.path(), pinned);
+
+        let handshake = session.request(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": { "name": handshake_name, "version": "1" }
+            }
+        }));
+        assert_eq!(handshake["result"]["serverInfo"]["name"], "myne-mcp");
+
+        let reply = session.request(tools_call(2, "note_search", json!({ "query": "needle" })));
+        assert_eq!(reply["result"]["isError"], false, "got {reply}");
+
+        let requests = door.requests();
+        let call = requests.last().expect("the call reached the door");
+        assert_eq!(call["tool"], "note_search");
+        assert_eq!(call["arguments"]["query"], "needle");
+        assert_eq!(
+            call["connection"], expected,
+            "the name the host resolves the grant by ({tag})"
+        );
+        session.close();
+    }
 }
 
 #[test]
