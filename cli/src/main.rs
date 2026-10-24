@@ -14,6 +14,8 @@ mod logging_discipline;
 mod output;
 mod paths;
 mod status;
+#[cfg(windows)]
+mod windows_pipe;
 mod wire;
 
 use std::io::Read;
