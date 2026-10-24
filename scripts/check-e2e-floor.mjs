@@ -124,7 +124,42 @@ console.log(
     (typeof ceiling === "number" ? `, failure ceiling ${ceiling}` : ""),
 );
 
+/**
+ * Print the failing roster: one line per failing test, file and name, plus the
+ * first line of its error.
+ *
+ * Why this exists. The ceiling message used to name a report path and stop,
+ * which is fine on a workstation and useless in CI: the JSON lives inside the
+ * runner's container and the pipeline log is the only artefact that survives.
+ * The first run that tripped it cost a local container build to answer "which
+ * 76?" — an hour to recover a fact the guard already held in memory. A gate
+ * that says a number instead of a name sends the reader to the wrong tool.
+ *
+ * Capped, because a catastrophic run would otherwise bury the counts. The cap
+ * says how many it hid, so a truncated list cannot read as a complete one.
+ */
+const ROSTER_CAP = 40;
+function printFailingRoster() {
+  const rows = [];
+  for (const file of report.testResults ?? []) {
+    for (const t of file.assertionResults ?? []) {
+      if (t.status !== "failed") continue;
+      const first = (t.failureMessages ?? [])[0] ?? "";
+      const line = first.split("\n").find((l) => l.trim().length > 0) ?? "";
+      const rel = (file.name ?? "").replace(/^.*\/work\//, "");
+      rows.push(`  ${rel} > ${t.fullName ?? t.title}\n      ${line.slice(0, 200)}`);
+    }
+  }
+  if (rows.length === 0) return;
+  console.error(
+    `\n  Failing (${rows.length}):\n` +
+      rows.slice(0, ROSTER_CAP).join("\n") +
+      (rows.length > ROSTER_CAP ? `\n  … and ${rows.length - ROSTER_CAP} more` : ""),
+  );
+}
+
 if (typeof ceiling === "number" && failed > ceiling) {
+  printFailingRoster();
   console.error(
     `\ncheck-e2e-floor: FAILURE COUNT ABOVE CEILING — ${failed} > ${ceiling}\n\n` +
       "  The suite is allowed its standing failures; it is not allowed MORE of\n" +
