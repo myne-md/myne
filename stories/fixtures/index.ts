@@ -176,6 +176,9 @@ export const DEFAULT_PREFS: Record<string, unknown> = {
   spell_languages: [],
   saved_views: [],
   view_order: [],
+  // Device-local since view-manifests: a surface that reads it without the key
+  // would compare against `undefined` and throw on a versioned view.
+  view_approvals: {},
   ribbon_items: null,
   ribbon_visible: true,
   // The four fields this object was missing, found by the accessibility gate

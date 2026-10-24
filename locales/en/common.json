@@ -665,6 +665,9 @@
       "manageTemplates": {
         "label": "Manage templates…"
       },
+      "manageViews": {
+        "label": "Manage views…"
+      },
       "moveNote": {
         "label": "Move note to folder…"
       },
@@ -2727,6 +2730,21 @@
       "list": {
         "empty": "No notes match this view",
         "noValue": "No value"
+      },
+      "manager": {
+        "approve": "Approve",
+        "approvedState": "Approved on this device",
+        "close": "Close",
+        "deleteFailed": "That view could not be deleted.",
+        "deleteLabel": "Delete {{name}}",
+        "emptyBody": "A view you save from the note list, or one somebody sends you, appears here.",
+        "emptyTitle": "No views yet",
+        "listLabel": "Saved views",
+        "openLabel": "Open {{name}}",
+        "pendingBody": "This view came from another device or from a file. Its definition is here, but it reads nothing until you approve it on this device.",
+        "pendingState": "Needs approval",
+        "pendingTitle": "{{name}} needs approval",
+        "title": "Views"
       },
       "menu": {
         "deleteView": "Delete view",

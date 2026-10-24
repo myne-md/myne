@@ -116,6 +116,10 @@ export type CommandContext = {
   onOpenSettings: () => void;
   /** Open the template-management surface (MYND-189). */
   onManageTemplates: () => void;
+  /** Open the Views manager (view-manifests). Deliberately NOT behind the
+   *  device-local Views toggle: that toggle hides the sidebar flyout, and
+   *  hiding an entry point must never strand the data behind it. */
+  onManageViews: () => void;
   /** Open the new-note-from-template flow (picker → name → create) (MYND-190). */
   onNewNoteFromTemplate: () => void;
   /** Open (or idempotently create) one period's note: daily (MYND-191),

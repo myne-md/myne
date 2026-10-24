@@ -115,6 +115,7 @@ import { SyncStatusIndicator } from "@app/components/sync/SyncStatusIndicator";
 import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
 import { ViewConsent } from "@app/components/ViewConsent";
+import { ViewsManager } from "@app/components/ViewsManager";
 import { ThemeChiplet } from "@app/components/primitives/ThemeChiplet";
 import { ThemeInstallDialog } from "@app/components/ThemeInstallDialog";
 import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
@@ -203,6 +204,46 @@ const UNLOCKED_FIXTURE = {
     ],
     "plugin:vault-unlock|vault_slot_kind": () => "Unlocked",
     "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
+  },
+};
+
+/**
+ * One unlocked vault holding three saved views in a display order that differs
+ * from their storage order, with one pending approval among them: the state the
+ * Views manager exists to show, where a view is listed, visible and refused until
+ * the person at this device approves the version they were shown.
+ */
+const VIEWS_MANAGER_FIXTURE = {
+  description: "one unlocked vault with three saved views, one awaiting approval",
+  handlers: {
+    ...UNLOCKED_FIXTURE.handlers,
+    "plugin:prefs|prefs_read": () => ({
+      ...DEFAULT_PREFS,
+      saved_views: [
+        {
+          id: "v-books",
+          name: "Unread books",
+          view_type: "table",
+          filters: { kind: "hasTag", tag: "books" },
+          version: 2,
+        },
+        {
+          id: "v-reading",
+          name: "Reading list",
+          view_type: "list",
+          filters: { kind: "all" },
+          version: 5,
+        },
+        {
+          id: "v-legacy",
+          name: "Everything",
+          view_type: "cards",
+          filters: { kind: "all" },
+        },
+      ],
+      view_order: ["v-reading", "v-books", "v-legacy"],
+      view_approvals: { "v-reading": 5, "v-books": 1 },
+    }),
   },
 };
 
@@ -1725,6 +1766,28 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => (
       <TemplatesManager open onClose={action("onClose")} onOpenNote={action("onOpenNote")} />
     ),
+  },
+  {
+    id: "components/viewsmanager/default",
+    group: "components",
+    surface: "ViewsManager",
+    state: "default",
+    description:
+      "The Views manager modal: every saved view in display order with its type and whether this device has approved it. Look for the pending row to stay visible, refuse to open, and carry the one Approve action the decision needs.",
+    tags: ["components", "views", "manager", "approval", "modal", "sharing"],
+    fixture: VIEWS_MANAGER_FIXTURE,
+    render: () => <ViewsManager open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewsmanager/empty",
+    group: "components",
+    surface: "ViewsManager",
+    state: "empty",
+    description:
+      "The same manager with no saved views: a first-run empty state rather than a seeded example, so a screenshot of it never shows a view the vault does not have.",
+    tags: ["components", "views", "manager", "empty", "first-run", "modal"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewsManager open onClose={action("onClose")} />,
   },
   {
     id: "components/viewconsent/default",

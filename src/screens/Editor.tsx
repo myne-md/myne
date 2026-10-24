@@ -120,6 +120,7 @@ import {
 } from "../lib/aiOnboardingSeen";
 import { has } from "../platform/capabilities";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
+import { ViewsManager } from "../components/ViewsManager";
 import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
@@ -1152,6 +1153,11 @@ function EditorChrome({
   // SAME implementation (`installTaskChipEditor`) rather than two copies.
   useEffect(() => installTaskChipEditor(), []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
+  // The Views manager (view-manifests): an Editor-local boolean, like every
+  // other desktop modal carve-out. It is reachable from the palette regardless
+  // of the device-local Views toggle, because that toggle hides the sidebar
+  // flyout and a hidden door must not strand the views behind it.
+  const [viewsManagerOpen, setViewsManagerOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) - reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
   // own content load, autosave, word count, and the surgical sidebar
@@ -2850,6 +2856,10 @@ function EditorChrome({
           }}
         />
       ) : null}
+      <ViewsManager
+        open={viewsManagerOpen}
+        onClose={() => setViewsManagerOpen(false)}
+      />
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
@@ -2931,6 +2941,10 @@ function EditorChrome({
         onManageTemplates={() => {
           setPaletteOpen(false);
           ws.openTemplates();
+        }}
+        onManageViews={() => {
+          setPaletteOpen(false);
+          setViewsManagerOpen(true);
         }}
         onNewNoteFromTemplate={() => {
           setPaletteOpen(false);
@@ -3368,6 +3382,7 @@ type CommandPaletteHostProps = {
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
+  onManageViews: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
   onExportNoteMarkdown: () => void;
@@ -3422,6 +3437,7 @@ function CommandPaletteHost({
   onRestoreBackup,
   onOpenAttachments,
   onManageTemplates,
+  onManageViews,
   onNewNoteFromTemplate,
   onOpenSnapshots,
   onExportNoteMarkdown,
@@ -3948,6 +3964,7 @@ function CommandPaletteHost({
       paletteOpen: open,
       onOpenSettings,
       onManageTemplates,
+      onManageViews,
       onNewNoteFromTemplate,
       onOpenPeriodNote,
       onOpenRandomNote,
@@ -4016,6 +4033,7 @@ function CommandPaletteHost({
       open,
       onOpenSettings,
       onManageTemplates,
+      onManageViews,
       onNewNoteFromTemplate,
       onOpenPeriodNote,
       onOpenRandomNote,

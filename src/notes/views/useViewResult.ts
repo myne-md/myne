@@ -16,6 +16,21 @@
 //
 // Re-runs when the def, the live cache, the folder tree, or the SYNC-5
 // index-changed nonce moves. Guards against setState-after-unmount.
+//
+// **It refuses to run an unapproved view, and this hook is where that belongs.**
+// Approval is per device and keyed by version (view-manifests): a definition that
+// arrived by import or by sync renders only once the person at this device has
+// approved it. This hook is the ONLY place a saved view is run for rendering, so
+// making the refusal here makes it structural rather than a rule each surface
+// remembers: a pending view's tab, a restored tab, and the sidebar flyout all
+// reach this one gate, and the query that reads the vault never fires. A gate in
+// the manager modal alone would have been bypassed by every other door, which is
+// the difference between a product promise and a disabled button.
+//
+// `approved` is returned rather than folded into `result` so the host can say
+// WHY there is nothing to show. `isViewApproved` is the mirror of the Rust rule
+// (a version-less view is approved); the host still re-checks approval on every
+// field write, so this reading is a render decision and never an authority.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SavedView } from "../../lib/prefs";
@@ -23,14 +38,23 @@ import { usePrefs } from "../../hooks/usePrefs";
 import { useIndexNonce } from "../indexNonce";
 import { useRunViewContext } from "./useRunViewContext";
 import { runView, stabilizeViewResult, type ViewResult } from "../queryEngine";
+import { isViewApproved } from "./viewApproval";
 
 export type UseViewResult = {
   def: SavedView | null;
   result: ViewResult | null;
+  /** Whether this device has approved the definition it holds. `false` also
+   *  covers "no definition": a stale tab pointing at a deleted view is not a
+   *  pending approval, and the host tells the two apart by `def`. */
+  approved: boolean;
+  /** Record this device's approval of the version it was shown. Returned from
+   *  the same `usePrefs` instance the hook already reads, so the pending surface
+   *  does not open a second prefs read just to answer its one question. */
+  approve: (viewId: string, version: number | undefined) => Promise<void>;
 };
 
 export function useViewResult(viewId: string): UseViewResult {
-  const { prefs } = usePrefs();
+  const { prefs, approveView } = usePrefs();
   const indexNonce = useIndexNonce();
   const ctx = useRunViewContext();
 
@@ -41,12 +65,20 @@ export function useViewResult(viewId: string): UseViewResult {
     [prefs.saved_views, viewId],
   );
 
+  const approved = useMemo(
+    () => def !== null && isViewApproved(def, prefs.view_approvals),
+    [def, prefs.view_approvals],
+  );
+
   const [result, setResult] = useState<ViewResult | null>(null);
   // Hold the previous result so a value-equal re-run bails the render.
   const prevRef = useRef<ViewResult | null>(null);
 
   useEffect(() => {
-    if (def === null) {
+    // Unapproved (or unknown) means the query does not run at all: not a query
+    // whose output is hidden, which would still read the vault the reader has
+    // not agreed to hand to this definition.
+    if (def === null || !approved) {
       prevRef.current = null;
       setResult(null);
       return;
@@ -81,7 +113,7 @@ export function useViewResult(viewId: string): UseViewResult {
       cancelled = true;
     };
     // `indexNonce` is a re-run trigger only (read at fire time via `ctx`/`live`).
-  }, [def, ctx, indexNonce]);
+  }, [def, approved, ctx, indexNonce]);
 
-  return { def, result };
+  return { def, result, approved, approve: approveView };
 }

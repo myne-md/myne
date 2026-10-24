@@ -112,6 +112,7 @@ import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
+import { Button } from "../../components/primitives/Button";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
@@ -2578,6 +2579,36 @@ function PaneLoading() {
   );
 }
 
+/** The centred quiet body a view host falls back to: a stale view id, a result
+ *  still in flight, or a definition this device has not approved. One shape for
+ *  all three so the surface does not jump between them. */
+const QUIET_WRAP_STYLE: CSSProperties = {
+  maxWidth: 420,
+  margin: "12vh auto 0",
+  padding: "0 var(--space-5)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  textAlign: "center",
+  fontFamily: "var(--font-sans)",
+  lineHeight: 1.6,
+};
+
+const QUIET_TITLE_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
+
+const QUIET_BODY_STYLE: CSSProperties = {
+  margin: 0,
+  maxWidth: 360,
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+};
+
 /**
  * Host for an open saved-view tab (MYND-275, Saved Views #5). Resolves the
  * `viewId` to its `SavedView` def via prefs, runs the query engine over the
@@ -2589,7 +2620,7 @@ function PaneLoading() {
  */
 function ViewHost({ viewId }: { viewId: string }) {
   const { t } = useTranslation();
-  const { def, result } = useViewResult(viewId);
+  const { def, result, approved, approve } = useViewResult(viewId);
   const ws = useWorkspace();
   const sidebar = useSelectedNote();
   const [cardMenu, setCardMenu] = useState<{
@@ -2727,7 +2758,29 @@ function ViewHost({ viewId }: { viewId: string }) {
   }, [cardMenu, ws, sidebar]);
   return (
     <div data-testid="editor.view-host" data-view-id={viewId}>
-      {def !== null && result !== null ? (
+      {def !== null && !approved ? (
+        // A definition this device has not approved. The tab stays open and says
+        // so rather than closing or hiding, because a view the reader cannot see
+        // is a decision they cannot make, and `useViewResult` has already
+        // refused to run the query, so nothing has been read on their behalf.
+        <div style={QUIET_WRAP_STYLE} data-testid="editor.view-pending">
+          <p style={QUIET_TITLE_STYLE}>
+            {t("notes.views.manager.pendingTitle", {
+              name: def.name.trim() === "" ? t("notes.views.untitledView") : def.name,
+            })}
+          </p>
+          <p style={QUIET_BODY_STYLE}>{t("notes.views.manager.pendingBody")}</p>
+          <Button
+            variant="primary"
+            data-testid="editor.view-pending-approve"
+            onClick={() => {
+              void approve(def.id, def.version);
+            }}
+          >
+            {t("notes.views.manager.approve")}
+          </Button>
+        </div>
+      ) : def !== null && result !== null ? (
         <ViewRenderHost
           def={def}
           result={result}
@@ -2736,17 +2789,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           onSetCover={onSetCover}
         />
       ) : (
-        <div
-          style={{
-            maxWidth: 680,
-            margin: "12vh auto 0",
-            textAlign: "center",
-            color: "var(--fg-3)",
-            fontSize: "var(--text-sm)",
-            fontFamily: "var(--font-sans)",
-            lineHeight: 1.6,
-          }}
-        />
+        <div style={QUIET_WRAP_STYLE} />
       )}
       {cardMenu !== null && (
         <ContextMenu
