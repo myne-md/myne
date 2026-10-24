@@ -11544,6 +11544,11 @@ mod tests {
             card_size: Some(300),
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
+            // Neither manifest field set: this is the pre-feature view shape, and
+            // the golden bytes below are unchanged by this format's arrival —
+            // which is the byte-identity claim in the assertion's own message.
+            version: None,
+            write_fields: Vec::new(),
         };
         let prefs = PrefsView {
             saved_views: alloc::vec![view],
@@ -13601,6 +13606,8 @@ mod tests {
             card_size: Some(300),
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
+            version: None,
+            write_fields: Vec::new(),
         }
     }
 

@@ -7904,6 +7904,8 @@ mod tests {
             card_size: Some(300),
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
+            version: None,
+            write_fields: Vec::new(),
         }
     }
 
