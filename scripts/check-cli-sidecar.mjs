@@ -19,6 +19,13 @@
 //   7. `cli/src/status.rs`'s door-byte decode  ==  cli_bridge/status.rs's;
 //      and the desktop's own `byte_for` encode must agree with its `parse`
 //      decode (the CLI has no encoder — it only reads the marker)
+//   8. the `myne-mcp` shim's copies of 1, 2, 3, 6 and 7 (`mcp/src/transport.rs`
+//      for the identifier, both basenames and the two framing constants, and
+//      `mcp/src/status.rs` for the door-byte decode). It is a THIRD by-design
+//      copy for the same reason as the CLI's: `myne-mcp` depends on neither
+//      `myne-desktop` nor `myne-core`, so it recomputes the socket path and
+//      speaks the same frame format, and the two doors that must agree are
+//      checked by the one file that can see all of them.
 //
 // Number 5 exists because the E2E suite reads the marker and the socket inode
 // straight off disk to decide when the door has opened, which makes it a THIRD
@@ -232,6 +239,68 @@ compareByteMaps(
   `${DESKTOP_STATUS} byte_for`,
   rustDecodeByteMap(desktopStatus, `${DESKTOP_STATUS} (parse)`),
   `${DESKTOP_STATUS} parse`,
+);
+
+// ── 8. The `myne-mcp` shim's copies of the same contract ──────────────────
+// A third independent copy, and the one with the least visibility: the shim is
+// not a Tauri app, so nothing in its build can see the desktop's constants. A
+// drifted socket path would make every tool call answer "the app is not
+// running" while the app is running, and a drifted frame prefix would make every
+// call fail as unreachable with no hint which side is wrong.
+const mcpTransport = read("mcp/src/transport.rs");
+const mcpStatus = read("mcp/src/status.rs");
+const MCP_TRANSPORT = "mcp/src/transport.rs";
+const MCP_STATUS = "mcp/src/status.rs";
+
+const mcpIdentifier = rustStrConst(mcpTransport, MCP_TRANSPORT, "BUNDLE_IDENTIFIER");
+if (mcpIdentifier !== null && mcpIdentifier !== conf.identifier) {
+  fail(
+    `bundle identifier drift: tauri.conf.json has "${conf.identifier}", ` +
+      `${MCP_TRANSPORT}::BUNDLE_IDENTIFIER has "${mcpIdentifier}". ` +
+      `\`myne-mcp\` would dial a socket nobody binds.`,
+  );
+}
+
+for (const [name, desktopSource, desktopFile] of [
+  ["SOCKET_BASENAME", socketRs, "src-tauri/src/cli_bridge/socket.rs"],
+  ["STATUS_BASENAME", statusRs, "src-tauri/src/cli_bridge/status.rs"],
+]) {
+  // The shim may name the socket basename in `transport.rs` and the status
+  // basename in `status.rs`; read whichever file holds it.
+  const holder = [mcpTransport, mcpStatus].find((source) =>
+    new RegExp(`const\\s+${name}\\s*:\\s*&str`).test(source),
+  );
+  if (!holder) {
+    fail(`${MCP_TRANSPORT} / ${MCP_STATUS}: no \`const ${name}: &str\` — did it get renamed?`);
+    continue;
+  }
+  const mcpValue = rustStrConst(holder, holder === mcpTransport ? MCP_TRANSPORT : MCP_STATUS, name);
+  const desktopValue = rustStrConst(desktopSource, desktopFile, name);
+  if (mcpValue !== null && desktopValue !== null && mcpValue !== desktopValue) {
+    fail(
+      `${name} drift: ${desktopFile} has "${desktopValue}", ` +
+        `${holder === mcpTransport ? MCP_TRANSPORT : MCP_STATUS} has "${mcpValue}".`,
+    );
+  }
+}
+
+for (const name of ["LENGTH_PREFIX_BYTES", "MAX_FRAME_BODY"]) {
+  const mcpValue = rustUsizeConst(mcpTransport, MCP_TRANSPORT, name);
+  const desktopValue = rustUsizeConst(desktopFraming, DESKTOP_FRAMING, name);
+  if (mcpValue !== null && desktopValue !== null && mcpValue !== desktopValue) {
+    fail(
+      `${name} drift: ${MCP_TRANSPORT} has ${mcpValue}, ${DESKTOP_FRAMING} has ${desktopValue}. ` +
+        `The shim and the door would disagree about where a frame ends.`,
+    );
+  }
+}
+
+compareByteMaps(
+  "status-marker decode (shim)",
+  rustDecodeByteMap(mcpStatus, MCP_STATUS),
+  MCP_STATUS,
+  rustDecodeByteMap(desktopStatus, DESKTOP_STATUS),
+  DESKTOP_STATUS,
 );
 
 if (failures.length > 0) {

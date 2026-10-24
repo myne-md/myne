@@ -222,3 +222,14 @@ pub fn catalog() -> Vec<Value> {
         }),
     ]
 }
+
+/// Whether the compiled surface offers a tool by this exact name.
+///
+/// One implementation of the question, so `tools/call` cannot accept a verb the
+/// catalog does not list. The comparison is against the same constant
+/// [`catalog`] serves, never against a second roster.
+pub fn offers(name: &str) -> bool {
+    catalog()
+        .iter()
+        .any(|tool| tool["name"].as_str() == Some(name))
+}

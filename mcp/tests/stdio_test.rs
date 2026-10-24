@@ -188,16 +188,38 @@ fn a_non_initialize_first_frame_selects_the_stateless_revision() {
 fn an_unknown_method_is_an_error_and_the_connection_survives() {
     let mut session = Session::spawn();
 
-    // `resources/list` is a real MCP method this surface does not offer, and
-    // `tools/call` is deliberately not answered until the task that adds the
-    // door client. Neither may end the session.
-    for method in ["resources/list", "tools/call"] {
-        let reply = session.request(json!({ "jsonrpc": "2.0", "id": 1, "method": method }));
-        assert_eq!(reply["error"]["code"], -32601, "for {method}: {reply}");
-    }
+    // `resources/list` is a real MCP method this surface does not offer, and it
+    // stays an unknown METHOD. `tools/call` is a different refusal and is
+    // asserted below: it asks for arguments this frame does not carry, which is
+    // the client's error rather than an unknown verb.
+    let reply = session.request(json!({ "jsonrpc": "2.0", "id": 1, "method": "resources/list" }));
+    assert_eq!(reply["error"]["code"], -32601, "got {reply}");
 
-    let ping = session.request(json!({ "jsonrpc": "2.0", "id": 2, "method": "ping" }));
+    let incomplete = session.request(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call" }));
+    assert_eq!(incomplete["error"]["code"], -32602, "got {incomplete}");
+
+    let ping = session.request(json!({ "jsonrpc": "2.0", "id": 3, "method": "ping" }));
     assert_eq!(ping["result"], json!({}), "got {ping}");
+}
+
+#[test]
+fn server_discover_answers_through_the_binary() {
+    let mut session = Session::spawn();
+
+    // A strict client of the current revision discovers by this method alone,
+    // with no handshake and with no Myne process running.
+    let reply = session.request(json!({ "jsonrpc": "2.0", "id": 1, "method": "server/discover" }));
+    assert!(reply.get("error").is_none(), "got {reply}");
+    assert_eq!(reply["result"]["protocolVersion"], "2026-07-28");
+    assert_eq!(reply["result"]["serverInfo"]["name"], "myne-mcp");
+
+    let mut expected: Vec<String> = EXPECTED_TOOLS.map(str::to_string).to_vec();
+    expected.sort();
+    assert_eq!(tool_names(&reply), expected);
+
+    // The discovery list and `tools/list` are the same list, not two.
+    let listed = session.request(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }));
+    assert_eq!(reply["result"]["tools"], listed["result"]["tools"]);
 }
 
 #[test]
