@@ -220,6 +220,14 @@
     "reason": "Same generic failure on snapshots and the sync panel; generic fallback, intentionally shared."
   },
   {
+    "value": "The strength check could not load, so only the minimum length is checked.",
+    "keys": [
+      "password.createForm.strengthUnavailable",
+      "settings.changePassword.strengthUnavailable"
+    ],
+    "reason": "Same fallback sentence on the password create form and change-password, for the same reason `tooShort` above is shared: one policy, stated once. Two keys rather than one because each form composes its own caption from its own namespace, and rewording one side would let the two forms tell the user different things about why a gate came open."
+  },
+  {
     "value": "Use at least {{n}} characters.",
     "keys": [
       "password.createForm.tooShort",
