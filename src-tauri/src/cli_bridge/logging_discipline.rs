@@ -425,6 +425,7 @@ const ALLOWED_VALUES: &[&str] = &[
     "e.label()",
     "outcome.label()",
     "ShimOutcome::Unsupported.label()",
+    "spec.stage.label()",
     "?kind",
     "on_path",
 ];

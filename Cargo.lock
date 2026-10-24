@@ -5052,6 +5052,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "myne-mcp"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "myne-mobile"
 version = "0.10.1"
 dependencies = [

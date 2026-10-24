@@ -10,10 +10,11 @@
 // the name is host-dependent, so it has to be read from `rustc -vV` rather than
 // written down.
 //
-// Two sidecars ride on this today — `myne` (the CLI thin client, MYND-490) and
-// `myne-tor` (the arti SOCKS5 proxy, MYND-650). They differ only in crate/bin
-// name, so the mechanics live here and each `scripts/build-*-sidecar.mjs` keeps
-// its own header explaining what its binary is for.
+// Two sidecars rode on this first — `myne` (the CLI thin client, MYND-490) and
+// `myne-tor` (the arti SOCKS5 proxy, MYND-650); `myne-mcp` (the MCP front-end,
+// myne-md/myne#923) makes three. They differ only in crate/bin name, so the
+// mechanics live here and each `scripts/build-*-sidecar.mjs` keeps its own
+// header explaining what its binary is for.
 //
 // Gotcha worth knowing before you debug it: after a `tauri build`, Tauri copies
 // the staged file back into the cargo target dir with the triple STRIPPED — i.e.
