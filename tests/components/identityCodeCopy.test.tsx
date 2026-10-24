@@ -111,7 +111,8 @@ const surfaces = [
     code: OWNER_CODE,
     codeTestId: "member-roster.owner-code",
     copyTestId: "member-roster.copy-owner-code",
-    feedbackTestId: "member-roster.copy-feedback",
+    statusTestId: "member-roster.copy-status",
+    copyLabel: "personIdentityCode.copy",
     render: () => render(<MemberRosterPanel />),
 
     prepare: async () => {
@@ -124,6 +125,7 @@ const surfaces = [
     code: IDENTITY_CODE,
     codeTestId: "identity-home.identity-code",
     copyTestId: "identity-home.copy-code",
+    statusTestId: "identity-home.copy-status",
     copyLabel: "personIdentityCode.copy",
     render: () =>
 
@@ -207,21 +209,18 @@ describe.each(surfaces)("$name", (surface) => {
     });
 
     await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith(surface.code));
-    expect(getToasts()).toHaveLength(1);
-    expect(getToasts()[0].variant).toBe("info");
-    expect(getToasts()[0].message).toBe("personIdentityCode.copied");
-    // The toast is the ONLY report (2026-10-24). The line that used to repeat it
-    // under the field is gone from both surfaces, and the copy control is an
-    // icon-only button whose accessible label says what it copies.
-    expect(screen.queryByText("personIdentityCode.copied")).toBeNull();
-    // Where the control is ICON-ONLY its accessible label is the only thing that
-    // says what it copies, so that surface pins it here. The roster's copy is
-    // still a labelled button, which is why it declares no `copyLabel`.
-    if (surface.copyLabel !== undefined) {
-      expect(screen.getByTestId(surface.copyTestId).getAttribute("aria-label")).toBe(
-        surface.copyLabel,
-      );
-    }
+    // The report lives on the BUTTON, not in a toast and not under the field
+    // (2026-10-24): a tick, one pop, and a visually hidden live region saying the
+    // same words. Nothing is drawn that repeats it.
+    expect(getToasts()).toHaveLength(0);
+    expect(screen.getByTestId(surface.copyTestId).getAttribute("data-confirmed")).toBe("true");
+    expect(screen.getByTestId(surface.statusTestId).textContent).toBe("personIdentityCode.copied");
+    expect(screen.queryByText("personIdentityCode.copied", { selector: "p:not([role])" })).toBeNull();
+    // The control is ICON-ONLY, so its accessible label is the only thing that
+    // says what it copies.
+    expect(screen.getByTestId(surface.copyTestId).getAttribute("aria-label")).toBe(
+      surface.copyLabel,
+    );
   });
 
   it("reports a clipboard failure instead of presenting it as success", async () => {

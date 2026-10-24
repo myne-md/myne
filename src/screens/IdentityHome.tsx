@@ -15,7 +15,7 @@
 // rather than the bare column it shipped with, so the invite list scrolls
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
@@ -28,6 +28,7 @@ import {
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { MyneMark } from "../components/primitives/MyneMark";
+import { VISUALLY_HIDDEN } from "../components/primitives/visuallyHidden";
 import {
   personListInvites,
   type InviteSummary,
@@ -282,13 +283,36 @@ export function IdentityHome({
   // the failure are the dialog's own, so closing it discards all three with it
   // instead of leaving a ticked box behind for the next opening.
   const [forgetOpen, setForgetOpen] = useState(false);
+  // Which copy just landed, for the tick on the button itself (2026-10-24). The
+  // report lives on the control that was pressed rather than in a toast at the
+  // corner of the screen, and the live region below it says the same thing out
+  // loud, because a tick reaches nobody with a screen reader. A failure still
+  // goes to the toast: a control cannot show "that did not work" by looking
+  // happy, and a silent failure is the one report this app never makes
+  // (`lib/clipboard.ts`).
+  const [copied, setCopied] = useState<"code" | "account" | null>(null);
+  const copyTimer = useRef<number | null>(null);
+  const flashCopied = (kind: "code" | "account") => {
+    setCopied(kind);
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => {
+      setCopied(null);
+      copyTimer.current = null;
+    }, 1600);
+  };
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
 
   const copyIdentityCode = () => {
     if (!identityCode) return;
     void copyText(clipboardWriteText, identityCode, {
       onSuccess: {
         kind: "toast",
-        run: () => toast({ message: t("personIdentityCode.copied"), variant: "info" }),
+        run: () => flashCopied("code"),
       },
       onFailure: {
         kind: "toast",
@@ -306,7 +330,7 @@ export function IdentityHome({
     void copyText(clipboardWriteText, accountNumber, {
       onSuccess: {
         kind: "toast",
-        run: () => toast({ message: t("settings.account.numberCopied"), variant: "info" }),
+        run: () => flashCopied("account"),
       },
       onFailure: {
         kind: "toast",
@@ -417,6 +441,15 @@ export function IdentityHome({
   return (
     <CenteredCard>
       <div data-testid="identity-home.root" style={{ display: "contents" }}>
+        {/* The tick's screen-reader half. One region for both copy controls,
+            because only one copy can be in flight at a time. */}
+        <p role="status" aria-live="polite" data-testid="identity-home.copy-status" style={VISUALLY_HIDDEN}>
+          {copied === "code"
+            ? t("personIdentityCode.copied")
+            : copied === "account"
+              ? t("settings.account.numberCopied")
+              : ""}
+        </p>
         <div style={BRAND_ROW_STYLE}>
           <MyneMark size={36} />
           <span style={WORDMARK_STYLE}>Myne</span>
@@ -451,6 +484,7 @@ export function IdentityHome({
                 label={t("identityHome.copyAccountNumber")}
                 bordered
                 tooltip
+                confirmed={copied === "account"}
                 testId="identity-home.copy-account-number"
                 onClick={copyAccountNumber}
               />
@@ -491,16 +525,15 @@ export function IdentityHome({
                 label={t("personIdentityCode.copy")}
                 bordered
                 tooltip
+                confirmed={copied === "code"}
                 testId="identity-home.copy-code"
                 onClick={copyIdentityCode}
               />
             </div>
-            {/* The copy reports through the toast alone (2026-10-24). The line
-                that used to appear here repeated the toast's own sentence under
-                the field, and on a screen that already carries three paragraphs
-                of explanation it was the fourth thing saying what just happened.
-                The toast is the app's one confirmation channel and it says the
-                same words. */}
+            {/* The copy reports on the BUTTON (2026-10-24): a tick and one pop,
+                announced through the live region at the top of the card. Nothing
+                is written under the field — that line repeated the toast's own
+                sentence, and the toast repeated it again in the corner. */}
             <p style={HINT_STYLE}>{t("identityHome.shareCodeHint")}</p>
           </div>
         ) : null}

@@ -105,7 +105,7 @@ describe("the Identity block, per device identity state", () => {
     expect(screen.queryByTestId("sync.panel.add-identity")).toBeNull();
   });
 
-  it("copies the identity code with outcome feedback (myne-md/myne#823)", async () => {
+  it("copies the identity code and confirms it on the chip (myne-md/myne#823)", async () => {
     // The chip's BEHAVIOUR, not just its presence: a test that only asserts the
     // testid exists passes with an empty `copyIdentityCode` body. This is the
     // third identity-code-copy surface (the other two are in
@@ -127,8 +127,16 @@ describe("the Identity block, per device identity state", () => {
     await waitFor(() =>
       expect(writeTextMock).toHaveBeenCalledWith("MYNE-PERSON-1:deadbeef"),
     );
-    expect(getToasts().at(-1)?.variant).toBe("info");
-    expect(getToasts().at(-1)?.message).toBe("Identity code copied");
+    // The report lives on the control (2026-10-24): a tick on the chip and a
+    // live region saying the same words. No success toast, and no inline line
+    // repeating it.
+    expect(getToasts()).toHaveLength(0);
+    expect(
+      screen.getByTestId("sync.panel.copy-identity").getAttribute("data-confirmed"),
+    ).toBe("true");
+    expect(screen.getByTestId("sync.panel.copy-status").textContent).toBe(
+      "Identity code copied",
+    );
   });
 
   it("reports a clipboard failure on the identity chip (myne-md/myne#823)", async () => {

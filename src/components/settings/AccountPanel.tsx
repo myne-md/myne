@@ -50,7 +50,9 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
+import { IconButton } from "../primitives/IconButton";
 import { Input } from "../primitives/Input";
+import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
 import { AnchoredPanel } from "../primitives/AnchoredPanel";
 import * as capabilities from "../../platform/capabilities";
 import { ConnectedExtensions } from "./ConnectedExtensions";
@@ -539,12 +541,30 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
     );
   };
 
+  // The number's copy confirms itself (2026-10-24): tick plus one pop on the
+  // control, announced in the live region below; the toast is kept for the
+  // FAILURE only.
+  const [numberCopied, setNumberCopied] = useState(false);
+  const numberCopyTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (numberCopyTimer.current !== null) window.clearTimeout(numberCopyTimer.current);
+    },
+    [],
+  );
   const copyAccountNumber = () => {
     if (accountNumber === null) return;
     void copyText(clipboardWriteText, accountNumber, {
       onSuccess: {
         kind: "toast",
-        run: () => toast({ message: t("settings.account.numberCopied"), variant: "info" }),
+        run: () => {
+          setNumberCopied(true);
+          if (numberCopyTimer.current !== null) window.clearTimeout(numberCopyTimer.current);
+          numberCopyTimer.current = window.setTimeout(() => {
+            setNumberCopied(false);
+            numberCopyTimer.current = null;
+          }, 1600);
+        },
       },
       onFailure: {
         kind: "toast",
@@ -808,13 +828,23 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
                       userSelect: "all",
                     }}
                   />
-                  <Button
-                    variant="secondary"
-                    data-testid="settings.account-number-copy"
+                  <IconButton
+                    icon="copy"
+                    label={t("settings.account.copyAccountNumber")}
+                    bordered
+                    tooltip
+                    confirmed={numberCopied}
+                    testId="settings.account-number-copy"
                     onClick={copyAccountNumber}
+                  />
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    data-testid="settings.account-number-copy-status"
+                    style={VISUALLY_HIDDEN}
                   >
-                    {t("settings.account.numberCopy")}
-                  </Button>
+                    {numberCopied ? t("settings.account.numberCopied") : ""}
+                  </p>
                 </div>
               ) : (
                 <p data-testid="settings.account-number-empty" style={HELPER_STYLE}>
