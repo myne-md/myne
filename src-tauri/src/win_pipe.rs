@@ -40,9 +40,12 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::Security::Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW;
 use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
-use windows_sys::Win32::Storage::FileSystem::{ReadFile, WriteFile, PIPE_ACCESS_DUPLEX};
+use windows_sys::Win32::Storage::FileSystem::{
+    CreateFileW, ReadFile, WriteFile, FILE_GENERIC_READ, FILE_GENERIC_WRITE, OPEN_EXISTING,
+    PIPE_ACCESS_DUPLEX,
+};
 use windows_sys::Win32::System::Pipes::{
-    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_READMODE_BYTE,
+    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, WaitNamedPipeW, PIPE_READMODE_BYTE,
     PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
 };
 
@@ -160,6 +163,84 @@ impl Write for PipeWriter {
     fn flush(&mut self) -> io::Result<()> {
         // WriteFile is unbuffered: nothing sits above the handle to flush.
         Ok(())
+    }
+}
+
+/// A connected pipe handle, owned.
+///
+/// The client side of the same door. Access control is the SERVER's job: a pipe
+/// client cannot restrict who else connects, and the DACL that bounds this is
+/// set by [`create_instance`] when the pipe is created.
+pub struct Client {
+    handle: HANDLE,
+}
+
+impl Client {
+    /// Connect to the pipe at `path`, waiting briefly while every instance is
+    /// busy (a door whose accept loop has not yet created the next one).
+    pub fn connect(path: &str) -> io::Result<Self> {
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut attempt = 0;
+        loop {
+            // SAFETY: `wide` is NUL-terminated and outlives the call; a null
+            // security-attributes pointer means "default", no template file.
+            let handle = unsafe {
+                CreateFileW(
+                    wide.as_ptr(),
+                    FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+                    0,
+                    std::ptr::null(),
+                    OPEN_EXISTING,
+                    0,
+                    std::ptr::null_mut(),
+                )
+            };
+            if handle != INVALID_HANDLE_VALUE {
+                return Ok(Self { handle });
+            }
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() == Some(windows_sys::Win32::Foundation::ERROR_PIPE_BUSY as i32)
+                && attempt < 4
+            {
+                attempt += 1;
+                // SAFETY: `wide` is NUL-terminated and outlives the call.
+                if unsafe { WaitNamedPipeW(wide.as_ptr(), 500) } != 0 {
+                    continue;
+                }
+            }
+            return Err(error);
+        }
+    }
+
+    /// The raw handle, for the two zero-copy views a duplex pump needs.
+    pub fn raw(&self) -> HANDLE {
+        self.handle
+    }
+}
+
+impl Read for Client {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        PipeReader(self.handle).read(buf)
+    }
+}
+
+impl Write for Client {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        PipeWriter(self.handle).write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        // SAFETY: the handle came from a successful CreateFileW and is closed
+        // exactly once, here.
+        unsafe {
+            CloseHandle(self.handle);
+        }
     }
 }
 
