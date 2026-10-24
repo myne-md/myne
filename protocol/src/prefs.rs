@@ -1338,6 +1338,25 @@ pub struct PrefsView {
     #[serde(default)]
     pub saved_views: Vec<crate::saved_view::SavedView>,
 
+    /// `saved_views` entries this build CANNOT represent, carried verbatim from
+    /// the bytes it read so a whole-blob re-write re-emits them instead of
+    /// deleting a newer client's views (§9.5.2 / §9.5.5). A newer client's
+    /// `view_type` (`"board"`, …) is the motivating case: without this carrier
+    /// the array decode fails, §9.5.5 falls the WHOLE blob back to defaults, and
+    /// this client's next write pushes that loss to every device — the theme,
+    /// keymap and favorites gone because of one view it could not render.
+    ///
+    /// **Not a preference field, and deliberately NOT on the wire.**
+    /// `#[serde(skip)]` keeps it off the IPC/serde path — the host struct is
+    /// authoritative because prefs writes are per-field setters that read the
+    /// whole view and write it back, so the carrier survives a setter without
+    /// the WebView ever holding raw bytes it cannot interpret. It has no
+    /// canonical key, no clock and no §10.2 classification: it is part of the
+    /// `saved_views` encoding, not a field beside it, which is also why the
+    /// merge carries it along with whichever side wins the whole-value LWW.
+    #[serde(skip)]
+    pub opaque_saved_views: Vec<crate::saved_view::OpaqueSavedView>,
+
     /// Saved-view display order (MYND-273) — an ordered list of view ids in the
     /// views-list / sidebar Views section order (SYNC-10). A **sequence** (order
     /// is the payload): preserved verbatim — NFC-normalized, NOT sorted, NOT
@@ -1436,6 +1455,7 @@ impl Default for PrefsView {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         }
     }
@@ -2229,11 +2249,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // screen_capture_protection ['sav' < 'scr']). A nested array of canonical
     // SavedView objects, sorted by id (MYND-273); omitted entirely when empty so
     // a vault with no views is byte-identical to a pre-MYND-273 vault.prefs.
-    if !prefs.saved_views.is_empty() {
+    // Written through the opaque-aware encoder and gated on BOTH vecs: a blob
+    // whose only views are ones this build cannot represent must still be
+    // re-emitted, or this client's next write would delete them.
+    if !prefs.saved_views.is_empty() || !prefs.opaque_saved_views.is_empty() {
         out.extend_from_slice(b"\"saved_views\":");
-        out.extend_from_slice(&crate::saved_view::canonical_encode_saved_views(
-            &prefs.saved_views,
-        ));
+        out.extend_from_slice(
+            &crate::saved_view::canonical_encode_saved_views_with_opaque(
+                &prefs.saved_views,
+                &prefs.opaque_saved_views,
+            ),
+        );
         out.push(b',');
     }
 
@@ -3104,7 +3130,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // canonical SavedView objects; parsed from the same monotonic cursor so the
     // following screen_capture_protection find is never fooled by a view name /
     // filter value that literally contains the marker text.
-    let saved_views = parse_optional_saved_views_field(rest, &mut cursor, b"\"saved_views\":")?;
+    let (saved_views, opaque_saved_views) =
+        parse_optional_saved_views_field(rest, &mut cursor, b"\"saved_views\":")?;
 
     // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
@@ -3260,34 +3287,46 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         spell_enabled,
         spell_languages,
         saved_views,
+        opaque_saved_views,
         view_order,
     })
 }
 
 /// Parse the OPTIONAL `saved_views` nested-array-of-objects field (MYND-273),
 /// searching `rest` from `*cursor` onward. On a hit, decodes the canonical
-/// `SavedView` array via [`crate::saved_view::parse_saved_views_array`] and
-/// advances `*cursor` past the closing `]`; on a miss returns an empty `Vec`
-/// and leaves `*cursor` unchanged. A malformed array (a `SavedView` that fails
-/// to decode, or a non-array value) collapses to
-/// [`PrefsBlobError::PlaintextParseFailed`] (the caller falls back to defaults
-/// per § 9.5.5). The monotonic cursor keeps the canonical key-order discipline:
-/// the following `screen_capture_protection` find never matches inside a view's
-/// content.
+/// `SavedView` array via [`crate::saved_view::parse_saved_views_array_with_opaque`]
+/// and advances `*cursor` past the closing `]`; on a miss returns two empty
+/// `Vec`s and leaves `*cursor` unchanged.
+///
+/// The second vec is the entries this build cannot represent, which are carried
+/// rather than treated as a parse failure: a newer client's `view_type` used to
+/// collapse the WHOLE blob to defaults (§9.5.5) and then be overwritten by this
+/// client's next write. Structural damage is still fatal and still collapses to
+/// [`PrefsBlobError::PlaintextParseFailed`] (a non-array value, a malformed
+/// `SavedView`, damaged JSON). The monotonic cursor keeps the canonical
+/// key-order discipline: the following `screen_capture_protection` find never
+/// matches inside a view's content.
 fn parse_optional_saved_views_field(
     rest: &[u8],
     cursor: &mut usize,
     marker: &[u8],
-) -> Result<Vec<crate::saved_view::SavedView>, PrefsBlobError> {
+) -> Result<
+    (
+        Vec<crate::saved_view::SavedView>,
+        Vec<crate::saved_view::OpaqueSavedView>,
+    ),
+    PrefsBlobError,
+> {
     match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
-            let (views, consumed) = crate::saved_view::parse_saved_views_array(&rest[val_start..])
-                .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            let (views, opaque, consumed) =
+                crate::saved_view::parse_saved_views_array_with_opaque(&rest[val_start..])
+                    .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
             *cursor = val_start + consumed;
-            Ok(views)
+            Ok((views, opaque))
         }
-        None => Ok(Vec::new()),
+        None => Ok((Vec::new(), Vec::new())),
     }
 }
 
@@ -4373,6 +4412,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4458,6 +4498,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4938,6 +4979,7 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
                 view_order: Vec::new(),
             }
         );
@@ -5025,6 +5067,7 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
                 view_order: Vec::new(),
             }
         );
@@ -6928,6 +6971,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7535,6 +7579,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7627,6 +7672,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7717,6 +7763,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7806,6 +7853,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7958,6 +8006,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let blob =
@@ -8078,6 +8127,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8177,6 +8227,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8350,6 +8401,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let blob =
@@ -8457,6 +8509,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8804,6 +8857,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8893,6 +8947,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8984,6 +9039,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -9143,6 +9199,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let blob =
@@ -9279,6 +9336,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -9605,6 +9663,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let blob =
@@ -9698,6 +9757,7 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
@@ -10053,6 +10113,7 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
                 view_order: Vec::new(),
             },
             &nonce_default,
@@ -10139,6 +10200,7 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
                 view_order: Vec::new(),
             },
             &nonce_toggled,
@@ -10319,6 +10381,7 @@ mod tests {
                 "0190a000-0000-7000-8000-000000000006",
             )),
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
             view_order: Vec::new(),
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
@@ -11484,6 +11547,7 @@ mod tests {
         };
         let prefs = PrefsView {
             saved_views: alloc::vec![view],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000005")],
             ..PrefsView::default()
         };
@@ -13546,6 +13610,7 @@ mod tests {
         let hash = fixed_account_number_hash();
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("v2", "Books"), sample_view("v1", "Films")],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("v2"), String::from("v1")],
             ..PrefsView::default()
         };
@@ -13589,6 +13654,7 @@ mod tests {
         // order; the display order lives in view_order.
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("zzz", "Z"), sample_view("aaa", "A")],
+            opaque_saved_views: Vec::new(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
@@ -13603,6 +13669,7 @@ mod tests {
         // saved_views sorts before screen_capture_protection; view_order is last.
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("v1", "A")],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("v1")],
             ..PrefsView::default()
         };
@@ -13614,15 +13681,83 @@ mod tests {
         assert!(scp < vo, "view_order last");
     }
 
+    /// A canonical prefs plaintext carrying one view this build represents and
+    /// one it does not (`view_type: "board"`), plus a field beside them so the
+    /// "did the whole blob fall back?" question is observable.
+    fn prefs_plaintext_with_an_unsupported_view() -> &'static [u8] {
+        br#"{"label":"Work","saved_views":[{"filters":{"kind":"all"},"id":"a","name":"Cards","view_type":"cards"},{"filters":{"kind":"all"},"id":"b","name":"Board","view_type":"board"}],"screen_capture_protection":true}"#
+    }
+
     #[test]
-    fn malformed_saved_view_collapses_to_parse_failed() {
-        // A structurally-bad saved view (a `map` viewType) makes the whole prefs
-        // plaintext fail to parse — the caller falls back to defaults (§9.5.5).
-        let bad = br#"{"saved_views":[{"filters":{"kind":"all"},"id":"x","name":"n","view_type":"map"}],"screen_capture_protection":true}"#;
+    fn unsupported_view_type_no_longer_collapses_the_blob_to_defaults() {
+        // §9.5.5: an entry this build cannot REPRESENT is carried verbatim
+        // rather than failing the whole prefs plaintext. Before this, one
+        // `view_type: "board"` reset every preference in the blob (the label
+        // included), and because a prefs write is a whole-blob rewrite, this
+        // client would then push those defaults to every device.
+        let input = prefs_plaintext_with_an_unsupported_view();
+        let decoded = canonical_json_decode(input).expect("whole-blob parse must succeed");
+        assert_eq!(decoded.label.as_deref(), Some("Work"));
+        assert_eq!(decoded.saved_views.len(), 1);
+        assert_eq!(decoded.saved_views[0].id, "a");
+        assert_eq!(decoded.opaque_saved_views.len(), 1);
+        assert_eq!(decoded.opaque_saved_views[0].id_bytes(), b"b");
+        // ...and the re-encode reproduces the input bytes exactly, so the
+        // carried entry is neither lost nor rewritten.
+        assert_eq!(canonical_json_encode(&decoded), input);
+    }
+
+    #[test]
+    fn opaque_saved_views_survive_the_full_blob_round_trip() {
+        // The carry has to survive the actual `MYP1` envelope, not just the
+        // plaintext codec: the host reads a blob, sets an unrelated preference,
+        // and writes the whole view back.
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let carried =
+            canonical_json_decode(prefs_plaintext_with_an_unsupported_view()).expect("decode");
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &hash, &carried, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, carried);
         assert_eq!(
-            canonical_json_decode(bad),
+            canonical_json_encode(&decoded),
+            prefs_plaintext_with_an_unsupported_view()
+        );
+    }
+
+    #[test]
+    fn structurally_broken_saved_views_still_collapse_to_parse_failed() {
+        // Only an Unrepresentable entry is carried. Structural damage stays
+        // fatal: retaining garbage is a weaker promise than retaining a
+        // well-formed entry this schema happens not to express.
+        let wrong_type = br#"{"saved_views":[{"filters":{"kind":"all"},"id":7,"name":"n","view_type":"table"}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(wrong_type),
             Err(PrefsBlobError::PlaintextParseFailed)
         );
+        let missing_required = br#"{"saved_views":[{"id":"x"}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(missing_required),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        );
+    }
+
+    #[test]
+    fn pre_feature_saved_views_blob_is_byte_identical_after_round_trip() {
+        // No opaque entry → nothing about the encoding may move for existing
+        // vaults (the `saved_views` golden vectors are unmoved by this change).
+        let original = PrefsView {
+            label: Some(String::from("Work")),
+            saved_views: alloc::vec![sample_view("v2", "Books"), sample_view("v1", "Films")],
+            opaque_saved_views: Vec::new(),
+            view_order: alloc::vec![String::from("v2"), String::from("v1")],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert!(decoded.opaque_saved_views.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), encoded);
     }
 
     // ---- paired_extensions (MYND-443, browser-clipper pairing-token persistence) ----
@@ -13680,6 +13815,7 @@ mod tests {
             meeting_ai_prompt: None,
             paired_extensions: alloc::vec![sample_paired("e", "t", false)],
             saved_views: alloc::vec![sample_view("v1", "A")],
+            opaque_saved_views: Vec::new(),
             ..PrefsView::default()
         };
         let s = String::from_utf8(canonical_json_encode(&original)).unwrap();

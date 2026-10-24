@@ -300,8 +300,9 @@ pub use prefs::{
 };
 pub use saved_view::{
     canonical_decode_saved_view, canonical_encode_saved_view, canonical_encode_saved_views,
-    parse_saved_views_array, FilterNode, PropertyOp, SavedView, SavedViewParseError, SortDirection,
-    ViewSort, ViewType,
+    canonical_encode_saved_views_with_opaque, parse_saved_views_array,
+    parse_saved_views_array_with_opaque, FilterNode, OpaqueSavedView, PropertyOp, SavedView,
+    SavedViewParseError, SortDirection, ViewSort, ViewType,
 };
 pub use scram::{
     scram_client_final_message, scram_client_proof, ScramClientOutput, SCRAM_CBIND_NAME,
