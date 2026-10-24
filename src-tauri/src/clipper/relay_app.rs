@@ -768,6 +768,14 @@ pub fn spawn_relay_listener<R: Runtime>(app: AppHandle<R>) {
             return;
         }
     };
+    // Windows takes the named-pipe arm and returns: the Unix body below binds a
+    // `UnixListener` and cannot compile there.
+    #[cfg(windows)]
+    {
+        spawn_relay_listener_windows(app, app_data_dir);
+        return;
+    }
+
     // Ensure the app-data dir exists (the socket lives directly in it).
     let _ = std::fs::create_dir_all(&app_data_dir);
     let socket = super::relay::socket_path(&app_data_dir);
@@ -1057,5 +1065,78 @@ mod tests {
         assert_eq!(rx.recv().unwrap(), PairResult::Accepted("t".into()));
         // A second take of the same id is gone (delivery removes it).
         assert!(reg.take("pair-7").is_none(), "take removes the entry");
+    }
+}
+
+/// The Windows relay: the same `serve_connection` over a named pipe.
+///
+/// Placed here rather than in its own module because every one of the six
+/// dependencies below is a private wrapper defined in this file
+/// ([`AppVaultStatus`], [`ClipDispatch`], [`PairingDispatch`]); a sibling module
+/// would need them all re-exported, which is a wider door than the one this
+/// closes.
+///
+/// The pipe name reuses [`crate::cli_bridge::socket::windows_pipe_name`] with the
+/// clipper's prefix instead of the CLI's. One hash function, two names: the two
+/// sides of this door are the same binary family and there is no cross-crate
+/// contract to freeze, unlike the CLI's.
+///
+/// ── The one behaviour that differs from the Unix arm, stated ──────────────
+///
+/// Unix sets a per-READ idle timeout, so a connection that keeps sending stays
+/// open indefinitely. A pipe has no per-read timeout, and [`crate::win_pipe`]'s
+/// watchdog arms once for the whole exchange, so the bound here is the
+/// connection's LIFETIME. That is stricter than Unix and harmless in practice:
+/// a browser's native-messaging host is a fresh process per dispatch, so a
+/// connection carries one clip and closes. A connection that somehow stayed open
+/// would be closed at the deadline rather than served forever, which is the
+/// direction this bound should fail in.
+#[cfg(windows)]
+fn spawn_relay_listener_windows<R: Runtime>(app: AppHandle<R>, app_data_dir: std::path::PathBuf) {
+    let name = crate::cli_bridge::socket::windows_pipe_name(&app_data_dir)
+        .replacen("myne-cli-", "myne-clipper-", 1)
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<u16>>();
+    // ONE process-global rate limiter, created outside the connection closure
+    // for the reason the Unix arm states: native messaging reconnects per
+    // dispatch, so a per-connection limiter would hand every reconnect a fresh
+    // full budget and defeat the A14 flood bound.
+    let rate_limiter = std::sync::Arc::new(super::rate_limit::SharedRateLimiter::default());
+    let server =
+        crate::win_pipe::Server::start(name, CONNECTION_READ_IDLE, move |reader, writer| {
+            // A fresh registry snapshot per connection, so a just-minted or
+            // just-revoked token is honoured immediately.
+            let registry =
+                match app.try_state::<crate::plugins::clipper_pairing::state::PairingState>() {
+                    Some(s) => s.registry_snapshot(),
+                    None => super::token::TokenRegistry::new(), // empty ⇒ silent
+                };
+            let status = AppVaultStatus::new(app.clone());
+            let assembler = ClipDispatch::new(app.clone());
+            let pairing = PairingDispatch::new(app.clone());
+            if let Err(e) = super::relay::serve_connection(
+                reader,
+                writer,
+                &registry,
+                &status,
+                &rate_limiter,
+                &assembler,
+                &pairing,
+            ) {
+                let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+                tracing::debug!(stage = "clip_relay_conn", io_failure_kind = ?kind);
+            }
+        });
+    match server {
+        Ok(_s) => tracing::debug!(stage = "clip_relay_listen", event = "listening"),
+        Err(e) => {
+            let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+            tracing::error!(
+                stage = "clip_relay_bind",
+                io_failure_kind = ?kind,
+                "clipper relay listener could not bind; relay unavailable"
+            );
+        }
     }
 }
