@@ -56,6 +56,7 @@ pub mod protocol;
 pub mod serve;
 pub mod server;
 pub mod status;
+pub mod tool_list;
 pub mod tools;
 pub mod transport;
 
