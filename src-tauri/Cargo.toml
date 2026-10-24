@@ -7,6 +7,14 @@ license = "AGPL-3.0"
 repository = "https://github.com/myne-md/myne"
 publish = false
 
+# The browser clipper's native-messaging host, as its own executable: a browser
+# launches a manifest's `path` with no arguments and host mode needs one, and a
+# `.cmd` wrapper would re-expand `%` in an install path (myne#381 on Unix).
+# Staged as an `externalBin` so it lands beside the app binary.
+[[bin]]
+name = "myne-clipper-host"
+path = "src/bin/clipper_host.rs"
+
 [lib]
 # `_lib` suffix is required so the lib name is unique and does not conflict
 # with the bin name on Windows. See rust-lang/cargo#8519.
@@ -323,6 +331,7 @@ windows-sys = { version = "0.60", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Security_Authorization",
+    "Win32_System_Registry",
     "Win32_System_IO",
     "Win32_System_Memory",
     "Win32_System_Pipes",
