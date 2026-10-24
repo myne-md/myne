@@ -382,6 +382,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-branding-parity.mjs` | the app token sheet is the source for its THREE companion projections (audit Aşama 6… | `pre-commit` (local only) |
 | `check-referenced-digests.mjs` | the one guard here that needs the NETWORK, and that is why it is pre-commit and not CI (a… | `pre-commit` (local only) |
 | `check-cli-sidecar.mjs` | the `myne` CLI's duplicated-by-design contract with the desktop: bundle identifier +… | `pre-commit` + CI `pnpm-build` |
+| `check-mcp-tool-surface.mjs` | the compiled MCP tool list stays a constant expression over string literals and names no capability outside the vault (no fetch, HTTP, URL, mail, shell, clipboard, attachment); it reads `mcp/src/tool_list.rs` rather than prose | `pre-commit` + CI `pnpm-build` |
 | `check-clipper-identifiers.mjs` | the browser clipper's three load-bearing identifiers, across four files and two… | `pre-commit` |
 | `check-npm-license-mirror.mjs` | the npm allowlist in `check-npm-licenses.mjs` claims, in a comment, to mirror… | `pre-commit` |
 | `check-adversary-coverage.mjs` | the internal-service epic's anti-rot binding (myne-md/myne#553), in THIS repo so it cannot go… | `pre-commit` + CI `pnpm-build` |
