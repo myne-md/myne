@@ -80,6 +80,10 @@ const FLAG_FILE_NAME: &str = "clipper-install.json";
 /// passes" the flag).
 const WRAPPER_FILE_NAME: &str = "clipper-native-host";
 
+/// The dedicated host binary's file name, beside the app binary on Windows.
+#[cfg(windows)]
+const CLIPPER_HOST_BIN: &str = "myne-clipper-host.exe";
+
 /// The manifest file name the browser reads, keyed by the host name
 /// (`md.myne.clipper.json`).
 fn manifest_file_name() -> String {
@@ -111,6 +115,10 @@ struct BrowserTarget {
     browser: Browser,
     base_dir: PathBuf,
     manifest_dir: PathBuf,
+    /// The registry key this browser reads the host from, on Windows. `None` on
+    /// the platforms where the manifest FILE in `manifest_dir` is the
+    /// registration itself.
+    registry_key: Option<String>,
 }
 
 impl BrowserTarget {
@@ -136,7 +144,8 @@ impl BrowserTarget {
 /// (`$HOME`, `$XDG_CONFIG_HOME`) — no `dirs` crate (the `host_mode_app_data_dir`
 /// idiom). Windows returns empty for now (registry fast-follow).
 #[cfg(target_os = "macos")]
-fn resolve_targets() -> Vec<BrowserTarget> {
+fn resolve_targets(app_data_dir: &Path) -> Vec<BrowserTarget> {
+    let _ = app_data_dir;
     match std::env::var_os("HOME") {
         Some(home) => macos_targets(Path::new(&home)),
         None => Vec::new(),
@@ -152,6 +161,7 @@ fn macos_targets(home: &Path) -> Vec<BrowserTarget> {
         browser,
         manifest_dir: base.join("NativeMessagingHosts"),
         base_dir: base,
+        registry_key: None,
     };
     vec![
         target(Browser::Firefox, app_support.join("Mozilla")),
@@ -161,7 +171,8 @@ fn macos_targets(home: &Path) -> Vec<BrowserTarget> {
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-fn resolve_targets() -> Vec<BrowserTarget> {
+fn resolve_targets(app_data_dir: &Path) -> Vec<BrowserTarget> {
+    let _ = app_data_dir;
     let home = match std::env::var_os("HOME") {
         Some(h) => PathBuf::from(h),
         None => return Vec::new(),
@@ -184,17 +195,22 @@ fn linux_targets(home: &Path, config: &Path) -> Vec<BrowserTarget> {
         BrowserTarget {
             browser: Browser::Firefox,
             manifest_dir: mozilla.join("native-messaging-hosts"),
+            registry_key: None,
             base_dir: mozilla,
         },
         BrowserTarget {
             browser: Browser::Chrome,
             manifest_dir: chrome.join("NativeMessagingHosts"),
+            registry_key: None,
             base_dir: chrome,
+            registry_key: None,
         },
         BrowserTarget {
             browser: Browser::Edge,
             manifest_dir: edge.join("NativeMessagingHosts"),
+            registry_key: None,
             base_dir: edge,
+            registry_key: None,
         },
     ]
 }
@@ -202,7 +218,7 @@ fn linux_targets(home: &Path, config: &Path) -> Vec<BrowserTarget> {
 /// Windows: registry-based registration is a documented fast-follow; no file
 /// targets yet (the app still starts — reconcile is a logged no-op).
 #[cfg(windows)]
-fn resolve_targets() -> Vec<BrowserTarget> {
+fn resolve_targets(app_data_dir: &Path) -> Vec<BrowserTarget> {
     Vec::new()
 }
 
@@ -250,8 +266,15 @@ fn write_wrapper(app_data_dir: &Path, real_binary: &str) -> std::io::Result<Path
 
 /// Windows registration is a fast-follow; no wrapper is produced there yet.
 #[cfg(windows)]
-fn write_wrapper(_app_data_dir: &Path, real_binary: &str) -> std::io::Result<PathBuf> {
-    Ok(PathBuf::from(real_binary))
+fn write_wrapper(_app_data_dir: &Path, _real_binary: &str) -> std::io::Result<PathBuf> {
+    // The manifest names `myne-clipper-host.exe`, which sits beside the app
+    // binary: it runs host mode unconditionally because a browser passes no
+    // arguments, and it exists rather than a `.cmd` because cmd.exe re-expands
+    // `%` and an install path may contain one (the hazard myne#381 paid for on
+    // Unix). The real binary would need the flag this manifest cannot supply.
+    let exe = std::env::current_exe()?;
+    let dir = exe.parent().map(Path::to_path_buf).unwrap_or_default();
+    Ok(dir.join(CLIPPER_HOST_BIN))
 }
 
 /// Install (write) the manifest for one browser, ONLY if the browser's base
@@ -279,6 +302,24 @@ fn install_one(target: &BrowserTarget, host_path: &str) {
     {
         return;
     }
+    // The registry value is what the browser actually reads on Windows, and it
+    // points at the file written just below. Written AFTER the file exists: a
+    // key naming a path that is not there reads as "host not found".
+    let register = |path: &std::path::Path| {
+        #[cfg(windows)]
+        if let (Some(key), Some(p)) = (&target.registry_key, path.to_str()) {
+            if let Err(e) = super::registry::set(key, p) {
+                let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+                tracing::error!(
+                    stage = "clipper_install_registry",
+                    browser = target.browser.label(),
+                    io_failure_kind = ?kind
+                );
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = path;
+    };
     if let Err(e) = std::fs::create_dir_all(&target.manifest_dir) {
         let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
         tracing::error!(
@@ -300,6 +341,7 @@ fn install_one(target: &BrowserTarget, host_path: &str) {
         );
         return;
     }
+    register(&path);
     tracing::debug!(
         stage = "clipper_install_write",
         browser = target.browser.label(),
@@ -310,6 +352,19 @@ fn install_one(target: &BrowserTarget, host_path: &str) {
 /// Remove a previously-written manifest for one browser (opt-out / disable).
 /// A missing file is success; other errors are logged bounded, never fatal.
 fn uninstall_one(target: &BrowserTarget) {
+    // Windows first: the registry value is what the browser reads, so a key left
+    // pointing at a file we are about to remove is a registration to nothing.
+    #[cfg(windows)]
+    if let Some(key) = &target.registry_key {
+        if let Err(e) = super::registry::remove(key) {
+            let kind = crate::io_failure_kind::from_io_error_kind(e.kind());
+            tracing::debug!(
+                stage = "clipper_install_registry_remove",
+                browser = target.browser.label(),
+                io_failure_kind = ?kind
+            );
+        }
+    }
     let path = target.manifest_path();
     match std::fs::remove_file(&path) {
         Ok(()) => tracing::debug!(
@@ -348,9 +403,9 @@ fn reconcile_targets(targets: &[BrowserTarget], enabled: bool, host_path: Option
 /// per-browser manifests to `enabled`. The manifest `path` points at the wrapper
 /// (`<app_data_dir>/clipper-native-host`), NOT the raw binary.
 fn reconcile(app_data_dir: &Path, enabled: bool) {
-    let targets = resolve_targets();
+    let targets = resolve_targets(app_data_dir);
     if targets.is_empty() {
-        return; // Windows today, or a home-less environment — nothing to do.
+        return; // a home-less environment — nothing to do.
     }
     if !enabled {
         reconcile_targets(&targets, false, None); // removal needs no path
@@ -423,7 +478,7 @@ pub struct InstallStatus {
 
 /// Compute the current install status (does not mutate anything).
 pub fn status(app_data_dir: &Path) -> InstallStatus {
-    let installed_browsers = resolve_targets()
+    let installed_browsers = resolve_targets(app_data_dir)
         .into_iter()
         .filter(|t| t.manifest_path().exists())
         .map(|t| t.browser.label().to_string())
@@ -462,6 +517,7 @@ mod tests {
         BrowserTarget {
             browser: Browser::Firefox,
             manifest_dir: base.join("NativeMessagingHosts"),
+            registry_key: None,
             base_dir: base,
         }
     }
@@ -471,6 +527,7 @@ mod tests {
         BrowserTarget {
             browser: Browser::Chrome,
             manifest_dir: base.join("NativeMessagingHosts"),
+            registry_key: None,
             base_dir: base,
         }
     }
