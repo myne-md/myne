@@ -78,6 +78,13 @@ type Step =
    * identity could never become invitable at all.
    */
   | "register"
+  /**
+   * The register act's SECOND half (2026-10-24, desktop parity). The server is a
+   * decision and the phrase is a secret, and asking for both on one screen made
+   * the user read two unrelated things before understanding either — the desktop
+   * dialog split for the same reason. `register` is the server step.
+   */
+  | "register-phrase"
   | "accept-owner"
   | "accept-phrase"
   | "accept-password"
@@ -406,6 +413,29 @@ export function IdentityFlow({
   const [accountState, setAccountState] = useState<PersonAccountState | null>(null);
   /** The registration step's phrase cells, wiped when the step is left. */
   const [registerWords, setRegisterWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+  /**
+   * The server this identity will be registered ON, and the admission code a
+   * gated server asks for (2026-10-24, the desktop fix mirrored).
+   *
+   * The step asks for the address BEFORE the phrase, because registration is a
+   * write against a NAMED server: which server is a decision with a place, and
+   * the old order collected 24 words first and then, on `NotConfigured`, told the
+   * user to go and set a server in Settings — a screen with no door at zero
+   * vaults, which is exactly where this step lives. The invite code rides in the
+   * same row for the same reason: a self-hoster who gates registration with
+   * `MYNE_INVITE_CODE` had no way to enter one here at all.
+   */
+  const [registerServerUrl, setRegisterServerUrl] = useState("");
+  const [registerInviteCode, setRegisterInviteCode] = useState("");
+  /** What the device's config said when the step opened, so an unchanged address
+   *  costs no second write (each one re-verifies TLS against the server). */
+  const [registerConfigured, setRegisterConfigured] = useState<{
+    url: string;
+    code: string;
+  } | null>(null);
+  /** Whether the server step has read the device's config already: it reads once,
+   *  so Back from the phrase step cannot overwrite what the user just typed. */
+  const registerEndpointLoaded = useRef(false);
   /** The person join's phrase cells, and whether the claim still needs them. */
   const [personWords, setPersonWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
   const [personBusy, setPersonBusy] = useState(false);
@@ -598,6 +628,34 @@ export function IdentityFlow({
     };
   }, [step]);
 
+  // The register step's server row, read when the step opens (2026-10-24): the
+  // address this identity would be registered against today, prefilled so the
+  // screen shows the truth instead of an empty box the user has to guess at. A
+  // failed read is not fatal: both fields stay empty and the address is required
+  // before submit, which is the honest fallback rather than a hidden field.
+  useEffect(() => {
+    // Loaded ONCE: going Back to the server step must not re-read the device's
+    // config over what the user has just typed.
+    if (step !== "register" || registerEndpointLoaded.current || !HAS_TAURI) return;
+    registerEndpointLoaded.current = true;
+    let cancelled = false;
+    void syncGetEndpoint()
+      .then((cfg) => {
+        if (cancelled) return;
+        const url = cfg.endpoint_url ?? "";
+        const code = cfg.invite_code ?? "";
+        setRegisterServerUrl(url);
+        setRegisterInviteCode(code);
+        setRegisterConfigured({ url, code });
+      })
+      .catch(() => {
+        /* unknown; the address field is the answer either way */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
   // Forget a held identity this device cannot open with a fresh phrase, so a
   // create can proceed (myne-md/myne#780).
   const forgetHeld = useCallback(async () => {
@@ -636,15 +694,17 @@ export function IdentityFlow({
 
   /**
    * Register this identity with the server, using the phrase as proof of
-   * possession (myne-md/myne#911 task 12).
+   * possession (myne-md/myne#911 task 12; server row first since 2026-10-24).
    *
-   * A failure leaves the identity exactly where it was (`reserved`, sealed, and
-   * usable), which is what makes registration safe to attempt: nothing about the
-   * local identity depends on the server answering.
+   * The address is settled and WRITTEN before any secret crosses IPC, so a
+   * mistyped address costs a URL rather than a phrase, and its failure is its own
+   * arm that keeps the words. A failure leaves the identity exactly where it was
+   * (`reserved`, sealed, and usable), which is what makes registration safe to
+   * attempt: nothing about the local identity depends on the server answering.
    */
   const registerIdentity = useCallback(async () => {
-    if (!registerWords.every((word) => word.length > 0)) return;
     const phrase = registerWords.join(" ");
+    if (!registerWords.every((word) => word.length > 0)) return;
     setBusy(true);
     setError(null);
     try {
@@ -658,15 +718,57 @@ export function IdentityFlow({
       setStep("home");
     } catch (e) {
       const kind = (e as { kind?: string } | null)?.kind;
-      setError(
-        kind === "NotConfigured"
-          ? t("identityFlow.register.needsServer")
-          : t("identityFlow.register.failed"),
-      );
+      // `NotConfigured` names a MISSING SERVER, so the fix is on the step before
+      // this one and the dialog goes back there with the words kept: they were
+      // never the problem. Everything else is a refusal of the phrase, which does
+      // not survive it (the user retypes it, and nothing mounted keeps holding a
+      // credential that was just rejected).
+      if (kind === "NotConfigured") {
+        setError(t("identityHome.registerServerError"));
+        setStep("register");
+        return;
+      }
+      setRegisterWords(Array(PHRASE_WORDS).fill(""));
+      setError(t("identityFlow.register.failed"));
     } finally {
       setBusy(false);
     }
   }, [registerWords, t]);
+
+  /**
+   * The register act's FIRST half: settle the server, then move on (2026-10-24).
+   *
+   * The address is written HERE rather than on the final press, so a mistyped URL
+   * costs a URL and is refused before any secret is typed. Its failure keeps the
+   * user on this step, which is where the fix is.
+   */
+  const continueRegisterServer = useCallback(async () => {
+    const url = registerServerUrl.trim();
+    const code = registerInviteCode.trim();
+    if (url === "") return;
+    setError(null);
+    const changed =
+      registerConfigured === null ||
+      registerConfigured.url !== url ||
+      registerConfigured.code !== code;
+    if (!changed) {
+      setStep("register-phrase");
+      return;
+    }
+    setBusy(true);
+    try {
+      // `undefined` (not `""`) when the field is empty, because the backend reads
+      // `null` as "preserve the stored code" and `""` as an explicit CLEAR; this
+      // step must never erase the only copy of a server's admission word.
+      await syncSetEndpoint(url, code === "" ? undefined : code);
+      setRegisterConfigured({ url, code });
+      setStep("register-phrase");
+    } catch {
+      setError(t("identityHome.registerServerError"));
+    } finally {
+      setBusy(false);
+    }
+  }, [registerServerUrl, registerInviteCode, registerConfigured, t]);
 
   const finishPhrase = useCallback(() => {
     setResult(null);
@@ -1258,25 +1360,100 @@ export function IdentityFlow({
   );
 
   /**
-   * The explicit registration (myne-md/myne#911 task 12).
+   * The explicit registration (myne-md/myne#911 task 12), in TWO steps since
+   * 2026-10-24.
    *
-   * The phrase is the proof of possession, so it is asked for here rather than
-   * being read out of the session: a device that can register itself from a
-   * session it already holds is a device that can register from a stolen unlock.
-   * The backend derives the SCRAM secret from it and stores nothing.
+   * The server is a decision and the phrase is a secret, so they do not share a
+   * view: asking on one screen made the user read two unrelated things before
+   * understanding either, and it is the same split the desktop dialog took. The
+   * old shape went further wrong than a long screen: it collected 24 words, failed
+   * `NotConfigured`, and told the user to set a server "in Settings" — a screen
+   * with no door before the first vault exists.
    */
-  const renderRegister = () => (
+  const renderRegisterServer = () => (
     <Screen>
       <FlowHeader label={t("identityFlow.register.title")} onBack={() => setStep("home")} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.register.title")}</Title>
-        <Lead>{t("identityFlow.register.lead")}</Lead>
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <FieldLabel>{t("identityHome.registerServerLabel")}</FieldLabel>
+          <TextField
+            value={registerServerUrl}
+            onChange={(value) => {
+              setError(null);
+              setRegisterServerUrl(value);
+            }}
+            testId="identity-flow.register-server"
+            label={t("identityHome.registerServerLabel")}
+            disabled={busy}
+          />
+          <div data-testid="identity-flow.register-server-hint" style={HINT_STYLE}>
+            {t("identityHome.registerServerHint")}
+          </div>
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <FieldLabel>{t("identityHome.registerInviteCodeLabel")}</FieldLabel>
+            <TextField
+              value={registerInviteCode}
+              onChange={(value) => {
+                setError(null);
+                setRegisterInviteCode(value);
+              }}
+              testId="identity-flow.register-invite-code"
+              label={t("identityHome.registerInviteCodeLabel")}
+              disabled={busy}
+            />
+            <div style={HINT_STYLE}>{t("identityHome.registerInviteCodeHint")}</div>
+          </div>
+        </div>
+        {error ? (
+          <Banner kind="warning" style={{ marginTop: "var(--space-4)" }}>
+            {error}
+          </Banner>
+        ) : null}
+      </ScreenScroll>
+      <FooterBar>
+        <Button
+          variant="secondary"
+          full={false}
+          onClick={() => {
+            // Leaving the flow drops whatever phrase a previous attempt left in
+            // the grid: it is the account's only credential, and every other grid
+            // on this screen drops its own on the way out for the same reason.
+            setRegisterWords(Array(PHRASE_WORDS).fill(""));
+            setError(null);
+            setStep("home");
+          }}
+        >
+          {t("identityFlow.back")}
+        </Button>
+        <Button
+          onClick={() => void continueRegisterServer()}
+          disabled={busy || registerServerUrl.trim() === ""}
+          data-testid="identity-flow.register-continue"
+        >
+          {t("identityHome.registerContinue")}
+        </Button>
+      </FooterBar>
+      {busy && <BlockingOverlay title={t("identityFlow.register.working")} />}
+    </Screen>
+  );
+
+  const renderRegisterPhrase = () => (
+    <Screen>
+      <FlowHeader
+        label={t("identityFlow.register.title")}
+        onBack={() => {
+          setError(null);
+          setStep("register");
+        }}
+      />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.register.title")}</Title>
         <div style={{ marginTop: "var(--space-4)" }}>
           <FieldLabel id={registerPhraseLabelId}>
-            {t("identityFlow.register.phraseLabel")}
+            {t("identityHome.registerPhraseLabel")}
           </FieldLabel>
         </div>
-        <div style={HINT_STYLE}>{t("identityFlow.register.phraseHint")}</div>
         <PhraseEntryGrid
             cells={registerWords}
             onCells={(next) => {
@@ -1302,12 +1479,10 @@ export function IdentityFlow({
           variant="secondary"
           full={false}
           onClick={() => {
-            // The 24 words go with the step. Every other phrase grid on this
-            // screen drops its own on the way out "so a second accept can never
-            // inherit the first invite's ... phrase", and this one is the
-            // account's only credential (myne-md/myne#911 review).
-            setRegisterWords(Array(PHRASE_WORDS).fill(""));
-            setStep("home");
+            // Back to the server step keeps the words: the address is what the
+            // user came back to change.
+            setError(null);
+            setStep("register");
           }}
         >
           {t("identityFlow.back")}
@@ -2300,7 +2475,8 @@ export function IdentityFlow({
       {step === "typeback" && renderTypeback()}
       {step === "recover" && renderRecover()}
       {step === "home" && renderHome()}
-      {step === "register" && renderRegister()}
+      {step === "register" && renderRegisterServer()}
+      {step === "register-phrase" && renderRegisterPhrase()}
       {step === "person-phrase" && renderPersonPhrase()}
       {step === "person-pending" && renderPersonPending()}
       {step === "person-finishing" && renderPersonFinishing()}

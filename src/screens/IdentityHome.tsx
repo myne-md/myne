@@ -42,7 +42,7 @@ import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { AcceptInviteWizard, JoinVaultWizard } from "../components/sync/InviteWizard";
 import { MemberNameGate } from "../components/sync/MemberNameGate";
-import { PersonRegisterForm } from "../components/sync/PersonRegisterForm";
+import { PersonRegisterDialog } from "../components/sync/PersonRegisterDialog";
 
 /** How often the pending-invite list re-polls while the identity home is
  *  mounted and visible. The relay has no push channel for a person account, so
@@ -274,9 +274,13 @@ export function IdentityHome({
   // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
-  // Registration (myne-md/myne#911). The host owns one boolean; the form owns
-  // the phrase, the address and the beta-terms gate, so two surfaces cannot
-  // drift about any of the three (2026-10-23 review).
+  // Registration (myne-md/myne#911). The host owns one boolean; the dialog owns
+  // the phrase, the address, the admission code and the beta-terms gate, so two
+  // surfaces cannot drift about any of them (2026-10-23 review). It is a DIALOG
+  // rather than a block that expands here (2026-10-24 owner report): the card
+  // already carries the account number, the code and the invitation list, and the
+  // 24-cell grid added to that same scroll region is what pushed it past the
+  // window. A dialog says what it asks for, names the server, and offers Cancel.
   const [registerOpen, setRegisterOpen] = useState(false);
   // Forget-this-identity-on-this-device (myne-md/myne#782). Only whether the
   // confirmation is UP lives here: the acknowledgement, the in-flight state and
@@ -562,12 +566,7 @@ export function IdentityHome({
                     : "identityHome.invitesUnregistered",
                 )}
               </p>
-              {accountState === "pending" ? null : registerOpen ? (
-                <PersonRegisterForm
-                  testIdPrefix="identity-home.register"
-                  onRegistered={onRegistered}
-                />
-              ) : (
+              {accountState === "pending" ? null : (
                 <Button
                   onClick={() => setRegisterOpen(true)}
                   data-testid="identity-home.register-cta"
@@ -662,6 +661,28 @@ export function IdentityHome({
             {t("identityHome.forgetCta")}
           </Button>
         </div>
+
+        {/* PORTALLED out of the card for the same reason the forget dialog
+            below is: `CenteredCard` masks its scroll region with `mask-image`
+            once the content outgrows the window, and a mask clips its whole
+            rendered subtree, a fixed-position backdrop included. */}
+        {registerOpen
+          ? createPortal(
+              <PersonRegisterDialog
+                open
+                testIdPrefix="identity-home.register"
+                onRegistered={() => {
+                  // Closed before the reprobe: the probe re-renders this screen
+                  // with the identity now `enrolled`, and a dialog left open over
+                  // it would be asking for a phrase that has already been used.
+                  setRegisterOpen(false);
+                  onRegistered();
+                }}
+                onClose={() => setRegisterOpen(false)}
+              />,
+              document.body,
+            )
+          : null}
 
         {/* PORTALLED out of the card, not merely rendered at the end of it.
             `CenteredCard` masks its scroll region with `mask-image` once the

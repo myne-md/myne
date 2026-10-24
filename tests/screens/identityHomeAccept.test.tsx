@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personListInvites = vi.hoisted(() => vi.fn());
 const personRegister = vi.hoisted(() => vi.fn());
-const readSyncEndpoint = vi.hoisted(() => vi.fn());
+const readSyncConfig = vi.hoisted(() => vi.fn());
 const writeSyncEndpoint = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
@@ -35,7 +35,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personAcceptInvite,
   personRegister,
-  readSyncEndpoint,
+  readSyncConfig,
   writeSyncEndpoint,
 }));
 
@@ -72,7 +72,9 @@ function continueAccept(): void {
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personRegister.mockReset().mockResolvedValue({});
-  readSyncEndpoint.mockReset().mockResolvedValue("https://sync.example");
+  readSyncConfig
+    .mockReset()
+    .mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: null });
   writeSyncEndpoint.mockReset().mockResolvedValue(undefined);
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
@@ -747,13 +749,18 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
   });
 });
 
-// 2026-10-23: the register form is the shared 24-cell grid, and the server
-// address is asked for HERE when the device has none, because this screen is
-// reachable at zero vaults, where Settings does not exist.
+// 2026-10-24: the register act is a DIALOG (it used to expand a 24-cell grid
+// inside the card, which is what pushed the card past the window), in TWO STEPS
+// (the server is a decision, the phrase is a secret, and one view made the user
+// read both before understanding either), and the server step comes first, because
+// which server the identity is written to is a decision with a place rather than a
+// value inherited in silence. This screen is reachable at zero vaults, where
+// Settings does not exist, so the address has to be answerable here.
 describe("IdentityHome registration", () => {
+  const P = "identity-home.register";
   const PHRASE = Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => `word${i + 1}`);
 
-  const renderReserved = () =>
+  const renderReserved = (onRegistered: () => void = () => {}) =>
     render(
       <IdentityHome
         identityCode="code"
@@ -762,73 +769,109 @@ describe("IdentityHome registration", () => {
         onAccepted={() => {}}
         onForgotten={() => {}}
         accountState="reserved"
-        onRegistered={() => {}}
+        onRegistered={onRegistered}
       />,
     );
 
   const fillCells = (prefix: string) => {
     for (let i = 0; i < PHRASE_CELL_COUNT; i += 1) {
-      const id =
-        i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
+      const id = i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
       fireEvent.change(screen.getByTestId(id), { target: { value: PHRASE[i] } });
     }
   };
 
+  /** Step one's Continue, the only way to the phrase. */
+  const toPhraseStep = async (prefix: string = P) => {
+    fireEvent.click(await screen.findByTestId(`${prefix}-continue`));
+    await screen.findByTestId(`${prefix}-phrase-grid`);
+  };
+
+  it("opens as a dialog on the server step, with the card left as it was", async () => {
+    renderReserved();
+    // Nothing of the form is in the card before the press.
+    expect(screen.queryByTestId(`${P}-server`)).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    // Mounted through a portal on `document.body`, and the form is inside it.
+    const dialog = await screen.findByTestId(`${P}-dialog`);
+    expect(dialog.parentElement).toBe(document.body);
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    // The phrase is not in the same view as the address.
+    expect(screen.queryByTestId(`${P}-phrase-grid`)).toBeNull();
+  });
+
   it("asks for the phrase in 24 cells, and keeps Register disabled until they are full", async () => {
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await screen.findByTestId("identity-home.register-phrase-grid");
-    const submit = screen.getByTestId(
-      "identity-home.register-submit",
-    ) as HTMLButtonElement;
+    await toPhraseStep();
+    const submit = screen.getByTestId(`${P}-submit`) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
 
-    fireEvent.change(screen.getByTestId("identity-home.register-phrase"), {
+    fireEvent.change(screen.getByTestId(`${P}-phrase`), {
       target: { value: PHRASE[0] },
     });
     expect(submit.disabled).toBe(true);
 
-    fillCells("identity-home.register");
+    fillCells(P);
     expect(submit.disabled).toBe(false);
   });
 
-  it("asks for the sync server when the device has none, and sets it before registering", async () => {
-    readSyncEndpoint.mockResolvedValue(null);
+  it("shows the server the identity will be registered on, prefilled", async () => {
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    const server = await screen.findByTestId("identity-home.register-server");
-    fillCells("identity-home.register");
-    fireEvent.change(server, { target: { value: "https://sync.example" } });
-    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+    const server = (await screen.findByTestId(`${P}-server`)) as HTMLInputElement;
+    await waitFor(() => expect(server.value).toBe("https://sync.example"));
+    // Unchanged, so it is not re-written (each write re-verifies TLS).
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
+    expect(writeSyncEndpoint).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example"));
+  it("takes an address when the device has none, and sets it before any phrase", async () => {
+    readSyncConfig.mockResolvedValue({ endpoint_url: null, invite_code: null });
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    const server = await screen.findByTestId(`${P}-server`);
+    // No address, no way forward: the order the 2026-10-24 report asked for.
+    expect((screen.getByTestId(`${P}-continue`) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(server, { target: { value: "https://sync.example" } });
+    await toPhraseStep();
+    expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example", null);
+    expect(personRegister).not.toHaveBeenCalled();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
     await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
   });
 
-  it("keeps the field out of the way when an endpoint is already configured", async () => {
-    readSyncEndpoint.mockResolvedValue("https://sync.example");
-    renderReserved();
-    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
-    expect(screen.queryByTestId("identity-home.register-server")).toBeNull();
-  });
-
-  it("reveals the server field when registration is refused for a missing endpoint", async () => {
-    readSyncEndpoint.mockRejectedValue(new Error("probe failed"));
+  it("goes back to the server step on NotConfigured, with the words kept", async () => {
+    // The defect the report named: the address was hidden, the register call
+    // refused `NotConfigured`, and the 24 words were wiped before the address
+    // field appeared. Injection: restoring `resetCells()` on this arm reddens it.
     personRegister.mockRejectedValue({ kind: "NotConfigured" });
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
-    fillCells("identity-home.register");
-    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
 
-    expect((await screen.findByTestId("identity-home.register-error")).textContent).toBe(
-      "identityHome.registerNeedsServer",
+    expect((await screen.findByTestId(`${P}-error`)).textContent).toBe(
+      "identityHome.registerServerError",
     );
-    expect(await screen.findByTestId("identity-home.register-server")).toBeTruthy();
-    // The phrase does not survive the failure.
-    expect(
-      (screen.getByTestId("identity-home.register-phrase") as HTMLInputElement).value,
-    ).toBe("");
+    // Back where the fix is, and the words survived the round trip.
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    await toPhraseStep();
+    expect((screen.getByTestId(`${P}-phrase`) as HTMLInputElement).value).toBe(PHRASE[0]);
+  });
+
+  it("closes the dialog and reprobes once the registration lands", async () => {
+    const onRegistered = vi.fn();
+    renderReserved(onRegistered);
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(onRegistered).toHaveBeenCalled());
+    expect(screen.queryByTestId(`${P}-dialog`)).toBeNull();
   });
 });

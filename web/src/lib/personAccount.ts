@@ -87,18 +87,29 @@ export async function personRegister(phrase: string): Promise<PersonSetupView> {
   return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
 }
 
+/** The browser's sync-server configuration, as the register dialog states it. */
+export interface SyncEndpointConfig {
+  endpoint_url: string | null;
+  invite_code: string | null;
+}
+
 /**
- * The device-local sync endpoint, or `null` when this browser has none.
+ * The sync endpoint and its admission code, as this browser holds them.
  *
- * The twin of the shared module's wrapper (2026-10-23): the register form asks
- * for an address when the device has none, and this client's endpoint is fixed by
- * the deployment, so the read usually answers it rather than `null`.
+ * The twin of the shared module's wrapper (2026-10-23; the code returned too on
+ * 2026-10-24, when the register dialog started naming the server it writes the
+ * identity to): this client's endpoint is fixed by the deployment, so the read
+ * usually answers it rather than `null`, and a gated deployment's admission code
+ * is shown in the same row so the dialog can carry it.
  */
-export async function readSyncEndpoint(): Promise<string | null> {
-  const view = await invoke<{ endpoint_url: string | null } | null>(
+export async function readSyncConfig(): Promise<SyncEndpointConfig> {
+  const view = await invoke<SyncEndpointConfig | null>(
     "plugin:sync|sync_get_endpoint",
   );
-  return view?.endpoint_url ?? null;
+  return {
+    endpoint_url: view?.endpoint_url ?? null,
+    invite_code: view?.invite_code ?? null,
+  };
 }
 
 /**
