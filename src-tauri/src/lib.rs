@@ -18,6 +18,8 @@ mod cli_bridge;
 // of the WebView (`run_native_messaging_host_if_requested` below, called
 // from `main.rs` before the Tauri app builds).
 mod clipper;
+#[cfg(windows)]
+mod win_pipe;
 // The shared export-naming vocabulary (filename sanitization, `" (1)"` suffix
 // dedup, the §6 sanctioned embed/HTML rewrite) moved to `myne-core` (shared with
 // mobile). Re-exported so existing `crate::export_naming::…` paths keep resolving
