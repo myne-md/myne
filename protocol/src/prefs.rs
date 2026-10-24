@@ -14285,4 +14285,287 @@ mod tests {
         std::fs::write("/tmp/myne_periodic_notes_prefs_cases.json", dump.as_bytes())
             .expect("write periodic-notes prefs cases");
     }
+
+    /// Generator for the `view_approvals` `vault-prefs` cases (`view-manifests`,
+    /// myne-md/myne#922).
+    ///
+    /// `cargo test -p protocol --lib emit_view_approval_prefs_vectors -- --ignored`
+    ///
+    /// Writes `/tmp/myne_view_approval_prefs_cases.json`, a JSON array fragment
+    /// spliced by hand into the companion repo's existing `cases` array.
+    ///
+    /// **Two halves, and the ABSENT half is the load-bearing one.**
+    /// `docs/spec/protocol.md` §9.5.2 says the map is omitted when empty, so a
+    /// vault that has approved nothing encodes byte-identically to a
+    /// pre-feature blob, and a freshly enrolled device's approval state cannot
+    /// be manufactured by re-writing the prefs. A suite that pinned only the
+    /// populated map would leave that claim untested, and "the bytes did not
+    /// change" is the claim most likely to be false on the one path nobody ran.
+    /// The absent case's expected bytes are asserted against the exact literal a
+    /// pre-feature encoder produced for the same vault.
+    ///
+    /// **Both canonical neighbours are present** in the populated fixture
+    /// (`transcription_enabled` < `view_approvals` < `view_order`), because
+    /// `vault.prefs` is canonical JSON and key ORDER is part of the bytes: a
+    /// port that emits the right map in the wrong slot produces a blob this
+    /// crate rejects, and a case that pinned the value alone would not notice.
+    ///
+    /// Two entries in the map, inserted in reverse id order, pin the
+    /// lexicographic key order inside it. Values are bare non-negative integers,
+    /// because the comparison against a view's `version` is an equality and a
+    /// float would never match.
+    ///
+    /// Nonces 0xFA (populated) and 0xFB (absent): free in this family's
+    /// registry (…0xF8 and 0xF9 are taken).
+    #[test]
+    #[ignore]
+    fn emit_view_approval_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce_populated: [u8; AEAD_NONCE_LEN] = [0xFA; AEAD_NONCE_LEN];
+        let nonce_absent: [u8; AEAD_NONCE_LEN] = [0xFB; AEAD_NONCE_LEN];
+
+        // Case 1/2: the map POPULATED, beside both canonical neighbours.
+        let prefs_populated = PrefsView {
+            // `false` because the field is omit-when-TRUE (its default is on),
+            // so this is the value that actually emits the left neighbour.
+            transcription_enabled: false,
+            view_approvals: BTreeMap::from([
+                // Inserted in the order opposite to their sorted order on
+                // purpose: the emitted map is ordered by the ENCODER, not by the
+                // caller.
+                (String::from("0190a000-0000-7000-8000-000000000006"), 1u64),
+                (String::from("0190a000-0000-7000-8000-000000000005"), 3u64),
+            ]),
+            view_order: alloc::vec![
+                String::from("0190a000-0000-7000-8000-000000000006"),
+                String::from("0190a000-0000-7000-8000-000000000005"),
+            ],
+            ..PrefsView::default()
+        };
+        let canonical_populated = canonical_json_encode(&prefs_populated);
+        assert_eq!(
+            canonical_populated.as_slice(),
+            br#"{"screen_capture_protection":true,"transcription_enabled":false,"view_approvals":{"0190a000-0000-7000-8000-000000000005":3,"0190a000-0000-7000-8000-000000000006":1},"view_order":["0190a000-0000-7000-8000-000000000006","0190a000-0000-7000-8000-000000000005"]}"#.as_slice(),
+            "canonical bytes must pin the slot transcription_enabled (t) < view_approvals (view_a) < view_order (view_o), the map's lexicographic key order, and bare-decimal integer values",
+        );
+        let blob_populated = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &prefs_populated,
+            &nonce_populated,
+        )
+        .expect("encode view_approvals populated");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_populated).expect("decode"),
+            prefs_populated,
+            "populated view_approvals blob must round-trip exactly",
+        );
+
+        // Case 2/2: the map ABSENT from a vault that DOES carry views, which is
+        // the shape the spec's byte-identity sentence is about. The expected
+        // bytes below are the literal a pre-feature encoder produced for the
+        // same vault: no `view_approvals` key anywhere in the plaintext.
+        let books = crate::saved_view::SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000005"),
+            name: String::from("Books"),
+            view_type: crate::saved_view::ViewType::Cards,
+            filters: crate::saved_view::FilterNode::And {
+                children: alloc::vec![
+                    crate::saved_view::FilterNode::InFolder {
+                        path: String::from("Books/"),
+                    },
+                    crate::saved_view::FilterNode::Property {
+                        key: String::from("rating"),
+                        op: crate::saved_view::PropertyOp::Gt,
+                        value: String::from("4"),
+                    },
+                ],
+            },
+            sort: Some(crate::saved_view::ViewSort {
+                key: String::from("finished"),
+                direction: crate::saved_view::SortDirection::Desc,
+            }),
+            group_by: Some(String::from("status")),
+            columns: alloc::vec![String::from("author"), String::from("rating")],
+            card_size: Some(300),
+            image: Some(String::from("image")),
+            image_aspect_ratio: Some(String::from("1.65")),
+            version: None,
+            write_fields: Vec::new(),
+        };
+        let prefs_absent = PrefsView {
+            saved_views: alloc::vec![books],
+            view_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000005")],
+            ..PrefsView::default()
+        };
+        let canonical_absent = canonical_json_encode(&prefs_absent);
+        assert_eq!(
+            canonical_absent.as_slice(),
+            br#"{"saved_views":[{"card_size":300,"columns":["author","rating"],"filters":{"children":[{"kind":"inFolder","path":"Books/"},{"key":"rating","kind":"property","op":">","value":"4"}],"kind":"and"},"group_by":"status","id":"0190a000-0000-7000-8000-000000000005","image":"image","image_aspect_ratio":"1.65","name":"Books","sort":{"direction":"desc","key":"finished"},"view_type":"cards"}],"screen_capture_protection":true,"view_order":["0190a000-0000-7000-8000-000000000005"]}"#.as_slice(),
+            "a vault with views but NO approvals must encode byte-identically to its pre-feature self: this literal is the pre-view_approvals encoding of the same vault (the saved_views family's own fixture), so any emitted `view_approvals` key here is a format change",
+        );
+        assert!(
+            !core::str::from_utf8(&canonical_absent)
+                .expect("utf8")
+                .contains("view_approvals"),
+            "the omitted-when-empty rule is the whole sentence: an empty map must emit NO key at all, not `{{}}`",
+        );
+        let blob_absent =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_absent, &nonce_absent)
+                .expect("encode view_approvals absent");
+        let decoded_absent =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_absent).expect("decode");
+        assert_eq!(
+            decoded_absent, prefs_absent,
+            "absent-approval blob must round-trip exactly",
+        );
+        assert!(
+            decoded_absent.view_approvals.is_empty(),
+            "an absent map decodes as empty rather than as an error or a default entry",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Device-local saved-view approvals (view-manifests, myne-md/myne#922). PrefsView carries the additive view_approvals map (view id -> the definition version this DEVICE approved) beside transcription_enabled and view_order, pinning the canonical slot transcription_enabled (t) < view_approvals (view_a) < view_order (view_o), the map's lexicographic key order (two entries written here in reverse id order), and bare-decimal non-negative integer values. The approval is an EQUALITY against the view's current version rather than a flag, which is why the values are pinned as integers. Same vault-A inputs as the sibling cases; prefs_nonce=0xFAx24. Generated by emit_view_approval_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_populated)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-view-approvals: the blob decodes back to a PrefsView carrying view_approvals under the same root_key + account_number_hash. A decoder that does not know the field (pre-#922) tolerates it per the §9.5.2 forward-compat rule and sees no approvals, which is the fail-closed direction: an unapproved view is not opened. Nothing here is a value a peer can be told to approve, which is why the field is device-local and never arrives by sync.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_populated)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"transcription_enabled\": false,\n");
+        dump.push_str("        \"view_approvals\": { \"0190a000-0000-7000-8000-000000000005\": 3, \"0190a000-0000-7000-8000-000000000006\": 1 },\n");
+        dump.push_str(
+            "        \"view_order\": [\"0190a000-0000-7000-8000-000000000006\", \"0190a000-0000-7000-8000-000000000005\"]\n",
+        );
+        dump.push_str("      }\n");
+        dump.push_str("    },\n");
+
+        // case 3/4: encrypt-no-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-no-view-approvals\",\n");
+        dump.push_str("      \"description\": \"The ABSENT half of the approval pair, and the one that pins §9.5.2's sentence rather than a value: a vault carrying a saved view and no approvals encodes BYTE-IDENTICALLY to its pre-#922 self, and the expected bytes below are exactly that pre-feature encoding (the saved_views family's own fixture). An implementation that emitted an empty `view_approvals` object, or wrote a default entry for a view nobody approved, would produce a different blob for every existing vault and push it on the next write. Same vault-A inputs; prefs_nonce=0xFBx24. Generated by emit_view_approval_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_absent)
+        ));
+        dump.push_str("    },\n");
+
+        // case 4/4: decrypt-no-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-no-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-no-view-approvals: the pre-feature blob decodes with NO `view_approvals` key in expected_prefs_view, so an absence and an empty map are the same value rather than two states a decoder has to distinguish. A port whose schema made the field required would fail here rather than on a live vault.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_absent)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"saved_views\": [{\n");
+        dump.push_str("          \"card_size\": 300,\n");
+        dump.push_str("          \"columns\": [\"author\", \"rating\"],\n");
+        dump.push_str("          \"filters\": { \"children\": [{ \"kind\": \"inFolder\", \"path\": \"Books/\" }, { \"key\": \"rating\", \"kind\": \"property\", \"op\": \">\", \"value\": \"4\" }], \"kind\": \"and\" },\n");
+        dump.push_str("          \"group_by\": \"status\",\n");
+        dump.push_str("          \"id\": \"0190a000-0000-7000-8000-000000000005\",\n");
+        dump.push_str("          \"image\": \"image\",\n");
+        dump.push_str("          \"image_aspect_ratio\": \"1.65\",\n");
+        dump.push_str("          \"name\": \"Books\",\n");
+        dump.push_str("          \"sort\": { \"direction\": \"desc\", \"key\": \"finished\" },\n");
+        dump.push_str("          \"view_type\": \"cards\"\n");
+        dump.push_str("        }],\n");
+        dump.push_str("        \"view_order\": [\"0190a000-0000-7000-8000-000000000005\"]\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_view_approval_prefs_cases.json", dump.as_bytes())
+            .expect("write view-approval prefs cases dump");
+    }
 }

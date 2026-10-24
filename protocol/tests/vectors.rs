@@ -10673,7 +10673,10 @@ fn scram_auth_vectors() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn saved_view_vectors() {
-    use protocol::{canonical_encode_saved_views, parse_saved_views_array, SavedViewParseError};
+    use protocol::{
+        canonical_encode_saved_views, canonical_encode_saved_views_with_opaque,
+        parse_saved_views_array, parse_saved_views_array_with_opaque, SavedViewParseError,
+    };
 
     let Some(raw) = cases_json("saved-view") else {
         return;
@@ -10725,6 +10728,48 @@ fn saved_view_vectors() {
                     "[{id}] canonical re-encoding mismatch"
                 );
             }
+            "parse_ok_opaque" => {
+                seen.insert("parse_ok_opaque");
+                let (views, opaque, consumed) = parse_saved_views_array_with_opaque(&input)
+                    .unwrap_or_else(|e| {
+                        panic!("[{id}] parse_ok_opaque input did not parse: {e:?}")
+                    });
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+
+                let want_ids: Vec<String> = case["expected_opaque_ids"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_opaque_ids"))
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .unwrap_or_else(|| {
+                                panic!("[{id}] expected_opaque_ids entry not a string")
+                            })
+                            .to_owned()
+                    })
+                    .collect();
+                let got_ids: Vec<String> = opaque
+                    .iter()
+                    .map(|o| String::from_utf8_lossy(o.id_bytes()).into_owned())
+                    .collect();
+                assert_eq!(
+                    got_ids, want_ids,
+                    "[{id}] retained-entry id set/order mismatch — a retained entry is sorted by its id and is never dropped, so a missing one means the decoder lost bytes it cannot reconstruct",
+                );
+                assert!(
+                    !opaque.is_empty(),
+                    "[{id}] every parse_ok_opaque case must retain at least one entry; a case that retains none belongs in parse_ok",
+                );
+                assert_eq!(
+                    hex_encode(&canonical_encode_saved_views_with_opaque(&views, &opaque)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch (retained entries are re-emitted verbatim and id-sorted together with the represented ones)",
+                );
+            }
             "parse_fail" => {
                 seen.insert("parse_fail");
                 let got = parse_saved_views_array(&input)
@@ -10738,7 +10783,7 @@ fn saved_view_vectors() {
             other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
         }
     }
-    for kind in ["parse_ok", "parse_fail"] {
+    for kind in ["parse_ok", "parse_ok_opaque", "parse_fail"] {
         assert!(
             seen.contains(kind),
             "saved-view missing every case of case_kind '{kind}' — coverage regression"
