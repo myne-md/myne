@@ -77,6 +77,8 @@ export const STORY_ONLY_SURFACES = Object.freeze({
     "the desktop AI chat panel lives under src/notes/components, outside the surface roots; the screenshot harness shoots it from the catalogue (myne-md/myne#832 task 14)",
   BoardView:
     "the board renderer lives under src/notes/views, outside the surface roots; the catalogue shoots it because a board's own layout rule (lanes left to right, each its own scroller, an empty lane kept on purpose) is not reviewable in a diff (myne-md/myne#922)",
+  ViewCard:
+    "one saved-view card lives under src/notes/views, outside the surface roots; the catalogue shoots it because its two shapes (openable, so its content block is a real button, and read-only, so it carries no control at all) are the extraction myne-md/myne#922 task 3 made, and a diff does not show which shape a renderer mounts",
   Overview:
     "the catalogue's own Welcome page (myne-md/myne#845): documentation about the workbench, not a surface of the app",
   Tokens:
