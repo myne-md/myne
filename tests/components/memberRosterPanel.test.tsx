@@ -71,6 +71,14 @@ let mockMembers: RosterMemberView[] = [
 let mockAuthority: "owner" | "member" = "owner";
 // The group-key epoch per test (`null` = legacy roster, no epoch line).
 let mockGroupKeyEpoch: number | null = null;
+// The owner's sent-invitation rows per test. Empty by default: most cases are
+// about the member list, not the invitations section.
+let mockVaultInvites: Array<{
+  invite_id_hex: string;
+  recipient_person_id_hex: string;
+  claimed: boolean;
+  declined: boolean;
+}> = [];
 
 /** One row over the base fixture, so a test states only what it is about. */
 const rowView = (over: Partial<RosterMemberView>): RosterMemberView => ({
@@ -94,7 +102,7 @@ vi.mock("../../src/hooks/useRoster", () => ({
     inviting: false,
     lastInvite: null,
     invite: vi.fn(() => Promise.resolve(null)),
-    vaultInvites: [],
+    vaultInvites: mockVaultInvites,
     removing: false,
     remove: vi.fn(() => Promise.resolve()),
   }),
@@ -246,6 +254,35 @@ describe("MemberRosterPanel roles", () => {
       expect(empty.contains(buttons[0])).toBe(true);
     } finally {
       mockMembers = saved;
+      cleanup();
+    }
+  });
+});
+
+// The owner's view of the invitations it sent (myne-md/myne#911 follow-up). It
+// used to carry two states; the recipient's refusal is a third, and it is the only
+// one that says "they said no" rather than "not yet", which is what decides whether
+// the owner waits or invites somebody else.
+describe("MemberRosterPanel invitation rows", () => {
+  it("tells a declined invitation apart from one nobody has opened yet", () => {
+    mockAuthority = "owner";
+    mockVaultInvites = [
+      { invite_id_hex: "aa", recipient_person_id_hex: "11".repeat(16), claimed: false, declined: false },
+      { invite_id_hex: "bb", recipient_person_id_hex: "22".repeat(16), claimed: true, declined: false },
+      { invite_id_hex: "cc", recipient_person_id_hex: "33".repeat(16), claimed: false, declined: true },
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      const states = screen
+        .getAllByTestId("member-roster.invitation-status")
+        .map((el) => el.getAttribute("data-declined") + ":" + el.textContent);
+      expect(states).toEqual([
+        "false:sync.memberRoster.invitationPending",
+        "false:sync.memberRoster.invitationClaimed",
+        "true:sync.memberRoster.invitationDeclined",
+      ]);
+    } finally {
+      mockVaultInvites = [];
       cleanup();
     }
   });
@@ -513,6 +550,11 @@ describe("MemberRosterPanel rename", () => {
       const dialog = screen.getByTestId("member-roster.name-dialog");
       expect(dialog.getAttribute("role")).toBe("dialog");
       expect(dialog.getAttribute("aria-modal")).toBe("true");
+      // P4 (2026-10-25): the dialog runs on the shared `ModalShell`, so it has a
+      // backdrop, a card and a centred position. Asserted because the testids and
+      // the copy are identical on the hand-rolled `role="dialog"` div this
+      // replaced, so a regression to that shape would keep every other case green.
+      expect(dialog.className).toContain("myne-modal-backdrop");
       fireEvent.change(screen.getByTestId("member-roster.name-input"), {
         target: { value: "  Ada  " },
       });

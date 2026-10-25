@@ -318,6 +318,7 @@ import { applyCustomTheme } from "../lib/theme";
 import { failClosedCode } from "../lib/global-failure";
 import { ornamentRole } from "@myne/ornaments";
 import { rewriteSelectionToEditor } from "../notes/ai/rewriteToEditor";
+import type { InvitesUnavailable } from "../lib/personAccount";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion - confirmed as a separate
@@ -504,8 +505,14 @@ interface EditorProps {
    *
    * Zero renders no row, and the pair is omitted together: a count with no way
    * to open the dialog would be a badge that leads nowhere.
+   *
+   * `invitesUnavailable` is the third state, and the reason the row is not purely
+   * count-driven: an identity this device holds but never registered cannot list
+   * its invitations, so a zero count there means "cannot be known", not "none".
+   * The switcher says which and opens the same dialog either way.
    */
   inviteCount?: number;
+  invitesUnavailable?: InvitesUnavailable | null;
   /**
    * Open the invitations dialog. App tears this vault down first (`flush +
    * vault_lock` + `editor.lock`) for the same reason `onJoinDevice` does:
@@ -550,6 +557,7 @@ export function Editor({
   onCreateAnother,
   onJoinDevice,
   inviteCount = 0,
+  invitesUnavailable = null,
   onInvites,
   switching = false,
   detachedNoteId = null,
@@ -749,6 +757,7 @@ export function Editor({
           onCreateAnother={onCreateAnother}
           onJoinDevice={onJoinDevice}
           inviteCount={inviteCount}
+          invitesUnavailable={invitesUnavailable}
           onInvites={onInvites}
           switching={switching}
           detachedNoteId={detachedNoteId}
@@ -790,6 +799,7 @@ type EditorChromeProps = {
   onCreateAnother?: () => void;
   onJoinDevice?: () => void;
   inviteCount?: number;
+  invitesUnavailable?: InvitesUnavailable | null;
   onInvites?: () => void;
   switching: boolean;
   /** Detached (pop-out) note id, or null in the main window. See `EditorProps`. */
@@ -810,6 +820,7 @@ function EditorChrome({
   onCreateAnother,
   onJoinDevice,
   inviteCount,
+  invitesUnavailable,
   onInvites,
   switching,
   detachedNoteId,
@@ -2478,6 +2489,7 @@ function EditorChrome({
                 onCreateAnother={onCreateAnother}
                 onJoinDevice={onJoinDevice}
                 inviteCount={inviteCount}
+                invitesUnavailable={invitesUnavailable}
                 onInvites={onInvites}
                 switching={switching}
               />
@@ -3215,6 +3227,7 @@ function SidebarVaultSwitcher({
   onCreateAnother,
   onJoinDevice,
   inviteCount,
+  invitesUnavailable,
   onInvites,
   switching,
 }: {
@@ -3222,6 +3235,7 @@ function SidebarVaultSwitcher({
   onCreateAnother?: () => void;
   onJoinDevice?: () => void;
   inviteCount?: number;
+  invitesUnavailable?: InvitesUnavailable | null;
   onInvites?: () => void;
   switching: boolean;
 }) {
@@ -3245,6 +3259,7 @@ function SidebarVaultSwitcher({
         onCreateAnother={onCreateAnother}
         onJoinDevice={onJoinDevice}
         inviteCount={inviteCount}
+        invitesUnavailable={invitesUnavailable}
         onInvites={onInvites}
         switching={switching}
       />

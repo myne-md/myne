@@ -100,8 +100,13 @@ export function beginScrollRestore(noteId: string, now = Date.now()): void {
   restoring.set(noteId, now);
 }
 
-/** How long `noteId`'s restore window still has to run, in ms (0 when none). */
-export function scrollRestoreRemaining(noteId: string, now = Date.now()): number {
+/** How long `noteId`'s restore window still has to run, in ms (0 when none).
+ *
+ *  Deliberately NOT exported: its one consumer is `restoreDelay` two hundred
+ *  lines down, and an export with no caller outside this file is exactly what
+ *  `check-export-callers.mjs` reports. It read as part of the module's public
+ *  surface for no reason. */
+function scrollRestoreRemaining(noteId: string, now = Date.now()): number {
   const started = restoring.get(noteId);
   if (started === undefined) return 0;
   const left = RESTORE_SUPPRESSION_MS - (now - started);

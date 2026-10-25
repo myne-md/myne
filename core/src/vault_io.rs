@@ -200,6 +200,151 @@ pub mod std_io {
 #[cfg(not(target_arch = "wasm32"))]
 pub use std_io::StdVaultIo;
 
+/// An in-memory [`VaultIo`] for tests that need to hand a reader some bytes without
+/// a filesystem.
+///
+/// The member plane's resolvers take `&dyn VaultIo` and read exactly one file
+/// (`vault.meta`), so a real temp directory would work too; this exists because the
+/// property under test is usually "which generations does this reader accept", and a
+/// map makes the fixture one line rather than a directory to create and clean up.
+/// Every method is implemented rather than `unimplemented!()`d, because a future
+/// caller in the same module may start listing or renaming and the panic would then
+/// read as a product bug.
+#[cfg(test)]
+pub mod test_io {
+    use super::{DirEntry, FileStat, IoResult, VaultIo, WriteOpts};
+    use crate::io_failure_kind::IoFailureKind;
+    use std::collections::BTreeMap;
+    use std::path::{Path, PathBuf};
+    use std::sync::Mutex;
+
+    /// A vault filesystem held in a map, keyed by full path.
+    #[derive(Default)]
+    pub struct MemoryVaultIo {
+        files: Mutex<BTreeMap<PathBuf, Vec<u8>>>,
+    }
+
+    impl MemoryVaultIo {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Seed one file. Panics only if a previous test poisoned the lock, which
+        /// no test here does (no `assert!` runs while it is held).
+        pub fn with_file(path: impl Into<PathBuf>, bytes: impl Into<Vec<u8>>) -> Self {
+            let io = Self::new();
+            io.files
+                .lock()
+                .expect("memory io lock")
+                .insert(path.into(), bytes.into());
+            io
+        }
+
+        pub fn bytes_at(&self, path: &Path) -> Option<Vec<u8>> {
+            self.files
+                .lock()
+                .expect("memory io lock")
+                .get(path)
+                .cloned()
+        }
+    }
+
+    fn not_found() -> IoFailureKind {
+        IoFailureKind::NotFound
+    }
+
+    #[async_trait::async_trait]
+    impl VaultIo for MemoryVaultIo {
+        async fn read(&self, path: &Path) -> IoResult<Vec<u8>> {
+            self.bytes_at(path).ok_or_else(not_found)
+        }
+
+        async fn read_prefix(&self, path: &Path, len: usize) -> IoResult<Vec<u8>> {
+            let bytes = self.bytes_at(path).ok_or_else(not_found)?;
+            if bytes.len() < len {
+                return Err(IoFailureKind::Other);
+            }
+            Ok(bytes[..len].to_vec())
+        }
+
+        async fn write(&self, path: &Path, bytes: &[u8], _opts: WriteOpts) -> IoResult<()> {
+            self.files
+                .lock()
+                .expect("memory io lock")
+                .insert(path.to_path_buf(), bytes.to_vec());
+            Ok(())
+        }
+
+        async fn remove_file(&self, path: &Path) -> IoResult<()> {
+            self.files
+                .lock()
+                .expect("memory io lock")
+                .remove(path)
+                .map(|_| ())
+                .ok_or_else(not_found)
+        }
+
+        async fn remove_dir_all(&self, prefix: &Path) -> IoResult<()> {
+            self.files
+                .lock()
+                .expect("memory io lock")
+                .retain(|path, _| !path.starts_with(prefix));
+            Ok(())
+        }
+
+        async fn create_dir_all(&self, _path: &Path) -> IoResult<()> {
+            Ok(())
+        }
+
+        async fn read_dir(&self, dir: &Path) -> IoResult<Vec<DirEntry>> {
+            let mut names: Vec<DirEntry> = Vec::new();
+            for path in self.files.lock().expect("memory io lock").keys() {
+                let Some(parent) = path.parent() else {
+                    continue;
+                };
+                if parent != dir {
+                    continue;
+                }
+                let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                    continue;
+                };
+                names.push(DirEntry {
+                    name: name.to_string(),
+                    is_dir: false,
+                });
+            }
+            names.sort_by(|a, b| a.name.cmp(&b.name));
+            Ok(names)
+        }
+
+        async fn exists(&self, path: &Path) -> IoResult<bool> {
+            Ok(self
+                .files
+                .lock()
+                .expect("memory io lock")
+                .contains_key(path))
+        }
+
+        async fn is_dir(&self, _path: &Path) -> IoResult<bool> {
+            Ok(false)
+        }
+
+        async fn stat(&self, path: &Path) -> IoResult<Option<FileStat>> {
+            Ok(self.bytes_at(path).map(|bytes| FileStat {
+                size: bytes.len() as u64,
+                modified_epoch_ms: None,
+            }))
+        }
+
+        async fn rename(&self, from: &Path, to: &Path) -> IoResult<()> {
+            let mut files = self.files.lock().expect("memory io lock");
+            let bytes = files.remove(from).ok_or_else(not_found)?;
+            files.insert(to.to_path_buf(), bytes);
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

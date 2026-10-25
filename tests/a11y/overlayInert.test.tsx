@@ -336,12 +336,6 @@ const NOT_OVERLAYS: Record<string, string> = {
     "skeleton pushes its backdrop and pops it in `close`, so the caller does " +
     "not call `useOverlayInert` itself. Kept here only so the reason is " +
     "written down; the scan's `openModal(` arm accepts it.",
-  "src/components/sync/MemberRosterPanel.tsx":
-    "The invite panel is INLINE, not an overlay: its `STATUS_STYLE` is two " +
-    "text properties with no positioning and no backdrop, so it renders in " +
-    "the roster's own flow and there is no background to inert. Its " +
-    "`role=\"dialog\" aria-modal` predates this pass and is questionable on " +
-    "the same grounds; left alone rather than widened here.",
   "src/components/primitives/ModalShell.tsx":
     "IS the shell: it registers, and every dialog built on it inherits that.",
 };

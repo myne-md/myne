@@ -29,9 +29,13 @@ import {
   AcceptInviteWizard,
   JoinVaultWizard,
 } from "./InviteWizard";
-import type { InviteSummary } from "../../lib/personAccount";
+import {
+  personDeclineInvite,
+  type InviteSummary,
+} from "../../lib/personAccount";
 import type { InvitesUnavailable } from "../../hooks/usePendingInvites";
 import { unclaimedInvites } from "../../hooks/usePendingInvites";
+import { PersonRegisterDialog } from "./PersonRegisterDialog";
 
 interface InvitesDialogProps {
   open: boolean;
@@ -99,11 +103,35 @@ export function InvitesDialog({
   // to be confused (the same reason `IdentityHome` holds one).
   const [accepting, setAccepting] = useState<InviteSummary | null>(null);
   const [joining, setJoining] = useState<InviteSummary | null>(null);
+  // The refusal, and the two states around it (myne-md/myne#911 follow-up). It
+  // asks first because it CANNOT be undone: the server drops the sealed payload,
+  // so the only way back is a fresh invitation from the owner. `declineError`
+  // stays in the confirm dialog rather than replacing the list, which would hide
+  // the invitation the retry acts on.
+  const [declining, setDeclining] = useState<InviteSummary | null>(null);
+  const [declineError, setDeclineError] = useState(false);
+  const [decliningBusy, setDecliningBusy] = useState(false);
+  // The register door, for the two lifecycle states that cannot list invitations
+  // at all (see the `not-enrolled` arm below).
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const close = () => {
     setAccepting(null);
     setJoining(null);
+    setDeclining(null);
+    // The two states around the refusal are cleared with it. Leaving `busy` set
+    // would re-open the dialog with its confirm button disabled forever, and a
+    // stale error would greet the next decline before anything was pressed.
+    setDeclineError(false);
+    setDecliningBusy(false);
     onClose();
+  };
+
+  /** Closing the confirm on its own, which is the same reset one step narrower. */
+  const closeDecline = () => {
+    setDeclining(null);
+    setDeclineError(false);
+    setDecliningBusy(false);
   };
 
   const pending = unclaimedInvites(invites);
@@ -139,8 +167,27 @@ export function InvitesDialog({
           {t("invites.noIdentity")}
         </p>
       ) : unavailable === "not-enrolled" ? (
-        <p style={HINT_STYLE} data-testid="invites.not-enrolled">
-          {t("invites.notEnrolled")}
+        // The state AND the act that ends it, the shape `IdentityHome` already
+        // uses for the same fact (`decisions/ui/0725`): an invitation is
+        // addressed to a person account, so an identity this device has created
+        // but never registered cannot list what was sent to it. The register form
+        // is mounted here rather than pointing at Settings, because this is where
+        // the question is asked.
+        <div
+          style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--space-3)" }}
+          data-testid="invites.not-enrolled"
+        >
+          <p style={HINT_STYLE}>{t("invites.notEnrolled")}</p>
+          <Button onClick={() => setRegisterOpen(true)} data-testid="invites.register-cta">
+            {t("identityHome.registerCta")}
+          </Button>
+        </div>
+      ) : unavailable === "pending" ? (
+        // Registered and waiting for approval: it HAS an account, so the sentence
+        // is a wait rather than a remedy, and no register control appears: the
+        // fix is on the account's other device, not here.
+        <p style={HINT_STYLE} data-testid="invites.pending-identity">
+          {t("identityHome.invitesPending")}
         </p>
       ) : loading && invites.length === 0 ? (
         <div
@@ -170,13 +217,25 @@ export function InvitesDialog({
                   data-testid="invites.row"
                 >
                   <span style={ID_STYLE}>{invite.vault_account_hash_hex}</span>
-                  <Button
-                    variant="primary"
-                    onClick={() => setAccepting(invite)}
-                    data-testid="invites.accept"
-                  >
-                    {t("identityHome.accept")}
-                  </Button>
+                  <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setDeclineError(false);
+                        setDeclining(invite);
+                      }}
+                      data-testid="invites.decline"
+                    >
+                      {t("invites.decline")}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={() => setAccepting(invite)}
+                      data-testid="invites.accept"
+                    >
+                      {t("identityHome.accept")}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -220,6 +279,65 @@ export function InvitesDialog({
       testId="invites.dialog"
     >
       {body}
+      {declining !== null ? (
+        <ModalShell
+          open
+          title={t("invites.declineTitle")}
+          labelId="invites-decline-title"
+          testId="invites.decline-confirm"
+          onClose={closeDecline}
+          width={440}
+        >
+          <p style={HINT_STYLE} data-testid="invites.decline-body">
+            {t("invites.declineBody")}
+          </p>
+          {declineError ? (
+            <p role="alert" style={{ ...HINT_STYLE, color: "var(--danger)" }} data-testid="invites.decline-error">
+              {t("invites.declineFailed")}
+            </p>
+          ) : null}
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button
+              variant="ghost"
+              disabled={decliningBusy}
+              onClick={closeDecline}
+              data-testid="invites.decline-cancel"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={decliningBusy}
+              onClick={async () => {
+                setDecliningBusy(true);
+                setDeclineError(false);
+                try {
+                  await personDeclineInvite(declining.invite_id_hex);
+                  setDeclining(null);
+                  setDeclineError(false);
+                  onRetry();
+                } catch {
+                  setDeclineError(true);
+                } finally {
+                  setDecliningBusy(false);
+                }
+              }}
+              data-testid="invites.decline-confirm-cta"
+            >
+              {t("invites.declineCta")}
+            </Button>
+          </div>
+        </ModalShell>
+      ) : null}
+      <PersonRegisterDialog
+        open={registerOpen}
+        testIdPrefix="invites.register"
+        onRegistered={() => {
+          setRegisterOpen(false);
+          onRetry();
+        }}
+        onClose={() => setRegisterOpen(false)}
+      />
     </ModalShell>
   );
 }
