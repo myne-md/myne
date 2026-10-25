@@ -32,6 +32,7 @@
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
+import { ViewImportDialog } from "./ViewImportDialog";
 import { Button } from "./primitives/Button";
 import { Icon } from "./primitives/Icon";
 import { EmptyState } from "./primitives/EmptyState";
@@ -52,6 +53,14 @@ const ROOT_STYLE: CSSProperties = {
   minHeight: 0,
   display: "flex",
   flexDirection: "column",
+};
+
+const TOOLBAR_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  display: "flex",
+  justifyContent: "flex-start",
+  padding: "var(--space-3) var(--space-5)",
+  borderBottom: "1px solid var(--line-1)",
 };
 
 const BODY_STYLE: CSSProperties = {
@@ -146,6 +155,10 @@ export function ViewsManager({ open, onClose }: ViewsManagerProps) {
   // otherwise stay on screen with no explanation, which reads as a click that
   // did nothing.
   const [error, setError] = useState<string | null>(null);
+  // The import lives in this modal (the PRD's shape: "approval state, import,
+  // export and the form live in it"), as a nested dialog so the list stays where
+  // it was and the file picker does not replace it.
+  const [importOpen, setImportOpen] = useState(false);
 
   const views = useMemo(
     () => orderSavedViews(prefs.saved_views, prefs.view_order),
@@ -189,6 +202,15 @@ export function ViewsManager({ open, onClose }: ViewsManagerProps) {
       testId="views-manager.modal"
     >
       <div data-testid="views-manager.root" style={ROOT_STYLE}>
+        <div style={TOOLBAR_STYLE}>
+          <Button
+            variant="secondary"
+            data-testid="views-manager.import"
+            onClick={() => setImportOpen(true)}
+          >
+            {t("notes.views.import.pick")}
+          </Button>
+        </div>
         {error !== null && (
           <p
             role="alert"
@@ -300,6 +322,7 @@ export function ViewsManager({ open, onClose }: ViewsManagerProps) {
             })}
           </div>
         )}
+        <ViewImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       </div>
     </ModalShell>
   );

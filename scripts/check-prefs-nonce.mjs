@@ -100,6 +100,10 @@ export const READ_COMMANDS = new Set([
   "prefs_read",
   "device_platform",
   "ai_provider_has_key",
+  // view-manifests: reads a FILE at a user-chosen path and validates it with the
+  // strict reader. It carries no prefs field and writes none, so there is nothing
+  // for a nonce bump to invalidate.
+  "read_view_manifest",
 ]);
 
 /**

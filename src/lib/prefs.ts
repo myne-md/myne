@@ -2109,6 +2109,21 @@ export async function setViewApproval(
 }
 
 /**
+ * Read and strictly validate ONE `.myneview` manifest from `targetPath`
+ * (view-manifests). The host does both: the read is bounded by the manifest cap
+ * (so an oversized file is refused rather than truncated) and the parse is
+ * `protocol::parse_view_manifest`, the only authority on the grammar.
+ *
+ * A refusal arrives as `ViewManifestReadError` with the reader's named reason
+ * (`src/types/view-manifest-error.ts`), which the import dialog renders: the key
+ * this build does not know, the marker it will not let a view write, and so on.
+ * Nothing is written and nothing is approved here.
+ */
+export async function readViewManifest(targetPath: string): Promise<SavedView> {
+  return invoke<SavedView>("plugin:prefs|read_view_manifest", { targetPath });
+}
+
+/**
  * Write ONE saved view as canonical `.myneview` manifest bytes to `targetPath`
  * (view-manifests). The host encodes with the same canonical encoder
  * `vault.prefs` uses, so the file an export writes is the file an import reads

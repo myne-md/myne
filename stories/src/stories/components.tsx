@@ -116,6 +116,7 @@ import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
 import { ViewConsent } from "@app/components/ViewConsent";
 import { ViewsManager } from "@app/components/ViewsManager";
+import { ViewImportDialog } from "@app/components/ViewImportDialog";
 import { ThemeChiplet } from "@app/components/primitives/ThemeChiplet";
 import { ThemeInstallDialog } from "@app/components/ThemeInstallDialog";
 import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
@@ -1766,6 +1767,32 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => (
       <TemplatesManager open onClose={action("onClose")} onOpenNote={action("onOpenNote")} />
     ),
+  },
+  {
+    id: "components/viewimportdialog/default",
+    group: "components",
+    surface: "ViewImportDialog",
+    state: "default",
+    description:
+      "The import surface for a `.myneview` file: it asks for the file, then shows what the definition selects and reads before anything is stored. Look for the capability summary to appear before the store action, never after it.",
+    tags: ["components", "views", "import", "manifest", "consent", "sharing"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewImportDialog open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewimportdialog/ordered",
+    group: "components",
+    surface: "ViewImportDialog",
+    state: "ordered",
+    unreachable: {
+      what: "The ordered comparison arms (new, replace, identical, refused) after a file is validated.",
+      why: "They are reached through a native file-open dialog, which no catalogue frame can answer; the arms are covered by tests/components/viewImportDialog.test.tsx, one per arm.",
+    },
+    description:
+      "The same surface after a file was chosen. Recorded as unreachable here because the state begins at the OS file dialog; the four ordering arms are asserted in the component suite instead.",
+    tags: ["components", "views", "import", "manifest", "ordering", "unreachable"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewImportDialog open onClose={action("onClose")} />,
   },
   {
     id: "components/viewsmanager/default",
