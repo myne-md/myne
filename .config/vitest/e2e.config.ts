@@ -55,6 +55,14 @@ const shardCount = ((): number => {
   return Math.max(2, Math.min(6, Math.floor(cpus().length / 2)));
 })();
 
+/** See `e2e/support/webdriver.ts`'s `TIMEOUT_SCALE` for why this exists. */
+const timeoutScale = ((): number => {
+  const raw = process.env.MYNE_E2E_TIMEOUT_SCALE;
+  if (raw === undefined || raw.trim() === "") return 1;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+})();
+
 export default defineConfig({
   test: {
     include: ["e2e/**/*.e2e.ts"],
@@ -85,8 +93,12 @@ export default defineConfig({
     maxConcurrency: 1,
     // Production-KDF unlocks (m=256 MiB, t=3) and full create flows run
     // inside scenarios; budget generously, fail loudly.
-    testTimeout: 180_000,
-    hookTimeout: 120_000,
+    // Scaled by the same `MYNE_E2E_TIMEOUT_SCALE` the harness applies to every
+    // wait (`e2e/support/webdriver.ts`): a 45 s wait doubled to 90 s inside a
+    // 180 s test budget would fail the test rather than the wait, and the report
+    // would then name the whole scenario instead of the step that starved.
+    testTimeout: 180_000 * timeoutScale,
+    hookTimeout: 120_000 * timeoutScale,
     // Retry a failed e2e test (up to 3 attempts total). The whole suite drives a
     // real tauri-driver + production binary across MYNE_E2E_SHARDS parallel
     // worker processes (default 2) for ~84 files — so running the full suite puts
