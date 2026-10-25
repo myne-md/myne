@@ -102,6 +102,28 @@ export const READ_COMMANDS = new Set([
   "ai_provider_has_key",
 ]);
 
+/**
+ * Commands in the `prefs` namespace that carry NO prefs field, so neither rule's
+ * reason reaches them: there is no cached value for a nonce bump to invalidate.
+ *
+ * Kept as its own set rather than added to `READ_COMMANDS`, because that set is
+ * counted in the success line as "read command(s) exempt" and a manifest EXPORT is
+ * not a read. Folding it in would make the line miscount in the small way this
+ * repository has paid for before.
+ *
+ * `export_view_manifest` (view-manifests) writes a FILE: it canonical-encodes one
+ * `SavedView` and durably writes it to a path the OS save dialog named. It does
+ * not touch `vault.prefs`, which is why it is the first entry here and why the
+ * rule it is excused from (route the write through `writePref`) has nothing to
+ * route.
+ */
+export const NON_FIELD_COMMANDS = new Set(["export_view_manifest"]);
+
+/** Whether a `plugin:prefs|…` command carries a field, and so needs the nonce. */
+export function needsNonceBump(command) {
+  return !READ_COMMANDS.has(command) && !NON_FIELD_COMMANDS.has(command);
+}
+
 // The shared-tree roster, imported rather than copied. `scripts/lib/shared-roots.mjs`
 // exists because "each guard kept a private copy" is a recorded past bug (#273),
 // and its header states the rule: a guard claiming shared-tree scope imports it,
@@ -225,7 +247,7 @@ export function analyse({ prefsSource, missingTrees } = {}) {
     while ((m = PREFS_WRITE_CALL.exec(prefsSrc)) !== null) {
       if (m[1]) continue; // sat as writePref's first argument, the chokepoint
       const command = m[2];
-      if (READ_COMMANDS.has(command)) continue;
+      if (!needsNonceBump(command)) continue;
       failures.push({
         file: rel,
         line: lineOf(prefsSrc, m.index),
@@ -296,7 +318,7 @@ export function analyse({ prefsSource, missingTrees } = {}) {
       let hit;
       while ((hit = PREFS_LITERAL.exec(src)) !== null) {
         const command = hit[1];
-        if (READ_COMMANDS.has(command)) continue;
+        if (!needsNonceBump(command)) continue;
         failures.push({
           file: rel,
           line: lineOf(src, hit.index),
@@ -328,6 +350,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
 
   console.log(
-    `prefs-nonce: ok (${writes} write(s) through the chokepoint; ${READ_COMMANDS.size} read command(s) exempt; the chokepoint's name is unique across ${SCANNED_TREES.length} shared tree(s))`,
+    `prefs-nonce: ok (${writes} write(s) through the chokepoint; ${READ_COMMANDS.size} read command(s) exempt, ${NON_FIELD_COMMANDS.size} field-less command(s) exempt; the chokepoint's name is unique across ${SCANNED_TREES.length} shared tree(s))`,
   );
 }

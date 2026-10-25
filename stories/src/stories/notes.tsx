@@ -907,14 +907,19 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     group: "components",
     surface: "ViewSettings",
     state: "default",
-    description: "The per-view display settings, seeded from the view being edited.",
-    tags: ["notes", "views", "settings", "display"],
+    description:
+      "The per-view settings, seeded from the view being edited: render type, grouping, sort, columns, the writable-field set a shared view carries, and the read-only version. Look for archived, deleted and trashed to be absent from the writable picker, because the import path refuses them outright.",
+    tags: ["notes", "views", "settings", "display", "sharing", "version"],
     render: () => (
       <Frame>
         <ViewSettings
           title="Reading list"
-          initial={{}}
-          propertyKeys={["status", "priority", "owner"]}
+          initial={{ write_fields: ["status"] }}
+          version={4}
+          onExport={action("onExport")}
+          // `archived` is in the vault's key universe on purpose: the picker
+          // filters it out rather than the fixture hiding it.
+          propertyKeys={["status", "priority", "owner", "archived", "trashed"]}
           onCancel={action("onCancel")}
           onSave={action("onSave")}
         />

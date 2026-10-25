@@ -2109,6 +2109,29 @@ export async function setViewApproval(
 }
 
 /**
+ * Write ONE saved view as canonical `.myneview` manifest bytes to `targetPath`
+ * (view-manifests). The host encodes with the same canonical encoder
+ * `vault.prefs` uses, so the file an export writes is the file an import reads
+ * byte for byte; a WebView-side `JSON.stringify` would be a second opinion about
+ * those bytes.
+ *
+ * `targetPath` must come from the OS save dialog: the dialog IS the export
+ * consent, and its "Replace" prompt is what authorizes `overwrite=true` (SYNC-2).
+ * This does not touch `vault.prefs`, so nothing here bumps the prefs nonce.
+ */
+export async function exportViewManifestFile(
+  view: SavedView,
+  targetPath: string,
+  overwrite: boolean,
+): Promise<void> {
+  await invoke<void>("plugin:prefs|export_view_manifest", {
+    view,
+    targetPath,
+    overwrite,
+  });
+}
+
+/**
  * Persist the full color-group rule list (graph-connection-ux-polish) — a
  * WHOLE-LIST replace, not a per-item upsert/delete. Order is rule precedence
  * (first match wins), so unlike {@link setViewOrder} there is no separate
