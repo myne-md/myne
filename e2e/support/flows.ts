@@ -550,6 +550,130 @@ export async function openSettings(
   }
 }
 
+/**
+ * Deliver `event` to THIS webview with `payload`, through the production event
+ * plugin.
+ *
+ * **`plugin:event|emit_to`, not `plugin:event|emit`, and the difference is the
+ * whole delivery.** A broadcast `emit` invoked from the page seat does NOT reach
+ * a listener registered in the same webview: measured 2026-10-24 by registering
+ * one through the plugin's own `plugin:event|listen` and counting deliveries —
+ * 0 for `emit`, 1 for `emit_to` naming this window (`{kind: "WebviewWindow",
+ * label}`). `collab-presence` had been broadcasting and waiting for a decoration
+ * that could never arrive, and reported the renderer as broken.
+ *
+ * This is a production IPC call, not a test hook: it is the same path a
+ * Rust-side `emit_to` takes to reach one window, which is why the frame's shape
+ * stays the real one.
+ */
+export async function emitEventToSelf(
+  session: Session,
+  event: string,
+  payload: unknown,
+): Promise<void> {
+  const label = await session.execute<string>(
+    "return window.__TAURI_INTERNALS__.metadata.currentWebview.label;",
+  );
+  await pageSeatInvoke(
+    session,
+    "plugin:event|emit_to",
+    { target: { kind: "WebviewWindow", label }, event, payload },
+    10_000,
+  );
+}
+
+/** Settings → Sync, on the DEVICES topic.
+ *
+ * **The topic is a real step, and clicking the rail is not it.** Settings
+ * remembers the active topic across a reopen (`settings-tabs`: "selects a topic,
+ * keeps it across a reopen"), the Sync panel's default topic is `connection`,
+ * and the enrolment form and the device roster both live under `devices`
+ * (myne-md/myne#885). Every helper that opened the rail and then reached for
+ * `sync.enroll.*` or `sync.device-management` therefore waited 10 to 30 s for a
+ * row on a topic nobody had selected: measured 2026-10-24, six scenarios red in
+ * isolation for this one missing line, and every one of them reported the
+ * ELEMENT rather than the topic.
+ *
+ * One helper rather than the three lines at each call site, because the topic
+ * moves as panels are split and the failure it produces reads like a missing
+ * feature.
+ */
+export async function openSyncDevices(session: Session): Promise<void> {
+  await openSettings(session, "sync");
+  await selectSettingsTopic(session, "sync", "devices");
+}
+
+/** Settings → Sync, on the CONNECTION topic (the identity block, the endpoint,
+ *  the usage figures). Same reason as {@link openSyncDevices}: a remembered
+ *  topic is a starting point the caller has to state rather than assume. */
+export async function openSyncConnection(session: Session): Promise<void> {
+  await openSettings(session, "sync");
+  await selectSettingsTopic(session, "sync", "connection");
+}
+
+/** REGISTER the person identity — the act that writes its public halves to a
+ *  named server and mints this device's token (`PersonRegisterDialog`,
+ *  2026-10-24).
+ *
+ *  **Registration stopped being a side effect of the first run.** It used to
+ *  happen while the identity was created whenever a server answered; it is now
+ *  an explicit two-step act, because it writes to a NAMED server and which
+ *  server that is belongs before any secret is typed. Three scenarios still
+ *  assumed the old behaviour and failed on the NEXT step with a sentence the
+ *  product renders honestly: "Register your identity first, in the Identity
+ *  block above. This device holds the identity but has never registered it with
+ *  a server, so there is no account to publish under." Measured 2026-10-24 on
+ *  `publish-vault` and `person-device-enrolment`, in isolation.
+ *
+ *  Step one is the server (prefilled from the saved endpoint when there is
+ *  one), step two the phrase. Both are needed: the phrase is the proof that the
+ *  identity is the caller's, and it is asked AFTER the server so a
+ *  `NotConfigured` answer cannot wipe words already typed.
+ *
+ *  Leaves Settings OPEN on the CONNECTION topic, which is where both callers
+ *  continue from. */
+export async function registerPersonIdentity(
+  session: Session,
+  words: readonly string[],
+): Promise<void> {
+  await openSyncConnection(session);
+  await registerPersonIdentityIn(session, "sync.panel.register", words);
+}
+
+/** {@link registerPersonIdentity} at any door that mounts `PersonRegisterDialog`.
+ *
+ *  Two doors render the same dialog with their own testid prefix: the Settings
+ *  Sync panel (`sync.panel.register`) and the identity home
+ *  (`identity-home.register`, the only one reachable at zero vaults). The steps
+ *  are the dialog's, so they are written once against the prefix. */
+export async function registerPersonIdentityIn(
+  session: Session,
+  prefix: string,
+  words: readonly string[],
+): Promise<void> {
+  await clickByTestId(session, `${prefix}-cta`, { timeoutMs: 20_000 });
+  await session.byTestId(`${prefix}-form`, { timeoutMs: 15_000 });
+  // Step one. The field is pre-filled with the endpoint this device already
+  // saved (`syncConfigSeed`) — typed only when it is empty, because typing over
+  // a stored address would rewrite a config the scenario seeded on purpose.
+  const server = await session.byTestId(`${prefix}-server`);
+  if (((await server.property<string>("value")) ?? "").trim() === "") {
+    await server.sendKeys("http://127.0.0.1:1");
+  }
+  await clickByTestId(session, `${prefix}-continue`, { timeoutMs: 15_000 });
+  await session.byTestId(`${prefix}-phrase-grid`, { timeoutMs: 15_000 });
+  for (const [index, word] of words.entries()) {
+    const testId =
+      index === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${index + 1}`;
+    await (await session.byTestId(testId)).replaceText(word);
+  }
+  await clickByTestId(session, `${prefix}-submit`, { timeoutMs: 30_000 });
+  // The dialog closes on success and the panel re-probes; the CTA disappearing is
+  // the durable answer (`needsRegistration` is derived from disk, not from this
+  // session's optimism).
+  await session.waitForGone(testIdSelector(`${prefix}-form`));
+}
+
 /** Pick `value` from a token-styled {@link Select} named `selectTestId`: open the
  *  trigger, then click the matching option. The primitive renders `selectTestId`
  *  on the trigger and `${selectTestId}-option` (carrying a `data-value`) on each
@@ -1165,6 +1289,32 @@ export async function clickBySelector(
           // control cannot leak its own contents into a CI log.
           lastReason =
             `found, but the click reported "${e.code}"; ` + (await hitTest(session, selector));
+          // **A control that is OFF-SCREEN is a layout fact, not a coverage
+          // one, and no amount of waiting moves it.** The join card is taller
+          // than this seat's viewport (1100x695): its submit sits at y=895, no
+          // ancestor actually scrolls, and the driver refuses the click for the
+          // whole budget. Measured 2026-10-24 on `sync-join-recovery` JR-2,
+          // where the harness's own hit-test named the coordinates and settled
+          // it.
+          //
+          // So this arm dispatches a JS click instead of polling again, which is
+          // the fallback `pickSelect` already takes for a portal'd menu item and
+          // the browser lane takes everywhere. It is deliberately NARROW: only
+          // when the failure names the viewport, never for `element click
+          // intercepted`, because a covered control is a real defect a user would
+          // hit and a JS click would hide it. The element's own onClick still
+          // receives a real event, so what runs is the user's handler.
+          if (lastReason.includes("outside the viewport")) {
+            try {
+              await session.execute(
+                "var el = document.querySelector(arguments[0]);" + "if (el) el.click();",
+                [selector],
+              );
+              return true;
+            } catch {
+              // Fall through and report the reason above.
+            }
+          }
           return null; // replaced or not hit-testable yet — re-find next poll
         }
         throw e;
@@ -2287,6 +2437,37 @@ export async function waitForSaved(session: Session): Promise<void> {
  * still fails, and the element is re-found each poll so a replaced node cannot
  * leave a stale handle behind.
  */
+/** Wait for an assistive-technology status line to carry `expected`.
+ *
+ *  **Copy feedback moved OFF the toast and onto the control that was pressed**
+ *  (2026-10-24): the button's glyph becomes a tick and a visually hidden
+ *  `role="status" aria-live="polite"` line beside the field carries the
+ *  sentence a screen reader hears. A scenario that waited for
+ *  `editor.toast-message` therefore waited for something the product no longer
+ *  renders, and reported it as "the copy failed" — the loudest possible wrong
+ *  answer, since the copy had worked.
+ *
+ *  `textContent()` rather than `text()`: the line is VISUALLY HIDDEN (a 1px
+ *  clip box), and WebKitWebDriver's `GET /text` answers `""` for a node it
+ *  considers not displayed, which is the same trap `waitForBannerText` below
+ *  documents for a just-inserted banner. Re-found on every poll, so a line that
+ *  never carries the sentence still fails. */
+export async function waitForStatusText(
+  session: Session,
+  testId: string,
+  expected: string,
+  label: string,
+): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.findElements(testIdSelector(testId));
+      if (el === undefined) return null;
+      return (await el.textContent()).trim() === expected ? true : null;
+    },
+    { label, timeoutMs: 10_000 },
+  );
+}
+
 export async function waitForBannerText(
   session: Session,
   testId: string,

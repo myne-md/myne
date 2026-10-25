@@ -20,7 +20,17 @@
 import { expect } from "vitest";
 import { type AppSession } from "./session";
 import { launchDevice, syncConfigSeed } from "./multi-device";
-import { closeSettings, ipcOk, openSettings, unlockToEditor, dismissImporterOffer } from "./flows";
+import {
+  closeSettings,
+  ipcOk,
+  openSyncConnection,
+  openSyncDevices,
+  registerPersonIdentity,
+  registerPersonIdentityIn,
+  selectSettingsTopic,
+  unlockToEditor,
+  dismissImporterOffer,
+} from "./flows";
 import { seedVault } from "./fixtures";
 
 /** A session, as every helper below takes it. */
@@ -135,6 +145,14 @@ export async function createMemberIdentity(member: AppSession): Promise<string> 
   await (await member.session.byTestId("first-run.identity.close-cta")).click();
   await (await member.session.byTestId("create.briefing-back")).click();
   await member.session.byTestId("identity-home.root");
+  // **REGISTER, at the identity home's own door.** Since 2026-10-24 a person is
+  // reachable only once their identity is written to a NAMED server, and the
+  // invitee reads its invitations over the relay with the token that act mints.
+  // Without it the home polls for an invitation that has nowhere to be delivered:
+  // measured 2026-10-24 as a 120 s timeout on `identity-home.invite-row` in
+  // `member-onboarding` and `member-devices`.
+  await registerPersonIdentityIn(member.session, "identity-home.register", MEMBER_PHRASE.split(" "));
+  await member.session.byTestId("identity-home.root");
   return readValue(member.session, "identity-home.identity-code");
 }
 
@@ -146,7 +164,7 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   await owner.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
   await unlockToEditor(owner.session, OWNER_PASSWORD);
   await dismissImporterOffer(owner.session);
-  await openSettings(owner.session, "sync");
+  await openSyncDevices(owner.session);
   await owner.session.byTestId("sync.enroll.account-input", { timeoutMs: 10_000 });
   // The relay post needs an authenticated device: enrolling registers this vault at
   // the endpoint and self-approves the first device, which is the credential
@@ -159,7 +177,7 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   await closeSettings(owner.session);
   // The identity is unlocked from the Sync panel's Identity block, which is collapsed
   // by default (myne-md/myne#831); the roster no longer carries its own grid.
-  await openSettings(owner.session, "sync");
+  await openSyncConnection(owner.session);
   await (await owner.session.byTestId("sync.panel.identity-unlock.open")).click();
   await typePhrase(
     owner.session,
@@ -168,7 +186,23 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
     OWNER_PHRASE,
   );
   await (await owner.session.byTestId("sync.panel.identity-unlock.submit")).click();
+  await owner.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 30_000 });
+  // The roster is a DEVICES-topic surface and the unlock happened on
+  // CONNECTION, so the section it waits for is not mounted until the topic
+  // moves. Measured 2026-10-24: every scenario built on this helper reported
+  // `member-roster.person-ready` missing for 90 s after an unlock that had
+  // worked, which reads as "the phrase was refused".
+  await selectSettingsTopic(owner.session, "sync", "devices");
   await owner.session.byTestId("member-roster.person-ready", { timeoutMs: 90_000 });
+  // **REGISTER the owner's identity before anything tries to reach them.**
+  // Since 2026-10-24 registration is an explicit act, not a side effect of the
+  // first run: the relay only knows an identity that was written to a NAMED
+  // server, and an invite addressed to an unregistered person has nowhere to
+  // land. Skipping it left the member's identity home polling for an invitation
+  // that could never arrive, which surfaced as a 120 s timeout on
+  // `identity-home.invite-row` in three scenarios at once.
+  await registerPersonIdentity(owner.session, OWNER_PHRASE.split(" "));
+  await selectSettingsTopic(owner.session, "sync", "devices");
   return readValue(owner.session, "member-roster.owner-code");
 }
 

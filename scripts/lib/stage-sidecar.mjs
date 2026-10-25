@@ -41,13 +41,16 @@ const STAGE_DIR = join(repoRoot, "src-tauri", "binaries");
 /**
  * Parse the shared CLI surface: `[--profile debug|release] [--target <triple>]
  * [--no-build]`. `scriptName` only shapes the error messages.
+ *
+ * `args.features` is deliberately NOT parsed from the command line: it is set by
+ * the one caller whose package declares features (see `build-clipper-host.mjs`).
  */
 export function parseArgs(argv, scriptName) {
   const fail = (message) => {
     console.error(`${scriptName}: ${message}`);
     process.exit(1);
   };
-  const args = { profile: "release", target: null, build: true };
+  const args = { profile: "release", target: null, build: true, features: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--profile") {
@@ -141,6 +144,14 @@ export function stageSidecar({ scriptName, package: pkg, binName, args }) {
     const cargoArgs = ["build", "-p", pkg, "--bin", binName];
     if (args.profile === "release") cargoArgs.push("--release");
     if (args.target) cargoArgs.push("--target", args.target);
+    // `features` is OPT-IN and only the caller that knows its package declares
+    // them sets it (`build-clipper-host.mjs`). `myne` and `myne-tor` are their
+    // own crates with no such features, so a shared env var read here refused
+    // those builds outright: `the package 'myne-cli' does not contain these
+    // features`. The list belongs to the package, not to the stager.
+    if (args.features !== undefined && args.features.length > 0) {
+      cargoArgs.push("--features", args.features.join(","));
+    }
     // FATAL (myne#528). A cargo build is slow enough that silence reads as a
     // hang, so the diagnostics are what make the wait legible, not noise.
     runTool(["cargo", ...cargoArgs], { cwd: repoRoot, onToolFailure: "fatal" });
