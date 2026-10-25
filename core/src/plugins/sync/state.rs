@@ -585,7 +585,10 @@ pub async fn read_head_baseline(
         if blob[4] != protocol::VAULT_HEAD_PROTOCOL_VERSION {
             return Err(protocol::vault_head::VaultHeadError::ProtocolVersionMismatch);
         }
-        if blob[5] != head_authority.expected_format() {
+        // The baseline may hold a format this device no longer AUTHORS: a `0x03` head
+        // written before a device key was lost still has to be readable, or the device
+        // would forget its own version vector and re-author from zero.
+        if !head_authority.accepts_format(blob[5]) {
             return Err(protocol::vault_head::VaultHeadError::FormatUnsupported);
         }
         head_authority.open(&blob[header..])

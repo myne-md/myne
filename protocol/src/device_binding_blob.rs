@@ -127,6 +127,32 @@ pub const DEVICE_BINDING_BLOB_AAD_ROLE: &[u8] = b"device-binding-blob";
 /// instead of half-parsing.
 pub const DEVICE_BINDING_BLOB_FORMAT_V1: u8 = 0x01;
 
+/// `format_version` byte for the schema that carries the **device public halves**
+/// (`decisions/protocol/0733` decision 3).
+///
+/// A v2 row adds `device_ed_pk` and `device_mldsa_vk`, OMITTED from a v1-shaped row,
+/// so a map of v1 rows still encodes byte-identically and an older reader sees a
+/// canonical map it already understands. What a v2 row buys is the one thing a
+/// device-signed head needs: the verifying key of the device that signed it, carried
+/// by a row the PERSON key signs.
+pub const DEVICE_BINDING_BLOB_FORMAT_V2: u8 = 0x02;
+
+/// The format this client WRITES. A `0x02` blob may hold `0x01` rows (a device that
+/// has not re-signed itself yet), so the byte is the map's schema revision and never
+/// an assertion about every row inside it.
+pub const DEVICE_BINDING_BLOB_FORMAT_CURRENT: u8 = DEVICE_BINDING_BLOB_FORMAT_V2;
+
+/// Every format byte this client ACCEPTS, the vocabulary `dictionary_blob` uses for
+/// the same situation. A reader dispatches on the byte; a blob outside this list is
+/// `DeviceBindingFormatUnsupported` rather than half-parsed.
+pub const DEVICE_BINDING_BLOB_SUPPORTED_FORMATS: &[u8] =
+    &[DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_FORMAT_V2];
+
+/// The `v2` message class: a row that carries the device public halves signs under
+/// this prefix, so a v1 signature can never be read as a v2 one (the class is inside
+/// the signed bytes, and the two messages differ in their prefix AND their length).
+pub const DEVICE_BINDING_PREFIX_V2: &[u8] = b"myne.device-binding v2|";
+
 /// The registered message-class prefix every row's signature covers. A signature
 /// class, minted whole, so a device-binding signature can never be replayed as a
 /// member-name signature, a roster, an invite, a transition or an awareness
@@ -178,10 +204,25 @@ pub struct DeviceBindingEntry {
     /// A tombstone removes the binding and WINS at equal version, so a concurrent
     /// re-claim cannot resurrect a device whose person was removed from the vault.
     pub tombstone: bool,
+    /// The DEVICE's Ed25519 public key, lowercase hex, when this row carries the
+    /// device's signing halves (`format_version` 0x02). `None` on a v1-shaped row,
+    /// which is why it is skipped on serialize: a v1 row re-encodes byte-identically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_ed_pk: Option<String>,
+    /// The DEVICE's ML-DSA-65 verifying key, lowercase hex. `None` on a v1 row.
+    ///
+    /// A row's own claim is still the PERSON's signature; these halves are the
+    /// material that lets a peer verify records the DEVICE signed, and they are inside
+    /// the person-signed message so a third party cannot swap them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_mldsa_vk: Option<String>,
     /// Hybrid Ed25519 + ML-DSA-65 signature over
     /// `"myne.device-binding v1|" || device_id || person_fingerprint || version ||
-    /// tombstone`, lowercase hex, produced by the person this row CLAIMS (or, for a
-    /// removal, by the vault owner). See [`sign_device_binding`].
+    /// tombstone` (a v1 row) or, when the row carries the device halves,
+    /// `"myne.device-binding v2|" || device_id || person_fingerprint || version ||
+    /// tombstone || device_ed_pk || device_mldsa_vk` (a v2 row). Lowercase hex,
+    /// produced by the person this row CLAIMS (or, for a removal, by the vault
+    /// owner). See [`sign_device_binding`] and [`sign_device_binding_v2`].
     pub signature_hex: String,
 }
 
@@ -292,8 +333,19 @@ fn valid_entry(entry: &DeviceBindingEntry) -> bool {
     // well-formed signature. This layer is STRUCTURAL: whether the signature is the
     // RIGHT one is [`verify_device_binding`]'s question, and whether the fingerprint
     // is a real member's is the roster's.
+    let halves_ok = match (&entry.device_ed_pk, &entry.device_mldsa_vk) {
+        (None, None) => true,
+        (Some(ed), Some(vk)) => {
+            is_hex_len(ed, crate::device_key::DEVICE_ED25519_PK_LEN)
+                && is_hex_len(vk, crate::device_key::DEVICE_MLDSA_VK_LEN)
+        }
+        // Half a public key is refused rather than ignored: a row whose two halves
+        // drifted apart would verify under one class and carry unusable material.
+        _ => false,
+    };
     is_fingerprint_hex(&entry.person_fingerprint)
         && is_hex_len(&entry.signature_hex, DEVICE_BINDING_SIGNATURE_LEN)
+        && halves_ok
 }
 
 /// The canonical bytes of a map: `serde_json` over a `BTreeMap` (keys in byte order)
@@ -440,15 +492,42 @@ pub fn encode_device_binding_blob_raw(
     map: &DeviceBindingsMap,
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, DeviceBindingBlobError> {
+    encode_device_binding_blob_raw_with_format(
+        device_binding_key,
+        account_number_hash,
+        group_key_epoch,
+        map,
+        DEVICE_BINDING_BLOB_FORMAT_V2,
+        nonce,
+    )
+}
+
+/// [`encode_device_binding_blob_raw`] with the `format_version` byte chosen by the
+/// caller.
+///
+/// It exists for ONE reason: the family's vectors pin the v1 layout, and a v1 case
+/// cannot be produced by a writer that always emits v2. Production callers use the
+/// wrapper above, which is v2 (`decisions/protocol/0733`).
+pub fn encode_device_binding_blob_raw_with_format(
+    device_binding_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; 16],
+    group_key_epoch: u64,
+    map: &DeviceBindingsMap,
+    format_version: u8,
+    nonce: &[u8; AEAD_NONCE_LEN],
+) -> Result<Vec<u8>, DeviceBindingBlobError> {
     if group_key_epoch == 0 {
         return Err(DeviceBindingBlobError::EpochZero);
+    }
+    if !DEVICE_BINDING_BLOB_SUPPORTED_FORMATS.contains(&format_version) {
+        return Err(DeviceBindingBlobError::DeviceBindingFormatUnsupported);
     }
     let plaintext = encode_device_bindings_map(map)?;
     let aad = aad_device_binding_blob(account_number_hash, group_key_epoch);
     crate::blob_envelope::encode_blob_envelope_raw(
         device_binding_key,
         &DEVICE_BINDING_BLOB_MAGIC,
-        DEVICE_BINDING_BLOB_FORMAT_V1,
+        format_version,
         &aad,
         MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
         &plaintext,
@@ -472,7 +551,7 @@ pub fn encode_device_binding_blob(
     encode_blob_envelope(
         device_binding_key,
         &DEVICE_BINDING_BLOB_MAGIC,
-        DEVICE_BINDING_BLOB_FORMAT_V1,
+        DEVICE_BINDING_BLOB_FORMAT_V2,
         &aad,
         MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
         &plaintext,
@@ -493,10 +572,22 @@ pub fn decode_device_binding_blob(
         return Err(DeviceBindingBlobError::EpochZero);
     }
     let aad = aad_device_binding_blob(account_number_hash, group_key_epoch);
+    // The FORMAT BYTE picks the schema, and it is read before the envelope decode
+    // rather than after: a v1 blob is still readable (a vault that has not written a
+    // device key yet), and anything else is refused as unsupported instead of being
+    // half-parsed. `blob[5]` is safe to read because the envelope rejects a short
+    // input first, and this check is repeated by that decode for its own version.
+    let format_version = blob
+        .get(5)
+        .copied()
+        .ok_or(DeviceBindingBlobError::HeaderTooShort)?;
+    if !DEVICE_BINDING_BLOB_SUPPORTED_FORMATS.contains(&format_version) {
+        return Err(DeviceBindingBlobError::DeviceBindingFormatUnsupported);
+    }
     let plaintext = decode_blob_envelope(
         device_binding_key,
         &DEVICE_BINDING_BLOB_MAGIC,
-        DEVICE_BINDING_BLOB_FORMAT_V1,
+        format_version,
         &aad,
         MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
         blob,
@@ -610,8 +701,95 @@ pub fn sign_device_binding(
         person_fingerprint: crate::hex::encode_lower(person_fingerprint),
         version,
         tombstone,
+        device_ed_pk: None,
+        device_mldsa_vk: None,
         signature_hex: crate::hex::encode_lower(&bytes),
     })
+}
+
+/// The `v2` message: the v1 message with the device's two public halves appended at
+/// fixed widths, so one row signs exactly one string and a port reproduces it
+/// without ambiguity.
+pub fn device_binding_signed_bytes_v2(
+    device_id: &[u8; 16],
+    person_fingerprint: &[u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+    version: u64,
+    tombstone: bool,
+    device_ed_pk: &[u8; crate::device_key::DEVICE_ED25519_PK_LEN],
+    device_mldsa_vk: &[u8; crate::device_key::DEVICE_MLDSA_VK_LEN],
+) -> Vec<u8> {
+    let mut msg = Vec::with_capacity(
+        DEVICE_BINDING_PREFIX_V2.len()
+            + 16
+            + crate::person_key::PERSON_FINGERPRINT_LEN
+            + 8
+            + 1
+            + crate::device_key::DEVICE_ED25519_PK_LEN
+            + crate::device_key::DEVICE_MLDSA_VK_LEN,
+    );
+    msg.extend_from_slice(DEVICE_BINDING_PREFIX_V2);
+    msg.extend_from_slice(device_id);
+    msg.extend_from_slice(person_fingerprint);
+    msg.extend_from_slice(&version.to_be_bytes());
+    msg.push(u8::from(tombstone));
+    msg.extend_from_slice(device_ed_pk);
+    msg.extend_from_slice(device_mldsa_vk);
+    msg
+}
+
+/// Build a row that carries the DEVICE's public halves (`format_version` 0x02),
+/// signed by the person the row claims.
+///
+/// The halves are inside the signed message, so the person's signature attests them:
+/// a third party holding the group key cannot swap a device's verifying key for one
+/// of their own while keeping the row's fingerprint, which is what would otherwise
+/// turn the binding store into a way to sign heads as somebody else's device.
+///
+/// The limit the v1 docblock states still stands and is not closed by this: the row
+/// is a CLAIM ("this person says this device is theirs"), because a member can still
+/// name any device id under their own fingerprint. What v2 adds is that the row now
+/// carries the key that will actually have to produce the signature.
+pub fn sign_device_binding_v2(
+    person: &crate::person_key::PersonKeyPair,
+    device_id: &[u8; 16],
+    person_fingerprint: &[u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+    version: u64,
+    tombstone: bool,
+    device_public: &crate::device_key::DevicePublicHalf,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<DeviceBindingEntry, DeviceBindingBlobError> {
+    let msg = device_binding_signed_bytes_v2(
+        device_id,
+        person_fingerprint,
+        version,
+        tombstone,
+        device_public.ed_pk(),
+        device_public.mldsa_vk(),
+    );
+    let signed = person
+        .sign(&msg, rng)
+        .map_err(|_| DeviceBindingBlobError::SignatureUnavailable)?;
+    let mut bytes = Vec::with_capacity(DEVICE_BINDING_SIGNATURE_LEN);
+    bytes.extend_from_slice(&signed.ed25519_sig);
+    bytes.extend_from_slice(&signed.mldsa_sig);
+    Ok(DeviceBindingEntry {
+        person_fingerprint: crate::hex::encode_lower(person_fingerprint),
+        version,
+        tombstone,
+        device_ed_pk: Some(crate::hex::encode_lower(device_public.ed_pk())),
+        device_mldsa_vk: Some(crate::hex::encode_lower(device_public.mldsa_vk())),
+        signature_hex: crate::hex::encode_lower(&bytes),
+    })
+}
+
+/// The device public halves a row carries, if it carries a complete pair.
+#[must_use]
+pub fn device_public_half_from_entry(
+    entry: &DeviceBindingEntry,
+) -> Option<crate::device_key::DevicePublicHalf> {
+    let ed = entry.device_ed_pk.as_deref()?;
+    let vk = entry.device_mldsa_vk.as_deref()?;
+    crate::device_key::DevicePublicHalf::from_parts_hex(ed, vk).ok()
 }
 
 /// Split a row's hex signature back into its two halves. `None` for anything that is
@@ -655,8 +833,54 @@ pub fn verify_device_binding(
     let Some(signed) = signature_from_hex(&entry.signature_hex) else {
         return false;
     };
-    let msg = device_binding_signed_bytes(device_id, &claimed, entry.version, entry.tombstone);
-    public.verify(&msg, &signed).is_ok()
+    match binding_message_for_entry(device_id, &claimed, entry) {
+        Some(msg) => public.verify(&msg, &signed).is_ok(),
+        // A row carrying a malformed half is not verifiable in either class: the
+        // structural check would already reject it on encode, and this is the read
+        // side refusing the same shape rather than falling back to v1.
+        None => false,
+    }
+}
+
+/// The exact message a row's signature covers, chosen by whether the row carries the
+/// device halves.
+///
+/// Public because it is the assembly a port has to reproduce byte-for-byte, and
+/// because the choice is made from the ROW rather than from the blob's format byte: a
+/// v2 map can hold a v1 row that has not re-signed itself yet.
+///
+/// The choice is made from the ROW, never from the blob's `format_version`: a v2 blob
+/// can hold rows written before the change (they have not re-signed yet), so the row
+/// is the authority on its own class. `None` when the halves are present but
+/// malformed.
+pub fn binding_message_for_entry(
+    device_id: &[u8; 16],
+    claimed: &[u8; crate::person_key::PERSON_FINGERPRINT_LEN],
+    entry: &DeviceBindingEntry,
+) -> Option<Vec<u8>> {
+    match (&entry.device_ed_pk, &entry.device_mldsa_vk) {
+        (None, None) => Some(device_binding_signed_bytes(
+            device_id,
+            claimed,
+            entry.version,
+            entry.tombstone,
+        )),
+        (Some(ed), Some(vk)) => {
+            let ed = hex_bytes(ed, crate::device_key::DEVICE_ED25519_PK_LEN)?;
+            let vk = hex_bytes(vk, crate::device_key::DEVICE_MLDSA_VK_LEN)?;
+            let ed: [u8; crate::device_key::DEVICE_ED25519_PK_LEN] = ed.try_into().ok()?;
+            let vk: [u8; crate::device_key::DEVICE_MLDSA_VK_LEN] = vk.try_into().ok()?;
+            Some(device_binding_signed_bytes_v2(
+                device_id,
+                claimed,
+                entry.version,
+                entry.tombstone,
+                &ed,
+                &vk,
+            ))
+        }
+        _ => None,
+    }
 }
 
 /// Whether this row is a REMOVAL the vault owner signed, which is how a member's
@@ -681,8 +905,10 @@ pub fn verify_device_binding_removal(
     let Some(signed) = signature_from_hex(&entry.signature_hex) else {
         return false;
     };
-    let msg = device_binding_signed_bytes(device_id, &claimed, entry.version, entry.tombstone);
-    owner.verify(&msg, &signed).is_ok()
+    match binding_message_for_entry(device_id, &claimed, entry) {
+        Some(msg) => owner.verify(&msg, &signed).is_ok(),
+        None => false,
+    }
 }
 
 /// Split a map into the rows whose signature checks out and the device ids that do
@@ -766,6 +992,8 @@ mod tests {
             person_fingerprint: person_fingerprint.to_string(),
             version,
             tombstone,
+            device_ed_pk: None,
+            device_mldsa_vk: None,
             signature_hex: core::iter::repeat_n(signature_byte, DEVICE_BINDING_SIGNATURE_HEX_LEN)
                 .collect(),
         }
@@ -776,6 +1004,8 @@ mod tests {
             person_fingerprint: person_fingerprint.to_string(),
             version,
             tombstone,
+            device_ed_pk: None,
+            device_mldsa_vk: None,
             signature_hex: placeholder_signature(),
         }
     }
@@ -1452,11 +1682,22 @@ mod tests {
                 if i > 0 {
                     s.push(',');
                 }
+                // Declaration order, which is what serde emits and what the canonical
+                // check compares against. The two device halves are OMITTED on a v1
+                // row, which is the whole reason a v1 map still encodes
+                // byte-identically after the schema gained them.
+                let halves = match (&e.device_ed_pk, &e.device_mldsa_vk) {
+                    (Some(ed), Some(vk)) => {
+                        format!(",\"device_ed_pk\":\"{ed}\",\"device_mldsa_vk\":\"{vk}\"")
+                    }
+                    _ => String::new(),
+                };
                 s.push_str(&format!(
-                    "\"{id}\":{{\"person_fingerprint\":\"{}\",\"version\":{},\"tombstone\":{},\"signature_hex\":\"{}\"}}",
+                    "\"{id}\":{{\"person_fingerprint\":\"{}\",\"version\":{},\"tombstone\":{}{},\"signature_hex\":\"{}\"}}",
                     e.person_fingerprint,
                     e.version,
                     e.tombstone,
+                    halves,
                     e.signature_hex,
                 ));
             }
@@ -1491,9 +1732,18 @@ mod tests {
         }
 
         // Seal `map` under the family AAD and assert the header the format fixes.
-        let seal = |map: &DeviceBindingsMap| -> Vec<u8> {
-            let blob = encode_device_binding_blob_raw(&key, &acct, epoch, map, &nonce)
-                .expect("seal device-binding map");
+        // The v1 cases pin the OLDER schema byte, which a reader must still accept and
+        // which no writer emits any more; production writes v2 (`0733`).
+        let seal_v1 = |map: &DeviceBindingsMap| -> Vec<u8> {
+            let blob = encode_device_binding_blob_raw_with_format(
+                &key,
+                &acct,
+                epoch,
+                map,
+                DEVICE_BINDING_BLOB_FORMAT_V1,
+                &nonce,
+            )
+            .expect("seal device-binding map");
             assert_eq!(&blob[..4], b"MYU5", "family magic");
             assert_eq!(blob[4], 0x01, "envelope protocol_version");
             assert_eq!(
@@ -1644,7 +1894,7 @@ mod tests {
         ]
         .into_iter()
         {
-            let blob = seal(map);
+            let blob = seal_v1(map);
             let mj = map_json(map);
             let canonical = String::from_utf8(encode_device_bindings_map(map).expect("canonical"))
                 .expect("canonical map bytes are UTF-8");
@@ -1669,7 +1919,7 @@ mod tests {
         // ===== decrypt_fail ===================================================
         // One case per way of reaching the single non-distinguishing answer, plus the
         // epoch guard, which is checked before the AEAD is even attempted.
-        let good = seal(&empty);
+        let good = seal_v1(&empty);
         let mut tampered = good.clone();
         let last = tampered.len() - 1;
         tampered[last] ^= 0x01;
@@ -2281,6 +2531,131 @@ mod tests {
             "GroupRole::DeviceBindingSyncId ('device-binding-sync-id'): the deterministic sync blob-id for the singleton. It is a SUBKEY rather than a filename so the id is epoch-scoped and does not leak a vault-independent constant to the server. Distinct from the AAD role 'device-binding-blob': a KEK role and an AAD role share no namespace. It is the id that ROTATES on member removal, which is what makes the retired record reclaimable rather than readable to the member just removed.",
             GroupRole::DeviceBindingSyncId,
             "device-binding-sync-id",
+            true,
+        );
+
+        // ===== the v2 schema: a row carrying the DEVICE public halves =========
+        // `decisions/protocol/0733` decision 3. The format byte moves to 0x02 and the
+        // row gains the two halves INSIDE the person-signed message, which is what
+        // lets a peer verify a record the DEVICE signed. The v1 cases above are left
+        // exactly as they were on purpose: a reader must still accept a v1 blob, and
+        // a v1 row re-encodes byte-identically because the halves are omitted.
+        let device_pair = crate::device_key::DeviceKeyPair::generate_raw(&[0x51; 32], &[0x52; 32]);
+        let device_pub = device_pair.public_half();
+        let (v2_key, v2_row) = {
+            let row = sign_device_binding_v2(
+                &member_a,
+                &dev_a,
+                member_a.fingerprint(),
+                9,
+                false,
+                &device_pub,
+                &mut SeededRng(0x2d),
+            )
+            .expect("sign v2 binding");
+            (crate::hex::encode_lower(&dev_a), row)
+        };
+        let mut v2_map = DeviceBindingsMap::new();
+        v2_map.insert(v2_key.clone(), v2_row.clone());
+        {
+            let blob = encode_device_binding_blob_raw_with_format(
+                &key,
+                &acct,
+                epoch,
+                &v2_map,
+                DEVICE_BINDING_BLOB_FORMAT_V2,
+                &nonce,
+            )
+            .expect("seal the v2 map");
+            let mj = map_json(&v2_map);
+            let canonical =
+                String::from_utf8(encode_device_bindings_map(&v2_map).expect("canonical"))
+                    .expect("canonical map bytes are UTF-8");
+            assert_eq!(
+                mj, canonical,
+                "[v2] the emitted input_map must BE the canonical plaintext"
+            );
+            assert_eq!(blob[5], DEVICE_BINDING_BLOB_FORMAT_V2, "[v2] format byte");
+            let body = format!(
+                "      \"input_device_binding_key_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_group_key_epoch\": {},\n      \"input_nonce_hex\": \"{}\",\n      \"input_map\": {},\n      \"expected_blob_hex\": \"{}\",\n      \"informational_header_len\": {},\n      \"informational_nonce_offset\": 6,\n      \"expected_magic_ascii\": \"MYU5\",\n      \"expected_protocol_version_byte_hex\": \"01\",\n      \"expected_format_version_byte_hex\": \"02\"\n",
+                crate::hex::encode_lower(&key),
+                crate::hex::encode_lower(&acct),
+                epoch,
+                crate::hex::encode_lower(&nonce),
+                mj,
+                crate::hex::encode_lower(&blob),
+                DEVICE_BINDING_BLOB_HEADER_LEN,
+            );
+            case(
+                &mut dump,
+                "encrypt-v2-row-with-device-public-halves",
+                "encrypt",
+                "The v2 schema: format_version 0x02, one row carrying the DEVICE's Ed25519 public key and ML-DSA-65 verifying key beside the person's signature. The halves sit INSIDE the signed message, so the person's signature attests them: without that, anybody holding the group key could swap a device's verifying key while keeping the row's fingerprint, which is exactly the substitution that would let them sign heads as somebody else's device. A v1 map still encodes byte-identically because both fields are omitted when absent.",
+                &body,
+                true,
+            );
+        }
+
+        // The v2 row is accepted by the SAME verifier as a v1 row, and the halves are
+        // what it verifies against: swapping them for another device's breaks the
+        // signature, which is the property the schema exists for.
+        let v2_entry_json = |e: &DeviceBindingEntry| -> String {
+            format!(
+                "      \"input_entry\": {{ \"person_fingerprint\": \"{}\", \"version\": {}, \"tombstone\": {}, \"device_ed_pk\": \"{}\", \"device_mldsa_vk\": \"{}\", \"signature_hex\": \"{}\" }},\n",
+                e.person_fingerprint,
+                e.version,
+                e.tombstone,
+                e.device_ed_pk.clone().unwrap_or_default(),
+                e.device_mldsa_vk.clone().unwrap_or_default(),
+                e.signature_hex,
+            )
+        };
+        let verify_case_v2 = |dump: &mut String,
+                              slug: &str,
+                              description: &str,
+                              entry: &DeviceBindingEntry,
+                              expect: bool,
+                              trailing: bool| {
+            let got = verify_device_binding(&a_pub, &dev_a, entry);
+            assert_eq!(
+                got, expect,
+                "[{slug}] the emitted case must match the codec"
+            );
+            let claimed = member_a.fingerprint();
+            let message =
+                binding_message_for_entry(&dev_a, claimed, entry).expect("a v2 row's message");
+            let body = format!(
+                    "      \"verifier\": \"person\",\n      \"input_device_id_hex\": \"{}\",\n{}      \"informational_signed_bytes_hex\": \"{}\",\n      \"input_signer_kem_ek_hex\": \"{}\",\n      \"input_signer_ed_pk_hex\": \"{}\",\n      \"input_signer_mldsa_vk_hex\": \"{}\",\n      \"expected_verified\": {}\n",
+                    crate::hex::encode_lower(&dev_a),
+                    v2_entry_json(entry),
+                    crate::hex::encode_lower(&message),
+                    crate::hex::encode_lower(a_pub.kem_ek()),
+                    crate::hex::encode_lower(a_pub.ed_pk()),
+                    crate::hex::encode_lower(a_pub.mldsa_vk()),
+                    expect,
+                );
+            case(dump, slug, "verify", description, &body, trailing);
+        };
+        verify_case_v2(
+            &mut dump,
+            "verify-v2-own-signer-and-halves",
+            "The accepting half of the v2 schema: a row carrying the device public halves, signed by the person the row claims. A port that treats the v2 message as the v1 message (or that reads the halves but does not put them in the message) refuses this case, which is what pins the message bytes without pinning a signature.",
+            &v2_row,
+            true,
+            true,
+        );
+        let mut swapped = v2_row.clone();
+        let other_device = crate::device_key::DeviceKeyPair::generate_raw(&[0x61; 32], &[0x62; 32]);
+        swapped.device_ed_pk = Some(crate::hex::encode_lower(other_device.public_half().ed_pk()));
+        swapped.device_mldsa_vk = Some(crate::hex::encode_lower(
+            other_device.public_half().mldsa_vk(),
+        ));
+        verify_case_v2(
+            &mut dump,
+            "verify-v2-swapped-device-halves",
+            "The refusal the schema exists for: the same row with its two device halves replaced by another device's, signature untouched. The person signed a message containing the ORIGINAL halves, so the substitution fails verification. Without the halves in the signed message a member holding the group key could point a person's binding row at a key they control and then sign heads as that person's device.",
+            &swapped,
+            false,
             false,
         );
 

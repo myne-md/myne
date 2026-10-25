@@ -7551,7 +7551,7 @@ async fn sync_cycle_attempt(
                 "marked the re-key's stranded singleton blobs for horizon-GC"
             );
         }
-        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
+        write_head_baseline(io, vault_root, &sealed, head_authority.authors_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
@@ -7563,7 +7563,7 @@ async fn sync_cycle_attempt(
             record: vh.record.clone(),
             head_id: vh.head_id,
         };
-        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
+        write_head_baseline(io, vault_root, &sealed, head_authority.authors_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
     }

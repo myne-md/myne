@@ -168,19 +168,47 @@ pub async fn claim_self_in_dir(
     key: &DeviceBindingKey<'_>,
     person: &protocol::PersonKeyPair,
     device_id: &[u8; 16],
+    device_public: Option<&protocol::device_key::DevicePublicHalf>,
     rng: &mut (impl rand_core::CryptoRng + ?Sized),
 ) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
     let mut map = read_device_bindings_in_dir(io, vault_dir, key).await?;
     let id = device_id_hex(device_id);
     let mine = fingerprint_hex(person.fingerprint());
     if let Some(existing) = map.get(&id) {
-        if !existing.tombstone && existing.person_fingerprint == mine {
+        // Current means: live, naming this person, AND (when this device holds a
+        // device key) carrying that key's public half. The third clause is what makes
+        // an upgraded device re-sign itself ONCE: a `v1` row that names the right
+        // person is otherwise "current" forever, and its device key would never be
+        // published, so the device could never author a `0x03` head that peers resolve.
+        let halves_match = match device_public {
+            None => true,
+            Some(public) => {
+                existing.device_ed_pk.as_deref() == Some(public.ed_pk_hex().as_str())
+                    && existing.device_mldsa_vk.as_deref() == Some(public.mldsa_vk_hex().as_str())
+            }
+        };
+        if !existing.tombstone && existing.person_fingerprint == mine && halves_match {
             return Ok((map, ClaimOutcome::AlreadyCurrent));
         }
     }
     let version = next_version(&map, &id);
-    let row = sign_device_binding(person, device_id, person.fingerprint(), version, false, rng)
-        .map_err(|_| DeviceBindingError::Codec)?;
+    // A row written by a device that holds a device key is a `v2` row: the halves go
+    // INSIDE the person's signature, which is what lets a peer verify the heads that
+    // device authors (`decisions/protocol/0733` decision 3). A platform with no
+    // storage rung keeps writing a `v1` row, unchanged.
+    let row = match device_public {
+        Some(public) => protocol::sign_device_binding_v2(
+            person,
+            device_id,
+            person.fingerprint(),
+            version,
+            false,
+            public,
+            rng,
+        ),
+        None => sign_device_binding(person, device_id, person.fingerprint(), version, false, rng),
+    }
+    .map_err(|_| DeviceBindingError::Codec)?;
     map.insert(id, row);
     write_device_bindings_in_dir(io, vault_dir, key, &map).await?;
     Ok((map, ClaimOutcome::Written))
@@ -409,9 +437,16 @@ mod tests {
         let mut rng = SeededRng(1);
 
         with_key(|k| {
-            let (map, outcome) =
-                block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                    .expect("first claim");
+            let (map, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("first claim");
             assert_eq!(outcome, ClaimOutcome::Written);
             assert_eq!(live_row_count(&map), 1);
             let row = map.get(&device_id_hex(&DEV_A)).expect("the row exists");
@@ -429,9 +464,16 @@ mod tests {
             );
             let first = stored_bytes(&io, dir.path()).expect("the store exists after a claim");
 
-            let (again, outcome2) =
-                block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                    .expect("second claim");
+            let (again, outcome2) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("second claim");
             assert_eq!(
                 outcome2,
                 ClaimOutcome::AlreadyCurrent,
@@ -474,6 +516,7 @@ mod tests {
                 k,
                 &ann,
                 &DEV_A,
+                None,
                 &mut rng,
             ))
             .expect("a claims itself");
@@ -483,6 +526,7 @@ mod tests {
                 k,
                 &bob,
                 &DEV_B,
+                None,
                 &mut rng,
             ))
             .expect("b claims itself");
@@ -550,6 +594,90 @@ mod tests {
     /// against a peer whose copy PREDATES this device's join (it carries the peer's
     /// row and nothing about ours) takes both rather than replacing the local map
     /// with the older one.
+    /// The upgrade path a device takes the first time it holds a device key
+    /// (`decisions/protocol/0733` decision 3): its `v1` row is re-signed ONCE as a `v2`
+    /// row carrying the device public halves, and a third claim writes nothing.
+    ///
+    /// What this pins is the idempotence clause nobody would notice breaking: without
+    /// the halves in the "already current" test, a device that upgraded would keep its
+    /// `v1` row forever, its halves would never reach the store, and `cycle.rs` would
+    /// decline to author `0x03` heads for the rest of the device's life with no error
+    /// anywhere.
+    #[test]
+    fn a_device_key_upgrades_a_v1_row_to_v2_once() {
+        let dir = ScopedTempDir::new("device-binding-upgrade").unwrap();
+        let io = StdVaultIo;
+        let ann = pair(b"ann");
+        let mut rng = SeededRng(11);
+        let device_public =
+            protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32])
+                .public_half();
+
+        with_key(|k| {
+            // Before the device holds a key: a v1 row, no halves.
+            let (map, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &ann,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("first claim");
+            assert_eq!(outcome, ClaimOutcome::Written);
+            let row = map.get(&device_id_hex(&DEV_A)).expect("a row");
+            assert!(
+                row.device_ed_pk.is_none(),
+                "a pre-key row carries no halves"
+            );
+
+            // With a key: re-signed as v2, carrying exactly this device's halves.
+            let (map, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &ann,
+                &DEV_A,
+                Some(&device_public),
+                &mut rng,
+            ))
+            .expect("upgrade claim");
+            assert_eq!(outcome, ClaimOutcome::Written);
+            let row = map.get(&device_id_hex(&DEV_A)).expect("a row");
+            assert_eq!(
+                row.device_ed_pk.as_deref(),
+                Some(device_public.ed_pk_hex().as_str())
+            );
+            assert_eq!(
+                row.device_mldsa_vk.as_deref(),
+                Some(device_public.mldsa_vk_hex().as_str())
+            );
+            assert!(
+                protocol::verify_device_binding(&ann.public_half(), &DEV_A, row),
+                "the upgraded row is signed by the person it claims"
+            );
+            assert_eq!(
+                protocol::device_public_half_from_entry(row),
+                Some(device_public),
+                "the halves a peer resolves out of the row are the device's own"
+            );
+
+            // Third claim: already current, so nothing is written.
+            let (_, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &ann,
+                &DEV_A,
+                Some(&device_public),
+                &mut rng,
+            ))
+            .expect("third claim");
+            assert_eq!(outcome, ClaimOutcome::AlreadyCurrent);
+        });
+    }
+
     #[test]
     fn a_claim_written_offline_reconciles_without_a_user_visible_failure() {
         let dir = ScopedTempDir::new("device-binding-offline").unwrap();
@@ -562,9 +690,16 @@ mod tests {
         with_key(|k| {
             // Nothing remote exists. The claim is a plain success, not an error the
             // caller has to swallow.
-            let (map, outcome) =
-                block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                    .expect("an offline claim is not a failure");
+            let (map, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("an offline claim is not a failure");
             assert_eq!(outcome, ClaimOutcome::Written);
             assert_eq!(live_row_count(&map), 1);
 
@@ -585,6 +720,7 @@ mod tests {
                 k,
                 &peer,
                 &DEV_B,
+                None,
                 &mut rng,
             ))
             .expect("peer claims");
@@ -776,6 +912,7 @@ mod tests {
                 k,
                 &old,
                 &DEV_A,
+                None,
                 &mut rng,
             ))
             .expect("the device claims itself under the first identity");
@@ -787,6 +924,7 @@ mod tests {
                 k,
                 &new,
                 &DEV_A,
+                None,
                 &mut rng,
             ))
             .expect("the next unlock re-claims");
@@ -819,6 +957,7 @@ mod tests {
                 k,
                 &new,
                 &DEV_A,
+                None,
                 &mut rng,
             ))
             .expect("a third unlock");
@@ -845,8 +984,16 @@ mod tests {
         let mut rng = SeededRng(19);
 
         with_key(|k| {
-            let _ = block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                .expect("claim");
+            let _ = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("claim");
             // An owner-signed tombstone lands on the row, as a removal would write it.
             let (tombstoned, n) = block_on(tombstone_member_devices_in_dir(
                 &io,
@@ -861,9 +1008,16 @@ mod tests {
             assert!(tombstoned.get(&device_id_hex(&DEV_A)).unwrap().tombstone);
             assert_eq!(live_row_count(&tombstoned), 0);
 
-            let (reclaimed, outcome) =
-                block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                    .expect("re-claim");
+            let (reclaimed, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("re-claim");
             assert_eq!(
                 outcome,
                 ClaimOutcome::Written,
@@ -914,8 +1068,16 @@ mod tests {
         let mut rng = SeededRng(23);
 
         with_key(|k| {
-            let _ = block_on(claim_self_in_dir(&io, dir.path(), k, &me, &DEV_A, &mut rng))
-                .expect("claim");
+            let _ = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("claim");
             let before = stored_bytes(&io, dir.path()).expect("the store");
 
             let err = block_on(merge_pulled_blob_in_dir(&io, dir.path(), k, &[0u8; 128]))

@@ -1139,6 +1139,7 @@ mod join_tests {
                 &bindings_key.borrow(),
                 &member,
                 &DEVICE,
+                None,
                 &mut rng,
             )
             .await
