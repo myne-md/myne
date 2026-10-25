@@ -50,6 +50,7 @@ import {
   type ViewStreamItem,
 } from "./viewLayout";
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
+import { refusalSentence } from "./refusalSentence";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
@@ -62,7 +63,6 @@ import {
   type BulkRestoreResult,
 } from "../bulkSetField";
 import { lastBulkAction } from "./bulkUndoJournal";
-import type { NoteSetFieldError } from "../../types/note-set-field-error";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./card";
 import {
   HOVER_TRANSITION,
@@ -217,42 +217,10 @@ const NAME_TEXT_STYLE: CSSProperties = {
  * One sentence per host refusal. Exhaustive over the mirror, so a new variant is
  * a compile error here rather than a silent generic line: the whole point of the
  * per-note report is that the reader learns what to redo.
+ *
+ * Moved to `./refusalSentence` when the board began reporting the same refusals
+ * for a refused drag: one closed mapping, two callers.
  */
-function refusalSentence(
-  reason: NoteSetFieldError,
-  t: (key: string) => string,
-): string {
-  switch (reason.kind) {
-    case "VaultLocked":
-      return t("notes.views.bulk.refusedVaultLocked");
-    case "InvalidNoteId":
-      return t("notes.views.bulk.refusedInvalidNoteId");
-    case "NoteNotFound":
-      return t("notes.views.bulk.refusedNoteNotFound");
-    case "CannotDecrypt":
-      return t("notes.views.bulk.refusedCannotDecrypt");
-    case "NotApproved":
-      return t("notes.views.bulk.refusedNotApproved");
-    case "FieldNotDeclared":
-      return t("notes.views.bulk.refusedFieldNotDeclared");
-    case "FieldReserved":
-      return t("notes.views.bulk.refusedFieldReserved");
-    case "FieldChanged":
-      return t("notes.views.bulk.refusedFieldChanged");
-    case "InvalidField":
-      return t("notes.views.bulk.refusedInvalidField");
-    case "ValueTooLarge":
-      return t("notes.views.bulk.refusedValueTooLarge");
-    case "LiveSessionOpen":
-      return t("notes.views.bulk.refusedLiveSessionOpen");
-    case "PrefsUnreadable":
-      return t("notes.views.bulk.refusedPrefsUnreadable");
-    case "Io":
-      return t("notes.views.bulk.refusedIo");
-    case "JoinFailure":
-      return t("notes.views.bulk.refusedJoinFailure");
-  }
-}
 
 /** The scalar the view row believes the field holds, or `null` when absent.
  *  A LIST value returns `null` PLUS a flag: the caller excludes those notes,

@@ -34,6 +34,12 @@ export const VIEW_TESTID = {
   laneScroll: "view.lane-scroll",
   laneHeading: "view.lane-heading",
   laneEmpty: "view.lane-empty",
+  /** The slot one card occupies inside a lane: the element that carries the
+   *  drag and keyboard gesture, so the pointer target and the card's own click
+   *  stay separate things. */
+  laneCardSlot: "view.card-slot",
+  /** The line a refused drag renders, where the gesture happened. */
+  boardRefusal: "view.board-refusal",
 } as const;
 
 /** Default cover aspect ratio (≈16:9) when a view sets no
