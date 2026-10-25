@@ -130,12 +130,14 @@ const STATE_PENDING_STYLE: CSSProperties = {
 };
 
 /** One saved view's render type, in the words the view settings modal already
- *  uses. Reusing those keys rather than adding a second naming of the three
+ *  uses. Reusing those keys rather than adding a second naming of the render
  *  types is what keeps "Table" meaning one thing in the app. */
 function viewTypeKey(type: ViewType): string {
   switch (type) {
     case "cards":
       return "notes.viewSettings.viewTypeCards";
+    case "board":
+      return "notes.viewSettings.viewTypeBoard";
     case "table":
       return "notes.viewSettings.viewTypeTable";
     case "list":

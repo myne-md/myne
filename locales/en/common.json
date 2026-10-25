@@ -2747,6 +2747,10 @@
         "valuePlaceholder": "New value",
         "written": "Wrote {{count}}."
       },
+      "board": {
+        "emptyLane": "No cards",
+        "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
+      },
       "cards": {
         "changeCover": "Change cover",
         "changeCoverImage": "Change cover image",
@@ -2868,6 +2872,7 @@
       "writeFields": "Fields this view can change",
       "writeFieldsHint": "The only frontmatter fields this view may write. Empty means it can change nothing. Archived, deleted and trashed are never offered: those are how the app hides a note, so no view may set them.",
       "writeFieldsPlaceholder": "Add a writable field…",
+      "viewTypeBoard": "Board",
       "viewTypeCards": "Cards",
       "viewTypeList": "List",
       "viewTypeTable": "Table"

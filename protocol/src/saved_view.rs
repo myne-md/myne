@@ -65,7 +65,8 @@ pub(crate) const MAX_JSON_DEPTH: usize = 64;
 
 /// View render type. `Map` is deliberately absent — a map view needs a Maps
 /// plugin and is not representable in v1 (SYNC-5). Serialized lowercase
-/// (`"table"` / `"cards"` / `"list"`) on both the IPC and canonical paths.
+/// (`"table"` / `"cards"` / `"list"` / `"board"`) on both the IPC and canonical
+/// paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewType {
@@ -75,6 +76,12 @@ pub enum ViewType {
     Cards,
     /// Note-list rows.
     List,
+    /// Grouped columns of cards (myne-md/myne#922). A `board` is a RENDERER,
+    /// not an object: there is no board file and no per-board state, its lanes
+    /// are the distinct values of `group_by` in the order [`SavedView::lanes`]
+    /// declares, and every card is a note. Adding the variant is what makes
+    /// such a view storable at all; the format gains no new key here.
+    Board,
 }
 
 /// Sort direction. Serialized lowercase (`"asc"` / `"desc"`).
@@ -293,7 +300,7 @@ pub struct SavedView {
 /// One `saved_views` array element this build cannot REPRESENT, carried
 /// verbatim so a re-encode re-emits it instead of dropping it.
 ///
-/// The motivating case is a newer client's `view_type` (`"board"`, …): the
+/// The motivating case is a newer client's `view_type` (`"timeline"`, …): the
 /// array decoder cannot build a [`SavedView`] for it, and §9.5.5's
 /// whole-blob fall-back-to-defaults would then treat the entire `vault.prefs`
 /// as unreadable — resetting the theme, keymap and favorites alongside the one
@@ -663,6 +670,7 @@ fn view_type_str(v: ViewType) -> &'static str {
         ViewType::Table => "table",
         ViewType::Cards => "cards",
         ViewType::List => "list",
+        ViewType::Board => "board",
     }
 }
 
@@ -1052,6 +1060,7 @@ pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedView
         "table" => ViewType::Table,
         "cards" => ViewType::Cards,
         "list" => ViewType::List,
+        "board" => ViewType::Board,
         _ => return Err(SavedViewParseError::Unrepresentable), // `map` et al.
     };
 
@@ -1567,15 +1576,15 @@ mod tests {
 
     #[test]
     fn unknown_view_type_is_retained_verbatim() {
-        // One `view_type: "board"` entry beside a represented one: the decode
+        // One `view_type: "timeline"` entry beside a represented one: the decode
         // succeeds (it used to be Unrepresentable → the prefs codec's
         // PlaintextParseFailed → every preference reset to its default), and
         // the re-encode reproduces the input bytes exactly.
         let input = concat!(
             "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
             "\"view_type\":\"cards\"},",
-            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
-            "\"view_type\":\"board\"}]"
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"}]"
         )
         .as_bytes();
         let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input).unwrap();
@@ -1589,13 +1598,33 @@ mod tests {
     }
 
     #[test]
+    fn board_view_type_is_representable() {
+        // The other side of the retention rule (myne-md/myne#922): a `board`
+        // entry is decoded into a real view rather than retained as opaque,
+        // which is what makes a board storable at all. The opaque fixtures use
+        // `timeline` for exactly this reason.
+        let input = br#"[{"filters":{"kind":"all"},"group_by":"status","id":"b","lanes":["Doing","Done"],"name":"Board","view_type":"board"}]"#;
+        let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert_eq!(consumed, input.len());
+        assert!(opaque.is_empty(), "board must not be retained as opaque");
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].view_type, ViewType::Board);
+        assert_eq!(
+            views[0].lanes,
+            alloc::vec![String::from("Doing"), String::from("Done")]
+        );
+        // Round trip: the enum value encodes back as its lowercase literal.
+        assert_eq!(canonical_encode_saved_views(&views), input);
+    }
+
+    #[test]
     fn opaque_entry_sorts_by_id_among_the_represented_ones() {
-        // Input order is NOT canonical (the board entry's id sorts after the
+        // Input order is NOT canonical (the unknown entry's id sorts after the
         // cards entry's). Both kinds share §9.5.2's byte sort on id, so the
         // re-encode interleaves them rather than appending the raw tail.
         let input = concat!(
-            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
-            "\"view_type\":\"board\"},",
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"},",
             "{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
             "\"view_type\":\"cards\"}]"
         )
@@ -1604,8 +1633,8 @@ mod tests {
         let expected = concat!(
             "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
             "\"view_type\":\"cards\"},",
-            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Board\",",
-            "\"view_type\":\"board\"}]"
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"}]"
         );
         assert_eq!(core::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -1615,7 +1644,7 @@ mod tests {
         // An unknown entry whose `id` is not a string is still retained: the
         // id is read leniently (empty sort key) rather than as a reason to drop
         // content this build cannot represent.
-        let input = b"[{\"id\":7,\"name\":\"Board\",\"view_type\":\"board\"}]";
+        let input = b"[{\"id\":7,\"name\":\"Timeline\",\"view_type\":\"timeline\"}]";
         let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
         assert!(views.is_empty());
         assert_eq!(opaque.len(), 1);
@@ -1668,7 +1697,7 @@ mod tests {
         // vector family pins `map-view-type` as an `unrepresentable`
         // `parse_fail`, and a caller that only wants the rendered set must not
         // silently receive a shorter list.
-        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"B\",\"view_type\":\"board\"}]";
+        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"B\",\"view_type\":\"timeline\"}]";
         assert_eq!(
             parse_saved_views_array(input),
             Err(SavedViewParseError::Unrepresentable)
@@ -2549,7 +2578,7 @@ mod tests {
             &mut dump,
             "opaque-entry-preserved",
             "One represented view plus one entry whose view_type this build cannot express: the decode succeeds, the unknown entry is retained RAW (its keys stay in the authored, non-canonical order, so an implementation that re-serialises it fails here), and the re-encode carries it alongside the represented view. This is the case that turns §9.5.5's whole-blob fall-back into 'one view this build does not render, and nothing else lost'.",
-            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"name":"Board","view_type":"board","id":"0190a000-0000-7000-8000-000000000002"}]"#,
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"name":"Timeline","view_type":"timeline","id":"0190a000-0000-7000-8000-000000000002"}]"#,
             false,
         );
 
@@ -2560,7 +2589,7 @@ mod tests {
             &mut dump,
             "opaque-entry-sorts-among-represented",
             "The id sort spans represented AND retained entries: the opaque entry arrives second in the input and sorts first by id, so the re-encode reorders the two. §9.5.2's array order is a byte sort on id with no notion of 'known entry first', and an implementation that sorted per kind produces an array this decoder would not have written.",
-            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":"0190a000-0000-7000-8000-000000000000","name":"Inbox board","view_type":"board"}]"#,
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":"0190a000-0000-7000-8000-000000000000","name":"Inbox timeline","view_type":"timeline"}]"#,
             false,
         );
 
@@ -2569,7 +2598,7 @@ mod tests {
             &mut dump,
             "opaque-entry-malformed-id-retained",
             "An unrepresentable entry whose `id` is not a string is still retained, sorting first under an empty sort key rather than being dropped. The element is already unknown, so a malformed id is a reason to lose its place in the order and never a reason to delete an entry this build was asked to preserve: deletion is the one outcome the client cannot undo, because the bytes are not its to reconstruct.",
-            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":7,"view_type":"board"}]"#,
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":7,"view_type":"timeline"}]"#,
             false,
         );
 
@@ -2716,6 +2745,22 @@ mod tests {
             &SavedView {
                 lanes: Vec::new(),
                 template: Some(template.clone()),
+                ..board.clone()
+            },
+            false,
+        );
+
+        // The new VIEW TYPE, which is the format-visible half of this task: a
+        // port that treats `board` as unknown retains the entry as opaque (the
+        // old behaviour) instead of decoding a view it can render.
+        emit(
+            &mut dump,
+            "board-view-type",
+            "The `board` view type (myne-md/myne#922), which joins table/cards/list as a representable value in the same family that pins `map` as unrepresentable. A port whose closed allow-list stops at `list` decodes this entry as an opaque retained element rather than a view with lanes, so the case pins the value's acceptance as well as its lowercase encoding.",
+            &SavedView {
+                view_type: ViewType::Board,
+                lanes: lanes.clone(),
+                template: None,
                 ..board.clone()
             },
             false,

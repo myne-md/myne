@@ -197,6 +197,7 @@ export function ViewSettings({
   const VIEW_TYPE_OPTIONS = useMemo<readonly { value: string; label: string }[]>(
     () => [
       { value: "cards", label: t("notes.viewSettings.viewTypeCards") },
+      { value: "board", label: t("notes.viewSettings.viewTypeBoard") },
       { value: "table", label: t("notes.viewSettings.viewTypeTable") },
       { value: "list", label: t("notes.viewSettings.viewTypeList") },
     ],
@@ -383,8 +384,11 @@ export function ViewSettings({
           </div>
         </div>
 
-        {/* Cover settings — cards only -------------------------------------- */}
-        {viewType === "cards" && (
+        {/* Cover settings — the two card renderers ---------------------------
+            A board card is the same component as a gallery card, so a board
+            that hid these would be the one surface with a cover it cannot
+            choose. */}
+        {(viewType === "cards" || viewType === "board") && (
           <>
             <div style={FIELD_STYLE}>
               <label htmlFor="view-settings.image-input" style={LABEL_STYLE}>

@@ -190,6 +190,13 @@ export default defineConfig(async () => ({
       // move its version, or the desktop's approval keeps naming bytes that are
       // no longer the ones it approved.
       { find: /^@myne\/view-version$/, replacement: sib("../src/notes/views/viewVersion.ts") },
+      // The BOARD renderer (myne-md/myne#922), for the reason `@myne/view-version`
+      // is here: a board is a projection over notes rather than a stored object,
+      // so a mobile copy would be a second implementation of one layout rule and
+      // a second answer to which lane a card is in. The module is pure React over
+      // the shared query-engine types, and its only host contact is the
+      // navigation handler the phone passes in.
+      { find: /^@myne\/board-view$/, replacement: sib("../src/notes/views/boardView.tsx") },
       { find: /^@myne\/graph-color-groups$/, replacement: sib("../src/notes/graphColorGroups.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },

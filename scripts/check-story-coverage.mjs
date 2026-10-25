@@ -75,6 +75,8 @@ export const NON_SURFACE = Object.freeze({
 export const STORY_ONLY_SURFACES = Object.freeze({
   AiChatTab:
     "the desktop AI chat panel lives under src/notes/components, outside the surface roots; the screenshot harness shoots it from the catalogue (myne-md/myne#832 task 14)",
+  BoardView:
+    "the board renderer lives under src/notes/views, outside the surface roots; the catalogue shoots it because a board's own layout rule (lanes left to right, each its own scroller, an empty lane kept on purpose) is not reviewable in a diff (myne-md/myne#922)",
   Overview:
     "the catalogue's own Welcome page (myne-md/myne#845): documentation about the workbench, not a surface of the app",
   Tokens:
