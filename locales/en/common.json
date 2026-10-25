@@ -2073,7 +2073,9 @@
       "copyLink": "Copy link",
       "open": "Open",
       "openInNewTab": "Open in new tab",
-      "revealInFolder": "Reveal in folder"
+      "revealInFolder": "Reveal in folder",
+      "archive": "Archive note",
+      "trash": "Move note to trash"
     },
     "colorLabels": {
       "clay": "Clay",
@@ -2764,6 +2766,9 @@
         "lanesNotSaved": "The cards moved, but the lane order could not be saved.",
         "laneOrderRestored": "The lane order is back.",
         "laneOrderRestoreFailed": "The lane order could not be restored.",
+        "cancel": "Cancel",
+        "archiveFailed": "The note could not be archived.",
+        "trashFailed": "The note could not be moved to the trash.",
         "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
       },
       "cards": {

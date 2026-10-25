@@ -82,6 +82,9 @@ import {
   type BulkRestoreResult,
 } from "../bulkSetField";
 import { SelectToggle } from "./selectToggle";
+import { buildCardMenuItems } from "./cardMenu";
+import { ContextMenu } from "../components/ContextMenu";
+import { ModalShell } from "../../components/primitives/ModalShell";
 import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Input } from "../../components/primitives/Input";
@@ -252,6 +255,21 @@ const CARD_SLOT_WITH_SELECT_STYLE: CSSProperties = {
   paddingInlineStart: "var(--target-min)",
 };
 
+const CONFIRM_BODY_STYLE: CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+  lineHeight: "var(--leading-normal)",
+};
+
+const CONFIRM_ACTIONS_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-4)",
+};
+
 const EMPTY_STYLE: CSSProperties = {
   margin: "12vh auto 0",
   maxWidth: 420,
@@ -272,6 +290,22 @@ const EMPTY_STYLE: CSSProperties = {
  * only when the approval was already there. A version-less view is approved by
  * definition (the Rust rule), so its default mirrors that.
  */
+/**
+ * What the host lets a card DO. Supplied rather than called directly, because
+ * every one of these leaves the board: opening a note is the workspace's, and
+ * archiving or trashing writes the host's reserved markers, which no manifest can
+ * address in either direction. `archive`/`trash` absent → the menu carries
+ * navigation only, which is what a read-only host gets.
+ */
+export interface BoardCardActions {
+  readonly open: (noteId: string) => void;
+  readonly openInNewTab: (noteId: string) => void;
+  readonly revealInFolder: (noteId: string) => void;
+  readonly copyLink: (noteId: string) => void;
+  readonly archive?: (noteId: string) => Promise<void>;
+  readonly trash?: (noteId: string) => Promise<void>;
+}
+
 export function BoardView({
   def,
   result,
@@ -279,6 +313,7 @@ export function BoardView({
   onCardContextMenu,
   onSetCover,
   approved,
+  cardActions,
 }: {
   def: SavedView;
   result: ViewResult;
@@ -286,6 +321,9 @@ export function BoardView({
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
   approved?: boolean;
+  /** The host's card actions. Present → the board draws the shared menu itself,
+   *  because it is the surface that offers the lifecycle verb. */
+  cardActions?: BoardCardActions;
 }) {
   const { t } = useTranslation();
   const columns = useMemo(() => displayColumns(def), [def]);
@@ -316,6 +354,15 @@ export function BoardView({
     /** `null` when no note could be created at all. */
     readonly refusal: NoteSetFieldError | null;
   } | null>(null);
+
+  // ---- the card menu and the two lifecycle actions (task 8) ---------------
+  const [cardMenu, setCardMenu] = useState<{
+    readonly noteId: string;
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
+  const [trashTarget, setTrashTarget] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<"archive" | "trash" | null>(null);
 
   // ---- multi-card move and lane rename (task 7) ---------------------------
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -426,6 +473,42 @@ export function BoardView({
     },
     [rendered, runDrop, writable],
   );
+
+  // One lifecycle action, through the host's own path. A refusal is a LINE
+  // rather than a silent no-op: a card that did not move must say so, and a
+  // locked vault is the ordinary way this happens.
+  const runLifecycle = useCallback(
+    (noteId: string, kind: "archive" | "trash") => {
+      const run = kind === "archive" ? cardActions?.archive : cardActions?.trash;
+      if (run === undefined) return;
+      void run(noteId).catch(() => setActionError(kind));
+    },
+    [cardActions],
+  );
+
+  const cardMenuItems = useMemo(() => {
+    if (cardMenu === null || cardActions === undefined) return [];
+    const id = cardMenu.noteId;
+    const lifecycle =
+      cardActions.archive !== undefined && cardActions.trash !== undefined
+        ? {
+            archive: () => runLifecycle(id, "archive"),
+            // The trash item asks first: archiving and trashing both take the
+            // note off this board, but only one of them is the recoverable
+            // action a hurried click should not perform by accident.
+            trash: () => setTrashTarget(id),
+          }
+        : undefined;
+    return buildCardMenuItems(
+      {
+        open: () => cardActions.open(id),
+        openInNewTab: () => cardActions.openInNewTab(id),
+        revealInFolder: () => cardActions.revealInFolder(id),
+        copyLink: () => cardActions.copyLink(id),
+      },
+      lifecycle,
+    );
+  }, [cardActions, cardMenu, runLifecycle]);
 
   // One card into one lane: create, place, then open. The board does not invent
   // the row: the field write re-indexes the note and the next query carries the
@@ -623,6 +706,17 @@ export function BoardView({
       </p>
     );
 
+  const actionErrorLine: ReactNode =
+    actionError === null ? null : (
+      <p data-testid={VIEW_TESTID.boardActionError} role="status" style={REFUSAL_STYLE}>
+        {t(
+          actionError === "archive"
+            ? "notes.views.board.archiveFailed"
+            : "notes.views.board.trashFailed",
+        )}
+      </p>
+    );
+
   const bulkReport: ReactNode =
     bulkOutcome === null ? null : (
       <div data-testid={VIEW_TESTID.boardBulkReport}>
@@ -729,6 +823,7 @@ export function BoardView({
       )}
       {refusalLine}
       {addErrorLine}
+      {actionErrorLine}
       {bulkReport}
       <div data-testid={VIEW_TESTID.boardLanes} style={LANES_STYLE}>
         {rendered.map((lane: BoardLane) => {
@@ -856,7 +951,12 @@ export function BoardView({
                             def.image_aspect_ratio,
                           )}
                           onOpenNote={onOpenNote}
-                          onCardContextMenu={onCardContextMenu}
+                          onCardContextMenu={
+                            cardActions === undefined
+                              ? onCardContextMenu
+                              : (noteId, pos) =>
+                                  setCardMenu({ noteId, x: pos.x, y: pos.y })
+                          }
                           onSetCover={onSetCover}
                         />
                       </div>
@@ -870,6 +970,39 @@ export function BoardView({
           );
         })}
       </div>
+      {cardMenu !== null && cardMenuItems.length > 0 && (
+        <ContextMenu
+          x={cardMenu.x}
+          y={cardMenu.y}
+          items={cardMenuItems}
+          onClose={() => setCardMenu(null)}
+        />
+      )}
+      <ModalShell
+        open={trashTarget !== null}
+        title={t("notes.list.trashConfirmTitle")}
+        labelId="board-trash-confirm-title"
+        onClose={() => setTrashTarget(null)}
+        width={420}
+      >
+        <p style={CONFIRM_BODY_STYLE}>{t("notes.list.trashConfirmWarning")}</p>
+        <div style={CONFIRM_ACTIONS_STYLE}>
+          <Button variant="ghost" onClick={() => setTrashTarget(null)}>
+            {t("notes.views.board.cancel")}
+          </Button>
+          <Button
+            variant="danger"
+            data-testid={VIEW_TESTID.boardTrashConfirm}
+            onClick={() => {
+              const id = trashTarget;
+              setTrashTarget(null);
+              if (id !== null) runLifecycle(id, "trash");
+            }}
+          >
+            {t("notes.list.trashConfirmConfirm")}
+          </Button>
+        </div>
+      </ModalShell>
     </div>
   );
 }

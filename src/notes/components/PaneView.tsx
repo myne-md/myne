@@ -112,6 +112,7 @@ import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
+import type { BoardCardActions } from "../views/boardView";
 import { Button } from "../../components/primitives/Button";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
@@ -2739,6 +2740,28 @@ function ViewHost({ viewId }: { viewId: string }) {
   // projection; deletion stays at the note's own location, the sidebar).
   // Reveal selects the note in the sidebar; Copy link writes a `[[title]]`
   // wikilink via the existing clipboard plugin (no new capability).
+  // Copying a card's link is the one menu action with no workspace seam of its
+  // own: it writes a `[[title]]` wikilink through the existing clipboard plugin
+  // (no new capability). Shared by the host's menu and the board's, so the two
+  // doors cannot disagree about what "copy link" puts on the clipboard.
+  const copyCardLink = useCallback(
+    (id: string) => {
+      const title = sidebar.cache.get(id)?.title ?? "";
+      // TRANSPORT MIGRATION ONLY (myne-md/myne#390). Both arms are silent
+      // because that is what this menu item does today: the rejection used to
+      // be dropped by a bare `void`, and an empty title is a no-op the user
+      // also never sees. Recorded rather than deleted so the follow-up task
+      // that gives it a toast is editing a decision, not discovering an
+      // absence.
+      if (title !== "") {
+        void copyText(clipboardWriteText, `[[${title}]]`, {
+          onSuccess: { kind: "silent", reason: "pre-fix behaviour (myne 390): the card menu reported nothing" },
+          onFailure: { kind: "silent", reason: "pre-fix behaviour (myne 390): the rejection was dropped by `void`" },
+        });
+      }
+    },
+    [sidebar],
+  );
   const cardMenuItems: ContextMenuItem[] = useMemo(() => {
     if (cardMenu === null) return [];
     const id = cardMenu.noteId;
@@ -2746,23 +2769,25 @@ function ViewHost({ viewId }: { viewId: string }) {
       open: () => ws.openInFocused(id),
       openInNewTab: () => ws.openNewTabInFocused(id),
       revealInFolder: () => sidebar.select(id),
-      copyLink: () => {
-        const title = sidebar.cache.get(id)?.title ?? "";
-        // TRANSPORT MIGRATION ONLY (myne-md/myne#390). Both arms are silent
-        // because that is what this menu item does today: the rejection used to
-        // be dropped by a bare `void`, and an empty title is a no-op the user
-        // also never sees. Recorded rather than deleted so the follow-up task
-        // that gives it a toast is editing a decision, not discovering an
-        // absence.
-        if (title !== "") {
-          void copyText(clipboardWriteText, `[[${title}]]`, {
-            onSuccess: { kind: "silent", reason: "pre-fix behaviour (myne 390): the card menu reported nothing" },
-            onFailure: { kind: "silent", reason: "pre-fix behaviour (myne 390): the rejection was dropped by `void`" },
-          });
-        }
-      },
+      copyLink: () => copyCardLink(id),
     });
-  }, [cardMenu, ws, sidebar]);
+  }, [cardMenu, ws, sidebar, copyCardLink]);
+  // The board's card actions (myne-md/myne#922 task 8). The board draws its own
+  // menu because it is the surface that offers the lifecycle verb, but every
+  // handler is the host's own path: opening goes through the workspace seam, and
+  // archive/trash go through the sidebar's rollback writers, which write the
+  // reserved markers the host owns. A manifest cannot ask for either.
+  const boardCardActions: BoardCardActions = useMemo(
+    () => ({
+      open: (id) => ws.openInFocused(id),
+      openInNewTab: (id) => ws.openNewTabInFocused(id),
+      revealInFolder: (id) => sidebar.select(id as NoteId),
+      copyLink: (id) => copyCardLink(id),
+      archive: (id) => sidebar.archiveWithRollback(id as NoteId),
+      trash: (id) => sidebar.trashWithRollback(id as NoteId),
+    }),
+    [ws, sidebar, copyCardLink],
+  );
   return (
     <div data-testid="editor.view-host" data-view-id={viewId}>
       {def !== null && !approved ? (
@@ -2795,6 +2820,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
           approved={approved}
+          cardActions={def.view_type === "board" ? boardCardActions : undefined}
         />
       ) : (
         <div style={QUIET_WRAP_STYLE} />

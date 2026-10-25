@@ -67,6 +67,10 @@ export const VIEW_TESTID = {
   boardRenameInput: "view.board-rename-input",
   boardRenameSave: "view.board-rename-save",
   boardRenameCancel: "view.board-rename-cancel",
+  /** The line a refused archive or trash renders. */
+  boardActionError: "view.board-action-error",
+  /** The confirm button inside the trash confirmation. */
+  boardTrashConfirm: "view.board-trash-confirm",
 } as const;
 
 /** Default cover aspect ratio (≈16:9) when a view sets no

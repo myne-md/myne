@@ -14,7 +14,7 @@
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult } from "../queryEngine";
 import { CardsView } from "./cardsView";
-import { BoardView } from "./boardView";
+import { BoardView, type BoardCardActions } from "./boardView";
 import type {
   CardContextMenuHandler,
   OpenNoteHandler,
@@ -30,6 +30,7 @@ export function ViewRenderHost({
   onCardContextMenu,
   onSetCover,
   approved,
+  cardActions,
 }: {
   def: SavedView;
   result: ViewResult;
@@ -39,6 +40,9 @@ export function ViewRenderHost({
   /** This device's verdict on `def`, for the board's own definition writes (a
    *  lane rename must not grant an approval the manager is still asking for). */
   approved?: boolean;
+  /** The host's card actions, for the board's own card menu. The other three
+   *  renderers keep the host's menu through `onCardContextMenu`. */
+  cardActions?: BoardCardActions;
 }) {
   switch (def.view_type) {
     case "cards":
@@ -60,6 +64,7 @@ export function ViewRenderHost({
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
           approved={approved}
+          cardActions={cardActions}
         />
       );
     case "table":
