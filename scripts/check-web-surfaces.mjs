@@ -43,6 +43,10 @@ const V = {
     "ported",
     "Build identity and links; no host call. Carries the Developer mode toggle, which since #181 renders here too — it used to be withheld on a `localAi`-less capability set, which on web left the mode's other members (the Vim row) unreachable.",
   ],
+  "src/components/settings/DiagnosticsPanel.tsx": [
+    "adapted",
+    "Ships, and it is the one settings panel whose WEB arm is the point rather than a compromise. The report block and its Copy button render on every client on purpose: a browser user cannot open a devtools panel and read a failure back to anyone, so the copy is the half that matters most there. The logging half (the switch, the crash record, the folder reveal and the saved bundle) is capability-gated on `diagnosticLog`, which the web descriptor does not carry because a served bundle installs no `tracing` subscriber, so those rows are absent rather than disabled. Split out of AboutPanel on 2026-10-25; the verdict is unchanged in kind, because it is the same code with the same gate.",
+  ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
     "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",

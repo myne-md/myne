@@ -266,3 +266,63 @@ describe("the Settings register door submits", () => {
     await waitFor(() => expect(calls).toEqual(["endpoint", "register:24"]));
   });
 });
+
+// 2026-10-25 owner report, in their words: "I created the vault with the identity,
+// why do I have to register it again here". The state is right by design
+// (`decisions/protocol/0719`: creation is network-free, registration is the
+// separate act that asks for the phrase because the phrase IS the server
+// credential). The SURFACE was wrong in three ways, and each one is asserted
+// below rather than described: it offered Unlock beside Register, its helper said
+// "unlock it with your recovery phrase to sign sync and invites" about an identity
+// that could sign nothing yet, and it named the same missing act a third time in
+// the status line as "Not enrolled".
+describe("a reserved identity: one act, named once", () => {
+  const reserved = {
+    state: "reserved" as const,
+    sealed_keypair_present: true,
+    identity_code: "MYNE-PERSON-1:deadbeef",
+  };
+
+  it("offers Register, not Unlock, and says what this identity is", async () => {
+    mount({ syncState: "not_enrolled", person: reserved });
+    await waitFor(() => expect(screen.getByTestId("sync.panel.identity-unregistered")).toBeTruthy());
+    expect(screen.getByTestId("sync.panel.register-cta")).toBeTruthy();
+    // Register installs the person session itself, so the second door asked for
+    // the same 24 words and could enable nothing on its own: publishing refuses a
+    // reserved identity with `PersonNotRegistered`, and the invite list and the
+    // sync cycle both need a token.
+    expect(screen.queryByTestId("sync.panel.identity-unlock.open")).toBeNull();
+    // The public code still shows: it is stable, and writing it down is what makes
+    // an invitation addressable the moment the identity reaches a server.
+    expect(screen.getByTestId("sync.panel.identity-code")).toBeTruthy();
+  });
+
+  it("keeps Unlock for an identity that really is only locked", async () => {
+    // The gate is `reserved`, not "locked": an enrolled device whose session was
+    // locked must keep the door, and that is the neighbouring case.
+    mount({
+      syncState: "idle",
+      person: { state: "enrolled", enrolled: true, sealed_keypair_present: true, identity_code: "c" },
+    });
+    await waitFor(() => expect(screen.getByTestId("sync.panel.identity-locked")).toBeTruthy());
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
+    expect(screen.queryByTestId("sync.panel.register-cta")).toBeNull();
+  });
+
+  it("calls the missing act by its own name in the status line", async () => {
+    mount({ syncState: "not_enrolled", person: reserved });
+    await waitFor(() => expect(screen.getByTestId("sync.status-label")).toBeTruthy());
+    // "Not enrolled" is the vault-account vocabulary and names no act; "Not
+    // registered" is the one the button above performs.
+    expect(screen.getByTestId("sync.status-label").textContent).toBe("Not registered");
+  });
+
+  it("still says 'Not enrolled' when the identity is merely locked", async () => {
+    mount({
+      syncState: "not_enrolled",
+      person: { state: "enrolled", sealed_keypair_present: true, identity_code: "c" },
+    });
+    await waitFor(() => expect(screen.getByTestId("sync.status-label")).toBeTruthy());
+    expect(screen.getByTestId("sync.status-label").textContent).toBe("Not enrolled");
+  });
+});

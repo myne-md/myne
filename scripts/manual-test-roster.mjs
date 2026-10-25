@@ -744,12 +744,16 @@ export const ROSTER = Object.freeze([
   },
   {
     // myne-md/myne#860. A new surface: the opt-in device-local diagnostic log
-    // and the bug-report rows in Settings, About.
+    // and the bug-report rows, which since 2026-10-25 are Settings → Diagnostics
+    // rather than the last section of About. `AboutPanel.tsx` stays on this entry's
+    // paths because the panel it was split out of is still where a reader starts
+    // looking; the walkthrough sentence below names the new place.
     id: "app.diagnostic-log",
     title: "Diagnostic log and bug reports",
     paths: [
       "src/platform/diagnostics.ts",
       "src/hooks/useDiagnostics.ts",
+      "src/components/settings/DiagnosticsPanel.tsx",
       "src/components/settings/AboutPanel.tsx",
       "src/components/FailClosedError.tsx",
       "src-tauri/src/logging/",
@@ -760,7 +764,7 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/diagnostics-copy.e2e.ts"],
     manual: [
       {
-        see: "On a real desktop session on macOS and on Windows, open Settings, About. Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm About lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
+        see: "On a real desktop session on macOS and on Windows, open Settings → Diagnostics (its own rail item since 2026-10-25; it used to be the last section of About). Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm Diagnostics lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
         whyNotAutomated:
           "The platform file manager is an OS session the Linux container does not have, and the permission half is per-platform file-mode and ACL observation: the container is Linux, so it can speak for 0600/0700 there and for neither WKWebView-era macOS nor WebView2 Windows ACL inheritance. The toggle, the block preview, the manifest line and the report actions are driven by the scenario named in automatedBy, but that scenario HAS NEVER EXECUTED in a container on this branch (the release compile dies with signal 9 on the machine it was written on, which scripts/lib/e2e-docker.sh documents), so nothing on this surface is automation-proven today and this item also covers that walkthrough until a green run is recorded here.",
         clients: ["desktop-macos", "desktop-windows"],

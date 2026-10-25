@@ -131,3 +131,52 @@ describe("MemberRosterPanel invitation loading gate", () => {
     );
   });
 });
+
+// 2026-10-25. A vault born under an identity cannot be shared yet
+// (`decisions/storage/0723`; `protocol.md` §9.29 states it: the member plane is
+// `NTV6`-only, so a person-born vault is owner-only on every client). The panel
+// nevertheless rendered "Invite member" on one, disabled and silent, and the
+// report was "I did everything and I still cannot click invite".
+describe("MemberRosterPanel on a vault that cannot be shared", () => {
+  it("does not offer an invite it cannot perform, and says why", async () => {
+    groupKeyEpoch = 1;
+    render(<MemberRosterPanel personBorn />);
+    await unlockPerson();
+    await act(async () => {});
+
+    // Absent rather than disabled: a control the product cannot honour is an
+    // offer it cannot keep, which is the absent-not-disabled rule the rail and
+    // the capability-gated blocks already follow.
+    expect(screen.queryByTestId("member-roster.invite-button")).toBeNull();
+    expect(screen.getByTestId("member-roster.generation-notice")).toBeTruthy();
+    // The zero state stops asking for an invite and states the fact instead.
+    expect(screen.getByText("sync.memberRoster.emptyOwnedAlone")).toBeTruthy();
+    // The removal disclosure describes an act this vault has no member for.
+    expect(screen.queryByTestId("member-roster.removal-limits")).toBeNull();
+  });
+
+  it("still offers the invite on a legacy vault, which can be shared", async () => {
+    groupKeyEpoch = null;
+    render(<MemberRosterPanel personBorn={false} />);
+    await unlockPerson();
+
+    expect(screen.getByTestId("member-roster.invite-button")).toBeTruthy();
+    expect(screen.queryByTestId("member-roster.generation-notice")).toBeNull();
+  });
+
+  it("names the locked identity and mounts the door, instead of a dead button", async () => {
+    groupKeyEpoch = 1;
+    // NOT unlocked: this is the state the panel answered with silence. Its whole
+    // identity section is gated on `personReady`, and the Identity row that owns
+    // the unlock lives in the Connection topic, so from this panel the fix was
+    // unreachable and the disabled control gave no reason.
+    render(<MemberRosterPanel personBorn={false} />);
+    await act(async () => {});
+
+    expect(screen.getByTestId("member-roster.identity-locked")).toBeTruthy();
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
+    expect((screen.getByTestId("member-roster.invite-button") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+});

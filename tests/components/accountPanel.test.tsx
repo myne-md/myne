@@ -279,11 +279,16 @@ describe("AccountPanel — the vault roster", () => {
     expect(screen.queryByTestId("settings.account-number-copy")).toBeNull();
   });
 
-  it("opens the Sync panel instead of pointing at it", async () => {
-    const onOpenPanel = vi.fn();
-    renderPanel({ onOpenPanel });
-    fireEvent.click(await screen.findByTestId("settings.account-open-sync"));
-    expect(onOpenPanel).toHaveBeenCalledWith("sync");
+  // 2026-10-25 owner report: "the Open Sync button there is not needed either".
+  // `decisions/ui/0725` item 5 asked for a door INSTEAD of the sentence, and the
+  // panel shipped both, over a rail that is on screen the whole time. The sentence
+  // stays and the button goes, so this asserts the absence of the second control
+  // rather than a click on it.
+  it("points at Sync in one sentence and offers no second door", async () => {
+    renderPanel();
+    const note = await screen.findByTestId("settings.account-devices-note");
+    expect(note.textContent).toContain("managed in Sync");
+    expect(screen.queryByTestId("settings.account-open-sync")).toBeNull();
   });
 });
 

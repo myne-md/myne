@@ -240,6 +240,24 @@ describe("DeviceAttributionPanel: failures are typed, not flattened", () => {
     expect(screen.queryByTestId("device-bindings.error")).toBeNull();
     expect(screen.queryByTestId("device-bindings.claim")).toBeNull();
   });
+
+  // 2026-10-25 owner report: "shared is ready and syncing, yet this says not
+  // shared yet". The refusal is the same (`NotASharedVault`) but the FACT is not:
+  // an `NTV5` vault has no group tier, while a person-born `NTV7` vault carries one
+  // from birth and this family is still unreachable on it because the member plane
+  // is `NTV6`-only (`protocol.md` §9.29). The old copy answered both with "sharing
+  // happens the first time you invite someone", which on the second vault is an
+  // act the product cannot perform.
+  it("says the generation cannot carry the family, not 'not shared yet'", async () => {
+    listRejects("NotASharedVault");
+    render(<DeviceAttributionPanel personBorn />);
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("device-bindings.generation")).toBeTruthy(),
+    );
+    // The `NTV5` sentence promises an invite, so it must NOT be the one shown here.
+    expect(screen.queryByTestId("device-bindings.unshared")).toBeNull();
+  });
 });
 
 describe("DeviceAttributionPanel: the claim affordance", () => {

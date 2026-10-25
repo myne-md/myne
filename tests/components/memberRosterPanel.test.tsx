@@ -507,6 +507,12 @@ describe("MemberRosterPanel rename", () => {
     render(<MemberRosterPanel />);
     try {
       fireEvent.click(screen.getByTestId("member-roster.name-edit"));
+      // 2026-10-25: the editor is a DIALOG, not an inline field that reflows the
+      // row. Asserted rather than implied, because the testids are the same either
+      // way and a regression to the row shape would keep every other case green.
+      const dialog = screen.getByTestId("member-roster.name-dialog");
+      expect(dialog.getAttribute("role")).toBe("dialog");
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
       fireEvent.change(screen.getByTestId("member-roster.name-input"), {
         target: { value: "  Ada  " },
       });

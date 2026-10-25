@@ -14,6 +14,7 @@ import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 
 import { AboutPanel } from "@app/components/settings/AboutPanel";
+import { DiagnosticsPanel } from "@app/components/settings/DiagnosticsPanel";
 import { BarCustomizeSettings } from "@app/components/settings/BarCustomizeSettings";
 import { RecoveryDrillRow } from "@app/components/settings/RecoveryDrillRow";
 import {
@@ -226,6 +227,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     render: () => (
       <Frame>
         <AboutPanel />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/diagnosticspanel/default",
+    group: "settings",
+    surface: "DiagnosticsPanel",
+    state: "default",
+    description:
+      "Settings → Diagnostics: the report block that is the exact string Copy puts on the clipboard, the opt-in plaintext log switch, the crash record when one exists, and the two ways the log leaves the device (open its folder, or save a report). Look for the preview being the copy itself rather than a summary of it.",
+    tags: ["settings", "diagnostics", "log", "crash", "report", "support"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <DiagnosticsPanel />
       </Frame>
     ),
   },

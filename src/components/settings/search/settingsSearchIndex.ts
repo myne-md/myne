@@ -484,7 +484,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "localOnlyVault",
     panelId: "sync",
-    topic: "devices",
+    // `connection`, not `devices` (2026-10-25): the row moved into the account
+    // section, under the identity and the server, because publishing is an identity
+    // act and a devices heading over it read as a device operation. Search lands on
+    // the topic the row actually renders in; this registry is what says so.
+    topic: "connection",
     testid: "sync.panel.publish",
     titleKey: "sync.panel.publish.label",
     descriptionKey: "sync.panel.publish.deviceOnlyHelper",
@@ -1089,7 +1093,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
       reason:
         "consent control: it decides whether a plaintext log is written to disk, not how the app behaves, so it is not an agent-settable setting",
     },
-    panelId: "about",
+    // `panelId` follows the ROW, not the key prefix: the row moved to its own
+    // Diagnostics panel on 2026-10-25 and its i18n keys kept the `settings.about.`
+    // prefix, because a key name is a catalog id that no user reads and renaming it
+    // would move thirty-three catalogs for a naming preference.
+    panelId: "diagnostics",
     titleKey: "settings.about.diagnosticLogLabel",
     descriptionKey: "settings.about.diagnosticLogHelper",
     keywordsKey: "settings.search.keywords.diagnosticLog",
