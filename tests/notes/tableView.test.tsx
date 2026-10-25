@@ -5,13 +5,38 @@
 // note, typed cells, group headings, the empty state, the sticky Name column,
 // the read-only guarantee, and the navigation click matrix.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
+// The bulk path's three seams, mocked only so the RESTORE OFFER can be driven
+// with and without a snapshot id. Everything else in this file renders the real
+// component against fabricated view results.
+const setNoteField = vi.hoisted(() => vi.fn());
+const snapshotRestore = vi.hoisted(() => vi.fn());
+const flush = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/notes/setNoteField", () => ({
+  NOTE_FIELD_WRITE_EVENT: "myne-note-field-written",
+  setNoteField,
+}));
+vi.mock("../../src/notes/snapshots", () => ({ snapshotRestore }));
+vi.mock("../../src/notes/flushBeforeFrontmatterWrite", () => ({
+  flushBeforeFrontmatterWrite: () => flush(),
+}));
+
 import { TableView } from "../../src/notes/views/tableView";
 import type { SavedView } from "../../src/lib/prefs";
 import type { StoredProperty, ViewResult, ViewRow } from "../../src/notes/queryEngine";
+import { clearBulkUndoForLock } from "../../src/notes/views/bulkUndoJournal";
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  setNoteField.mockReset();
+  snapshotRestore.mockReset().mockResolvedValue(undefined);
+  flush.mockReset().mockResolvedValue(undefined);
+  clearBulkUndoForLock();
+});
 
 function tableDef(over: Partial<SavedView> = {}): SavedView {
   return {
@@ -142,7 +167,55 @@ describe("TableView", () => {
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     // And the Apply button reports the derived selection size.
-    expect(screen.getByTestId("view.bulk-apply").disabled).toBe(false);
+    expect(
+      (screen.getByTestId("view.bulk-apply") as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("offers no restore when the written notes carry no pre-write snapshot, and says why", async () => {
+    // A note in the current on-disk format is a CRDT note: its change graph IS its
+    // history, so `note_set_field` captures no snapshot and reports none. The
+    // button used to render anyway and could only answer "Restored 0." on every
+    // vault created today, which is an offer without a capability.
+    setNoteField.mockResolvedValue({ snapshotId: null });
+    const result: ViewResult = {
+      groups: [
+        {
+          key: "",
+          type: "none",
+          rows: [row("n1", "Alpha", { status: str("x") }), row("n2", "Beta")],
+        },
+      ],
+    };
+    render(<TableView def={tableDef({ write_fields: ["status"] })} result={result} />);
+    for (const toggle of screen.getAllByTestId("view.bulk-select-row")) {
+      fireEvent.click(toggle);
+    }
+    fireEvent.click(screen.getByTestId("view.bulk-apply"));
+    await screen.findByTestId("view.bulk-nothing-to-restore");
+    expect(screen.queryByTestId("view.bulk-restore")).toBeNull();
+  });
+
+  it("offers the restore as soon as one written note has a snapshot", async () => {
+    setNoteField
+      .mockResolvedValueOnce({ snapshotId: "s1" })
+      .mockResolvedValueOnce({ snapshotId: null });
+    const result: ViewResult = {
+      groups: [
+        {
+          key: "",
+          type: "none",
+          rows: [row("n1", "Alpha", { status: str("x") }), row("n2", "Beta")],
+        },
+      ],
+    };
+    render(<TableView def={tableDef({ write_fields: ["status"] })} result={result} />);
+    for (const toggle of screen.getAllByTestId("view.bulk-select-row")) {
+      fireEvent.click(toggle);
+    }
+    fireEvent.click(screen.getByTestId("view.bulk-apply"));
+    await screen.findByTestId("view.bulk-restore");
+    expect(screen.queryByTestId("view.bulk-nothing-to-restore")).toBeNull();
   });
 
   it("is a read-only projection (no editable CELL: input / contenteditable / draggable)", () => {
