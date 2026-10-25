@@ -38,6 +38,12 @@ set -euo pipefail
 LANE="${1:-}"
 case "$LANE" in
   stable)
+    # THE GATE. No `MYNE_E2E_AI=1`: the sixteen AI-gated spec files moved to the
+    # `ai` lane below, because inference scenarios are the slowest tests in the
+    # suite and a release gate that spends a fifth of its wall clock proving the
+    # model runner still answers is a gate people stop running. They are still
+    # run, on their own lane, on a schedule; what changed is that the gate no
+    # longer waits for them.
     # MYNE_E2E_AI=1 pairs with the `local-inference-stub` feature the build step
     # compiles: without BOTH, nine AI scenarios stay `describe.skip`.
     #
@@ -70,15 +76,26 @@ case "$LANE" in
     #
     # `MYNE_E2E_SHARDS` still overrides for anyone measuring throughput: that is a
     # measurement, not a gate.
-    LANE_ENV='MYNE_E2E_SHARDS=1 MYNE_E2E_AI=1'
+    LANE_ENV='MYNE_E2E_LANE=stable MYNE_E2E_SHARDS=1'
+    ;;
+  ai)
+    # The inference suites, alone. `MYNE_E2E_AI=1` pairs with the
+    # `local-inference-stub` feature the build step compiles: without BOTH, the
+    # AI specs stay `describe.skip`.
+    #
+    # The file list is DERIVED, not typed: every spec that reads `MYNE_E2E_AI` is
+    # an AI spec by definition, so a new one joins this lane the moment it lands
+    # and none can be forgotten here.
+    LANE_ONLY="$(grep -rl 'MYNE_E2E_AI' e2e/*.e2e.ts | sed 's#^e2e/##; s#\.e2e\.ts$##' | tr '\n' ' ')"
+    LANE_ENV='MYNE_E2E_LANE=ai MYNE_E2E_AI=1 MYNE_E2E_SHARDS=1'
     ;;
   quarantine)
     # MYNE_E2E_QUARANTINE=1 flips `e2e/support/scenario.ts`'s gate to run ONLY
     # the `describeE2E.flaky` specs, which the stable lane skips.
-    LANE_ENV='MYNE_E2E_QUARANTINE=1'
+    LANE_ENV='MYNE_E2E_LANE=quarantine MYNE_E2E_QUARANTINE=1'
     ;;
   *)
-    echo "ci-e2e-lane: expected 'stable' or 'quarantine', got '${LANE}'" >&2
+    echo "ci-e2e-lane: expected 'stable', 'ai' or 'quarantine', got '${LANE}'" >&2
     exit 2
     ;;
 esac
@@ -120,10 +137,24 @@ esac
 # IS a build sysdep, so the subtraction hides the runtime half. That is the
 # guard's stated scope rather than a defect in it, but it means this line has no
 # machine check and the comment above is the record.
-apt-get update
-apt-get install -y --no-install-recommends \
-  curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold \
-  libayatana-appindicator3-1
+# **Every install below is GUARDED, so this lane runs on either image.** The
+# intended home for these packages is `ci/e2e/Dockerfile` (a dedicated image,
+# published by hand per `operations/runbooks/ci-base-image.md`'s procedure), and on
+# that image all four commands are no-ops. Until it is published — and after, on
+# any runner still pointed at the old one — they install what is missing.
+# `command -v` / `dpkg -s` rather than a version probe: the question is "is this
+# already here", and a probe that answers "here but old" would reinstall anyway.
+need_apt=0
+for pkg in webkit2gtk-driver xvfb xauth xdotool python3 mold libayatana-appindicator3-1 \
+           libssl-dev pkg-config xz-utils ca-certificates curl; do
+  dpkg -s "$pkg" >/dev/null 2>&1 || need_apt=1
+done
+if [ "$need_apt" = 1 ]; then
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth xdotool python3 mold \
+    libayatana-appindicator3-1
+fi
 
 # The Node tarball is version-pinned and fetched over TLS from the first-party
 # distribution origin, and it is NOT sha256-pinned. `.woodpecker/e2e.yml` states
@@ -135,10 +166,15 @@ apt-get install -y --no-install-recommends \
 # of it, and pinning the hash here alone would leave the others unpinned while
 # implying they were covered. Recorded as shared debt on myne-md/myne#579 rather
 # than half-fixed.
-curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz \
-  | tar -xJ -C /usr/local --strip-components=1
-npm install -g pnpm@11.8.0
-cargo install tauri-driver --locked --version 2.0.6
+if ! command -v node >/dev/null 2>&1; then
+  curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz \
+    | tar -xJ -C /usr/local --strip-components=1
+fi
+command -v pnpm >/dev/null 2>&1 || npm install -g pnpm@11.8.0
+# `cargo install tauri-driver` is a from-source build of the driver, and it was
+# the single largest fixed cost of this lane after the apt install. Baked into
+# `ci/e2e/Dockerfile`; skipped here when present.
+command -v tauri-driver >/dev/null 2>&1 || cargo install tauri-driver --locked --version 2.0.6
 
 # chmod-based fault-injection scenarios require an unprivileged runner, because
 # root bypasses DAC. Same rule `cargo-test-tauri` follows in the push pipeline.
@@ -167,6 +203,32 @@ else
   MYNE_E2E_SERVER=""
 fi
 
+# ─── One E2E suite per runner at a time ──────────────────────
+#
+# The measurement behind this whole file's recent history is that a second
+# concurrent WebKit app is what turns a green suite into a rotating set of reds.
+# Within one run that is the shard count; ACROSS runs it is two branches reaching
+# this lane at once, which happens whenever a release gate and a push-driven
+# rerun overlap on a single agent.
+#
+# `flock` on the shared `/cache` mount serialises them rather than interleaving
+# them. It is deliberately permissive: no `flock`, no writable `/cache`, or a
+# full wait budget expiring all degrade to "run anyway", because a gate that
+# refuses to run is worse than a gate that runs beside a neighbour. What it must
+# never do is run SILENTLY beside one while pretending the number it produced is
+# clean, so a lock it could not take says so on stdout.
+E2E_LOCK="${E2E_LOCK:-/cache/myne-e2e.lock}"
+E2E_LOCK_WAIT="${MYNE_E2E_LOCK_WAIT:-1800}"
+if command -v flock >/dev/null 2>&1 && [ -w "$(dirname "$E2E_LOCK")" ]; then
+  echo "ci-e2e-lane: acquiring ${E2E_LOCK} (wait up to ${E2E_LOCK_WAIT}s)"
+  exec 9>"$E2E_LOCK" || true
+  if ! flock -w "$E2E_LOCK_WAIT" 9; then
+    echo "ci-e2e-lane: WARNING: another E2E run holds ${E2E_LOCK}; running beside it, expect contention"
+  fi
+else
+  echo "ci-e2e-lane: no flock or no writable $(dirname "$E2E_LOCK"); running without the E2E lock"
+fi
+
 # Build the inner command as a string because `su` resets the environment, so
 # every variable the run needs has to be set inside it. Quoting rules, since
 # this is where the original inline version was hardest to read:
@@ -181,6 +243,7 @@ INNER="$INNER MYNE_E2E_SERVER=\"${MYNE_E2E_SERVER}\""
 # number a loaded runner cannot honour. Passed through rather than hardcoded so a
 # developer running this script by hand keeps their own value.
 INNER="$INNER MYNE_E2E_TIMEOUT_SCALE=\"${MYNE_E2E_TIMEOUT_SCALE:-1}\""
+INNER="$INNER MYNE_E2E_LANE=\"${LANE}\""
 INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache'
 INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0'
 # fd soft limit -> hard cap (EMFILE guard): the Tauri app plus parallel cargo
@@ -188,7 +251,7 @@ INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCRE
 INNER="$INNER"' ; ulimit -n $(ulimit -Hn) 2>/dev/null || true'
 INNER="$INNER"' ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store'
 INNER="$INNER"' && cargo build --release -p e2e-fixture-gen'
-INNER="$INNER"' && xvfb-run -a pnpm test:e2e'
+INNER="$INNER"' && xvfb-run -a pnpm test:e2e '"${LANE_ONLY:-}"
 
 echo "ci-e2e-lane: running the ${LANE} lane"
 su ci -c "$INNER"
