@@ -397,7 +397,7 @@ async fn signed_head_ctx(
         b2b.group_key_epoch,
     );
     let own_device = is_owner
-        .then(|| super::device_identity::load().ok().flatten())
+        .then(|| super::device_identity::load_for_fallback("sync_cycle"))
         .flatten()
         .map(|key| key.public_half());
     let owner_devices = super::roster_trust::device_halves_for_owner(
@@ -435,7 +435,7 @@ async fn signed_head_ctx(
     );
 
     // The device half (`decisions/protocol/0731` + `0733`): this device authors `0x03`
-    // only when BOTH halves of the binding are in place — a device key at rest, and a
+    // only when BOTH halves of the binding are in place: a device key at rest, and a
     // VERIFIED binding row for this device that publishes the same public half. Either
     // half missing means the phrase path (`0x02`), which every peer already accepts, so
     // a half-finished rollout never authors a head its peers cannot resolve.
@@ -853,15 +853,30 @@ pub async fn run_active_cycle_from_host(
         // vouches for is what an `NTV7` vault needs exactly as much as an `NTV6`
         // one, and checking one magic would let the newer generation author the
         // downgraded head this guard exists to refuse (myne-md/myne#911 task 8).
-        let needs_signed_head = io
-            .read(&dir.join("vault.meta"))
-            .await
-            .map(|b| {
+        let needs_signed_head = match io.read(&dir.join("vault.meta")).await {
+            Ok(b) => {
                 let magic = b.get(..4);
                 magic == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
                     || magic == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-            })
-            .unwrap_or(false);
+            }
+            // An ABSENT meta is not a B2B vault, and that is the only read failure
+            // that means so. Collapsing every error into `false` was a default-on-
+            // error feeding a write: a transient IO failure made an `NTV7` vault look
+            // single-user, and the cycle then authored a `0x01` HMAC head the server
+            // refuses, wedging sync in exactly the shape this guard exists to prevent.
+            // An unreadable meta is a failure to classify, so the cycle stops and says
+            // so rather than guessing a generation.
+            Err(crate::io_failure_kind::IoFailureKind::NotFound) => false,
+            Err(err) => {
+                tracing::warn!(
+                    stage = "sync_cycle",
+                    event = "vault_meta_unreadable",
+                    reason = ?err,
+                    "cannot classify the vault generation, so the cycle will not author a head"
+                );
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            }
+        };
         if needs_signed_head && signed_ctx.is_none() {
             // A missing person identity is the one cause of `signed_ctx == None`
             // the user can fix in place (unlock the identity), so it gets its own

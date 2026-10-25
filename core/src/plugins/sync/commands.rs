@@ -1221,7 +1221,7 @@ async fn own_device_attestation_for(
     owner: &protocol::person_key::PersonPublicHalf,
 ) -> Option<protocol::person_invite::OwnerDeviceAttestation> {
     // No device key means no device signature, so there is nothing to attest.
-    let device_key = super::device_identity::load().ok().flatten()?;
+    let device_key = super::device_identity::load_for_fallback("invite_package")?;
     let sync_state = super::state::read_sync_state(io, root).await.ok()?;
     let device_id = super::devices::hex16(sync_state.device_id_hex.as_deref()?)?;
     let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
@@ -1278,10 +1278,8 @@ async fn write_ntv6_invite(
         account_number_hash,
         epoch,
     );
-    let own_device = super::device_identity::load()
-        .ok()
-        .flatten()
-        .map(|key| key.public_half());
+    let own_device =
+        super::device_identity::load_for_fallback("roster_verify").map(|key| key.public_half());
     let owner_devices = super::roster_trust::device_halves_for_owner(
         io,
         root,
@@ -1659,7 +1657,7 @@ pub async fn sync_list_roster<R: Runtime>(
             b2b.group_key_epoch,
         );
         let own_device = is_owner
-            .then(|| super::device_identity::load().ok().flatten())
+            .then(|| super::device_identity::load_for_fallback("invite_verify"))
             .flatten()
             .map(|key| key.public_half());
         let owner_devices = super::roster_trust::device_halves_for_owner(

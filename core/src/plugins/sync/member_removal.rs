@@ -838,9 +838,7 @@ pub async fn rotate_group_from_host(
         account_number_hash,
         b2b_meta.group_key_epoch,
     );
-    let own_device = crate::plugins::sync::device_identity::load()
-        .ok()
-        .flatten()
+    let own_device = crate::plugins::sync::device_identity::load_for_fallback("member_removal")
         .map(|key| key.public_half());
     let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
         io,
@@ -940,7 +938,8 @@ pub async fn rotate_group_from_host(
         account_number_hash,
         b2b_meta.group_key_epoch,
     );
-    let rotation_device = crate::plugins::sync::device_identity::load().ok().flatten();
+    let rotation_device =
+        crate::plugins::sync::device_identity::load_for_fallback("rotation_roster");
     let rotation_attestation = match (
         &rotation_device,
         super::state::read_sync_state(io, &vault_root).await,
@@ -1395,7 +1394,7 @@ pub async fn member_person_id_from_host(
             }
         }
     }
-    if let Ok(Some(key)) = crate::plugins::sync::device_identity::load() {
+    if let Some(key) = crate::plugins::sync::device_identity::load_for_fallback("rotation_verify") {
         owner_devices.push(key.public_half());
     }
     let roster = protocol::person_invite::verify_group_roster(

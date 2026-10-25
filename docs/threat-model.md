@@ -328,7 +328,16 @@ Items that are acknowledged as imperfect today and will be revisited. Captured h
 vault that device is bound to, until its binding is revoked. That is a capability the
 person token never had: the token could spend server-side slots, this one can change who
 holds the group key. Two bounds remain and both are the binding. A device key unwraps
-nothing, so it opens no vault and reads no note. And revocation is cryptographic rather
+nothing, so it opens no vault and reads no note. **Where it lives at rest, stated because it is a
+new at-rest secret rather than a new use of an old one** (`core/src/plugins/sync/device_identity.rs`):
+the signing key sits in the OS keychain under service `md.myne.devicekey`, account
+`device-signing-key`, with `WhenUnlockedThisDeviceOnly` accessibility and no biometric gate, so it is
+readable while the app runs and the vault is unlocked, it is not exportable, and it is excluded from
+platform backup by the accessibility class rather than by a policy flag. It is Apple-only today:
+every other platform has no rung of the ladder, so there is no key to steal and the phrase path
+(`0x02`) signs instead. A device whose keychain read fails falls back to that same phrase path with a
+warning rather than signing something it cannot verify, and the device-local erase paths destroy the
+item, so a wiped device leaves no signing key behind. And revocation is cryptographic rather
 than a note in a table: the binding tombstone plus peers refusing that device's signatures
 ends both the heads and the rosters it could author, which the pre-change model could not
 do for a device that had seen the phrase. Attribution loses one hop with it: a roster and
