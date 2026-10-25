@@ -51,6 +51,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
+import type { InvitesUnavailable } from "../lib/personAccount";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
@@ -103,8 +104,16 @@ interface VaultPickerProps {
    *
    * It is a count rather than the list because the list lives in the dialog,
    * which owns the two wizards and their error states.
+   *
+   * `invitesUnavailable` is the other half, and it is what keeps the row on
+   * screen when the count CANNOT be known: an invitation is addressed to a
+   * registered person account, so an identity this device created but never
+   * registered cannot list what was sent to it. Without this arm the invitee
+   * waits forever with no surface saying why, which is the report this pair of
+   * props exists to answer (myne-md/myne#911 follow-up).
    */
   inviteCount: number;
+  invitesUnavailable?: InvitesUnavailable | null;
   /** Open the invitations dialog. */
   onInvites: () => void;
 }
@@ -487,17 +496,44 @@ function CreateAnother({
  * Renders NOTHING at zero, which is what keeps an uninvited user's picker
  * exactly as it was before this feature.
  */
-function InvitesNotice({ count, onOpen }: { count: number; onOpen: () => void }) {
+/**
+ * The invitations row of the picker: a count when the list is readable, and the
+ * reason plus the door when it is not.
+ *
+ * Both arms open the same dialog, and both are buttons: the second is not a
+ * notification, it is the one surface that says "an invitation to this identity
+ * cannot be listed until you register it". A `reserved` or `pending` identity is
+ * a normal first-run state, not a fault, so the row states the wait rather than
+ * an error.
+ */
+function InvitesNotice({
+  count,
+  unavailable,
+  onOpen,
+}: {
+  count: number;
+  unavailable?: InvitesUnavailable | null;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
-  if (count <= 0) return null;
+  const unreadable =
+    unavailable === "not-enrolled" || unavailable === "pending" ? unavailable : null;
+  if (count <= 0 && unreadable === null) return null;
   return (
     <Button
       variant="secondary"
       onClick={onOpen}
       data-testid="picker.invites-notice"
+      data-invites={count > 0 ? "count" : unreadable}
       style={NOTICE_STYLE}
     >
-      {t("invites.notice", { count })}
+      {count > 0
+        ? t("invites.notice", { count })
+        : t(
+            unreadable === "pending"
+              ? "invites.noticePending"
+              : "invites.noticeUnregistered",
+          )}
     </Button>
   );
 }
@@ -593,7 +629,8 @@ function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
-  onRestoreBackup, onJoinDevice, inviteCount, onInvites }: VaultPickerProps) {
+  onRestoreBackup, onJoinDevice, inviteCount, invitesUnavailable,
+  onInvites }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // The last account-grouping failure, shown as a banner. `null` is no error.
@@ -720,7 +757,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
           />
         }
       >
-        <InvitesNotice count={inviteCount} onOpen={onInvites} />
+        <InvitesNotice
+          count={inviteCount}
+          unavailable={invitesUnavailable}
+          onOpen={onInvites}
+        />
       </PickerCard>
     );
   }
@@ -824,7 +865,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
           {accountsError}
         </p>
       )}
-      <InvitesNotice count={inviteCount} onOpen={onInvites} />
+      <InvitesNotice
+          count={inviteCount}
+          unavailable={invitesUnavailable}
+          onOpen={onInvites}
+        />
       {/* The fade is applied here rather than baked into LIST_STYLE because it
           is conditional on scroll position; see `useScrollEdges.ts` for why a
           fixed mask on both edges is wrong at rest. */}

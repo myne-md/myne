@@ -200,6 +200,20 @@ export async function personListInvites(): Promise<InviteSummary[]> {
   return [];
 }
 
+/**
+ * The recipient's refusal of an invitation (`DELETE /b2b/invites/{id}`,
+ * `decisions/protocol/0732`).
+ *
+ * Refused here for the reason the list above returns empty: the invitation
+ * commands need the device-scoped person token held in a carrier outside browser
+ * storage, so this page has no invitation to decline. It throws rather than
+ * resolving, because a decline that silently "succeeds" would tell the user the
+ * owner had been notified when nothing left the tab.
+ */
+export async function personDeclineInvite(_inviteIdHex: string): Promise<void> {
+  throw new Error("member vaults are unavailable on web");
+}
+
 export interface AcceptedInviteView {
   vault_id: string;
   vault_account_hash_hex: string;

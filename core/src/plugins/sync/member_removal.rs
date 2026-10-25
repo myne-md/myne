@@ -792,11 +792,29 @@ pub async fn rotate_group_from_host(
         .read(&meta_path)
         .await
         .map_err(|_| MemberRemovalError::Io)?;
-    if meta_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+    // Both tail generations rotate the same way: the roster, the group key and the
+    // epoch are `NTV6` objects, and `NTV7` only adds the person wrap around them. The
+    // gate therefore admits both, and the wrap is carried to the writer below so the
+    // frame is re-emitted in the generation it arrived in (dropping it would retire
+    // the owner's only phrase-independent credential).
+    if !matches!(
+        protocol::vault_meta_generation(&meta_bytes),
+        protocol::VaultMetaGeneration::B2b | protocol::VaultMetaGeneration::Person
+    ) {
         return Err(MemberRemovalError::InvalidVaultMeta);
     }
-    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+    let b2b_meta = protocol::parse_b2b_tail_any(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    let person_wrap =
+        if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
+            Some(
+                protocol::parse_vault_meta_ntv7(&meta_bytes)
+                    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?
+                    .person_wrap,
+            )
+        } else {
+            None
+        };
     let account_number_hash = b2b_meta.base.account_number_hash;
     // Captured rather than read off `b2b_meta` later: `base` is moved out of it at
     // step (6), while the `vault.member-names` re-seal in between needs the RETIRED
@@ -1103,13 +1121,25 @@ pub async fn rotate_group_from_host(
         &rotated.signed_roster,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
-    let new_meta_bytes = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
-        base,
-        group_key_nonce,
-        enc_group_key,
-        group_key_epoch: rotated.new_epoch,
-        signed_roster_envelope,
-    })
+    let new_meta_bytes = match person_wrap {
+        Some(person_wrap) => {
+            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+                base,
+                group_key_nonce,
+                enc_group_key,
+                group_key_epoch: rotated.new_epoch,
+                signed_roster_envelope,
+                person_wrap,
+            })
+        }
+        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base,
+            group_key_nonce,
+            enc_group_key,
+            group_key_epoch: rotated.new_epoch,
+            signed_roster_envelope,
+        }),
+    }
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
 
     // (6b) Persist the delivery obligations BEFORE the first mutation. This is
@@ -1277,7 +1307,7 @@ pub async fn member_person_id_from_host(
         .read(&vault_root.join("vault.meta"))
         .await
         .map_err(|_| MemberRemovalError::Io)?;
-    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+    let b2b_meta = protocol::parse_b2b_tail_any(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
     let account_number_hash = b2b_meta.base.account_number_hash;
     let envelope = protocol::person_invite::open_group_roster(
@@ -1383,11 +1413,15 @@ pub async fn recover_pending_rekey(
                 {
                     failed = true;
                 } else {
-                    // The committed batch is a rotation when its meta is NTV6;
-                    // record that the local content is now at that epoch, so a
-                    // member's adoption (and the owner's own next cycle) can tell
-                    // "keys installed, blobs still retired" from "both landed".
-                    if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&new_meta) {
+                    // The committed batch is a rotation when its meta carries the
+                    // B2B tail, in EITHER generation (`NTV7` is the birth format and
+                    // keeps the `NTV6` tail byte for byte); record that the local
+                    // content is now at that epoch, so a member's adoption (and the
+                    // owner's own next cycle) can tell "keys installed, blobs still
+                    // retired" from "both landed". Asking for the `NTV6` frame only
+                    // skipped this write on every person-born vault, which is now
+                    // every shared vault.
+                    if let Ok(b2b) = protocol::parse_b2b_tail_any(&new_meta) {
                         let _ = crate::plugins::sync::state::write_content_epoch(
                             io,
                             vault_root,

@@ -83,6 +83,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             person_account::sync_person_status,
             person_account::sync_person_list_invites,
             person_account::sync_list_vault_invites,
+            person_account::sync_person_decline_invite,
             person_account::sync_person_accept_invite,
             person_account::sync_member_join_vault,
             person_account::sync_person_unlock_member_vault,

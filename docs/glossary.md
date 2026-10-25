@@ -984,11 +984,19 @@ The v2 layout also keeps a version of the two carried fields that a reader must 
 
 Used in: `decisions.md` 2026-07-19; `decisions/protocol/0689`; `threat-model.md` §7
 
-### **device key** &nbsp; 🗝️ *Key/identifier*
+### **device key** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-Reserved term for a later major version's multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
+**Status: decided, not built.** Today the [person keypair](#person-keypair) still signs every vault head, group roster, device-binding row and member display-name row, and the device key does not exist in the tree. The term is defined here because the decision is recorded and the sentences that describe it would otherwise be read as a shipped guarantee (`decisions/protocol/0731`, sharpened by `0733`).
 
-Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+The per-device asymmetric key pair that takes over **daily authority** from the person key: it signs every vault head, the owner-signed [group roster](#group-roster) (so create, invite and removal), its own [device-to-person binding](#device-to-person-binding) row and the member display-name rows, while the person key does one thing per device: it signs that device's own binding row, once, when the device joins the account. The phrase keeps one job, recovery: the phrase opens the account when there is no working device, and every vault still opens with its own password.
+
+Four constants and one invariant are load-bearing. The head format is **`0x03`** (so `0x02` keeps meaning "signed by the person key"), the signature is **double, Ed25519 + ML-DSA-65**, and the record is the same length as `0x02` with the device id in the author slot; the head signature class becomes `"myne.head-signature v2|"`. The binding row's inner schema is `MYU5` format version `0x02` and carries the **device public halves** (a device-signed head cannot be verified without them) under the class `"myne.device-binding v2|"`; rows written under `v1` stay readable and a device re-signs itself on its first write. And the private half is **never on disk in plaintext**: OS keychain with `thisDeviceOnly` semantics, else the Linux Secret Service, else a `0600` file sealed by a user PIN reusing the [quick-unlock credential](#quick-unlock-credential) `MYQ1` attempt-and-wipe machinery, and if the user declines a PIN **no device key is created on that machine** and it keeps the phrase path.
+
+The invariant that makes the whole thing safe is a negative one: **a device key unwraps nothing.** The person key is deliberately NOT cached in a keychain, because on an `NTV7` vault every owned vault's `root_key` is sealed to it, so a keychain-held person key would let one biometric open every vault without a password, which is the cross-vault escalation `person_vault_carrier::carrier_applies` already refuses. What a stolen device key buys an adversary is the ability to sign as that device until its binding is revoked; what it does not buy is any vault.
+
+Not to be confused with the reserved sense the term used to carry (a hardware-held device key participating in MLS group formation): that reading stays out of scope, and `0731` gives the term a different, narrower job.
+
+Used in: `docs/decisions/protocol/0731-daily-authority-moves-to-a-device-key.md`; `docs/decisions/protocol/0733-the-device-keys-open-questions-are-answered.md`; `docs/decisions/protocol/0670-the-device-binding-signature-class.md`
 
 ### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
 
@@ -1517,9 +1525,9 @@ Used in: `docs/decisions/sync/0627-hosted-sync-access-is-gated-by-a-server-confi
 
 ### **invite relay** &nbsp; 📦 *Product*
 
-The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, plus the owner-side claimed-versus-pending list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
+The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, `DELETE /b2b/invites/{invite_id}` (the recipient's refusal, which drops the sealed payload and leaves a payload-free tombstone so the sender's list can say "declined" rather than "not accepted yet", `decisions/protocol/0732`), plus the owner-side three-state list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
 
-Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/decisions/protocol/0732-an-invitation-decline-is-a-real-server-side-delete.md`; `docs/spec/server-protocol.md` §3.1
 
 ### **heading record** &nbsp; 📦 *Product*
 
@@ -2100,6 +2108,14 @@ Used in: `docs/decisions/protocol/0666-member-display-names-a-group-tier-sealed-
 The verdict a reader attaches to a member display-name row: `verified` (the row's signature checks out against the public half of the person the row names), `unverified` (a record exists and the signature does not check out, or names somebody else), or `absent` (no record for that person). The three are deliberately separate rather than collapsed into a boolean or into "no name", because "this member has not chosen a name" and "somebody wrote a row for this member that nobody signed" are different things to tell a reader. The verification happens where the roster's public halves are already available, and the unverified record's CONTENT is not carried out of that partition, so a tampered name never reaches a surface that could render it.
 
 Used in: `docs/spec/protocol.md` §9.29.4; `docs/decisions/protocol/0667-the-member-name-signature-class.md`; `protocol/src/member_names_blob.rs` (`partition_verified`).
+
+### **member plane** &nbsp; 📋 *Protocol*
+
+The half of the shared-vault protocol that a **member** (not the owner) speaks, as opposed to the account plane and the [awareness plane](#awareness-plane). It is the set of acts a member performs against a vault it does not own: unlocking the vault from its own phrase, reading the [group roster](#group-key-epoch) and the two member-writable families, adopting a rotated group epoch from a delivered package rather than authenticating the rotated meta itself, and writing its own [display name](#member-display-name) and [device binding](#device-to-person-binding). Its credential is a `(person, vault)` **membership token**, not the vault's own device token, and it never holds the vault's `root_key`: the `group_key` and `itemsKey` arrive in the invite package and the root stays sealed to the owner's person key, which is why a member cannot re-sign an owner-signed record.
+
+The term became load-bearing when the plane stopped being `NTV6`-only. A vault born under a person identity is `NTV7` (the generation wraps `root_key` to the owner's person key), and the member plane used to resolve the group tail through a reader that asked for the `NTV6` frame specifically, so every member act answered `BadRequest` on exactly the vaults the product made shareable. The plane now reads the tail generation-agnostically through `parse_b2b_tail_any` and re-emits the generation it found (`decisions/protocol/0730`), which is a reader change and not a format change: `NTV7` keeps the `NTV6` tail byte for byte.
+
+Used in: `docs/decisions/protocol/0730-the-member-plane-reads-the-ntv7-generation.md`; `docs/spec/protocol.md` §9.3.5, §9.29.6, §9.30.6; `docs/spec/server-protocol.md` §3.1a; `core/src/plugins/sync/person_account.rs`.
 
 ### **member removal** &nbsp; 📦 *Product*
 

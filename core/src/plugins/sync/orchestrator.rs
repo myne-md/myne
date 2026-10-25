@@ -929,11 +929,11 @@ fn read_dictionary_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
 /// `themes_sync_id` archetype.
 ///
 /// It cannot go through [`shared_sync_id`], and the reason is worth stating: this
-/// family is `NTV6`-only and has **no `SubkeyRole` counterpart** (there is no
-/// pre-B2B form to derive a root-tier id for), so `SubkeyRole::shared_group_role`
-/// has no arm to map and a `SubkeyRole` argument would not typecheck. `None` is
-/// therefore the whole pre-B2B answer: an `OwnerRoot` session has no such blob and
-/// the phase stands down, exactly as the command layer answers
+/// family exists only on a vault that HAS a group tier, and it has **no `SubkeyRole`
+/// counterpart** (there is no pre-B2B form to derive a root-tier id for), so
+/// `SubkeyRole::shared_group_role` has no arm to map and a `SubkeyRole` argument would
+/// not typecheck. `None` is therefore the whole pre-B2B answer: an `OwnerRoot` session
+/// has no such blob and the phase stands down, exactly as the command layer answers
 /// `NotASharedVault`.
 fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
     let group = shared.group_bytes()?;
@@ -942,8 +942,9 @@ fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
 
 /// The member-names blob's sync discriminator (`read_singleton_nonce` over MYO5).
 ///
-/// `MYO5` is this family's ONE generation: it is born `NTV6`-only, so there is no
-/// `MYO1` form and no later `MY?5` generation to accept beside it. That is why the
+/// `MYO5` is this family's ONE generation: it exists only on a vault with a group
+/// tier, so there is no `MYO1` form and no later `MY?5` generation to accept beside
+/// it. That is why the
 /// `later` list is empty here and not because one was forgotten, which is the shape
 /// `check-crypto-registries.mjs` rule 5 exists to catch: `MEMBER_NAMES_BLOB_MAGIC` is
 /// deliberately off the `_V<n>_<m>_MAGIC` pattern, so the family has no later magic
@@ -963,7 +964,8 @@ fn device_bindings_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
 
 /// The device-binding blob's sync discriminator (`read_singleton_nonce` over MYU5).
 ///
-/// `MYU5` is this family's ONE generation, born `NTV6`-only exactly as `MYO5` is: there
+/// `MYU5` is this family's ONE generation, existing on every vault with a group tier
+/// exactly as `MYO5` does: there
 /// is no `MYU1` form and no later `MY?5` generation to accept beside it. The `later`
 /// list is empty because there is nothing to name, not because one was forgotten, which
 /// is the shape `check-crypto-registries.mjs` rule 5 exists to catch;
@@ -3683,7 +3685,8 @@ impl MemberNamesPhase {
 /// `sync_themes_phase` twin. Three things differ, and each is dictated by the family
 /// rather than chosen here:
 ///
-/// 1. **It is `NTV6`-only.** The store is group-sealed and its AAD binds the group
+/// 1. **It needs the group tier, which both tail generations carry.** The store is
+///    group-sealed and its AAD binds the group
 ///    epoch, so a pre-B2B `OwnerRoot` session has neither, and the phase answers
 ///    [`MemberNamesPhase::idle`] without a byte of traffic. The command layer answers
 ///    `NotASharedVault` for the same vault.
@@ -3711,8 +3714,8 @@ async fn sync_member_names_phase(
     names_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
 ) -> Result<MemberNamesPhase, SyncCycleError> {
-    // NTV6-only: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK
-    // to derive and no blob to address.
+    // No group tier: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK
+    // to derive and no blob to address. `NTV6` and `NTV7` both carry it.
     let Some(group) = shared.group_bytes() else {
         return Ok(MemberNamesPhase::idle());
     };
@@ -3910,8 +3913,9 @@ impl DeviceBindingsPhase {
 
 /// Pull-side `vault.device-bindings` reconciliation, the `sync_member_names_phase` twin.
 ///
-/// Every structural decision is the same as its sibling's and for the same reasons: it is
-/// `NTV6`-only (the store is group-sealed and its AAD binds the epoch); the KEK and its
+/// Every structural decision is the same as its sibling's and for the same reasons: it needs
+/// the group tier, which both tail generations carry (the store is group-sealed and its AAD
+/// binds the epoch); the KEK and its
 /// two bindings come from the family's own resolver, which reads `vault.meta` once for the
 /// account hash AND the epoch; a pulled copy that does not decode is refused rather than
 /// merged as empty, because `merge(local, empty) == local` would discard a peer's claim
@@ -3938,8 +3942,8 @@ async fn sync_device_bindings_phase(
     bindings_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
 ) -> Result<DeviceBindingsPhase, SyncCycleError> {
-    // NTV6-only: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK to
-    // derive and no blob to address.
+    // No group tier: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK to
+    // derive and no blob to address. `NTV6` and `NTV7` both carry it.
     let Some(group) = shared.group_bytes() else {
         return Ok(DeviceBindingsPhase::idle());
     };
@@ -5209,7 +5213,10 @@ async fn sync_cycle_attempt(
         crate::plugins::sync::state::read_content_epoch(io, vault_root).await,
         io.read(&vault_root.join("vault.meta")).await,
     ) {
-        if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta) {
+        // Both tail generations. Reading only `NTV6` made this stand-down check a no-op on
+        // `NTV7`, so a person-born vault whose local content lagged the group-key epoch went
+        // on to re-seal under a retired `itemsKey` instead of waiting.
+        if let Ok(b2b) = protocol::parse_b2b_tail_any(&meta) {
             if content_epoch < b2b.group_key_epoch {
                 tracing::warn!(
                     stage = "sync_cycle",

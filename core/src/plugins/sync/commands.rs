@@ -968,21 +968,6 @@ pub async fn invite_member_from_host(
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
         return Err(SyncDeviceError::MigrationRequired);
     }
-    // Sharing is not available on the person-wrapped generation yet, and the
-    // refusal is explicit rather than a fall-through. Before this, an `NTV7`
-    // frame took the legacy branch below, ran a whole invite and then died in
-    // `write_roster_row` because the `NTV5` membership field is absent, which
-    // surfaced as a generic bad request with no reason (myne-md/myne#911 review).
-    // The upgrade that could create such a vault is gated on a single-member
-    // roster for the same reason; see `vault_migrate::ntv7`.
-    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
-        tracing::warn!(
-            stage = "member_invite",
-            event = "person_generation_sharing_unsupported",
-            "refusing to invite a member to a person-wrapped vault"
-        );
-        return Err(SyncDeviceError::BadRequest);
-    }
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
         // The `NTV6` invite writes the owner-signed roster, and the member's
         // grant is a group-key package rather than an `itemsKey` wrap.
@@ -996,6 +981,34 @@ pub async fn invite_member_from_host(
             member_public,
             member_person_id_hex,
             group_key.as_deref(),
+            None,
+            &_permit,
+        )
+        .await;
+    }
+    // A person-born vault (`NTV7`) invites through the SAME writer, because its tail
+    // is `NTV6`'s byte for byte: the roster, the group-key package and the epoch are
+    // the same objects. What differs is the frame it is sealed back into, so the
+    // writer takes the person wrap and re-emits `NTV7` verbatim around the new tail.
+    //
+    // This used to answer a flat `BadRequest` with a warning, because sharing a
+    // person-born vault was out of scope (`decisions/ui/0729`). It is in scope now:
+    // a generation that is born with the group tier and can never be shared is a
+    // vault type the product no longer has.
+    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
+        let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes)
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+        return write_ntv6_invite(
+            state,
+            io,
+            &root,
+            &meta_path,
+            &meta_bytes,
+            &owner,
+            member_public,
+            member_person_id_hex,
+            group_key.as_deref(),
+            Some(parsed.person_wrap),
             &_permit,
         )
         .await;
@@ -1182,13 +1195,19 @@ pub async fn create_invite_from_host(
     Ok(view)
 }
 
-/// **Invite a member to an `NTV6` vault** (B2B, myne-md/myne#712).
+/// **Invite a member to an `NTV6` or `NTV7` vault** (B2B, myne-md/myne#712).
 ///
-/// The `NTV6` grant is a GROUP-key package, not an `itemsKey` wrap: the member
-/// receives the current epoch's `group_key`, which is what opens the vault's
-/// shared content. This opens the sealed owner-signed roster, appends the new
-/// live member row (with the package's wrap), re-signs and re-seals it at the
-/// SAME epoch, and writes `vault.meta`. The epoch only advances on a removal.
+/// The grant is a GROUP-key package, not an `itemsKey` wrap: the member receives the
+/// current epoch's `group_key`, which is what opens the vault's shared content. This
+/// opens the sealed owner-signed roster, appends the new live member row (with the
+/// package's wrap), re-signs and re-seals it at the SAME epoch, and writes
+/// `vault.meta`. The epoch only advances on a removal.
+///
+/// `person_wrap` is the generation: `None` writes an `NTV6` frame, `Some` writes the
+/// `NTV7` frame with that wrap preserved. `NTV7` keeps the `NTV6` tail byte for byte,
+/// so only the envelope around the new roster differs; a caller that passed `None`
+/// for a person-born vault would silently downgrade it to `NTV6` and retire the very
+/// credential (`root_key` sealed to the owner's person key) the vault was born with.
 ///
 /// The member-accept path and the wire that carries the package are Grill 4; the
 /// frame is returned in `invite_wire` so the caller can relay it.
@@ -1203,11 +1222,11 @@ async fn write_ntv6_invite(
     member_public: &protocol::person_key::PersonPublicHalf,
     member_person_id_hex: Option<&str>,
     group_key: Option<&[u8; 32]>,
+    person_wrap: Option<protocol::PersonWrap>,
     _permit: &tokio::sync::SemaphorePermit<'_>,
 ) -> Result<InviteCommandView, SyncDeviceError> {
     use protocol::person_invite as pi;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let account_number_hash = b2b.base.account_number_hash;
     // An `NTV6` invite wraps the shared `group_key`, so an owner session that
     // does not carry the group tier cannot seal one. This is the typed refusal
@@ -1294,13 +1313,25 @@ async fn write_ntv6_invite(
         &signed,
     )
     .ok_or(SyncDeviceError::BadRequest)?;
-    let new_meta = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
-        base: b2b.base,
-        group_key_nonce: b2b.group_key_nonce,
-        enc_group_key: b2b.enc_group_key,
-        group_key_epoch: epoch,
-        signed_roster_envelope: sealed,
-    })
+    let new_meta = match person_wrap {
+        Some(person_wrap) => {
+            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+                base: b2b.base,
+                group_key_nonce: b2b.group_key_nonce,
+                enc_group_key: b2b.enc_group_key,
+                group_key_epoch: epoch,
+                signed_roster_envelope: sealed,
+                person_wrap,
+            })
+        }
+        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base: b2b.base,
+            group_key_nonce: b2b.group_key_nonce,
+            enc_group_key: b2b.enc_group_key,
+            group_key_epoch: epoch,
+            signed_roster_envelope: sealed,
+        }),
+    }
     .map_err(|_| SyncDeviceError::BadRequest)?;
 
     let old_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes);

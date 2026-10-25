@@ -43,6 +43,8 @@ import { toast } from "../components/toast/toastStore";
 import { AcceptInviteWizard, JoinVaultWizard } from "../components/sync/InviteWizard";
 import { MemberNameGate } from "../components/sync/MemberNameGate";
 import { PersonRegisterDialog } from "../components/sync/PersonRegisterDialog";
+import { PersonIdentityUnlock } from "../components/sync/PersonIdentityUnlock";
+import { usePersonIdentityState } from "../components/sync/personIdentityState";
 
 /** How often the pending-invite list re-polls while the identity home is
  *  mounted and visible. The relay has no push channel for a person account, so
@@ -248,6 +250,21 @@ export function IdentityHome({
   onRegistered,
 }: IdentityHomeProps) {
   const { t } = useTranslation();
+  // Whether this SESSION holds the identity's private half. It decides the one
+  // action this screen exists for: a vault born under an identity signs its first
+  // member list with that key, so creating one while the identity is sealed needs
+  // the phrase first (`vault_creation::commands` refuses with `PersonLocked`, and
+  // `decisions/protocol/0717` is why it refuses rather than degrading to a
+  // phrase-bearing vault).
+  //
+  // The door that satisfies it used to live only inside Settings, which a device
+  // with zero vaults cannot open: this screen offered "Create a vault", the flow
+  // answered "unlock your identity first", and there was nowhere to do that
+  // (2026-10-25 owner report). Same shape as the register door `decisions/ui/0725`
+  // item 2 added here for the same reason: a refusal must not name an act the
+  // surface cannot perform.
+  const { ready: identityReady } = usePersonIdentityState();
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
   // The identity the server does not know yet, as a state rather than an error
@@ -639,9 +656,28 @@ export function IdentityHome({
             `invitesPending` already says. No second block here. */}
 
         <div style={BLOCK_STYLE}>
-          <Button variant="primary" onClick={onCreateVault} data-testid="identity-home.create-vault-cta">
-            {t("identityHome.createVaultCta")}
-          </Button>
+          {/* **Absent, not disabled** (the rule `decisions/ui/0729` states for a
+              control the state cannot honour). While the identity is locked the
+              primary action is the UNLOCK, and the sentence above it says why:
+              the alternative was a "Create a vault" button whose only outcome was
+              a refusal that pointed at a door this screen did not have. */}
+          {identityReady ? (
+            <Button
+              variant="primary"
+              onClick={onCreateVault}
+              data-testid="identity-home.create-vault-cta"
+            >
+              {t("identityHome.createVaultCta")}
+            </Button>
+          ) : (
+            <div
+              style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--space-3)" }}
+              data-testid="identity-home.create-vault-locked"
+            >
+              <p style={HINT_STYLE}>{t("identityHome.createVaultLocked")}</p>
+              <PersonIdentityUnlock open={unlockOpen} onOpenChange={setUnlockOpen} />
+            </div>
+          )}
         </div>
 
         {/* Forget this identity on this device. Device-local only: the server

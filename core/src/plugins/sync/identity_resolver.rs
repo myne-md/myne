@@ -432,8 +432,11 @@ pub async fn join_durable_attribution(
         return DurableAttribution::empty();
     };
     // A pre-B2B (`NTV5`) vault has no group tier, so this family does not exist there and
-    // there is nothing to join.
-    let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta_bytes) else {
+    // there is nothing to join. BOTH tail generations do carry it: `NTV7` keeps the `NTV6`
+    // tail byte for byte, and a member vault bootstrapped from an owner's person-born meta
+    // is `NTV7`, so asking for the `NTV6` frame specifically dropped every device binding
+    // on exactly the vaults sharing now produces (parse_b2b_tail_any).
+    let Ok(b2b) = protocol::parse_b2b_tail_any(&meta_bytes) else {
         return DurableAttribution::empty();
     };
     let account = b2b.base.account_number_hash;
