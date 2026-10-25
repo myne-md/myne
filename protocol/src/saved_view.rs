@@ -2589,4 +2589,170 @@ mod tests {
         std::fs::write("/tmp/myne_saved_view_opaque_vectors.json", dump.as_bytes())
             .expect("write saved-view opaque vectors dump");
     }
+
+    /// Emit the `board-view` cases for this family (myne-md/myne#922): the two
+    /// optional sub-fields `lanes` and `template` in every presence combination.
+    ///
+    /// `cargo test -p protocol --lib emit_saved_view_board_vectors_for_paste -- --ignored`
+    ///
+    /// Writes `/tmp/myne_saved_view_board_vectors.json`, a JSON array fragment
+    /// SPLICED into the existing `cases` array, for the same reason
+    /// [`Self::emit_saved_view_opaque_vectors_for_paste`] is a fragment: the
+    /// whole-file writer would delete every case later features added.
+    ///
+    /// Four cases, and the combinations are the point rather than the count:
+    /// both keys, `lanes` alone, `template` alone, neither. A port that emitted
+    /// either key unconditionally passes the first two and fails the last, and a
+    /// port that hardcoded the pair (treating them as one optional object) fails
+    /// the middle two.
+    ///
+    /// `lanes` is authored in a NON-lexicographic order with a value that no
+    /// card carries in the fixture's data, because the order is the payload: a
+    /// sort or a dedup on either side of the wire is the divergence this case
+    /// exists to catch, and a sorted fixture would hide it.
+    #[test]
+    #[ignore]
+    fn emit_saved_view_board_vectors_for_paste() {
+        extern crate std;
+
+        let mut dump = String::new();
+        dump.push_str("[\n");
+
+        // `last` is threaded because the fragment is pasted as the tail of the
+        // array, so exactly one case omits its trailing comma.
+        let emit = |dump: &mut String, slug: &str, desc: &str, view: &SavedView, last: bool| {
+            let bytes = canonical_encode_saved_views(core::slice::from_ref(view));
+            // Fixed point: the bytes pinned here are the bytes this reader
+            // accepts back and re-emits unchanged.
+            let (reparsed, consumed) = parse_saved_views_array(&bytes)
+                .unwrap_or_else(|e| panic!("[{slug}] board fixture did not parse: {e:?}"));
+            assert_eq!(
+                consumed,
+                bytes.len(),
+                "[{slug}] cursor must cover the array"
+            );
+            let canonical = canonical_encode_saved_views(&reparsed);
+            assert_eq!(
+                canonical, bytes,
+                "[{slug}] encode must be a decode fixed point"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"saved-view/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(desc)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_ok\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\",\n",
+                hex_lower(&bytes)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_consumed_len\": {consumed},\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\"\n",
+                hex_lower(&canonical)
+            ));
+            dump.push_str(if last { "    }\n" } else { "    },\n" });
+        };
+
+        let board = SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000020"),
+            name: String::from("Release board"),
+            view_type: ViewType::Cards,
+            filters: FilterNode::All,
+            sort: Some(ViewSort {
+                key: String::from("title"),
+                direction: SortDirection::Asc,
+            }),
+            group_by: Some(String::from("status")),
+            columns: alloc::vec![String::from("owner"), String::from("due")],
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+            version: Some(3),
+            write_fields: alloc::vec![String::from("status")],
+            lanes: Vec::new(),
+            template: None,
+        };
+        let lanes = alloc::vec![
+            String::from("Doing"),
+            String::from("Backlog"),
+            String::from("Done"),
+        ];
+        let template = String::from("0190a000-0000-7000-8000-000000000021");
+
+        emit(
+            &mut dump,
+            "board-fields-populated",
+            "Both board sub-fields (`board-view`, myne-md/myne#922) on one view: `lanes` in its canonical slot between `image_aspect_ratio` and `name`, `template` between `sort` and `version`. The declared lane order ('Doing', 'Backlog', 'Done') is authored NON-lexicographic and includes a lane no card carries, and it comes back verbatim: a conformant encoder sorts neither the sequence nor its elements, because the order is the board's left-to-right reading order, and an empty declared lane is the normal case that lets a card be dropped into 'Done' before anything is done.",
+            &SavedView {
+                lanes: lanes.clone(),
+                template: Some(template.clone()),
+                ..board.clone()
+            },
+            false,
+        );
+
+        emit(
+            &mut dump,
+            "board-lanes-only",
+            "`lanes` present with `template` unset: the lane declaration survives and `template` is ABSENT from the encoding rather than emitted as null or an empty string. The two keys are independently optional, so a port that modelled them as one object, or that emitted a placeholder for an unset template, diverges here.",
+            &SavedView {
+                lanes: lanes.clone(),
+                template: None,
+                ..board.clone()
+            },
+            false,
+        );
+
+        emit(
+            &mut dump,
+            "board-template-only",
+            "`template` present with `lanes` unset: the template note id survives and `lanes` is ABSENT from the encoding rather than emitted as an empty array. A board with no declared order is supported by definition (undeclared lanes append in first-appearance order), so an encoder that always writes `lanes` changes the bytes of every view that never declares one.",
+            &SavedView {
+                lanes: Vec::new(),
+                template: Some(template.clone()),
+                ..board.clone()
+            },
+            false,
+        );
+
+        // The absent case's expected bytes are spelled out as a literal rather
+        // than taken from the encoder, so the claim is about the BYTES and not
+        // about the encoder agreeing with itself.
+        let absent_bytes = canonical_encode_saved_views(core::slice::from_ref(&board));
+        assert_eq!(
+            core::str::from_utf8(&absent_bytes).unwrap(),
+            concat!(
+                "[{\"columns\":[\"owner\",\"due\"],\"filters\":{\"kind\":\"all\"},",
+                "\"group_by\":\"status\",\"id\":\"0190a000-0000-7000-8000-000000000020\",",
+                "\"name\":\"Release board\",",
+                "\"sort\":{\"direction\":\"asc\",\"key\":\"title\"},",
+                "\"version\":3,\"view_type\":\"cards\",\"write_fields\":[\"status\"]}]"
+            ),
+            "a view carrying neither board key must encode exactly as it did before the keys existed",
+        );
+        assert!(!core::str::from_utf8(&absent_bytes)
+            .unwrap()
+            .contains("lanes"));
+        assert!(!core::str::from_utf8(&absent_bytes)
+            .unwrap()
+            .contains("template"));
+        emit(
+            &mut dump,
+            "board-fields-absent",
+            "Neither board sub-field: the encoding is byte-identical to the same view before these keys existed, which is what makes the addition additive rather than a format bump. An older client decodes these bytes as it always did, and a newer one that emitted an empty `lanes` array or a null `template` would rewrite every pre-board view in the vault.",
+            &board,
+            true,
+        );
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_saved_view_board_vectors.json", dump.as_bytes())
+            .expect("write saved-view board vectors dump");
+    }
 }
