@@ -2749,6 +2749,7 @@
       },
       "board": {
         "emptyLane": "No cards",
+        "dropRefused": "{{reason}}. The card is back in {{lane}}.",
         "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
       },
       "cards": {
