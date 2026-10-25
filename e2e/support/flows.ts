@@ -492,6 +492,7 @@ export type SettingsTab =
   | "network"
   | "cli"
   | "transcription"
+  | "diagnostics"
   | "about";
 
 export async function openSettings(
@@ -579,6 +580,67 @@ export async function emitEventToSelf(
     "plugin:event|emit_to",
     { target: { kind: "WebviewWindow", label }, event, payload },
     10_000,
+  );
+}
+
+/** Click the `n`-th element carrying `testId`, re-finding it inside the poll.
+ *
+ *  A positional click needs its OWN helper: `clickByTestId` addresses a testid,
+ *  and a row index is not a selector. Reading `byTestIdAll(id)[n]` once and then
+ *  `.click()` is the shape `e2e/AGENTS.md` rules out — the handle is stale the
+ *  moment the list re-renders, and the click then burns its whole budget polling
+ *  a node that no longer exists (`waitUntil(element interactable + clicked)
+ *  timed out … [stale element reference]`, which reads as a slow app).
+ *  Measured on `agent-setting-intent` ag8, whose rows re-render as each applied
+ *  setting lands. */
+export async function clickNthByTestId(
+  session: Session,
+  testId: string,
+  index: number,
+  opts?: { timeoutMs?: number },
+): Promise<void> {
+  let lastReason = "never polled";
+  await session.waitUntil(
+    async () => {
+      const all = await session.byTestIdAll(testId);
+      if (all.length <= index) {
+        lastReason = `only ${all.length} match(es) for ${testId}`;
+        return null;
+      }
+      const el = all[index]!;
+      // Bring it into view inside its OWN scroll container first, the same
+      // reason `clickBySelector` does: WebDriver's pre-click scroll does not
+      // reliably reach a nested `overflow` body in WebKit. Index-based, because
+      // the selector here is a position rather than a testid.
+      try {
+        await session.execute(
+          "var els = document.querySelectorAll('[data-testid=\"' + arguments[0] + '\"]');" +
+            "var el = els[arguments[1]]; if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
+          [testId, String(index)],
+        );
+      } catch {
+        /* re-find next poll */
+      }
+      try {
+        await el.clickOnce();
+        return true;
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          lastReason = `click reported "${e.code}"`;
+          return null;
+        }
+        throw e;
+      }
+    },
+    {
+      label: () => `${testId}[${index}] clicked (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 20_000,
+    },
   );
 }
 

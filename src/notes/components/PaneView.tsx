@@ -2395,6 +2395,23 @@ export function PaneView({
     // pane re-rendered with `peers: 1`, and the editor's awareness effect logged
     // NO dispatch for that frame (`peers: 0` twice, then nothing).
     paneAwareness,
+    // **The suggestion chips, and their absence is the same failure one band
+    // over (myne-md/myne#651).** The editor element is built inside this memo,
+    // so `tagSuggestions={tagSuggestions}` only reaches it when the memo
+    // recomputes. A dismissal updated the hook's `hidden` set and re-rendered
+    // the pane, and the editor then received the SAME old array, so its
+    // `setTagSuggestions` push never fired and the chip the reader had just
+    // crossed out stayed on screen until an unrelated render invalidated one of
+    // the deps above. Measured 2026-10-24 on `tag-suggestion-band` tsb1: the
+    // band still read `[stub-tag, notes]` 30 s after the dismiss click, while
+    // `useTagSuggestions`' own unit tests passed because they never involve
+    // this memo.
+    tagSuggestions,
+    // Both chip handlers are read here too, and one of them closes over
+    // `editorView`: naming them keeps the memo from handing the editor a
+    // callback that targets a view this pane has already swapped out.
+    handleAcceptTagSuggestion,
+    handleDismissTagSuggestion,
   ]);
 
   return (

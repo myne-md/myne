@@ -178,6 +178,18 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   // The identity is unlocked from the Sync panel's Identity block, which is collapsed
   // by default (myne-md/myne#831); the roster no longer carries its own grid.
   await openSyncConnection(owner.session);
+  // **Two acts, in this order, and the panel's own ternary is why.** A seeded
+  // vault has NO identity, so the block offers Add and Unlock; the unlock door is
+  // the one that DERIVES an identity from an existing phrase. That identity is
+  // then `reserved` — on this device, on no server — and a reserved identity has
+  // no Unlock control at all (`SyncPanel`: `identityUnlocked || needsRegistration
+  // ? null : …`), because `person_register` installs the person session itself.
+  // Waiting for `identity-unlocked` straight after the derive is therefore
+  // waiting for a word the panel only prints once the identity is also
+  // REGISTERED, which an invite needs anyway: the relay only knows an identity
+  // written to a NAMED server, and an invite addressed to an unregistered person
+  // has nowhere to land (measured 2026-10-24 as a 120 s timeout on
+  // `identity-home.invite-row`).
   await (await owner.session.byTestId("sync.panel.identity-unlock.open")).click();
   await typePhrase(
     owner.session,
@@ -186,23 +198,13 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
     OWNER_PHRASE,
   );
   await (await owner.session.byTestId("sync.panel.identity-unlock.submit")).click();
+  await owner.session.byTestId("sync.panel.identity-unregistered", { timeoutMs: 20_000 });
+  await registerPersonIdentityIn(owner.session, "sync.panel.register", OWNER_PHRASE.split(" "));
   await owner.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 30_000 });
-  // The roster is a DEVICES-topic surface and the unlock happened on
-  // CONNECTION, so the section it waits for is not mounted until the topic
-  // moves. Measured 2026-10-24: every scenario built on this helper reported
-  // `member-roster.person-ready` missing for 90 s after an unlock that had
-  // worked, which reads as "the phrase was refused".
+  // The roster is a DEVICES-topic surface and registration happened on
+  // CONNECTION, so the section it waits for is not mounted until the topic moves.
   await selectSettingsTopic(owner.session, "sync", "devices");
   await owner.session.byTestId("member-roster.person-ready", { timeoutMs: 90_000 });
-  // **REGISTER the owner's identity before anything tries to reach them.**
-  // Since 2026-10-24 registration is an explicit act, not a side effect of the
-  // first run: the relay only knows an identity that was written to a NAMED
-  // server, and an invite addressed to an unregistered person has nowhere to
-  // land. Skipping it left the member's identity home polling for an invitation
-  // that could never arrive, which surfaced as a 120 s timeout on
-  // `identity-home.invite-row` in three scenarios at once.
-  await registerPersonIdentity(owner.session, OWNER_PHRASE.split(" "));
-  await selectSettingsTopic(owner.session, "sync", "devices");
   return readValue(owner.session, "member-roster.owner-code");
 }
 
