@@ -137,9 +137,9 @@ pub const DEVICE_BINDING_BLOB_FORMAT_V1: u8 = 0x01;
 /// by a row the PERSON key signs.
 pub const DEVICE_BINDING_BLOB_FORMAT_V2: u8 = 0x02;
 
-/// The format this client WRITES. A `0x02` blob may hold `0x01` rows (a device that
-/// has not re-signed itself yet), so the byte is the map's schema revision and never
-/// an assertion about every row inside it.
+/// The NEWEST format this client understands. It is not what a writer always emits:
+/// [`format_for_map`] picks the byte the map needs, so a vault with no device key
+/// anywhere keeps writing the `0x01` bytes the previous release reads.
 pub const DEVICE_BINDING_BLOB_FORMAT_CURRENT: u8 = DEVICE_BINDING_BLOB_FORMAT_V2;
 
 /// Every format byte this client ACCEPTS, the vocabulary `dictionary_blob` uses for
@@ -497,9 +497,30 @@ pub fn encode_device_binding_blob_raw(
         account_number_hash,
         group_key_epoch,
         map,
-        DEVICE_BINDING_BLOB_FORMAT_V2,
+        format_for_map(map),
         nonce,
     )
+}
+
+/// The `format_version` byte a map NEEDS: `0x02` once any row carries the device public
+/// halves, and `0x01` until then.
+///
+/// Deriving it instead of always writing the newest byte is what keeps the change from
+/// breaking a fleet that has not adopted it. A vault whose devices all sit on a platform
+/// with no storage rung writes exactly the bytes the previous release reads, so an older
+/// build on that same vault sees no format it does not understand; the first device that
+/// does hold a key bumps the blob, and the older build is then told to update by a format
+/// byte rather than silently failing.
+#[must_use]
+pub fn format_for_map(map: &DeviceBindingsMap) -> u8 {
+    if map
+        .values()
+        .any(|entry| entry.device_ed_pk.is_some() || entry.device_mldsa_vk.is_some())
+    {
+        DEVICE_BINDING_BLOB_FORMAT_V2
+    } else {
+        DEVICE_BINDING_BLOB_FORMAT_V1
+    }
 }
 
 /// [`encode_device_binding_blob_raw`] with the `format_version` byte chosen by the
@@ -551,7 +572,7 @@ pub fn encode_device_binding_blob(
     encode_blob_envelope(
         device_binding_key,
         &DEVICE_BINDING_BLOB_MAGIC,
-        DEVICE_BINDING_BLOB_FORMAT_V2,
+        format_for_map(map),
         &aad,
         MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
         &plaintext,
