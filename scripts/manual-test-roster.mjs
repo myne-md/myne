@@ -6907,6 +6907,12 @@ export const ROSTER = Object.freeze([
       "src/notes/reorderViewOrder.ts",
       "src/notes/filterDraft.ts",
       "src/lib/viewsEnabled.ts",
+      "src/components/ViewsManager.tsx",
+      "src/components/ViewImportDialog.tsx",
+      "src/components/ViewConsent.tsx",
+      "src/notes/importViewManifest.ts",
+      "src/notes/exportViewManifest.ts",
+      "src/notes/bulkSetField.ts",
       "mobile/src/app/flows/editor/views/MobileViewRenderHost.tsx",
       "mobile/src/app/flows/editor/views/cardsView.tsx",
       "mobile/src/app/flows/editor/views/listView.tsx",
@@ -6922,6 +6928,7 @@ export const ROSTER = Object.freeze([
       "e2e/saved-view-display-settings.e2e.ts",
       "e2e/cards-cover-picker.e2e.ts",
       "e2e/search-query-operators.e2e.ts",
+      "e2e/view-manifests.e2e.ts",
     ],
     manual: [
       {
