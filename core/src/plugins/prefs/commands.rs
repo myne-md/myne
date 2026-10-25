@@ -8059,6 +8059,8 @@ mod tests {
             image_aspect_ratio: Some(String::from("1.65")),
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         }
     }
 

@@ -22,10 +22,11 @@
 // the only evaluator (`src/notes/queryEngine.ts`), and nothing here decides what
 // matches.
 //
-// `template` is DELIBERATELY absent from this format (the board PRD adds it as an
-// additive key). It is read defensively rather than declared on `SavedView`, so
-// this build discloses one if it ever meets a definition carrying one instead of
-// silently dropping it.
+// `template` is the board's additive key, and it is DISCLOSED rather than treated
+// as a capability: it names a note whose body a new card copies, and the note
+// itself is resolved by the import path, which is the only layer that can know
+// the vault. So it is echoed for the consent surface and read here for nothing
+// else.
 
 import type { FilterNode, PropertyOp, SavedView } from "../../lib/prefs";
 
@@ -67,8 +68,9 @@ export interface ViewCapabilitySummary {
   readonly readsEnvelopes: readonly ViewEnvelopeRef[];
   /** The property keys the view may write (`write_fields`). Empty means none. */
   readonly writesProperties: readonly string[];
-  /** The template this definition names, or `null`. Always `null` in this
-   *  format: `template` is not a key it carries (see the file header). */
+  /** The template note id this definition names, or `null` when it names none.
+   *  A note id, not a verdict about the note: resolution belongs to the import
+   *  path (see the file header). */
   readonly template: string | null;
 }
 
@@ -142,10 +144,10 @@ export function viewCapabilitySummary(definition: SavedView): ViewCapabilitySumm
   };
 }
 
-/** Read the optional `template` key defensively. The key is not on `SavedView`
- *  on purpose (nothing can produce it until the board ships), so this is a
- *  forward-looking disclosure rather than a field this feature added. */
+/** Read the optional `template` key. Trimmed, and blank reads as absent: a key
+ *  carrying only whitespace names no note, and a consent surface must not claim
+ *  otherwise. */
 function templateOf(definition: SavedView): string | null {
-  const raw = (definition as SavedView & { readonly template?: unknown }).template;
+  const raw = definition.template;
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
 }

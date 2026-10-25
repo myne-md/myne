@@ -69,7 +69,7 @@ pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 /// fully-populated view's canonical bytes and compares the key set both ways, so
 /// a field added to [`SavedView`] without a matching entry here fails a test
 /// rather than silently becoming an unknown key that refuses every manifest.
-pub const MANIFEST_KEYS: [&str; 12] = [
+pub const MANIFEST_KEYS: [&str; 14] = [
     "card_size",
     "columns",
     "filters",
@@ -77,8 +77,10 @@ pub const MANIFEST_KEYS: [&str; 12] = [
     "id",
     "image",
     "image_aspect_ratio",
+    "lanes",
     "name",
     "sort",
+    "template",
     "version",
     "view_type",
     "write_fields",
@@ -98,9 +100,10 @@ pub const MANIFEST_KEYS: [&str; 12] = [
 #[non_exhaustive]
 pub enum ViewManifestError {
     /// A top-level key this format does not define, carried so the refusal can
-    /// name it. This is the arm that makes a later additive key (`template`)
-    /// safe: an older client says which key it does not know rather than
-    /// importing a manifest minus that key.
+    /// name it. This is the arm that makes a later additive key safe: an older
+    /// client says which key it does not know rather than importing a manifest
+    /// minus that key. `lanes` and `template` arrived through it, which is why
+    /// both are in [`MANIFEST_KEYS`] and a fresh key is not.
     #[error("the manifest carries an unknown key")]
     UnknownKey(String),
     /// A `write_fields` entry naming a marker the host owns.
@@ -237,6 +240,8 @@ mod tests {
             image_aspect_ratio: None,
             version: Some(2),
             write_fields: vec!["rating".into()],
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -252,12 +257,14 @@ mod tests {
                 direction: crate::saved_view::SortDirection::Desc,
             }),
             group_by: Some("status".into()),
+            lanes: vec!["Backlog".into(), "Doing".into(), "Done".into()],
             columns: vec!["author".into()],
             card_size: Some(300),
             image: Some("cover".into()),
             image_aspect_ratio: Some("1.65".into()),
             version: Some(1),
             write_fields: vec!["rating".into()],
+            template: Some("01J8Z".into()),
         }
     }
 
@@ -265,10 +272,10 @@ mod tests {
 
     #[test]
     fn unknown_top_level_key_is_refused_by_name() {
-        let bad = br#"{"filters":{"kind":"all"},"id":"v1","name":"n","template":{"x":1},"version":1,"view_type":"table"}"#;
+        let bad = br#"{"filters":{"kind":"all"},"id":"v1","name":"n","version":1,"view_type":"table","wip_limit":3}"#;
         assert_eq!(
             parse_view_manifest(bad),
-            Err(ViewManifestError::UnknownKey("template".to_string()))
+            Err(ViewManifestError::UnknownKey("wip_limit".to_string()))
         );
     }
 
@@ -353,7 +360,7 @@ mod tests {
         // its declaration silently.
         let stored = concat!(
             "[{\"filters\":{\"kind\":\"all\"},\"id\":\"v1\",\"name\":\"n\",",
-            "\"template\":{\"x\":1},\"view_type\":\"table\"}]"
+            "\"wip_limit\":{\"x\":1},\"view_type\":\"table\"}]"
         )
         .as_bytes();
         let (views, opaque, _) =
@@ -371,12 +378,12 @@ mod tests {
 
         let manifest = concat!(
             "{\"filters\":{\"kind\":\"all\"},\"id\":\"v1\",\"name\":\"n\",",
-            "\"template\":{\"x\":1},\"view_type\":\"table\"}"
+            "\"wip_limit\":{\"x\":1},\"view_type\":\"table\"}"
         )
         .as_bytes();
         assert_eq!(
             parse_view_manifest(manifest),
-            Err(ViewManifestError::UnknownKey("template".to_string()))
+            Err(ViewManifestError::UnknownKey("wip_limit".to_string()))
         );
     }
 
@@ -421,6 +428,34 @@ mod tests {
     }
 
     #[test]
+    fn a_manifest_carrying_the_board_keys_is_accepted_not_refused() {
+        // The other half of the unknown-key rule: a key this format KNOWS is
+        // imported rather than refused. Both board keys are additive, so a
+        // definition written by this build must be readable by this build, and a
+        // manifest carrying them must not fall into the `wip_limit` arm above.
+        let v = SavedView {
+            view_type: ViewType::Cards,
+            group_by: Some("status".into()),
+            lanes: vec!["Backlog".into(), "Doing".into(), "Done".into()],
+            template: Some("01J8ZTEMPLATE".into()),
+            write_fields: vec!["status".into()],
+            ..fully_populated()
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        assert_eq!(parse_view_manifest(&bytes), Ok(v));
+        // The declared order survives an export and a re-import, which is the
+        // property the board depends on.
+        assert_eq!(
+            parse_view_manifest(&bytes).unwrap().lanes,
+            vec![
+                "Backlog".to_string(),
+                "Doing".to_string(),
+                "Done".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn both_fields_are_omitted_when_absent_so_a_pre_feature_view_is_unchanged() {
         // The byte-identity claim: a view that carries neither field encodes
         // exactly as it did before this format existed. `had_no_manifest_fields`
@@ -441,6 +476,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         assert_eq!(canonical_encode_saved_view(&pre_feature), expected);
         // …and the strict reader cannot accept it, which is the only difference

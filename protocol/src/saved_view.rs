@@ -195,6 +195,24 @@ pub struct SavedView {
     /// Optional groupBy property key. Omitted when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_by: Option<String>,
+
+    /// The declared LANE ORDER for a board view: the group values of `group_by`
+    /// in the order the user wants them read left to right (`board-view`;
+    /// §9.5.2). Omitted when empty.
+    ///
+    /// Sequence semantics, the `columns` discipline: order IS the payload,
+    /// preserved verbatim and NFC per element, never sorted and never
+    /// deduplicated, so an export then re-import is byte-identical.
+    ///
+    /// It is a DECLARATION, not the authoritative lane set. A board renders
+    /// every value the data carries, appending the ones this list omits in
+    /// first-appearance order, and a value listed here with no cards still
+    /// renders as an empty lane because "drop a card into Done" has to be
+    /// possible before anything is done. Keeping the list separate from the
+    /// data is what lets the view stay a projection: no card order and no lane
+    /// membership is stored anywhere but the note's own property.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lanes: Vec<String>,
     /// Ordered display columns (the `.base` `order` list). A SEQUENCE —
     /// element order is the payload (preserved verbatim, not sorted/deduped).
     /// Omitted when empty.
@@ -255,6 +273,21 @@ pub struct SavedView {
     ///   would fail a whole prefs parse over one view's declaration.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub write_fields: Vec<String>,
+
+    /// Optional note id a board's "add a card" copies the BODY from
+    /// (`board-view`; §9.5.2). Omitted when unset.
+    ///
+    /// A note id and NOT a note: the format layer cannot resolve one, because
+    /// the vault is the only thing that knows what exists, so this is stored as
+    /// the opaque string the author picked and resolved (or reported missing) by
+    /// the import path that already resolves and reports everything else.
+    ///
+    /// Additive on purpose. The board creates the note and then sets the lane
+    /// value through the host-owned field command, and having no template is a
+    /// supported state rather than a setup step: a board with this key absent
+    /// creates the vault's default new note.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
 }
 
 /// One `saved_views` array element this build cannot REPRESENT, carried
@@ -339,9 +372,10 @@ pub fn canonical_encode_saved_view(view: &SavedView) -> Vec<u8> {
 
 fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
     // Canonical key order: card_size, columns, filters, group_by, id, image,
-    // image_aspect_ratio, name, sort, version, view_type, write_fields.
-    // (`version` < `view_type` on the third byte, `view_type` < `write_fields`
-    // on the second.)
+    // image_aspect_ratio, lanes, name, sort, template, version, view_type,
+    // write_fields.
+    // (`lanes` sorts after `image_aspect_ratio` on the first byte, `sort` <
+    // `template` < `version` on the second.)
     out.push(b'{');
     let mut first = true;
     if let Some(cs) = view.card_size {
@@ -375,6 +409,11 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
         out.extend_from_slice(b"\"image_aspect_ratio\":");
         push_string(out, &nfc(ar));
     }
+    if !view.lanes.is_empty() {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"lanes\":");
+        push_string_array(out, &view.lanes);
+    }
     sep(out, &mut first);
     out.extend_from_slice(b"\"name\":");
     push_string(out, &nfc(&view.name));
@@ -382,6 +421,11 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
         sep(out, &mut first);
         out.extend_from_slice(b"\"sort\":");
         encode_sort_into(out, s);
+    }
+    if let Some(ref t) = view.template {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"template\":");
+        push_string(out, &nfc(t));
     }
     if let Some(v) = view.version {
         sep(out, &mut first);
@@ -1051,6 +1095,18 @@ pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedView
         None => Vec::new(),
     };
 
+    // `lanes`: the declared board lane order, stored verbatim. Nothing is
+    // validated against the data here, because this layer has no data: a lane
+    // value with no cards is legal and expected.
+    let lanes = match find(obj, "lanes") {
+        Some(JsonValue::Array(a)) => a
+            .iter()
+            .map(|e| as_str(e).map(String::from))
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => Vec::new(),
+    };
+
     let sort = match find(obj, "sort") {
         Some(v) => Some(sort_from_json(v)?),
         None => None,
@@ -1069,6 +1125,8 @@ pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedView
         image_aspect_ratio: opt_string(obj, "image_aspect_ratio")?,
         version,
         write_fields,
+        lanes,
+        template: opt_string(obj, "template")?,
     })
 }
 
@@ -1183,6 +1241,8 @@ mod tests {
             image_aspect_ratio: Some("1.65".into()),
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -1229,6 +1289,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let bytes = canonical_encode_saved_view(&v);
         assert_eq!(
@@ -1273,6 +1335,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded, v);
@@ -1306,6 +1370,8 @@ mod tests {
                 image_aspect_ratio: None,
                 version: None,
                 write_fields: Vec::new(),
+                lanes: Vec::new(),
+                template: None,
             };
             assert_eq!(
                 canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap(),
@@ -1401,6 +1467,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.name, "\u{00e9}");
@@ -1446,6 +1514,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let bytes = canonical_encode_saved_views(&[a.clone(), b.clone()]);
         let (views, consumed) = parse_saved_views_array(&bytes).unwrap();
@@ -1895,6 +1965,85 @@ mod tests {
         );
     }
 
+    // ---- `lanes` / `template` (board-view, §9.5.2) -----------------------
+
+    #[test]
+    fn lanes_preserve_declared_order_and_are_not_deduplicated() {
+        // Order IS the payload: the lane sequence is the board's left-to-right
+        // reading order, so a sort or a dedup here would silently rewrite the
+        // view. Declared-but-empty lanes are the normal case, not a defect.
+        let v = SavedView {
+            lanes: vec![
+                "Done".into(),
+                "Backlog".into(),
+                "Doing".into(),
+                "Done".into(),
+            ],
+            template: Some("01J8ZTEMPLATE".into()),
+            ..sample()
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        let text = core::str::from_utf8(&bytes).unwrap();
+        assert!(text.contains("\"lanes\":[\"Done\",\"Backlog\",\"Doing\",\"Done\"]"));
+        assert!(text.contains("\"template\":\"01J8ZTEMPLATE\""));
+        assert_eq!(canonical_decode_saved_view(&bytes).unwrap(), v);
+    }
+
+    #[test]
+    fn lanes_and_template_are_omitted_when_unset() {
+        // Byte identity for every pre-board view: neither key may appear, which
+        // is what makes the format additive rather than a version bump.
+        let v = SavedView {
+            lanes: Vec::new(),
+            template: None,
+            ..sample()
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        let text = core::str::from_utf8(&bytes).unwrap();
+        assert!(!text.contains("lanes"));
+        assert!(!text.contains("template"));
+        // The canonical slot each key occupies when present, pinned by position
+        // rather than by membership alone: `lanes` sits between
+        // `image_aspect_ratio` and `name`, `template` between `sort` and
+        // `version`.
+        let populated = canonical_encode_saved_view(&SavedView {
+            lanes: vec!["Backlog".into()],
+            template: Some("t".into()),
+            version: Some(1),
+            ..v
+        });
+        let populated = core::str::from_utf8(&populated).unwrap();
+        let lanes_at = populated.find("\"lanes\"").expect("lanes emitted");
+        let name_at = populated.find("\"name\"").expect("name emitted");
+        let sort_at = populated.find("\"sort\"").expect("sort emitted");
+        let template_at = populated.find("\"template\"").expect("template emitted");
+        let version_at = populated.find("\"version\"").expect("version emitted");
+        assert!(lanes_at < name_at, "lanes sorts before name");
+        assert!(sort_at < template_at && template_at < version_at);
+    }
+
+    #[test]
+    fn lanes_and_template_wrong_types_are_refused() {
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"lanes\":\"Done\",\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"lanes\":[1],\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"template\":7,\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
     #[test]
     fn decode_rejects_unknown_sort_direction() {
         // sort.direction outside {asc,desc} → Unrepresentable (line 782).
@@ -1934,6 +2083,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.sort, v.sort);
@@ -2032,6 +2183,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.filters, node);
@@ -2054,6 +2207,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let forward = canonical_encode_saved_views(&[mk("a"), mk("b"), mk("c")]);
         let shuffled = canonical_encode_saved_views(&[mk("c"), mk("a"), mk("b")]);
@@ -2185,6 +2340,8 @@ mod tests {
                 image_aspect_ratio: None,
                 version: None,
                 write_fields: Vec::new(),
+                lanes: Vec::new(),
+                template: None,
             },
         ]);
         emit_ok(&mut dump, "multi-sorted-by-id", "Two views: the array is emitted sorted by id (v0 before v1) regardless of caller order.", &two, true);
@@ -2306,6 +2463,8 @@ mod tests {
             image_aspect_ratio: None,
             version: Some(4),
             write_fields: alloc::vec![String::from("status"), String::from("due")],
+            lanes: Vec::new(),
+            template: None,
         };
         let manifest_bytes = canonical_encode_saved_views(core::slice::from_ref(&with_manifest));
         // Fixed point: the vector is only worth pinning if the bytes it pins are
