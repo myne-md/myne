@@ -5,12 +5,20 @@
 //! for the open vault. The whole plugin core (commands, error, sniff, reconcile,
 //! reconcile_commands, text_cache, the pure `scheme_core`, the cleanup ref-scan)
 //! lives in `myne-core` (`myne_core::plugins::attachments`, shared with the
-//! desktop client). Mobile registers the CRUD subset that works without a native
-//! microphone or the desktop text extractor:
+//! desktop client). Mobile registers the CRUD subset, plus the image half of text
+//! extraction:
 //!
-//! - `attachment_import` — the **extraction-free** core import command (mobile
-//!   has no `lopdf`/`zip`/`quick-xml` producer, so no `MYE1` text cache is
-//!   written; desktop registers its own eager-extracting wrapper instead).
+//! - `attachment_import`: the mobile wrapper over the shared import, injecting
+//!   `ocr::extract_image_only` so an image is read into the `MYE1` cache
+//!   (MYND-441). PDF / DOCX / text-like extraction stays desktop-only, because
+//!   those producers are bound to `lopdf` / `zip` / `quick-xml`, which mobile
+//!   does not compile. This entry said "the extraction-free core import" and "no
+//!   `MYE1` cache is written" long after MYND-441 made both false, which is the
+//!   one sentence a reader would cite before concluding the phone has no text to
+//!   read.
+//! - `attachment_read_extracted_text`: read that cache back by attachment id,
+//!   re-extracting once from the sealed source on a miss (myne-md/myne#926).
+//!   Reading needs no pref gate, so it stays available with OCR switched off.
 //! - `catalog_list` / `attachment_delete` / `attachment_rename` /
 //!   `attachment_export` / `attachment_unused_list` / `attachment_clean_unused`.
 //! - the reconcile trio (`attachment_refs_apply` / `_remove` / `_referencing`).
@@ -50,6 +58,7 @@ pub use myne_core::plugins::attachments::{
 // Mobile Tauri glue for the `attachment://` URI scheme (delegates to the shared
 // `scheme_core::build_response`). Registered on the Builder in `lib.rs`.
 pub mod import_mobile;
+pub mod read_extracted;
 pub mod scheme;
 
 use tauri::plugin::{Builder, TauriPlugin};
@@ -67,6 +76,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // contents exactly as on desktop. PDF/DOCX/text extraction stays
             // desktop-only (lopdf/zip/quick-xml are desktop deps).
             import_mobile::attachment_import,
+            // myne-md/myne#926: read back the MYE1 cache the import just wrote.
+            // The phone has held the text of a photographed page since MYND-441
+            // and had no way to show it; this is that read, by attachment id.
+            read_extracted::attachment_read_extracted_text,
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
