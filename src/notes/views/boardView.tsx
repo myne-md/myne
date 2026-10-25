@@ -312,6 +312,7 @@ export function BoardView({
   onOpenNote,
   onCardContextMenu,
   onSetCover,
+  onNoteCreated,
   approved,
   cardActions,
 }: {
@@ -320,6 +321,15 @@ export function BoardView({
   onOpenNote?: OpenNoteHandler;
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
+  /**
+   * Announce a note the board just created, so the host's derived surfaces learn
+   * about it. A board card is created outside the editor's autosave path, and a
+   * view's rows are built from the host's note cache: without this the card the
+   * user just added is missing from the board that created it, while the note
+   * itself is on disk with the right lane. The "+ New Note" action does the same
+   * thing for the same reason (`refreshOne` after create).
+   */
+  onNoteCreated?: (noteId: string) => void | Promise<void>;
   approved?: boolean;
   /** The host's card actions. Present → the board draws the shared menu itself,
    *  because it is the surface that offers the lifecycle verb. */
@@ -530,6 +540,12 @@ export function BoardView({
             setAddError({ refusal: result.refusal });
             return;
           }
+          // Before the open, so the card is in the view's rows by the time the
+          // new note's tab takes the board off screen. A board card is created
+          // outside the editor's autosave path, so nothing else would tell the
+          // host's note cache about it and the board that just added the card
+          // would be the one surface that cannot see it.
+          await onNoteCreated?.(result.noteId);
           // A NEW TAB rather than the focused one: replacing the board with the
           // new note would turn "capture an item" into "leave the board".
           onOpenNote?.(result.noteId, { newTab: true, toSide: false });
@@ -540,7 +556,7 @@ export function BoardView({
         }
       })();
     },
-    [addingLane, def.id, def.template, laneField, onOpenNote],
+    [addingLane, def.id, def.template, laneField, onNoteCreated, onOpenNote],
   );
 
   // ---- selection, the move, and the one restore (task 7) ------------------
@@ -688,9 +704,9 @@ export function BoardView({
         {t("notes.views.board.dropRefused", {
           reason: refusalSentence(drag.refusal.reason, t),
           lane:
-            drag.refusal.toLane === ""
+            drag.refusal.fromLane === ""
               ? t("notes.views.cards.noValue")
-              : drag.refusal.toLane,
+              : drag.refusal.fromLane,
         })}
       </p>
     );

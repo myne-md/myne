@@ -26,6 +26,8 @@ const h = vi.hoisted(() => ({
   refusing: new Set<string>(),
   invoke: vi.fn(),
   prefsWrite: vi.fn(),
+  /** Every `reindexNoteFromBody(noteId, body)` the restore makes. */
+  reindex: vi.fn(),
 }));
 
 vi.mock("../../src/platform/core", () => ({ invoke: h.invoke }));
@@ -36,7 +38,7 @@ vi.mock("../../src/notes/readNote", () => ({
   noteRead: async (noteId: string) => h.vault.get(noteId) ?? "",
 }));
 vi.mock("../../src/notes/vaultIndices", () => ({
-  reindexNoteFromBody: async () => {},
+  reindexNoteFromBody: h.reindex,
 }));
 vi.mock("../../src/notes/snapshots", () => ({
   snapshotRestore: async (noteId: string, snapshotId: string) => {
@@ -81,6 +83,7 @@ beforeEach(() => {
   h.vault.set("b1", NOTE("Backlog", "Pick a name"));
   h.refusing.clear();
   h.invoke.mockReset();
+  h.reindex.mockReset();
   h.prefsWrite.mockReset().mockResolvedValue(undefined);
   h.invoke.mockImplementation(
     async (command: string, args: Record<string, unknown>) => {
@@ -228,6 +231,10 @@ describe("renaming a lane", () => {
     const renamed = { ...def, lanes: ["Backlog", "In progress", "Done"], version: 5 };
     rerender(<BoardView def={renamed} result={result()} approved />);
 
+    // The rename itself reindexed the three notes it wrote (that is
+    // `setNoteField`'s own step), so clear before the restore to measure the
+    // restore's half only.
+    h.reindex.mockClear();
     fireEvent.click(await screen.findByTestId("view.board-restore"));
 
     await waitFor(() => expect(h.vault.get("a1")).toContain("restored:snap-a1"));
@@ -238,6 +245,18 @@ describe("renaming a lane", () => {
       (h.vault.get(noteId) ?? "").includes("restored:"),
     );
     expect(restoredIds).toEqual(["a1", "a2", "a3"]);
+    // …and each restored note was read back into the property index. The bytes
+    // and the index are two different facts: without this the board keeps
+    // drawing the pre-restore lane because the index is what its rows come from
+    // (the E2E caught exactly that). The refused/non-restorable note is not
+    // reindexed, because nothing was restored into it.
+    await waitFor(() =>
+      expect(h.reindex.mock.calls.map(([id]) => id).sort()).toEqual([
+        "a1",
+        "a2",
+        "a3",
+      ]),
+    );
     // …and the declaration came back with it, version forward.
     await waitFor(() => expect(h.prefsWrite).toHaveBeenCalledTimes(2));
     const restoreWrite = h.prefsWrite.mock.calls[1]![0] as {

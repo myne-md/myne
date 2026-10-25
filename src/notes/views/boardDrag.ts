@@ -56,10 +56,15 @@ export interface PendingDrop {
   readonly toLane: string;
 }
 
-/** A drop the host refused, with its own reason. */
+/** A drop the host refused, with its own reason.
+ *
+ *  `fromLane` rather than the drop target, because the line this feeds says
+ *  where the card IS: a refusal puts it back in the lane it came from, so naming
+ *  the lane it was dropped on told the reader the opposite of what happened
+ *  (board-view, found by the E2E). */
 export interface DragRefusal {
   readonly noteId: string;
-  readonly toLane: string;
+  readonly fromLane: string;
   readonly reason: NoteSetFieldError;
 }
 
@@ -179,10 +184,13 @@ export function boardDragReducer(
       };
     case "refused":
       // The placement goes away FIRST: the card must be back where the note
-      // says it is before the line explaining why appears.
+      // says it is before the line explaining why appears. The line names the
+      // lane it went back TO, which is the one the gesture started in; the drop
+      // target is where it did not go, so naming that would report the opposite
+      // of what the reader can see.
       return { ...state, pending: null, refusal: {
         noteId: state.pending?.noteId ?? "",
-        toLane: state.pending?.toLane ?? "",
+        fromLane: state.pending?.fromLane ?? "",
         reason: action.reason,
       } };
   }

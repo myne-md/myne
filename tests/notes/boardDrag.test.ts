@@ -140,7 +140,9 @@ describe("the optimistic placement", () => {
     expect(state.pending).toBeNull();
     expect(state.refusal).toMatchObject({
       noteId: "n2",
-      toLane: "Done",
+      // The lane the card is back IN, not the one it was dropped on: the line
+      // this feeds says where the card went, and a refusal returns it.
+      fromLane: "Doing",
       reason: { kind: "FieldChanged" },
     });
     // …so the board renders the data again, which is where the note still is.
