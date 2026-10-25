@@ -44,6 +44,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -72,6 +73,9 @@ import {
   type PendingDrop,
 } from "./boardDrag";
 import { refusalSentence } from "./refusalSentence";
+import { addCardToLane } from "./addCard";
+import { IconButton } from "../../components/primitives/IconButton";
+import type { NoteSetFieldError } from "../../types/note-set-field-error";
 
 /** Lane column width in px. A layout constant rather than a token, the same
  *  class as the gallery's `maxWidth`: it is the board's geometry, not a value a
@@ -163,6 +167,13 @@ const LANE_COUNT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+/** The add-card control sits at the trailing edge of the lane header, on the
+ *  count's baseline, so the header keeps one reading line. */
+const LANE_ADD_STYLE: CSSProperties = {
+  marginInlineStart: "auto",
+  display: "inline-flex",
+};
+
 const LANE_BODY_STYLE: CSSProperties = {
   flex: "1 1 auto",
   minHeight: 0,
@@ -239,6 +250,14 @@ export function BoardView({
     () => applyOptimistic(lanes, drag.pending),
     [lanes, drag.pending],
   );
+
+  // ---- add a card (task 6) ------------------------------------------------
+  const [addingLane, setAddingLane] = useState<string | null>(null);
+  const [addError, setAddError] = useState<{
+    readonly lane: string;
+    /** `null` when no note could be created at all. */
+    readonly refusal: NoteSetFieldError | null;
+  } | null>(null);
 
   // End the optimism when the DATA has moved off the lane the gesture started
   // in: either the write landed (the note is now in the target lane), the note
@@ -340,6 +359,39 @@ export function BoardView({
     [rendered, runDrop, writable],
   );
 
+  // One card into one lane: create, place, then open. The board does not invent
+  // the row: the field write re-indexes the note and the next query carries the
+  // card with the truth behind it.
+  const runAddCard = useCallback(
+    (lane: string) => {
+      if (addingLane !== null) return;
+      setAddingLane(lane);
+      setAddError(null);
+      void (async () => {
+        try {
+          const result = await addCardToLane({
+            viewId: def.id,
+            laneField,
+            lane,
+            template: def.template,
+          });
+          if (result.refusal !== null) {
+            setAddError({ lane, refusal: result.refusal });
+            return;
+          }
+          // A NEW TAB rather than the focused one: replacing the board with the
+          // new note would turn "capture an item" into "leave the board".
+          onOpenNote?.(result.noteId, { newTab: true, toSide: false });
+        } catch {
+          setAddError({ lane, refusal: null });
+        } finally {
+          setAddingLane(null);
+        }
+      })();
+    },
+    [addingLane, def.id, def.template, laneField, onOpenNote],
+  );
+
   const refusalLine: ReactNode =
     drag.refusal === null ? null : (
       <p
@@ -354,6 +406,17 @@ export function BoardView({
               ? t("notes.views.cards.noValue")
               : drag.refusal.toLane,
         })}
+      </p>
+    );
+
+  const addErrorLine: ReactNode =
+    addError === null ? null : (
+      <p data-testid={VIEW_TESTID.boardAddError} role="status" style={REFUSAL_STYLE}>
+        {addError.refusal === null
+          ? t("notes.views.board.addCardFailed")
+          : t("notes.views.board.addCardRefused", {
+              reason: refusalSentence(addError.refusal, t),
+            })}
       </p>
     );
 
@@ -373,6 +436,7 @@ export function BoardView({
         </p>
       )}
       {refusalLine}
+      {addErrorLine}
       <div data-testid={VIEW_TESTID.boardLanes} style={LANES_STYLE}>
         {rendered.map((lane: BoardLane) => {
           const label =
@@ -396,6 +460,20 @@ export function BoardView({
               <div data-testid={VIEW_TESTID.laneHeading} style={LANE_HEADER_STYLE}>
                 <span style={LANE_TITLE_STYLE}>{label}</span>
                 <span style={LANE_COUNT_STYLE}>· {lane.rows.length}</span>
+                {/* Only where the view DECLARES its lane property writable: a
+                    board that cannot place a card must not offer to make one,
+                    and a disabled button would be an offer it cannot honour. */}
+                {writable && (
+                  <span style={LANE_ADD_STYLE}>
+                    <IconButton
+                      icon="plus"
+                      label={t("notes.views.board.addCardTo", { lane: label })}
+                      testId={VIEW_TESTID.boardAddCard}
+                      disabled={addingLane !== null}
+                      onClick={() => runAddCard(lane.value)}
+                    />
+                  </span>
+                )}
               </div>
               {lane.rows.length === 0 ? (
                 // A declared lane with no cards is the NORMAL state, not a
