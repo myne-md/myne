@@ -101,6 +101,7 @@ permissions = [
   # permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
   "allow-set-view-approval",
   "allow-export-view-manifest",
+  "allow-read-view-manifest",
 ]
 
 [[permission]]
@@ -686,3 +687,13 @@ commands.allow = ["set_view_approval"]
 identifier = "allow-export-view-manifest"
 description = "Allow invoking prefs:export_view_manifest (writes ONE saved view as canonical `.myneview` manifest bytes to a user-chosen path; the definition arrives as a typed SavedView so the file is always a canonical manifest and never arbitrary content, bounded by MAX_MANIFEST_BYTES; atomic-writes at the USER destination via atomic_write_unclobbered and touches vault.prefs not at all; the OS save dialog is the export consent per TB3, and the command logs a closed error kind only, never a view name, id or path)."
 commands.allow = ["export_view_manifest"]
+
+# view-manifests: read ONE `.myneview` file from a user-chosen path and validate
+# it with the strict reader. A READ in the prefs namespace that touches no prefs
+# field, so `scripts/check-prefs-nonce.mjs` exempts it by name (`READ_COMMANDS`).
+# Main-window-only: the import dialog is an editor surface, and no detached note
+# window has business pulling a definition out of a file.
+[[permission]]
+identifier = "allow-read-view-manifest"
+description = "Allow invoking prefs:read_view_manifest (opens ONE user-chosen `.myneview` file, reads at most MAX_MANIFEST_BYTES + 1 so an oversized file is detected rather than truncated, and validates it with protocol::parse_view_manifest, which is the only authority on the manifest grammar; returns the parsed SavedView or the reader's named refusal and writes nothing, approves nothing and reads no vault state, because validation is not permission; the OS open dialog is the access consent)."
+commands.allow = ["read_view_manifest"]

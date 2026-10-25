@@ -61,6 +61,12 @@ pub use myne_core::plugins::prefs::{commands, error};
 /// the bytes.
 mod export;
 
+/// The manifest IMPORT reader. Same reasoning as `export`: it opens a file at a
+/// user-chosen path, which belongs on this side of the core seam, and it validates
+/// with the shared `protocol::parse_view_manifest` so the import path and the
+/// `vault.prefs` path cannot disagree about the grammar.
+mod import;
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
@@ -170,6 +176,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // a user-chosen path. Needs its own `allow-` entry in
             // permissions/prefs/default.toml like every command above.
             export::export_view_manifest,
+            // view-manifests: read + strictly validate ONE `.myneview` file.
+            // Needs its own `allow-` entry like every command above.
+            import::read_view_manifest,
         ])
         .build()
 }
@@ -457,11 +466,21 @@ mod acl_registration_guard {
             + shim[gh_start..]
                 .find(']')
                 .expect("unterminated generate_handler!");
+        // The LAST path segment, not a `commands::` prefix. This extraction was
+        // blind to any command that lives in another module of the same plugin:
+        // it saw `commands::set_theme` and skipped `export::export_view_manifest`
+        // entirely, so the "permitted but not registered" comparison could not
+        // name the two commands that genuinely were registered. The prefix was
+        // never the subject; the command NAME is, and `::` is just the path to it.
         let mut registered: Vec<String> = shim[gh_start..gh_end]
             .lines()
-            .filter_map(|l| l.trim().strip_prefix("commands::"))
-            .map(|l| l.trim_end_matches(',').trim().to_string())
-            .filter(|l| !l.is_empty())
+            .filter_map(|l| {
+                let line = l.trim().trim_end_matches(',').trim();
+                if line.is_empty() || !line.contains("::") {
+                    return None;
+                }
+                Some(line.rsplit("::").next().unwrap_or(line).to_string())
+            })
             .collect();
         registered.sort();
         registered.dedup();

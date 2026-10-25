@@ -227,6 +227,7 @@ fn main() {
                 // `plugin:prefs|export_view_manifest` authorize form never
                 // matches.
                 "export_view_manifest",
+                "read_view_manifest",
             ]),
         )
         .plugin(
