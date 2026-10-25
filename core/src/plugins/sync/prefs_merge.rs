@@ -1866,6 +1866,8 @@ mod tests {
             image_aspect_ratio: None,
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let mut a = PrefsView {
             saved_views: vec![view("0190-a", "Books")],

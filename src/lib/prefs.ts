@@ -148,6 +148,17 @@ export interface SavedView {
    *  (`archived`, `trashed`, `deleted`) are refused by the import reader, so no
    *  view can hide notes from its own vault. Absent → no write authority. */
   write_fields?: string[];
+  /** A board's declared lane order (`board-view`): the `group_by` values in the
+   *  order they read left to right. Sequence semantics, order preserved verbatim
+   *  (never sorted, never deduplicated). It is a DECLARATION, not the lane set:
+   *  a value present in the data and absent here appends in first-appearance
+   *  order, and a value here with no cards still renders, so "drop a card into
+   *  Done" works before anything is done. Absent → derived order only. */
+  lanes?: string[];
+  /** A note id whose BODY a new board card copies (`board-view`). Resolved by the
+   *  import path, never by this type: the format layer cannot know the vault.
+   *  Absent → a new card is the vault's default new note. */
+  template?: string;
 }
 
 /** One color-group rule (graph-connection-ux-polish) — a stable id, a

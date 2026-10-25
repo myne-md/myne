@@ -107,6 +107,8 @@ mod tests {
             image_aspect_ratio: None,
             version: Some(2),
             write_fields: vec![],
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -145,13 +147,15 @@ mod tests {
     fn names_the_unknown_key_it_refuses() {
         let dir = crate::test_support::ScopedTempDir::new("view-manifest-unknown").unwrap();
         let mut bytes = canonical_encode_saved_view(&sample());
-        // Splice an unknown key in at the front of the object.
-        bytes.splice(1..1, b"\"template\":\"book\",".iter().copied());
+        // Splice an unknown key in at the front of the object. A plausible
+        // future key rather than a nonsense one, because the refusal's job is to
+        // name a key this build does not implement.
+        bytes.splice(1..1, b"\"wip_limit\":3,".iter().copied());
         let path = write(&dir, "v.myneview", &bytes);
         match read_manifest_from(&path).unwrap_err() {
             ViewManifestReadError::Invalid {
                 reason: ViewManifestError::UnknownKey(key),
-            } => assert_eq!(key, "template"),
+            } => assert_eq!(key, "wip_limit"),
             other => panic!("expected UnknownKey, got {other:?}"),
         }
     }

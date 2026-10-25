@@ -164,6 +164,11 @@ export interface SavedView {
    *  by the host. Same reasoning as `version`: declared so a mobile edit cannot
    *  silently look like it cleared a desktop-authored declaration. */
   write_fields?: string[];
+  /** A board's declared lane order and the template a new card copies, mirrored
+   *  for the same reason: mobile does not render a board, but a mobile save of a
+   *  desktop-authored view must not drop either key. */
+  lanes?: string[];
+  template?: string;
 }
 
 export interface PrefsView {

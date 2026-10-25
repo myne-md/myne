@@ -4205,6 +4205,8 @@ mod tests {
                 image_aspect_ratio: None,
                 version: Some(1),
                 write_fields: write_fields.iter().map(|f| f.to_string()).collect(),
+                lanes: Vec::new(),
+                template: None,
             }
         }
 

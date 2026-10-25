@@ -11634,6 +11634,8 @@ mod tests {
             // which is the byte-identity claim in the assertion's own message.
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let prefs = PrefsView {
             saved_views: alloc::vec![view],
@@ -13693,6 +13695,8 @@ mod tests {
             image_aspect_ratio: Some(String::from("1.65")),
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -14396,6 +14400,8 @@ mod tests {
             image_aspect_ratio: Some(String::from("1.65")),
             version: None,
             write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let prefs_absent = PrefsView {
             saved_views: alloc::vec![books],

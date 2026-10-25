@@ -161,6 +161,8 @@ mod tests {
             image_aspect_ratio: None,
             version: Some(3),
             write_fields: vec!["status".to_string()],
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
