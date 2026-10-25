@@ -332,6 +332,13 @@ steps:
     failure: ignore
     environment:
       CI: "true"
+      # The runner hosts several pipelines at once and this lane is triggered by
+      # hand while other branches are mid-push, so the same waits that are
+      # generous on an idle machine starve here: pipeline 936 and pipeline 944
+      # each reported a DIFFERENT set of ~5 reds out of 462, every one of them
+      # green in isolation. Doubling every budget is the fix that hides nothing
+      # (`e2e/support/webdriver.ts` carries the reasoning).
+      MYNE_E2E_TIMEOUT_SCALE: "2"
     commands:
       - bash scripts/ci-e2e-lane.sh stable
 
@@ -358,6 +365,7 @@ steps:
     failure: ignore
     environment:
       CI: "true"
+      MYNE_E2E_TIMEOUT_SCALE: "2"
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
 

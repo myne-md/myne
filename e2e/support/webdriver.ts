@@ -484,6 +484,38 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /**
+ * Multiplier on EVERY wait budget in the suite (`MYNE_E2E_TIMEOUT_SCALE`).
+ *
+ * # Why a budget the host cannot honour is a false red
+ *
+ * The budgets above are tuned for a machine running this suite alone, and the
+ * CI runner is not that machine: it hosts several Woodpecker pipelines at once
+ * (this lane is triggered by hand while other branches are mid-push), and every
+ * scenario drives a real WebKit app whose rendering and CodeMirror measure loops
+ * queue behind whatever else is running. What that produces is not a slightly
+ * slower app, it is a rotating set of ~1% failures that changes identity on
+ * every run and every one of which passes in isolation: pipeline 936 read
+ * `folder-notes`, `search-casefold`, `typewriter-anchor`, `vim-mode`; 944 read
+ * `code-block-typography`, `editor-vertical-caret`, `state-machine`,
+ * `unsynced-marker`, `wikilink-hover`.
+ *
+ * Scaling the budget is the honest half of the fix and it hides nothing: a
+ * scenario whose flow is genuinely broken never settles, so it still fails, only
+ * later; and the number in the timeout message is the scaled one, so a report
+ * says what the machine was actually given. `retry: 2` in the config was the
+ * earlier answer to the same shape and it cannot help here, because the load that
+ * starves an attempt also starves its retries.
+ *
+ * Read once: a per-call `process.env` lookup would run on every poll.
+ */
+const TIMEOUT_SCALE = ((): number => {
+  const raw = process.env.MYNE_E2E_TIMEOUT_SCALE;
+  if (raw === undefined || raw.trim() === "") return 1;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+})();
+
+/**
  * Opt-in wait profiler (`MYNE_E2E_WAIT_PROFILE=1`).
  *
  * A scenario's wall clock is dominated by its WAITS, and the suite's JSON
@@ -614,7 +646,7 @@ export class Session {
     // observable from inside the predicate.
     opts?: FindOptions & { label?: string | (() => string) },
   ): Promise<T> {
-    const timeout = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeout = Math.round((opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) * TIMEOUT_SCALE);
     const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
     const deadline = Date.now() + timeout;
     const started = WAIT_PROFILE_ON ? Date.now() : 0;
