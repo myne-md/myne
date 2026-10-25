@@ -55,6 +55,7 @@ pub mod config;
 pub mod conflict;
 pub mod corpus;
 pub mod crdt_doc;
+pub mod device_identity;
 pub mod devices;
 /// The typed `vault.dictionary` inner payload (`0x02`) and its §10.2.1 merge
 /// (myne-md/myne#640).

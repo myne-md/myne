@@ -4663,13 +4663,13 @@ fn member_names_vectors() {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn device_binding_vectors() {
     use protocol::{
-        decode_device_binding_blob, derive_group_subkey_v0_2, device_binding_signed_bytes,
-        encode_device_binding_blob_raw, merge_device_bindings, verify_device_binding,
-        verify_device_binding_removal, DeviceBindingBlobError, DeviceBindingEntry,
-        DeviceBindingsMap, GroupKey, GroupRole, PersonPublicHalf, SubkeyRole,
-        DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_V1,
-        DEVICE_BINDING_BLOB_HEADER_LEN, DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX,
-        DEVICE_BINDING_SIGNATURE_HEX_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
+        binding_message_for_entry, decode_device_binding_blob, derive_group_subkey_v0_2,
+        device_binding_signed_bytes, encode_device_binding_blob_raw_with_format,
+        merge_device_bindings, verify_device_binding, verify_device_binding_removal,
+        DeviceBindingBlobError, DeviceBindingEntry, DeviceBindingsMap, GroupKey, GroupRole,
+        PersonPublicHalf, SubkeyRole, DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_HEADER_LEN,
+        DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX, DEVICE_BINDING_SIGNATURE_HEX_LEN,
+        MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
     };
 
     // Same contract as the sibling above: the wire names the companion's
@@ -4707,6 +4707,11 @@ fn device_binding_vectors() {
             tombstone: v["tombstone"]
                 .as_bool()
                 .unwrap_or_else(|| panic!("[{id}] entry tombstone")),
+            // The v2 schema's device public halves: OPTIONAL in a case, because the
+            // v1 cases predate the schema and a v1 row re-encodes byte-identically
+            // only while both stay absent.
+            device_ed_pk: v["device_ed_pk"].as_str().map(ToString::to_string),
+            device_mldsa_vk: v["device_mldsa_vk"].as_str().map(ToString::to_string),
             signature_hex: v["signature_hex"]
                 .as_str()
                 .unwrap_or_else(|| panic!("[{id}] entry signature_hex"))
@@ -4809,9 +4814,28 @@ fn device_binding_vectors() {
                         .unwrap_or_else(|| panic!("[{id}] expected_blob_hex")),
                 );
 
-                let blob =
-                    encode_device_binding_blob_raw(&key(), &account_hash(), epoch, &map, &nonce)
-                        .expect("seal the device-binding map");
+                // The writer's format byte comes from the CASE. The family gained a
+                // `0x02` schema (a row carrying the device public halves,
+                // `decisions/protocol/0733`) without moving any magic, so the v1 cases
+                // stay readable-and-pinned rather than being rewritten: a reader must
+                // still accept a v1 blob, and the production writer emits v2.
+                let declared_format = hex_decode(
+                    case["expected_format_version_byte_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] expected_format_version_byte_hex")),
+                );
+                let format_version = *declared_format
+                    .first()
+                    .unwrap_or_else(|| panic!("[{id}] expected_format_version_byte_hex empty"));
+                let blob = encode_device_binding_blob_raw_with_format(
+                    &key(),
+                    &account_hash(),
+                    epoch,
+                    &map,
+                    format_version,
+                    &nonce,
+                )
+                .expect("seal the device-binding map");
                 assert_eq!(blob, expected, "[{id}] device-binding blob bytes mismatch");
 
                 // The header facts the format fixes, asserted against the case's own
@@ -4833,12 +4857,8 @@ fn device_binding_vectors() {
                     "[{id}] protocol_version byte"
                 );
                 assert_eq!(
-                    hex_decode(
-                        case["expected_format_version_byte_hex"]
-                            .as_str()
-                            .unwrap_or_else(|| panic!("[{id}] expected_format_version_byte_hex"))
-                    ),
-                    vec![DEVICE_BINDING_BLOB_FORMAT_V1],
+                    declared_format,
+                    vec![format_version],
                     "[{id}] format_version byte"
                 );
                 assert_eq!(
@@ -4917,12 +4937,16 @@ fn device_binding_vectors() {
                 let want = case["expected_error"]
                     .as_str()
                     .unwrap_or_else(|| panic!("[{id}] expected_error"));
-                let err =
-                    encode_device_binding_blob_raw(&key(), &account_hash(), epoch, &map, &nonce)
-                        .err()
-                        .unwrap_or_else(|| {
-                            panic!("[{id}] expected {want} on the write side, got Ok")
-                        });
+                let err = encode_device_binding_blob_raw_with_format(
+                    &key(),
+                    &account_hash(),
+                    epoch,
+                    &map,
+                    protocol::DEVICE_BINDING_BLOB_FORMAT_CURRENT,
+                    &nonce,
+                )
+                .err()
+                .unwrap_or_else(|| panic!("[{id}] expected {want} on the write side, got Ok"));
                 assert_eq!(
                     err_name(&err),
                     want,
@@ -5081,14 +5105,12 @@ fn device_binding_vectors() {
                         .as_str()
                         .unwrap_or_else(|| panic!("[{id}] informational_signed_bytes_hex")),
                 );
+                // The message depends on the row's CLASS, so it is rebuilt through the
+                // same helper the signer uses rather than by assuming v1: a v2 row
+                // carries the device public halves inside the message.
                 assert_eq!(
-                    signed,
-                    device_binding_signed_bytes(
-                        &device_id,
-                        &claimed,
-                        entry.version,
-                        entry.tombstone
-                    ),
+                    Some(signed),
+                    binding_message_for_entry(&device_id, &claimed, &entry),
                     "[{id}] informational_signed_bytes_hex must be the message the row signs"
                 );
 

@@ -392,7 +392,7 @@ async fn signed_head_ctx(
         &b2b.base.account_number_hash,
     )
     .ok()?;
-    let roster_publics = roster
+    let roster_publics: Vec<protocol::person_key::PersonPublicHalf> = roster
         .members
         .iter()
         .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
@@ -405,11 +405,99 @@ async fn signed_head_ctx(
             .ok()
         })
         .collect();
-    Some(super::head_authority::SignedHeadCtx::new(
-        person,
+    let ctx = super::head_authority::SignedHeadCtx::new(
+        person.clone(),
         b2b.base.account_number_hash,
-        roster_publics,
+        roster_publics.clone(),
+    );
+
+    // The device half (`decisions/protocol/0731` + `0733`): this device authors `0x03`
+    // only when BOTH halves of the binding are in place — a device key at rest, and a
+    // VERIFIED binding row for this device that publishes the same public half. Either
+    // half missing means the phrase path (`0x02`), which every peer already accepts, so
+    // a half-finished rollout never authors a head its peers cannot resolve.
+    let Some(device_id_hex) = super::state::read_sync_state(io, vault_dir)
+        .await
+        .ok()
+        .and_then(|st| st.device_id_hex)
+    else {
+        return Some(ctx);
+    };
+    let Some(device_id) = super::devices::hex16(&device_id_hex) else {
+        return Some(ctx);
+    };
+    let Ok(Some(device_key)) = super::device_identity::load() else {
+        return Some(ctx);
+    };
+    let signers =
+        verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
+    let own_bound = signers
+        .iter()
+        .any(|s| s.device_id == device_id && s.public == device_key.public_half());
+    if !own_bound {
+        // A device key with no verified binding row is not a signer: peers would answer
+        // `AuthorUnknown` for its heads, and a head nobody can verify is worse than an
+        // `0x02` one everybody can.
+        return Some(ctx);
+    }
+    Some(ctx.with_device(
+        super::head_authority::DeviceSigner {
+            device_id,
+            key: device_key,
+        },
+        signers,
     ))
+}
+
+/// The device public halves a `0x03` head may be verified against: the LIVE,
+/// VERIFIED rows of `vault.device-bindings`, resolved through the signed roster.
+///
+/// "Verified" is the load-bearing word rather than tidiness. The map is group-sealed,
+/// so any member can write it; an unverified row would let a member holding the group
+/// key point a binding at a key they control and then sign heads as that person's
+/// device. The partition checks each row against the public half of the person the row
+/// NAMES, taken from the signed roster.
+async fn verified_device_head_signers(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &std::path::Path,
+    b2b: &protocol::B2bVaultMeta,
+    roster_publics: &[protocol::person_key::PersonPublicHalf],
+    group_key: &[u8; 32],
+) -> Vec<protocol::vault_head::DeviceHeadSigner> {
+    let bindings_key = super::super::device_binding::bindings_key_for_group(
+        group_key,
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+    );
+    let Ok(map) = super::super::device_binding::read_device_bindings_in_dir(
+        io,
+        vault_dir,
+        &bindings_key.borrow(),
+    )
+    .await
+    else {
+        return Vec::new();
+    };
+    let (verified, _unverified) = protocol::partition_verified_bindings(
+        &map,
+        |fingerprint_hex| {
+            roster_publics
+                .iter()
+                .find(|p| protocol::hex::encode_lower(p.fingerprint()) == fingerprint_hex)
+                .cloned()
+        },
+        None,
+    );
+    verified
+        .iter()
+        .filter(|(_, entry)| !entry.tombstone)
+        .filter_map(|(device_hex, entry)| {
+            Some(protocol::vault_head::DeviceHeadSigner {
+                device_id: super::devices::hex16(device_hex)?,
+                public: protocol::device_public_half_from_entry(entry)?,
+            })
+        })
+        .collect()
 }
 
 /// The person session's device token, as raw bytes (myne-md/myne#911 task 8).

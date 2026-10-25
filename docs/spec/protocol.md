@@ -3384,7 +3384,7 @@ format's future.
 |---|---|---|---|
 | 0 | 4 | magic | ASCII `MYO5`, in the `MY?5` column only (§10.3) |
 | 4 | 1 | protocol_version | `0x01` (the shared-singleton family byte; the generation domain-separates on magic + AAD prefix + KEK, not on this byte) |
-| 5 | 1 | format_version | `0x01` = the canonical-JSON map below |
+| 5 | 1 | format_version | `0x01` = the canonical-JSON map below; `0x02` = the same map whose rows MAY carry the device public halves (§9.30.4). A writer emits `0x02`; a reader MUST accept both. |
 | 6 | 24 | nonce | XChaCha20-Poly1305 nonce, drawn from the OS CSPRNG |
 | 30 | 4 | ciphertext_len | big-endian `u32`, `plaintext_len + 32` |
 | 34 | M | ciphertext | AEAD ciphertext + 32-byte CTX tag |
@@ -3542,7 +3542,11 @@ family adds nothing past the ciphertext. `DEVICE_BINDING_BLOB_HEADER_LEN` is `34
 
 The inner plaintext is canonical JSON whose keys are `device_id` in lowercase hex and
 whose values are `{ "person_fingerprint": string, "version": u64, "tombstone": bool,
-"signature_hex": string }`. Canonical means a parser re-serializes and requires byte
+"device_ed_pk"?, "device_mldsa_vk"?, "signature_hex": string }`, where the two
+`device_*` fields are OPTIONAL and belong to the `format_version 0x02` schema. Both
+are omitted from the canonical bytes when absent, so a `0x01` row re-encodes
+byte-identically and a `0x01` blob stays readable; a row carrying one half and not the
+other is malformed rather than half-used. Canonical means a parser re-serializes and requires byte
 equality with its input, the discipline the owner-signed roster and the member
 display-name map already use, so two implementations agree on which byte strings are
 blobs of this family. The codec owns the map rather than leaving it opaque, because the
@@ -3620,7 +3624,23 @@ Every row carries a hybrid Ed25519 + ML-DSA-65 signature under the
 
 which is `23 + 16 + 32 + 8 + 1 = 80` bytes. Fixed widths rather than canonical JSON, so
 the signed message has exactly one encoding and there is no ambiguity about where a
-field ends. Version and tombstone are inside the message deliberately, so a co-member
+field ends.
+
+**A `0x02` row signs a LONGER message, under its own class** (`decisions/protocol/0733`):
+
+```text
+"myne.device-binding v2|" || device_id (16 raw) || person_fingerprint (32 raw) || version (8, big-endian) || tombstone (1) || device_ed_pk (32 raw) || device_mldsa_vk (1952 raw)
+```
+
+`23 + 16 + 32 + 8 + 1 + 32 + 1952 = 2064` bytes. The device's two public halves are
+inside the signed message on purpose: they are what a peer resolves to verify the heads
+that device authors (§3.6 of `sync-protocol.md`), and a substituted half that verified
+would let any member holding the group key point a person's binding at a key they
+control and then sign heads as that person's device. The class prefix differs as well as
+the length, so a `v1` signature can never be read as a `v2` one. Which class a row is in
+is decided by the ROW (it carries the halves or it does not), never by the blob's
+`format_version`: a `0x02` blob may still hold `0x01` rows that have not re-signed
+themselves yet, and a device re-signs its own row once, when it first holds a device key. Version and tombstone are inside the message deliberately, so a co-member
 cannot bump a version (which decides the merge) or flip a tombstone (which would
 resurrect a removed device).
 
