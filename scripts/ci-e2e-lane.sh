@@ -50,7 +50,27 @@ case "$LANE" in
     # lost to SCHEDULING at N; the work itself expands under contention. The
     # reading that would justify raising it is a run at N+1 whose SUMMED FILE
     # TIME is unchanged from N.
-    LANE_ENV='MYNE_E2E_SHARDS=2 MYNE_E2E_AI=1'
+    # **ONE shard, not two, since 2026-10-25.** Two shards put two WebKit apps on
+    # one host that is also running other branches' pipelines, and the result was
+    # a rotating set of ~1 % failures that changed identity on every run and every
+    # one of which passed in isolation: pipeline 936 read folder-notes /
+    # search-casefold / typewriter-anchor / vim-mode, 944 read
+    # code-block-typography / editor-vertical-caret / state-machine /
+    # unsynced-marker / wikilink-hover, 946 read version-diff /
+    # wikilink-deep-links (19 in total, after doubling every wait budget made the
+    # cascade longer rather than shorter).
+    #
+    # The measurement that settles the axis: a 90 s `waitForElement` expiring means
+    # the thing never rendered, not that it rendered late, so no budget fixes it.
+    # What does is removing the second concurrent app. The cost is wall clock —
+    # the suite's summed file time is around 3000-4400 s, so a single-shard run is
+    # 50-75 minutes — and that is the right trade for a gate whose whole job is
+    # to be believed: this lane runs by hand before a release, and a release is
+    # rare, while a gate nobody trusts sends people to re-roll the dice.
+    #
+    # `MYNE_E2E_SHARDS` still overrides for anyone measuring throughput: that is a
+    # measurement, not a gate.
+    LANE_ENV='MYNE_E2E_SHARDS=1 MYNE_E2E_AI=1'
     ;;
   quarantine)
     # MYNE_E2E_QUARANTINE=1 flips `e2e/support/scenario.ts`'s gate to run ONLY

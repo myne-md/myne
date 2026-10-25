@@ -332,13 +332,13 @@ steps:
     failure: ignore
     environment:
       CI: "true"
-      # The runner hosts several pipelines at once and this lane is triggered by
-      # hand while other branches are mid-push, so the same waits that are
-      # generous on an idle machine starve here: pipeline 936 and pipeline 944
-      # each reported a DIFFERENT set of ~5 reds out of 462, every one of them
-      # green in isolation. Doubling every budget is the fix that hides nothing
-      # (`e2e/support/webdriver.ts` carries the reasoning).
-      MYNE_E2E_TIMEOUT_SCALE: "2"
+      # No `MYNE_E2E_TIMEOUT_SCALE` here, deliberately. It exists and is honoured
+      # (`e2e/support/webdriver.ts`), but doubling it was MEASURED to make things
+      # worse, not better: pipeline 946 ran with 2 and reported 19 reds against
+      # the 4-5 a normal run gives, because a wedged scenario then holds its
+      # worker for twice as long and every later file in that shard falls with
+      # it. The budget was never the axis; the concurrent app count was, and
+      # `scripts/ci-e2e-lane.sh` now runs the gate on one shard.
     commands:
       - bash scripts/ci-e2e-lane.sh stable
 
@@ -365,7 +365,6 @@ steps:
     failure: ignore
     environment:
       CI: "true"
-      MYNE_E2E_TIMEOUT_SCALE: "2"
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
 
