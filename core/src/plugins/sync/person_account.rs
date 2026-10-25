@@ -1025,6 +1025,13 @@ pub async fn forget_person_from_host(
             Err(_) => return Err(SyncDeviceError::BadRequest),
         }
     }
+    // The DEVICE signing key goes with the identity that bound it
+    // (`decisions/protocol/0731`): left behind, it is a signing key for a person
+    // this device no longer claims, and the next claim would mint another one over
+    // a binding the vault still holds. Best-effort, like its own store: a keychain
+    // that refuses the delete must not leave the device with an identity it failed
+    // to forget.
+    super::device_identity::destroy();
     // Last, and only once the credential is gone: the marker exists to tell a
     // later session that an identity is present but not loaded, so clearing it
     // before the credential would turn a half-forgotten device into one that

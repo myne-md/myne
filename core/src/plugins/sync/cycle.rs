@@ -426,8 +426,25 @@ async fn signed_head_ctx(
     let Some(device_id) = super::devices::hex16(&device_id_hex) else {
         return Some(ctx);
     };
-    let Ok(Some(device_key)) = super::device_identity::load() else {
-        return Some(ctx);
+    // Three states, told apart on purpose. `Ok(None)` is first run; `Unsupported` is
+    // rung 4 of the ladder (no storage on this platform), which is the ordinary state
+    // on everything but Apple. Anything else is a FAULT: a keychain that refused or an
+    // item that would not decode is not "this device has no key", and reading it as
+    // that would leave the phrase path in place for ever with one trace line as the
+    // only clue. It is still not fatal here: sync must run, and a `0x02` head is a
+    // head every peer accepts.
+    let device_key = match super::device_identity::load() {
+        Ok(Some(key)) => key,
+        Ok(None) => return Some(ctx),
+        Err(super::device_identity::DeviceKeyStoreError::Unsupported) => return Some(ctx),
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_device_key",
+                error = ?err,
+                "device key could not be read; authoring a person-signed head"
+            );
+            return Some(ctx);
+        }
     };
     let signers =
         verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
@@ -469,14 +486,26 @@ async fn verified_device_head_signers(
         b2b.base.account_number_hash,
         b2b.group_key_epoch,
     );
-    let Ok(map) = super::super::device_binding::read_device_bindings_in_dir(
+    let map = match super::super::device_binding::read_device_bindings_in_dir(
         io,
         vault_dir,
         &bindings_key.borrow(),
     )
     .await
-    else {
-        return Vec::new();
+    {
+        Ok(map) => map,
+        // An empty signer set and an unreadable store are different states with the
+        // same effect here, so the difference is at least recorded: a corrupt store
+        // silently reading as "no device is bound" is how a binding problem hides for
+        // a release.
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_device_signers",
+                error = ?err,
+                "device-binding store unreadable; no device signer is resolvable"
+            );
+            return Vec::new();
+        }
     };
     let (verified, _unverified) = protocol::partition_verified_bindings(
         &map,

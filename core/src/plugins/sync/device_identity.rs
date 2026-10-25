@@ -8,12 +8,12 @@
 //! **never plaintext**.
 //!
 //! 1. the OS keychain with `thisDeviceOnly` semantics, excluded from platform backup
-//!    and cloud sync — IMPLEMENTED here for Apple (Keychain, macOS + iOS);
+//!    and cloud sync: IMPLEMENTED here for Apple (Keychain, macOS + iOS);
 //! 2. on Linux, the Secret Service (GNOME Keyring / KWallet) through the session bus
-//!    — NOT IMPLEMENTED. It needs a platform dependency the tree does not carry, and
+//!    NOT IMPLEMENTED. It needs a platform dependency the tree does not carry, and
 //!    adding one to an audited, no-egress-clean graph is its own decision;
 //! 3. failing that, a `0600` file sealed by a user PIN, reusing the `MYQ1`
-//!    attempt-and-wipe machinery — NOT IMPLEMENTED yet, for the same kind of reason
+//!    attempt-and-wipe machinery: NOT IMPLEMENTED yet, for the same kind of reason
 //!    one step over: it is a user-facing ceremony (choose a PIN, enter it on every
 //!    cold start, lose the key after N wrong tries) and it lands with its own UI;
 //! 4. and if the user declines a PIN, **no device key is created on that machine**

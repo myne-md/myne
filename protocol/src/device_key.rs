@@ -8,7 +8,7 @@
 //! (at [`VAULT_HEAD_FORMAT_V3`](crate::vault_head::VAULT_HEAD_FORMAT_V3)), the
 //! owner-signed group roster, the device's own binding row once that row carries
 //! the device public halves, and the member display-name rows. It is a SIGNING
-//! pair and nothing else — no KEM half, no wrapping — which is the property that
+//! pair and nothing else (no KEM half, no wrapping), which is the property that
 //! makes caching it in an OS keychain safe: **a device key unwraps nothing**, so
 //! a stolen one costs attribution until its binding is revoked and costs no vault
 //! a key. The person key stays sealed behind the recovery phrase for exactly that

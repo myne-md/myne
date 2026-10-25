@@ -173,13 +173,17 @@ pub async fn claim_own_binding_with_dir(
     // storage rung (`0733`'s rung 4), and `None` then keeps today's `v1` row.
     let device_public = match crate::plugins::sync::device_identity::load_or_create() {
         Ok(pair) => Some(pair.public_half()),
+        // Rung 4: this platform has no place to keep one, so the row is written exactly
+        // as it was before the device-key change. Expected, not a fault.
         Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => None,
-        Err(_) => {
-            // A keychain that refused is not a reason to refuse the BINDING: the row is
-            // still valid without the halves, and the next unlock retries the mint.
+        Err(err) => {
+            // A keychain that refused is not a reason to refuse the BINDING (the row is
+            // valid without the halves and the next unlock retries), but it IS a fault
+            // rather than a platform fact, so it is logged as one and named.
             tracing::warn!(
                 stage = "device_binding_claim",
-                "device key unavailable on this launch"
+                error = ?err,
+                "device key could not be created; the binding is written without its halves"
             );
             None
         }
