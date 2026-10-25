@@ -39,6 +39,7 @@ import { invoke } from "../platform/core";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
 import { resetPersonIdentityState } from "../components/sync/personIdentityState";
 import { clearAwareness } from "../notes/collab/awarenessStore";
+import { clearBulkUndoForLock } from "../notes/views/bulkUndoJournal";
 import { has as hasCapability } from "../platform/capabilities";
 import { appDataDir, join } from "../platform/path";
 import type { VaultDeleteError } from "../types/vault-delete-error";
@@ -261,5 +262,8 @@ export async function deleteVault(vaultId: string): Promise<void> {
   // erased, so without this they stay resident after the vault that named them is
   // gone. `myne-core` drops its half in `vault_delete`; this is the WebView half.
   clearAwareness();
+  // The bulk field journal, on the erase path: its snapshots are going away with
+  // the vault, so a journal entry naming them is a restore that cannot succeed.
+  clearBulkUndoForLock();
   await invoke<void>("plugin:vault-delete|vault_delete", { vaultId });
 }

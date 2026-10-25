@@ -92,7 +92,10 @@ describe("TableView", () => {
       groups: [{ key: "", type: "none", rows: [row("n1", "Alpha")] }],
     };
     render(<TableView def={tableDef()} result={result} />);
-    const name = screen.getByText("Alpha");
+    // The pinned element is the CELL, not the text node: the cell now carries the
+    // bulk-selection toggle beside the title, so a title-only query would find the
+    // ellipsis box instead of the sticky column. The assertion is unchanged.
+    const name = screen.getByTestId("view.table-name-cell");
     expect(name.style.position).toBe("sticky");
     // Logical property (RTL migration): the pinned column anchors to the leading
     // edge via `inset-inline-start` (= `left` in LTR).
@@ -119,13 +122,60 @@ describe("TableView", () => {
     expect(onOpenNote).toHaveBeenLastCalledWith("n1", { newTab: true, toSide: false });
   });
 
-  it("is a read-only projection (no input / contenteditable / draggable)", () => {
+  it("offers bulk selection only for a view that declares write fields", () => {
+    const result: ViewResult = {
+      groups: [{ key: "", type: "none", rows: [row("n1", "Alpha")] }],
+    };
+    const { unmount } = render(<TableView def={tableDef()} result={result} />);
+    // No declared write authority → no selection affordance at all. A read-only
+    // view must not hint at a write it can never make.
+    expect(screen.queryByTestId("view.bulk-bar")).toBeNull();
+    expect(screen.queryByTestId("view.bulk-select-row")).toBeNull();
+    unmount();
+
+    render(
+      <TableView def={tableDef({ write_fields: ["status"] })} result={result} />,
+    );
+    expect(screen.getByTestId("view.bulk-bar")).toBeTruthy();
+    const toggle = screen.getByTestId("view.bulk-select-row");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    // And the Apply button reports the derived selection size.
+    expect(screen.getByTestId("view.bulk-apply").disabled).toBe(false);
+  });
+
+  it("is a read-only projection (no editable CELL: input / contenteditable / draggable)", () => {
     const result: ViewResult = {
       groups: [{ key: "", type: "none", rows: [row("n1", "Alpha", { status: str("x") })] }],
     };
-    const { container } = render(<TableView def={tableDef()} result={result} />);
-    expect(container.querySelector("input")).toBeNull();
-    expect(container.querySelector("[contenteditable]")).toBeNull();
-    expect(container.querySelector("[draggable='true']")).toBeNull();
+    // The promise is about CELLS: a calm table of typed cells, never a
+    // spreadsheet. The assertion is scoped to the rows and the header because the
+    // bulk bar above the table legitimately carries one `<input>` (the value a
+    // bulk set will write) — a bar is not a cell, and a blanket query over the
+    // whole component would have to be weakened for a view that declares NO write
+    // fields either, which is the case the promise actually governs.
+    const readOnly = render(<TableView def={tableDef()} result={result} />);
+    const body = () => readOnly.container.querySelectorAll('[data-testid="view.table-row"], [data-testid="view.table-header"]');
+    for (const node of body()) {
+      expect(node.querySelector("input")).toBeNull();
+      expect(node.querySelector("[contenteditable]")).toBeNull();
+      expect(node.querySelector("[draggable='true']")).toBeNull();
+    }
+    expect(readOnly.container.querySelector("input")).toBeNull();
+    readOnly.unmount();
+
+    // And the same holds for a view that DECLARES write fields: bulk selection is
+    // a `role="checkbox"` button, so nothing inside a row became editable.
+    const writable = render(
+      <TableView def={tableDef({ write_fields: ["status"] })} result={result} />,
+    );
+    for (const node of writable.container.querySelectorAll(
+      '[data-testid="view.table-row"], [data-testid="view.table-header"]',
+    )) {
+      expect(node.querySelector("input")).toBeNull();
+      expect(node.querySelector("[contenteditable]")).toBeNull();
+      expect(node.querySelector("[draggable='true']")).toBeNull();
+    }
   });
 });
