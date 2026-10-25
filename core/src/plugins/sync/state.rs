@@ -182,6 +182,23 @@ pub struct SyncState {
     /// namespace and no selector is sent.
     #[serde(default)]
     pub namespace_hex: Option<String>,
+    /// The OWNER's device, as the invite package attested it
+    /// (`decisions/protocol/0731` stage 2, `0733`).
+    ///
+    /// A roster signed by the owner's DEVICE key needs that device's public halves to
+    /// verify, and a member has no group key before the first accept, so the halves
+    /// travel INSIDE the package, person-signed by the owner. They are pinned here for
+    /// the same reason `owner_identity_code` is: verification must not depend on a
+    /// network round trip, and the value is public material only.
+    ///
+    /// Absent on every member device that accepted before the stage landed, and on every
+    /// package from an owner with no device key. Its absence is not an error: it means
+    /// "this owner signs rosters with the person key".
+    ///
+    /// Public material, so stored in the clear like the account hash and the identity
+    /// code beside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_device: Option<protocol::person_invite::OwnerDeviceAttestation>,
     /// Epoch-ms of the publish that recorded [`Self::namespace_hex`], or `None`
     /// while the vault is device-only (myne-md/myne#911 task 8).
     ///
@@ -921,6 +938,7 @@ mod tests {
             owner_member_token_hex: Some("ff".repeat(32)),
             owner_member_person_id_hex: Some("12".repeat(16)),
             owner_identity_code: Some("MYNE-PERSON-1:aa".to_string()),
+            owner_device: None,
             namespace_hex: None,
             published_at_ms: None,
         };

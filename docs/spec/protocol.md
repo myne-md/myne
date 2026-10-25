@@ -1200,6 +1200,26 @@ trailing-byte rejection. Both signatures cover the whole literal signature
 class `"myne.group-roster v1|"` followed by the payload bytes, and both MUST
 verify. A signature from any other record class MUST fail.
 
+**A roster MAY instead be signed by a DEVICE key**, under its own class
+`"myne.group-roster v2|"` (`decisions/protocol/0731` stage 2, `0733`). The frame and the
+payload are unchanged: the roster still names PEOPLE and still carries the owner's
+person fingerprint, so what moves is only the key that vouches for it. A reader MUST
+accept both classes, and it resolves the device from the same three sources the `0x03`
+head path uses (`sync-protocol.md` §3.6): the attestation a member pinned at accept
+(`owner_device` in `sync-state.json`), the reader's own device key, and the verified
+rows of `vault.device-bindings` that name the owner. A reader that has no reason to
+trust any device (`RosterTrust::person_only`) MUST refuse a `v2` roster.
+
+**The attestation, and why it rides in the package.** A member's first roster
+verification happens before it holds a group key, so it cannot read the binding store;
+the owner's device halves therefore travel INSIDE the person-signed group package, as an
+optional `owner_device` field carrying the device id and the owner's person-signed
+binding row. Carrying the whole row rather than the two halves is deliberate: the
+recipient verifies the person's signature over the row itself against the owner public
+half it pinned out of band, instead of trusting the package's word that those halves
+belong to the owner. The field is omitted when absent, so a package from a build with no
+device key encodes exactly the bytes the previous release reads.
+
 The payload is canonical JSON with `account_number_hash_hex`, positive
 `group_key_epoch`, `owner_fingerprint_hex`, and a `members` array strictly
 sorted by `fingerprint_hex`. Exactly one live owner row matches

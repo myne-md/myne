@@ -386,8 +386,31 @@ async fn signed_head_ctx(
             .ok()?
             .public
     };
-    let roster = protocol::person_invite::verify_group_roster(
+    // The roster may have been signed by the owner's PERSON key or by one of the
+    // owner's DEVICES (`decisions/protocol/0731` stage 2). Candidates come from the
+    // pinned attestation (a member), this device's own key (the owner) and the
+    // verified rows of the binding store.
+    let sync_state = super::state::read_sync_state(io, vault_dir).await.ok()?;
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        &group_key,
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+    );
+    let own_device = is_owner
+        .then(|| super::device_identity::load().ok().flatten())
+        .flatten()
+        .map(|key| key.public_half());
+    let owner_devices = super::roster_trust::device_halves_for_owner(
+        io,
+        vault_dir,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        sync_state.owner_device.as_ref(),
         &owner_public,
+    )
+    .await;
+    let roster = protocol::person_invite::verify_group_roster(
+        super::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,
         &b2b.base.account_number_hash,
     )
