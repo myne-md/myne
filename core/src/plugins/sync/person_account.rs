@@ -2053,6 +2053,11 @@ pub async fn accept_invite_from_host(
         password,
     )
     .await?;
+    // The owner's device attestation, pinned for later roster verification.
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    pin_owner_device_attestation(io, &vault_dir, &owner.public, &package).await;
 
     Ok(AcceptedInviteView {
         vault_id: vault_id.to_string(),
@@ -2409,12 +2414,63 @@ pub async fn member_join_vault_from_host(
         password,
     )
     .await?;
+    // Same pin on the second-device path: it re-claims the retained package, so it sees
+    // the same attestation and owes the same stored copy.
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    pin_owner_device_attestation(io, &vault_dir, &owner.public, &package).await;
     Ok(AcceptedInviteView {
         vault_id: vault_id.to_string(),
         vault_account_hash_hex: vault_account_hash_hex.to_string(),
         owner_fingerprint_hex,
         group_key_epoch: epoch,
     })
+}
+
+/// Pin the OWNER's device attestation a package carried, so this member can verify later
+/// rosters without a network round trip (`decisions/protocol/0731` stage 2).
+///
+/// Called on BOTH paths that install a member vault (a fresh accept and a second device's
+/// join), because both re-claim the same package. An attestation that does not verify
+/// against the owner public half this device pinned is DROPPED rather than stored: a
+/// tampered pin would otherwise choose the key that verifies every future roster, which is
+/// the whole trust decision.
+async fn pin_owner_device_attestation(
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+    owner_public: &protocol::person_key::PersonPublicHalf,
+    package: &protocol::person_invite::SignedGroupPackage,
+) {
+    let Ok(payload) = protocol::person_invite::verify_group_package(owner_public, package) else {
+        return;
+    };
+    let Some(attestation) = payload.owner_device else {
+        return;
+    };
+    if !attestation.verifies_against(owner_public) {
+        tracing::warn!(
+            stage = "accept_owner_device",
+            "the package's owner-device attestation does not verify; not pinned"
+        );
+        return;
+    }
+    let Ok(mut st) = super::state::read_sync_state(io, vault_dir).await else {
+        return;
+    };
+    st.owner_device = Some(attestation);
+    if super::state::write_sync_state(io, vault_dir, &st)
+        .await
+        .is_err()
+    {
+        // Best effort: without the pin this member falls back to the person-key class,
+        // which a device-signed roster will refuse, so the failure is logged rather than
+        // swallowed silently.
+        tracing::warn!(
+            stage = "accept_owner_device",
+            "the owner-device attestation could not be pinned"
+        );
+    }
 }
 
 /// Whether this device already holds a vault for `account_hash`.

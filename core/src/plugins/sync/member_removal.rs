@@ -756,7 +756,7 @@ pub async fn rotate_group_from_host(
     owner: &protocol::person_key::PersonKeyPair,
     removed_fingerprint_hex: &str,
 ) -> Result<GroupRotationOutput, MemberRemovalError> {
-    use protocol::person_invite::{rotate_group_roster, verify_group_roster};
+    use protocol::person_invite::{rotate_group_roster_signed_by, verify_group_roster};
 
     let _permit = match state.auth_permits().try_acquire() {
         Ok(p) => p,
@@ -830,8 +830,29 @@ pub async fn rotate_group_from_host(
         &b2b_meta.signed_roster_envelope,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    // The owner signs rosters with its device key once it holds one
+    // (`decisions/protocol/0731` stage 2), so the rotation reads back either class.
+    let owner_public = owner.public_half();
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        &old_group_key,
+        account_number_hash,
+        b2b_meta.group_key_epoch,
+    );
+    let own_device = crate::plugins::sync::device_identity::load()
+        .ok()
+        .flatten()
+        .map(|key| key.public_half());
+    let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
+        io,
+        &vault_root,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        None,
+        &owner_public,
+    )
+    .await;
     let mut current_roster = verify_group_roster(
-        &owner.public_half(),
+        crate::plugins::sync::roster_trust::trust(&owner_public, &owner_devices),
         &current_envelope,
         &account_number_hash,
     )
@@ -910,8 +931,52 @@ pub async fn rotate_group_from_host(
 
     // (5) New signed roster, remaining-member packages, retirement records.
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
-    let rotated = rotate_group_roster(
+    // Signed by the owner's DEVICE key when it holds one, with the attestation each
+    // package must carry so a member can verify the rotated roster (`0731` stage 2).
+    // Absent on a platform with no device-key rung, which keeps the person-key path.
+    let owner_public_for_rotation = owner.public_half();
+    let bindings_for_rotation = crate::plugins::device_binding::bindings_key_for_group(
+        &old_group_key,
+        account_number_hash,
+        b2b_meta.group_key_epoch,
+    );
+    let rotation_device = crate::plugins::sync::device_identity::load().ok().flatten();
+    let rotation_attestation = match (
+        &rotation_device,
+        super::state::read_sync_state(io, &vault_root).await,
+    ) {
+        (Some(device_key), Ok(sync_state)) => {
+            match sync_state
+                .device_id_hex
+                .as_deref()
+                .and_then(super::devices::hex16)
+            {
+                Some(device_id) => {
+                    let attestation = crate::plugins::sync::roster_trust::own_attestation(
+                        io,
+                        &vault_root,
+                        &bindings_for_rotation.borrow(),
+                        &owner_public_for_rotation,
+                        &device_id,
+                    )
+                    .await;
+                    attestation.filter(|a| a.device_public_half() == Some(device_key.public_half()))
+                }
+                None => None,
+            }
+        }
+        _ => None,
+    };
+    // Both or neither: a device signature with no attestation is a rotation nobody can
+    // open, so the device is only used when the attestation is really there.
+    let (rotation_device, rotation_attestation) = match (&rotation_device, &rotation_attestation) {
+        (Some(device_key), Some(attestation)) => (Some(device_key), Some(attestation)),
+        _ => (None, None),
+    };
+    let rotated = rotate_group_roster_signed_by(
         owner,
+        rotation_device,
+        rotation_attestation,
         &current_roster,
         removed_fingerprint_hex,
         &new_group_key,
@@ -1317,8 +1382,24 @@ pub async fn member_person_id_from_host(
         &b2b_meta.signed_roster_envelope,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    // Either class, for the same reason the rotation accepts both: the roster of a vault
+    // whose owner signs with a device key is a `v2`-class roster.
+    let owner_public = owner.public_half();
+    let mut owner_devices: Vec<protocol::device_key::DevicePublicHalf> = Vec::new();
+    if let Ok(sync_state) = crate::plugins::sync::state::read_sync_state(io, &vault_root).await {
+        if let Some(attestation) = sync_state.owner_device.as_ref() {
+            if attestation.verifies_against(&owner_public) {
+                if let Some(half) = attestation.device_public_half() {
+                    owner_devices.push(half);
+                }
+            }
+        }
+    }
+    if let Ok(Some(key)) = crate::plugins::sync::device_identity::load() {
+        owner_devices.push(key.public_half());
+    }
     let roster = protocol::person_invite::verify_group_roster(
-        &owner.public_half(),
+        crate::plugins::sync::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,
         &account_number_hash,
     )
@@ -2460,7 +2541,7 @@ mod tests {
             )
             .expect("open sealed roster");
             let roster = protocol::person_invite::verify_group_roster(
-                &owner.public_half(),
+                protocol::person_invite::RosterTrust::person_only(&owner.public_half()),
                 &envelope,
                 &ROT_ACCT,
             )

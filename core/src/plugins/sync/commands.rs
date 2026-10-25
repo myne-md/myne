@@ -1211,6 +1211,32 @@ pub async fn create_invite_from_host(
 ///
 /// The member-accept path and the wire that carries the package are Grill 4; the
 /// frame is returned in `invite_wire` so the caller can relay it.
+/// This device's own binding row, when it can sign rosters for this vault.
+async fn own_device_attestation_for(
+    io: &dyn crate::vault_io::VaultIo,
+    root: &std::path::Path,
+    group_key: &[u8; 32],
+    account_number_hash: [u8; 16],
+    epoch: u64,
+    owner: &protocol::person_key::PersonPublicHalf,
+) -> Option<protocol::person_invite::OwnerDeviceAttestation> {
+    // No device key means no device signature, so there is nothing to attest.
+    let device_key = super::device_identity::load().ok().flatten()?;
+    let sync_state = super::state::read_sync_state(io, root).await.ok()?;
+    let device_id = super::devices::hex16(sync_state.device_id_hex.as_deref()?)?;
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        group_key,
+        account_number_hash,
+        epoch,
+    );
+    let attestation =
+        super::roster_trust::own_attestation(io, root, &bindings_key.borrow(), owner, &device_id)
+            .await?;
+    // The attestation must describe the SAME device whose key is about to sign, or the
+    // recipient would resolve a key that never signed anything.
+    (attestation.device_public_half() == Some(device_key.public_half())).then_some(attestation)
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn write_ntv6_invite(
     state: &VaultRuntimeState,
@@ -1242,8 +1268,35 @@ async fn write_ntv6_invite(
         &b2b.signed_roster_envelope,
     )
     .ok_or(SyncDeviceError::BadRequest)?;
-    let roster = pi::verify_group_roster(&owner.public_half(), &current, &account_number_hash)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
+    // A vault whose owner signs with a device key has a roster this call must be able
+    // to read back before it re-signs it (`decisions/protocol/0731` stage 2). The
+    // candidates are this owner's own device half plus every verified row of the store
+    // that names the owner.
+    let owner_public = owner.public_half();
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        group_key,
+        account_number_hash,
+        epoch,
+    );
+    let own_device = super::device_identity::load()
+        .ok()
+        .flatten()
+        .map(|key| key.public_half());
+    let owner_devices = super::roster_trust::device_halves_for_owner(
+        io,
+        root,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        None,
+        &owner_public,
+    )
+    .await;
+    let roster = pi::verify_group_roster(
+        super::roster_trust::trust(&owner_public, &owner_devices),
+        &current,
+        &account_number_hash,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
     let member_fp = crate::account::person_identity::hex_lower(member_public.fingerprint());
     if roster
         .members
@@ -1255,12 +1308,26 @@ async fn write_ntv6_invite(
     }
 
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
-    let package = pi::create_group_package(
+    // The owner's DEVICE attestation, if it has one (`0731` stage 2): the package carries
+    // it so the recipient can resolve a roster this device is about to sign. Absent on a
+    // platform with no device-key rung, which keeps the person-key path exactly as it
+    // was.
+    let own_device_attestation = own_device_attestation_for(
+        io,
+        root,
+        group_key,
+        account_number_hash,
+        epoch,
+        &owner.public_half(),
+    )
+    .await;
+    let package = pi::create_group_package_with_attestation(
         owner,
         member_public,
         group_key,
         &account_number_hash,
         epoch,
+        own_device_attestation.as_ref(),
         &mut rng,
     )
     .map_err(|_| SyncDeviceError::BadRequest)?;
@@ -1301,8 +1368,20 @@ async fn write_ntv6_invite(
             &person_id,
         );
     }
-    let signed = pi::sign_group_roster(owner, &new_roster, &mut rng)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
+    // Signed by the DEVICE key when this owner holds one and the package above carries
+    // its attestation, so inviting stops needing the recovery phrase. Otherwise the
+    // person key signs, which is the pre-stage-2 behaviour and still the only option on a
+    // platform with no device-key rung.
+    let signed = match (
+        own_device_attestation.is_some(),
+        super::device_identity::load(),
+    ) {
+        (true, Ok(Some(device_key))) => {
+            pi::sign_group_roster_with_device(&device_key, &new_roster, &mut rng)
+        }
+        _ => pi::sign_group_roster(owner, &new_roster, &mut rng),
+    }
+    .map_err(|_| SyncDeviceError::BadRequest)?;
     let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
     getrandom::getrandom(&mut roster_nonce).map_err(|_| SyncDeviceError::Transport)?;
     let sealed = pi::seal_group_roster(
@@ -1551,28 +1630,49 @@ pub async fn sync_list_roster<R: Runtime>(
             &b2b.signed_roster_envelope,
         )
         .ok_or(SyncDeviceError::BadRequest)?;
-        let owner_public =
-            if authority == crate::plugins::vault_unlock::state::VaultAuthority::Owner {
-                state
-                    .inner()
-                    .clone_person_identity()
-                    .await
-                    .ok_or(SyncDeviceError::NotOwner)?
-                    .public_half()
-            } else {
-                // A member holds the owner's public half only as the pinned
-                // out-of-band code recorded at invite accept.
-                let code = super::state::read_sync_state(&io, &root)
-                    .await
-                    .map_err(|_| SyncDeviceError::Transport)?
-                    .owner_identity_code
-                    .ok_or(SyncDeviceError::BadRequest)?;
-                super::invite::decode_person_identity_code(&code)
-                    .map_err(|_| SyncDeviceError::BadRequest)?
-                    .public
-            };
-        let roster = protocol::person_invite::verify_group_roster(
+        let is_owner = authority == crate::plugins::vault_unlock::state::VaultAuthority::Owner;
+        // One state read serves both the pinned owner code and the pinned owner-DEVICE
+        // attestation, which arrive together at accept.
+        let sync_state = super::state::read_sync_state(&io, &root)
+            .await
+            .map_err(|_| SyncDeviceError::Transport)?;
+        let owner_public = if is_owner {
+            state
+                .inner()
+                .clone_person_identity()
+                .await
+                .ok_or(SyncDeviceError::NotOwner)?
+                .public_half()
+        } else {
+            // A member holds the owner's public half only as the pinned out-of-band
+            // code recorded at invite accept.
+            let code = sync_state
+                .owner_identity_code
+                .ok_or(SyncDeviceError::BadRequest)?;
+            super::invite::decode_person_identity_code(&code)
+                .map_err(|_| SyncDeviceError::BadRequest)?
+                .public
+        };
+        let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+            &group_key,
+            b2b.base.account_number_hash,
+            b2b.group_key_epoch,
+        );
+        let own_device = is_owner
+            .then(|| super::device_identity::load().ok().flatten())
+            .flatten()
+            .map(|key| key.public_half());
+        let owner_devices = super::roster_trust::device_halves_for_owner(
+            &io,
+            &root,
+            Some(&bindings_key.borrow()),
+            own_device.as_ref(),
+            sync_state.owner_device.as_ref(),
             &owner_public,
+        )
+        .await;
+        let roster = protocol::person_invite::verify_group_roster(
+            super::roster_trust::trust(&owner_public, &owner_devices),
             &envelope,
             &b2b.base.account_number_hash,
         )

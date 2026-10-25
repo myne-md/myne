@@ -218,6 +218,11 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/aad-construction/v0.2/cases.json"),
         ),
         (
+            "group-roster",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/group-roster/v0.2/cases.json"),
+        ),
+        (
             "awareness-frame",
             "v0.2",
             include_str!("../../myne-test-vectors/vectors/awareness-frame/v0.2/cases.json"),
@@ -4659,6 +4664,181 @@ fn member_names_vectors() {
 /// 3. that merge has a refusal, so the `merge` kind carries two mutually exclusive
 ///    outcomes and its sub-schema needs a nested `oneOf` no sibling family has;
 /// 4. exactly one GROUP role is pinned, not two.
+///
+/// The `group-roster` category (`decisions/protocol/0731` stage 2 + `0733`;
+/// `protocol.md` §9.3.3). Three case kinds and one invariant behind all of them: the
+/// roster's canonical payload is the SAME in both signature classes, so a port that
+/// reproduces the v1 message must reproduce the v2 one by changing the prefix alone.
+///
+/// What is pinned, in three parts. First `signed_bytes`, the exact message each class
+/// signs: the class prefix is inside the signed bytes, which is what stops a person
+/// signature satisfying a device verifier. Second `verify`, four verdicts over whole
+/// frames so a port exercises its own decoder: v1 with the person key, v2 with the
+/// vouched device, v2 with no attestation (refused), and v2 with a DIFFERENT device
+/// (refused). A roster carries no key of its own, so a device is trusted only because
+/// something else vouched for it. Third `package_payload`, the canonical package payload
+/// that carries the attestation and the same payload from a build with no device key,
+/// where the field is ABSENT rather than null; that absence is what makes the field
+/// additive instead of a format break.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn group_roster_vectors() {
+    use protocol::person_invite::{
+        decode_signed_group_frame_public, verify_group_roster, RosterTrust, GROUP_ROSTER_PREFIX,
+        GROUP_ROSTER_PREFIX_V2,
+    };
+
+    let Some(raw) = cases_json_v0_2("group-roster") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw).expect("group-roster cases.json");
+    let cases = doc["cases"].as_array().expect("cases array");
+    let mut kinds = std::collections::BTreeSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .unwrap_or_else(|| panic!("vector_id"));
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] case_kind"));
+        kinds.insert(kind.to_string());
+        match kind {
+            "signed_bytes" => {
+                let payload = hex_decode(case["input_payload_hex"].as_str().unwrap_or_default());
+                let class = case["input_class"].as_str().unwrap_or_default();
+                let prefix = match class {
+                    "v1" => GROUP_ROSTER_PREFIX,
+                    "v2" => GROUP_ROSTER_PREFIX_V2,
+                    other => panic!("[{id}] unknown input_class {other:?}"),
+                };
+                let mut expected = Vec::new();
+                expected.extend_from_slice(prefix);
+                expected.extend_from_slice(&payload);
+                assert_eq!(
+                    hex_decode(
+                        case["expected_signed_bytes_hex"]
+                            .as_str()
+                            .unwrap_or_default()
+                    ),
+                    expected,
+                    "[{id}] the signed message is prefix || payload"
+                );
+                // The payload must parse as a roster in BOTH classes, which is the
+                // invariance the category exists to pin.
+                assert!(
+                    protocol::person_invite::parse_group_roster(&payload).is_some(),
+                    "[{id}] the payload is a canonical roster"
+                );
+            }
+            "verify" => {
+                let frame = hex_decode(case["input_frame_hex"].as_str().unwrap_or_default());
+                let account = hex_decode_array(
+                    case["input_account_number_hash_hex"]
+                        .as_str()
+                        .unwrap_or_default(),
+                );
+                let expected = case["expected_verified"].as_bool().unwrap_or(false);
+                let person = person_public_for_case(&doc, case, id);
+                let device = match (
+                    case["input_device_ed_pk_hex"].as_str(),
+                    case["input_device_mldsa_vk_hex"].as_str(),
+                ) {
+                    (Some(ed), Some(vk)) => Some(
+                        protocol::device_key::DevicePublicHalf::from_parts_hex(ed, vk)
+                            .unwrap_or_else(|e| panic!("[{id}] device halves: {e}")),
+                    ),
+                    _ => None,
+                };
+                // The person half is always supplied, because a reader always has the
+                // pinned one; which KEY actually verifies is decided by the class inside
+                // the frame, and whether that key is trusted is decided by this list.
+                let devices: Vec<protocol::device_key::DevicePublicHalf> =
+                    device.into_iter().collect();
+                let trust = RosterTrust {
+                    owner_person: &person,
+                    owner_devices: &devices,
+                };
+                let (payload, signature) = decode_signed_group_frame_public(&frame)
+                    .unwrap_or_else(|| panic!("[{id}] frame"));
+                let envelope = protocol::person_invite::SignedGroupRoster { payload, signature };
+                let got = verify_group_roster(trust, &envelope, &account).is_ok();
+                assert_eq!(got, expected, "[{id}] verification verdict");
+            }
+            "package_payload" => {
+                let payload = hex_decode(case["input_payload_hex"].as_str().unwrap_or_default());
+                // Canonical means the CODEC's own re-serialization reproduces the bytes,
+                // which is the struct's declaration order. A `serde_json::Value`
+                // round-trip would compare against alphabetical key order instead and
+                // fail a correct payload (`preserve_order` is deliberately off in this
+                // workspace), so the typed decode is the only honest comparator here.
+                let parsed: protocol::person_invite::GroupPackagePayload =
+                    serde_json::from_slice(&payload)
+                        .unwrap_or_else(|e| panic!("[{id}] package payload is JSON: {e}"));
+                assert_eq!(
+                    serde_json::to_vec(&parsed).expect("re-serialize"),
+                    payload,
+                    "[{id}] the payload is canonical JSON"
+                );
+                let parsed = serde_json::to_value(&parsed).expect("to value");
+                if let Some(field) = case["expects_no_field"].as_str() {
+                    assert!(
+                        parsed.get(field).is_none(),
+                        "[{id}] {field} must be ABSENT, not null: an absent attestation is                          omitted so the bytes match the previous release"
+                    );
+                }
+                if case["expected_person_fingerprint_hex"].as_str().is_some() {
+                    assert!(
+                        parsed["account_number_hash_hex"].is_string(),
+                        "[{id}] a package payload carries its vault"
+                    );
+                }
+                if let Some(device_id) = case["expected_device_id_hex"].as_str() {
+                    assert_eq!(
+                        parsed["owner_device"]["device_id_hex"].as_str(),
+                        Some(device_id),
+                        "[{id}] the attestation names its device"
+                    );
+                }
+                if let Some(ed) = case["expected_device_ed_pk_hex"].as_str() {
+                    assert_eq!(
+                        parsed["owner_device"]["entry"]["device_ed_pk"].as_str(),
+                        Some(ed),
+                        "[{id}] the attested row carries the device halves"
+                    );
+                }
+            }
+            other => panic!("[{id}] unknown case_kind {other:?}"),
+        }
+    }
+
+    assert_eq!(
+        kinds.len(),
+        3,
+        "the category carries all three case kinds; a missing one is a lost half"
+    );
+}
+
+/// The owner's person half a `verify` case is checked against. The frame does not carry
+/// it (a roster is verified against a PINNED key, which is the whole trust model), so the
+/// case names it by the payload's `owner_fingerprint_hex` and the runner needs the real
+/// half: it is pinned in the category's fixture under `informational_owner_*` keys.
+fn person_public_for_case(
+    doc: &serde_json::Value,
+    _case: &serde_json::Value,
+    id: &str,
+) -> protocol::person_key::PersonPublicHalf {
+    let owner = doc
+        .get("informational_owner")
+        .unwrap_or_else(|| panic!("[{id}] the category pins the owner's public halves"));
+    protocol::person_key::PersonPublicHalf::from_parts_hex(
+        owner["kem_ek_hex"].as_str().unwrap_or_default(),
+        owner["ed_pk_hex"].as_str().unwrap_or_default(),
+        owner["mldsa_vk_hex"].as_str().unwrap_or_default(),
+    )
+    .unwrap_or_else(|e| panic!("[{id}] owner halves: {e}"))
+}
+
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn device_binding_vectors() {
