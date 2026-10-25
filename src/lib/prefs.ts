@@ -77,7 +77,7 @@ export function normalizeStartupOpen(value: string | null): StartupOpen {
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
  *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
  *  `ViewType` (serde lowercase). */
-export type ViewType = "table" | "cards" | "list";
+export type ViewType = "table" | "cards" | "list" | "board";
 
 /** Sort direction. Mirrors Rust `SortDirection` (serde lowercase). */
 export type SortDirection = "asc" | "desc";

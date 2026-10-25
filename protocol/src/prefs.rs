@@ -1341,7 +1341,7 @@ pub struct PrefsView {
     /// `saved_views` entries this build CANNOT represent, carried verbatim from
     /// the bytes it read so a whole-blob re-write re-emits them instead of
     /// deleting a newer client's views (§9.5.2 / §9.5.5). A newer client's
-    /// `view_type` (`"board"`, …) is the motivating case: without this carrier
+    /// `view_type` (`"timeline"`, …) is the motivating case: without this carrier
     /// the array decode fails, §9.5.5 falls the WHOLE blob back to defaults, and
     /// this client's next write pushes that loss to every device — the theme,
     /// keymap and favorites gone because of one view it could not render.
@@ -13845,17 +13845,17 @@ mod tests {
     }
 
     /// A canonical prefs plaintext carrying one view this build represents and
-    /// one it does not (`view_type: "board"`), plus a field beside them so the
+    /// one it does not (`view_type: "timeline"`), plus a field beside them so the
     /// "did the whole blob fall back?" question is observable.
     fn prefs_plaintext_with_an_unsupported_view() -> &'static [u8] {
-        br#"{"label":"Work","saved_views":[{"filters":{"kind":"all"},"id":"a","name":"Cards","view_type":"cards"},{"filters":{"kind":"all"},"id":"b","name":"Board","view_type":"board"}],"screen_capture_protection":true}"#
+        br#"{"label":"Work","saved_views":[{"filters":{"kind":"all"},"id":"a","name":"Cards","view_type":"cards"},{"filters":{"kind":"all"},"id":"b","name":"Timeline","view_type":"timeline"}],"screen_capture_protection":true}"#
     }
 
     #[test]
     fn unsupported_view_type_no_longer_collapses_the_blob_to_defaults() {
         // §9.5.5: an entry this build cannot REPRESENT is carried verbatim
         // rather than failing the whole prefs plaintext. Before this, one
-        // `view_type: "board"` reset every preference in the blob (the label
+        // `view_type: "timeline"` reset every preference in the blob (the label
         // included), and because a prefs write is a whole-blob rewrite, this
         // client would then push those defaults to every device.
         let input = prefs_plaintext_with_an_unsupported_view();

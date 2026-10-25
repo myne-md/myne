@@ -2,16 +2,19 @@
 // renderer (Saved Views #5). It maps `def.view_type` to a concrete renderer:
 //
 //   "cards" → <CardsView/>   (MYND-275)
+//   "board" → <BoardView/>   (myne-md/myne#922)
 //   "table" → <TableView/>   (MYND-277)
 //   "list"  → <ListView/>    (MYND-278)
 //
-// One dispatch site; all three view types render. Every renderer consumes the
+// One dispatch site; all four view types render. Every renderer consumes the
 // same query-engine `ViewResult` + the same navigation handlers (`onOpenNote`,
-// `onCardContextMenu`); only cards uses `onSetCover` (table/list have no cover).
+// `onCardContextMenu`); the two CARD renderers (cards, board) also take
+// `onSetCover`, and table/list have no cover to take.
 
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult } from "../queryEngine";
 import { CardsView } from "./cardsView";
+import { BoardView } from "./boardView";
 import type {
   CardContextMenuHandler,
   OpenNoteHandler,
@@ -37,6 +40,16 @@ export function ViewRenderHost({
     case "cards":
       return (
         <CardsView
+          def={def}
+          result={result}
+          onOpenNote={onOpenNote}
+          onCardContextMenu={onCardContextMenu}
+          onSetCover={onSetCover}
+        />
+      );
+    case "board":
+      return (
+        <BoardView
           def={def}
           result={result}
           onOpenNote={onOpenNote}

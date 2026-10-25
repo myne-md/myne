@@ -23,7 +23,12 @@ import {
 import { useTranslation } from "react-i18next";
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult, ViewRow } from "../queryEngine";
-import { dedupeRowsByNote, displayColumns, resolveCoverAttachmentId } from "./viewLayout";
+import {
+  dedupeRowsByNote,
+  displayColumns,
+  resolveAspectRatio,
+  resolveCoverAttachmentId,
+} from "./viewLayout";
 import { VirtualList } from "../components/VirtualList";
 import {
   ViewCard,
@@ -60,9 +65,6 @@ export const DEFAULT_CARD_WIDTH = 220;
  *  `resolveCardWidth` clamps against (no drift between control and render). */
 export const MIN_CARD_WIDTH = 120;
 export const MAX_CARD_WIDTH = 600;
-/** Default cover aspect ratio (≈16:9) when the view sets no
- *  `image_aspect_ratio`. */
-const DEFAULT_ASPECT_RATIO = "1.78";
 /** Inter-card gap in px — the numeric twin of the `var(--space-3)` token the
  *  shelf grid uses. Load-bearing for the `columnsPerRow` math (a CSS var can't
  *  be read back from a 0-width jsdom container). Keep in sync with the token. */
@@ -152,17 +154,10 @@ export function resolveCardWidth(cardSize: number | undefined): number {
   return Math.min(MAX_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, cardSize));
 }
 
-/**
- * Resolve the cover aspect ratio (a CSS `aspect-ratio` string) from the view's
- * `image_aspect_ratio` — a STRING in the schema (e.g. `"1.65"`) so the `.base`
- * float never enters canonical JSON (#3, SYNC-11). Pure consumer: a finite
- * positive parse is used verbatim; anything else → {@link DEFAULT_ASPECT_RATIO}.
- */
-export function resolveAspectRatio(ratio: string | undefined): string {
-  if (ratio === undefined) return DEFAULT_ASPECT_RATIO;
-  const n = Number.parseFloat(ratio.trim());
-  return Number.isFinite(n) && n > 0 ? ratio.trim() : DEFAULT_ASPECT_RATIO;
-}
+// `resolveAspectRatio` moved to the shared `viewLayout` (the board and the
+// mobile cover renderer read the same rule). Re-exported so existing importers
+// of `./cardsView` (the view settings slider, the cards tests) stay unchanged.
+export { resolveAspectRatio };
 
 // `dedupeRowsByNote` moved to the shared `viewLayout` (the table + list
 // renderers reuse it verbatim). Re-exported so existing importers of

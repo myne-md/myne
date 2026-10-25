@@ -24,7 +24,36 @@ export const VIEW_TESTID = {
   listRow: "view.list-row",
   groupHeading: "view.group-heading",
   empty: "view.empty",
+  // The board (myne-md/myne#922). The lane ids are here rather than written
+  // inline because the board mounts from a second tree (mobile imports the
+  // shared module), and one E2E locator has to work on both.
+  board: "view.board",
+  boardLanes: "view.board-lanes",
+  boardNoGroupBy: "view.board-no-group-by",
+  lane: "view.lane",
+  laneScroll: "view.lane-scroll",
+  laneHeading: "view.lane-heading",
+  laneEmpty: "view.lane-empty",
 } as const;
+
+/** Default cover aspect ratio (≈16:9) when a view sets no
+ *  `image_aspect_ratio`. */
+export const DEFAULT_COVER_ASPECT_RATIO = "1.78";
+
+/**
+ * Resolve the cover aspect ratio (a CSS `aspect-ratio` string) from a view's
+ * `image_aspect_ratio` — a STRING in the schema (e.g. `"1.65"`) so the `.base`
+ * float never enters canonical JSON. Pure consumer: a finite positive parse is
+ * used verbatim; anything else falls back to the default.
+ *
+ * Shared by the cards gallery and the board (myne-md/myne#922), and reached by
+ * mobile through the same module: one cover rule, not one per renderer.
+ */
+export function resolveAspectRatio(ratio: string | undefined): string {
+  if (ratio === undefined) return DEFAULT_COVER_ASPECT_RATIO;
+  const n = Number.parseFloat(ratio.trim());
+  return Number.isFinite(n) && n > 0 ? ratio.trim() : DEFAULT_COVER_ASPECT_RATIO;
+}
 
 /**
  * Within-group dedupe by note id (query-engine fan-out constraint, lifted from

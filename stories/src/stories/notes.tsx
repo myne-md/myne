@@ -30,6 +30,7 @@ import { FilterBuilder } from "@app/notes/components/FilterBuilder";
 import { TaskListPanel } from "@app/notes/components/TaskListPanel";
 import { ViewSettings } from "@app/notes/components/ViewSettings";
 import { ViewsSection } from "@app/notes/components/ViewsSection";
+import { BoardView } from "@app/notes/views/boardView";
 import { DEFAULT_TASK_VIEW } from "@app/notes/taskView";
 import type { SavedView } from "@app/lib/prefs";
 import { PanelEmptyState } from "@app/notes/components/PanelEmptyState";
@@ -901,6 +902,71 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         />
       </Frame>
     ),
+  },
+  {
+    id: "notes/boardview/empty-lane",
+    group: "components",
+    surface: "BoardView",
+    state: "empty-lane",
+    description:
+      "The board a saved view renders: lanes left to right in the order the view declares, each one its own vertical scroller, and Done empty on purpose. An empty lane is the drop target for work that has not started, so it stays on screen; the card is the same component the cards gallery mounts, which is why a board card's cover, context menu and testids are the gallery's.",
+    tags: ["notes", "views", "board", "lanes", "layout"],
+    render: () => {
+      const view: SavedView = {
+        id: "v-board",
+        name: "Release board",
+        view_type: "board",
+        filters: { kind: "all" },
+        group_by: "status",
+        lanes: ["Backlog", "Doing", "Done"],
+        columns: ["owner", "due"],
+      };
+      const str = (key: string, value: string) => ({ key, type: "string" as const, value });
+      return (
+        <Frame>
+          <div style={{ width: "900px", height: "440px", display: "flex" }}>
+            <BoardView
+              def={view}
+              result={{
+                groups: [
+                  {
+                    key: "Backlog",
+                    type: "string",
+                    rows: [
+                      {
+                        noteId: "n1",
+                        title: "Pick a release name",
+                        folder: null,
+                        values: { owner: str("owner", "Ada"), due: str("due", "2026-11-02") },
+                      },
+                      {
+                        noteId: "n2",
+                        title: "Pin the changelog format",
+                        folder: null,
+                        values: { owner: str("owner", "Mei") },
+                      },
+                    ],
+                  },
+                  {
+                    key: "Doing",
+                    type: "string",
+                    rows: [
+                      {
+                        noteId: "n3",
+                        title: "Draft the upgrade guide",
+                        folder: null,
+                        values: { owner: str("owner", "Sam") },
+                      },
+                    ],
+                  },
+                ],
+              }}
+              onOpenNote={action("onOpenNote")}
+            />
+          </div>
+        </Frame>
+      );
+    },
   },
   {
     id: "notes/viewsettings/default",
